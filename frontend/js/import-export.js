@@ -528,6 +528,281 @@ var ImportExport = (function() {
       } catch(e) { errors.push(p.code + ': ' + e.message); }
     }
 
+        // 建立 BOM 关系（先清后建，避免重复）
+    var allParts = Store.getAll('parts');
+    var allComps = Store.getAll('components');
+    for (var j = 0; j < preview.length; j++) {
+      var comp = preview[j];
+      var compId = comp._newId || comp.matchId;
+      if (!compId || !comp.bomRows || comp.bomRows.length === 0) continue;
+
+      // 先清除该部件的旧 BOM 子项
+      try {
+        var existingItems = await API._fetch('GET', '/assemblies/' + compId + '/parts');
+        for (var ei = 0; ei < existingItems.length; ei++) {
+          try { await API._fetch('DELETE', '/assemblies/' + compId + '/parts/' + existingItems[ei].id); } catch(e) { /* skip */ }
+        }
+      } catch(e) { /* no existing items */ }
+
+      // 只处理层级 > 0 的子项
+      var childItems = comp.bomRows.filter(function(r) { return (r['层级'] || 0) > 0; });
+      for (var k = 0; k < childItems.length; k++) {
+        var item = childItems[k];
+        var childCode = String(item['件号'] || '').trim();
+        var childTypeStr = String(item['类型'] || '');
+        var isPart = childTypeStr === '零件';
+        var child = null;
+        // 先在 preview 中查找（本轮新建的部件）
+        for (var m = 0; m < preview.length; m++) {
+          if (preview[m].code === childCode) {
+            child = { id: preview[m]._newId || preview[m].matchId };
+            isPart = false;
+            break;
+          }
+        }
+        if (!child) {
+          child = isPart
+            ? allParts.find(function(p) { return p.code === childCode; })
+            : allComps.find(function(cc) { return cc.code === childCode; });
+        }
+        if (!child) continue;
+
+        var body = {
+          child_id: child.id,
+          child_type: isPart ? 'part' : 'component',
+          quantity: Number(item['用量']) || 1
+        };
+        try { await API._fetch('POST', '/assemblies/' + compId + '/parts', body); } catch(e) { errors.push(childCode + ': BOM添加失败 - ' + e.message); }
+      }
+    }
+
+    // 建立关联图文档
+    for (var j = 0; j < relPreview.length; j++) {
+      var rel = relPreview[j];
+      if (!rel.docId) continue;
+      // 找到零件ID
+      var partItem = preview.find(function(p) { return p.code === rel.partCode && p.version === rel.partVersion; });
+      var partId = partItem ? (partItem._newId || partItem.matchId) : null;
+      if (!partId) continue;
+      try {
+        await API._fetch('POST', '/parts/' + partId + '/documents', {
+          document_id: rel.docId, sort_order: 0
+        });
+      } catch(e) { /* skip */ }
+    }
+
+    return { created: created, updated: updated, errors: errors };
+  }
+
+  // ==================== 部件导出 ====================
+
+  async function exportAllAssemblies() {
+    if (!_checkFSAccess()) {
+      UI.alert('您的浏览器不支持文件夹操作，请使用 Chrome 或 Edge 浏览器');
+      return;
+    }
+
+    try {
+      UI.toast('正在导出...', 'info');
+      var dirHandle = await _pickDirectory('readwrite');
+      var folderName = '部件数据_' + _today();
+      var subDir = await dirHandle.getDirectoryHandle(folderName, { create: true });
+
+      var components = Store.getAll('components');
+      var cfDefs = _getCfDefs('component');
+
+      // 写入部件清单
+      var listData = components.map(function(c) {
+        var row = {
+          '部件件号': c.code, '中文名称': c.name, '规格型号': c.spec || '',
+          '版本': c.version, '状态': _statusLabel(c.status),
+        };
+        cfDefs.forEach(function(d) { row[d.name] = _getCfValue(c, d.field_key); });
+        return row;
+      });
+
+
+      // 获取关联图文档
+      var relData = [];
+      var relPromises = components.map(function(comp) {
+        return API._fetch('GET', '/assemblies/' + comp.id + '/documents').then(function(list) {
+          list.forEach(function(ed) {
+            var doc = ed.document || {};
+            relData.push({
+              '部件件号': comp.code, '部件版本': comp.version,
+              '图文档编号': doc.code || '', '图文档名称': doc.name || '', '图文档版本': doc.version || ''
+            });
+          });
+        }).catch(function() {});
+      });
+      await Promise.all(relPromises);
+
+      // 写入关联图文档Sheet到部件清单
+      // 需要重新构建workbook包含两个sheet
+      var listSheets = [{ name: '部件清单', data: listData }];
+      if (relData.length > 0) listSheets.push({ name: '关联图文档', data: relData });
+      var listWb2 = _buildWorkbook(listSheets);
+      await _writeToDir(subDir, '部件清单.xlsx', _wbToBlob(listWb2));
+
+      // 写入每个部件的BOM
+      var allParts = Store.getAll('parts');
+      var allComps = Store.getAll('components');
+      for (var i = 0; i < components.length; i++) {
+        var comp = components[i];
+        if (!comp.parts || comp.parts.length === 0) continue;
+        var bomRows = _buildBomRows(comp, allParts, allComps);
+        var fileName = 'BOM_' + comp.code + '_' + comp.version + '.xlsx';
+        fileName = fileName.replace(/[\\/:*?"<>|]/g, '_');
+        var bomWb = _buildWorkbook([{ name: 'BOM', data: bomRows }]);
+        await _writeToDir(subDir, fileName, _wbToBlob(bomWb));
+      }
+
+      Store.addLog('数据导出', '导出部件数据（' + components.length + '个部件）');
+      UI.toast('导出完成，共 ' + components.length + ' 个部件，保存至 ' + folderName, 'success');
+    } catch(e) {
+      if (e.message.indexOf('浏览器不支持') === -1) {
+        UI.toast('导出失败: ' + e.message, 'error');
+      }
+    }
+  }
+
+  function _buildBomRows(comp, allParts, allComps) {
+    var rows = [];
+    // 顶层部件
+    rows.push({ '层级': 0, '类型': '部件', '件号': comp.code, '中文名称': comp.name, '规格型号': comp.spec || '', '版本': comp.version, '状态': _statusLabel(comp.status), '用量': 1 });
+    // 递归收集子项
+    _collectBom(comp.parts || [], allParts, allComps, rows, 1);
+    return rows;
+  }
+
+  function _collectBom(items, allParts, allComps, rows, depth) {
+    if (!items) return;
+    items.forEach(function(item) {
+      var childType = item.childType || 'part';
+      var refId = childType === 'component' ? (item.componentId || '') : (item.partId || '');
+      var info = childType === 'part'
+        ? allParts.find(function(p) { return p.id === refId; })
+        : allComps.find(function(c) { return c.id === refId; });
+      if (!info) return;
+      rows.push({
+        '层级': depth, '类型': childType === 'part' ? '零件' : '部件',
+        '件号': info.code, '中文名称': info.name, '规格型号': info.spec || '',
+        '版本': info.version || '', '状态': _statusLabel(info.status),
+        '用量': item.quantity || 1
+      });
+      if (childType === 'component' && info.parts && info.parts.length > 0) {
+        _collectBom(info.parts, allParts, allComps, rows, depth + 1);
+      }
+    });
+  }
+
+  // ==================== 部件导入 ====================
+
+  async function importAssemblies(onPreview, onConfirm) {
+    if (!_checkFSAccess()) {
+      UI.alert('您的浏览器不支持文件夹操作，请使用 Chrome 或 Edge 浏览器');
+      return;
+    }
+
+    try {
+      var dirHandle = await _pickDirectory('read');
+      var entries = await _readDirFiles(dirHandle);
+
+      // 找部件清单
+      var listEntry = entries.find(function(e) { return e.name === '部件清单.xlsx'; });
+      if (!listEntry) { UI.toast('未找到"部件清单.xlsx"', 'error'); return; }
+
+      var listFile = await _readDirEntryAsFile(listEntry);
+      var wb = await _parseExcelFile(listFile);
+      var rows = _sheetToJson(wb, '部件清单');
+
+      if (rows.length === 0) { UI.toast('部件清单为空', 'error'); return; }
+      if (rows.length > MAX_IMPORT_ROWS) { UI.toast('超出导入上限 ' + MAX_IMPORT_ROWS + ' 条', 'error'); return; }
+
+      var allComps = Store.getAll('components');
+      var preview = rows.map(function(r) {
+        var code = String(r['部件件号'] || '').trim();
+        var name = String(r['中文名称'] || '').trim();
+        var version = String(r['版本'] || 'V1.0').trim();
+        var errors = [];
+        if (!code) errors.push('件号为空');
+        if (!name) errors.push('名称为空');
+
+        var match = allComps.find(function(c) { return c.code === code && c.version === version; });
+        var action = match ? 'update' : 'create';
+        var statusMap = {'草稿':'draft','冻结':'frozen','发布':'released','作废':'obsolete'};
+        var statusVal = statusMap[String(r['状态'] || '')] || String(r['状态'] || '') || 'draft';
+
+        return {
+          code: code, name: name, spec: String(r['规格型号'] || '').trim(),
+          version: version, status: statusVal, action: action, errors: errors,
+          matchId: match ? match.id : null, bomRows: []
+        };
+      });
+
+      // 找所有 BOM 文件
+      var bomEntries = entries.filter(function(e) { return e.name.startsWith('BOM_') && e.name.endsWith('.xlsx'); });
+      for (var i = 0; i < bomEntries.length; i++) {
+        var bomFile = await _readDirEntryAsFile(bomEntries[i]);
+        var bomWb = await _parseExcelFile(bomFile);
+        var bomData = _sheetToJson(bomWb, 'BOM');
+        // 从文件名提取件号和版本：BOM_ASM-001_V2.0.xlsx
+        var bomName = bomEntries[i].name.replace('.xlsx', '');
+        var bomCode = '', bomVersion = '';
+        // 文件名：BOM_ASM-001_V1.0.xlsx → 件号=ASM-001, 版本=V1.0
+        var parts = bomName.substring(4).split('_');
+        if (parts.length >= 2) {
+          bomVersion = parts.pop();
+          bomCode = parts.join('_');
+        } else { bomCode = bomName.substring(4); }
+
+        var target = preview.find(function(p) { return p.code === bomCode; });
+        if (target) target.bomRows = bomData;
+      }
+
+      // 读取关联图文档Sheet
+      var relData = [];
+      var relSheetName = wb.SheetNames ? wb.SheetNames.find(function(n) { return n.indexOf('关联图文档') >= 0; }) : null;
+      if (relSheetName) relData = _sheetToJson(wb, relSheetName);
+
+      var stats = {
+        total: preview.length,
+        create: preview.filter(function(p) { return p.action === 'create'; }).length,
+        update: preview.filter(function(p) { return p.action === 'update'; }).length,
+        bomFiles: bomEntries.length
+      };
+
+      if (onPreview) onPreview(preview, stats, relData);
+      if (onConfirm) onConfirm(preview, stats, relData);
+    } catch(e) {
+      if (e.message.indexOf('浏览器不支持') === -1) {
+        UI.toast('导入失败: ' + e.message, 'error');
+      }
+    }
+  }
+
+  async function _executeImportAssemblies(preview, relData) {
+    var created = 0, updated = 0, errors = [];
+
+    for (var i = 0; i < preview.length; i++) {
+      var p = preview[i];
+      if (p.errors.length > 0) continue;
+      try {
+        if (p.action === 'update') {
+          await API._fetch('PUT', '/assemblies/' + p.matchId, {
+            code: p.code, name: p.name, spec: p.spec, version: p.version, status: p.status, customFields: p.customFields
+          });
+          updated++;
+        } else {
+          var result = await API._fetch('POST', '/assemblies/', {
+            code: p.code, name: p.name, spec: p.spec, version: p.version, status: p.status, customFields: p.customFields
+          });
+          p._newId = result.id;
+          created++;
+        }
+      } catch(e) { errors.push(p.code + ': ' + e.message); }
+    }
+
     // 建立 BOM 关系
     var allParts = Store.getAll('parts');
     var allComps = Store.getAll('components');
@@ -559,8 +834,8 @@ var ImportExport = (function() {
         if (!child) continue;
 
         var body = {};
-        if (isPart) { body.partId = child.id; body.childType = 'part'; }
-        else { body.componentId = child.id; body.childType = 'component'; }
+        if (isPart) { body.child_id = child.id; body.child_type = 'part'; }
+        else { body.child_id = child.id; body.child_type = 'component'; }
         body.quantity = Number(item['用量']) || 1;
 
         try { await API._fetch('POST', '/assemblies/' + compId + '/parts', body); } catch(e) { /* skip */ }
