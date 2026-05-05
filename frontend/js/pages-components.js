@@ -160,9 +160,11 @@ var Components = {
 
   /* ===== 部件导入（文件夹） ===== */
   _importAll: function() {
-    ImportExport.importAssemblies(function(preview, stats) {
+    ImportExport.importAssemblies(function(preview, stats, relData) {
       var html = '<div style="max-height:400px;overflow-y:auto">';
-      html += '<p style="margin:8px 0">共 <b>' + stats.total + '</b> 条（新增 ' + stats.create + ' / 更新 ' + stats.update + '），<b>' + stats.bomFiles + '</b> 个BOM文件</p>';
+      var matchedBoms = preview.filter(function(p){ return p.bomRows.length > 0; }).length;
+      var relCount = relData ? relData.length : 0;
+      html += '<p style="margin:8px 0">共 <b>' + stats.total + '</b> 条（新增 ' + stats.create + ' / 更新 ' + stats.update + '），BOM文件 ' + stats.bomFiles + ' 个（匹配 ' + matchedBoms + ' 个），关联图文档 ' + relCount + ' 条</p>';
       html += '<table class="board-table"><thead><tr><th>状态</th><th>件号</th><th>名称</th><th>版本</th><th>备注</th></tr></thead><tbody>';
       preview.forEach(function(p) {
         var icon = p.action === 'create' ? '🆕' : '✏️';

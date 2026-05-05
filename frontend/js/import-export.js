@@ -473,11 +473,14 @@ var ImportExport = (function() {
         // 从文件名提取件号和版本：BOM_ASM-001_V2.0.xlsx
         var bomName = bomEntries[i].name.replace('.xlsx', '');
         var bomCode = '', bomVersion = '';
-        var m = bomName.match(/^BOM_(.+)_([A-Za-z0-9.]+)$/);
-        if (m) { bomCode = m[1]; bomVersion = m[2]; }
-        else { bomCode = bomName.replace('BOM_', ''); }
+        // 文件名：BOM_ASM-001_V1.0.xlsx → 件号=ASM-001, 版本=V1.0
+        var parts = bomName.substring(4).split('_');
+        if (parts.length >= 2) {
+          bomVersion = parts.pop();
+          bomCode = parts.join('_');
+        } else { bomCode = bomName.substring(4); }
 
-        var target = preview.find(function(p) { return p.code === bomCode && (!bomVersion || p.version === bomVersion); });
+        var target = preview.find(function(p) { return p.code === bomCode; });
         if (target) target.bomRows = bomData;
       }
 
