@@ -189,7 +189,19 @@ var Components = {
     ImportExport.executeImportAssemblies(window._importAssembliesPreview, window._importAssembliesRel).then(function(result) {
       Store.addLog('数据导入', '导入部件：新增 ' + result.created + '，更新 ' + result.updated);
       UI.toast('导入完成：新增 ' + result.created + '，更新 ' + result.updated + (result.errors.length ? '，失败 ' + result.errors.length : ''), 'success');
-      Store.onLogin().then(function() { Components.render(document.getElementById('content')); });
+      Store.onLogin().then(function() {
+        // 额外刷新每个部件的BOM子项数据
+        var comps = Store.getAll('components');
+        var proms = comps.map(function(comp) {
+          return API.getAssemblyParts(comp.id).then(function(parts) {
+            comp.parts = parts;
+          }).catch(function() {});
+        });
+        Promise.all(proms).then(function() {
+          Store.saveAll('components', comps);
+          Components.render(document.getElementById('content'));
+        });
+      });
     });
   },
 
