@@ -377,7 +377,7 @@ var ImportExport = (function() {
         var comp = components[i];
         if (!comp.parts || comp.parts.length === 0) continue;
         var bomRows = _buildBomRows(comp, allParts, allComps);
-        var fileName = 'BOM_' + comp.code + '_V' + comp.version + '.xlsx';
+        var fileName = 'BOM_' + comp.code + '_' + comp.version + '.xlsx';
         fileName = fileName.replace(/[\\/:*?"<>|]/g, '_');
         var bomWb = _buildWorkbook([{ name: 'BOM', data: bomRows }]);
         await _writeToDir(subDir, fileName, _wbToBlob(bomWb));
@@ -475,7 +475,7 @@ var ImportExport = (function() {
         // 从文件名提取件号和版本：BOM_ASM-001_V2.0.xlsx
         var bomName = bomEntries[i].name.replace('.xlsx', '');
         var bomCode = '', bomVersion = '';
-        var m = bomName.match(/^BOM_(.+)_V(.+)$/);
+        var m = bomName.match(/^BOM_(.+)_([A-Za-z0-9.]+)$/);
         if (m) { bomCode = m[1]; bomVersion = m[2]; }
         else { bomCode = bomName.replace('BOM_', ''); }
 
