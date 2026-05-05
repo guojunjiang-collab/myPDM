@@ -157,7 +157,6 @@ var ImportExport = (function() {
       { key: 'spec', label: '规格型号' },
       { key: 'version', label: '版本' },
       { key: 'status', label: '状态', render: function(r) { return _statusLabel(r.status); } },
-      { key: 'createdAt', label: '创建时间' },
       { key: 'updatedAt', label: '更新时间' }
     ];
     cfDefs.forEach(function(d) {
