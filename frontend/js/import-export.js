@@ -528,53 +528,87 @@ var ImportExport = (function() {
       } catch(e) { errors.push(p.code + ': ' + e.message); }
     }
 
-        // 建立 BOM 关系（先清后建，避免重复）
+    // 建立 BOM 关系（按层级逐级导入，先浅后深）
+    // 1. 收集所有 BOM 子项，按层级分组
+    // 2. 逐层处理：先导入层级1，再层级2...
+    // 3. 已存在的子项跳过，缺少的零件自动创建
     var allParts = Store.getAll('parts');
     var allComps = Store.getAll('components');
+    var bomErrors = [];
+
     for (var j = 0; j < preview.length; j++) {
       var comp = preview[j];
       var compId = comp._newId || comp.matchId;
       if (!compId || !comp.bomRows || comp.bomRows.length === 0) continue;
 
-      // 先清除该部件的旧 BOM 子项
-      try {
-        var existingItems = await API._fetch('GET', '/assemblies/' + compId + '/parts');
-        for (var ei = 0; ei < existingItems.length; ei++) {
-          try { await API._fetch('DELETE', '/assemblies/' + compId + '/parts/' + existingItems[ei].id); } catch(e) { /* skip */ }
-        }
-      } catch(e) { /* no existing items */ }
+      // 获取该部件已有的 BOM 子项
+      var existingItems = [];
+      try { existingItems = await API._fetch('GET', '/assemblies/' + compId + '/parts'); } catch(e) {}
 
-      // 只处理层级 > 0 的子项
+      // 收集所有子项并按层级排序
       var childItems = comp.bomRows.filter(function(r) { return (r['层级'] || 0) > 0; });
+      childItems.sort(function(a, b) { return (a['层级'] || 1) - (b['层级'] || 1); });
+
       for (var k = 0; k < childItems.length; k++) {
         var item = childItems[k];
         var childCode = String(item['件号'] || '').trim();
         var childTypeStr = String(item['类型'] || '');
         var isPart = childTypeStr === '零件';
-        var child = null;
-        // 先在 preview 中查找（本轮新建的部件）
+        if (!childCode) continue;
+
+        // 查找子项 ID
+        var childId = null;
+        // 1) 先在 preview 中查找（本轮新建的部件）
         for (var m = 0; m < preview.length; m++) {
           if (preview[m].code === childCode) {
-            child = { id: preview[m]._newId || preview[m].matchId };
-            isPart = false;
+            childId = preview[m]._newId || preview[m].matchId;
+            isPart = false; // 在 preview 中找到的是部件
             break;
           }
         }
-        if (!child) {
-          child = isPart
-            ? allParts.find(function(p) { return p.code === childCode; })
-            : allComps.find(function(cc) { return cc.code === childCode; });
+        // 2) 在 Store 中查找
+        if (!childId) {
+          if (isPart) {
+            var found = allParts.find(function(p) { return p.code === childCode; });
+            if (found) childId = found.id;
+          } else {
+            var found2 = allComps.find(function(cc) { return cc.code === childCode; });
+            if (found2) childId = found2.id;
+          }
         }
-        if (!child) continue;
+        // 3) 零件不存在则自动创建
+        if (!childId && isPart) {
+          try {
+            var newPart = await API._fetch('POST', '/parts/', {
+              code: childCode,
+              name: String(item['中文名称'] || childCode).trim(),
+              spec: String(item['规格型号'] || '').trim(),
+              version: String(item['版本'] || 'A').trim(),
+              status: 'draft'
+            });
+            childId = newPart.id;
+            allParts.push(newPart);
+          } catch(e) { bomErrors.push(childCode + ': 零件自动创建失败'); continue; }
+        }
+        if (!childId) { bomErrors.push(childCode + ': 未找到'); continue; }
 
-        var body = {
-          child_id: child.id,
-          child_type: isPart ? 'part' : 'component',
-          quantity: Number(item['用量']) || 1
-        };
-        try { await API._fetch('POST', '/assemblies/' + compId + '/parts', body); } catch(e) { errors.push(childCode + ': BOM添加失败 - ' + e.message); }
+        // 检查是否已存在该子项关系
+        var alreadyExists = existingItems.some(function(ei) {
+          return ei.child_id === childId || (ei.child_detail && ei.child_detail.id === childId);
+        });
+        if (alreadyExists) continue; // 跳过已存在的
+
+        // 添加 BOM 子项（使用 Store 同样的 API 调用方式）
+        try {
+          await API.addAssemblyPart(compId, {
+            child_type: isPart ? 'part' : 'component',
+            child_id: childId,
+            quantity: Number(item['用量']) || 1
+          });
+        } catch(e) { bomErrors.push(childCode + ': BOM添加失败 - ' + e.message); }
       }
     }
+    errors = errors.concat(bomErrors);
 
     // 建立关联图文档
     for (var j = 0; j < relPreview.length; j++) {
