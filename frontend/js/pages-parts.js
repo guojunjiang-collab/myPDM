@@ -157,6 +157,47 @@ var Parts = {
   },
 
   // 导出零件清单
+  _importParts: function() {
+    var input = document.createElement('input');
+    input.type = 'file'; input.accept = '.xlsx,.xls';
+    input.onchange = function(e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      ImportExport.importParts(file, function(preview, relPreview, stats) {
+        var html = '<div style="max-height:400px;overflow-y:auto">';
+        html += '<p style="margin:8px 0">共 <b>' + stats.total + '</b> 条（新增 ' + stats.create + ' / 更新 ' + stats.update + '）';
+        if (stats.warnings > 0) html += '，<span style="color:#faad14">⚠️ ' + stats.warnings + ' 个关联图文档未找到</span>';
+        html += '</p>';
+        html += '<table class="board-table"><thead><tr><th>状态</th><th>件号</th><th>名称</th><th>版本</th><th>备注</th></tr></thead><tbody>';
+        preview.forEach(function(p) {
+          var icon = p.action === 'create' ? '🆕' : '✏️';
+          var note = p.errors.length > 0 ? p.errors.join(', ') : '';
+          html += '<tr><td>' + icon + (p.action === 'create' ? '新增' : '更新') + '</td><td>' + p.code + '</td><td>' + p.name + '</td><td>' + p.version + '</td><td style="color:#ff4d4f">' + note + '</td></tr>';
+        });
+        html += '</tbody></table></div>';
+        UI.modal('导入预览 - 零件', html, {
+          footer: '<button class="btn-outline" onclick="UI.closeModal()">取消</button>' +
+            '<button class="btn-primary" onclick="Parts._doImportParts()">确认导入 (' + stats.total + '条)</button>',
+          large: true
+        });
+        window._importPartsPreview = preview;
+        window._importPartsRel = relPreview;
+      });
+    };
+    input.click();
+  },
+
+  _doImportParts: function() {
+    UI.closeModal();
+    UI.toast('正在导入...', 'info');
+    ImportExport.executeImportParts(window._importPartsPreview, window._importPartsRel).then(function(result) {
+      Store.addLog('数据导入', '导入零件：新增 ' + result.created + '，更新 ' + result.updated);
+      UI.toast('导入完成：新增 ' + result.created + '，更新 ' + result.updated + (result.errors.length ? '，失败 ' + result.errors.length : ''), 'success');
+      Store.onLogin();
+      Parts.render(document.getElementById('content'));
+    });
+  },
+
   _exportParts: function() {
     var statusLabel = function(v) { return {draft:'草稿',frozen:'冻结',released:'发布',obsolete:'作废'}[v] || v; };
     var columns = [

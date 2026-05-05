@@ -1,7 +1,10 @@
 var Documents = {
+  _exportAll: function() { ImportExport.exportDocuments(); },
+  _importAll: function() { ImportExport.importDocuments(function(preview, attFiles, stats) { var html = '<div style="max-height:400px;overflow-y:auto"><p>共 <b>' + stats.total + '</b> 条（新增 ' + stats.create + ' / 更新 ' + stats.update + '），' + stats.attachments + ' 个附件</p><table class="board-table"><thead><tr><th>状态</th><th>编号</th><th>名称</th><th>版本</th></tr></thead><tbody>'; preview.forEach(function(p) { html += '<tr><td>' + (p.action === 'create' ? '🆕新增' : '✏️更新') + '</td><td>' + p.code + '</td><td>' + p.name + '</td><td>' + p.version + '</td></tr>'; }); html += '</tbody></table></div>'; UI.modal('导入预览 - 图文档', html, { footer: '<button class="btn-outline" onclick="UI.closeModal()">取消</button><button class="btn-primary" onclick="Documents._doImportAll()">确认导入</button>', large: true }); window._importDocsPreview = preview; window._importDocsAttFiles = attFiles; }); },
+  _doImportAll: function() { UI.closeModal(); UI.toast('正在导入...', 'info'); ImportExport.executeImportDocuments(window._importDocsPreview, window._importDocsAttFiles).then(function(r) { Store.addLog('数据导入', '导入图文档：新增 ' + r.created + '，更新 ' + r.updated); UI.toast('导入完成：新增 ' + r.created + '，更新 ' + r.updated, 'success'); Store.onLogin(); Documents.render(document.getElementById('content')); }); },
   render: function(c) {
     // UI: 与 Parts 页风格对齐
-    c.innerHTML = '<div class="page-header"><h2>📄 图文档管理</h2><div class="actions"><button class="btn-primary" id="btn-create-doc">+ 新建图文文档</button></div></div>' +
+    c.innerHTML = '<div class="page-header"><h2>📄 图文档管理</h2><div class="actions"><button class="btn-outline" id="btn-export-doc" style="margin-right:4px">📥 导出</button><button class="btn-outline" id="btn-import-doc" style="margin-right:4px">📤 导入</button><button class="btn-primary" id="btn-create-doc">+ 新建图文文档</button></div></div>' +
       '<div class="card"><div class="toolbar">' +
         '<div class="search-box" style="flex:1"><input type="text" id="doc-search" class="form-input" placeholder="搜索编号或名称..." style="width:100%"></div>' +
         '<select id="doc-status-filter" class="form-select" style="width:140px">' +
@@ -204,7 +207,7 @@ var Documents = {
       });
     }
 
-    document.getElementById('btn-create-doc').onclick = function() { Documents._editDoc(null); };
+    var exportBtn = document.getElementById('btn-export-doc'); if (exportBtn) exportBtn.onclick = function() { Documents._exportAll(); }; exportBtn.style.display = Auth.canDownload() ? '' : 'none'; var importBtn = document.getElementById('btn-import-doc'); if (importBtn) importBtn.onclick = function() { Documents._importAll(); }; importBtn.style.display = Auth.canEdit() ? '' : 'none'; document.getElementById('btn-create-doc').onclick = function() { Documents._editDoc(null); };
     document.getElementById('doc-search').oninput = function() { renderList(); };
     document.getElementById('doc-status-filter').onchange = function() { renderList(); };
 

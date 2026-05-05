@@ -69,7 +69,9 @@ var Components = {
       if (!container) return;
       container.innerHTML = '<table id="components-table"><thead><tr><th data-sort="code" class="th-sortable">部件件号<span class="th-sort-icon"></span></th><th data-sort="name" class="th-sortable">中文名称<span class="th-sort-icon"></span></th><th data-sort="spec" class="th-sortable">规格型号<span class="th-sort-icon"></span></th><th data-sort="version" class="th-sortable">版本<span class="th-sort-icon"></span></th><th data-sort="parts" class="th-sortable">零件数<span class="th-sort-icon"></span></th><th data-sort="status" class="th-sortable">状态<span class="th-sort-icon"></span></th><th data-sort="updatedAt" class="th-sortable">更新时间<span class="th-sort-icon"></span></th><th>操作</th></tr></thead><tbody>' +
         (data.length === 0 ? '<tr><td colspan="8" style="text-align:center;color:var(--text-light);padding:40px">暂无数据</td></tr>' :
-          data.map(function(c2) { return '<tr onclick="Components._viewComp(\'' + c2.id + '\');" style="cursor:pointer"><td>' + c2.code + '</td><td>' + c2.name + '</td><td>' + (c2.spec||'-') + '</td><td><span class="tag" style="background:#e6f7ff;color:#1890ff;font-weight:600">' + c2.version + '</span></td><td>' + (c2.parts||[]).length + ' 种</td><td>' + UI.statusTag(c2.status) + '</td><td style="font-size:12px;color:var(--text-secondary)">' + UI.formatDate(c2.updatedAt) + '</td><td>' + (canDl ? '<button class="btn-text" onclick="event.stopPropagation();Components._exportBom(\'' + c2.id + '\')">导出</button>' : '') + (canE ? '<button class="btn-text" onclick="event.stopPropagation();Components._editComp(\'' + c2.id + '\')">编辑</button><button class="btn-text danger" onclick="event.stopPropagation();Components._deleteComp(\'' + c2.id + '\')">删除</button>' : '') + '</td></tr>'; }).join('')) +
+          data.map(function(c2) { return '<tr onclick="Components._viewComp(\'' + c2.id + '\');" style="cursor:pointer"><td>' + c2.code + '</td><td>' + c2.name + '</td><td>' + (c2.spec||'-') + '</td><td><span class="tag" style="background:#e6f7ff;color:#1890ff;font-weight:600">' + c2.version + '</span></td><td>' + (c2.parts||[]).length + ' 种</td><td>' + UI.statusTag(c2.status) + '</td><td style="font-size:12px;color:var(--text-secondary)">' + UI.formatDate(c2.updatedAt) + '</td><td>' + (Auth.canDownload() ? '<button class="btn-outline" onclick="Components._exportAll()" style="margin-right:4px">📥 导出全部</button>' : '') +
+        (Auth.canEdit() ? '<button class="btn-outline" onclick="Components._importAll()" style="margin-right:4px">📤 导入</button>' : '') +
+        (canDl ? '<button class="btn-text" onclick="event.stopPropagation();Components._exportBom(\'' + c2.id + '\')">导出</button>' : '') + (canE ? '<button class="btn-text" onclick="event.stopPropagation();Components._editComp(\'' + c2.id + '\')">编辑</button><button class="btn-text danger" onclick="event.stopPropagation();Components._deleteComp(\'' + c2.id + '\')">删除</button>' : '') + '</td></tr>'; }).join('')) +
         '</tbody></table>';
 
       // 排序角标 & 点击事件
@@ -151,6 +153,42 @@ var Components = {
         renderList();
       };
     }
+  },
+
+  /* ===== 部件批量导出（文件夹） ===== */
+  _exportAll: function() { ImportExport.exportAllAssemblies(); },
+
+  /* ===== 部件导入（文件夹） ===== */
+  _importAll: function() {
+    ImportExport.importAssemblies(function(preview, stats) {
+      var html = '<div style="max-height:400px;overflow-y:auto">';
+      html += '<p style="margin:8px 0">共 <b>' + stats.total + '</b> 条（新增 ' + stats.create + ' / 更新 ' + stats.update + '），<b>' + stats.bomFiles + '</b> 个BOM文件</p>';
+      html += '<table class="board-table"><thead><tr><th>状态</th><th>件号</th><th>名称</th><th>版本</th><th>备注</th></tr></thead><tbody>';
+      preview.forEach(function(p) {
+        var icon = p.action === 'create' ? '🆕' : '✏️';
+        var bomInfo = p.bomRows.length > 0 ? p.bomRows.filter(function(r){return r['层级']>0;}).length + '个子项' : '无BOM';
+        var note = p.errors.length > 0 ? p.errors.join(', ') : bomInfo;
+        html += '<tr><td>' + icon + (p.action === 'create' ? '新增' : '更新') + '</td><td>' + p.code + '</td><td>' + p.name + '</td><td>' + p.version + '</td><td>' + note + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+      UI.modal('导入预览 - 部件', html, {
+        footer: '<button class="btn-outline" onclick="UI.closeModal()">取消</button>' +
+          '<button class="btn-primary" onclick="Components._doImportAll()">确认导入 (' + stats.total + '条)</button>',
+        large: true
+      });
+      window._importAssembliesPreview = preview;
+    });
+  },
+
+  _doImportAll: function() {
+    UI.closeModal();
+    UI.toast('正在导入...', 'info');
+    ImportExport.executeImportAssemblies(window._importAssembliesPreview).then(function(result) {
+      Store.addLog('数据导入', '导入部件：新增 ' + result.created + '，更新 ' + result.updated);
+      UI.toast('导入完成：新增 ' + result.created + '，更新 ' + result.updated + (result.errors.length ? '，失败 ' + result.errors.length : ''), 'success');
+      Store.onLogin();
+      Components.render(document.getElementById('content'));
+    });
   },
 
   /* ===== 部件BOM导出 ===== */
