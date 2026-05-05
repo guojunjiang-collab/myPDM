@@ -194,8 +194,7 @@ var Parts = {
     ImportExport.executeImportParts(window._importPartsPreview, window._importPartsRel).then(function(result) {
       Store.addLog('数据导入', '导入零件：新增 ' + result.created + '，更新 ' + result.updated);
       UI.toast('导入完成：新增 ' + result.created + '，更新 ' + result.updated + (result.errors.length ? '，失败 ' + result.errors.length : ''), 'success');
-      Store.onLogin();
-      Parts.render(document.getElementById('content'));
+      Store.onLogin().then(function() { Parts.render(document.getElementById('content')); });
     });
   },
 
