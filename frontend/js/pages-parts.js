@@ -441,7 +441,8 @@ var Parts = {
       UI.modal('零件详情',
         '<div class="form-row"><div class="form-group"><label>零件件号</label><input type="text" value="' + _esc(part.code) + '"' + ro + '></div><div class="form-group"><label>中文名称</label><input type="text" value="' + _esc(part.name) + '"' + ro + '></div></div>' +
         '<div class="form-row"><div class="form-group"><label>规格型号</label><input type="text" value="' + _esc(part.spec||'') + '"' + ro + '></div><div class="form-group"><label>版本</label><input type="text" value="' + (part.version||'A') + '"' + ro + '></div></div>' +
-        '<div class="form-row"><div class="form-group"><label>状态</label>' + UI.statusTag(part.status) + '</div></div>' +
+        '<div class="form-row"><div class="form-group"><label>状态</label>' + UI.statusTag(part.status) + '</div><div class="form-group"><label>创建时间</label><div style="padding:6px 10px;font-size:13px;color:#666">' + (part.created_at ? UI.formatDate(part.created_at) : '-') + '</div></div></div>' +
+        '<div class="form-row"><div class="form-group" style="flex:1"><label>更新时间</label><div style="padding:6px 10px;font-size:13px;color:#666">' + (part.updated_at ? UI.formatDate(part.updated_at) : '-') + '</div></div></div>' +
           '<div id="part-cf-view-area"></div>' +
         '<div id="view-part-edocs-area">' + Parts._renderAttachmentsView(part) + '</div>',
         { large: true, footer: '<button class="btn-primary" onclick="UI.closeModal()">关闭</button>',

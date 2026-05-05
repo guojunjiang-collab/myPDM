@@ -69,8 +69,8 @@ var Components = {
       // 渲染表格
       var container = document.getElementById('components-table-area');
       if (!container) return;
-      container.innerHTML = '<table id="components-table"><thead><tr><th data-sort="code" class="th-sortable">部件件号<span class="th-sort-icon"></span></th><th data-sort="name" class="th-sortable">中文名称<span class="th-sort-icon"></span></th><th data-sort="spec" class="th-sortable">规格型号<span class="th-sort-icon"></span></th><th data-sort="version" class="th-sortable">版本<span class="th-sort-icon"></span></th><th data-sort="parts" class="th-sortable">零件数<span class="th-sort-icon"></span></th><th data-sort="status" class="th-sortable">状态<span class="th-sort-icon"></span></th><th data-sort="updatedAt" class="th-sortable">更新时间<span class="th-sort-icon"></span></th><th>操作</th></tr></thead><tbody>' +
-        (data.length === 0 ? '<tr><td colspan="8" style="text-align:center;color:var(--text-light);padding:40px">暂无数据</td></tr>' :
+      container.innerHTML = '<table id="components-table"><thead><tr><th data-sort="code" class="th-sortable">部件件号<span class="th-sort-icon"></span></th><th data-sort="name" class="th-sortable">中文名称<span class="th-sort-icon"></span></th><th data-sort="spec" class="th-sortable">规格型号<span class="th-sort-icon"></span></th><th data-sort="version" class="th-sortable">版本<span class="th-sort-icon"></span></th><th data-sort="parts" class="th-sortable">零件数<span class="th-sort-icon"></span></th><th data-sort="status" class="th-sortable">状态<span class="th-sort-icon"></span></th><th>操作</th></tr></thead><tbody>' +
+        (data.length === 0 ? '<tr><td colspan="7" style="text-align:center;color:var(--text-light);padding:40px">暂无数据</td></tr>' :
           data.map(function(c2) { return '<tr onclick="Components._viewComp(\'' + c2.id + '\');" style="cursor:pointer"><td>' + c2.code + '</td><td>' + c2.name + '</td><td>' + (c2.spec||'-') + '</td><td><span class="tag" style="background:#e6f7ff;color:#1890ff;font-weight:600">' + c2.version + '</span></td><td>' + (c2.parts||[]).length + ' 种</td><td>' + UI.statusTag(c2.status) + '</td><td style="font-size:12px;color:var(--text-secondary)">' + UI.formatDate(c2.updatedAt) + '</td><td>' + (canDl ? '<button class="btn-text" onclick="event.stopPropagation();Components._exportBom(\'' + c2.id + '\')">导出</button>' : '') + (canE ? '<button class="btn-text" onclick="event.stopPropagation();Components._editComp(\'' + c2.id + '\')">编辑</button><button class="btn-text danger" onclick="event.stopPropagation();Components._deleteComp(\'' + c2.id + '\')">删除</button>' : '') + '</td></tr>'; }).join('')) +
         '</tbody></table>';
 
@@ -511,6 +511,7 @@ var Components = {
       '<div class="form-row"><div class="form-group"><label>部件件号</label><input type="text" value="' + _esc(comp.code) + '" readonly></div><div class="form-group"><label>中文名称</label><input type="text" value="' + _esc(comp.name) + '" readonly></div></div>' +
       '<div class="form-row"><div class="form-group"><label>规格型号</label><input type="text" value="' + _esc(comp.spec||'') + '" readonly></div><div class="form-group"><label>版本</label><input type="text" value="' + (comp.version||'A') + '" readonly></div></div>' +
       '<div class="form-row"><div class="form-group"><label>状态</label>' + UI.statusTag(comp.status) + '</div></div>' +
+        '<div class="form-row"><div class="form-group" style="flex:1"><label>创建时间</label><div style="padding:6px 10px;font-size:13px;color:#666">' + (comp.created_at ? UI.formatDate(comp.created_at) : '-') + '</div></div></div>' +
       cfHtml +
 
       '<h4 style="margin-bottom:12px">子项列表 (' + (sortedParts||[]).length + '种)</h4>' +
