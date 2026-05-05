@@ -341,7 +341,6 @@ var ImportExport = (function() {
         var row = {
           '部件件号': c.code, '中文名称': c.name, '规格型号': c.spec || '',
           '版本': c.version, '状态': _statusLabel(c.status),
-          '创建时间': c.created_at || '', '更新时间': c.updated_at || ''
         };
         cfDefs.forEach(function(d) { row[d.name] = _getCfValue(c, d.field_key); });
         return row;
