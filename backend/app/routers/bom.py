@@ -60,7 +60,7 @@ async def create_bom_item(item: schemas.BOMItemCreate, request: Request, db: Ses
     return db_item
 
 @router.delete("/items/{item_id}")
-async def delete_bom_item(item_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def delete_bom_item(item_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin"]))):
     if not crud.delete_bom_item(db, item_id):
         raise HTTPException(status_code=404, detail="BOM项不存在")
     ip = request.client.host if request.client else None

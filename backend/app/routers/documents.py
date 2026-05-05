@@ -231,7 +231,7 @@ async def list_attachments(doc_id: uuid.UUID, skip: int = 0, limit: int = 100, d
     } for a in atts]
 
 @router.delete("/{doc_id}/attachments/{att_id}")
-async def delete_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def delete_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin"]))):
     att = db.query(DocumentAttachment).filter(DocumentAttachment.id == att_id, DocumentAttachment.document_id == doc_id).first()
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")

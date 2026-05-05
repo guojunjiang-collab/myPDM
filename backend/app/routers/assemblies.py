@@ -177,7 +177,7 @@ async def update_assembly_document(assembly_id: uuid.UUID, edoc_id: uuid.UUID, b
     return {"message": "关联已更新"}
 
 @router.delete("/{assembly_id}/documents/{edoc_id}")
-async def delete_assembly_document(assembly_id: uuid.UUID, edoc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def delete_assembly_document(assembly_id: uuid.UUID, edoc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin"]))):
     ed = db.query(EntityDocument).filter(EntityDocument.id == edoc_id, EntityDocument.entity_id == assembly_id).first()
     if not ed:
         raise HTTPException(status_code=404, detail="关联不存在")
