@@ -179,6 +179,7 @@ var Components = {
         large: true
       });
       window._importAssembliesPreview = preview;
+        window._importAssembliesRel = relData;
     });
   },
 
