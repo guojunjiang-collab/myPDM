@@ -9,7 +9,7 @@ var Board = {
 
   render: function(c) {
     var self = this;
-    var canE = Auth.canEdit();
+    var canE = Auth.hasRole(['admin','engineer','production','guest']);
 
     c.innerHTML =
       '<div class="page-header"><h2>🗂️ 用户看板</h2><div class="actions">' +
@@ -189,7 +189,7 @@ var Board = {
     var tab = this._state.tab;
     var filtered = tab === 'all' ? items : items.filter(function(i) { return i.entity_type === tab; });
 
-    var canE = Auth.canEdit();
+    var canE = Auth.hasRole(['admin','engineer','production','guest']);
     var isShared = folder.shared_from;
 
     // Tab 切换
