@@ -571,30 +571,12 @@ var ImportExport = (function() {
       var documents = Store.getAll('documents');
       var cfDefs = _getCfDefs('document');
 
-      // 获取每个文档的附件列表
-      var attMap = {};
-      var attPromises = documents.map(function(doc) {
-        return fetch(API._base + '/documents/' + doc.id + '/attachments', { headers: API._headers() })
-          .then(function(r) {
-            if (!r.ok) return [];
-            return r.json();
-          })
-          .then(function(atts) {
-            attMap[doc.id] = atts;
-          })
-          .catch(function() {
-            attMap[doc.id] = [];
-          });
-      });
-      await Promise.all(attPromises);
-
-      // 构建清单数据
+      // 构建清单数据（直接用文档对象的 file_name 字段）
       var listData = documents.map(function(d) {
-        var att = attMap[d.id];
         var row = {
           '图文档编号': d.code, '名称': d.name, '版本': d.version,
           '状态': _statusLabel(d.status), '描述': d.description || '',
-          '附件文件名': Array.isArray(att) && att.length > 0 ? att.map(function(a){return a.file_name||'';}).join(', ') : (att && att.file_name ? att.file_name : ''),
+          '附件文件名': d.file_name || '',
           '创建时间': d.createdAt || '', '更新时间': d.updatedAt || ''
         };
         cfDefs.forEach(function(cf) { row[cf.name] = _getCfValue(d, cf.field_key); });
@@ -604,27 +586,19 @@ var ImportExport = (function() {
       var listWb = _buildWorkbook([{ name: '图文档清单', data: listData }]);
       await _writeToDir(subDir, '图文档清单.xlsx', _wbToBlob(listWb));
 
-      // 遍历所有文档的附件，下载并写入文件夹
+      // 下载附件文件并写入文件夹
       var attCount = 0;
-      for (var docId in attMap) {
-        var atts = attMap[docId];
-        if (!Array.isArray(atts) || atts.length === 0) continue;
-        var docItem = documents.find(function(d) { return d.id === docId; });
-        if (!docItem) continue;
-        for (var j = 0; j < atts.length; j++) {
-          var att = atts[j];
-          if (!att.id) continue;
-          try {
-            var resp = await fetch(API._base + '/v2/attachments/' + att.id + '/stream', { headers: API._headers() });
-            if (!resp.ok) continue;
-            var blob = await resp.blob();
-            var rawName = att.file_name || 'attachment';
-            // 命名：图文档编号_版本_附件文件名（保留原始后缀）
-            var safeName = (docItem.code + '_' + docItem.version + '_' + rawName).replace(/[\\/:*?"<>|]/g, '_');
-            await _writeToDir(attDir, safeName, blob);
-            attCount++;
-          } catch(e) { /* skip */ }
-        }
+      for (var i = 0; i < documents.length; i++) {
+        var doc = documents[i];
+        if (!doc.file_id || !doc.file_name) continue;
+        try {
+          var resp = await fetch(API._base + '/v2/attachments/' + doc.file_id + '/stream', { headers: _getAuthHeaders() });
+          if (!resp.ok) continue;
+          var blob = await resp.blob();
+          var safeName = (doc.code + '_' + doc.version + '_' + doc.file_name).replace(/[\\/:*?"<>|]/g, '_');
+          await _writeToDir(attDir, safeName, blob);
+          attCount++;
+        } catch(e) { /* skip */ }
       }
 
       Store.addLog('数据导出', '导出图文档数据（' + documents.length + '条，' + attCount + '个附件）');
@@ -635,7 +609,6 @@ var ImportExport = (function() {
       }
     }
   }
-
   // ==================== 图文档导入 ====================
 
   async function importDocuments(onPreview, onConfirm) {
