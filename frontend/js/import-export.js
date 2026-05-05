@@ -346,8 +346,29 @@ var ImportExport = (function() {
         cfDefs.forEach(function(d) { row[d.name] = _getCfValue(c, d.field_key); });
         return row;
       });
-      var listWb = _buildWorkbook([{ name: '部件清单', data: listData }]);
-      await _writeToDir(subDir, '部件清单.xlsx', _wbToBlob(listWb));
+
+
+      // 获取关联图文档
+      var relData = [];
+      var relPromises = components.map(function(comp) {
+        return API._fetch('GET', '/assemblies/' + comp.id + '/documents').then(function(list) {
+          list.forEach(function(ed) {
+            var doc = ed.document || {};
+            relData.push({
+              '部件件号': comp.code, '部件版本': comp.version,
+              '图文档编号': doc.code || '', '图文档名称': doc.name || '', '图文档版本': doc.version || ''
+            });
+          });
+        }).catch(function() {});
+      });
+      await Promise.all(relPromises);
+
+      // 写入关联图文档Sheet到部件清单
+      // 需要重新构建workbook包含两个sheet
+      var listSheets = [{ name: '部件清单', data: listData }];
+      if (relData.length > 0) listSheets.push({ name: '关联图文档', data: relData });
+      var listWb2 = _buildWorkbook(listSheets);
+      await _writeToDir(subDir, '部件清单.xlsx', _wbToBlob(listWb2));
 
       // 写入每个部件的BOM
       var allParts = Store.getAll('parts');
