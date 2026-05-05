@@ -131,7 +131,7 @@ async def update_part_document(part_id: uuid.UUID, edoc_id: uuid.UUID, body: sch
     return {"message": "关联已更新"}
 
 @router.delete("/{part_id}/documents/{edoc_id}")
-async def delete_part_document(part_id: uuid.UUID, edoc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin"]))):
+async def delete_part_document(part_id: uuid.UUID, edoc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
     """移除图文档关联"""
     ed = db.query(EntityDocument).filter(EntityDocument.id == edoc_id, EntityDocument.entity_id == part_id).first()
     if not ed:
