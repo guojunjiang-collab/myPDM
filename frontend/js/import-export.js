@@ -481,6 +481,11 @@ var ImportExport = (function() {
         if (target) target.bomRows = bomData;
       }
 
+      // 读取关联图文档Sheet
+      var relData = [];
+      var relSheetName = wb.SheetNames ? wb.SheetNames.find(function(n) { return n.indexOf('关联图文档') >= 0; }) : null;
+      if (relSheetName) relData = _sheetToJson(wb, relSheetName);
+
       var stats = {
         total: preview.length,
         create: preview.filter(function(p) { return p.action === 'create'; }).length,
@@ -488,8 +493,8 @@ var ImportExport = (function() {
         bomFiles: bomEntries.length
       };
 
-      if (onPreview) onPreview(preview, stats);
-      if (onConfirm) onConfirm(preview, stats);
+      if (onPreview) onPreview(preview, stats, relData);
+      if (onConfirm) onConfirm(preview, stats, relData);
     } catch(e) {
       if (e.message.indexOf('浏览器不支持') === -1) {
         UI.toast('导入失败: ' + e.message, 'error');
