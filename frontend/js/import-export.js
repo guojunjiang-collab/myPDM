@@ -470,7 +470,7 @@ var ImportExport = (function() {
       for (var i = 0; i < bomEntries.length; i++) {
         var bomFile = await _readDirEntryAsFile(bomEntries[i]);
         var bomWb = await _parseExcelFile(bomFile);
-        var bomData = _sheetToJson(bomWb);
+        var bomData = _sheetToJson(bomWb, 'BOM');
         // 从文件名提取件号和版本：BOM_ASM-001_V2.0.xlsx
         var bomName = bomEntries[i].name.replace('.xlsx', '');
         var bomCode = '', bomVersion = '';
