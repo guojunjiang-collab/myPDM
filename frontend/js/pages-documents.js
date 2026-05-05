@@ -4,7 +4,7 @@ var Documents = {
   _doImportAll: function() { UI.closeModal(); UI.toast('正在导入...', 'info'); ImportExport.executeImportDocuments(window._importDocsPreview, window._importDocsAttFiles).then(function(r) { Store.addLog('数据导入', '导入图文档：新增 ' + r.created + '，更新 ' + r.updated); UI.toast('导入完成：新增 ' + r.created + '，更新 ' + r.updated, 'success'); Store.onLogin(); Documents.render(document.getElementById('content')); }); },
   render: function(c) {
     // UI: 与 Parts 页风格对齐
-    c.innerHTML = '<div class="page-header"><h2>📄 图文档管理</h2><div class="actions"><button class="btn-outline" id="btn-export-doc" style="margin-right:4px">📥 导出</button><button class="btn-outline" id="btn-import-doc" style="margin-right:4px">📤 导入</button><button class="btn-primary" id="btn-create-doc">+ 新建图文文档</button></div></div>' +
+    c.innerHTML = '<div class="page-header"><h2>📄 图文档管理</h2><div class="actions"><button class="btn-outline" id="btn-export-doc" style="margin-right:4px">📥 导出全部图文档</button><button class="btn-outline" id="btn-import-doc" style="margin-right:4px">📤 批量导入图文档</button><button class="btn-primary" id="btn-create-doc">+ 新建图文文档</button></div></div>' +
       '<div class="card"><div class="toolbar">' +
         '<div class="search-box" style="flex:1"><input type="text" id="doc-search" class="form-input" placeholder="搜索编号或名称..." style="width:100%"></div>' +
         '<select id="doc-status-filter" class="form-select" style="width:140px">' +
