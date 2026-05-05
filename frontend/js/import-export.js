@@ -546,7 +546,7 @@ var ImportExport = (function() {
       try { existingItems = await API._fetch('GET', '/assemblies/' + compId + '/parts'); } catch(e) {}
 
       // 收集所有子项并按层级排序
-      var childItems = comp.bomRows.filter(function(r) { return (r['层级'] || 0) > 0; });
+      var childItems = comp.bomRows.filter(function(r) { return (r['层级'] || 0) === 1; });
       childItems.sort(function(a, b) { return (a['层级'] || 1) - (b['层级'] || 1); });
 
       for (var k = 0; k < childItems.length; k++) {
