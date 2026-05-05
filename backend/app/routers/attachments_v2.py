@@ -400,7 +400,7 @@ async def get_attachment(
 async def download_attachment(
     attachment_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
 ):
     """下载附件"""
     import base64
@@ -540,9 +540,6 @@ async def preview_attachment(
         user_role = payload.get("role", "")
         if not username:
             raise HTTPException(status_code=401, detail="无效的认证令牌")
-        # guest 不可预览附件
-        if user_role == "guest":
-            raise HTTPException(status_code=403, detail="访客无权预览附件")
     except JWTError:
         raise HTTPException(status_code=401, detail="认证令牌验证失败")
     
