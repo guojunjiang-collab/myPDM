@@ -380,30 +380,10 @@ const SyncManager = {
 
               if (existing) {
 
-                // 冲突解决：以 updatedAt 更晚者胜出（新数据覆盖旧数据）
-
-var serverTime = converted.updatedAt || 0;
-
-                var localTime  = existing.updatedAt  || 0;
-
-                if (serverTime > localTime) {
-                  // 服务器更新更晚 → 覆盖本地（同时更新ID为服务器ID）
-                  console.log('[Pull] 覆盖本地', entity.key, 'id=' + existing.id, 'oldStatus=' + existing.status, '-> newStatus=' + converted.status);
-                  if (converted.status === undefined) {
-                    console.warn('[Pull WARNING] converted.status is undefined! raw server response:', item);
-                  }
-                  var updateData = Object.assign({}, converted, { id: converted.id });
-                  Store.update(entity.key, existing.id, updateData, { silent: true, skipSync: true });
-                } else {
-                  // 本地更新更晚或同等新 → 保留本地，但对于图文档始终更新附件字段
-                  var updateFields = { id: converted.id };
-                  // 图文档：始终从服务器更新附件信息（file_id, file_name 只在服务器端设置）
-                  if (entity.key === 'documents') {
-                    if (converted.file_id) updateFields.file_id = converted.file_id;
-                    if (converted.file_name) updateFields.file_name = converted.file_name;
-                  }
-                  Store.update(entity.key, existing.id, updateFields, { silent: true, skipSync: true });
-                }
+                // "检出数据"：始终以服务器数据覆盖本地，确保数据一致
+                // 先删除本地旧记录，再用服务器数据添加
+                Store.remove(entity.key, existing.id, { silent: true, skipSync: true });
+                Store.add(entity.key, converted, { silent: true, skipSync: true });
 
               } else {
 
