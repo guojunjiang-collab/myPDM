@@ -188,8 +188,7 @@ var Components = {
     ImportExport.executeImportAssemblies(window._importAssembliesPreview, window._importAssembliesRel).then(function(result) {
       Store.addLog('数据导入', '导入部件：新增 ' + result.created + '，更新 ' + result.updated);
       UI.toast('导入完成：新增 ' + result.created + '，更新 ' + result.updated + (result.errors.length ? '，失败 ' + result.errors.length : ''), 'success');
-      Store.onLogin();
-      Components.render(document.getElementById('content'));
+      Store.onLogin().then(function() { Components.render(document.getElementById('content')); });
     });
   },
 
