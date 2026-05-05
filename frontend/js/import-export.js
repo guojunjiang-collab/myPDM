@@ -611,20 +611,29 @@ var ImportExport = (function() {
     errors = errors.concat(bomErrors);
 
     // 建立关联图文档
-    for (var j = 0; j < relPreview.length; j++) {
-      var rel = relPreview[j];
-      if (!rel.docId) continue;
-      // 找到零件ID
-      var partItem = preview.find(function(p) { return p.code === rel.partCode && p.version === rel.partVersion; });
-      var partId = partItem ? (partItem._newId || partItem.matchId) : null;
-      if (!partId) continue;
-      try {
-        await API._fetch('POST', '/parts/' + partId + '/documents', {
-          document_id: rel.docId, sort_order: 0
-        });
-      } catch(e) { /* skip */ }
+    if (relData && relData.length > 0) {
+      var allDocs = Store.getAll('documents');
+      for (var r = 0; r < relData.length; r++) {
+        var rel = relData[r];
+        var compCode = String(rel['部件件号'] || '').trim();
+        var compVer = String(rel['部件版本'] || '').trim();
+        var docCode = String(rel['图文档编号'] || '').trim();
+        var docVersion = String(rel['图文档版本'] || '').trim();
+        if (!compCode || !docCode) continue;
+        // 找到部件ID
+        var compItem = preview.find(function(p) { return p.code === compCode && p.version === compVer; });
+        var compId2 = compItem ? (compItem._newId || compItem.matchId) : null;
+        if (!compId2) continue;
+        // 找到图文档ID
+        var doc = allDocs.find(function(d) { return d.code === docCode && d.version === docVersion; });
+        if (!doc) continue;
+        try {
+          await API._fetch('POST', '/assemblies/' + compId2 + '/documents', {
+            document_id: doc.id, sort_order: 0
+          });
+        } catch(e) { /* skip */ }
+      }
     }
-
     return { created: created, updated: updated, errors: errors };
   }
 
