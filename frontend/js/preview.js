@@ -32,7 +32,7 @@ var Preview = {
       return;
     }
 
-    document.title = '文件预览 - Amo系统';
+    document.title = '文件预览 - PDM系统';
 
     if (this.fileType === 'pdf') {
       this.loadPDF();
