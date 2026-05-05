@@ -194,7 +194,7 @@ var ImportExport = (function() {
     Promise.all(promises).then(function() {
       var sheets = [];
       if (partsData.length > 0) sheets.push({ name: '零件数据', data: partsData });
-      if (relData.length > 0) sheets.push({ name: '关联图文档', data: relData });
+      sheets.push({ name: '关联图文档', data: relData });
 
       var wb = _buildWorkbook(sheets);
       var blob = _wbToBlob(wb);

@@ -213,8 +213,7 @@ var Parts = {
           return (r.customFields && r.customFields[d.field_key]) ? r.customFields[d.field_key] : '';
         }});
       }
-    });
-    UI.exportCSV(Store.getAll('parts'), '零件清单.csv', columns);
+    });    ImportExport.exportParts();
   },
 
   // 编辑零件（新增/修改）
