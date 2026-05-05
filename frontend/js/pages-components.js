@@ -12,8 +12,8 @@ var Components = {
     var canDl = Auth.canDownload();
     c.innerHTML =
       '<div class="page-header"><h2>📦 部件管理</h2><div class="actions">' +
-        (Auth.canDownload() ? '<button class="btn-outline" onclick="Components._exportAll()" style="margin-right:4px">📥 导出全部</button>' : '') +
-        (Auth.canEdit() ? '<button class="btn-outline" onclick="Components._importAll()" style="margin-right:4px">📤 导入</button>' : '') +
+        (Auth.canDownload() ? '<button class="btn-outline" onclick="Components._exportAll()" style="margin-right:4px">📥 导出全部部件</button>' : '') +
+        (Auth.canEdit() ? '<button class="btn-outline" onclick="Components._importAll()" style="margin-right:4px">📤 批量导入部件</button>' : '') +
         (canE ? '<button class="btn-primary" id="btn-add-cp">＋ 新增部件</button>' : '') +
       '</div></div>' +
       '<div class="card"><div class="toolbar"><div class="search-box"><input type="text" id="cs" placeholder="搜索件号/名称..." style="width:100%"></div>' +

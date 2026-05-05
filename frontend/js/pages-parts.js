@@ -7,8 +7,8 @@ var Parts = {
     var canE = Auth.canEdit();
     c.innerHTML =
       '<div class="page-header"><h2>🔧 零件管理</h2><div class="actions">' +
-        (Auth.canDownload() ? '<button class="btn-outline" onclick="Parts._exportParts()">📥 导出Excel</button>' : '') +
-        (Auth.canEdit() ? '<button class="btn-outline" onclick="Parts._importParts()">📤 导入Excel</button>' : '') +
+        (Auth.canDownload() ? '<button class="btn-outline" onclick="Parts._exportParts()">📥 导出全部零件</button>' : '') +
+        (Auth.canEdit() ? '<button class="btn-outline" onclick="Parts._importParts()">📤 批量导入零件</button>' : '') +
         (canE ? '<button class="btn-primary" id="btn-add-part">＋ 新增零件</button>' : '') +
       '</div></div>' +
       '<div class="card"><div class="toolbar">' +
