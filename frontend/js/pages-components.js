@@ -12,6 +12,8 @@ var Components = {
     var canDl = Auth.canDownload();
     c.innerHTML =
       '<div class="page-header"><h2>📦 部件管理</h2><div class="actions">' +
+        (Auth.canDownload() ? '<button class="btn-outline" onclick="Components._exportAll()" style="margin-right:4px">📥 导出全部</button>' : '') +
+        (Auth.canEdit() ? '<button class="btn-outline" onclick="Components._importAll()" style="margin-right:4px">📤 导入</button>' : '') +
         (canE ? '<button class="btn-primary" id="btn-add-cp">＋ 新增部件</button>' : '') +
       '</div></div>' +
       '<div class="card"><div class="toolbar"><div class="search-box"><input type="text" id="cs" placeholder="搜索件号/名称..." style="width:100%"></div>' +
@@ -70,7 +72,6 @@ var Components = {
       container.innerHTML = '<table id="components-table"><thead><tr><th data-sort="code" class="th-sortable">部件件号<span class="th-sort-icon"></span></th><th data-sort="name" class="th-sortable">中文名称<span class="th-sort-icon"></span></th><th data-sort="spec" class="th-sortable">规格型号<span class="th-sort-icon"></span></th><th data-sort="version" class="th-sortable">版本<span class="th-sort-icon"></span></th><th data-sort="parts" class="th-sortable">零件数<span class="th-sort-icon"></span></th><th data-sort="status" class="th-sortable">状态<span class="th-sort-icon"></span></th><th data-sort="updatedAt" class="th-sortable">更新时间<span class="th-sort-icon"></span></th><th>操作</th></tr></thead><tbody>' +
         (data.length === 0 ? '<tr><td colspan="8" style="text-align:center;color:var(--text-light);padding:40px">暂无数据</td></tr>' :
           data.map(function(c2) { return '<tr onclick="Components._viewComp(\'' + c2.id + '\');" style="cursor:pointer"><td>' + c2.code + '</td><td>' + c2.name + '</td><td>' + (c2.spec||'-') + '</td><td><span class="tag" style="background:#e6f7ff;color:#1890ff;font-weight:600">' + c2.version + '</span></td><td>' + (c2.parts||[]).length + ' 种</td><td>' + UI.statusTag(c2.status) + '</td><td style="font-size:12px;color:var(--text-secondary)">' + UI.formatDate(c2.updatedAt) + '</td><td>' + (Auth.canDownload() ? '<button class="btn-outline" onclick="Components._exportAll()" style="margin-right:4px">📥 导出全部</button>' : '') +
-        (Auth.canEdit() ? '<button class="btn-outline" onclick="Components._importAll()" style="margin-right:4px">📤 导入</button>' : '') +
         (canDl ? '<button class="btn-text" onclick="event.stopPropagation();Components._exportBom(\'' + c2.id + '\')">导出</button>' : '') + (canE ? '<button class="btn-text" onclick="event.stopPropagation();Components._editComp(\'' + c2.id + '\')">编辑</button><button class="btn-text danger" onclick="event.stopPropagation();Components._deleteComp(\'' + c2.id + '\')">删除</button>' : '') + '</td></tr>'; }).join('')) +
         '</tbody></table>';
 
