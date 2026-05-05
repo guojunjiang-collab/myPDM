@@ -293,7 +293,7 @@ var Components = {
 
     }
 
-    var headers = ['层级', '类型', '件号', '中文名称', '版本', '状态', '用量', '规格', '材料'];
+    var headers = ['层级', '类型', '件号', '中文名称', '版本', '状态', '用量', '规格'];
 
     var csvLines = [headers.join(',')];
 
