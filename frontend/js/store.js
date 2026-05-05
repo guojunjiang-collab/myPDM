@@ -674,7 +674,10 @@ _fieldMap: {
 
     rec.createdAt = rec.createdAt || Date.now();
 
-    rec.updatedAt = Date.now();
+    // skipSync 时保持原始 updatedAt（检出数据场景），否则设为当前时间
+    if (!opts.skipSync) {
+      rec.updatedAt = Date.now();
+    }
 
     d.push(rec);
 
@@ -704,7 +707,12 @@ _fieldMap: {
 
     const oldRecord = Object.assign({}, d[i]);
 
-    Object.assign(d[i], upd, { updatedAt: Date.now() });
+    Object.assign(d[i], upd);
+
+    // skipSync 时保持原始 updatedAt（检出数据场景），否则设为当前时间
+    if (!opts.skipSync) {
+      d[i].updatedAt = Date.now();
+    }
 
     this.saveAll(e, d);
 
@@ -834,25 +842,11 @@ _fieldMap: {
 
       const serverDocs = await API.getDocuments().catch(() => []);
 
-      // 转换字段名 snake_case -> camelCase
-      const convertFields = (data) => {
-        return data.map(item => {
-          const out = {};
-          for (const k in item) {
-            const camel = k.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
-            out[camel] = item[k];
-          }
-          return out;
-        });
-      };
-
-      const localParts = convertFields(serverParts);
-      const localComps = convertFields(serverComps);
-      const localDocs = convertFields(serverDocs);
-
-      this.saveAll('parts', localParts);
-      this.saveAll('components', localComps);
-      this.saveAll('documents', localDocs);
+      // 直接保存服务器返回的数据，不做 camelCase 转换
+      // 前端代码统一使用 snake_case（如 file_id, file_name）
+      this.saveAll('parts', serverParts);
+      this.saveAll('components', serverComps);
+      this.saveAll('documents', serverDocs);
 
     } catch (e) {
 
