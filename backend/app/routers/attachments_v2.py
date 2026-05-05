@@ -525,6 +525,7 @@ async def preview_attachment(
     预览附件（支持 query token，浏览器直接打开）
     返回 Content-Disposition: inline 让浏览器内嵌显示
     支持 Range 请求，浏览器可流式加载大文件
+    production 可预览，guest 不可预览
     """
     from jose import JWTError, jwt
     from .auth import SECRET_KEY, ALGORITHM
@@ -536,8 +537,12 @@ async def preview_attachment(
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
+        user_role = payload.get("role", "")
         if not username:
             raise HTTPException(status_code=401, detail="无效的认证令牌")
+        # guest 不可预览附件
+        if user_role == "guest":
+            raise HTTPException(status_code=403, detail="访客无权预览附件")
     except JWTError:
         raise HTTPException(status_code=401, detail="认证令牌验证失败")
     

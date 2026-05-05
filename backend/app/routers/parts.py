@@ -24,7 +24,7 @@ def _part_response(part):
     }
 
 @router.get("/", response_model=list[schemas.PartResponse])
-async def list_parts(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def list_parts(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
     parts = crud.get_parts(db, skip=skip, limit=limit)
     return [_part_response(p) for p in parts]
 
@@ -39,7 +39,7 @@ async def create_part(part: schemas.PartCreate, request: Request, db: Session = 
     return _part_response(db_part)
 
 @router.get("/{part_id}", response_model=schemas.PartResponse)
-async def get_part(part_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def get_part(part_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
     db_part = crud.get_part(db, part_id)
     if not db_part:
         raise HTTPException(status_code=404, detail="零件不存在")
@@ -67,7 +67,7 @@ async def delete_part(part_id: uuid.UUID, request: Request, db: Session = Depend
 # ===== 零件关联图文档 =====
 
 @router.get("/{part_id}/documents")
-async def get_part_documents(part_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def get_part_documents(part_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
     """获取零件关联的图文档列表"""
     docs = db.query(EntityDocument, Document).join(Document, EntityDocument.document_id == Document.id).filter(
         EntityDocument.entity_type == 'part',

@@ -155,10 +155,10 @@ var Documents = {
 
         html += '<td style="padding:10px 12px;font-size:13px;color:#666">' + (d.file_name ? _esc(d.file_name) : '<span style="color:#ccc">—</span>') + '</td>' +
           '<td style="padding:10px 12px;text-align:right;white-space:nowrap">' +
-            (d.file_id ? '<button class="btn-text btn-sm btn-preview-doc" data-file-id="' + d.file_id + '" data-file-name="' + _esc(d.file_name || '') + '">预览</button>' : '') +
-            '<button class="btn-text btn-sm btn-download-doc" data-id="' + d.id + '">下载</button>' +
-            '<button class="btn-text btn-sm btn-edit-doc" data-id="' + d.id + '">编辑</button>' +
-            '<button class="btn-text btn-sm btn-delete-doc" data-id="' + d.id + '" style="color:#ff4d4f">删除</button>' +
+            (d.file_id && Auth.canPreview() ? '<button class="btn-text btn-sm btn-preview-doc" data-file-id="' + d.file_id + '" data-file-name="' + _esc(d.file_name || '') + '">预览</button>' : '') +
+            (Auth.canDownload() ? '<button class="btn-text btn-sm btn-download-doc" data-id="' + d.id + '">下载</button>' : '') +
+            (Auth.canEdit() ? '<button class="btn-text btn-sm btn-edit-doc" data-id="' + d.id + '">编辑</button>' : '') +
+            (Auth.isAdmin() ? '<button class="btn-text btn-sm btn-delete-doc" data-id="' + d.id + '" style="color:#ff4d4f">删除</button>' : '') +
           '</td></tr>';
       });
 

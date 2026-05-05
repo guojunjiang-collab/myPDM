@@ -24,7 +24,7 @@ def _assembly_response(asm):
     }
 
 @router.get("/", response_model=list[schemas.AssemblyResponse])
-async def list_assemblies(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def list_assemblies(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
     return [_assembly_response(a) for a in crud.get_assemblies(db, skip=skip, limit=limit)]
 
 @router.post("/", response_model=schemas.AssemblyResponse)
@@ -37,7 +37,7 @@ async def create_assembly(assembly: schemas.AssemblyCreate, request: Request, db
     return _assembly_response(db_assembly)
 
 @router.get("/{assembly_id}", response_model=schemas.AssemblyResponse)
-async def get_assembly(assembly_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def get_assembly(assembly_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
     db_assembly = crud.get_assembly(db, assembly_id)
     if not db_assembly:
         raise HTTPException(status_code=404, detail="部件不存在")
@@ -63,7 +63,7 @@ async def delete_assembly(assembly_id: uuid.UUID, request: Request, db: Session 
     return {"message": "部件已删除"}
 
 @router.get("/{assembly_id}/parts")
-async def get_assembly_parts(assembly_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def get_assembly_parts(assembly_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
     """获取部件的子项列表"""
     db_assembly = crud.get_assembly(db, assembly_id)
     if not db_assembly:
@@ -116,7 +116,7 @@ async def update_assembly_part(assembly_id: uuid.UUID, item_id: uuid.UUID, item_
     return db_item
 
 @router.get("/{assembly_id}/documents")
-async def get_assembly_documents(assembly_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def get_assembly_documents(assembly_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
     docs = db.query(EntityDocument, Document).join(Document, EntityDocument.document_id == Document.id).filter(
         EntityDocument.entity_type == 'component',
         EntityDocument.entity_id == assembly_id

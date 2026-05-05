@@ -11,7 +11,7 @@ from .auth import require_role
 router = APIRouter(prefix="/documents", tags=["图文档管理"])
 
 @router.get("/")
-async def list_documents(skip: int = 0, limit: int = 100, keyword: str = None, status: str = None, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def list_documents(skip: int = 0, limit: int = 100, keyword: str = None, status: str = None, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
     query = db.query(Document)
     if keyword:
         kw = f"%{keyword.strip().lower()}%"
@@ -28,7 +28,7 @@ async def list_documents(skip: int = 0, limit: int = 100, keyword: str = None, s
     } for d in docs]
 
 @router.get("/{doc_id}/references")
-async def get_document_references(doc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def get_document_references(doc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
     """
     获取图文档的引用信息
     
@@ -129,7 +129,7 @@ async def create_document(doc: schemas.DocumentCreate, request: Request, db: Ses
     }
 
 @router.get("/{doc_id}")
-async def get_document(doc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def get_document(doc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
     d = db.query(Document).filter(Document.id == doc_id).first()
     if not d:
         raise HTTPException(status_code=404, detail="图文档不存在")
@@ -223,7 +223,7 @@ async def download_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, db: Session 
     }
 
 @router.get("/{doc_id}/attachments/")
-async def list_attachments(doc_id: uuid.UUID, skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def list_attachments(doc_id: uuid.UUID, skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
     atts = db.query(DocumentAttachment).filter(DocumentAttachment.document_id == doc_id).offset(skip).limit(limit).all()
     return [{
         "id": a.id, "document_id": a.document_id,

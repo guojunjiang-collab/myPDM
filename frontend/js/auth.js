@@ -44,7 +44,9 @@ const Auth = {
 
   getUser() { try { return JSON.parse(localStorage.getItem(this._key)); } catch { return null; } },
   hasRole(r) { const u = this.getUser(); return u && r.includes(u.role); },
-  canEdit() { const u = this.getUser(); return u && (u.role === 'admin' || u.role === 'engineer'); },
+  canEdit() { const u = this.getUser(); return u && (u.role === 'admin' || u.role === 'engineer'); },
+  canDownload() { const u = this.getUser(); return u && (u.role === 'admin' || u.role === 'engineer'); },
+  canPreview() { const u = this.getUser(); return u && u.role !== 'guest'; },
   isAdmin() { const u = this.getUser(); return u && u.role === 'admin'; },
   refreshUser() { const u = this.getUser(); if (u) { const f = Store.getById('users', u.id); if (f) localStorage.setItem(this._key, JSON.stringify(f)); } }
 };
