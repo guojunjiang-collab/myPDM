@@ -604,21 +604,27 @@ var ImportExport = (function() {
       var listWb = _buildWorkbook([{ name: '图文档清单', data: listData }]);
       await _writeToDir(subDir, '图文档清单.xlsx', _wbToBlob(listWb));
 
-      // 下载附件文件并写入文件夹
+      // 遍历所有文档的附件，下载并写入文件夹
       var attCount = 0;
-      for (var i = 0; i < documents.length; i++) {
-        var doc = documents[i];
-        if (!doc.file_id) continue;
-        try {
-          var resp = await fetch(API_BASE + '/attachments/' + doc.file_id + '/stream', { headers: _getAuthHeaders() });
-          if (!resp.ok) continue;
-          var blob = await resp.blob();
-          var attName = attMap[doc.id] ? attMap[doc.id].file_name : 'attachment';
-          // 用编号_v版本_文件名 格式
-          var safeName = (doc.code + '_v' + doc.version + '_' + attName).replace(/[\\/:*?"<>|]/g, '_');
-          await _writeToDir(attDir, safeName, blob);
-          attCount++;
-        } catch(e) { /* skip failed attachments */ }
+      for (var docId in attMap) {
+        var atts = attMap[docId];
+        if (!Array.isArray(atts) || atts.length === 0) continue;
+        var docItem = documents.find(function(d) { return d.id === docId; });
+        if (!docItem) continue;
+        for (var j = 0; j < atts.length; j++) {
+          var att = atts[j];
+          if (!att.id) continue;
+          try {
+            var resp = await fetch(API._base + '/v2/attachments/' + att.id + '/stream', { headers: API._headers() });
+            if (!resp.ok) continue;
+            var blob = await resp.blob();
+            var rawName = att.file_name || 'attachment';
+            // 命名：图文档编号_版本_附件文件名（保留原始后缀）
+            var safeName = (docItem.code + '_' + docItem.version + '_' + rawName).replace(/[\\/:*?"<>|]/g, '_');
+            await _writeToDir(attDir, safeName, blob);
+            attCount++;
+          } catch(e) { /* skip */ }
+        }
       }
 
       Store.addLog('数据导出', '导出图文档数据（' + documents.length + '条，' + attCount + '个附件）');
