@@ -770,7 +770,7 @@ _fieldMap: {
 
 
 
-  // ===== 首次登录后主动推送本地数据 =====
+  // ===== 首次登录后主动清除缓存并拉取服务器数据 =====
 
   async onLogin() {
 
@@ -782,17 +782,33 @@ _fieldMap: {
 
     try {
 
+      // 1. 清除本地缓存（保留登录 token 和用户信息）
+      var keepKeys = ['bom_api_token', 'bom_current_user'];
+      var toRemove = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf('bom_') === 0 && keepKeys.indexOf(k) < 0) {
+          toRemove.push(k);
+        }
+      }
+      toRemove.forEach(function(k) { localStorage.removeItem(k); });
+      
+      // 清除内存缓存
+      if (typeof this.clearLocalDocAndCFCache === 'function') {
+        try { this.clearLocalDocAndCFCache(); } catch (e) { /* ignore */ }
+      }
+      
+      // 2. 从服务器拉取数据
       await this._loadDataFromServer();
-
-      const results = await this.syncAll();
-
       await this._loadCustomFieldData();
 
       this._syncStatus = 'idle';
 
       this._updateSyncIndicator();
-
-      return results;
+      
+      this.addLog('数据检出', '登录后自动同步完成，已从服务器检出数据');
+      
+      return { success: true, cleared: toRemove.length };
 
     } catch (e) {
 

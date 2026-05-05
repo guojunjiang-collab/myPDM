@@ -255,6 +255,10 @@ var Documents = {
   },
 
   _viewDoc: function(id, docs) {
+    // 如果没有传入 docs 数组，从 Store 获取
+    if (!docs) {
+      docs = Store.getAll('documents') || [];
+    }
     var doc = docs.find(function(d) { return d.id === id; });
     if (!doc) return;
 
@@ -266,6 +270,30 @@ var Documents = {
     UI.modal('图文档详情', html, {
       footer: (doc && doc.file_id ? '<button class="btn-primary" onclick="Documents._previewDoc(\'' + doc.file_id + '\', \'' + _esc(doc.file_name || '') + '\')">预览</button>' : '') + '<button class="btn-outline" onclick="UI.closeModal()">关闭</button>',
       afterRender: function() {
+        // 添加返回按钮（如果是从零件/部件详情进入）
+        if (window._docDetailReturnTo) {
+          var footer = document.querySelector('#modal-box .modal-footer');
+          if (footer) {
+            var backBtn = document.createElement('button');
+            backBtn.className = 'btn-outline';
+            backBtn.innerHTML = '← 返回' + (window._docDetailReturnTo.type === 'part' ? '零件' : '部件') + '详情';
+            backBtn.style.marginRight = 'auto';
+            backBtn.onclick = function() {
+              var returnTo = window._docDetailReturnTo;
+              window._docDetailReturnTo = null;
+              UI.closeModal();
+              setTimeout(function() {
+                if (returnTo.type === 'part') {
+                  Parts._viewPart(returnTo.id);
+                } else {
+                  Components._viewComp(returnTo.id);
+                }
+              }, 100);
+            };
+            footer.insertBefore(backBtn, footer.firstChild);
+          }
+        }
+        
         _loadDocCFDefs().then(function(cfDefs) {
           // 从服务器获取该文档的自定义字段值，避免本地缓存为空
           if (doc && doc.id) {
@@ -607,10 +635,17 @@ var Documents = {
       return;
     }
 
-    // 统一用 preview.html 在新标签页加载，不阻塞主界面
     var token = localStorage.getItem('bom_api_token') || '';
-    var previewUrl = window.location.origin + '/preview.html?att_id=' + fileId + '&token=' + encodeURIComponent(token) + '&type=' + ext;
-    window.open(previewUrl, '_blank');
+    
+    if (ext === 'pdf') {
+      // PDF 直接用浏览器原生阅读器流式加载
+      var previewUrl = '/api/v2/attachments/' + fileId + '/preview?token=' + encodeURIComponent(token);
+      window.open(previewUrl, '_blank');
+    } else {
+      // STP 使用自定义预览页面
+      var previewUrl = window.location.origin + '/preview.html?att_id=' + fileId + '&token=' + encodeURIComponent(token) + '&type=' + ext;
+      window.open(previewUrl, '_blank');
+    }
   }
 };
 

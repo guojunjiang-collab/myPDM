@@ -35,7 +35,7 @@ services:
       - REDIS_PORT=6379
       - UPLOAD_DIR=/app/uploads
       - CHUNK_DIR=/app/uploads/chunks
-      - MAX_FILE_SIZE=104857600
+      - MAX_FILE_SIZE=1073741824
       - CHUNK_SIZE=5242880
     volumes:
       - ./uploads:/app/uploads
@@ -48,9 +48,7 @@ services:
       - "8000:8000"
 
   nginx:
-    build: 
-      context: .
-      dockerfile: Dockerfile.nginx
+    image: nginx:alpine
     container_name: bom_nginx
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
@@ -60,7 +58,7 @@ services:
     networks:
       - bom_network
     ports:
-      - "8080:80"
+      - "80:80"
 
 networks:
   bom_network:

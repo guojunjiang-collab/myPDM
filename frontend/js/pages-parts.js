@@ -433,7 +433,8 @@ var Parts = {
                     
                     // 为下载按钮添加事件监听器
                     area.querySelectorAll('.btn-download-edoc').forEach(function(btn) {
-                      btn.onclick = function() {
+                      btn.onclick = function(e) {
+                        e.stopPropagation(); // 阻止冒泡，避免触发行点击
                         var fileId = btn.dataset.fileId;
                         var fileName = btn.dataset.fileName;
                         
@@ -455,6 +456,18 @@ var Parts = {
                         });
                       };
                     });
+                    
+                    // 为图文档行添加点击事件，打开图文档详情
+                    area.querySelectorAll('.edoc-row').forEach(function(row) {
+                      row.onclick = function() {
+                        var docId = row.getAttribute('data-doc-id');
+                        if (docId) {
+                          // 存储返回信息
+                          window._docDetailReturnTo = { type: 'part', id: part.id };
+                          Documents._viewDoc(docId);
+                        }
+                      };
+                    });
                   }
                 });
               } else {
@@ -464,7 +477,8 @@ var Parts = {
                   
                   // 为下载按钮添加事件监听器
                   area.querySelectorAll('.btn-download-edoc').forEach(function(btn) {
-                    btn.onclick = function() {
+                    btn.onclick = function(e) {
+                      e.stopPropagation(); // 阻止冒泡
                       var fileId = btn.dataset.fileId;
                       var fileName = btn.dataset.fileName;
                       
@@ -484,6 +498,18 @@ var Parts = {
                       }).catch(function(e) {
                         UI.toast('下载失败: ' + e.message, 'error');
                       });
+                    };
+                  });
+                  
+                  // 为图文档行添加点击事件
+                  area.querySelectorAll('.edoc-row').forEach(function(row) {
+                    row.onclick = function() {
+                      var docId = row.getAttribute('data-doc-id');
+                      if (docId) {
+                        // 存储返回信息
+                        window._docDetailReturnTo = { type: 'part', id: part.id };
+                        Documents._viewDoc(docId);
+                      }
                     };
                   });
                 }
@@ -522,7 +548,7 @@ var Parts = {
     
     edocList.forEach(function(ed) {
       var d = ed.document || {};
-      html += '<tr style="border-bottom:1px solid #f0f0f0">' +
+      html += '<tr class="edoc-row" data-doc-id="' + (d.id || '') + '" style="border-bottom:1px solid #f0f0f0;cursor:pointer">' +
         '<td style="padding:6px 10px;font-weight:500;white-space:nowrap">' + _esc(d.code || '') + '</td>' +
         '<td style="padding:6px 10px">' + _esc(d.name || '') + '</td>' +
         '<td style="padding:6px 10px;text-align:center"><span class="tag" style="background:#e6f7ff;color:#1890ff">' + _esc(d.version || '') + '</span></td>' +

@@ -501,7 +501,8 @@ var Components = {
                     
                     // 为下载按钮添加事件监听器
                     area.querySelectorAll('.btn-download-edoc').forEach(function(btn) {
-                      btn.onclick = function() {
+                      btn.onclick = function(e) {
+                        e.stopPropagation();
                         var fileId = btn.dataset.fileId;
                         var fileName = btn.dataset.fileName;
                         
@@ -523,6 +524,18 @@ var Components = {
                         });
                       };
                     });
+                    
+                    // 为图文档行添加点击事件
+                    area.querySelectorAll('.edoc-row').forEach(function(row) {
+                      row.onclick = function() {
+                        var docId = row.getAttribute('data-doc-id');
+                        if (docId) {
+                          // 存储返回信息
+                          window._docDetailReturnTo = { type: 'component', id: comp.id };
+                          Documents._viewDoc(docId);
+                        }
+                      };
+                    });
                   }
                 });
               } else {
@@ -532,7 +545,8 @@ var Components = {
                   
                   // 为下载按钮添加事件监听器
                   area.querySelectorAll('.btn-download-edoc').forEach(function(btn) {
-                    btn.onclick = function() {
+                    btn.onclick = function(e) {
+                      e.stopPropagation();
                       var fileId = btn.dataset.fileId;
                       var fileName = btn.dataset.fileName;
                       
@@ -552,6 +566,18 @@ var Components = {
                       }).catch(function(e) {
                         UI.toast('下载失败: ' + e.message, 'error');
                       });
+                    };
+                  });
+                  
+                  // 为图文档行添加点击事件
+                  area.querySelectorAll('.edoc-row').forEach(function(row) {
+                    row.onclick = function() {
+                      var docId = row.getAttribute('data-doc-id');
+                      if (docId) {
+                        // 存储返回信息
+                        window._docDetailReturnTo = { type: 'component', id: comp.id };
+                        Documents._viewDoc(docId);
+                      }
                     };
                   });
                 }
@@ -593,13 +619,14 @@ var Components = {
     } else {
       Components._viewComp(refId);
     }
-    // 在模态框 footer 中添加"返回"按钮，与"关闭"并排
+    // 在模态框 footer 中添加"返回"按钮（放在最左侧）
     setTimeout(function() {
       var footer = document.querySelector('#modal-box .modal-footer');
       if (!footer) return;
       var btn = document.createElement('button');
       btn.className = 'btn-outline';
       btn.innerHTML = '← 返回部件详情';
+      btn.style.marginRight = 'auto';
       btn.onclick = function() {
         var pid = window._compDetailReturnTo;
         window._compDetailReturnTo = null;
@@ -608,13 +635,7 @@ var Components = {
           Components._viewComp(pid);
         }, 150);
       };
-      // 插入到"关闭"按钮之前
-      var closeBtn = footer.querySelector('.btn-primary');
-      if (closeBtn) {
-        footer.insertBefore(btn, closeBtn);
-      } else {
-        footer.insertBefore(btn, footer.firstChild);
-      }
+      footer.insertBefore(btn, footer.firstChild);
     }, 100);
   },
 
@@ -1494,7 +1515,7 @@ var Components = {
     
     edocList.forEach(function(ed) {
       var d = ed.document || {};
-      html += '<tr style="border-bottom:1px solid #f0f0f0">' +
+      html += '<tr class="edoc-row" data-doc-id="' + (d.id || '') + '" style="border-bottom:1px solid #f0f0f0;cursor:pointer">' +
         '<td style="padding:6px 10px;font-weight:500;white-space:nowrap">' + _esc(d.code || '') + '</td>' +
         '<td style="padding:6px 10px">' + _esc(d.name || '') + '</td>' +
         '<td style="padding:6px 10px;text-align:center"><span class="tag" style="background:#e6f7ff;color:#1890ff">' + _esc(d.version || '') + '</span></td>' +

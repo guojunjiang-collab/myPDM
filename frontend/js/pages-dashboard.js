@@ -3,12 +3,14 @@ var Dashboard = {
     // 原 Pages.dashboard 函数体
     var parts = Store.getAll('parts');
     var comps = Store.getAll('components');
+    var docs = Store.getAll('documents');
     var boms = Store.getAll('bom');
     var logs = Store.getAll('logs').slice(-8).reverse();
     c.innerHTML =
       '<div class="stats-row">' +
         '<div class="stat-card"><div class="stat-icon blue">🔧</div><div class="stat-info"><div class="label">零件总数</div><div class="value">' + parts.length + '</div></div></div>' +
         '<div class="stat-card"><div class="stat-icon green">📦</div><div class="stat-info"><div class="label">部件总数</div><div class="value">' + comps.length + '</div></div></div>' +
+        '<div class="stat-card"><div class="stat-icon orange">📄</div><div class="stat-info"><div class="label">图文档总数</div><div class="value">' + docs.length + '</div></div></div>' +
       '</div>' +
       '<div class="card"><div class="card-header">📝 最近操作</div><div class="card-body"><div class="log-list">' +
         (logs.length === 0 ? '<p style="color:var(--text-light)">暂无日志</p>' :

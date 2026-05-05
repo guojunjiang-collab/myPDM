@@ -4,7 +4,7 @@
 
 const API_BASE = '/api/v2';
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB 每块
-const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB 最大文件大小
+const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1GB 最大文件大小
 
 /**
  * 获取认证头

@@ -1,6 +1,6 @@
 const Router = {
 
-  _titles: { dashboard:'仪表板', board:'用户看板', parts:'零件管理', components:'部件管理', bom:'BOM管理', documents:'图文档管理', users:'用户管理', logs:'操作日志', settings:'系统设置' },
+  _titles: { dashboard:'仪表盘', board:'用户看板', parts:'零件管理', components:'部件管理', documents:'图文档管理', bom:'管理工具', users:'用户管理', logs:'操作日志', settings:'系统设置' },
 
   navigate(page) {
 
