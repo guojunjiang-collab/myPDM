@@ -9,6 +9,7 @@ var Components = {
 
     // 创建页面结构（只创建一次）
     var canE = Auth.canEdit();
+    var canDl = Auth.canDownload();
     c.innerHTML =
       '<div class="page-header"><h2>📦 部件管理</h2><div class="actions">' +
         (canE ? '<button class="btn-primary" id="btn-add-cp">＋ 新增部件</button>' : '') +
