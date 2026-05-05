@@ -8,7 +8,6 @@ var Bom = {
         '<div class="bom-view-switcher">' +
           '<button class="view-switch-btn active" data-view="compare">📊 BOM对比</button>' +
           '<button class="view-switch-btn" data-view="search">🔍 BOM反查</button>' +
-          '<button class="view-switch-btn" data-view="doc-search">📄 图文档反查</button>' +
         '</div>' +
         
         '<div class="bom-view active" id="view-compare">' +
@@ -49,14 +48,6 @@ var Bom = {
             '<div id="bom-search-results" style="margin-top:8px;display:none;max-height:320px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:8px"></div>' +
           '</div>' +
           '<div id="bom-search-tree"></div>' +
-        '</div>' +
-        
-        '<div class="bom-view" id="view-doc-search">' +
-          '<div class="card" style="margin-bottom:20px">' +
-            '<input type="text" id="doc-search-input" placeholder="输入编号或名称搜索图文档..." autocomplete="off" class="form-input" style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;box-sizing:border-box" />' +
-            '<div id="doc-search-results" style="margin-top:8px;display:none;max-height:320px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:8px"></div>' +
-          '</div>' +
-          '<div id="doc-search-result-area"></div>' +
         '</div>' +
       '</div>';
     
@@ -470,116 +461,6 @@ var Bom = {
       }
       html += '</div>';
       return html;
-    }
-
-    // ===== 图文档反查功能 =====
-    var docSearchInput = c.querySelector('#doc-search-input');
-    var docSearchResults = c.querySelector('#doc-search-results');
-    var docSearchResultArea = c.querySelector('#doc-search-result-area');
-    var docSearchTimer = null;
-
-    function performDocSearch() {
-      var keyword = docSearchInput.value.trim().toLowerCase();
-      if (!keyword) { docSearchResults.style.display = 'none'; docSearchResultArea.innerHTML = ''; return; }
-      var docs = Store.getAll('documents') || [];
-      var filtered = docs.filter(function(d) {
-        return (d.code && d.code.toLowerCase().includes(keyword)) || (d.name && d.name.toLowerCase().includes(keyword));
-      });
-      if (filtered.length === 0) {
-        docSearchResults.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-light);font-size:13px">未找到匹配的图文档</div>';
-        docSearchResults.style.display = 'block'; docSearchResultArea.innerHTML = '';
-        return;
-      }
-      var html = '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb"><th style="padding:8px 12px;text-align:left;color:var(--text-secondary);font-weight:500">编号</th><th style="padding:8px 12px;text-align:left;color:var(--text-secondary);font-weight:500">名称</th><th style="padding:8px 12px;text-align:center;color:var(--text-secondary);font-weight:500">版本</th><th style="padding:8px 12px;text-align:center;color:var(--text-secondary);font-weight:500">状态</th></tr></thead><tbody>';
-      filtered.forEach(function(doc) {
-        var ver = doc.version || '';
-        var statusHtml = doc.status ? UI.statusTag(doc.status) : '<span style="color:#9ca3af;font-size:12px">-</span>';
-        html += '<tr class="doc-search-row" data-id="'+doc.id+'" style="cursor:pointer">' +
-          '<td style="padding:9px 12px;border-bottom:1px solid #f3f4f6;font-weight:500">'+(doc.code||'-')+'</td>' +
-          '<td style="padding:9px 12px;border-bottom:1px solid #f3f4f6;color:var(--text-secondary)">'+(doc.name||'-')+'</td>' +
-          '<td style="padding:9px 12px;border-bottom:1px solid #f3f4f6;text-align:center;font-size:12px;color:var(--text-secondary)">'+(ver||'-')+'</td>' +
-          '<td style="padding:9px 12px;border-bottom:1px solid #f3f4f6;text-align:center">'+statusHtml+'</td></tr>';
-      });
-      html += '</tbody></table>';
-      docSearchResults.innerHTML = html; docSearchResults.style.display = 'block'; docSearchResultArea.innerHTML = '';
-      c.querySelectorAll('.doc-search-row').forEach(function(row) {
-        row.onmouseover = function() { this.style.background = '#f0f7ff'; };
-        row.onmouseout = function() { this.style.background = ''; };
-        row.onclick = function() {
-          var docId = this.getAttribute('data-id');
-          docSearchResults.style.display = 'none';
-          doDocReverse(docId);
-        };
-      });
-    }
-
-    docSearchInput.addEventListener('input', function() {
-      clearTimeout(docSearchTimer);
-      docSearchTimer = setTimeout(performDocSearch, 300);
-    });
-    docSearchResults.style.display = 'none';
-
-    function doDocReverse(docId) {
-      var doc = Store.getById('documents', docId);
-      if (!doc) { docSearchResultArea.innerHTML = '<div class="card"><div class="card-body" style="text-align:center;padding:40px;color:var(--text-light)">图文档不存在</div></div>'; return; }
-
-      // 调用后端 API 获取引用信息
-      var token = localStorage.getItem('bom_api_token') || '';
-      docSearchResultArea.innerHTML = '<div class="card"><div class="card-body" style="text-align:center;padding:40px;color:var(--text-light)">正在查询引用信息...</div></div>';
-
-      fetch('/api/documents/' + docId + '/references', {
-        headers: { 'Authorization': 'Bearer ' + token }
-      }).then(function(r) { return r.json(); }).then(function(data) {
-        var refs = data.references || [];
-        var folders = data.dashboard_folders || [];
-
-        var html = '<div class="stat-card" style="margin-bottom:20px;max-width:400px"><div class="stat-icon blue">📄</div><div class="stat-info"><div class="label">' + (doc.code || '-') + '</div><div class="value" style="font-size:16px">' + (doc.name || '-') + '</div></div></div>';
-
-        // 零件/部件引用
-        html += '<div class="card" style="margin-bottom:20px"><div class="card-header">📎 被零件/部件引用 (' + refs.length + ')</div><div class="card-body">';
-        if (refs.length === 0) {
-          html += '<div style="text-align:center;padding:20px;color:var(--text-light)">未被任何零件或部件引用</div>';
-        } else {
-          html += '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f9fafb;border-bottom:1px solid #e5e7eb"><th style="padding:8px 12px;text-align:left">类型</th><th style="padding:8px 12px;text-align:left">编号</th><th style="padding:8px 12px;text-align:left">名称</th><th style="padding:8px 12px;text-align:center">版本</th><th style="padding:8px 12px;text-align:center">状态</th></tr></thead><tbody>';
-          refs.forEach(function(ref) {
-            var typeTag = ref.entity_type === 'part'
-              ? '<span style="font-size:12px;padding:1px 6px;border-radius:3px;background:#f6ffed;color:#52c41a;border:1px solid #b7eb8f">零件</span>'
-              : '<span style="font-size:12px;padding:1px 6px;border-radius:3px;background:#e6f4ff;color:#1677ff;border:1px solid #91caff">部件</span>';
-            var clickHandler = ref.entity_type === 'part'
-              ? 'onclick="Parts._viewPart(\'' + ref.entity_id + '\')"'
-              : 'onclick="Components._viewComp(\'' + ref.entity_id + '\')"';
-            var ver = ref.version || '';
-            var statusHtml = ref.status ? UI.statusTag(ref.status) : '<span style="color:#9ca3af;font-size:12px">-</span>';
-            html += '<tr style="cursor:pointer" ' + clickHandler + '>' +
-              '<td style="padding:8px 12px;border-bottom:1px solid #f3f4f6">' + typeTag + '</td>' +
-              '<td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;font-weight:500">' + (ref.entity_code || '-') + '</td>' +
-              '<td style="padding:8px 12px;border-bottom:1px solid #f3f4f6">' + (ref.entity_name || '-') + '</td>' +
-              '<td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:center;font-size:12px;color:var(--text-secondary)">' + (ver || '-') + '</td>' +
-              '<td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:center">' + statusHtml + '</td></tr>';
-          });
-          html += '</tbody></table>';
-        }
-        html += '</div></div>';
-
-        // 用户看板文件夹引用
-        html += '<div class="card"><div class="card-header">📁 被用户看板引用 (' + folders.length + ')</div><div class="card-body">';
-        if (folders.length === 0) {
-          html += '<div style="text-align:center;padding:20px;color:var(--text-light)">未被任何用户看板引用</div>';
-        } else {
-          html += '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f9fafb;border-bottom:1px solid #e5e7eb"><th style="padding:8px 12px;text-align:left">用户</th><th style="padding:8px 12px;text-align:left">文件夹路径</th></tr></thead><tbody>';
-          folders.forEach(function(f) {
-            html += '<tr>' +
-              '<td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;font-weight:500">' + (f.user_name || '-') + '</td>' +
-              '<td style="padding:8px 12px;border-bottom:1px solid #f3f4f6">' + (f.folder_path || '-') + '</td></tr>';
-          });
-          html += '</tbody></table>';
-        }
-        html += '</div></div>';
-
-        docSearchResultArea.innerHTML = html;
-      }).catch(function(e) {
-        docSearchResultArea.innerHTML = '<div class="card"><div class="card-body" style="text-align:center;padding:40px;color:var(--danger)">查询失败: ' + e.message + '</div></div>';
-      });
     }
   },
 

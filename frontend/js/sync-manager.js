@@ -395,14 +395,9 @@ var serverTime = converted.updatedAt || 0;
                   var updateData = Object.assign({}, converted, { id: converted.id });
                   Store.update(entity.key, existing.id, updateData, { silent: true, skipSync: true });
                 } else {
-                  // 本地更新更晚或同等新 → 保留本地，但对于图文档始终更新附件字段
-                  var updateFields = { id: converted.id };
-                  // 图文档：始终从服务器更新附件信息（file_id, file_name 只在服务器端设置）
-                  if (entity.key === 'documents') {
-                    if (converted.file_id) updateFields.file_id = converted.file_id;
-                    if (converted.file_name) updateFields.file_name = converted.file_name;
-                  }
-                  Store.update(entity.key, existing.id, updateFields, { silent: true, skipSync: true });
+                  // 本地更新更晚或同等新 → 保留本地（同时更新ID为服务器ID）
+                  console.log('[Pull] 保留本地', entity.key, 'id=' + existing.id, 'status=' + existing.status);
+                  Store.update(entity.key, existing.id, { id: converted.id }, { silent: true, skipSync: true });
                 }
 
               } else {

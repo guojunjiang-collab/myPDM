@@ -499,76 +499,14 @@ async def direct_download_attachment(
         raise HTTPException(status_code=404, detail="文件不存在")
 
     import mimetypes
-    from urllib.parse import quote
-    
     mime_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
-    
-    # RFC 5987 编码文件名（支持中文）
-    encoded_filename = quote(att.file_name)
-    
+
     # 返回文件，带 Content-Disposition: attachment 触发下载
     return FileResponse(
         path=str(file_path),
         filename=att.file_name,
         media_type=mime_type,
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"}
-    )
-
-
-@router.get("/{attachment_id}/preview")
-async def preview_attachment(
-    attachment_id: uuid.UUID,
-    token: str = None,
-    db: Session = Depends(get_db)
-):
-    """
-    预览附件（支持 query token，浏览器直接打开）
-    返回 Content-Disposition: inline 让浏览器内嵌显示
-    支持 Range 请求，浏览器可流式加载大文件
-    """
-    from jose import JWTError, jwt
-    from .auth import SECRET_KEY, ALGORITHM
-    
-    # 验证 token
-    if not token:
-        raise HTTPException(status_code=401, detail="缺少认证令牌")
-    
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
-        if not username:
-            raise HTTPException(status_code=401, detail="无效的认证令牌")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="认证令牌验证失败")
-    
-    # 获取附件
-    att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
-    if not att:
-        raise HTTPException(status_code=404, detail="附件不存在")
-
-    file_path = None
-    if hasattr(att, 'file_path') and att.file_path:
-        full_path = file_storage.base_dir / att.file_path
-        if full_path.exists():
-            file_path = full_path
-
-    if not file_path:
-        raise HTTPException(status_code=404, detail="文件不存在")
-
-    import mimetypes
-    from urllib.parse import quote
-    
-    mime_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
-    
-    # RFC 5987 编码文件名（支持中文）
-    encoded_filename = quote(att.file_name)
-    
-    # 返回文件，带 Content-Disposition: inline 让浏览器内嵌显示
-    return FileResponse(
-        path=str(file_path),
-        filename=att.file_name,
-        media_type=mime_type,
-        headers={"Content-Disposition": f"inline; filename*=UTF-8''{encoded_filename}"}
+        headers={"Content-Disposition": f'attachment; filename="{att.file_name}"'}
     )
 
 
