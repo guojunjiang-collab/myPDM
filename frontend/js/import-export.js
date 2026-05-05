@@ -134,7 +134,7 @@ var ImportExport = (function() {
 
   function _getCfDefs(appliesTo) {
     var defs = Store.getAll('custom_field_defs');
-    if (appliesTo) defs = defs.filter(function(d) { return d.applies_to === appliesTo; });
+    if (appliesTo === 'document') defs = defs.filter(function(d) { return d.applies_to === 'document'; }); else if (appliesTo) defs = defs.filter(function(d) { return d.applies_to === appliesTo || d.applies_to === 'both'; });
     return defs;
   }
 
