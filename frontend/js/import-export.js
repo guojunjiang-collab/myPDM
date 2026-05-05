@@ -246,8 +246,9 @@ var ImportExport = (function() {
 
     // 解析自定义字段
     preview.forEach(function(p) {
+      p.customFields = {};
       cfDefs.forEach(function(d) {
-        p.customFields[d.field_key] = '';
+        if (rows[0] && rows[0][d.name] !== undefined) p.customFields[d.field_key] = String(rows[0][d.name]);
       });
     });
 
@@ -287,13 +288,13 @@ var ImportExport = (function() {
       try {
         if (p.action === 'update') {
           await API._fetch('PUT', '/parts/' + p.matchId, {
-            code: p.code, name: p.name, spec: p.spec, version: p.version, status: p.status
-          });
+            code: p.code, name: p.name, spec: p.spec, version: p.version, status: p.status, customFields: p.customFields
+        });
           updated++;
         } else {
           var result = await API._fetch('POST', '/parts/', {
-            code: p.code, name: p.name, spec: p.spec, version: p.version, status: p.status
-          });
+            code: p.code, name: p.name, spec: p.spec, version: p.version, status: p.status, customFields: p.customFields
+        });
           p._newId = result.id;
           created++;
         }
@@ -514,13 +515,13 @@ var ImportExport = (function() {
       try {
         if (p.action === 'update') {
           await API._fetch('PUT', '/assemblies/' + p.matchId, {
-            code: p.code, name: p.name, spec: p.spec, version: p.version, status: p.status
-          });
+            code: p.code, name: p.name, spec: p.spec, version: p.version, status: p.status, customFields: p.customFields
+        });
           updated++;
         } else {
           var result = await API._fetch('POST', '/assemblies/', {
-            code: p.code, name: p.name, spec: p.spec, version: p.version, status: p.status
-          });
+            code: p.code, name: p.name, spec: p.spec, version: p.version, status: p.status, customFields: p.customFields
+        });
           p._newId = result.id;
           created++;
         }
@@ -699,14 +700,14 @@ var ImportExport = (function() {
         if (p.action === 'update') {
           await API._fetch('PUT', '/documents/' + p.matchId, {
             code: p.code, name: p.name, version: p.version,
-            description: p.description, status: p.status
-          });
+            description: p.description, status: p.status, customFields: p.customFields
+        });
           updated++;
         } else {
           var result = await API._fetch('POST', '/documents/', {
             code: p.code, name: p.name, version: p.version,
-            description: p.description, status: p.status
-          });
+            description: p.description, status: p.status, customFields: p.customFields
+        });
           p._newId = result.id;
           created++;
         }
