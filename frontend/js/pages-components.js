@@ -514,7 +514,8 @@ var Components = {
         '<div class="form-row"><div class="form-group" style="flex:1"><label>创建时间</label><div style="padding:6px 10px;font-size:13px;color:#666">' + (comp.created_at ? UI.formatDate(comp.created_at) : '-') + '</div></div></div>' +
       cfHtml +
 
-      '<h4 style="margin-bottom:12px">子项列表 (' + (sortedParts||[]).length + '种)</h4>' +
+      '<h4 style="margin-bottom:12px">子项列表 (' + 
+        '<div class="form-row"><div class="form-group" style="flex:1"><label>更新时间</label><div style="padding:6px 10px;font-size:13px;color:#666">' + (comp.updated_at ? UI.formatDate(comp.updated_at) : '-') + '</div></div></div>' +(sortedParts||[]).length + '种)</h4>' +
 
       '<div class="tabs" id="comp-tabs"><div class="tab active" data-t="tree">🌲 树形视图</div><div class="tab" data-t="table">📊 表格视图</div><div class="tab" data-t="attachment">📎 关联图文档</div></div>' +
 
