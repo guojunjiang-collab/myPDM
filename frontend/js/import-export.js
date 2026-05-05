@@ -571,14 +571,20 @@ var ImportExport = (function() {
       var documents = Store.getAll('documents');
       var cfDefs = _getCfDefs('document');
 
-      // 获取附件列表
+      // 获取每个文档的附件列表
       var attMap = {};
       var attPromises = documents.map(function(doc) {
-        if (!doc.file_id) return Promise.resolve();
-        return fetch(API_BASE + '/attachments/' + doc.file_id, { headers: _getAuthHeaders() })
-          .then(function(r) { return r.json(); })
-          .then(function(att) { attMap[doc.id] = att; })
-          .catch(function() {});
+        return fetch(API._base + '/documents/' + doc.id + '/attachments', { headers: API._headers() })
+          .then(function(r) {
+            if (!r.ok) return [];
+            return r.json();
+          })
+          .then(function(atts) {
+            attMap[doc.id] = atts;
+          })
+          .catch(function() {
+            attMap[doc.id] = [];
+          });
       });
       await Promise.all(attPromises);
 
@@ -588,8 +594,8 @@ var ImportExport = (function() {
         var row = {
           '图文档编号': d.code, '名称': d.name, '版本': d.version,
           '状态': _statusLabel(d.status), '描述': d.description || '',
-          '附件文件名': att ? att.file_name : '',
-          '创建时间': d.created_at || '', '更新时间': d.updated_at || ''
+          '附件文件名': Array.isArray(att) && att.length > 0 ? att.map(function(a){return a.file_name||'';}).join(', ') : (att && att.file_name ? att.file_name : ''),
+          '创建时间': d.createdAt || '', '更新时间': d.updatedAt || ''
         };
         cfDefs.forEach(function(cf) { row[cf.name] = _getCfValue(d, cf.field_key); });
         return row;
