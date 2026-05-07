@@ -33,6 +33,7 @@ export interface Assembly {
   code: string;
   name: string;
   spec?: string;
+  material?: string;
   unit?: string;
   price?: number;
   status: 'draft' | 'frozen' | 'released' | 'obsolete';
