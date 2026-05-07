@@ -252,7 +252,7 @@
 ### 开发环境准备
 ```bash
 # 1. 启动Docker环境
-cd "C:\Users\guoju\Desktop\BOM Tool"
+cd "D:\OpenCode\myPDM"
 docker-compose up -d
 
 # 2. 验证后端运行
