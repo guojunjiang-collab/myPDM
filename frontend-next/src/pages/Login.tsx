@@ -17,8 +17,10 @@ export default function Login() {
 
     try {
       const response = await authApi.login(username, password);
-      const { access_token, user } = response.data;
-      useAuthStore.getState().setUser(user, access_token);
+      const { access_token } = response.data;
+      // 获取用户信息
+      const userResponse = await authApi.getCurrentUser();
+      useAuthStore.getState().setUser(userResponse.data, access_token);
       navigate('/');
     } catch (err) {
       setError('用户名或密码错误');

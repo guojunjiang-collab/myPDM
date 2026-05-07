@@ -33,8 +33,8 @@
     if (!attachmentId) {
       document.getElementById('preview').innerHTML = '<p class="error">缺少附件ID参数</p>';
     } else {
-      fetch(`/api/attachments/${attachmentId}/preview`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      fetch('/api/attachments/' + attachmentId + '/preview', {
+        headers: token ? { 'Authorization': 'Bearer ' + token } : {}
       })
       .then(res => {
         if (!res.ok) throw new Error('加载失败');
@@ -48,13 +48,13 @@
       .then(data => {
         const preview = document.getElementById('preview');
         if (typeof data === 'string') {
-          preview.innerHTML = `<img src="${data}" alt="预览">`;
+          preview.innerHTML = '<img src="' + data + '" alt="预览">';
         } else {
-          preview.innerHTML = `<p class="error">该文件类型暂不支持预览: ${data.contentType}</p>`;
+          preview.innerHTML = '<p class="error">该文件类型暂不支持预览: ' + data.contentType + '</p>';
         }
       })
       .catch(err => {
-        document.getElementById('preview').innerHTML = `<p class="error">预览失败: ${err.message}</p>`;
+        document.getElementById('preview').innerHTML = '<p class="error">预览失败: ' + err.message + '</p>';
       });
     }
   </script>

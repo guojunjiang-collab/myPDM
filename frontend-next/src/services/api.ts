@@ -32,8 +32,14 @@ api.interceptors.response.use(
 
 // 认证 API
 export const authApi = {
-  login: (username: string, password: string) =>
-    api.post('/auth/token', { username, password }),
+  login: (username: string, password: string) => {
+    const formData = new URLSearchParams();
+    formData.append('username', username);
+    formData.append('password', password);
+    return api.post('/auth/token', formData.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  },
   getCurrentUser: () => api.get('/auth/me'),
   changePassword: (oldPassword: string, newPassword: string) =>
     api.post('/auth/change-password', {
