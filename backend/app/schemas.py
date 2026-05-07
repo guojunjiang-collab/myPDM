@@ -1,7 +1,18 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, BeforeValidator
+from typing import Optional, List, Any, Dict, Union, Annotated
 from datetime import datetime
-from typing import Optional, List, Any, Dict
 import uuid
+
+
+def _normalize_applies_to(v):
+    """兼容字符串或列表输入，统一转为列表"""
+    if isinstance(v, str):
+        return [v]
+    if isinstance(v, list):
+        return v
+    return ['part']
+
+AppliesToList = Annotated[List[str], BeforeValidator(_normalize_applies_to)]
 
 class BaseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -194,7 +205,7 @@ class CustomFieldDefinitionBase(BaseSchema):
     field_type: str = Field(..., pattern=r'^(text|number|select|multiselect)$')
     options: Optional[List[str]] = None
     is_required: bool = False
-    applies_to: str = Field(default='both', pattern=r'^(part|component|document|both)$')
+    applies_to: AppliesToList = Field(default=['part'])
     sort_order: int = 0
 
 class CustomFieldDefinitionCreate(CustomFieldDefinitionBase):
@@ -205,7 +216,7 @@ class CustomFieldDefinitionUpdate(BaseSchema):
     field_type: Optional[str] = None
     options: Optional[List[str]] = None
     is_required: Optional[bool] = None
-    applies_to: Optional[str] = None
+    applies_to: Optional[AppliesToList] = None
     sort_order: Optional[int] = None
 
 class CustomFieldDefinitionResponse(CustomFieldDefinitionBase):

@@ -7,6 +7,19 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  paramsSerializer: {
+    serialize: (params) => {
+      // 强制将数组序列化为 JSON 字符串，避免 axios 把单元素数组变成字符串
+      return Object.entries(params)
+        .filter(([, v]) => v !== undefined && v !== null && v !== '')
+        .map(([k, v]) =>
+          Array.isArray(v)
+            ? `${encodeURIComponent(k)}=${encodeURIComponent(JSON.stringify(v))}`
+            : `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`
+        )
+        .join('&');
+    },
+  },
 });
 
 // 请求拦截器：自动添加 Token
@@ -101,6 +114,7 @@ export const attachmentsApi = {
 export const bomApi = {
   getTree: (type: 'part' | 'assembly', id: string) =>
     api.get(`/bom/tree/${type}/${id}`),
+  getAllItems: () => api.get('/bom/items/all'),
   createItem: (data: { parent_type: string; parent_id: string; child_type: string; child_id: string; qty: number }) =>
     api.post('/bom/items', data),
   deleteItem: (id: string) => api.delete(`/bom/items/${id}`),
@@ -126,25 +140,6 @@ export const logsApi = {
     api.get('/logs/', { params }),
 };
 
-// 数据字典 API
-export const dictApi = {
-  getByType: (type: string) => api.get(`/dict/${type}`),
-};
-
-// 自定义字段 API
-export const customFieldsApi = {
-  list: (entityType?: string) =>
-    api.get('/custom_fields/', { params: { entity_type: entityType } }),
-  create: (data: unknown) => api.post('/custom_fields/', data),
-  update: (id: string, data: unknown) => api.put(`/custom_fields/${id}`, data),
-  delete: (id: string) => api.delete(`/custom_fields/${id}`),
-};
-
-// 仪表盘 API
-export const dashboardApi = {
-  getStats: () => api.get('/dashboard/stats'),
-};
-
 // 用户看板 API
 export const boardApi = {
   getFolders: () => api.get('/dashboard/folders'),
@@ -160,6 +155,38 @@ export const boardApi = {
     api.delete(`/dashboard/folders/${folderId}/items/${itemId}`),
   shareFolder: (id: string, data: { shared: boolean }) =>
     api.put(`/dashboard/folders/${id}/share`, data),
+};
+
+// 仪表盘 API
+export const dashboardApi = {
+  getStats: () => api.get('/dashboard/stats'),
+};
+
+// 部件子项 API
+export const assemblyPartsApi = {
+  list: (assemblyId: string) => api.get(`/assemblies/${assemblyId}/parts`),
+  add: (assemblyId: string, data: { child_type: string; child_id: string; quantity: number }) =>
+    api.post(`/assemblies/${assemblyId}/parts`, data),
+  update: (assemblyId: string, itemId: string, data: { quantity: number }) =>
+    api.put(`/assemblies/${assemblyId}/parts/${itemId}`, data),
+  remove: (assemblyId: string, itemId: string) =>
+    api.delete(`/assemblies/${assemblyId}/parts/${itemId}`),
+};
+
+// 自定义字段 API
+export const customFieldsApi = {
+  listDefinitions: () =>
+    api.get('/custom-fields/definitions/'),
+  createDefinition: (data: unknown) => api.post('/custom-fields/definitions/', data),
+  updateDefinition: (id: string, data: unknown) => api.put(`/custom-fields/definitions/${id}`, data),
+  deleteDefinition: (id: string) => api.delete(`/custom-fields/definitions/${id}`),
+  reorderDefinitions: (items: { id: string; sort_order: number }[]) =>
+    api.put('/custom-fields/definitions/reorder', { items }),
+  getValues: (entityType: string, entityId: string) =>
+    api.get(`/custom-fields/values/${entityType}/${entityId}`),
+  setValues: (entityType: string, entityId: string, values: unknown[]) =>
+    api.put(`/custom-fields/values/${entityType}/${entityId}`, { values }),
+  resetData: () => api.post('/custom-fields/reset-data'),
 };
 
 export default api;

@@ -1,11 +1,59 @@
 import { useEffect, useState } from 'react';
-import { customFieldsApi } from '../services/api';
-import type { CustomFieldDef } from '../types';
+import { customFieldsApi, authApi } from '../services/api';
+import { useAuthStore } from '../stores/auth';
+import type { CustomFieldDefinition } from '../types';
+import { Modal } from '../components/Modal';
+import { useDataStore } from '../stores/data';
+
+const FIELD_TYPES = [
+  { value: 'text', label: '单行文本' },
+  { value: 'number', label: '数字' },
+  { value: 'select', label: '下拉选择' },
+] as const;
+
+const ENTITY_TYPES = [
+  { value: 'part', label: '零件' },
+  { value: 'component', label: '部件' },
+  { value: 'document', label: '图文档' },
+] as const;
+
+interface FieldFormData {
+  name: string;
+  field_key: string;
+  field_type: 'text' | 'number' | 'select';
+  options: string;
+  is_required: boolean;
+  applies_to: string[];
+}
+
+const defaultFormData: FieldFormData = {
+  name: '',
+  field_key: '',
+  field_type: 'text',
+  options: '',
+  is_required: false,
+  applies_to: ['part'],
+};
 
 export default function Settings() {
-  const [customFields, setCustomFields] = useState<CustomFieldDef[]>([]);
+  const currentUser = useAuthStore((state) => state.user);
+  const logout = useAuthStore((state) => state.logout);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'customFields' | 'dict'>('customFields');
+  const [activeTab, setActiveTab] = useState<'password' | 'customFields' | 'dataManagement'>('password');
+
+  // Password change state
+  const [passwordForm, setPasswordForm] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  // Custom field modal state
+  const [showModal, setShowModal] = useState(false);
+  const [editingField, setEditingField] = useState<CustomFieldDefinition | null>(null);
+  const [formData, setFormData] = useState<FieldFormData>(defaultFormData);
+  const [formError, setFormError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     if (activeTab === 'customFields') {
@@ -13,10 +61,18 @@ export default function Settings() {
     }
   }, [activeTab]);
 
+  // 订阅 store 数据变化
+  const storeCustomFields = useDataStore((s) => s.customFieldDefs);
+
   const loadCustomFields = async () => {
+    const localDefs = useDataStore.getState().customFieldDefs;
+    if (localDefs.length > 0) {
+      setLoading(false);
+      return;
+    }
     try {
-      const response = await customFieldsApi.list();
-      setCustomFields(response.data.items || []);
+      const response = await customFieldsApi.listDefinitions();
+      useDataStore.getState().setCustomFieldDefs(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('加载自定义字段失败', error);
     } finally {
@@ -24,19 +80,162 @@ export default function Settings() {
     }
   };
 
+  // store 变化时刷新
+  useEffect(() => {
+    if (activeTab === 'customFields') {
+      setLoading(false);
+    }
+  }, [activeTab, storeCustomFields]);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    if (passwordForm.newPassword.length < 6) {
+      setPasswordError('新密码至少6位');
+      return;
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError('两次密码不一致');
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      await authApi.changePassword(passwordForm.oldPassword, passwordForm.newPassword);
+      setPasswordSuccess('密码修改成功，请重新登录');
+      setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
+      setTimeout(() => {
+        logout();
+        window.location.href = '/login';
+      }, 2000);
+    } catch (error: any) {
+      setPasswordError(error.response?.data?.detail || '修改失败');
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const openCreateModal = () => {
+    setEditingField(null);
+    setFormData(defaultFormData);
+    setFormError('');
+    setSaving(false);
+    setShowModal(true);
+  };
+
+  const openEditModal = (field: CustomFieldDefinition) => {
+    setEditingField(field);
+    // applies_to 现在直接是数组
+    const appliesToArray = Array.isArray(field.applies_to) ? field.applies_to : [field.applies_to];
+    setFormData({
+      name: field.name,
+      field_key: field.field_key,
+      field_type: field.field_type as 'text' | 'number' | 'select',
+      options: (field.options || []).join('\n'),
+      is_required: field.is_required,
+      applies_to: appliesToArray,
+    });
+    setFormError('');
+    setSaving(false);
+    setShowModal(true);
+  };
+
+  const handleSubmitField = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError('');
+
+    if (!formData.name.trim()) {
+      setFormError('请输入字段名称');
+      return;
+    }
+    if (!formData.field_key.trim()) {
+      setFormError('请输入字段标识');
+      return;
+    }
+    if (!/^[a-z_][a-z0-9_]*$/.test(formData.field_key)) {
+      setFormError('字段标识只能包含小写字母、数字、下划线，且以字母或下划线开头');
+      return;
+    }
+    if (formData.applies_to.length === 0) {
+      setFormError('请选择至少一个适用类型');
+      return;
+    }
+
+    // applies_to 现在直接传递数组，不做字符串转换
+    const payload = {
+      name: formData.name.trim(),
+      field_key: formData.field_key.trim(),
+      field_type: formData.field_type,
+      options: formData.options ? formData.options.split('\n').map(s => s.trim()).filter(Boolean) : [],
+      is_required: formData.is_required,
+      applies_to: formData.applies_to,
+    };
+
+    setSaving(true);
+    try {
+      let newField: CustomFieldDefinition | null = null;
+      if (editingField) {
+        const res = await customFieldsApi.updateDefinition(editingField.id, payload);
+        newField = res.data;
+        // 直接更新 store
+        useDataStore.getState().setCustomFieldDefs(
+          useDataStore.getState().customFieldDefs.map(f => f.id === editingField.id ? newField! : f)
+        );
+      } else {
+        const res = await customFieldsApi.createDefinition(payload);
+        newField = res.data;
+        // 直接追加到 store
+        useDataStore.getState().setCustomFieldDefs([...useDataStore.getState().customFieldDefs, newField!]);
+      }
+      setShowModal(false);
+      setFormData(defaultFormData);
+      setEditingField(null);
+    } catch (error: any) {
+      // 尝试从不同格式的错误响应中提取信息
+      const detail = error.response?.data?.detail;
+      if (Array.isArray(detail)) {
+        setFormError(detail.map((e: any) => e.msg || JSON.stringify(e)).join('; '));
+      } else {
+        setFormError(typeof detail === 'string' ? detail : '保存失败');
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleResetData = async () => {
+    setResetting(true);
+    try {
+      await customFieldsApi.resetData();
+      // 清空本地缓存
+      localStorage.removeItem('data-storage');
+      // 清空本地 store 中的业务数据
+      useDataStore.getState().setParts([]);
+      useDataStore.getState().setAssemblies([]);
+      useDataStore.getState().setDocuments([]);
+      useDataStore.getState().setCustomFieldDefs([]);
+      alert('系统数据已清空');
+    } catch (error: any) {
+      alert(error.response?.data?.detail || '重置失败，请重试');
+    } finally {
+      setResetting(false);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm('确定要删除该自定义字段吗？')) return;
     try {
-      await customFieldsApi.delete(id);
-      loadCustomFields();
+      await customFieldsApi.deleteDefinition(id);
+      // 直接从 store 删除
+      useDataStore.getState().setCustomFieldDefs(
+        useDataStore.getState().customFieldDefs.filter(f => f.id !== id)
+      );
     } catch (error) {
       alert('删除失败');
     }
   };
-
-  if (loading) {
-    return <div className="text-gray-500">加载中...</div>;
-  }
 
   return (
     <div>
@@ -44,6 +243,16 @@ export default function Settings() {
 
       {/* Tabs */}
       <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => setActiveTab('password')}
+          className={`px-4 py-2 rounded-lg ${
+            activeTab === 'password'
+              ? 'bg-primary-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          修改密码
+        </button>
         <button
           onClick={() => setActiveTab('customFields')}
           className={`px-4 py-2 rounded-lg ${
@@ -55,23 +264,92 @@ export default function Settings() {
           自定义字段
         </button>
         <button
-          onClick={() => setActiveTab('dict')}
+          onClick={() => setActiveTab('dataManagement')}
           className={`px-4 py-2 rounded-lg ${
-            activeTab === 'dict'
+            activeTab === 'dataManagement'
               ? 'bg-primary-600 text-white'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
-          数据字典
+          数据管理
         </button>
       </div>
+
+      {/* 修改密码 */}
+      {activeTab === 'password' && (
+        <div className="max-w-md">
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-medium mb-4">修改密码</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              当前用户: <span className="font-medium">{currentUser?.username}</span>
+            </p>
+
+            {passwordSuccess ? (
+              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
+                {passwordSuccess}
+              </div>
+            ) : (
+              <form onSubmit={handleChangePassword} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">原密码</label>
+                  <input
+                    type="password"
+                    value={passwordForm.oldPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, oldPassword: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">新密码</label>
+                  <input
+                    type="password"
+                    value={passwordForm.newPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    required
+                    minLength={6}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">确认新密码</label>
+                  <input
+                    type="password"
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    required
+                  />
+                </div>
+
+                {passwordError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
+                    {passwordError}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={changingPassword}
+                  className="w-full py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                >
+                  {changingPassword ? '提交中...' : '确认修改'}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 自定义字段 */}
       {activeTab === 'customFields' && (
         <div>
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm text-gray-500">自定义字段用于扩展零件、部件、图文档的结构</p>
-            <button className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+            <button
+              onClick={openCreateModal}
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+            >
               新增字段
             </button>
           </div>
@@ -80,45 +358,52 @@ export default function Settings() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">实体类型</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">字段名</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">显示名称</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">名称</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">标识</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">类型</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">适用类型</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">必填</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">状态</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">排序</th>
                   <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {customFields.length === 0 ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">加载中...</td>
+                  </tr>
+                ) : storeCustomFields.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                       暂无数据
                     </td>
                   </tr>
                 ) : (
-                  customFields.map((field) => (
+                  storeCustomFields.map((field) => (
                     <tr key={field.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm">{field.entity_type}</td>
-                      <td className="px-4 py-3 text-sm">{field.field_name}</td>
-                      <td className="px-4 py-3 text-sm">{field.field_label}</td>
-                      <td className="px-4 py-3 text-sm">{field.field_type}</td>
+                      <td className="px-4 py-3 text-sm">{field.name}</td>
+                      <td className="px-4 py-3 text-sm font-mono text-gray-600">{field.field_key}</td>
                       <td className="px-4 py-3 text-sm">
-                        {field.required ? '是' : '否'}
+                        {FIELD_TYPES.find(t => t.value === field.field_type)?.label || field.field_type}
                       </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`px-2 py-1 text-xs rounded-full ${
-                            field.status === 'active'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}
-                        >
-                          {field.status === 'active' ? '启用' : '禁用'}
-                        </span>
+                      <td className="px-4 py-3 text-sm">
+                        <div className="flex gap-1">
+                          {(Array.isArray(field.applies_to) ? field.applies_to : [field.applies_to]).map((type) => (
+                            <span key={type} className="px-2 py-0.5 text-xs bg-gray-100 rounded">
+                              {ENTITY_TYPES.find(e => e.value === type)?.label || type}
+                            </span>
+                          ))}
+                        </div>
                       </td>
+                      <td className="px-4 py-3 text-sm">
+                        {field.is_required ? '是' : '否'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500">{field.sort_order}</td>
                       <td className="px-4 py-3 text-right">
-                        <button className="text-primary-600 hover:text-primary-800 mr-2">
+                        <button
+                          className="text-primary-600 hover:text-primary-800 mr-2"
+                          onClick={() => openEditModal(field)}
+                        >
                           编辑
                         </button>
                         <button
@@ -137,12 +422,156 @@ export default function Settings() {
         </div>
       )}
 
-      {/* 数据字典 */}
-      {activeTab === 'dict' && (
-        <div>
-          <p className="text-sm text-gray-500">数据字典管理 - 待实现</p>
+      {/* 数据管理 */}
+      {activeTab === 'dataManagement' && (
+        <div className="space-y-6">
+          {/* 导出全部数据 */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-medium mb-2">导出全部数据</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              将系统中的所有零件、部件、图文档数据导出为文件备份。
+            </p>
+            <button
+              onClick={() => alert('功能开发中')}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            >
+              导出全部数据
+            </button>
+          </div>
+
+          {/* 重置系统数据 */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-medium mb-2">重置系统数据</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              清空所有零件、部件、图文档数据，自定义字段和用户账号不受影响。此操作不可逆，请谨慎操作。
+            </p>
+            <button
+              onClick={handleResetData}
+              disabled={resetting}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+            >
+              {resetting ? '重置中...' : '重置系统数据'}
+            </button>
+          </div>
         </div>
       )}
+
+      {/* 自定义字段 Modal */}
+      <Modal
+        open={showModal}
+        title={editingField ? '编辑字段' : '新增字段'}
+        onClose={() => setShowModal(false)}
+        width="lg"
+      >
+        <form onSubmit={handleSubmitField} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">字段名称</label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              placeholder="例如：采购周期"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">字段标识</label>
+            <input
+              type="text"
+              value={formData.field_key}
+              onChange={(e) => setFormData({ ...formData, field_key: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+              placeholder="例如：lead_time（小写字母、数字、下划线）"
+              disabled={!!editingField}
+            />
+            <p className="mt-1 text-xs text-gray-500">创建后不可修改，用于API字段映射</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">字段类型</label>
+            <select
+              value={formData.field_type}
+              onChange={(e) => setFormData({ ...formData, field_type: e.target.value as 'text' | 'number' | 'select' })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            >
+              {FIELD_TYPES.map((type) => (
+                <option key={type.value} value={type.value}>{type.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {formData.field_type === 'select' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">选项</label>
+              <textarea
+                value={formData.options}
+                onChange={(e) => setFormData({ ...formData, options: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                rows={3}
+                placeholder="每行一个选项"
+              />
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">适用类型</label>
+            <div className="flex gap-4">
+              {ENTITY_TYPES.map((type) => (
+                <label key={type.value} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.applies_to.includes(type.value)}
+                    onChange={(e) => {
+                      const newAppliesTo = e.target.checked
+                        ? [...formData.applies_to, type.value]
+                        : formData.applies_to.filter(t => t !== type.value);
+                      setFormData({ ...formData, applies_to: newAppliesTo });
+                    }}
+                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm">{type.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={formData.is_required}
+                onChange={(e) => setFormData({ ...formData, is_required: e.target.checked })}
+                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              />
+              <span className="text-sm font-medium text-gray-700">必填字段</span>
+            </label>
+          </div>
+
+          {formError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
+              {formError}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={() => setShowModal(false)}
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+            >
+              {saving ? '保存中...' : '保存'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

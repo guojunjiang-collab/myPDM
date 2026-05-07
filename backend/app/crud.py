@@ -297,12 +297,13 @@ def delete_dictionary(db, dict_id):
 
 def get_custom_field_definitions(db, applies_to=None):
     q = db.query(models.CustomFieldDefinition)
+    # 前端已经做过滤，后端直接返回全部（applies_to 为空）或按类型过滤
     if applies_to and applies_to != 'all':
-        if applies_to == 'document':
-            # 'both' 表示零件+部件，不包含图文档
-            q = q.filter(models.CustomFieldDefinition.applies_to == 'document')
-        else:
-            q = q.filter((models.CustomFieldDefinition.applies_to == applies_to) | (models.CustomFieldDefinition.applies_to == 'both'))
+        # applies_to 现在是逗号分隔的字符串，如 "part,component"
+        types = [t.strip() for t in applies_to.split(',')]
+        if types:
+            from sqlalchemy import any_
+            q = q.filter(models.CustomFieldDefinition.applies_to.overlap(types))
     return q.order_by(models.CustomFieldDefinition.sort_order, models.CustomFieldDefinition.created_at).all()
 
 def get_custom_field_definition(db, field_id):
@@ -312,13 +313,17 @@ def get_custom_field_definition_by_key(db, field_key):
     return db.query(models.CustomFieldDefinition).filter(models.CustomFieldDefinition.field_key == field_key).first()
 
 def create_custom_field_definition(db, field_def):
+    # 确保 applies_to 是 list 类型（JSONB 字段）
+    applies_to_val = field_def.applies_to
+    if isinstance(applies_to_val, str):
+        applies_to_val = [applies_to_val]
     kwargs = dict(
         name=field_def.name,
         field_key=field_def.field_key,
         field_type=field_def.field_type,
         options=field_def.options or [],
         is_required=1 if field_def.is_required else 0,
-        applies_to=field_def.applies_to,
+        applies_to=applies_to_val,
         sort_order=field_def.sort_order
     )
     if field_def.id:
@@ -336,6 +341,10 @@ def update_custom_field_definition(db, field_id, field_update):
     update_data = field_update.model_dump(exclude_unset=True)
     if 'is_required' in update_data:
         update_data['is_required'] = 1 if update_data['is_required'] else 0
+    # 确保 applies_to 是 list 类型
+    if 'applies_to' in update_data:
+        if isinstance(update_data['applies_to'], str):
+            update_data['applies_to'] = [update_data['applies_to']]
     for field, value in update_data.items():
         setattr(db_field, field, value)
     from datetime import datetime

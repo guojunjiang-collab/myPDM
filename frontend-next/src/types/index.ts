@@ -17,15 +17,11 @@ export interface Part {
   code: string;
   name: string;
   spec?: string;
-  material?: string;
-  unit?: string;
-  price?: number;
-  supplier?: string;
-  stock?: number;
+  version?: string;
   status: 'draft' | 'frozen' | 'released' | 'obsolete';
   remark?: string;
-  created: string;
-  updated: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Assembly {
@@ -33,13 +29,11 @@ export interface Assembly {
   code: string;
   name: string;
   spec?: string;
-  material?: string;
-  unit?: string;
-  price?: number;
+  version?: string;
   status: 'draft' | 'frozen' | 'released' | 'obsolete';
   remark?: string;
-  created: string;
-  updated: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Document {
@@ -49,8 +43,8 @@ export interface Document {
   version?: string;
   status: 'draft' | 'frozen' | 'released' | 'obsolete';
   remark?: string;
-  created: string;
-  updated: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface BOMItem {
@@ -85,6 +79,27 @@ export interface OperationLog {
   created: string;
 }
 
+export interface CustomFieldDefinition {
+  id: string;
+  name: string;
+  field_key: string;
+  field_type: 'text' | 'number' | 'select' | 'multiselect';
+  options?: string[];
+  is_required: boolean;
+  applies_to: string[]; // backend: ['part'] / ['component'] / ['part', 'component'] 等数组
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CustomFieldValue {
+  field_id: string;
+  field_key: string;
+  field_name: string;
+  field_type: string;
+  value: string | number | string[] | null;
+}
+
 export interface CustomFieldDef {
   id: string;
   entity_type: string;
@@ -94,6 +109,23 @@ export interface CustomFieldDef {
   options?: string;
   required: boolean;
   status: 'active' | 'disabled';
+}
+
+/** 子项（后端 get_assembly_parts 返回格式） */
+export interface AssemblyPartItem {
+  id: string;
+  childType: 'part' | 'component';
+  child_id: string;
+  componentId: string | null;
+  partId: string | null;
+  quantity: number;
+  created_at: string;
+  child_detail?: {
+    id: string;
+    code: string;
+    name: string;
+    spec?: string;
+  };
 }
 
 export interface DashboardStats {

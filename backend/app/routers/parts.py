@@ -18,6 +18,7 @@ def _part_response(part):
         "spec": part.spec,
         "version": part.version,
         "status": part.status,
+        "remark": part.remark,
         "revisions": part.revisions or [],
         "created_at": part.created_at,
         "updated_at": part.updated_at,

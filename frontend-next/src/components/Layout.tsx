@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/auth';
+import { useDataStore } from '../stores/data';
 
 const navItems = [
   { path: '/dashboard', label: '仪表盘', icon: '📊', roles: ['admin', 'engineer', 'production', 'guest'] },
@@ -17,11 +19,25 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
+  const { syncAll, isSyncing } = useDataStore();
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const userRole = user?.role || 'guest';
 
   const visibleNavItems = navItems.filter((item) =>
     item.roles.includes(userRole)
   );
+
+  const handleSync = async () => {
+    setSyncMsg(null);
+    try {
+      await syncAll();
+      setSyncMsg('检出成功');
+      setTimeout(() => setSyncMsg(null), 3000);
+    } catch {
+      setSyncMsg('检出失败');
+      setTimeout(() => setSyncMsg(null), 3000);
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -66,6 +82,19 @@ export default function Layout() {
             </span>
           </div>
           <div className="right flex items-center gap-2">
+            {syncMsg && (
+              <span className={`text-sm px-2 py-1 rounded ${syncMsg.includes('成功') ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+                {syncMsg}
+              </span>
+            )}
+            <button
+              onClick={handleSync}
+              disabled={isSyncing}
+              className="flex items-center gap-1 px-3 py-1 text-sm border border-blue-300 text-blue-600 rounded hover:bg-blue-50 disabled:opacity-50"
+              title="从服务器检出最新数据到本地"
+            >
+              <span>{isSyncing ? '同步中...' : '⬇ 检出数据'}</span>
+            </button>
             <span className="text-sm text-gray-500">{user?.real_name}</span>
             <button
               onClick={handleLogout}

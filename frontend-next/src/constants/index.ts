@@ -51,3 +51,60 @@ export const ALLOWED_FILE_TYPES = [
   'application/dxf',
   'image/vnd.dxf',
 ];
+
+// 版本号序列（排除 I 和 O）
+// 基础字符集: A, B, C, D, E, F, G, H, J, K, L, M, N, P, Q, R, S, T, U, V, W, X, Y, Z
+const VERSION_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+/**
+ * 将数字转为指定进制的字符串（使用 VERSION_CHARS 作为字符集）
+ */
+function toBase24(num: number): string {
+  if (num < 0) throw new Error('Version number must be non-negative');
+  if (num === 0) return VERSION_CHARS[0]; // 'A'
+  
+  let result = '';
+  while (num > 0) {
+    num -= 1; // 调整为从 0 开始
+    result = VERSION_CHARS[num % 24] + result;
+    num = Math.floor(num / 24);
+  }
+  return result;
+}
+
+/**
+ * 将版本字符串转为数字（用于比较）
+ */
+function versionToNumber(version: string): number {
+  if (!version || version === 'A') return 0;
+  
+  let result = 0;
+  for (let i = 0; i < version.length; i++) {
+    const charIndex = VERSION_CHARS.indexOf(version[i]);
+    if (charIndex === -1) throw new Error(`Invalid version character: ${version[i]}`);
+    result = result * 24 + (charIndex + 1);
+  }
+  return result - 1; // 调整为从 0 开始
+}
+
+/**
+ * 获取指定版本的下一个版本
+ * 序列: A, B, C, ... Z, AA, AB, ... AZ, BA, BB, ... ZZ
+ */
+export function getNextVersion(currentVersion?: string): string {
+  const current = currentVersion?.trim().toUpperCase() || 'A';
+  const num = versionToNumber(current);
+  return toBase24(num + 1);
+}
+
+/**
+ * 比较两个版本号
+ * 返回: -1 (v1 < v2), 0 (v1 === v2), 1 (v1 > v2)
+ */
+export function compareVersions(v1: string, v2: string): number {
+  const num1 = versionToNumber(v1);
+  const num2 = versionToNumber(v2);
+  if (num1 < num2) return -1;
+  if (num1 > num2) return 1;
+  return 0;
+}

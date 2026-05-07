@@ -139,7 +139,7 @@ class CustomFieldDefinition(Base):
     field_type = Column(String(32), nullable=False)      # text / number / select / multiselect
     options = Column(JSONB, default=[])                   # 单选/多选选项列表
     is_required = Column(Integer, default=0)              # 是否必填（数据库是 BOOLEAN，用 Integer 兼容）
-    applies_to = Column(String(32), nullable=False, default='both')  # part / component / document / both
+    applies_to = Column(JSONB, nullable=False, default=[])  # ['part'] / ['component'] / ['part', 'component'] / ['part', 'component', 'document'] 等数组
     sort_order = Column(Integer, default=0)               # 排序序号
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -18,6 +18,7 @@ def _assembly_response(asm):
         "spec": asm.spec,
         "version": asm.version,
         "status": asm.status,
+        "remark": asm.remark,
         "revisions": asm.revisions or [],
         "created_at": asm.created_at,
         "updated_at": asm.updated_at,
