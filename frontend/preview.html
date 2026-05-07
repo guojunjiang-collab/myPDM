@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>附件预览 - myPDM</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: #f5f5f5; }
+    .container { max-width: 1200px; margin: 40px auto; padding: 20px; }
+    .header { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .header h1 { font-size: 20px; color: #333; }
+    .preview-area { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center; }
+    .preview-area img { max-width: 100%; max-height: 70vh; object-fit: contain; }
+    .error { color: #dc2626; padding: 40px; text-align: center; }
+    .loading { color: #666; padding: 40px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>附件预览</h1>
+    </div>
+    <div id="preview" class="preview-area">
+      <p class="loading">加载中...</p>
+    </div>
+  </div>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const attachmentId = params.get('id');
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+
+    if (!attachmentId) {
+      document.getElementById('preview').innerHTML = '<p class="error">缺少附件ID参数</p>';
+    } else {
+      fetch(`/api/attachments/${attachmentId}/preview`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      })
+      .then(res => {
+        if (!res.ok) throw new Error('加载失败');
+        const contentType = res.headers.get('Content-Type') || '';
+        if (contentType.startsWith('image/')) {
+          return res.blob().then(blob => URL.createObjectURL(blob));
+        } else {
+          return res.blob().then(blob => ({ blob, contentType }));
+        }
+      })
+      .then(data => {
+        const preview = document.getElementById('preview');
+        if (typeof data === 'string') {
+          preview.innerHTML = `<img src="${data}" alt="预览">`;
+        } else {
+          preview.innerHTML = `<p class="error">该文件类型暂不支持预览: ${data.contentType}</p>`;
+        }
+      })
+      .catch(err => {
+        document.getElementById('preview').innerHTML = `<p class="error">预览失败: ${err.message}</p>`;
+      });
+    }
+  </script>
+</body>
+</html>
