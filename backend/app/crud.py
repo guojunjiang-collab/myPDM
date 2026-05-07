@@ -204,7 +204,9 @@ def get_assembly_parts(db, assembly_id):
                     "id": child.id,
                     "code": child.code,
                     "name": child.name,
-                    "spec": child.spec
+                    "spec": child.spec,
+                    "version": child.version,
+                    "status": child.status,
                 }
         elif child_type != "part":  # assembly 或 component 都视为部件
             child = get_assembly(db, item.child_id)
@@ -213,7 +215,9 @@ def get_assembly_parts(db, assembly_id):
                     "id": child.id,
                     "code": child.code,
                     "name": child.name,
-                    "spec": child.spec
+                    "spec": child.spec,
+                    "version": child.version,
+                    "status": child.status,
                 }
         result.append(item_dict)
     return result

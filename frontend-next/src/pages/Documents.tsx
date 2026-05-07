@@ -6,6 +6,7 @@ import { Modal, ConfirmModal } from '../components/Modal';
 import { getNextVersion } from '../constants';
 import { useDataStore } from '../stores/data';
 import { formatDateTime } from '../utils/date';
+import { useTableSort } from '../hooks/useTableSort';
 
 interface DocFormData {
   code: string;
@@ -53,22 +54,12 @@ export default function Documents() {
     loadDocuments();
   }, [search, status, storeDocuments]);
 
-  const loadDocuments = async () => {
+  const { sortedData, handleSort, getSortIcon } = useTableSort<Document>(documents);
+
+  const loadDocuments = () => {
     const localDocuments = useDataStore.getState().documents;
-    if (localDocuments.length > 0) {
-      setDocuments(localDocuments);
-      setLoading(false);
-      return;
-    }
-    try {
-      setLoading(true);
-      const response = await documentsApi.list({ search, status });
-      setDocuments(Array.isArray(response.data) ? response.data : (response.data.items || []));
-    } catch (error) {
-      console.error('加载图文档失败', error);
-    } finally {
-      setLoading(false);
-    }
+    setDocuments(localDocuments);
+    setLoading(false);
   };
 
   const loadCustomFields = async () => {
@@ -290,20 +281,20 @@ export default function Documents() {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">编号</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">名称</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">版本</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">状态</th>
+              <th onClick={() => handleSort('code' as keyof Document)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">编号 {getSortIcon('code' as keyof Document)}</th>
+              <th onClick={() => handleSort('name' as keyof Document)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">名称 {getSortIcon('name' as keyof Document)}</th>
+              <th onClick={() => handleSort('version' as keyof Document)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">版本 {getSortIcon('version' as keyof Document)}</th>
+              <th onClick={() => handleSort('status' as keyof Document)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">状态 {getSortIcon('status' as keyof Document)}</th>
               <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
               <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
-            ) : documents.length === 0 ? (
+            ) : sortedData.length === 0 ? (
               <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
             ) : (
-              documents.map((doc) => (
+              sortedData.map((doc) => (
                 <tr key={doc.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleView(doc)}>
                   <td className="px-4 py-3 text-sm font-medium">{doc.code}</td>
                   <td className="px-4 py-3 text-sm">{doc.name}</td>

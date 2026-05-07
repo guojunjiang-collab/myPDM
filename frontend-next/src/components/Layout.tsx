@@ -19,7 +19,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
-  const { syncAll, isSyncing } = useDataStore();
+  const { syncAll, isSyncing, clearCache } = useDataStore();
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const userRole = user?.role || 'guest';
 
@@ -37,6 +37,16 @@ export default function Layout() {
       setSyncMsg('检出失败');
       setTimeout(() => setSyncMsg(null), 3000);
     }
+  };
+
+  const handleClearCache = () => {
+    clearCache();
+    localStorage.removeItem('data-storage');
+    setSyncMsg('缓存已清除');
+    setTimeout(() => {
+      setSyncMsg(null);
+      window.location.reload();
+    }, 500);
   };
 
   const handleLogout = () => {
@@ -67,8 +77,30 @@ export default function Layout() {
             </a>
           ))}
         </nav>
-        <div className="p-2 border-t border-gray-200 text-sm text-gray-500">
-          v1.0 · PDM系统
+        <div className="p-2 border-t border-gray-200 space-y-1">
+          <button
+            onClick={handleSync}
+            disabled={isSyncing}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg text-blue-600 hover:bg-blue-50 disabled:opacity-50 border border-blue-200"
+            title="从服务器检出最新数据到本地"
+          >
+            <span>⬇</span>
+            <span>{isSyncing ? '同步中...' : '检出数据'}</span>
+          </button>
+          <button
+            onClick={handleClearCache}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg text-red-600 hover:bg-red-50 border border-red-200"
+            title="清除本地缓存数据"
+          >
+            <span>🗑</span>
+            <span>清除缓存</span>
+          </button>
+          {syncMsg && (
+            <div className={`text-xs px-2 py-1 rounded text-center ${syncMsg.includes('成功') || syncMsg.includes('已清除') ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+              {syncMsg}
+            </div>
+          )}
+          <div className="text-xs text-gray-400 text-center">v1.0 · PDM系统</div>
         </div>
       </aside>
 
@@ -82,19 +114,6 @@ export default function Layout() {
             </span>
           </div>
           <div className="right flex items-center gap-2">
-            {syncMsg && (
-              <span className={`text-sm px-2 py-1 rounded ${syncMsg.includes('成功') ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
-                {syncMsg}
-              </span>
-            )}
-            <button
-              onClick={handleSync}
-              disabled={isSyncing}
-              className="flex items-center gap-1 px-3 py-1 text-sm border border-blue-300 text-blue-600 rounded hover:bg-blue-50 disabled:opacity-50"
-              title="从服务器检出最新数据到本地"
-            >
-              <span>{isSyncing ? '同步中...' : '⬇ 检出数据'}</span>
-            </button>
             <span className="text-sm text-gray-500">{user?.real_name}</span>
             <button
               onClick={handleLogout}

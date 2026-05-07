@@ -3,9 +3,11 @@ import { partsApi, customFieldsApi } from '../services/api';
 import type { Part, CustomFieldDefinition, CustomFieldValue } from '../types';
 import { canEdit, isAdmin } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
+import EntityDocumentSection from '../components/EntityDocumentSection';
 import { getNextVersion } from '../constants';
 import { useDataStore } from '../stores/data';
 import { formatDateTime } from '../utils/date';
+import { useTableSort } from '../hooks/useTableSort';
 
 interface PartFormData {
   code: string;
@@ -51,51 +53,25 @@ export default function Parts() {
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
   const [loadingCustomFields, setLoadingCustomFields] = useState(false);
 
+  const { sortedData, handleSort, getSortIcon } = useTableSort<Part>(parts);
+
   useEffect(() => {
     loadParts();
   }, [search, status, storeParts]); // storeParts 变化时也重新加载
 
-  const loadParts = async () => {
-    // 优先从本地 store 取数据
+  const loadParts = () => {
+    // 仅从本地 store 取数据，不自动调 API
     const localParts = useDataStore.getState().parts;
-    if (localParts.length > 0) {
-      setParts(localParts);
-      setLoading(false);
-      return;
-    }
-    // 无本地数据，调 API
-    try {
-      setLoading(true);
-      const response = await partsApi.list({ search, status });
-      setParts(Array.isArray(response.data) ? response.data : (response.data.items || []));
-    } catch (error) {
-      console.error('加载零件失败', error);
-    } finally {
-      setLoading(false);
-    }
+    setParts(localParts);
+    setLoading(false);
   };
 
-  const loadCustomFields = async () => {
+  const loadCustomFields = () => {
     const localDefs = useDataStore.getState().customFieldDefs;
-    if (localDefs.length > 0) {
-      setCustomFieldDefs(localDefs.filter((d: CustomFieldDefinition) =>
-        d.applies_to?.includes('part')
-      ));
-      setLoadingCustomFields(false);
-      return;
-    }
-    try {
-      setLoadingCustomFields(true);
-      const response = await customFieldsApi.listDefinitions();
-      const defs = (response.data || []).filter((d: CustomFieldDefinition) =>
-        d.applies_to?.includes('part')
-      );
-      setCustomFieldDefs(defs);
-    } catch (error) {
-      console.error('加载自定义字段失败', error);
-    } finally {
-      setLoadingCustomFields(false);
-    }
+    setCustomFieldDefs(localDefs.filter((d: CustomFieldDefinition) =>
+      d.applies_to?.includes('part')
+    ));
+    setLoadingCustomFields(false);
   };
 
   const loadCustomFieldValues = async (partId: string) => {
@@ -305,11 +281,11 @@ export default function Parts() {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">件号</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">中文名称</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">规格型号</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">版本</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">状态</th>
+              <th onClick={() => handleSort('code' as keyof Part)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">件号 {getSortIcon('code' as keyof Part)}</th>
+              <th onClick={() => handleSort('name' as keyof Part)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">中文名称 {getSortIcon('name' as keyof Part)}</th>
+              <th onClick={() => handleSort('spec' as keyof Part)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">规格型号 {getSortIcon('spec' as keyof Part)}</th>
+              <th onClick={() => handleSort('version' as keyof Part)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">版本 {getSortIcon('version' as keyof Part)}</th>
+              <th onClick={() => handleSort('status' as keyof Part)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">状态 {getSortIcon('status' as keyof Part)}</th>
               <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">操作</th>
             </tr>
           </thead>
@@ -318,12 +294,12 @@ export default function Parts() {
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-gray-500">加载中...</td>
               </tr>
-            ) : parts.length === 0 ? (
+            ) : sortedData.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-gray-500">暂无数据</td>
               </tr>
             ) : (
-              parts.map((part) => (
+              sortedData.map((part) => (
                 <tr key={part.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleView(part)}>
                   <td className="px-4 py-3 text-sm font-medium">{part.code}</td>
                   <td className="px-4 py-3 text-sm">{part.name}</td>
@@ -351,7 +327,7 @@ export default function Parts() {
         open={modalOpen}
         title={editingPart ? '编辑零件' : '新增零件'}
         onClose={() => setModalOpen(false)}
-        width="lg"
+        width="full"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -452,6 +428,10 @@ export default function Parts() {
             </div>
           )}
 
+          {editingPart && (
+            <EntityDocumentSection entityType="part" entityId={editingPart.id} editable />
+          )}
+
           <div className="flex justify-between items-center gap-2 pt-4 border-t">
             <div>
               {editingPart && (editingPart.status === 'released' || editingPart.status === 'obsolete') && (
@@ -491,7 +471,7 @@ export default function Parts() {
         open={!!viewingPart}
         title="零件详情"
         onClose={() => setViewingPart(null)}
-        width="lg"
+        width="full"
       >
         {viewingPart && (
           <div className="space-y-4">
@@ -550,6 +530,9 @@ export default function Parts() {
                 </div>
               </div>
             )}
+
+            {/* 关联图文档 */}
+            <EntityDocumentSection entityType="part" entityId={viewingPart.id} editable={false} />
           </div>
         )}
       </Modal>

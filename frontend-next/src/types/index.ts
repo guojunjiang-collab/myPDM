@@ -111,6 +111,26 @@ export interface CustomFieldDef {
   status: 'active' | 'disabled';
 }
 
+/** 实体-图文档关联记录 */
+export interface EntityDocument {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  document_id: string;
+  category?: string;
+  sort_order: number;
+  created_at: string;
+  document: {
+    id: string;
+    code: string;
+    name: string;
+    version: string;
+    status: string;
+    file_name?: string;
+    file_id?: string;
+  };
+}
+
 /** 子项（后端 get_assembly_parts 返回格式） */
 export interface AssemblyPartItem {
   id: string;
@@ -125,6 +145,8 @@ export interface AssemblyPartItem {
     code: string;
     name: string;
     spec?: string;
+    version?: string;
+    status?: string;
   };
 }
 

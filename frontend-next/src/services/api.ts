@@ -162,6 +162,23 @@ export const dashboardApi = {
   getStats: () => api.get('/dashboard/stats'),
 };
 
+// 实体-图文档关联 API
+export const entityDocumentsApi = {
+  list: (entityType: 'part' | 'assembly', entityId: string) =>
+    api.get(`/${entityType === 'part' ? 'parts' : 'assemblies'}/${entityId}/documents`),
+  add: (entityType: 'part' | 'assembly', entityId: string, data: { document_id: string; category?: string; sort_order?: number }) =>
+    api.post(`/${entityType === 'part' ? 'parts' : 'assemblies'}/${entityId}/documents`, data),
+  update: (entityType: 'part' | 'assembly', entityId: string, edocId: string, data: { category?: string; sort_order?: number }) =>
+    api.put(`/${entityType === 'part' ? 'parts' : 'assemblies'}/${entityId}/documents/${edocId}`, data),
+  remove: (entityType: 'part' | 'assembly', entityId: string, edocId: string) =>
+    api.delete(`/${entityType === 'part' ? 'parts' : 'assemblies'}/${entityId}/documents/${edocId}`),
+};
+
+// 附件下载
+export const attachmentApi = {
+  download: (id: string) => api.get(`/attachments/${id}/download`, { responseType: 'blob' }),
+};
+
 // 部件子项 API
 export const assemblyPartsApi = {
   list: (assemblyId: string) => api.get(`/assemblies/${assemblyId}/parts`),

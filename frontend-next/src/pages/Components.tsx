@@ -4,9 +4,11 @@ import type { Assembly, AssemblyPartItem, CustomFieldDefinition, CustomFieldValu
 import { canEdit, isAdmin } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
 import AssemblyPartPicker from '../components/AssemblyPartPicker';
+import EntityDocumentSection from '../components/EntityDocumentSection';
 import { getNextVersion } from '../constants';
 import { useDataStore } from '../stores/data';
 import { formatDateTime } from '../utils/date';
+import { useTableSort } from '../hooks/useTableSort';
 
 /* ================================================================
    Types
@@ -80,6 +82,8 @@ export default function Components() {
   const [viewParts, setViewParts] = useState<TreeNode[]>([]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [loadingViewParts, setLoadingViewParts] = useState(false);
+  const [viewSortField, setViewSortField] = useState<string | null>(null);
+  const [viewSortDir, setViewSortDir] = useState<'asc' | 'desc' | null>(null);
 
   /* ---- 自定义字段 ---- */
   const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDefinition[]>([]);
@@ -92,44 +96,22 @@ export default function Components() {
      Data Loading
      ============================================================== */
 
+  const { sortedData, handleSort, getSortIcon } = useTableSort<Assembly>(assemblies);
+
   useEffect(() => {
     loadAssemblies();
   }, [search, status, storeAssemblies]);
 
-  const loadAssemblies = async () => {
+  const loadAssemblies = () => {
     const localAssemblies = useDataStore.getState().assemblies;
-    if (localAssemblies.length > 0) {
-      setAssemblies(localAssemblies);
-      setLoading(false);
-      return;
-    }
-    try {
-      setLoading(true);
-      const response = await assembliesApi.list({ search, status });
-      setAssemblies(Array.isArray(response.data) ? response.data : (response.data.items || []));
-    } catch {
-      /* handled silently */
-    } finally {
-      setLoading(false);
-    }
+    setAssemblies(localAssemblies);
+    setLoading(false);
   };
 
-  const loadCustomFields = useCallback(async () => {
+  const loadCustomFields = useCallback(() => {
     const localDefs = useDataStore.getState().customFieldDefs;
-    if (localDefs.length > 0) {
-      setCustomFieldDefs(localDefs.filter((d: CustomFieldDefinition) => d.applies_to?.includes('component')));
-      return;
-    }
-    try {
-      setLoadingCustomFields(true);
-      const response = await customFieldsApi.listDefinitions();
-      const defs = (response.data || []).filter((d: CustomFieldDefinition) => d.applies_to?.includes('component'));
-      setCustomFieldDefs(defs);
-    } catch {
-      /* handled silently */
-    } finally {
-      setLoadingCustomFields(false);
-    }
+    setCustomFieldDefs(localDefs.filter((d: CustomFieldDefinition) => d.applies_to?.includes('component')));
+    setLoadingCustomFields(false);
   }, []);
 
   const loadCustomFieldValues = async (assemblyId: string, isView = false) => {
@@ -291,6 +273,39 @@ export default function Components() {
     };
     walk(nodes);
     return result;
+  };
+
+  /** 详情子项排序：只排顶层，子节点保持跟随 */
+  const sortViewParts = useCallback((nodes: TreeNode[]): TreeNode[] => {
+    if (!viewSortField || !viewSortDir) return nodes;
+    return [...nodes].sort((a, b) => {
+      let aVal: string = '';
+      let bVal: string = '';
+      const ad = a.item.child_detail;
+      const bd = b.item.child_detail;
+      if (viewSortField === 'type') { aVal = a.item.childType; bVal = b.item.childType; }
+      else if (viewSortField === 'code') { aVal = ad?.code || ''; bVal = bd?.code || ''; }
+      else if (viewSortField === 'version') { aVal = ad?.version || ''; bVal = bd?.version || ''; }
+      else if (viewSortField === 'status') { aVal = ad?.status || ''; bVal = bd?.status || ''; }
+      const cmp = aVal.localeCompare(bVal, 'zh-CN');
+      return viewSortDir === 'desc' ? -cmp : cmp;
+    });
+  }, [viewSortField, viewSortDir]);
+
+  const handleViewSort = (field: string) => {
+    if (viewSortField === field) {
+      if (viewSortDir === 'asc') setViewSortDir('desc');
+      else if (viewSortDir === 'desc') { setViewSortField(null); setViewSortDir(null); }
+    } else {
+      setViewSortField(field);
+      setViewSortDir('asc');
+    }
+  };
+
+  const getViewSortIcon = (field: string): string => {
+    if (viewSortField !== field) return '↕';
+    if (viewSortDir === 'asc') return '↑';
+    return '↓';
   };
 
   /* ==============================================================
@@ -505,7 +520,6 @@ export default function Components() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="px-3 py-2 text-left text-gray-500 font-medium w-12">层级</th>
                 <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">类型</th>
                 <th className="px-3 py-2 text-left text-gray-500 font-medium">件号</th>
                 <th className="px-3 py-2 text-left text-gray-500 font-medium">中文名称</th>
@@ -517,9 +531,8 @@ export default function Components() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {editParts.map((part, idx) => (
+              {editParts.map((part) => (
                 <tr key={part.id} className="hover:bg-gray-50">
-                  <td className="px-3 py-2 text-gray-400">{idx + 1}</td>
                   <td className="px-3 py-2">
                     <span className={`px-1.5 py-0.5 text-xs rounded ${
                       part.childType === 'part' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'
@@ -530,8 +543,12 @@ export default function Components() {
                   <td className="px-3 py-2 font-medium">{part.child_detail?.code || '-'}</td>
                   <td className="px-3 py-2">{part.child_detail?.name || '-'}</td>
                   <td className="px-3 py-2 text-gray-500">{part.child_detail?.spec || '-'}</td>
-                  <td className="px-3 py-2 text-gray-500">-</td>
-                  <td className="px-3 py-2">-</td>
+                  <td className="px-3 py-2 text-gray-500">{part.child_detail?.version || '-'}</td>
+                  <td className="px-3 py-2">
+                    <span className={`px-1.5 py-0.5 text-xs rounded-full ${statusTag(part.child_detail?.status || 'draft').cls}`}>
+                      {statusTag(part.child_detail?.status || 'draft').label}
+                    </span>
+                  </td>
                   <td className="px-3 py-2">
                     <input
                       type="number"
@@ -578,26 +595,20 @@ export default function Components() {
   /** 渲染一行树节点（详情态） */
   const renderViewTreeNode = (node: TreeNode) => {
     const { item, level, children, hasChildren } = node;
-    const indent = level * 24;
 
     return (
       <tr key={item.id} className="hover:bg-gray-50">
         {/* 层级 */}
-        <td className="px-3 py-2 text-gray-400">
-          <span style={{ paddingLeft: indent }}>
-            {hasChildren ? (
-              <button
-                onClick={() => toggleExpand(node)}
-                className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600"
-              >
-                {children.length > 0 ? '▼' : '▶'}
-              </button>
-            ) : (
-              <span className="inline-block w-5" />
-            )}
-          </span>
-          {level > 0 && <span className="text-xs text-gray-400 ml-1">L{level}</span>}
-          {level === 0 && <span className="text-xs text-gray-400 ml-1">L0</span>}
+        <td className="px-3 py-2 text-gray-400 whitespace-nowrap">
+          <span className="text-xs text-gray-400">L{level + 1}</span>
+          {hasChildren && (
+            <button
+              onClick={() => toggleExpand(node)}
+              className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1"
+            >
+              {children.length > 0 ? '▼' : '▶'}
+            </button>
+          )}
         </td>
         {/* 类型 */}
         <td className="px-3 py-2">
@@ -626,11 +637,11 @@ export default function Components() {
         {/* 规格型号 */}
         <td className="px-3 py-2 text-gray-500">{item.child_detail?.spec || '-'}</td>
         {/* 版本 */}
-        <td className="px-3 py-2 text-gray-500">-</td>
+        <td className="px-3 py-2 text-gray-500">{item.child_detail?.version || '-'}</td>
         {/* 状态 */}
         <td className="px-3 py-2">
-          <span className={`px-1.5 py-0.5 text-xs rounded ${statusTag('draft').cls}`}>
-            {statusTag('draft').label}
+          <span className={`px-1.5 py-0.5 text-xs rounded ${statusTag(item.child_detail?.status || 'draft').cls}`}>
+            {statusTag(item.child_detail?.status || 'draft').label}
           </span>
         </td>
         {/* 用量 */}
@@ -641,7 +652,8 @@ export default function Components() {
 
   /** 渲染详情态的子项树表格 */
   const renderViewPartsTable = () => {
-    const flatRows = flattenTree(viewParts);
+    const sorted = sortViewParts(viewParts);
+    const flatRows = flattenTree(sorted);
     return (
       <div className="border rounded-lg overflow-hidden mt-1">
         {loadingViewParts && flatRows.length === 0 ? (
@@ -654,12 +666,12 @@ export default function Components() {
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">层级</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">类型</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium">件号</th>
+                  <th onClick={() => handleViewSort('type')} className="px-3 py-2 text-left text-gray-500 font-medium w-16 cursor-pointer hover:text-gray-700 select-none">类型 {getViewSortIcon('type')}</th>
+                  <th onClick={() => handleViewSort('code')} className="px-3 py-2 text-left text-gray-500 font-medium cursor-pointer hover:text-gray-700 select-none">件号 {getViewSortIcon('code')}</th>
                   <th className="px-3 py-2 text-left text-gray-500 font-medium">中文名称</th>
                   <th className="px-3 py-2 text-left text-gray-500 font-medium">规格型号</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
+                  <th onClick={() => handleViewSort('version')} className="px-3 py-2 text-left text-gray-500 font-medium w-16 cursor-pointer hover:text-gray-700 select-none">版本 {getViewSortIcon('version')}</th>
+                  <th onClick={() => handleViewSort('status')} className="px-3 py-2 text-left text-gray-500 font-medium w-16 cursor-pointer hover:text-gray-700 select-none">状态 {getViewSortIcon('status')}</th>
                   <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">用量</th>
                 </tr>
               </thead>
@@ -719,11 +731,11 @@ export default function Components() {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">件号</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">中文名称</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">规格型号</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">版本</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">状态</th>
+              <th onClick={() => handleSort('code' as keyof Assembly)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">件号 {getSortIcon('code' as keyof Assembly)}</th>
+              <th onClick={() => handleSort('name' as keyof Assembly)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">中文名称 {getSortIcon('name' as keyof Assembly)}</th>
+              <th onClick={() => handleSort('spec' as keyof Assembly)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">规格型号 {getSortIcon('spec' as keyof Assembly)}</th>
+              <th onClick={() => handleSort('version' as keyof Assembly)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">版本 {getSortIcon('version' as keyof Assembly)}</th>
+              <th onClick={() => handleSort('status' as keyof Assembly)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">状态 {getSortIcon('status' as keyof Assembly)}</th>
               <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">操作</th>
             </tr>
           </thead>
@@ -734,14 +746,14 @@ export default function Components() {
                   加载中...
                 </td>
               </tr>
-            ) : assemblies.length === 0 ? (
+            ) : sortedData.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                   暂无数据
                 </td>
               </tr>
             ) : (
-              assemblies.map((assembly) => (
+              sortedData.map((assembly) => (
                 <tr
                   key={assembly.id}
                   className="hover:bg-gray-50 cursor-pointer"
@@ -882,6 +894,11 @@ export default function Components() {
                 </div>
               )}
             </div>
+          )}
+
+          {/* 关联图文档（仅编辑已有部件时显示） */}
+          {editingAssembly && (
+            <EntityDocumentSection entityType="assembly" entityId={editingAssembly.id} editable />
           )}
 
           {/* 子项管理（仅编辑时显示） */}
@@ -1030,12 +1047,14 @@ export default function Components() {
               </div>
             )}
 
+            {/* 关联图文档 */}
+            <EntityDocumentSection entityType="assembly" entityId={viewingAssembly.id} editable={false} />
+
             {/* 子项清单 */}
             <div className="border-t pt-4">
               <h4 className="text-sm font-medium text-gray-700 mb-2">子项清单</h4>
               {renderViewPartsTable()}
             </div>
-
 
           </div>
         )}
