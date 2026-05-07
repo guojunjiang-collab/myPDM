@@ -49,13 +49,16 @@
 
 | 类别 | 技术 |
 |------|------|
-| 框架 | 原生 HTML/CSS/JS (无框架) |
-| 页面类型 | 单文件 SPA |
-| HTTP 客户端 | 原生 fetch API |
+| 框架 | React 18 + TypeScript |
+| 构建工具 | Vite 5 |
+| 样式 | Tailwind CSS 3 |
+| 路由 | React Router 6 |
+| 状态管理 | Zustand |
+| HTTP 客户端 | Axios |
 | 存储 | localStorage + sessionStorage |
-| 请求库 | axios (可选) |
 
-**入口文件**: `frontend/index.html`
+**入口目录**: `frontend-next/` (开发中)
+**构建输出**: `frontend/`
 
 ### 基础设施
 
