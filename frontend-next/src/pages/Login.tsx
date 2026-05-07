@@ -18,6 +18,8 @@ export default function Login() {
     try {
       const response = await authApi.login(username, password);
       const { access_token } = response.data;
+      // 先设置 token，这样才能在 getCurrentUser 中携带
+      useAuthStore.getState().setUser(null, access_token);
       // 获取用户信息
       const userResponse = await authApi.getCurrentUser();
       useAuthStore.getState().setUser(userResponse.data, access_token);
