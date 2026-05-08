@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: bompass
       POSTGRES_DB: bom_system
     volumes:
-      - ./pgdata:/var/lib/postgresql/data
+      - ${PGDATA_HOST_PATH:-./pgdata}:/var/lib/postgresql/data
       - ./initdb:/docker-entrypoint-initdb.d
     networks:
       - bom_network
@@ -38,7 +38,7 @@ services:
       - MAX_FILE_SIZE=1073741824
       - CHUNK_SIZE=5242880
     volumes:
-      - ./uploads:/app/uploads
+      - ${UPLOADS_HOST_PATH:-./uploads}:/app/uploads
       - ./backend/app:/app/app
     depends_on:
       - postgres

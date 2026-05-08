@@ -312,6 +312,60 @@ docker-compose up -d
 
 ---
 
+## 📂 数据存储配置
+
+### 存储路径总览
+
+| 数据 | 宿主机默认路径 | 容器内路径 | 配置方式 |
+|------|---------------|-----------|---------|
+| PostgreSQL 数据 | `./pgdata/` | `/var/lib/postgresql/data` | `.env` → `PGDATA_HOST_PATH` |
+| 上传附件 | `./uploads/` | `/app/uploads` | `.env` → `UPLOADS_HOST_PATH` |
+
+### 修改存储位置
+
+通过 `.env` 文件配置宿主机路径（优先级高），或直接修改 `docker-compose.yml` 中的默认值：
+
+```powershell
+# 方式一: .env 文件（推荐）
+# 编辑项目根目录的 .env 文件:
+PGDATA_HOST_PATH=D:/data/pgdata
+UPLOADS_HOST_PATH=D:/data/uploads
+
+# 方式二: 直接在 docker-compose.yml 的 volumes 里改路径
+```
+
+> 如果未创建 `.env` 文件，默认使用 `./pgdata` 和 `./uploads`。
+
+### 修改后生效
+
+```powershell
+docker-compose up -d
+```
+
+> **注意**: 修改路径后旧数据不会自动迁移，需手动复制：
+> ```powershell
+> # 停服务
+> docker-compose down
+> # 复制旧数据到新目录
+> Copy-Item ./pgdata D:/data/pgdata -Recurse
+> Copy-Item ./uploads D:/data/uploads -Recurse
+> # 重新启动
+> docker-compose up -d
+> ```
+
+### 附件上传路径（后端内部）
+
+后端 `backend/app/file_storage.py` 通过环境变量读取容器内路径：
+
+| 环境变量 | 当前值 | 说明 |
+|---------|--------|------|
+| `UPLOAD_DIR` | `/app/uploads` | 附件根目录（容器内） |
+| `CHUNK_DIR` | `/app/uploads/chunks` | 分块上传临时目录 |
+
+一般无需修改——宿主机路径通过 volume 映射到容器内，改 `UPLOADS_HOST_PATH` 即可。
+
+---
+
 ## 🔧 常用命令
 
 | 操作 | 命令 |
