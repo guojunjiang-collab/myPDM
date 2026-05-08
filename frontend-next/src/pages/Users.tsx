@@ -3,6 +3,8 @@ import { usersApi } from '../services/api';
 import type { User } from '../types';
 import { isAdmin } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
+import { useTableSort } from '../hooks/useTableSort';
+import { formatDateTime } from '../utils/date';
 
 interface UserFormData {
   username: string;
@@ -10,6 +12,7 @@ interface UserFormData {
   role: string;
   department: string;
   phone: string;
+  status: string;
   password: string;
 }
 
@@ -19,31 +22,54 @@ const initialFormData: UserFormData = {
   role: 'engineer',
   department: '',
   phone: '',
+  status: 'active',
   password: '',
+};
+
+const roleTag = (role: string) => {
+  const map: Record<string, { label: string; cls: string }> = {
+    admin: { label: '管理员', cls: 'bg-red-100 text-red-800' },
+    engineer: { label: '工程师', cls: 'bg-blue-100 text-blue-800' },
+    production: { label: '生产人员', cls: 'bg-green-100 text-green-800' },
+    guest: { label: '访客', cls: 'bg-gray-100 text-gray-800' },
+  };
+  return map[role] || { label: role, cls: 'bg-gray-100 text-gray-800' };
+};
+
+const statusTag = (s: string) => {
+  const map: Record<string, { label: string; cls: string }> = {
+    active: { label: '正常', cls: 'bg-green-100 text-green-800' },
+    disabled: { label: '禁用', cls: 'bg-red-100 text-red-800' },
+  };
+  return map[s] || { label: s, cls: 'bg-gray-100 text-gray-800' };
 };
 
 export default function Users() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formData, setFormData] = useState<UserFormData>(initialFormData);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [resetId, setResetId] = useState<string | null>(null);
+
+  const { sortedData, handleSort, getSortIcon } = useTableSort<User>(users);
 
   useEffect(() => {
     loadUsers();
-  }, [search]);
+  }, []);
 
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const response = await usersApi.list({ search });
-      setUsers(response.data.items || []);
-    } catch (error) {
-      console.error('加载用户失败', error);
+      const res = await usersApi.list();
+      const data = res.data;
+      setUsers(Array.isArray(data) ? data : (data as any)?.items || []);
+    } catch {
+      /* handled silently */
     } finally {
       setLoading(false);
     }
@@ -52,6 +78,7 @@ export default function Users() {
   const handleAdd = () => {
     setEditingUser(null);
     setFormData(initialFormData);
+    setSaveError(null);
     setModalOpen(true);
   };
 
@@ -61,39 +88,51 @@ export default function Users() {
       username: user.username,
       real_name: user.real_name,
       role: user.role,
-      department: user.dept || '',
+      department: user.department || '',
       phone: user.phone || '',
+      status: user.status,
       password: '',
     });
+    setSaveError(null);
     setModalOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-
-    const data: Record<string, unknown> = {
-      real_name: formData.real_name,
-      role: formData.role,
-      department: formData.department || undefined,
-      phone: formData.phone || undefined,
-    };
-
-    if (!editingUser) {
-      data.username = formData.username;
-      data.password = formData.password;
-    }
+    setSaveError(null);
 
     try {
       if (editingUser) {
+        const data: Record<string, unknown> = {
+          real_name: formData.real_name,
+          role: formData.role,
+          department: formData.department || undefined,
+          phone: formData.phone || undefined,
+          status: formData.status,
+        };
+        if (formData.password) {
+          data.password = formData.password;
+        }
         await usersApi.update(editingUser.id, data);
       } else {
-        await usersApi.create(data);
+        await usersApi.create({
+          username: formData.username,
+          real_name: formData.real_name,
+          role: formData.role,
+          department: formData.department || undefined,
+          phone: formData.phone || undefined,
+          status: formData.status,
+          password: formData.password,
+        });
       }
       setModalOpen(false);
-      loadUsers();
-    } catch (error) {
-      alert(editingUser ? '更新失败' : '创建失败');
+      await loadUsers();
+    } catch (error: any) {
+      const detail = error?.response?.data?.detail;
+      setSaveError(
+        typeof detail === 'string' ? detail : (editingUser ? '更新失败，请重试' : '创建失败，请检查数据'),
+      );
     } finally {
       setSaving(false);
     }
@@ -104,24 +143,37 @@ export default function Users() {
     try {
       await usersApi.delete(deleteId);
       setDeleteId(null);
-      loadUsers();
-    } catch (error) {
+      await loadUsers();
+    } catch {
       alert('删除失败');
     }
   };
 
-  const getRoleTag = (role: string) => {
-    const tags: Record<string, { label: string; class: string }> = {
-      admin: { label: '管理员', class: 'bg-red-100 text-red-800' },
-      engineer: { label: '工程师', class: 'bg-blue-100 text-blue-800' },
-      production: { label: '生产人员', class: 'bg-green-100 text-green-800' },
-      guest: { label: '访客', class: 'bg-gray-100 text-gray-800' },
-    };
-    return tags[role] || { label: role, class: 'bg-gray-100 text-gray-800' };
+  const handleResetPassword = async () => {
+    if (!resetId) return;
+    try {
+      await usersApi.update(resetId, { password: '123456' });
+      setResetId(null);
+    } catch {
+      alert('重置密码失败');
+    }
   };
+
+  /* 前端搜索过滤 */
+  const displayData = (() => {
+    const keyword = search.trim().toLowerCase();
+    if (!keyword) return sortedData;
+    return sortedData.filter(
+      (u) =>
+        u.username.toLowerCase().includes(keyword) ||
+        u.real_name.toLowerCase().includes(keyword) ||
+        (u.department || '').toLowerCase().includes(keyword),
+    );
+  })();
 
   return (
     <div>
+      {/* 头部 */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold">用户管理</h2>
         {isAdmin() && (
@@ -131,56 +183,59 @@ export default function Users() {
         )}
       </div>
 
-      <div className="flex gap-2 mb-4">
+      {/* 搜索 */}
+      <div className="mb-4">
         <input
           type="text"
-          placeholder="搜索用户名/姓名..."
+          placeholder="搜索用户名/姓名/部门..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 flex-1"
+          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 w-full max-w-md"
         />
       </div>
 
+      {/* 列表 */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">用户名</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">姓名</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">角色</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">部门</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">状态</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">创建时间</th>
+              <th onClick={() => handleSort('username' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">用户名 {getSortIcon('username' as keyof User)}</th>
+              <th onClick={() => handleSort('real_name' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">姓名 {getSortIcon('real_name' as keyof User)}</th>
+              <th onClick={() => handleSort('role' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">角色 {getSortIcon('role' as keyof User)}</th>
+              <th onClick={() => handleSort('department' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">部门 {getSortIcon('department' as keyof User)}</th>
+              <th onClick={() => handleSort('status' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">状态 {getSortIcon('status' as keyof User)}</th>
+              <th onClick={() => handleSort('created_at' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">创建时间 {getSortIcon('created_at' as keyof User)}</th>
               <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
               <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
-            ) : users.length === 0 ? (
+            ) : displayData.length === 0 ? (
               <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
             ) : (
-              users.map((user) => (
+              displayData.map((user) => (
                 <tr key={user.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm font-medium">{user.username}</td>
                   <td className="px-4 py-3 text-sm">{user.real_name}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 text-xs rounded-full ${getRoleTag(user.role).class}`}>
-                      {getRoleTag(user.role).label}
+                    <span className={`px-2 py-1 text-xs rounded-full ${roleTag(user.role).cls}`}>
+                      {roleTag(user.role).label}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{user.dept || '-'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-500">{user.department || '-'}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 text-xs rounded-full ${user.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                      {user.status === 'active' ? '正常' : '禁用'}
+                    <span className={`px-2 py-1 text-xs rounded-full ${statusTag(user.status).cls}`}>
+                      {statusTag(user.status).label}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{user.created?.slice(0, 10) || '-'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-500">{formatDateTime(user.created_at)}</td>
                   <td className="px-4 py-3 text-right">
                     {isAdmin() && (
                       <>
-                        <button onClick={() => handleEdit(user)} className="text-primary-600 hover:text-primary-800 mr-3">编辑</button>
-                        <button onClick={() => setDeleteId(user.id)} className="text-red-600 hover:text-red-800">删除</button>
+                        <button onClick={() => handleEdit(user)} className="text-primary-600 hover:text-primary-800 mr-2">编辑</button>
+                        <button type="button" onClick={() => setResetId(user.id)} className="text-orange-600 hover:text-orange-800 mr-2">重置密码</button>
+                        <button type="button" onClick={() => setDeleteId(user.id)} className="text-red-600 hover:text-red-800">删除</button>
                       </>
                     )}
                   </td>
@@ -191,13 +246,10 @@ export default function Users() {
         </table>
       </div>
 
-      <Modal
-        open={modalOpen}
-        title={editingUser ? '编辑用户' : '新增用户'}
-        onClose={() => setModalOpen(false)}
-        width="lg"
-      >
+      {/* 新增/编辑弹窗 */}
+      <Modal open={modalOpen} title={editingUser ? '编辑用户' : '新增用户'} onClose={() => setModalOpen(false)} width="lg">
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* 用户名（仅新增） */}
           {!editingUser && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">用户名 <span className="text-red-500">*</span></label>
@@ -207,10 +259,24 @@ export default function Users() {
                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 required
+                minLength={3}
+                maxLength={64}
+                placeholder="3-64个字符"
               />
+              {editingUser && (
+                <p className="text-xs text-gray-400 mt-1">用户名不可修改</p>
+              )}
             </div>
           )}
 
+          {editingUser && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">用户名</label>
+              <input type="text" value={formData.username} disabled className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500" />
+            </div>
+          )}
+
+          {/* 姓名 + 角色 */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">姓名 <span className="text-red-500">*</span></label>
@@ -237,6 +303,7 @@ export default function Users() {
             </div>
           </div>
 
+          {/* 部门 + 电话 */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">部门</label>
@@ -258,17 +325,40 @@ export default function Users() {
             </div>
           </div>
 
-          {!editingUser && (
+          {/* 状态（仅编辑） */}
+          {editingUser && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">密码 <span className="text-red-500">*</span></label>
-              <input
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              <label className="block text-sm font-medium text-gray-700 mb-1">状态</label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                required
-                minLength={6}
-              />
+              >
+                <option value="active">正常</option>
+                <option value="disabled">禁用</option>
+              </select>
+            </div>
+          )}
+
+          {/* 密码 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              密码 {editingUser ? '' : <span className="text-red-500">*</span>}
+            </label>
+            <input
+              type="password"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              minLength={6}
+              placeholder={editingUser ? '留空则不修改密码' : '至少6个字符'}
+              {...((!editingUser) ? { required: true } : {})}
+            />
+          </div>
+
+          {saveError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
+              {saveError}
             </div>
           )}
 
@@ -281,6 +371,7 @@ export default function Users() {
         </form>
       </Modal>
 
+      {/* 删除确认 */}
       <ConfirmModal
         open={!!deleteId}
         title="确认删除"
@@ -290,6 +381,17 @@ export default function Users() {
         type="danger"
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}
+      />
+
+      <ConfirmModal
+        open={!!resetId}
+        title="重置密码"
+        content="确定要将该用户密码重置为 123456 吗？"
+        confirmText="确认重置"
+        cancelText="取消"
+        type="danger"
+        onConfirm={handleResetPassword}
+        onCancel={() => setResetId(null)}
       />
     </div>
   );

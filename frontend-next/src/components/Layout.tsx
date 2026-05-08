@@ -113,8 +113,12 @@ export default function Layout() {
               {navItems.find((item) => item.path === location.pathname)?.label || ''}
             </span>
           </div>
-          <div className="right flex items-center gap-2">
-            <span className="text-sm text-gray-500">{user?.real_name}</span>
+          <div className="right flex items-center gap-3">
+            <span className="text-sm text-gray-700">{user?.real_name}</span>
+            <span className={`px-2 py-0.5 text-xs rounded-full ${user?.role === 'admin' ? 'bg-red-100 text-red-700' : user?.role === 'engineer' ? 'bg-blue-100 text-blue-700' : user?.role === 'production' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
+              {{ admin: '管理员', engineer: '工程师', production: '生产人员', guest: '访客' }[user?.role || 'guest'] || user?.role}
+            </span>
+            <span className="text-gray-300">|</span>
             <button
               onClick={handleLogout}
               className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"

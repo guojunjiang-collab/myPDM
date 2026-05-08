@@ -3,9 +3,9 @@ import { documentsApi, customFieldsApi } from '../services/api';
 import type { Document, CustomFieldDefinition, CustomFieldValue } from '../types';
 import { canEdit, isAdmin } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
+import DocumentDetailContent from '../components/DocumentDetailContent';
 import { getNextVersion } from '../constants';
 import { useDataStore } from '../stores/data';
-import { formatDateTime } from '../utils/date';
 import { useTableSort } from '../hooks/useTableSort';
 
 interface DocFormData {
@@ -451,62 +451,14 @@ export default function Documents() {
         open={!!viewingDoc}
         title="图文档详情"
         onClose={() => setViewingDoc(null)}
-        width="lg"
+        width="full"
       >
         {viewingDoc && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">图文档编号</label>
-                <div className="text-sm font-medium">{viewingDoc.code}</div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">图文档名称</label>
-                <div className="text-sm">{viewingDoc.name}</div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">版本</label>
-                <div className="text-sm">{viewingDoc.version || '-'}</div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">状态</label>
-                <span className={`inline-block px-2 py-1 text-xs rounded-full ${getStatusTag(viewingDoc.status).class}`}>
-                  {getStatusTag(viewingDoc.status).label}
-                </span>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">备注</label>
-                <div className="text-sm">{viewingDoc.remark || '-'}</div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">创建时间</label>
-                <div className="text-sm">{formatDateTime(viewingDoc.created_at)}</div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">更新时间</label>
-                <div className="text-sm">{formatDateTime(viewingDoc.updated_at)}</div>
-              </div>
-            </div>
-
-            {/* 自定义字段 */}
-            {viewingCustomDefs.length > 0 && (
-              <div className="border-t pt-4">
-                <h4 className="text-sm font-medium text-gray-700 mb-3">自定义字段</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  {viewingCustomDefs.map(def => (
-                    <div key={def.id}>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">{def.name}</label>
-                      <div className="text-sm">
-                        {def.field_type === 'select'
-                          ? (def.options || []).find(o => o === viewingCustomValues[def.id]) || viewingCustomValues[def.id] || '-'
-                          : (viewingCustomValues[def.id] ?? '-')}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          <DocumentDetailContent
+            doc={viewingDoc}
+            customFieldDefs={viewingCustomDefs}
+            customFieldValues={viewingCustomValues}
+          />
         )}
       </Modal>
     </div>

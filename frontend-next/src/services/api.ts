@@ -142,19 +142,40 @@ export const logsApi = {
 
 // 用户看板 API
 export const boardApi = {
-  getFolders: () => api.get('/dashboard/folders'),
-  createFolder: (data: { name: string; parent_id?: string }) =>
+  /** 获取当前用户看板（含完整文件夹树 + 关联项 + 共享文件夹） */
+  getDashboard: () => api.get('/dashboard/'),
+  /** 初始化用户看板 */
+  initDashboard: () => api.post('/dashboard/init'),
+  /** 创建文件夹 */
+  createFolder: (data: { name: string; parent_id?: string | null }) =>
     api.post('/dashboard/folders', data),
-  updateFolder: (id: string, data: { name: string }) =>
+  /** 更新文件夹（重命名/移动） */
+  updateFolder: (id: string, data: { name?: string; parent_id?: string | null }) =>
     api.put(`/dashboard/folders/${id}`, data),
+  /** 删除文件夹（级联删除子文件夹+关联项） */
   deleteFolder: (id: string) => api.delete(`/dashboard/folders/${id}`),
-  getItems: (folderId: string) => api.get(`/dashboard/folders/${folderId}/items`),
+  /** 批量添加关联项到文件夹 */
+  addItems: (folderId: string, items: { entity_type: string; entity_id: string }[]) =>
+    api.post('/dashboard/items', { folder_id: folderId, items }),
+  /** 删除单个关联项 */
+  removeItem: (itemId: string) => api.delete(`/dashboard/items/${itemId}`),
+  /** 获取文件夹共享列表 */
+  getShares: (folderId: string) => api.get(`/dashboard/folders/${folderId}/shares`),
+  /** 添加共享 */
+  addShare: (folderId: string, userId: string, permission: string) =>
+    api.post(`/dashboard/folders/${folderId}/shares`, { shared_with_user_id: userId, permission }),
+  /** 取消共享 */
+  removeShare: (folderId: string, shareId: string) =>
+    api.delete(`/dashboard/folders/${folderId}/shares/${shareId}`),
+  /** @deprecated 兼容旧调用 */
+  getFolders: () => api.get('/dashboard/'),
+  /** @deprecated 兼容旧调用 */
+  getItems: (_folderId: string) => Promise.resolve({ data: [] }),
+  /** @deprecated 兼容旧调用 */
   addItem: (folderId: string, data: { item_type: string; item_id: string }) =>
-    api.post(`/dashboard/folders/${folderId}/items`, data),
-  removeItem: (folderId: string, itemId: string) =>
-    api.delete(`/dashboard/folders/${folderId}/items/${itemId}`),
-  shareFolder: (id: string, data: { shared: boolean }) =>
-    api.put(`/dashboard/folders/${id}/share`, data),
+    api.post('/dashboard/items', { folder_id: folderId, items: [{ entity_type: data.item_type, entity_id: data.item_id }] }),
+  /** @deprecated 兼容旧调用 */
+  shareFolder: (_id: string, _data: { shared: boolean }) => Promise.resolve({ data: {} }),
 };
 
 // 仪表盘 API

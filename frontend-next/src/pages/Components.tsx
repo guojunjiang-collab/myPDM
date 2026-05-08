@@ -3,11 +3,11 @@ import { assembliesApi, assemblyPartsApi, customFieldsApi } from '../services/ap
 import type { Assembly, AssemblyPartItem, CustomFieldDefinition, CustomFieldValue } from '../types';
 import { canEdit, isAdmin } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
+import AssemblyDetailContent from '../components/AssemblyDetailContent';
 import AssemblyPartPicker from '../components/AssemblyPartPicker';
 import EntityDocumentSection from '../components/EntityDocumentSection';
 import { getNextVersion } from '../constants';
 import { useDataStore } from '../stores/data';
-import { formatDateTime } from '../utils/date';
 import { useTableSort } from '../hooks/useTableSort';
 
 /* ================================================================
@@ -75,15 +75,24 @@ export default function Components() {
   const [loadingEditParts, setLoadingEditParts] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  /* ---- 详情弹窗 ---- */
+/* ---- 详情弹窗 ---- */
   const [viewingAssembly, setViewingAssembly] = useState<Assembly | null>(null);
   const [viewingCustomDefs, setViewingCustomDefs] = useState<CustomFieldDefinition[]>([]);
   const [viewingCustomValues, setViewingCustomValues] = useState<Record<string, unknown>>({});
-  const [viewParts, setViewParts] = useState<TreeNode[]>([]);
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [loadingViewParts, setLoadingViewParts] = useState(false);
-  const [viewSortField, setViewSortField] = useState<string | null>(null);
-  const [viewSortDir, setViewSortDir] = useState<'asc' | 'desc' | null>(null);
+  // Tree state now managed by AssemblyDetailContent - kept for backward compat only
+  const [viewParts, setViewPartsState] = useState<TreeNode[]>([]);
+  const [expandedIds, setExpandedIdsState] = useState<Set<string>>(new Set());
+  const [loadingViewParts, setLoadingPartsState] = useState(false);
+  const [viewSortField, setViewSortFieldState] = useState<string | null>(null);
+  const [viewSortDir, setViewSortDirState] = useState<'asc' | 'desc' | null>(null);
+  // Alias for existing setter functions
+  const setExpandedIds = setExpandedIdsState;
+  const setLoadingViewParts = setLoadingPartsState;
+  const setViewParts = (v: TreeNode[] | ((prev: TreeNode[]) => TreeNode[])) => {
+    setViewPartsState(Array.isArray(v) ? v : v([]));
+  };
+  const setViewSortField = setViewSortFieldState;
+  const setViewSortDir = setViewSortDirState;
 
   /* ---- 自定义字段 ---- */
   const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDefinition[]>([]);
@@ -651,39 +660,7 @@ export default function Components() {
   };
 
   /** 渲染详情态的子项树表格 */
-  const renderViewPartsTable = () => {
-    const sorted = sortViewParts(viewParts);
-    const flatRows = flattenTree(sorted);
-    return (
-      <div className="border rounded-lg overflow-hidden mt-1">
-        {loadingViewParts && flatRows.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-gray-400">加载子项中...</div>
-        ) : flatRows.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-gray-400">暂无子项</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">层级</th>
-                  <th onClick={() => handleViewSort('type')} className="px-3 py-2 text-left text-gray-500 font-medium w-16 cursor-pointer hover:text-gray-700 select-none">类型 {getViewSortIcon('type')}</th>
-                  <th onClick={() => handleViewSort('code')} className="px-3 py-2 text-left text-gray-500 font-medium cursor-pointer hover:text-gray-700 select-none">件号 {getViewSortIcon('code')}</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium">中文名称</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium">规格型号</th>
-                  <th onClick={() => handleViewSort('version')} className="px-3 py-2 text-left text-gray-500 font-medium w-16 cursor-pointer hover:text-gray-700 select-none">版本 {getViewSortIcon('version')}</th>
-                  <th onClick={() => handleViewSort('status')} className="px-3 py-2 text-left text-gray-500 font-medium w-16 cursor-pointer hover:text-gray-700 select-none">状态 {getViewSortIcon('status')}</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">用量</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {flatRows.map(renderViewTreeNode)}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    );
-  };
+  // Note: renderViewPartsTable moved to AssemblyDetailContent component
 
   /* ==============================================================
      Render
@@ -981,82 +958,11 @@ export default function Components() {
         width="full"
       >
         {viewingAssembly && (
-          <div className="space-y-4">
-            {/* 基本属性 */}
-            <div className="grid grid-cols-2 gap-x-8 gap-y-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">件号</label>
-                <div className="text-sm font-medium">{viewingAssembly.code}</div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">中文名称</label>
-                <div className="text-sm">{viewingAssembly.name}</div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">规格型号</label>
-                <div className="text-sm">{viewingAssembly.spec || '-'}</div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">版本</label>
-                <div className="text-sm">{viewingAssembly.version || '-'}</div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">状态</label>
-                <span className={`inline-block px-2 py-1 text-xs rounded-full ${statusTag(viewingAssembly.status).cls}`}>
-                  {statusTag(viewingAssembly.status).label}
-                </span>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">备注</label>
-                <div className="text-sm">{viewingAssembly.remark || '-'}</div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">创建时间</label>
-                <div className="text-sm">{formatDateTime(viewingAssembly.created_at)}</div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">更新时间</label>
-                <div className="text-sm">{formatDateTime(viewingAssembly.updated_at)}</div>
-              </div>
-            </div>
-
-            {/* 自定义字段 */}
-            {viewingCustomDefs.length > 0 && (
-              <div className="border-t pt-4">
-                <h4 className="text-sm font-medium text-gray-700 mb-3">自定义字段</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  {viewingCustomDefs.map((def) => (
-                    <div key={def.id}>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">
-                        {def.name}
-                      </label>
-                      <div className="text-sm">
-                        {def.field_type === 'select'
-                          ? String(
-                              (def.options || []).find((o) => o === viewingCustomValues[def.id]) ||
-                                viewingCustomValues[def.id] ||
-                                '-',
-                            )
-                          : Array.isArray(viewingCustomValues[def.id])
-                            ? ((viewingCustomValues[def.id] as string[]).join(', ') || '-')
-                            : String(viewingCustomValues[def.id] ?? '-')}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 关联图文档 */}
-            <EntityDocumentSection entityType="assembly" entityId={viewingAssembly.id} editable={false} />
-
-            {/* 子项清单 */}
-            <div className="border-t pt-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">子项清单</h4>
-              {renderViewPartsTable()}
-            </div>
-
-          </div>
+          <AssemblyDetailContent
+            assembly={viewingAssembly}
+            customFieldDefs={viewingCustomDefs}
+            customFieldValues={viewingCustomValues}
+          />
         )}
       </Modal>
     </div>

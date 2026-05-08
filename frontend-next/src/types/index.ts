@@ -5,11 +5,11 @@ export interface User {
   username: string;
   real_name: string;
   role: UserRole;
-  dept?: string;
+  department?: string;
   phone?: string;
-  status: 'active' | 'disabled';
-  created: string;
-  updated: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Part {
