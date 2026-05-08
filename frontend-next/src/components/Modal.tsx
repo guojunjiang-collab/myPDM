@@ -6,9 +6,10 @@ interface ModalProps {
   onClose: () => void;
   children: ReactNode;
   width?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  zIndex?: number;
 }
 
-export function Modal({ open, title, onClose, children, width = 'md' }: ModalProps) {
+export function Modal({ open, title, onClose, children, width = 'md', zIndex = 50 }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
 
@@ -40,9 +41,10 @@ export function Modal({ open, title, onClose, children, width = 'md' }: ModalPro
     <div
       ref={overlayRef}
       onClick={handleOverlayClick}
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 transition-opacity duration-300 ${
+      className={`fixed inset-0 flex items-center justify-center bg-black/50 transition-opacity duration-300 ${
         open ? 'opacity-100' : 'opacity-0'
       }`}
+      style={{ zIndex }}
     >
       <div
         className={`bg-white rounded-lg shadow-xl w-full mx-4 ${widthMap[width]} transform transition-transform duration-300 ${

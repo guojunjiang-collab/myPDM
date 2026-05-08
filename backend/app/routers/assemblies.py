@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 import uuid
 
 from ..database import get_db
-from ..models import User, Document, EntityDocument
+from ..models import User, Document
 from .. import crud, schemas
 from .auth import require_role
 
@@ -53,11 +53,69 @@ async def update_assembly(assembly_id: uuid.UUID, assembly_update: schemas.Assem
     crud.create_log(db, current_user.id, current_user.username, "更新部件", "assembly", str(assembly_id), None, ip)
     return _assembly_response(db_assembly)
 
-@router.delete("/{assembly_id}")
-async def delete_assembly(assembly_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin"]))):
+@router.get("/{assembly_id}/can-delete")
+async def check_assembly_can_delete(assembly_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+    """检查部件是否可以被删除（是否有父项引用）"""
+    from ..models import BOMItem, Assembly
+    
     db_assembly = crud.get_assembly(db, assembly_id)
     if not db_assembly:
         raise HTTPException(status_code=404, detail="部件不存在")
+    
+    # 检查是否被其他部件引用为子项
+    ref_count = db.query(BOMItem).filter(
+        BOMItem.child_type == 'component',
+        BOMItem.child_id == assembly_id
+    ).count()
+    
+    references = []
+    if ref_count > 0:
+        refs = db.query(BOMItem, Assembly).join(
+            Assembly, BOMItem.parent_id == Assembly.id
+        ).filter(
+            BOMItem.child_type == 'component',
+            BOMItem.child_id == assembly_id
+        ).all()
+        for r in refs[:10]:
+            references.append({
+                "id": str(r[1].id),
+                "code": r[1].code,
+                "name": r[1].name,
+                "version": r[1].version or "A"
+            })
+    
+    return {
+        "can_delete": ref_count == 0,
+        "ref_count": ref_count,
+        "references": references
+    }
+
+@router.delete("/{assembly_id}")
+async def delete_assembly(assembly_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin"]))):
+    from ..models import BOMItem, Assembly
+    db_assembly = crud.get_assembly(db, assembly_id)
+    if not db_assembly:
+        raise HTTPException(status_code=404, detail="部件不存在")
+    
+    # 检查是否被其他部件引用为子项 (只检查 component，数据库存储为 component)
+    ref_count = db.query(BOMItem).filter(
+        BOMItem.child_type == 'component',
+        BOMItem.child_id == assembly_id
+    ).count()
+    if ref_count > 0:
+        # 获取引用该部件的其他部件信息
+        refs = db.query(BOMItem, Assembly).join(
+            Assembly, BOMItem.parent_id == Assembly.id
+        ).filter(
+            BOMItem.child_type == 'component',
+            BOMItem.child_id == assembly_id
+        ).all()
+        ref_codes = [f"{r[1].code}({r[1].version})" for r in refs[:5]]
+        msg = f"该部件被 {ref_count} 个部件引用: {', '.join(ref_codes)}"
+        if ref_count > 5:
+            msg += f" 等"
+        raise HTTPException(status_code=400, detail=msg)
+    
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username, "删除部件", "assembly", str(assembly_id), f"编码:{db_assembly.code}", ip)
     crud.delete_assembly(db, assembly_id)
@@ -80,9 +138,6 @@ async def add_assembly_part(assembly_id: uuid.UUID, item: schemas.BOMItemCreate,
     # 设置 parent 为当前 assembly
     item.parent_type = "assembly"
     item.parent_id = assembly_id
-    # 统一 child_type：前端可能传 'assembly'，但数据库存储为 'component'
-    if item.child_type == 'assembly':
-        item.child_type = 'component'
     db_item = crud.create_bom_item(db, item)
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username, "添加子项", "assembly_part", str(assembly_id), f"子项:{item.child_type}:{item.child_id}", ip)
@@ -118,20 +173,24 @@ async def update_assembly_part(assembly_id: uuid.UUID, item_id: uuid.UUID, item_
 
 @router.get("/{assembly_id}/documents")
 async def get_assembly_documents(assembly_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
-    docs = db.query(EntityDocument, Document).join(Document, EntityDocument.document_id == Document.id).filter(
-        EntityDocument.entity_type == 'component',
-        EntityDocument.entity_id == assembly_id
-    ).order_by(EntityDocument.sort_order).all()
+    """获取部件关联的图文档列表（从 document_links JSONB 读取）"""
+    db_assembly = crud.get_assembly(db, assembly_id)
+    if not db_assembly:
+        raise HTTPException(status_code=404, detail="部件不存在")
+    links = db_assembly.document_links or []
     result = []
-    for ed, doc in docs:
+    for link in links:
+        doc = db.query(Document).filter(Document.id == link.get("document_id")).first()
+        if not doc:
+            continue
         result.append({
-            "id": ed.id,
-            "entity_type": ed.entity_type,
-            "entity_id": ed.entity_id,
-            "document_id": ed.document_id,
-            "category": ed.category,
-            "sort_order": ed.sort_order,
-            "created_at": ed.created_at,
+            "id": link.get("id"),
+            "entity_type": "component",
+            "entity_id": str(db_assembly.id),
+            "document_id": doc.id,
+            "category": link.get("category"),
+            "sort_order": link.get("sort_order", 0),
+            "created_at": link.get("created_at"),
             "document": {
                 "id": doc.id,
                 "code": doc.code,
@@ -146,42 +205,64 @@ async def get_assembly_documents(assembly_id: uuid.UUID, db: Session = Depends(g
 
 @router.post("/{assembly_id}/documents")
 async def add_assembly_document(assembly_id: uuid.UUID, body: schemas.EntityDocumentCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+    """关联图文档到部件（写入 document_links JSONB）"""
     doc = db.query(Document).filter(Document.id == body.document_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="图文档不存在")
-    ed = EntityDocument(
-        entity_type='component',
-        entity_id=assembly_id,
-        document_id=body.document_id,
-        category=body.category,
-        sort_order=body.sort_order
-    )
-    if body.id:
-        ed.id = body.id
-    db.add(ed)
+    db_assembly = crud.get_assembly(db, assembly_id)
+    if not db_assembly:
+        raise HTTPException(status_code=404, detail="部件不存在")
+    from datetime import datetime, timezone
+    link_id = str(body.id) if body.id else str(uuid.uuid4())
+    link = {
+        "id": link_id,
+        "document_id": str(body.document_id),
+        "category": body.category,
+        "sort_order": body.sort_order,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    links = db_assembly.document_links or []
+    links.append(link)
+    db_assembly.document_links = links
     db.commit()
-    db.refresh(ed)
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username, "关联图文档", "assembly_doc", str(assembly_id), f"文档:{doc.code}", ip)
-    return {"id": ed.id, "message": "图文档关联成功"}
+    return {"id": link_id, "message": "图文档关联成功"}
 
-@router.put("/{assembly_id}/documents/{edoc_id}")
-async def update_assembly_document(assembly_id: uuid.UUID, edoc_id: uuid.UUID, body: schemas.EntityDocumentUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
-    ed = db.query(EntityDocument).filter(EntityDocument.id == edoc_id, EntityDocument.entity_id == assembly_id).first()
-    if not ed:
+@router.put("/{assembly_id}/documents/{link_id}")
+async def update_assembly_document(assembly_id: uuid.UUID, link_id: uuid.UUID, body: schemas.EntityDocumentUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+    """更新关联信息（类别/排序）"""
+    db_assembly = crud.get_assembly(db, assembly_id)
+    if not db_assembly:
+        raise HTTPException(status_code=404, detail="部件不存在")
+    links = db_assembly.document_links or []
+    link_id_str = str(link_id)
+    found = False
+    for link in links:
+        if link.get("id") == link_id_str:
+            if body.category is not None:
+                link["category"] = body.category
+            if body.sort_order is not None:
+                link["sort_order"] = body.sort_order
+            found = True
+            break
+    if not found:
         raise HTTPException(status_code=404, detail="关联不存在")
-    if body.category is not None:
-        ed.category = body.category
-    if body.sort_order is not None:
-        ed.sort_order = body.sort_order
+    db_assembly.document_links = links
     db.commit()
     return {"message": "关联已更新"}
 
-@router.delete("/{assembly_id}/documents/{edoc_id}")
-async def delete_assembly_document(assembly_id: uuid.UUID, edoc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
-    ed = db.query(EntityDocument).filter(EntityDocument.id == edoc_id, EntityDocument.entity_id == assembly_id).first()
-    if not ed:
+@router.delete("/{assembly_id}/documents/{link_id}")
+async def delete_assembly_document(assembly_id: uuid.UUID, link_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+    """移除图文档关联"""
+    db_assembly = crud.get_assembly(db, assembly_id)
+    if not db_assembly:
+        raise HTTPException(status_code=404, detail="部件不存在")
+    links = db_assembly.document_links or []
+    link_id_str = str(link_id)
+    new_links = [l for l in links if l.get("id") != link_id_str]
+    if len(new_links) == len(links):
         raise HTTPException(status_code=404, detail="关联不存在")
-    db.delete(ed)
+    db_assembly.document_links = new_links
     db.commit()
     return {"message": "关联已移除"}

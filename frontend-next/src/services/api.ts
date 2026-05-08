@@ -101,26 +101,13 @@ export const documentsApi = {
   deleteAttachment: (docId: string, attId: string) => api.delete(`/documents/${docId}/attachments/${attId}`),
 };
 
-// 附件 API
-export const attachmentsApi = {
-  upload: (docId: string, file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return api.post(`/attachments/upload?doc_id=${docId}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-  },
-  download: (id: string) =>
-    api.get(`/attachments/${id}/download`, { responseType: 'blob' }),
-  preview: (id: string) => api.get(`/attachments/${id}/preview`, { responseType: 'blob' }),
-  delete: (id: string) => api.delete(`/attachments/${id}`),
-};
-
 // BOM API
 export const bomApi = {
   getTree: (type: 'part' | 'assembly', id: string) =>
     api.get(`/bom/tree/${type}/${id}`),
   getAllItems: () => api.get('/bom/items/all'),
+  checkReferences: (entityType: string, entityId: string) =>
+    api.get(`/bom/references/${entityType}/${entityId}`),
   createItem: (data: { parent_type: string; parent_id: string; child_type: string; child_id: string; qty: number }) =>
     api.post('/bom/items', data),
   deleteItem: (id: string) => api.delete(`/bom/items/${id}`),
@@ -203,7 +190,7 @@ export const entityDocumentsApi = {
 
 // 附件下载
 export const attachmentApi = {
-  download: (id: string) => api.get(`/attachments/${id}/download`, { responseType: 'blob' }),
+  download: (id: string) => api.get(`/v2/attachments/${id}/download`, { responseType: 'blob' }),
 };
 
 // 部件子项 API

@@ -25,14 +25,11 @@ class Part(Base):
     code = Column(String(64), nullable=False)
     name = Column(String(255), nullable=False)
     spec = Column(String(255))
-    material = Column(String(128))
-    unit = Column(String(32))
-    price = Column(Numeric(12, 2))
-    supplier = Column(String(255))
     version = Column(String(32), default="A")
     status = Column(String(32), nullable=False, default="draft")
     remark = Column(Text)
     revisions = Column(JSONB, default=[])
+    document_links = Column(JSONB, default=[])  # [{id, document_id, category, sort_order}]
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -40,16 +37,14 @@ class Assembly(Base):
     __tablename__ = "assemblies"
     __table_args__ = (UniqueConstraint('code', 'version', name='uix_assembly_code_version'),)
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    code = Column(String(64), unique=True, nullable=False)
+    code = Column(String(64), nullable=False)
     name = Column(String(255), nullable=False)
     spec = Column(String(255))
-    material = Column(String(128))
-    unit = Column(String(32))
-    price = Column(Numeric(12, 2))
     version = Column(String(32), default="V1.0")
     status = Column(String(32), nullable=False, default="draft")
     remark = Column(Text)
     revisions = Column(JSONB, default=[])
+    document_links = Column(JSONB, default=[])  # [{id, document_id, category, sort_order}]
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -75,15 +70,6 @@ class OperationLog(Base):
     ip_address = Column(String(64))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-class Attachment(Base):
-    """附件表：简化后仅存储文件内容（通过 Part/Assembly 外键关联）"""
-    __tablename__ = "attachments"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    file_name = Column(String(255))
-    file_data = Column(LargeBinary)  # 使用 BYTEA 存储二进制文件内容
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
 class Document(Base):
     """图文档主表"""
     __tablename__ = "documents"
@@ -93,42 +79,24 @@ class Document(Base):
     name = Column(String(255), nullable=False)
     version = Column(String(32), default="A")
     status = Column(String(32), nullable=False, default="draft")
-    description = Column(Text)
+    remark = Column(Text)
     file_name = Column(String(255))
     file_id = Column(UUID(as_uuid=True), ForeignKey('document_attachments.id', ondelete='SET NULL'))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 class DocumentAttachment(Base):
-    """图文档独立附件表"""
+    """图文档独立附件表（文件存储在文件系统）"""
     __tablename__ = "document_attachments"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     document_id = Column(UUID(as_uuid=True), ForeignKey('documents.id', ondelete='CASCADE'), nullable=False)
     file_name = Column(String(255))
-    file_data = Column(LargeBinary)  # 保留用于向后兼容
     file_size = Column(Integer)
-    file_path = Column(String(512))  # 新增：文件系统路径
-    file_hash = Column(String(64))   # 新增：文件哈希值
+    file_path = Column(String(512))  # 文件系统路径
+    file_hash = Column(String(64))   # 文件哈希值
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-class EntityDocument(Base):
-    """实体-图文档关联表（零部件↔图文档）"""
-    __tablename__ = "entity_documents"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    entity_type = Column(String(32), nullable=False)
-    entity_id = Column(UUID(as_uuid=True), nullable=False)
-    document_id = Column(UUID(as_uuid=True), ForeignKey('documents.id', ondelete='RESTRICT'), nullable=False)
-    category = Column(String(64))
-    sort_order = Column(Integer, default=0)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-class Dictionary(Base):
-    __tablename__ = "dictionaries"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    dict_type = Column(String(32), nullable=False)  # material, unit, supplier, product
-    value = Column(String(255), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 class CustomFieldDefinition(Base):
     """自定义字段定义表"""

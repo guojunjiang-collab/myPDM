@@ -213,13 +213,13 @@ export default function AssemblyDetailContent({ assembly, customFieldDefs, custo
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">层级</th>
-                  <th onClick={() => handleViewSort('type')} className="px-3 py-2 text-left text-gray-500 font-medium w-16 cursor-pointer hover:text-gray-700 select-none">类型 {getViewSortIcon('type')}</th>
-                  <th onClick={() => handleViewSort('code')} className="px-3 py-2 text-left text-gray-500 font-medium cursor-pointer hover:text-gray-700 select-none">件号 {getViewSortIcon('code')}</th>
+                  <th onClick={() => handleViewSort('type')} className="px-3 py-2 text-left text-gray-500 font-medium w-24 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">类型 {getViewSortIcon('type')}</th>
+                  <th onClick={() => handleViewSort('code')} className="px-3 py-2 text-left text-gray-500 font-medium cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">件号 {getViewSortIcon('code')}</th>
                   <th className="px-3 py-2 text-left text-gray-500 font-medium">中文名称</th>
                   <th className="px-3 py-2 text-left text-gray-500 font-medium">规格型号</th>
-                  <th onClick={() => handleViewSort('version')} className="px-3 py-2 text-left text-gray-500 font-medium w-16 cursor-pointer hover:text-gray-700 select-none">版本 {getViewSortIcon('version')}</th>
-                  <th onClick={() => handleViewSort('status')} className="px-3 py-2 text-left text-gray-500 font-medium w-16 cursor-pointer hover:text-gray-700 select-none">状态 {getViewSortIcon('status')}</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">用量</th>
+                  <th onClick={() => handleViewSort('version')} className="px-3 py-2 text-left text-gray-500 font-medium w-24 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">版本 {getViewSortIcon('version')}</th>
+                  <th onClick={() => handleViewSort('status')} className="px-3 py-2 text-left text-gray-500 font-medium w-24 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">状态 {getViewSortIcon('status')}</th>
+                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">用量</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">

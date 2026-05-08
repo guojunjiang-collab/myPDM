@@ -17,7 +17,7 @@ CREATE TABLE users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 零件表（已移除旧附件字段）
+-- 零件表
 CREATE TABLE parts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     code VARCHAR(64) NOT NULL,
@@ -25,23 +25,28 @@ CREATE TABLE parts (
     spec VARCHAR(255),
     version VARCHAR(32) DEFAULT 'A',
     status VARCHAR(32) NOT NULL DEFAULT 'draft',
+    remark TEXT,
     revisions JSONB DEFAULT '[]',
+    document_links JSONB DEFAULT '[]',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uix_part_code_version UNIQUE (code, version)
 );
 
--- 部件表（已移除旧附件字段）
+-- 部件表
 CREATE TABLE assemblies (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    code VARCHAR(64) UNIQUE NOT NULL,
+    code VARCHAR(64) NOT NULL,
     name VARCHAR(255) NOT NULL,
     spec VARCHAR(255),
     version VARCHAR(32) DEFAULT 'V1.0',
     status VARCHAR(32) NOT NULL DEFAULT 'draft',
+    remark TEXT,
     revisions JSONB DEFAULT '[]',
+    document_links JSONB DEFAULT '[]',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uix_assembly_code_version UNIQUE (code, version)
 );
 
 -- BOM表
@@ -68,15 +73,6 @@ CREATE TABLE operation_logs (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 旧附件表（保留以便后向兼容）
-CREATE TABLE attachments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    file_name VARCHAR(255),
-    file_data BYTEA,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
 -- 图文档主表
 CREATE TABLE documents (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -97,7 +93,6 @@ CREATE TABLE document_attachments (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
     file_name VARCHAR(255),
-    file_data BYTEA,
     file_size INTEGER,
     file_path VARCHAR(512),
     file_hash VARCHAR(64),
@@ -107,26 +102,6 @@ CREATE TABLE document_attachments (
 -- 图文档主附件外键
 ALTER TABLE documents ADD CONSTRAINT fk_doc_file
     FOREIGN KEY (file_id) REFERENCES document_attachments(id) ON DELETE SET NULL;
-
--- 实体-图文档关联表
-CREATE TABLE entity_documents (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    entity_type VARCHAR(32) NOT NULL,
-    entity_id UUID NOT NULL,
-    document_id UUID NOT NULL REFERENCES documents(id) ON DELETE RESTRICT,
-    category VARCHAR(64),
-    sort_order INTEGER DEFAULT 0,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- 字典表
-CREATE TABLE dictionaries (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    dict_type VARCHAR(32) NOT NULL,
-    value VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
 
 -- 自定义字段定义表
 CREATE TABLE custom_field_definitions (
@@ -166,14 +141,11 @@ CREATE INDEX idx_assemblies_code ON assemblies(code);
 CREATE INDEX idx_assemblies_status ON assemblies(status);
 CREATE INDEX idx_bom_parent ON bom_items(parent_type, parent_id);
 CREATE INDEX idx_bom_item_child ON bom_items(child_type, child_id);
-CREATE INDEX idx_dict_type ON dictionaries(dict_type);
 CREATE INDEX idx_cf_def_key ON custom_field_definitions(field_key);
 CREATE INDEX idx_cf_val_entity ON custom_field_values(entity_type, entity_id);
 CREATE INDEX idx_doc_code ON documents(code);
 CREATE INDEX idx_doc_status ON documents(status);
 CREATE INDEX idx_doc_att_doc ON document_attachments(document_id);
-CREATE INDEX idx_ent_doc_entity ON entity_documents(entity_type, entity_id);
-CREATE INDEX idx_ent_doc_doc ON entity_documents(document_id);
 
 -- 插入默认用户（密码均为 admin123）
 INSERT INTO users (username, password_hash, real_name, role, department, status) VALUES

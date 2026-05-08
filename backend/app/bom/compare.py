@@ -65,7 +65,7 @@ def get_bom_tree_recursive(
             COALESCE(p.status, a.status) as child_status
         FROM bom_items bi
         LEFT JOIN parts p ON bi.child_type = 'part' AND bi.child_id = p.id
-        LEFT JOIN assemblies a ON (bi.child_type = 'assembly' OR bi.child_type = 'component') AND bi.child_id = a.id
+        LEFT JOIN assemblies a ON bi.child_type = 'component' AND bi.child_id = a.id
         WHERE bi.parent_type = 'assembly' AND bi.parent_id = :assembly_id
         
         UNION ALL
@@ -88,9 +88,9 @@ def get_bom_tree_recursive(
         FROM bom_items bi
         JOIN bom_tree bt ON bi.parent_type = bt.child_type AND bi.parent_id = bt.child_id
         LEFT JOIN parts p ON bi.child_type = 'part' AND bi.child_id = p.id
-        LEFT JOIN assemblies a ON (bi.child_type = 'assembly' OR bi.child_type = 'component') AND bi.child_id = a.id
+        LEFT JOIN assemblies a ON bi.child_type = 'component' AND bi.child_id = a.id
         WHERE bt.level < :max_depth
-          AND (bi.child_type = 'part' OR bi.child_type = 'assembly' OR bi.child_type = 'component')
+          AND bi.child_type IN ('part', 'component')
     )
     SELECT * FROM bom_tree ORDER BY path, level
     """

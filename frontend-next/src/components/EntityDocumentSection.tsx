@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { entityDocumentsApi, customFieldsApi, attachmentApi } from '../services/api';
-import type { EntityDocument, CustomFieldDefinition, CustomFieldValue } from '../types';
+import { entityDocumentsApi, customFieldsApi, attachmentApi, documentsApi } from '../services/api';
+import type { EntityDocument, CustomFieldDefinition, CustomFieldValue, Document } from '../types';
 import { canEdit } from '../stores/auth';
 import { useDataStore } from '../stores/data';
+import { Modal } from './Modal';
 import DocumentPicker from './DocumentPicker';
+import DocumentDetailContent from './DocumentDetailContent';
 
 /* ----------------------------------------------------------------
    Types
@@ -53,6 +55,11 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
   /* 自定义字段 */
   const [docFieldDefs, setDocFieldDefs] = useState<CustomFieldDefinition[]>([]);
   const [docFieldValues, setDocFieldValues] = useState<Record<string, Record<string, unknown>>>({});
+
+  /* 图文档详情弹窗 */
+  const [viewDoc, setViewDoc] = useState<Document | null>(null);
+  const [viewDocCustomDefs, setViewDocCustomDefs] = useState<CustomFieldDefinition[]>([]);
+  const [viewDocCustomValues, setViewDocCustomValues] = useState<Record<string, any>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -140,6 +147,31 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
     }
   };
 
+  /** 查看图文档详情 */
+  const handleViewDocument = async (ed: EntityDocument) => {
+    try {
+      const res = await documentsApi.get(ed.document_id);
+      setViewDoc(res.data as Document);
+    } catch {
+      // fallback: use the data from the entity document record
+      setViewDoc(ed.document as Document);
+    }
+    const allDefs = useDataStore.getState().customFieldDefs;
+    const docDefs = allDefs.filter((d: CustomFieldDefinition) => d.applies_to?.includes('document'));
+    setViewDocCustomDefs(docDefs);
+    // Use already-loaded custom field values if available
+    if (docFieldValues[ed.document_id]) {
+      setViewDocCustomValues(docFieldValues[ed.document_id] as Record<string, any>);
+    } else {
+      try {
+        const res = await customFieldsApi.getValues('document', ed.document_id);
+        const values: Record<string, any> = {};
+        (res.data || []).forEach((v: CustomFieldValue) => { values[v.field_id] = v.value; });
+        setViewDocCustomValues(values);
+      } catch { setViewDocCustomValues({}); }
+    }
+  };
+
   const existingDocIds = new Set(docs.map((d) => d.document_id));
 
   /* 固定列 + 动态自定义字段列 */
@@ -186,7 +218,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
                 {docs.map((ed) => {
                   const vals = docFieldValues[ed.document_id] || {};
                   return (
-                    <tr key={ed.id} className="hover:bg-gray-50">
+                    <tr key={ed.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleViewDocument(ed)}>
                       <td className="px-3 py-2 font-medium">{ed.document.code}</td>
                       <td className="px-3 py-2">{ed.document.name}</td>
                       <td className="px-3 py-2 text-gray-500">{ed.document.version}</td>
@@ -205,7 +237,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
                         {ed.document.file_id && ed.document.file_name ? (
                           <button
                             type="button"
-                            onClick={() => handleDownload(ed.document.file_id!, ed.document.file_name!)}
+                            onClick={(e) => { e.stopPropagation(); handleDownload(ed.document.file_id!, ed.document.file_name!); }}
                             className="text-primary-600 hover:text-primary-800 text-xs"
                             title={`下载 ${ed.document.file_name}`}
                           >
@@ -217,7 +249,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
                       </td>
                       {hasEditableAction && (
                         <td className="px-3 py-2 text-right">
-                          <button type="button" onClick={() => handleRemove(ed.id)} className="text-red-500 hover:text-red-700 text-xs" title="移除关联">✕</button>
+                          <button type="button" onClick={(e) => { e.stopPropagation(); handleRemove(ed.id); }} className="text-red-500 hover:text-red-700 text-xs" title="移除关联">✕</button>
                         </td>
                       )}
                     </tr>
@@ -237,6 +269,17 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
         docFieldDefs={docFieldDefs}
         docFieldValues={docFieldValues}
       />
+
+      {/* 图文档详情弹窗 */}
+      <Modal open={!!viewDoc} title="图文档详情" onClose={() => setViewDoc(null)} width="full" zIndex={60}>
+        {viewDoc && (
+          <DocumentDetailContent
+            doc={viewDoc}
+            customFieldDefs={viewDocCustomDefs}
+            customFieldValues={viewDocCustomValues}
+          />
+        )}
+      </Modal>
     </div>
   );
 }

@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
+from sqlalchemy import cast, String
 import uuid
 import base64
 
 from ..database import get_db
-from ..models import User, Document, DocumentAttachment, EntityDocument, Part, Assembly
+from ..models import User, Document, DocumentAttachment, Part, Assembly
 from .. import crud, schemas
 from .auth import require_role
 
@@ -22,7 +23,7 @@ async def list_documents(skip: int = 0, limit: int = 100, keyword: str = None, s
     return [{
         "id": d.id, "code": d.code, "name": d.name,
         "version": d.version, "status": d.status,
-        "description": d.description,
+        "remark": d.remark,
         "file_name": d.file_name, "file_id": d.file_id,
         "created_at": d.created_at, "updated_at": d.updated_at,
     } for d in docs]
@@ -30,43 +31,45 @@ async def list_documents(skip: int = 0, limit: int = 100, keyword: str = None, s
 @router.get("/{doc_id}/references")
 async def get_document_references(doc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
     """
-    获取图文档的引用信息
-    
-    Returns:
-        引用该图文档的零部件列表、用户看板文件夹列表
+    获取图文档的引用信息（扫描 document_links JSONB）
     """
     from ..models import DashboardItem, DashboardFolder, User, UserDashboard
-    
-    # 查询引用该图文档的零部件关联记录
-    refs = db.query(EntityDocument).filter(EntityDocument.document_id == doc_id).all()
-    
-    # 构建引用信息列表
+    doc_id_str = str(doc_id)
+
+    # 扫描零件的 document_links
+    parts = db.query(Part).all()
     references = []
-    for ref in refs:
-        if ref.entity_type == 'part':
-            part = db.query(Part).filter(Part.id == ref.entity_id).first()
-            if part:
+    for p in parts:
+        links = p.document_links or []
+        for link in links:
+            if link.get("document_id") == doc_id_str:
                 references.append({
                     "entity_type": "part",
-                    "entity_id": str(part.id),
-                    "entity_code": part.code,
-                    "entity_name": part.name,
-                    "version": part.version or "",
-                    "status": part.status or "draft",
-                    "category": ref.category,
+                    "entity_id": str(p.id),
+                    "entity_code": p.code,
+                    "entity_name": p.name,
+                    "version": p.version or "",
+                    "status": p.status or "draft",
+                    "category": link.get("category"),
                 })
-        elif ref.entity_type == 'component':
-            assembly = db.query(Assembly).filter(Assembly.id == ref.entity_id).first()
-            if assembly:
+                break
+
+    # 扫描部件的 document_links
+    assemblies = db.query(Assembly).all()
+    for a in assemblies:
+        links = a.document_links or []
+        for link in links:
+            if link.get("document_id") == doc_id_str:
                 references.append({
                     "entity_type": "component",
-                    "entity_id": str(assembly.id),
-                    "entity_code": assembly.code,
-                    "entity_name": assembly.name,
-                    "version": assembly.version or "",
-                    "status": assembly.status or "draft",
-                    "category": ref.category,
+                    "entity_id": str(a.id),
+                    "entity_code": a.code,
+                    "entity_name": a.name,
+                    "version": a.version or "",
+                    "status": a.status or "draft",
+                    "category": link.get("category"),
                 })
+                break
     
     # 查询用户看板中引用该图文档的记录
     dashboard_refs = db.query(DashboardItem).filter(
@@ -123,7 +126,7 @@ async def create_document(doc: schemas.DocumentCreate, request: Request, db: Ses
     return {
         "id": d.id, "code": d.code, "name": d.name,
         "version": d.version, "status": d.status,
-        "description": d.description,
+        "remark": d.remark,
         "file_name": d.file_name, "file_id": d.file_id,
         "created_at": d.created_at, "updated_at": d.updated_at,
     }
@@ -136,7 +139,7 @@ async def get_document(doc_id: uuid.UUID, db: Session = Depends(get_db), current
     return {
         "id": d.id, "code": d.code, "name": d.name,
         "version": d.version, "status": d.status,
-        "description": d.description,
+        "remark": d.remark,
         "file_name": d.file_name, "file_id": d.file_id,
         "created_at": d.created_at, "updated_at": d.updated_at,
     }
@@ -155,16 +158,70 @@ async def update_document(doc_id: uuid.UUID, body: schemas.DocumentUpdate, reque
     return {
         "id": d.id, "code": d.code, "name": d.name,
         "version": d.version, "status": d.status,
-        "description": d.description,
+        "remark": d.remark,
         "file_name": d.file_name, "file_id": d.file_id,
         "created_at": d.created_at, "updated_at": d.updated_at,
     }
 
+def _find_doc_refs(db, doc_id_str):
+    """精确扫描 document_links JSONB，找出引用指定图文档的零件和部件"""
+    references = []
+    # 扫描零件
+    for p in db.query(Part).all():
+        for link in (p.document_links or []):
+            if link.get("document_id") == doc_id_str:
+                references.append({
+                    "entity_type": "part",
+                    "entity_id": str(p.id),
+                    "entity_code": p.code,
+                    "entity_name": p.name,
+                    "version": p.version or "",
+                    "status": p.status or "draft",
+                    "category": link.get("category"),
+                    "id": str(p.id),
+                    "code": p.code,
+                    "name": p.name,
+                })
+                break
+    # 扫描部件
+    for a in db.query(Assembly).all():
+        for link in (a.document_links or []):
+            if link.get("document_id") == doc_id_str:
+                references.append({
+                    "entity_type": "component",
+                    "entity_id": str(a.id),
+                    "entity_code": a.code,
+                    "entity_name": a.name,
+                    "version": a.version or "",
+                    "status": a.status or "draft",
+                    "category": link.get("category"),
+                    "id": str(a.id),
+                    "code": a.code,
+                    "name": a.name,
+                })
+                break
+    return references
+
+@router.get("/{doc_id}/can-delete")
+async def check_document_can_delete(doc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+    """检查图文档是否可以被删除（扫描 document_links JSONB）"""
+    d = db.query(Document).filter(Document.id == doc_id).first()
+    if not d:
+        raise HTTPException(status_code=404, detail="图文档不存在")
+    refs = _find_doc_refs(db, str(doc_id))
+    return {
+        "can_delete": len(refs) == 0,
+        "ref_count": len(refs),
+        "references": refs
+    }
+
 @router.delete("/{doc_id}")
 async def delete_document(doc_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin"]))):
-    ref_count = db.query(EntityDocument).filter(EntityDocument.document_id == doc_id).count()
-    if ref_count > 0:
-        raise HTTPException(status_code=400, detail=f"该图文档已被 {ref_count} 个零部件引用，无法删除")
+    # 扫描 document_links JSONB 检查引用
+    refs = _find_doc_refs(db, str(doc_id))
+    if refs:
+        labels = [f"{'零件' if r['entity_type']=='part' else '部件'} {r['code']}" for r in refs[:5]]
+        raise HTTPException(status_code=400, detail=f"该图文档被 {len(refs)} 个零部件引用: {', '.join(labels)}，无法删除")
     d = db.query(Document).filter(Document.id == doc_id).first()
     if not d:
         raise HTTPException(status_code=404, detail="图文档不存在")

@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from .routers import auth_router, users_router, parts_router, assemblies_router, bom_router, logs_router, attachments_router, custom_fields_router, documents_router, dashboard_router
+from .routers import auth_router, users_router, parts_router, assemblies_router, bom_router, logs_router, custom_fields_router, documents_router, dashboard_router
 from .routers.attachments_v2 import router as attachments_v2_router
 from .database import SessionLocal
 
@@ -28,7 +28,6 @@ app.include_router(parts_router, prefix="/api")
 app.include_router(assemblies_router, prefix="/api")
 app.include_router(bom_router, prefix="/api")
 app.include_router(logs_router, prefix="/api")
-app.include_router(attachments_router, prefix="/api")
 app.include_router(attachments_v2_router, prefix="/api/v2")  # 新版附件API（支持分块上传）
 app.include_router(custom_fields_router, prefix="/api")
 app.include_router(documents_router, prefix="/api")

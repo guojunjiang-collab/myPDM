@@ -1,12 +1,19 @@
 import { useEffect, useState, useRef } from 'react';
-import { documentsApi, customFieldsApi } from '../services/api';
+import { documentsApi, customFieldsApi, bomApi } from '../services/api';
 import type { Document, CustomFieldDefinition, CustomFieldValue, DocumentAttachment } from '../types';
-import { canEdit, isAdmin } from '../stores/auth';
+import { canEdit, isAdmin, canDownload } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
 import DocumentDetailContent from '../components/DocumentDetailContent';
 import { getNextVersion } from '../constants';
 import { useDataStore } from '../stores/data';
 import { useTableSort } from '../hooks/useTableSort';
+import {
+  exportDocumentsToFolder,
+  previewDocumentsImport,
+  executeDocumentsImport,
+} from '../services/importExport';
+import type { ImportPreview } from '../services/importExport';
+import ImportPreviewModal from '../components/ImportPreviewModal';
 
 /** 生成 UUID */
 function generateUUID(): string {
@@ -66,6 +73,7 @@ export default function Documents() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // 详情弹窗
   const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
@@ -87,6 +95,12 @@ export default function Documents() {
   const [uploadingFileName, setUploadingFileName] = useState<string>('');
   const [deletingAttId, setDeletingAttId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 导入导出
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
+  const [importPreviewOpen, setImportPreviewOpen] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     loadDocuments();
@@ -298,7 +312,15 @@ export default function Documents() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
+    setDeleteError(null);
     try {
+      const res = await bomApi.checkReferences('document', deleteId);
+      const refs = res.data || [];
+      if (refs.length > 0) {
+        const names = refs.map((r: any) => r.label).join(', ');
+        setDeleteError('该图文档被以下实体引用，不能删除: ' + names);
+        return;
+      }
       await documentsApi.delete(deleteId);
       setDeleteId(null);
       useDataStore.getState().setDocuments(
@@ -323,6 +345,47 @@ export default function Documents() {
       setViewingCustomValues(values);
     } catch {
       setViewingCustomValues({});
+    }
+  };
+
+  // ===== 导入导出 =====
+  const handleExportDocuments = async () => {
+    try {
+      await exportDocumentsToFolder();
+    } catch (err: any) {
+      if (err.name !== 'AbortError' && !err.message?.includes('abort')) {
+        alert(err.message || '导出失败');
+      }
+    }
+  };
+
+  const handleImportDocumentsClick = async () => {
+    setImportLoading(true);
+    try {
+      const preview = await previewDocumentsImport();
+      setImportPreview(preview);
+      setImportPreviewOpen(true);
+    } catch (err: any) {
+      if (err.name !== 'AbortError' && !err.message?.includes('abort')) {
+        alert(err.message || '导入解析失败');
+      }
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const handleImportDocumentsConfirm = async () => {
+    if (!importPreview) return;
+    setImporting(true);
+    try {
+      await executeDocumentsImport(importPreview);
+      setImportPreviewOpen(false);
+      setImportPreview(null);
+      alert('导入成功');
+    } catch (err: any) {
+      alert(err.message || '导入执行失败');
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -380,11 +443,30 @@ export default function Documents() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold">图文档管理</h2>
-        {canEdit() && (
-          <button onClick={handleAdd} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
-            + 新增图文档
-          </button>
-        )}
+        <div className="flex gap-2">
+          {canDownload() && (
+            <button
+              onClick={handleExportDocuments}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+            >
+              📥 导出全部
+            </button>
+          )}
+          {canEdit() && (
+            <button
+              onClick={handleImportDocumentsClick}
+              disabled={importLoading}
+              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm disabled:opacity-50"
+            >
+              {importLoading ? '解析中...' : '📤 导入'}
+            </button>
+          )}
+          {canEdit() && (
+            <button onClick={handleAdd} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+              + 新增图文档
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex gap-2 mb-4">
@@ -653,13 +735,13 @@ export default function Documents() {
 
       <ConfirmModal
         open={!!deleteId}
-        title="确认删除"
-        content="确定要删除该图文档吗？此操作不可撤销。"
-        confirmText="删除"
+        title={deleteError ? "无法删除" : "确认删除"}
+        content={deleteError || "确定要删除该图文档吗？此操作不可撤销。"}
+        confirmText={deleteError ? "知道了" : "删除"}
         cancelText="取消"
-        type="danger"
-        onConfirm={handleDelete}
-        onCancel={() => setDeleteId(null)}
+        type={deleteError ? "info" : "danger"}
+        onConfirm={deleteError ? () => { setDeleteId(null); setDeleteError(null); } : handleDelete}
+        onCancel={() => { setDeleteId(null); setDeleteError(null); }}
       />
 
       {/* 图文档详情弹窗 */}
@@ -677,6 +759,18 @@ export default function Documents() {
           />
         )}
       </Modal>
+
+      {/* 导入预览弹窗 */}
+      <ImportPreviewModal
+        open={importPreviewOpen}
+        preview={importPreview}
+        loading={importLoading}
+        onClose={() => {
+          setImportPreviewOpen(false);
+          setImportPreview(null);
+        }}
+        onConfirm={handleImportDocumentsConfirm}
+      />
     </div>
   );
 }

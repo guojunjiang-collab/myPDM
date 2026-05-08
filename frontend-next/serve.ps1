@@ -18,7 +18,7 @@ function Get-FileMimeType($extension) {
 
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 $distPath = Join-Path $scriptPath "dist"
-$port = 5173
+$port = 8080
 
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://localhost:$port/")

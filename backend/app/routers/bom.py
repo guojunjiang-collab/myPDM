@@ -4,11 +4,65 @@ import uuid
 
 from ..database import get_db
 from ..models import User
-from .. import crud, schemas
+from .. import crud, models, schemas
 from ..bom import compare
 from .auth import require_role
+from sqlalchemy import cast, String
 
 router = APIRouter(prefix="/bom", tags=["BOM管理"])
+
+
+@router.get("/references/{entity_type}/{entity_id}")
+async def check_references(
+    entity_type: str,
+    entity_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin", "engineer", "production"])),
+):
+    """检查某个实体是否被引用（用于删除前校验）"""
+    references = []
+
+    # 1. 检查 BOM 子项引用（零件/部件作为子项被引用）
+    if entity_type in ("part", "assembly"):
+        # 兼容 'assembly' 和 'component' 两种 child_type 值
+        child_types = [entity_type]
+        if entity_type == "assembly":
+            child_types.append("component")
+        bom_items = db.query(models.BOMItem).filter(
+            models.BOMItem.child_type.in_(child_types),
+            models.BOMItem.child_id == entity_id,
+        ).all()
+        for item in bom_items:
+            label = item.parent_type
+            if label == "part":
+                p = crud.get_part(db, item.parent_id)
+                if p:
+                    label = f"零件 {p.code}"
+            elif label == "assembly":
+                a = crud.get_assembly(db, item.parent_id)
+                if a:
+                    label = f"部件 {a.code}"
+            references.append({"type": "bom_child", "parent_id": str(item.parent_id), "label": label})
+
+    # 2. 检查 document_links 引用（图文档被关联到零件/部件）
+    if entity_type == "document":
+        from ..models import Part, Assembly
+        doc_id_str = str(entity_id)
+        # 扫描零件
+        # 扫描零件的 document_links（精确匹配）
+        for p in db.query(Part).all():
+            for link in (p.document_links or []):
+                if link.get("document_id") == doc_id_str:
+                    references.append({"type": "entity_document", "parent_id": str(p.id), "label": f"零件 {p.code}"})
+                    break
+        # 扫描部件的 document_links（精确匹配）
+        for a in db.query(Assembly).all():
+            for link in (a.document_links or []):
+                if link.get("document_id") == doc_id_str:
+                    references.append({"type": "entity_document", "parent_id": str(a.id), "label": f"部件 {a.code}"})
+                    break
+
+    return references
 
 @router.get("/items/all")
 async def get_all_bom_items_route(db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production"]))):

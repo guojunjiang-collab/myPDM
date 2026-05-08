@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 import uuid
 
 from ..database import get_db
-from ..models import User, Document, EntityDocument
+from ..models import User, Document
 from .. import crud, schemas
 from .auth import require_role
 
@@ -55,11 +55,69 @@ async def update_part(part_id: uuid.UUID, part_update: schemas.PartUpdate, reque
     crud.create_log(db, current_user.id, current_user.username, "更新零件", "part", str(part_id), None, ip)
     return _part_response(db_part)
 
-@router.delete("/{part_id}")
-async def delete_part(part_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin"]))):
+@router.get("/{part_id}/can-delete")
+async def check_part_can_delete(part_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+    """检查零件是否可以被删除（是否有父项引用）"""
+    from ..models import BOMItem, Assembly
+    
     db_part = crud.get_part(db, part_id)
     if not db_part:
         raise HTTPException(status_code=404, detail="零件不存在")
+    
+    # 检查是否被部件引用为子项
+    ref_count = db.query(BOMItem).filter(
+        BOMItem.child_type == 'part',
+        BOMItem.child_id == part_id
+    ).count()
+    
+    references = []
+    if ref_count > 0:
+        refs = db.query(BOMItem, Assembly).join(
+            Assembly, BOMItem.parent_id == Assembly.id
+        ).filter(
+            BOMItem.child_type == 'part',
+            BOMItem.child_id == part_id
+        ).all()
+        for r in refs[:10]:
+            references.append({
+                "id": str(r[1].id),
+                "code": r[1].code,
+                "name": r[1].name,
+                "version": r[1].version or "A"
+            })
+    
+    return {
+        "can_delete": ref_count == 0,
+        "ref_count": ref_count,
+        "references": references
+    }
+
+@router.delete("/{part_id}")
+async def delete_part(part_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin"]))):
+    from ..models import BOMItem, Assembly
+    db_part = crud.get_part(db, part_id)
+    if not db_part:
+        raise HTTPException(status_code=404, detail="零件不存在")
+    
+    # 检查是否被部件引用为子项
+    ref_count = db.query(BOMItem).filter(
+        BOMItem.child_type == 'part',
+        BOMItem.child_id == part_id
+    ).count()
+    if ref_count > 0:
+        # 获取引用该零件的部件信息
+        refs = db.query(BOMItem, Assembly).join(
+            Assembly, BOMItem.parent_id == Assembly.id
+        ).filter(
+            BOMItem.child_type == 'part',
+            BOMItem.child_id == part_id
+        ).all()
+        ref_codes = [f"{r[1].code}({r[1].version})" for r in refs[:5]]
+        msg = f"该零件被 {ref_count} 个部件引用: {', '.join(ref_codes)}"
+        if ref_count > 5:
+            msg += f" 等"
+        raise HTTPException(status_code=400, detail=msg)
+    
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username, "删除零件", "part", str(part_id), f"编码:{db_part.code}", ip)
     crud.delete_part(db, part_id)
@@ -69,21 +127,25 @@ async def delete_part(part_id: uuid.UUID, request: Request, db: Session = Depend
 
 @router.get("/{part_id}/documents")
 async def get_part_documents(part_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
-    """获取零件关联的图文档列表"""
-    docs = db.query(EntityDocument, Document).join(Document, EntityDocument.document_id == Document.id).filter(
-        EntityDocument.entity_type == 'part',
-        EntityDocument.entity_id == part_id
-    ).order_by(EntityDocument.sort_order).all()
+    """获取零件关联的图文档列表（从 document_links JSONB 读取）"""
+    from ..models import Part
+    part = db.query(Part).filter(Part.id == part_id).first()
+    if not part:
+        raise HTTPException(status_code=404, detail="零件不存在")
+    links = part.document_links or []
     result = []
-    for ed, doc in docs:
+    for link in links:
+        doc = db.query(Document).filter(Document.id == link.get("document_id")).first()
+        if not doc:
+            continue
         result.append({
-            "id": ed.id,
-            "entity_type": ed.entity_type,
-            "entity_id": ed.entity_id,
-            "document_id": ed.document_id,
-            "category": ed.category,
-            "sort_order": ed.sort_order,
-            "created_at": ed.created_at,
+            "id": link.get("id"),
+            "entity_type": "part",
+            "entity_id": str(part.id),
+            "document_id": doc.id,
+            "category": link.get("category"),
+            "sort_order": link.get("sort_order", 0),
+            "created_at": link.get("created_at"),
             "document": {
                 "id": doc.id,
                 "code": doc.code,
@@ -98,45 +160,67 @@ async def get_part_documents(part_id: uuid.UUID, db: Session = Depends(get_db), 
 
 @router.post("/{part_id}/documents")
 async def add_part_document(part_id: uuid.UUID, body: schemas.EntityDocumentCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
-    """关联图文档到零件"""
+    """关联图文档到零件（写入 document_links JSONB）"""
+    from ..models import Part
     doc = db.query(Document).filter(Document.id == body.document_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="图文档不存在")
-    ed = EntityDocument(
-        entity_type='part',
-        entity_id=part_id,
-        document_id=body.document_id,
-        category=body.category,
-        sort_order=body.sort_order
-    )
-    if body.id:
-        ed.id = body.id
-    db.add(ed)
+    part = db.query(Part).filter(Part.id == part_id).first()
+    if not part:
+        raise HTTPException(status_code=404, detail="零件不存在")
+    from datetime import datetime, timezone
+    link_id = str(body.id) if body.id else str(uuid.uuid4())
+    link = {
+        "id": link_id,
+        "document_id": str(body.document_id),
+        "category": body.category,
+        "sort_order": body.sort_order,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    links = part.document_links or []
+    links.append(link)
+    part.document_links = links
     db.commit()
-    db.refresh(ed)
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username, "关联图文档", "part_doc", str(part_id), f"文档:{doc.code}", ip)
-    return {"id": ed.id, "message": "图文档关联成功"}
+    return {"id": link_id, "message": "图文档关联成功"}
 
-@router.put("/{part_id}/documents/{edoc_id}")
-async def update_part_document(part_id: uuid.UUID, edoc_id: uuid.UUID, body: schemas.EntityDocumentUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+@router.put("/{part_id}/documents/{link_id}")
+async def update_part_document(part_id: uuid.UUID, link_id: uuid.UUID, body: schemas.EntityDocumentUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
     """更新关联信息（类别/排序）"""
-    ed = db.query(EntityDocument).filter(EntityDocument.id == edoc_id, EntityDocument.entity_id == part_id).first()
-    if not ed:
+    from ..models import Part
+    part = db.query(Part).filter(Part.id == part_id).first()
+    if not part:
+        raise HTTPException(status_code=404, detail="零件不存在")
+    links = part.document_links or []
+    link_id_str = str(link_id)
+    found = False
+    for link in links:
+        if link.get("id") == link_id_str:
+            if body.category is not None:
+                link["category"] = body.category
+            if body.sort_order is not None:
+                link["sort_order"] = body.sort_order
+            found = True
+            break
+    if not found:
         raise HTTPException(status_code=404, detail="关联不存在")
-    if body.category is not None:
-        ed.category = body.category
-    if body.sort_order is not None:
-        ed.sort_order = body.sort_order
+    part.document_links = links
     db.commit()
     return {"message": "关联已更新"}
 
-@router.delete("/{part_id}/documents/{edoc_id}")
-async def delete_part_document(part_id: uuid.UUID, edoc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+@router.delete("/{part_id}/documents/{link_id}")
+async def delete_part_document(part_id: uuid.UUID, link_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
     """移除图文档关联"""
-    ed = db.query(EntityDocument).filter(EntityDocument.id == edoc_id, EntityDocument.entity_id == part_id).first()
-    if not ed:
+    from ..models import Part
+    part = db.query(Part).filter(Part.id == part_id).first()
+    if not part:
+        raise HTTPException(status_code=404, detail="零件不存在")
+    links = part.document_links or []
+    link_id_str = str(link_id)
+    new_links = [l for l in links if l.get("id") != link_id_str]
+    if len(new_links) == len(links):
         raise HTTPException(status_code=404, detail="关联不存在")
-    db.delete(ed)
+    part.document_links = new_links
     db.commit()
     return {"message": "关联已移除"}

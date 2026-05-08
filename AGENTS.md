@@ -229,7 +229,11 @@ docker-compose up -d --build backend
 
 ### API 文档
 
-http://localhost:8080/api/docs
+- **Swagger UI**（在线调试）：http://localhost:8000/api/docs
+- **ReDoc**（阅读友好）：http://localhost:8000/api/redoc
+- **OpenAPI JSON**：http://localhost:8000/api/openapi.json
+
+> 通过 Nginx 访问时替换为 http://localhost:8080/api/docs
 
 ---
 
@@ -350,4 +354,4 @@ docker ps
 
 ---
 
-*最后更新: 2026-05-07*
+*最后更新: 2026-05-08*

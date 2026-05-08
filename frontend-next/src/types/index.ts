@@ -67,16 +67,6 @@ export interface BOMItem {
   created: string;
 }
 
-export interface Attachment {
-  id: string;
-  doc_id: string;
-  filename: string;
-  filepath: string;
-  filesize: number;
-  content_type: string;
-  created: string;
-}
-
 export interface OperationLog {
   id: string;
   user_id: string;

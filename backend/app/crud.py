@@ -156,7 +156,7 @@ def delete_assembly(db, assembly_id):
     ).delete(synchronize_session=False)
     # 删除所有引用该部件的 BOM items（该部件作为子项被其他部件引用）
     db.query(models.BOMItem).filter(
-        models.BOMItem.child_type == 'assembly',
+        models.BOMItem.child_type == 'component',
         models.BOMItem.child_id == assembly_id
     ).delete(synchronize_session=False)
     db.commit()
@@ -260,43 +260,6 @@ def create_log(db, user_id, username, action, target_type=None, target_id=None, 
 def get_logs(db, skip=0, limit=100):
     return db.query(models.OperationLog).order_by(models.OperationLog.created_at.desc()).offset(skip).limit(limit).all()
 
-# Dictionary CRUD
-def get_dictionary_items(db, dict_type: str, skip=0, limit=100):
-    return db.query(models.Dictionary).filter(models.Dictionary.dict_type == dict_type).offset(skip).limit(limit).all()
-
-def get_dictionary_by_value(db, dict_type: str, value: str):
-    return db.query(models.Dictionary).filter(
-        models.Dictionary.dict_type == dict_type,
-        models.Dictionary.value == value
-    ).first()
-
-def create_dictionary(db, dict_type: str, value: str, id=None):
-    db_dict = models.Dictionary(dict_type=dict_type, value=value)
-    if id:
-        db_dict.id = id
-    db.add(db_dict)
-    db.commit()
-    db.refresh(db_dict)
-    return db_dict
-
-def update_dictionary(db, dict_id, value: str):
-    db_dict = db.query(models.Dictionary).filter(models.Dictionary.id == dict_id).first()
-    if not db_dict:
-        return None
-    db_dict.value = value
-    from datetime import datetime
-    db_dict.updated_at = datetime.utcnow()
-    db.commit()
-    db.refresh(db_dict)
-    return db_dict
-
-def delete_dictionary(db, dict_id):
-    db_dict = db.query(models.Dictionary).filter(models.Dictionary.id == dict_id).first()
-    if db_dict:
-        db.delete(db_dict)
-        db.commit()
-    return db_dict
-
 # ===== Custom Field Definition CRUD =====
 
 def get_custom_field_definitions(db, applies_to=None):
@@ -378,9 +341,7 @@ def reset_business_data(db):
     db.query(models.CustomFieldValue).delete()
     db.query(models.BOMItem).delete()
     db.query(models.DocumentAttachment).delete()
-    db.query(models.EntityDocument).delete()
     db.query(models.Document).delete()
-    db.query(models.Attachment).delete()
     db.query(models.Part).delete()
     db.query(models.Assembly).delete()
     db.query(models.OperationLog).delete()

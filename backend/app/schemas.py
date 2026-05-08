@@ -45,10 +45,6 @@ class PartBase(BaseSchema):
     code: str = Field(..., min_length=1, max_length=64)
     name: str = Field(..., min_length=1, max_length=255)
     spec: Optional[str] = None
-    material: Optional[str] = None
-    unit: Optional[str] = None
-    price: Optional[float] = None
-    supplier: Optional[str] = None
     version: str = "A"
     status: str = "draft"
     remark: Optional[str] = None
@@ -61,10 +57,6 @@ class PartUpdate(BaseSchema):
     code: Optional[str] = None
     name: Optional[str] = None
     spec: Optional[str] = None
-    material: Optional[str] = None
-    unit: Optional[str] = None
-    price: Optional[float] = None
-    supplier: Optional[str] = None
     version: Optional[str] = None
     status: Optional[str] = None
     remark: Optional[str] = None
@@ -79,9 +71,6 @@ class AssemblyBase(BaseSchema):
     code: str = Field(..., min_length=1, max_length=64)
     name: str = Field(..., min_length=1, max_length=255)
     spec: Optional[str] = None
-    material: Optional[str] = None
-    unit: Optional[str] = None
-    price: Optional[float] = None
     version: str = "V1.0"
     status: str = "draft"
     remark: Optional[str] = None
@@ -94,9 +83,6 @@ class AssemblyUpdate(BaseSchema):
     code: Optional[str] = None
     name: Optional[str] = None
     spec: Optional[str] = None
-    material: Optional[str] = None
-    unit: Optional[str] = None
-    price: Optional[float] = None
     version: Optional[str] = None
     status: Optional[str] = None
     remark: Optional[str] = None
@@ -151,22 +137,6 @@ class LogResponse(BaseSchema):
     detail: Optional[str] = None
     ip_address: Optional[str] = None
     created_at: datetime
-
-class DictionaryBase(BaseSchema):
-    dict_type: str = Field(..., min_length=1, max_length=32)
-    value: str = Field(..., min_length=1, max_length=255)
-
-class DictionaryCreate(DictionaryBase):
-    id: Optional[uuid.UUID] = None
-
-class DictionaryUpdate(BaseSchema):
-    value: Optional[str] = None
-
-class DictionaryResponse(DictionaryBase):
-    id: uuid.UUID
-    created_at: datetime
-    updated_at: datetime
-
 
 class BOMCompareOptions(BaseSchema):
     """BOM对比选项"""
@@ -251,7 +221,8 @@ class DocumentBase(BaseSchema):
     name: str = Field(..., min_length=1, max_length=255)
     version: str = "A"
     status: str = "draft"
-    description: Optional[str] = None
+    remark: Optional[str] = None
+
 
 class DocumentCreate(DocumentBase):
     id: Optional[uuid.UUID] = None
@@ -260,7 +231,7 @@ class DocumentUpdate(BaseSchema):
     name: Optional[str] = None
     version: Optional[str] = None
     status: Optional[str] = None
-    description: Optional[str] = None
+    remark: Optional[str] = None
 
 class DocumentResponse(DocumentBase):
     id: uuid.UUID
@@ -285,24 +256,16 @@ class DocumentAttachmentFull(DocumentAttachmentResponse):
     file_data: Optional[str] = None
 
 class EntityDocumentCreate(BaseSchema):
+    """关联图文档到零件/部件的请求体"""
     id: Optional[uuid.UUID] = None
     document_id: uuid.UUID
     category: Optional[str] = None
     sort_order: int = 0
 
 class EntityDocumentUpdate(BaseSchema):
+    """更新图文档关联信息的请求体"""
     category: Optional[str] = None
     sort_order: Optional[int] = None
-
-class EntityDocumentResponse(BaseSchema):
-    id: uuid.UUID
-    entity_type: str
-    entity_id: uuid.UUID
-    document_id: uuid.UUID
-    category: Optional[str] = None
-    sort_order: int
-    created_at: datetime
-    document: Optional[DocumentResponse] = None
 
 class ReorderItem(BaseSchema):
     id: uuid.UUID

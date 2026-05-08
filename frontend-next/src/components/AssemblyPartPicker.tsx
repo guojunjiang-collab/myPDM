@@ -227,7 +227,7 @@ export default function AssemblyPartPicker({
   const selectedList = useMemo(() => Array.from(selected.values()), [selected]);
 
   return (
-    <Modal open={open} title="添加子项" onClose={handleCancel} width="full">
+    <Modal open={open} title="添加子项" onClose={handleCancel} width="full" zIndex={60}>
       <div className="space-y-4 max-h-[75vh] flex flex-col">
         {/* ---- 1. 已选子项 ---- */}
         <div className="border rounded-lg overflow-hidden">
@@ -343,7 +343,7 @@ export default function AssemblyPartPicker({
                     <th className="px-3 py-2 text-left text-gray-500 font-medium">中文名称</th>
                     <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
                     <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
-                    <th className="px-3 py-2 text-center text-gray-500 font-medium w-16">操作</th>
+                    <th className="px-3 py-2 text-center text-gray-500 font-medium w-20">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
