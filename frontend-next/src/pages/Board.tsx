@@ -135,14 +135,8 @@ export default function Board() {
     } catch { /* silent */ } finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { loadDashboard(); }, []);
-  useEffect(() => {
-    usersApi.list({ page_size: 10000 }).then((r) => {
-      const d = r.data;
-      setUsersList(Array.isArray(d) ? d : (d as any)?.items || []);
-    }).catch(() => {});
-  }, []);
   useEffect(() => { if (shareModal) loadShares(shareModal); }, [shareModal]);
+  useEffect(() => { if (shareModal) usersApi.list({ page_size: 10000 }).then((r) => { const d = r.data; setUsersList(Array.isArray(d) ? d : (d as any)?.items || []); }).catch(() => {}); }, [shareModal]);
 
   /* Close menu on outside click */
   useEffect(() => {
