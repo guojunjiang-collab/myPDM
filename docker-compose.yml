@@ -59,7 +59,7 @@ services:
     networks:
       - bom_network
     ports:
-      - "8080:80"
+      - "${NGINX_HOST_PORT:-8080}:80"
 
 networks:
   bom_network:

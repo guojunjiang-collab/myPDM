@@ -65,7 +65,7 @@
 
 | 服务 | 容器名 | 端口 |
 |------|--------|------|
-| Nginx | bom_nginx | 80 (映射 8080) |
+| Nginx | bom_nginx | 80 (映射 `${NGINX_HOST_PORT:-8080}`) |
 | FastAPI | bom_backend | 8000 |
 | PostgreSQL | bom_postgres | 5432 |
 | Redis | bom_redis | 6379 |
@@ -252,7 +252,7 @@ cd frontend && npm run build
 - **ReDoc**（阅读友好）：http://localhost:8000/api/redoc
 - **OpenAPI JSON**：http://localhost:8000/api/openapi.json
 
-> 通过 Nginx 访问时替换为 http://localhost:8080/api/docs
+> 通过 Nginx 访问时替换为 `http://localhost:${NGINX_HOST_PORT:-8080}/api/docs`
 
 ---
 
@@ -279,7 +279,7 @@ docker ps
 ```
 
 4 个容器均为 Up 时正常：
-- bom_nginx      :80 → localhost:8080
+- bom_nginx      :80 → localhost:${NGINX_HOST_PORT:-8080}
 - bom_backend   :8000
 - bom_postgres  :5432
 - bom_redis    :6379
@@ -318,6 +318,7 @@ docker-compose up -d
 
 | 数据 | 宿主机默认路径 | 容器内路径 | 配置方式 |
 |------|---------------|-----------|---------|
+| Nginx 端口 | `8080` | 80 | `.env` → `NGINX_HOST_PORT` |
 | PostgreSQL 数据 | `./pgdata/` | `/var/lib/postgresql/data` | `.env` → `PGDATA_HOST_PATH` |
 | 上传附件 | `./uploads/` | `/app/uploads` | `.env` → `UPLOADS_HOST_PATH` |
 
