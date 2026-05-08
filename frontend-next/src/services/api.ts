@@ -93,6 +93,12 @@ export const documentsApi = {
   create: (data: unknown) => api.post('/documents/', data),
   update: (id: string, data: unknown) => api.put(`/documents/${id}`, data),
   delete: (id: string) => api.delete(`/documents/${id}`),
+  // 图文档附件
+  uploadAttachment: (docId: string, data: { id?: string; file_name: string; file_data: string }) =>
+    api.post(`/documents/${docId}/attachments`, data),
+  listAttachments: (docId: string) => api.get(`/documents/${docId}/attachments/`),
+  getAttachment: (docId: string, attId: string) => api.get(`/documents/${docId}/attachments/${attId}`),
+  deleteAttachment: (docId: string, attId: string) => api.delete(`/documents/${docId}/attachments/${attId}`),
 };
 
 // 附件 API

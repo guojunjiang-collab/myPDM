@@ -189,16 +189,20 @@ async def delete_document(doc_id: uuid.UUID, request: Request, db: Session = Dep
 
 @router.post("/{doc_id}/attachments")
 async def upload_document_attachment(doc_id: uuid.UUID, body: schemas.DocumentAttachmentCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+    from ..file_storage import file_storage
     d = db.query(Document).filter(Document.id == doc_id).first()
     if not d:
         raise HTTPException(status_code=404, detail="图文档不存在")
+    
     file_data_bytes = base64.b64decode(body.file_data)
+    result = file_storage.save_file(file_data_bytes, "documents", str(doc_id), body.file_name)
+    
     att = DocumentAttachment(
         id=body.id,
         document_id=doc_id,
         file_name=body.file_name,
-        file_data=file_data_bytes,
-        file_size=len(file_data_bytes),
+        file_size=result["file_size"],
+        file_path=result["file_path"],
     )
     db.add(att)
     db.commit()
@@ -212,13 +216,24 @@ async def upload_document_attachment(doc_id: uuid.UUID, body: schemas.DocumentAt
 
 @router.get("/{doc_id}/attachments/{att_id}")
 async def download_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+    from ..file_storage import file_storage
     att = db.query(DocumentAttachment).filter(DocumentAttachment.id == att_id, DocumentAttachment.document_id == doc_id).first()
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
+    
+    file_data = None
+    if att.file_path:
+        try:
+            data = file_storage.read_file(att.file_path)
+            if data:
+                file_data = base64.b64encode(data).decode('utf-8')
+        except Exception as e:
+            print(f"[WARNING] {e}")
+    
     return {
         "id": att.id, "document_id": att.document_id,
         "file_name": att.file_name, "file_size": att.file_size,
-        "file_data": base64.b64encode(att.file_data).decode('utf-8') if att.file_data else None,
+        "file_data": file_data,
         "created_at": att.created_at,
     }
 
@@ -232,9 +247,17 @@ async def list_attachments(doc_id: uuid.UUID, skip: int = 0, limit: int = 100, d
 
 @router.delete("/{doc_id}/attachments/{att_id}")
 async def delete_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+    from ..file_storage import file_storage
     att = db.query(DocumentAttachment).filter(DocumentAttachment.id == att_id, DocumentAttachment.document_id == doc_id).first()
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
+    
+    if att.file_path:
+        try:
+            file_storage.delete_file(att.file_path)
+        except Exception as e:
+            print(f"[WARNING] {e}")
+    
     d = db.query(Document).filter(Document.id == doc_id).first()
     if d and d.file_id == att.id:
         d.file_id = None

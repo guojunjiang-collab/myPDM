@@ -1,10 +1,19 @@
-import type { Document, CustomFieldDefinition } from '../types';
+import { useState, useEffect } from 'react';
+import type { Document, CustomFieldDefinition, DocumentAttachment } from '../types';
+import { documentsApi } from '../services/api';
 import { formatDateTime } from '../utils/date';
 
 interface DocumentDetailContentProps {
   doc: Document;
   customFieldDefs: CustomFieldDefinition[];
   customFieldValues: Record<string, any>;
+}
+
+/** 文件大小格式化 */
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
 const statusTag = (s: string) => {
@@ -18,6 +27,80 @@ const statusTag = (s: string) => {
 };
 
 export default function DocumentDetailContent({ doc, customFieldDefs, customFieldValues }: DocumentDetailContentProps) {
+  const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
+  const [loadingAttachments, setLoadingAttachments] = useState(false);
+
+  // 加载附件列表
+  const loadAttachments = async () => {
+    setLoadingAttachments(true);
+    try {
+      const res = await documentsApi.listAttachments(doc.id);
+      setAttachments(res.data || []);
+    } catch (error) {
+      console.error('加载附件失败', error);
+      setAttachments([]);
+    } finally {
+      setLoadingAttachments(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAttachments();
+  }, [doc.id]);
+
+  // 下载附件
+  const handleDownload = async (attId: string, fileName: string) => {
+    try {
+      const res = await documentsApi.getAttachment(doc.id, attId);
+      const data = res.data as { file_data?: string };
+
+      if (data.file_data) {
+        const link = document.createElement('a');
+        link.href = `data:application/octet-stream;base64,${data.file_data}`;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        alert('文件数据获取失败');
+      }
+    } catch (error) {
+      console.error('下载失败', error);
+      alert('下载失败，请重试');
+    }
+  };
+
+  // 预览附件
+  const handlePreview = async (attId: string, fileName: string) => {
+    try {
+      const res = await documentsApi.getAttachment(doc.id, attId);
+      const data = res.data as { file_data?: string };
+
+      if (data.file_data) {
+        // 根据文件扩展名判断 content-type
+        const ext = fileName.split('.').pop()?.toLowerCase() || '';
+        const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'];
+        const pdfExts = ['pdf'];
+        
+        let contentType = 'application/octet-stream';
+        if (imageExts.includes(ext)) contentType = `image/${ext === 'svg' ? 'svg+xml' : ext}`;
+        if (pdfExts.includes(ext)) contentType = 'application/pdf';
+
+        const link = document.createElement('a');
+        link.href = `data:${contentType};base64,${data.file_data}`;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        alert('文件数据获取失败');
+      }
+    } catch (error) {
+      console.error('预览失败', error);
+      alert('预览失败，请重试');
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* 基本属性 */}
@@ -72,6 +155,59 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
           </div>
         </div>
       )}
+
+      {/* 附件区域 - 只显示、预览、下载，无上传/删除 */}
+      <div className="border-t pt-4">
+        <h4 className="text-sm font-medium text-gray-700 mb-3">附件</h4>
+
+        {loadingAttachments ? (
+          <div className="text-sm text-gray-500">加载中...</div>
+        ) : attachments.length === 0 ? (
+          <div className="text-sm text-gray-400 py-4 text-center border border-dashed border-gray-300 rounded-lg">
+            暂无附件
+          </div>
+        ) : (
+          <div className="border rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="px-3 py-2 text-left text-gray-500 font-medium">文件名</th>
+                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-24">大小</th>
+                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-40">上传时间</th>
+                  <th className="px-3 py-2 text-right text-gray-500 font-medium w-32">操作</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {attachments.map(att => (
+                  <tr key={att.id} className="hover:bg-gray-50">
+                    <td className="px-3 py-2">
+                      <span className="text-primary-600">{att.file_name}</span>
+                    </td>
+                    <td className="px-3 py-2 text-gray-500">{formatFileSize(att.file_size || 0)}</td>
+                    <td className="px-3 py-2 text-gray-500">{formatDateTime(att.created_at)}</td>
+                    <td className="px-3 py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => handlePreview(att.id, att.file_name || 'preview')}
+                        className="text-blue-600 hover:text-blue-800 mr-3"
+                      >
+                        预览
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownload(att.id, att.file_name || 'download')}
+                        className="text-primary-600 hover:text-primary-800"
+                      >
+                        下载
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,12 +1,42 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { documentsApi, customFieldsApi } from '../services/api';
-import type { Document, CustomFieldDefinition, CustomFieldValue } from '../types';
+import type { Document, CustomFieldDefinition, CustomFieldValue, DocumentAttachment } from '../types';
 import { canEdit, isAdmin } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
 import DocumentDetailContent from '../components/DocumentDetailContent';
 import { getNextVersion } from '../constants';
 import { useDataStore } from '../stores/data';
 import { useTableSort } from '../hooks/useTableSort';
+
+/** 生成 UUID */
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+/** 文件大小格式化 */
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+/** Base64 编码文件 */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 interface DocFormData {
   code: string;
@@ -49,6 +79,14 @@ export default function Documents() {
   const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDefinition[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
   const [loadingCustomFields, setLoadingCustomFields] = useState(false);
+
+  // 附件管理
+  const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
+  const [loadingAttachments, setLoadingAttachments] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadingFileName, setUploadingFileName] = useState<string>('');
+  const [deletingAttId, setDeletingAttId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadDocuments();
@@ -98,6 +136,98 @@ export default function Documents() {
     }
   };
 
+  // 加载附件列表
+  const loadAttachments = async (docId: string) => {
+    setLoadingAttachments(true);
+    try {
+      const res = await documentsApi.listAttachments(docId);
+      setAttachments(res.data || []);
+    } catch (error) {
+      console.error('加载附件失败', error);
+      setAttachments([]);
+    } finally {
+      setLoadingAttachments(false);
+    }
+  };
+
+  // 上传附件 - 后台进行，不阻塞 UI
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editingDoc) return;
+
+    setUploading(true);
+    setUploadingFileName(file.name);
+    
+    // 不阻塞 UI，后台上传
+    const uploadPromise = (async () => {
+      try {
+        const fileData = await fileToBase64(file);
+        const attachmentId = generateUUID();
+
+        await documentsApi.uploadAttachment(editingDoc.id, {
+          id: attachmentId,
+          file_name: file.name,
+          file_data: fileData,
+        });
+
+        // 上传完成后刷新列表
+        await loadAttachments(editingDoc.id);
+      } catch (error) {
+        console.error('上传失败', error);
+        alert('上传失败，请重试');
+      } finally {
+        setUploading(false);
+        setUploadingFileName('');
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }
+    })();
+  };
+
+  // 删除附件
+  const handleDeleteAttachment = async (attId: string) => {
+    if (!editingDoc || !confirm('确定要删除该附件吗？')) return;
+
+    setDeletingAttId(attId);
+    try {
+      await documentsApi.deleteAttachment(editingDoc.id, attId);
+      await loadAttachments(editingDoc.id);
+    } catch (error) {
+      console.error('删除失败', error);
+      alert('删除失败，请重试');
+    } finally {
+      setDeletingAttId(null);
+    }
+  };
+
+  // 下载附件
+  const handleDownloadAttachment = async (attId: string, fileName: string) => {
+    if (!editingDoc) return;
+    try {
+      const res = await documentsApi.getAttachment(editingDoc.id, attId);
+      const data = res.data as { file_data?: string };
+
+      if (data.file_data) {
+        const link = document.createElement('a');
+        link.href = `data:application/octet-stream;base64,${data.file_data}`;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        alert('文件数据获取失败');
+      }
+    } catch (error) {
+      console.error('下载失败', error);
+      alert('下载失败，请重试');
+    }
+  };
+
   const handleAdd = () => {
     setEditingDoc(null);
     setFormData(initialFormData);
@@ -117,6 +247,7 @@ export default function Documents() {
     });
     await loadCustomFields();
     await loadCustomFieldValues(doc.id);
+    await loadAttachments(doc.id); // 加载附件列表
     setModalOpen(true);
   };
 
@@ -321,7 +452,7 @@ export default function Documents() {
         open={modalOpen}
         title={editingDoc ? '编辑图文档' : '新增图文档'}
         onClose={() => setModalOpen(false)}
-        width="lg"
+        width="full"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -401,6 +532,91 @@ export default function Documents() {
                       {renderCustomFieldInput(def)}
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 附件管理 - 仅编辑时显示，且只能上传一个附件 */}
+          {editingDoc && (
+            <div className="border-t pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-medium text-gray-700">附件管理</h4>
+                {attachments.length === 0 && !uploading && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleUploadClick}
+                      className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700"
+                    >
+                      + 上传附件
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      className="hidden"
+                      onChange={handleFileChange}
+                      accept="*/*"
+                    />
+                  </>
+                )}
+              </div>
+
+              {/* 上传状态提示 - 不阻塞保存操作 */}
+              {uploading && (
+                <div className="mb-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+                  正在上传附件 "{uploadingFileName}"，您可以先保存...
+                </div>
+              )}
+
+              {loadingAttachments ? (
+                <div className="text-sm text-gray-500">加载中...</div>
+              ) : attachments.length === 0 && !uploading ? (
+                <div className="text-sm text-gray-400 py-4 text-center border border-dashed border-gray-300 rounded-lg">
+                  暂无附件
+                </div>
+              ) : (
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-gray-500 font-medium">文件名</th>
+                        <th className="px-3 py-2 text-left text-gray-500 font-medium w-24">大小</th>
+                        <th className="px-3 py-2 text-left text-gray-500 font-medium w-40">上传时间</th>
+                        <th className="px-3 py-2 text-right text-gray-500 font-medium w-32">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {attachments.map(att => (
+                        <tr key={att.id} className="hover:bg-gray-50">
+                          <td className="px-3 py-2">
+                            <span className="text-primary-600">{att.file_name}</span>
+                          </td>
+                          <td className="px-3 py-2 text-gray-500">{formatFileSize(att.file_size || 0)}</td>
+                          <td className="px-3 py-2 text-gray-500">
+                            {att.created_at ? new Date(att.created_at).toLocaleString('zh-CN') : '-'}
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadAttachment(att.id, att.file_name || 'download')}
+                              className="text-primary-600 hover:text-primary-800 mr-3"
+                            >
+                              下载
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAttachment(att.id)}
+                              disabled={deletingAttId === att.id}
+                              className="text-red-600 hover:text-red-800 disabled:opacity-50"
+                            >
+                              {deletingAttId === att.id ? '删除中...' : '删除'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>

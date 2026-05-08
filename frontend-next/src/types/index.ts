@@ -43,8 +43,18 @@ export interface Document {
   version?: string;
   status: 'draft' | 'frozen' | 'released' | 'obsolete';
   remark?: string;
+  file_name?: string;
+  file_id?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface DocumentAttachment {
+  id: string;
+  document_id: string;
+  file_name?: string;
+  file_size?: number;
+  created_at?: string;
 }
 
 export interface BOMItem {
