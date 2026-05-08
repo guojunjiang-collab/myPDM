@@ -28,12 +28,13 @@ interface FolderNode {
   items: DashboardItem[];
   children: FolderNode[];
   shared_from?: { user_id: string; real_name: string; permission: string };
+  is_shared?: boolean;
 }
 
 interface ShareRecord {
   id: string;
   shared_with_user_id: string;
-  shared_with: { id: string; username: string; real_name: string } | null;
+  shared_with_user: { id: string; username: string; real_name: string } | null;
   permission: string;
   created_at: string;
 }
@@ -137,6 +138,11 @@ export default function Board() {
 
   useEffect(() => { if (shareModal) loadShares(shareModal); }, [shareModal]);
   useEffect(() => { if (shareModal) usersApi.list({ page_size: 10000 }).then((r) => { const d = r.data; setUsersList(Array.isArray(d) ? d : (d as any)?.items || []); }).catch(() => {}); }, [shareModal]);
+
+  /* Load on mount */
+  useEffect(() => {
+    loadDashboard();
+  }, [loadDashboard]);
 
   /* Close menu on outside click */
   useEffect(() => {
@@ -447,7 +453,7 @@ export default function Board() {
               <div className="space-y-1">
                 {shares.map((s) => (
                   <div key={s.id} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded">
-                    <span className="text-sm">{s.shared_with?.real_name || '-'} <span className="text-xs text-gray-400 ml-1">({s.permission === 'edit' ? '可编辑' : '只读'})</span></span>
+                    <span className="text-sm">{s.shared_with_user?.real_name || '-'} <span className="text-xs text-gray-400 ml-1">({s.permission === 'edit' ? '可编辑' : '只读'})</span></span>
                     <button type="button" onClick={() => handleRemoveShare(s.id)} className="text-xs text-red-500 hover:text-red-700">取消</button>
                   </div>
                 ))}
@@ -531,6 +537,10 @@ function BoardTreeNode({
         )}
         <span className="text-gray-400">{isShared ? '📂' : '📁'}</span>
         <span className="flex-1 truncate">{node.name}</span>
+        {/* 共享状态标识：仅根级自己的文件夹显示 */}
+        {depth === 0 && !isShared && node.is_shared && (
+          <span className="text-xs text-blue-500" title="已共享">🔗</span>
+        )}
         {isShared && node.shared_from && (
           <span className="text-xs text-gray-400">{node.shared_from.real_name}</span>
         )}

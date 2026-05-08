@@ -14,12 +14,18 @@ router = APIRouter(prefix="/dashboard", tags=["用户看板"])
 
 def _folder_to_dict(folder, db: Session, include_items=False, include_children=False, depth=0):
     """递归构建文件夹树"""
+    # 检查是否有共享记录
+    has_share = db.query(DashboardFolderShare).filter(
+        DashboardFolderShare.folder_id == folder.id
+    ).first() is not None
+    
     result = {
         "id": folder.id,
         "parent_id": folder.parent_id,
         "name": folder.name,
         "sort_order": folder.sort_order,
         "created_at": folder.created_at.isoformat() if folder.created_at else None,
+        "is_shared": has_share,
     }
 
     if include_items:

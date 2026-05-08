@@ -39,6 +39,7 @@ services:
       - CHUNK_SIZE=5242880
     volumes:
       - ./uploads:/app/uploads
+      - ./backend/app:/app/app
     depends_on:
       - postgres
       - redis
