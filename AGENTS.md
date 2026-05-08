@@ -15,16 +15,16 @@
 | 项目名称 | 网页版 BOM 管理工具 (PDM 系统) |
 | 项目类型 | 前后端分离 Web 应用 |
 | 版本 | v1.0.0 |
-| 架构 | 单页应用 (SPA) + RESTful API |
+| 架构 | React SPA + RESTful API (Docker 部署) |
 
 ### 核心功能
 
 - **零件管理**: 物料清单全生命周期管理
-- **部件管理**: 部件层级管理
+- **部件管理**: 部件层级管理（树形 BOM）
 - **图文档管理**: 图纸文档与附件管理
 - **BOM 管理**: BOM 对比、BOM 反查、图文档反查
-- **用户看板**: 用户自定义数据看板
-- **数据同步**: 本地缓存与服务器同步
+- **用户看板**: 用户自定义文件夹式数据看板
+- **附件管理**: 上传 / 下载 / PDF 预览 / STP 三维预览
 
 ---
 
@@ -41,7 +41,8 @@
 | 认证 | JWT (python-jose + passlib/bcrypt) |
 | 数据库 | PostgreSQL 16 |
 | 缓存 | Redis 7 |
-| 文件处理 | aiofiles |
+| 文件存储 | 本地文件系统 (`./uploads/`) |
+| 3D 转换 | PythonOCC (STP → glTF/glb) |
 
 **依赖文件**: `backend/requirements.txt`
 
@@ -57,8 +58,8 @@
 | HTTP 客户端 | Axios |
 | 存储 | localStorage + sessionStorage |
 
-**入口目录**: `frontend-next/` (开发中)
-**构建输出**: `frontend/`
+**源码目录**: `frontend/`
+**构建输出**: `frontend/dist/`
 
 ### 基础设施
 
@@ -75,45 +76,52 @@
 
 ```
 D:\OpenCode\myPDM\
-├── frontend/                  # 前端单文件 SPA
-│   ├── index.html          # 主入口
-│   ├── preview.html      # 附件预览页
-│   ├── js/             # JavaScript 模块
-│   ├── css/             # 样式文件
-│   └── html/            # HTML 片段
-├── backend/               # FastAPI 后端
+├── frontend/                  # React + Vite 前端项目
+│   ├── src/                # TypeScript 源码
+│   │   ├── components/     # 可复用组件
+│   │   ├── pages/          # 页面组件
+│   │   ├── services/       # API 客户端
+│   │   ├── stores/         # Zustand 状态管理
+│   │   ├── hooks/          # 自定义 Hooks
+│   │   ├── utils/          # 工具函数
+│   │   ├── constants/      # 常量定义
+│   │   └── types/          # TypeScript 类型定义
+│   ├── dist/               # Vite 构建输出（nginx 挂载）
+│   ├── index.html          # 入口 HTML
+│   ├── vite.config.ts
+│   ├── package.json
+│   ├── tsconfig.json
+│   └── tailwind.config.js
+├── backend/                 # FastAPI 后端
 │   ├── app/
-│   │   ├── main.py      # FastAPI 入口
-│   │   ├── models.py    # SQLAlchemy 模型
-│   │   ├── schemas.py   # Pydantic schemas
-│   │   ├── crud.py     # 数据库操作
-│   │   ├── database.py # 数据库连接
-│   │   ├── routers/   # API 路由
-│   │   │   ├── auth.py
-│   │   │   ├── parts.py
-│   │   │   ├── assemblies.py
-│   │   │   ├── bom.py
-│   │   │   ├── documents.py
-│   │   │   ├── attachments*.py
-│   │   │   ├── users.py
-│   │   │   ├── logs.py
-│   │   │   ├── dashboard.py
-│   │   │   ├── custom_fields.py
-│   │   │   └── dict.py
-│   │   ├── bom/         # BOM 业务逻辑
-│   │   │   ├── compare.py
-│   │   │   └── ...
-│   │   └── file_storage.py  # 文件存储
+│   │   ├── main.py         # FastAPI 入口
+│   │   ├── models.py       # SQLAlchemy 模型
+│   │   ├── schemas.py      # Pydantic schemas
+│   │   ├── crud.py         # 数据库操作
+│   │   ├── database.py     # 数据库连接
+│   │   ├── file_storage.py # 文件系统存储服务
+│   │   ├── stp_converter.py# STP → glTF 转换
+│   │   └── routers/        # API 路由
+│   │       ├── auth.py
+│   │       ├── users.py
+│   │       ├── parts.py
+│   │       ├── assemblies.py
+│   │       ├── bom.py
+│   │       ├── documents.py
+│   │       ├── attachments_v2.py  # 新版附件 API（含预览/流式下载）
+│   │       ├── dashboard.py
+│   │       ├── custom_fields.py
+│   │       └── logs.py
 │   ├── requirements.txt
 │   └── Dockerfile
-├── nginx/                  # Nginx 配置
+├── nginx/                   # Nginx 配置
 │   └── nginx.conf
-├── initdb/                # 数据库初始化
+├── initdb/                  # 数据库初始化
 │   └── init.sql
-├── uploads/               # 上传文件目录
+├── migrations/              # 数据库迁移脚本
+├── uploads/                 # 上传文件存储目录
 ├── docker-compose.yml
-├── Dockerfile.nginx
-└── 项目说明/               # 项目文档
+└── 项目说明/                # 项目文档
     ├── 项目说明.md
     ├── 用户权限说明.md
     └── ...
@@ -137,12 +145,15 @@ D:\OpenCode\myPDM\
 - **SQLAlchemy 2.0**: 使用新版 Declarative API
 - **异常处理**: 使用 `HTTPException` 而非裸 raise
 
-### 前端 (HTML/CSS/JS)
+### 前端 (React + TypeScript)
 
-- **文件结构**: 单一 `index.html` 文件（包含所有页面模块）
-- **JavaScript**: 原生 ES6+，使用 async/await
-- **CSS**: 模块化（base.css, components.css, pages.css）
-- **HTML 片段**: 放在 `frontend/html/` 目录，按需加载
+- **组件**: `src/components/` 下每个组件一个文件，使用 `export default`
+- **页面**: `src/pages/` 下按功能命名，路由组件
+- **类型**: 统一在 `src/types/index.ts` 定义
+- **状态管理**: Zustand store 放在 `src/stores/`
+- **API 调用**: 在 `src/services/api.ts` 集中管理
+- **样式**: Tailwind CSS 原子类，避免自定义 CSS
+- **排序图标**: 可排序列表头添加 `cursor-pointer select-none whitespace-nowrap`
 
 ---
 
@@ -179,7 +190,7 @@ current_user: User = Depends(require_role(["admin", "engineer", "production", "g
 | `Auth.isAdmin()` | 删除按钮 |
 | `Auth.canEdit()` | 新增/编辑按钮 |
 | `Auth.canDownload()` | 导出/下载 |
-| `Auth.canPreview()` | 预览 |
+| `Auth.canPreview()` | PDF 预览 |
 
 ---
 
@@ -200,7 +211,9 @@ docker restart bom_backend
 
 ### 修改前端
 
-直接编辑 `frontend/index.html`，浏览器刷新即可。
+1. 编辑 `frontend/src/` 下的源码
+2. 构建：`cd frontend && npm run build`
+3. 刷新浏览器（注意清缓存 Ctrl+F5）
 
 ### 新增 API
 
@@ -215,7 +228,7 @@ docker restart bom_backend
 ### 后端测试
 
 ```powershell
-# 启动后端
+# 启动后端（开发模式）
 cd backend
 uvicorn app.main:app --reload --port 8000
 
@@ -225,7 +238,13 @@ docker-compose up -d --build backend
 
 ### 前端测试
 
-直接访问 http://localhost:8080
+```powershell
+# 开发服务器（热更新）
+cd frontend && npm run dev
+
+# 生产构建
+cd frontend && npm run build
+```
 
 ### API 文档
 
@@ -246,6 +265,13 @@ cd D:\OpenCode\myPDM
 docker-compose up -d
 ```
 
+### 构建前端后重启 Nginx
+
+```powershell
+cd frontend && npm run build
+docker-compose up -d --force-recreate nginx
+```
+
 ### 验证服务
 
 ```powershell
@@ -253,10 +279,36 @@ docker ps
 ```
 
 4 个容器均为 Up 时正常：
-- bom_nginx      :80
+- bom_nginx      :80 → localhost:8080
 - bom_backend   :8000
 - bom_postgres  :5432
 - bom_redis    :6379
+
+### 新服务器部署
+
+从旧环境迁移到新服务器，数据库和附件自动恢复：
+
+```powershell
+# 1. 拉取代码
+git clone <repo-url> myPDM
+cd myPDM
+
+# 2. 从旧服务器复制数据目录
+#    scp -r old-server:~/myPDM/pgdata ./
+#    scp -r old-server:~/myPDM/uploads ./
+
+# 3. 安装依赖并构建前端
+cd frontend
+npm install
+npm run build
+cd ..
+
+# 4. 一键启动所有服务
+docker-compose up -d
+```
+
+> **注意**：确保新旧服务器使用相同的 PostgreSQL 镜像版本（`postgres:16-alpine`），跨大版本不兼容。
+> `./pgdata` 已存在时 PostgreSQL 会跳过 `./initdb/` 的初始化脚本，避免重复执行。
 
 ---
 
@@ -269,6 +321,8 @@ docker ps
 | 清除数据（慎用） | `docker-compose down -v` |
 | 查看后端日志 | `docker logs bom_backend -f` |
 | 重启后端 | `docker restart bom_backend` |
+| 构建前端 | `cd frontend && npm run build` |
+| 重启 Nginx | `docker-compose up -d --force-recreate nginx` |
 | 备份数据库 | `docker exec bom_postgres pg_dump -U bomadmin bom_system > backup.sql` |
 
 ---
@@ -314,25 +368,56 @@ docker ps
 
 - `GET/POST /api/documents/` - 列表/创建
 - `GET/PUT/DELETE /api/documents/{doc_id}` - 详情/更新/删除
-- `POST /api/attachments/upload` - 上传附件
-- `GET /api/attachments/{id}/download` - 下载
-- `GET /api/attachments/{id}/preview` - 预览
+- `POST /api/documents/{doc_id}/attachments` - 上传附件 (base64)
+- `GET /api/documents/{doc_id}/attachments/` - 附件列表
+
+### 附件管理 (V2)
+
+| 端点 | 说明 |
+|------|------|
+| `POST /api/v2/attachments/upload` | Multipart 上传 |
+| `GET /api/v2/attachments/{id}/stream` | 流式下载（二进制） |
+| `GET /api/v2/attachments/{id}/download` | Base64 下载 |
+| `GET /api/v2/attachments/{id}/preview?token=` | **浏览器内联预览**（PDF 流式加载） |
+| `GET /api/v2/attachments/{id}/direct-download?token=` | 浏览器原生下载（显示进度） |
+| `GET /api/v2/attachments/{id}/gltf` | STP → glTF 3D 预览 |
+| `POST /api/v2/attachments/chunk/*` | 分块上传（init/upload/complete） |
+| `DELETE /api/v2/attachments/{id}` | 删除附件 |
 
 ### 用户管理（仅 admin）
 
 - `GET/POST /api/users/` - 用户列表/创建
 - `GET/PUT/DELETE /api/users/{user_id}` - 用户 CRUD
 
+### 用户看板
+
+- `GET /api/dashboard/` - 获取看板数据
+- `POST /api/dashboard/folders` - 创建文件夹
+- `POST /api/dashboard/items` - 关联项目
+- `POST /api/dashboard/folders/{id}/share` - 共享文件夹
+
 ---
 
-## 🛠️ 工具偏好
+## 🛠️ 关键设计决策
 
-| 类别 | 工具 |
-|------|------|
-| API 测试 | Swagger UI (/api/docs) |
-| 数据库客户端 | psql、DBeaver |
-| 容器管理 | Docker Desktop |
-| 日志查看 | docker logs |
+### PDF 预览
+
+- PDF 附件通过 `/api/v2/attachments/{id}/preview?token={jwt}` 端点流式加载
+- 新标签页 `window.open()` 打开，浏览器原生 PDF 查看器渲染
+- 后端 `Content-Disposition: inline` + Range 请求支持，自动显示加载进度
+- 非 PDF 格式弹窗提示"该格式暂不支持预览"
+
+### 附件存储
+
+- 文件存于 `./uploads/{entity_type}/{entity_id}/{filename}`
+- 数据库 `document_attachments` 表仅存元数据（路径、大小、哈希）
+- 支持分块上传（5MB/块），适合大文件
+
+### 前端目录合并
+
+- 源码目录 `frontend-next/` 已合并至 `frontend/`
+- `frontend/` 为源码 + `dist/` 为构建输出
+- Nginx 挂载 `./frontend/dist:/usr/share/nginx/html`
 
 ---
 

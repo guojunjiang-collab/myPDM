@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: bompass
       POSTGRES_DB: bom_system
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./pgdata:/var/lib/postgresql/data
       - ./initdb:/docker-entrypoint-initdb.d
     networks:
       - bom_network
@@ -53,7 +53,7 @@ services:
     container_name: bom_nginx
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
-      - ./frontend:/usr/share/nginx/html
+      - ./frontend/dist:/usr/share/nginx/html
     depends_on:
       - backend
     networks:
@@ -64,6 +64,3 @@ services:
 networks:
   bom_network:
     driver: bridge
-
-volumes:
-  postgres_data:
