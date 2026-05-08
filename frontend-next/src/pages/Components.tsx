@@ -652,9 +652,9 @@ export default function Components() {
                         type="button"
                         onClick={() => handleRemovePart(part.id)}
                         className="text-red-500 hover:text-red-700 text-xs"
-                        title="删除子项"
+                        title="移除子项"
                       >
-                        删除
+                        移除
                       </button>
                     )}
                   </td>

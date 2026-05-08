@@ -681,13 +681,6 @@ export default function Documents() {
                           <td className="px-3 py-2 text-right">
                             <button
                               type="button"
-                              onClick={() => handleDownloadAttachment(att.id, att.file_name || 'download')}
-                              className="text-primary-600 hover:text-primary-800 mr-3"
-                            >
-                              下载
-                            </button>
-                            <button
-                              type="button"
                               onClick={() => handleDeleteAttachment(att.id)}
                               disabled={deletingAttId === att.id}
                               className="text-red-600 hover:text-red-800 disabled:opacity-50"

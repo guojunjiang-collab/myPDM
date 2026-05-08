@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { Document, CustomFieldDefinition, DocumentAttachment } from '../types';
 import { documentsApi } from '../services/api';
+import { useAuthStore } from '../stores/auth';
 import { formatDateTime } from '../utils/date';
 
 interface DocumentDetailContentProps {
@@ -71,34 +72,18 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
   };
 
   // 预览附件
-  const handlePreview = async (attId: string, fileName: string) => {
-    try {
-      const res = await documentsApi.getAttachment(doc.id, attId);
-      const data = res.data as { file_data?: string };
-
-      if (data.file_data) {
-        // 根据文件扩展名判断 content-type
-        const ext = fileName.split('.').pop()?.toLowerCase() || '';
-        const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'];
-        const pdfExts = ['pdf'];
-        
-        let contentType = 'application/octet-stream';
-        if (imageExts.includes(ext)) contentType = `image/${ext === 'svg' ? 'svg+xml' : ext}`;
-        if (pdfExts.includes(ext)) contentType = 'application/pdf';
-
-        const link = document.createElement('a');
-        link.href = `data:${contentType};base64,${data.file_data}`;
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } else {
-        alert('文件数据获取失败');
-      }
-    } catch (error) {
-      console.error('预览失败', error);
-      alert('预览失败，请重试');
+  const handlePreview = (attId: string, fileName: string) => {
+    const ext = fileName.split('.').pop()?.toLowerCase() || '';
+    if (ext !== 'pdf') {
+      alert('该格式暂不支持预览');
+      return;
     }
+    const token = useAuthStore.getState().token;
+    if (!token) {
+      alert('登录已过期，请重新登录');
+      return;
+    }
+    window.open(`/api/v2/attachments/${attId}/preview?token=${encodeURIComponent(token)}`, '_blank');
   };
 
   return (

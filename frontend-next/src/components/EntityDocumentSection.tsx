@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { entityDocumentsApi, customFieldsApi, attachmentApi, documentsApi } from '../services/api';
 import type { EntityDocument, CustomFieldDefinition, CustomFieldValue, Document } from '../types';
-import { canEdit } from '../stores/auth';
+import { canEdit, useAuthStore } from '../stores/auth';
 import { useDataStore } from '../stores/data';
 import { Modal } from './Modal';
 import DocumentPicker from './DocumentPicker';
@@ -147,6 +147,21 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
     }
   };
 
+  /** 预览附件（仅 PDF 支持，其余弹窗提示） */
+  const handlePreviewAttachment = (fileId: string, fileName: string) => {
+    const ext = fileName.split('.').pop()?.toLowerCase() || '';
+    if (ext !== 'pdf') {
+      alert('该格式暂不支持预览');
+      return;
+    }
+    const token = useAuthStore.getState().token;
+    if (!token) {
+      alert('登录已过期，请重新登录');
+      return;
+    }
+    window.open(`/api/v2/attachments/${fileId}/preview?token=${encodeURIComponent(token)}`, '_blank');
+  };
+
   /** 查看图文档详情 */
   const handleViewDocument = async (ed: EntityDocument) => {
     try {
@@ -209,9 +224,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
                     </th>
                   ))}
                   <th className="px-3 py-2 text-left text-gray-500 font-medium">附件</th>
-                  {hasEditableAction && (
-                    <th className="px-3 py-2 text-right text-gray-500 font-medium w-12">操作</th>
-                  )}
+                  <th className="px-3 py-2 text-center text-gray-500 font-medium w-20">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -233,25 +246,40 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
                           {renderFieldValue(vals[def.id])}
                         </td>
                       ))}
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-2 text-gray-600">
                         {ed.document.file_id && ed.document.file_name ? (
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); handleDownload(ed.document.file_id!, ed.document.file_name!); }}
-                            className="text-primary-600 hover:text-primary-800 text-xs"
-                            title={`下载 ${ed.document.file_name}`}
-                          >
-                            📎 {ed.document.file_name}
-                          </button>
+                          <span className="text-xs">{ed.document.file_name}</span>
                         ) : (
                           <span className="text-gray-300">-</span>
                         )}
                       </td>
-                      {hasEditableAction && (
-                        <td className="px-3 py-2 text-right">
-                          <button type="button" onClick={(e) => { e.stopPropagation(); handleRemove(ed.id); }} className="text-red-500 hover:text-red-700 text-xs" title="移除关联">✕</button>
-                        </td>
-                      )}
+                      <td className="px-3 py-2 text-center whitespace-nowrap">
+                        <span className="inline-flex items-center gap-2">
+                          {!hasEditableAction && ed.document.file_id && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handlePreviewAttachment(ed.document.file_id!, ed.document.file_name!); }}
+                                className="text-blue-600 hover:text-blue-800 text-xs"
+                                title="预览"
+                              >
+                                预览
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleDownload(ed.document.file_id!, ed.document.file_name!); }}
+                                className="text-primary-600 hover:text-primary-800 text-xs"
+                                title={`下载 ${ed.document.file_name}`}
+                              >
+                                下载
+                              </button>
+                            </>
+                          )}
+                          {hasEditableAction && (
+                            <button type="button" onClick={(e) => { e.stopPropagation(); handleRemove(ed.id); }} className="text-red-500 hover:text-red-700 text-xs" title="移除关联">移除</button>
+                          )}
+                        </span>
+                      </td>
                     </tr>
                   );
                 })}

@@ -375,7 +375,7 @@ export default function Board() {
                         <td className="px-5 py-2.5"><StatusTag status={item.status} /></td>
                         {canEditFolder && (
                           <td className="px-5 py-2.5 text-right">
-                            <button type="button" onClick={() => handleRemoveItem(item.id)} className="text-red-500 hover:text-red-700 text-xs">移除</button>
+                            <button type="button" onClick={(e) => { e.stopPropagation(); handleRemoveItem(item.id); }} className="text-red-500 hover:text-red-700 text-xs">移除</button>
                           </td>
                         )}
                       </tr>
@@ -637,7 +637,7 @@ function ItemPicker({ open, onClose, onConfirm, existingIds, storeParts, storeAs
               <th className="px-3 py-2 text-left text-gray-500 font-medium">类型</th>
               <th className="px-3 py-2 text-left text-gray-500 font-medium">编号</th>
               <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
-              <th className="px-3 py-2 text-center text-gray-500 font-medium w-16">操作</th>
+               <th className="px-3 py-2 text-center text-gray-500 font-medium w-20">操作</th>
             </tr></thead><tbody className="divide-y divide-gray-100">
               {candidates.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50">
