@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
+from typing import List
 import uuid
 
 from ..database import get_db
@@ -7,7 +8,7 @@ from ..models import User
 from .. import crud, models, schemas
 from ..bom import compare
 from .auth import require_role
-from sqlalchemy import cast, String
+from sqlalchemy import cast, String, text
 
 router = APIRouter(prefix="/bom", tags=["BOM管理"])
 
@@ -105,6 +106,83 @@ async def get_bom_tree(item_type: str, item_id: uuid.UUID, db: Session = Depends
             "child_detail": child_detail
         })
     return result
+
+@router.get("/trace/{entity_type}/{entity_id}", response_model=List[schemas.BOMTraceItem])
+async def get_bom_trace(
+    entity_type: str,
+    entity_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin", "engineer", "production"])),
+):
+    """递归反查：查找使用该零件/部件的所有父装配体（向上追溯最多10层）"""
+    if entity_type not in ("part", "assembly"):
+        raise HTTPException(status_code=400, detail="无效的类型，仅支持 part 或 assembly")
+
+    # 递归 CTE：向上追溯父级
+    sql = text("""
+    WITH RECURSIVE trace AS (
+      SELECT bi.id, bi.parent_type, bi.parent_id, bi.child_type, bi.child_id,
+             bi.quantity, 1 AS level
+      FROM bom_items bi
+      WHERE bi.child_id = :entity_id
+        AND (bi.child_type = :entity_type
+             OR (bi.child_type = 'component' AND :entity_type = 'assembly'))
+      UNION ALL
+      SELECT bi.id, bi.parent_type, bi.parent_id, bi.child_type, bi.child_id,
+             bi.quantity, t.level + 1
+      FROM bom_items bi
+      JOIN trace t ON bi.child_id = t.parent_id
+      WHERE t.level < 10
+    )
+    SELECT * FROM trace ORDER BY level
+    """)
+    rows = db.execute(sql, {"entity_id": entity_id, "entity_type": entity_type}).fetchall()
+
+    result = []
+    for row in rows:
+        # 父装配体详情
+        parent_assembly = None
+        parent_part = None
+        if row.parent_type == "assembly":
+            a = crud.get_assembly(db, row.parent_id)
+            if a:
+                parent_assembly = {
+                    "id": str(a.id), "code": a.code, "name": a.name,
+                    "spec": a.spec, "version": a.version, "status": a.status,
+                }
+        elif row.parent_type == "part":
+            p = crud.get_part(db, row.parent_id)
+            if p:
+                parent_part = {
+                    "id": str(p.id), "code": p.code, "name": p.name,
+                    "spec": p.spec, "version": p.version, "status": p.status,
+                }
+
+        # 子实体详情
+        child_entity = None
+        child_type = row.child_type
+        if child_type == "component":
+            child_type = "assembly"
+        if child_type == "part":
+            c = crud.get_part(db, row.child_id)
+            if c:
+                child_entity = {"id": str(c.id), "code": c.code, "name": c.name, "type": "part"}
+        else:
+            c = crud.get_assembly(db, row.child_id)
+            if c:
+                child_entity = {"id": str(c.id), "code": c.code, "name": c.name, "type": "assembly"}
+
+        result.append({
+            "level": row.level,
+            "bom_item_id": str(row.id),
+            "parent_assembly": parent_assembly,
+            "parent_part": parent_part,
+            "child_entity": child_entity,
+            "quantity": float(row.quantity) if row.quantity else 1,
+        })
+
+    return result
+
 
 @router.post("/items", response_model=schemas.BOMItemResponse)
 async def create_bom_item(item: schemas.BOMItemCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):

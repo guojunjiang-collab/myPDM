@@ -483,6 +483,15 @@ export default function Board() {
             assembly={detailData}
             customFieldDefs={detailCustomDefs}
             customFieldValues={detailCustomValues}
+            onSubItemClick={(item) => handleViewDetail({
+              id: item.id,
+              entity_type: item.childType === 'part' ? 'part' : 'assembly',
+              entity_id: item.child_id,
+              code: item.child_detail?.code || '',
+              name: item.child_detail?.name || '',
+              version: item.child_detail?.version || '',
+              status: item.child_detail?.status || 'draft',
+            })}
           />
         ) : (
           <DocumentDetailContent

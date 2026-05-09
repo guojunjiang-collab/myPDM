@@ -167,6 +167,16 @@ class BOMCompareResponse(BaseSchema):
     summary: Dict[str, int]
 
 
+class BOMTraceItem(BaseSchema):
+    """BOM反查结果项"""
+    level: int
+    bom_item_id: str
+    parent_assembly: Optional[Dict[str, Any]] = None
+    parent_part: Optional[Dict[str, Any]] = None
+    child_entity: Optional[Dict[str, Any]] = None
+    quantity: float
+
+
 # ===== 自定义字段 Schema =====
 
 class CustomFieldDefinitionBase(BaseSchema):

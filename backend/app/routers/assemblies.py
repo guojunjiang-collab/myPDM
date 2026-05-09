@@ -25,8 +25,8 @@ def _assembly_response(asm):
     }
 
 @router.get("/", response_model=list[schemas.AssemblyResponse])
-async def list_assemblies(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
-    return [_assembly_response(a) for a in crud.get_assemblies(db, skip=skip, limit=limit)]
+async def list_assemblies(skip: int = 0, limit: int = 100, search: str = None, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+    return [_assembly_response(a) for a in crud.get_assemblies(db, skip=skip, limit=limit, search=search)]
 
 @router.post("/", response_model=schemas.AssemblyResponse)
 async def create_assembly(assembly: schemas.AssemblyCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):

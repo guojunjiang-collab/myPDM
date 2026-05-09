@@ -73,8 +73,15 @@ def get_part_by_code(db, code, version=None):
         return db.query(models.Part).filter(models.Part.code == code, models.Part.version == version).first()
     return db.query(models.Part).filter(models.Part.code == code).first()
 
-def get_parts(db, skip=0, limit=100):
-    return db.query(models.Part).offset(skip).limit(limit).all()
+def get_parts(db, skip=0, limit=100, search=None):
+    q = db.query(models.Part)
+    if search:
+        pattern = f"%{search}%"
+        q = q.filter(
+            (models.Part.code.ilike(pattern)) |
+            (models.Part.name.ilike(pattern))
+        )
+    return q.offset(skip).limit(limit).all()
 
 def create_part(db, part):
     db_part = models.Part(**part.model_dump())
@@ -126,8 +133,15 @@ def get_assembly_by_code_version(db, code, version):
         models.Assembly.version == version
     ).first()
 
-def get_assemblies(db, skip=0, limit=100):
-    return db.query(models.Assembly).offset(skip).limit(limit).all()
+def get_assemblies(db, skip=0, limit=100, search=None):
+    q = db.query(models.Assembly)
+    if search:
+        pattern = f"%{search}%"
+        q = q.filter(
+            (models.Assembly.code.ilike(pattern)) |
+            (models.Assembly.name.ilike(pattern))
+        )
+    return q.offset(skip).limit(limit).all()
 
 def create_assembly(db, assembly):
     db_assembly = models.Assembly(**assembly.model_dump())

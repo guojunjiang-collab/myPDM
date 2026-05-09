@@ -156,3 +156,56 @@ export interface DashboardStats {
   total_documents: number;
   total_users: number;
 }
+
+/** BOM对比节点 */
+export interface BOMCompareNode {
+  key: string;
+  level: number;
+  sort: string;
+  path: string;
+  change_type: 'none' | 'add' | 'delete' | 'modify' | 'internal';
+  left: {
+    id: string;
+    child_type: string;
+    child_id: string;
+    quantity: number;
+    detail: {
+      code: string;
+      name: string;
+      spec: string;
+      version: string;
+      status: string;
+    };
+  } | null;
+  right: {
+    id: string;
+    child_type: string;
+    child_id: string;
+    quantity: number;
+    detail: {
+      code: string;
+      name: string;
+      spec: string;
+      version: string;
+      status: string;
+    };
+  } | null;
+}
+
+/** BOM对比响应 */
+export interface BOMCompareResponse {
+  left_assembly: { id: string; code: string; name: string; spec: string; version: string; status: string; };
+  right_assembly: { id: string; code: string; name: string; spec: string; version: string; status: string; };
+  comparison: BOMCompareNode[];
+  summary: { total: number; added: number; deleted: number; modified: number; internal_changes: number; unchanged: number; };
+}
+
+/** BOM反查结果项 */
+export interface BOMTraceItem {
+  level: number;
+  bom_item_id: string;
+  parent_assembly: { id: string; code: string; name: string; spec: string; version: string; status: string; } | null;
+  parent_part: { id: string; code: string; name: string; spec: string; version: string; status: string; } | null;
+  child_entity: { id: string; code: string; name: string; type: string; };
+  quantity: number;
+}

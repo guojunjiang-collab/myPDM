@@ -111,10 +111,10 @@ export const bomApi = {
   createItem: (data: { parent_type: string; parent_id: string; child_type: string; child_id: string; qty: number }) =>
     api.post('/bom/items', data),
   deleteItem: (id: string) => api.delete(`/bom/items/${id}`),
-  compare: (type1: string, id1: string, type2: string, id2: string) =>
-    api.get('/bom/compare', { params: { type1, id1, type2, id2 } }),
+  compare: (leftAssemblyId: string, rightAssemblyId: string) =>
+    api.post('/bom/compare', { left_assembly_id: leftAssemblyId, right_assembly_id: rightAssemblyId }),
   trace: (type: string, id: string) =>
-    api.get('/bom/trace', { params: { type, id } }),
+    api.get(`/bom/trace/${type}/${id}`),
 };
 
 // 用户 API

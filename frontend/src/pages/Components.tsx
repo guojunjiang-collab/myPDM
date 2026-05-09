@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
-import { assembliesApi, assemblyPartsApi, customFieldsApi, bomApi } from '../services/api';
+import { assembliesApi, assemblyPartsApi, customFieldsApi, bomApi, partsApi } from '../services/api';
 import type { Assembly, AssemblyPartItem, CustomFieldDefinition, CustomFieldValue } from '../types';
 import { canEdit, isAdmin, canDownload } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
 import AssemblyDetailContent from '../components/AssemblyDetailContent';
+import PartDetailContent from '../components/PartDetailContent';
 import AssemblyPartPicker from '../components/AssemblyPartPicker';
 import EntityDocumentSection from '../components/EntityDocumentSection';
 import { getNextVersion } from '../constants';
@@ -94,6 +95,12 @@ export default function Components() {
   const [viewingAssembly, setViewingAssembly] = useState<Assembly | null>(null);
   const [viewingCustomDefs, setViewingCustomDefs] = useState<CustomFieldDefinition[]>([]);
   const [viewingCustomValues, setViewingCustomValues] = useState<Record<string, unknown>>({});
+  // 子项点击 → 嵌套详情弹窗
+  const [nestedEntity, setNestedEntity] = useState<{ type: 'part' | 'assembly'; id: string } | null>(null);
+  const [nestedData, setNestedData] = useState<any>(null);
+  const [nestedLoading, setNestedLoading] = useState(false);
+  const [nestedCustomDefs, setNestedCustomDefs] = useState<CustomFieldDefinition[]>([]);
+  const [nestedCustomValues, setNestedCustomValues] = useState<Record<string, any>>({});
   // Tree state now managed by AssemblyDetailContent - kept for backward compat only
   const [viewParts, setViewPartsState] = useState<TreeNode[]>([]);
   const [expandedIds, setExpandedIdsState] = useState<Set<string>>(new Set());
@@ -514,6 +521,33 @@ export default function Components() {
     await loadCustomFieldValues(assembly.id, true);
     const tree = await loadViewParts(assembly.id);
     setViewParts(tree);
+  };
+
+  // 子项行点击 → 弹出嵌套详情
+  const handleNestedView = async (type: 'part' | 'assembly', id: string) => {
+    setNestedEntity({ type, id });
+    setNestedData(null);
+    setNestedLoading(true);
+    setNestedCustomDefs([]);
+    setNestedCustomValues({});
+    try {
+      const api = type === 'part' ? partsApi : assembliesApi;
+      const res = await api.get(id);
+      setNestedData(res.data);
+      const allDefs = useDataStore.getState().customFieldDefs;
+      const entityType = type === 'part' ? 'part' : 'component';
+      const defs = allDefs.filter((d: CustomFieldDefinition) => d.applies_to?.includes(entityType));
+      setNestedCustomDefs(defs);
+      if (defs.length > 0) {
+        try {
+          const valuesRes = await customFieldsApi.getValues(entityType, id);
+          const vals: Record<string, any> = {};
+          (valuesRes.data || []).forEach((v: CustomFieldValue) => { vals[v.field_id] = v.value; });
+          setNestedCustomValues(vals);
+        } catch { /* optional */ }
+      }
+    } catch { setNestedData(null); }
+    finally { setNestedLoading(false); }
   };
 
   /* ==============================================================
@@ -1131,7 +1165,26 @@ export default function Components() {
             assembly={viewingAssembly}
             customFieldDefs={viewingCustomDefs}
             customFieldValues={viewingCustomValues}
+            onSubItemClick={(item) => handleNestedView(item.childType === 'part' ? 'part' : 'assembly', item.child_id)}
           />
+        )}
+      </Modal>
+
+      {/* ========== 嵌套详情弹窗（子项点击） ========== */}
+      <Modal
+        open={!!nestedEntity}
+        title={nestedEntity ? (nestedEntity.type === 'part' ? '零件详情' : '部件详情') : ''}
+        onClose={() => setNestedEntity(null)}
+        width="full"
+      >
+        {nestedLoading ? (
+          <div className="py-8 text-center text-sm text-gray-400">加载中...</div>
+        ) : !nestedData ? (
+          <div className="py-8 text-center text-sm text-gray-400">加载失败</div>
+        ) : nestedEntity?.type === 'part' ? (
+          <PartDetailContent part={nestedData} customFieldDefs={nestedCustomDefs} customFieldValues={nestedCustomValues} />
+        ) : (
+          <AssemblyDetailContent assembly={nestedData} customFieldDefs={nestedCustomDefs} customFieldValues={nestedCustomValues} onSubItemClick={(item) => handleNestedView(item.childType === 'part' ? 'part' : 'assembly', item.child_id)} />
         )}
       </Modal>
 

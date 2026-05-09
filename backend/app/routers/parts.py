@@ -25,8 +25,8 @@ def _part_response(part):
     }
 
 @router.get("/", response_model=list[schemas.PartResponse])
-async def list_parts(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
-    parts = crud.get_parts(db, skip=skip, limit=limit)
+async def list_parts(skip: int = 0, limit: int = 100, search: str = None, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+    parts = crud.get_parts(db, skip=skip, limit=limit, search=search)
     return [_part_response(p) for p in parts]
 
 @router.post("/", response_model=schemas.PartResponse)

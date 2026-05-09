@@ -14,6 +14,66 @@ from ..models import Assembly, Part, BOMItem
 from .. import schemas
 
 
+def get_direct_children(
+    db: Session,
+    assembly_id: uuid.UUID
+) -> List[Dict[str, Any]]:
+    """
+    获取装配体的直接子项（不递归，仅第一层）
+    
+    Args:
+        db: 数据库会话
+        assembly_id: 装配体ID
+        
+    Returns:
+        List[Dict]: 结构化子项列表，字段与 get_bom_tree_recursive 一致
+            （level 固定为 0，path 固定为 ''）
+    """
+    query = text("""
+        SELECT 
+            0 as level,
+            '' as path,
+            bi.id as bom_item_id,
+            bi.parent_type,
+            bi.parent_id,
+            bi.child_type,
+            bi.child_id,
+            bi.quantity,
+            COALESCE(p.code, a.code) as child_code,
+            COALESCE(p.name, a.name) as child_name,
+            COALESCE(p.spec, a.spec) as child_spec,
+            COALESCE(p.version, a.version) as child_version,
+            COALESCE(p.status, a.status) as child_status
+        FROM bom_items bi
+        LEFT JOIN parts p ON bi.child_type = 'part' AND bi.child_id = p.id
+        LEFT JOIN assemblies a ON bi.child_type IN ('component', 'assembly') AND bi.child_id = a.id
+        WHERE bi.parent_type = 'assembly' AND bi.parent_id = :assembly_id
+        ORDER BY child_code
+    """)
+    
+    result = db.execute(query, {"assembly_id": assembly_id}).fetchall()
+    
+    nodes = []
+    for row in result:
+        nodes.append({
+            "level": 0,
+            "path": "",
+            "bom_item_id": row.bom_item_id,
+            "parent_type": row.parent_type,
+            "parent_id": row.parent_id,
+            "child_type": row.child_type,
+            "child_id": row.child_id,
+            "quantity": float(row.quantity) if row.quantity else 1.0,
+            "child_code": row.child_code,
+            "child_name": row.child_name,
+            "child_spec": row.child_spec,
+            "child_version": row.child_version,
+            "child_status": row.child_status
+        })
+    
+    return nodes
+
+
 def get_bom_tree_recursive(
     db: Session, 
     assembly_id: uuid.UUID, 
@@ -65,7 +125,7 @@ def get_bom_tree_recursive(
             COALESCE(p.status, a.status) as child_status
         FROM bom_items bi
         LEFT JOIN parts p ON bi.child_type = 'part' AND bi.child_id = p.id
-        LEFT JOIN assemblies a ON bi.child_type = 'component' AND bi.child_id = a.id
+        LEFT JOIN assemblies a ON bi.child_type IN ('component', 'assembly') AND bi.child_id = a.id
         WHERE bi.parent_type = 'assembly' AND bi.parent_id = :assembly_id
         
         UNION ALL
@@ -88,9 +148,9 @@ def get_bom_tree_recursive(
         FROM bom_items bi
         JOIN bom_tree bt ON bi.parent_type = bt.child_type AND bi.parent_id = bt.child_id
         LEFT JOIN parts p ON bi.child_type = 'part' AND bi.child_id = p.id
-        LEFT JOIN assemblies a ON bi.child_type = 'component' AND bi.child_id = a.id
+        LEFT JOIN assemblies a ON bi.child_type IN ('component', 'assembly') AND bi.child_id = a.id
         WHERE bt.level < :max_depth
-          AND bi.child_type IN ('part', 'component')
+          AND bi.child_type IN ('part', 'component', 'assembly')
     )
     SELECT * FROM bom_tree ORDER BY path, level
     """
@@ -262,6 +322,7 @@ def compare_bom_trees(
             "key": key,
             "level": left_node["level"] if left_node else right_node["level"],
             "sort": left_node["sort"] if left_node else right_node["sort"],
+            "path": left_node["path"] if left_node else right_node["path"],
             "change_type": change_type,
             "left": None,
             "right": None
@@ -338,16 +399,19 @@ def compare_assemblies(
     if not right_assembly:
         raise ValueError(f"右侧装配体不存在: {right_assembly_id}")
     
-    # 获取BOM树
-    left_tree = get_bom_tree_recursive(db, left_assembly_id, max_depth)
-    right_tree = get_bom_tree_recursive(db, right_assembly_id, max_depth)
+    # 获取BOM树 — 仅直接子项
+    left_children = get_direct_children(db, left_assembly_id)
+    right_children = get_direct_children(db, right_assembly_id)
     
-    # 扁平化
-    left_flat = flatten_bom_tree(left_tree)
-    right_flat = flatten_bom_tree(right_tree)
+    # 分配排序号和匹配键
+    for side in (left_children, right_children):
+        for i, node in enumerate(side, 1):
+            node["sort"] = str(i).zfill(3)
+            child_code_or_id = node["child_code"] if node["child_code"] is not None else str(node["child_id"])
+            node["match_key"] = f"0:{child_code_or_id}"
     
     # 对比
-    comparison, stats = compare_bom_trees(left_flat, right_flat, ignore_quantity)
+    comparison, stats = compare_bom_trees(left_children, right_children, ignore_quantity)
     
     # 构建最终结果
     result = {
