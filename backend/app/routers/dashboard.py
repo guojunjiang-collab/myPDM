@@ -364,6 +364,10 @@ async def delete_folder(folder_id: uuid.UUID, request: Request, db: Session = De
 
     _check_folder_edit_permission(folder, current_user, db)
 
+    # 只有管理员可以删除根文件夹
+    if folder.parent_id is None and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="只有管理员可以删除根文件夹")
+
     name = folder.name
     # 显式递归删除：该文件夹 + 所有子文件夹 + 所有关联项 + 共享记录
     _delete_folder_cascade(folder_id, db)
@@ -541,6 +545,50 @@ async def add_folder_share(folder_id: uuid.UUID, data: dict, request: Request, d
     return {"message": f"已共享给 {target_user.real_name}" + (f"（含 {descendant_count} 个子文件夹）" if descendant_count > 0 else "")}
 
 
+@router.put("/folders/{folder_id}/shares/{share_id}")
+async def update_folder_share_permission(folder_id: uuid.UUID, share_id: uuid.UUID, data: dict, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+    """修改共享权限（级联更新所有子文件夹的共享记录）"""
+    share = db.query(DashboardFolderShare).filter(
+        DashboardFolderShare.id == share_id,
+        DashboardFolderShare.folder_id == folder_id,
+    ).first()
+    if not share:
+        raise HTTPException(status_code=404, detail="共享记录不存在")
+
+    # 只有拥有者可以修改共享权限
+    dash = db.query(UserDashboard).filter(UserDashboard.id == db.query(DashboardFolder).filter(DashboardFolder.id == folder_id).first().dashboard_id).first()
+    if not dash or dash.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="只有文件夹拥有者可以修改共享权限")
+
+    permission = data.get("permission")
+    if not permission or permission not in ("view", "edit"):
+        raise HTTPException(status_code=400, detail="权限类型无效")
+
+    if permission == share.permission:
+        return {"message": "权限未变更"}
+
+    # 更新当前记录
+    old_permission = share.permission
+    share.permission = permission
+
+    # 级联更新该用户在所有子孙文件夹上的共享权限
+    descendant_ids = _get_descendant_ids(folder_id, db)
+    db.query(DashboardFolderShare).filter(
+        DashboardFolderShare.folder_id.in_(descendant_ids),
+        DashboardFolderShare.shared_with_user_id == share.shared_with_user_id,
+    ).update({"permission": permission}, synchronize_session=False)
+
+    db.commit()
+
+    ip = request.client.host if request.client else None
+    from .. import crud
+    target_user = db.query(User).filter(User.id == share.shared_with_user_id).first()
+    detail = f"共享权限变更:{target_user.real_name if target_user else '未知用户'} {old_permission}->{permission}"
+    crud.create_log(db, current_user.id, current_user.username, "修改共享权限", "dashboard_share", str(folder_id), detail, ip)
+
+    return {"message": f"已更新权限为 {'可编辑' if permission == 'edit' else '只读查看'}"}
+
+
 @router.delete("/folders/{folder_id}/shares/{share_id}")
 async def delete_folder_share(folder_id: uuid.UUID, share_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
     """取消共享（级联移除所有子文件夹的共享记录）"""
@@ -562,6 +610,108 @@ async def delete_folder_share(folder_id: uuid.UUID, share_id: uuid.UUID, request
     crud.create_log(db, current_user.id, current_user.username, "取消看板文件夹共享", "dashboard_share", str(folder_id), None, ip)
 
     return {"message": "已取消共享"}
+
+
+@router.post("/folders/{folder_id}/shares/batch")
+async def save_folder_shares_batch(
+    folder_id: uuid.UUID,
+    data: dict,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
+):
+    """批量保存共享设置（原子操作：先清空再重建）"""
+    folder = db.query(DashboardFolder).filter(DashboardFolder.id == folder_id).first()
+    if not folder:
+        raise HTTPException(status_code=404, detail="文件夹不存在")
+
+    # 只有拥有者可以设置共享
+    dash = db.query(UserDashboard).filter(UserDashboard.id == folder.dashboard_id).first()
+    if not dash or dash.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="只有文件夹拥有者可以设置共享")
+
+    shares_data = data.get("shares", [])
+    # 去重：同一用户只保留一条
+    seen = set()
+    unique_shares = []
+    for s in shares_data:
+        uid = s.get("shared_with_user_id")
+        if not uid or uid in seen:
+            continue
+        if str(uid) == str(current_user.id):
+            continue  # 不能共享给自己
+        perm = s.get("permission", "view")
+        if perm not in ("view", "edit"):
+            perm = "view"
+        seen.add(uid)
+        unique_shares.append({"shared_with_user_id": uid, "permission": perm})
+
+    # 获取该文件夹及所有子孙文件夹 ID
+    all_folder_ids = _get_descendant_ids(folder_id, db)
+
+    # 原子操作：先清空该文件夹及子孙上的所有共享记录
+    db.query(DashboardFolderShare).filter(
+        DashboardFolderShare.folder_id.in_(all_folder_ids),
+    ).delete(synchronize_session=False)
+
+    # 重建共享（含级联）
+    for s in unique_shares:
+        _cascade_share(folder_id, s["shared_with_user_id"], s["permission"], db)
+
+    db.commit()
+
+    ip = request.client.host if request.client else None
+    from .. import crud
+    crud.create_log(db, current_user.id, current_user.username, "批量保存共享设置", "dashboard_share", str(folder_id), f"共享用户数:{len(unique_shares)}", ip)
+
+    return {"message": "共享设置已保存", "share_count": len(unique_shares)}
+
+
+@router.delete("/shared-folder/{folder_id}")
+async def remove_shared_folder(
+    folder_id: uuid.UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
+):
+    """被共享者从自己看板移除共享文件夹（主动退出，不删除原文件夹）"""
+    folder = db.query(DashboardFolder).filter(DashboardFolder.id == folder_id).first()
+    if not folder:
+        raise HTTPException(status_code=404, detail="文件夹不存在")
+
+    # 向上追溯找到最顶层的被共享文件夹
+    ancestor_ids = _get_ancestor_ids(folder_id, db)
+    all_check_ids = [folder_id] + ancestor_ids
+
+    # 从根级向下查找第一个共享记录（即最顶层被共享的文件夹）
+    root_share_folder_id = None
+    for fid in reversed(all_check_ids):
+        share = db.query(DashboardFolderShare).filter(
+            DashboardFolderShare.folder_id == fid,
+            DashboardFolderShare.shared_with_user_id == current_user.id
+        ).first()
+        if share:
+            root_share_folder_id = fid
+            break
+
+    if not root_share_folder_id:
+        raise HTTPException(status_code=403, detail="没有该文件夹的共享记录")
+
+    # 级联移除该用户在所有子孙文件夹上的共享
+    _cascade_remove_share(root_share_folder_id, current_user.id, db)
+    # 删除根级共享记录
+    db.query(DashboardFolderShare).filter(
+        DashboardFolderShare.folder_id == root_share_folder_id,
+        DashboardFolderShare.shared_with_user_id == current_user.id,
+    ).delete(synchronize_session=False)
+
+    db.commit()
+
+    ip = request.client.host if request.client else None
+    from .. import crud
+    crud.create_log(db, current_user.id, current_user.username, "移除共享文件夹", "dashboard_share", str(folder_id), None, ip)
+
+    return {"message": "已移除共享文件夹"}
 
 
 # ===== 辅助函数 =====

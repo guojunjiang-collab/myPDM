@@ -157,9 +157,18 @@ export const boardApi = {
   /** 添加共享 */
   addShare: (folderId: string, userId: string, permission: string) =>
     api.post(`/dashboard/folders/${folderId}/shares`, { shared_with_user_id: userId, permission }),
-  /** 取消共享 */
+  /** 取消共享（文件夹所有者操作） */
   removeShare: (folderId: string, shareId: string) =>
     api.delete(`/dashboard/folders/${folderId}/shares/${shareId}`),
+  /** 修改共享权限（仅文件夹所有者） */
+  updateSharePermission: (folderId: string, shareId: string, permission: string) =>
+    api.put(`/dashboard/folders/${folderId}/shares/${shareId}`, { permission }),
+  /** 批量保存共享设置（原子操作） */
+  saveShares: (folderId: string, shares: { shared_with_user_id: string; permission: string }[]) =>
+    api.post(`/dashboard/folders/${folderId}/shares/batch`, { shares }),
+  /** 移除共享文件夹（被共享者主动退出） */
+  removeSharedFolder: (folderId: string) =>
+    api.delete(`/dashboard/shared-folder/${folderId}`),
   /** @deprecated 兼容旧调用 */
   getFolders: () => api.get('/dashboard/'),
   /** @deprecated 兼容旧调用 */

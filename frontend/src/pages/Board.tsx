@@ -107,6 +107,7 @@ export default function Board() {
   const [shareModal, setShareModal] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [removeShareId, setRemoveShareId] = useState<string | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<{ id: string; el: HTMLElement } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -116,6 +117,8 @@ export default function Board() {
   const storeDocuments = useDataStore((s) => s.documents);
   const [usersList, setUsersList] = useState<{ id: string; username: string; real_name: string }[]>([]);
   const [shares, setShares] = useState<ShareRecord[]>([]);
+  const [workingShares, setWorkingShares] = useState<ShareRecord[]>([]);
+  const [isShareDirty, setIsShareDirty] = useState(false);
   const [shareUserId, setShareUserId] = useState('');
   const [sharePermission, setSharePermission] = useState('view');
   const [userSearch, setUserSearch] = useState('');
@@ -196,6 +199,15 @@ export default function Board() {
     } catch { alert('删除失败'); }
   };
 
+  const handleRemoveSharedFolder = async () => {
+    if (!removeShareId) return;
+    try {
+      await boardApi.removeSharedFolder(removeShareId);
+      if (selectedId === removeShareId) setSelectedId(null);
+      setRemoveShareId(null); await loadDashboard();
+    } catch { alert('移除共享失败'); }
+  };
+
   const handleRemoveItem = async (itemId: string) => {
     try { await boardApi.removeItem(itemId); await loadDashboard(); } catch { alert('移除失败'); }
   };
@@ -207,20 +219,58 @@ export default function Board() {
   };
 
   const loadShares = async (fid: string) => {
-    try { setShares((await boardApi.getShares(fid)).data || []); } catch { setShares([]); }
-  };
-
-  const handleAddShare = async () => {
-    if (!shareModal || !shareUserId) return;
     try {
-      await boardApi.addShare(shareModal, shareUserId, sharePermission);
-      setShareUserId(''); await loadShares(shareModal);
-    } catch (e: any) { alert(e?.response?.data?.detail || '共享失败'); }
+      const data = (await boardApi.getShares(fid)).data || [];
+      setShares(data);
+      setWorkingShares(data);
+      setIsShareDirty(false);
+    } catch { setShares([]); setWorkingShares([]); setIsShareDirty(false); }
   };
 
-  const handleRemoveShare = async (sid: string) => {
+  const handleAddShare = () => {
+    if (!shareModal || !shareUserId) return;
+    const newShare: ShareRecord = {
+      id: `pending-${Date.now()}`,
+      shared_with_user_id: shareUserId,
+      shared_with_user: usersList.find(u => u.id === shareUserId) || null,
+      permission: sharePermission,
+      created_at: new Date().toISOString(),
+    };
+    setWorkingShares(prev => [...prev, newShare]);
+    setIsShareDirty(true);
+    setShareUserId('');
+  };
+
+  const handleRemoveShareLocal = (sid: string) => {
+    setWorkingShares(prev => prev.filter(s => s.id !== sid));
+    setIsShareDirty(true);
+  };
+
+  const handleUpdateSharePermissionLocal = (sid: string, permission: string) => {
+    setWorkingShares(prev => prev.map(s => s.id === sid ? { ...s, permission } : s));
+    setIsShareDirty(true);
+  };
+
+  const handleSaveShares = async () => {
     if (!shareModal) return;
-    try { await boardApi.removeShare(shareModal, sid); await loadShares(shareModal); } catch { alert('取消共享失败'); }
+    try {
+      await boardApi.saveShares(shareModal, workingShares.map(s => ({
+        shared_with_user_id: s.shared_with_user_id,
+        permission: s.permission,
+      })));
+      setShareModal(null);
+      setShareUserId('');
+      setUserSearch('');
+      await loadDashboard();
+    } catch (e: any) { alert(e?.response?.data?.detail || '保存失败'); }
+  };
+
+  const handleCancelShares = () => {
+    setWorkingShares([...shares]);
+    setIsShareDirty(false);
+    setShareModal(null);
+    setShareUserId('');
+    setUserSearch('');
   };
 
   const canEditFolder = selectedFolder ? !selectedFolder.shared_from || selectedFolder.shared_from?.permission === 'edit' : false;
@@ -398,14 +448,25 @@ export default function Board() {
 
 
       {/* ---- Context Menu ---- */}
-      {menuAnchor && (
-        <div ref={menuRef} className="fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[120px]" style={{ left: menuAnchor.el.getBoundingClientRect().left, top: menuAnchor.el.getBoundingClientRect().bottom + 4 }}>
-          <button type="button" className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50" onClick={() => { const f = findFolderById(allFolders, menuAnchor.id); setRenameModal({ id: menuAnchor.id, name: f?.name || '' }); setRenameName(f?.name || ''); setMenuAnchor(null); }}>✏️ 重命名</button>
-          <button type="button" className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50" onClick={() => { setShareModal(menuAnchor.id); setUserSearch(''); setMenuAnchor(null); }}>🔗 共享</button>
-          <div className="border-t border-gray-100 my-1" />
-          <button type="button" className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50" onClick={() => { setDeleteId(menuAnchor.id); setMenuAnchor(null); }}>🗑️ 删除</button>
-        </div>
-      )}
+      {menuAnchor && (() => {
+        const menuFolder = findFolderById(allFolders, menuAnchor.id);
+        const menuIsShared = !!menuFolder?.shared_from;
+
+        return (
+          <div ref={menuRef} className="fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[120px]" style={{ left: menuAnchor.el.getBoundingClientRect().left, top: menuAnchor.el.getBoundingClientRect().bottom + 4 }}>
+            {menuIsShared ? (
+              <button type="button" className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50" onClick={() => { setRemoveShareId(menuAnchor.id); setMenuAnchor(null); }}>🚫 移除共享</button>
+            ) : (
+              <>
+                <button type="button" className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50" onClick={() => { const f = findFolderById(allFolders, menuAnchor.id); setRenameModal({ id: menuAnchor.id, name: f?.name || '' }); setRenameName(f?.name || ''); setMenuAnchor(null); }}>✏️ 重命名</button>
+                <button type="button" className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50" onClick={() => { setShareModal(menuAnchor.id); setUserSearch(''); setShareUserId(''); setSharePermission('view'); setMenuAnchor(null); }}>🔗 共享</button>
+                <div className="border-t border-gray-100 my-1" />
+                <button type="button" className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50" onClick={() => { setDeleteId(menuAnchor.id); setMenuAnchor(null); }}>🗑️ 删除</button>
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ---- Rename ---- */}
       <Modal open={!!renameModal} title="重命名文件夹" onClose={() => setRenameModal(null)} width="sm">
@@ -430,7 +491,7 @@ export default function Board() {
       </Modal>
 
       {/* ---- Share ---- */}
-      <Modal open={!!shareModal} title="共享文件夹" onClose={() => setShareModal(null)} width="md">
+      <Modal open={!!shareModal} title={`共享文件夹${isShareDirty ? ' (未保存)' : ''}`} onClose={handleCancelShares} width="md">
         <div className="space-y-4">
           <div className="flex gap-2">
             <input type="text" placeholder="搜索用户名/姓名..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm" />
@@ -440,26 +501,54 @@ export default function Board() {
             </select>
           </div>
           <div className="max-h-36 overflow-y-auto border border-gray-200 rounded-lg">
-            {usersList.filter((u) => !userSearch.trim() || u.username.includes(userSearch) || u.real_name.includes(userSearch)).filter((u) => !shares.some((s) => s.shared_with_user_id === u.id)).map((u) => (
-              <button type="button" key={u.id} onClick={() => setShareUserId(u.id)} className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-b-0">
+            {usersList.filter((u) => !userSearch.trim() || u.username.includes(userSearch) || u.real_name.includes(userSearch)).filter((u) => !workingShares.some((s) => s.shared_with_user_id === u.id)).map((u) => (
+              <button
+                type="button"
+                key={u.id}
+                onClick={() => setShareUserId(u.id)}
+                className={`w-full text-left px-3 py-2 text-sm border-b border-gray-100 last:border-b-0 transition-colors ${
+                  shareUserId === u.id
+                    ? 'bg-primary-50 text-primary-700 font-medium'
+                    : 'hover:bg-gray-50 text-gray-700'
+                }`}
+              >
                 {u.real_name} ({u.username})
+                {shareUserId === u.id && <span className="ml-2 text-xs text-primary-500">✓ 已选中</span>}
               </button>
             ))}
+            {usersList.filter((u) => !userSearch.trim() || u.username.includes(userSearch) || u.real_name.includes(userSearch)).filter((u) => !workingShares.some((s) => s.shared_with_user_id === u.id)).length === 0 && (
+              <p className="text-center text-sm text-gray-400 py-4">无匹配用户</p>
+            )}
           </div>
-          {shareUserId && <div className="flex justify-end"><button type="button" onClick={handleAddShare} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">确认共享</button></div>}
-          {shares.length > 0 && (
+          {shareUserId && <div className="flex justify-end"><button type="button" onClick={handleAddShare} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">添加到列表</button></div>}
+          {workingShares.length > 0 && (
             <div>
-              <h4 className="text-sm font-medium text-gray-700 mb-2">已共享</h4>
+              <h4 className="text-sm font-medium text-gray-700 mb-2">已共享 ({workingShares.length})</h4>
               <div className="space-y-1">
-                {shares.map((s) => (
+                {workingShares.map((s) => (
                   <div key={s.id} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded">
-                    <span className="text-sm">{s.shared_with_user?.real_name || '-'} <span className="text-xs text-gray-400 ml-1">({s.permission === 'edit' ? '可编辑' : '只读'})</span></span>
-                    <button type="button" onClick={() => handleRemoveShare(s.id)} className="text-xs text-red-500 hover:text-red-700">取消</button>
+                    <span className="text-sm">{s.shared_with_user?.real_name || '-'}</span>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={s.permission}
+                        onChange={(e) => handleUpdateSharePermissionLocal(s.id, e.target.value)}
+                        className="text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-primary-500"
+                      >
+                        <option value="view">只读</option>
+                        <option value="edit">可编辑</option>
+                      </select>
+                      <button type="button" onClick={() => handleRemoveShareLocal(s.id)} className="text-xs text-red-500 hover:text-red-700">取消</button>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
           )}
+          {/* Save / Cancel */}
+          <div className="flex justify-end gap-2 pt-2 border-t border-gray-200">
+            <button type="button" onClick={handleCancelShares} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
+            <button type="button" onClick={handleSaveShares} disabled={!isShareDirty} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">保存</button>
+          </div>
         </div>
       </Modal>
 
@@ -504,6 +593,9 @@ export default function Board() {
 
       {/* ---- Delete Confirm ---- */}
       <ConfirmModal open={!!deleteId} title="删除文件夹" content="确定要删除该文件夹吗？所有子文件夹和关联项将一并删除。" confirmText="删除" cancelText="取消" type="danger" onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />
+
+      {/* ---- Remove Shared Folder Confirm ---- */}
+      <ConfirmModal open={!!removeShareId} title="移除共享文件夹" content="确定要移除该共享文件夹吗？将从您的看板中移除该文件夹及其所有子文件夹。" confirmText="移除" cancelText="取消" type="danger" onConfirm={handleRemoveSharedFolder} onCancel={() => setRemoveShareId(null)} />
     </div>
   );
 }

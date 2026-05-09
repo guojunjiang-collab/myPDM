@@ -108,7 +108,7 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
             {statusTag(doc.status).label}
           </span>
         </div>
-        <div>
+        <div className="col-span-2">
           <label className="block text-xs font-medium text-gray-500 mb-1">备注</label>
           <div className="text-sm">{doc.remark || '-'}</div>
         </div>
