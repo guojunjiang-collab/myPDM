@@ -255,7 +255,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
                       </td>
                       <td className="px-3 py-2 text-center whitespace-nowrap">
                         <span className="inline-flex items-center gap-2">
-                          {!hasEditableAction && ed.document.file_id && (
+                          {ed.document.file_id && (
                             <>
                               <button
                                 type="button"

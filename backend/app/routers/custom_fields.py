@@ -158,12 +158,18 @@ async def set_values(
 
 @router.post("/reset-data")
 async def reset_business_data(
+    data: dict,
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(["admin"]))
 ):
-    """清除业务数据（零件、部件、BOM、附件、日志、自定义字段值），保留用户和系统设置"""
+    """清除所有业务数据（需验证管理员密码）"""
+    password = data.get("password", "")
+    if not password:
+        raise HTTPException(status_code=400, detail="请输入管理员密码")
+
+    if not crud.verify_password(password, current_user.password_hash):
+        raise HTTPException(status_code=403, detail="密码错误")
+
     crud.reset_business_data(db)
-    ip = request.client.host if request.client else None
-    # 日志在清除后无法写入，跳过
-    return {"message": "业务数据已重置，用户和系统设置已保留"}
+    return {"message": "业务数据已重置"}

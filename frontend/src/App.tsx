@@ -11,6 +11,9 @@ import BOM from './pages/BOM';
 import Users from './pages/Users';
 import Logs from './pages/Logs';
 import Settings from './pages/Settings';
+import ECN from './pages/ECN';
+import Inventory from './pages/Inventory';
+import Business from './pages/Business';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
@@ -40,6 +43,9 @@ export default function App() {
           <Route path="components" element={<Components />} />
           <Route path="documents" element={<Documents />} />
           <Route path="bom" element={<BOM />} />
+          <Route path="inventory" element={<Inventory />} />
+          <Route path="ecn" element={<ECN />} />
+          <Route path="business" element={<Business />} />
           <Route path="users" element={<Users />} />
           <Route path="logs" element={<Logs />} />
           <Route path="settings" element={<Settings />} />

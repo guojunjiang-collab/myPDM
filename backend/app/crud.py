@@ -350,16 +350,47 @@ def reorder_custom_field_definitions(db, items):
     return True
 
 def reset_business_data(db):
-    """清除业务数据，保留用户和系统设置（字典、自定义字段定义）"""
-    # 按依赖顺序删除：值 → BOM → 附件 → 零件/部件 → 日志
+    """清除所有业务数据：零件、部件、BOM、图文档、附件文件、自定义字段、看板、日志"""
+    import os
+    from .file_storage import UPLOAD_DIR
+
+    # 先收集所有要删除的附件文件路径
+    attachments = db.query(models.DocumentAttachment).all()
+    file_paths = []
+    for att in attachments:
+        if att.file_path:
+            file_paths.append(att.file_path)
+
+    # 按依赖顺序删除 DB 记录
     db.query(models.CustomFieldValue).delete()
     db.query(models.BOMItem).delete()
+    db.query(models.DashboardItem).delete()
+    db.query(models.DashboardFolderShare).delete()
+    db.query(models.DashboardFolder).delete()
+    db.query(models.UserDashboard).delete()
     db.query(models.DocumentAttachment).delete()
     db.query(models.Document).delete()
     db.query(models.Part).delete()
     db.query(models.Assembly).delete()
+    db.query(models.CustomFieldDefinition).delete()
     db.query(models.OperationLog).delete()
     db.commit()
+
+    # 删除附件实体文件
+    for fp in file_paths:
+        try:
+            full_path = os.path.join(UPLOAD_DIR, fp)
+            if os.path.exists(full_path):
+                os.remove(full_path)
+            # 尝试清理空目录
+            dir_path = os.path.dirname(full_path)
+            try:
+                os.rmdir(dir_path)  # 仅删除空目录
+            except OSError:
+                pass
+        except Exception:
+            pass
+
     return True
 
 # ===== Custom Field Value CRUD =====

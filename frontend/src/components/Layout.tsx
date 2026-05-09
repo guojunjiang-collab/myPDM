@@ -6,12 +6,13 @@ import { useDataStore } from '../stores/data';
 const navItems = [
   { path: '/dashboard', label: '仪表盘', icon: '📊', roles: ['admin', 'engineer', 'production', 'guest'] },
   { path: '/board', label: '用户看板', icon: '📋', roles: ['admin', 'engineer', 'production', 'guest'] },
+  { path: '/bom', label: '管理工具', icon: '🛠️', roles: ['admin', 'engineer', 'production'] },
   { path: '/parts', label: '零件管理', icon: '🔧', roles: ['admin', 'engineer', 'production', 'guest'] },
   { path: '/components', label: '部件管理', icon: '📦', roles: ['admin', 'engineer', 'production', 'guest'] },
   { path: '/documents', label: '图文档管理', icon: '📄', roles: ['admin', 'engineer', 'production', 'guest'] },
-  { path: '/bom', label: '管理工具', icon: '📋', roles: ['admin', 'engineer', 'production'] },
-  { path: '/users', label: '用户管理', icon: '👥', roles: ['admin'] },
-  { path: '/logs', label: '操作日志', icon: '📝', roles: ['admin'] },
+  { path: '/inventory', label: '库存管理', icon: '🏗️', roles: ['admin', 'engineer', 'production', 'guest'] },
+  { path: '/ecn', label: '变更管理', icon: '🔄', roles: ['admin', 'engineer', 'production', 'guest'] },
+  { path: '/business', label: '业务管理', icon: '💼', roles: ['admin', 'engineer', 'production', 'guest'] },
   { path: '/settings', label: '系统设置', icon: '⚙️', roles: ['admin'] },
 ];
 

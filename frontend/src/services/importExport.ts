@@ -285,10 +285,10 @@ async function loadEntityDocuments(
 // ================================================================
 
 /**
- * 导出零件为 Excel 文件
+ * 构建零件导出的 Excel workbook（共享数据准备逻辑）
  * 包含 Sheet1: 零件数据, Sheet2: 关联图文档
  */
-export async function exportPartsExcel(): Promise<void> {
+async function _buildPartsWorkbook(): Promise<XLSX.WorkBook> {
   const parts = useDataStore.getState().parts;
   if (parts.length === 0) {
     throw new Error('没有可导出的零件数据');
@@ -313,7 +313,6 @@ export async function exportPartsExcel(): Promise<void> {
       创建时间: p.created_at || '',
       更新时间: p.updated_at || '',
     };
-    // 自定义字段列
     const cfValues = cfValuesMap.get(p.id);
     if (cfValues) {
       for (const def of defs) {
@@ -322,8 +321,6 @@ export async function exportPartsExcel(): Promise<void> {
     }
     return row;
   });
-
-  const sheet1 = XLSX.utils.json_to_sheet(sheet1Rows);
 
   // Sheet 2: 关联图文档
   const sheet2Rows: Record<string, unknown>[] = [];
@@ -344,22 +341,32 @@ export async function exportPartsExcel(): Promise<void> {
       }
     }
   }
-  const sheet2 = XLSX.utils.json_to_sheet(sheet2Rows);
 
-  // 列宽
-  const colWidths = [
+  const wb = XLSX.utils.book_new();
+  const s1 = XLSX.utils.json_to_sheet(sheet1Rows);
+  s1['!cols'] = [
     { wch: 18 }, { wch: 24 }, { wch: 20 }, { wch: 8 },
     { wch: 10 }, { wch: 30 }, { wch: 20 }, { wch: 20 },
   ];
-  sheet1['!cols'] = colWidths;
-  sheet2['!cols'] = [
-    { wch: 18 }, { wch: 10 }, { wch: 20 }, { wch: 30 }, { wch: 10 }, { wch: 10 },
-  ];
+  XLSX.utils.book_append_sheet(wb, s1, '零件数据');
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, sheet1, '零件数据');
-  XLSX.utils.book_append_sheet(wb, sheet2, '关联图文档');
+  if (sheet2Rows.length > 0) {
+    const s2 = XLSX.utils.json_to_sheet(sheet2Rows);
+    s2['!cols'] = [
+      { wch: 18 }, { wch: 10 }, { wch: 20 }, { wch: 30 }, { wch: 10 }, { wch: 10 },
+    ];
+    XLSX.utils.book_append_sheet(wb, s2, '关联图文档');
+  }
 
+  return wb;
+}
+
+/**
+ * 导出零件为 Excel 文件（下载到浏览器）
+ * 包含 Sheet1: 零件数据, Sheet2: 关联图文档
+ */
+export async function exportPartsExcel(): Promise<void> {
+  const wb = await _buildPartsWorkbook();
   const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
   const blob = new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -626,8 +633,8 @@ async function gatherBOMTree(
  * 导出部件到文件夹
  * 使用 File System Access API 写入本地文件夹
  */
-export async function exportAssembliesToFolder(): Promise<void> {
-  if (!supportsFileSystemAccess()) {
+export async function exportAssembliesToFolder(dirHandle?: FileSystemDirectoryHandle): Promise<void> {
+  if (!dirHandle && !supportsFileSystemAccess()) {
     throw new Error('您的浏览器不支持文件夹操作，请使用 Chrome 86+ 或 Edge 86+');
   }
 
@@ -636,7 +643,7 @@ export async function exportAssembliesToFolder(): Promise<void> {
     throw new Error('没有可导出的部件数据');
   }
 
-  const dirHandle = await window.showDirectoryPicker({
+  const handle = dirHandle || await window.showDirectoryPicker({
     mode: 'readwrite',
     startIn: 'downloads',
   });
@@ -705,7 +712,7 @@ export async function exportAssembliesToFolder(): Promise<void> {
 
   const buf1 = XLSX.write(wb1, { bookType: 'xlsx', type: 'array' });
   await writeBlobToDirectory(
-    dirHandle,
+    handle,
     '部件清单.xlsx',
     new Blob([buf1], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -741,7 +748,7 @@ export async function exportAssembliesToFolder(): Promise<void> {
     const bufBom = XLSX.write(bomWb, { bookType: 'xlsx', type: 'array' });
     const bomFilename = `BOM_${asm.code}_${asm.version || 'A'}.xlsx`;
     await writeBlobToDirectory(
-      dirHandle,
+      handle,
       bomFilename,
       new Blob([bufBom], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -758,21 +765,21 @@ export async function exportAssembliesToFolder(): Promise<void> {
  * 预览部件导入
  * 用户选择文件夹后解析数据
  */
-export async function previewAssembliesImport(): Promise<ImportPreview> {
-  if (!supportsFileSystemAccess()) {
+export async function previewAssembliesImport(dirHandle?: FileSystemDirectoryHandle): Promise<ImportPreview> {
+  if (!dirHandle && !supportsFileSystemAccess()) {
     throw new Error('您的浏览器不支持文件夹操作，请使用 Chrome 86+ 或 Edge 86+');
   }
 
-  const dirHandle = await window.showDirectoryPicker({
+  const handle = dirHandle || await window.showDirectoryPicker({
     mode: 'read',
   });
-  _importDirHandle = dirHandle;
+  _importDirHandle = handle;
 
   const existingAssemblies = useDataStore.getState().assemblies;
   const existingParts = useDataStore.getState().parts;
 
   // 读取部件清单.xlsx
-  const manifestBuf = await readFileAsBuffer(dirHandle, '部件清单.xlsx');
+  const manifestBuf = await readFileAsBuffer(handle, '部件清单.xlsx');
   if (!manifestBuf) throw new Error('文件夹中未找到 "部件清单.xlsx"');
 
   const wb = XLSX.read(manifestBuf, { type: 'array' });
@@ -809,7 +816,7 @@ export async function previewAssembliesImport(): Promise<ImportPreview> {
   }
 
   // 扫描 BOM_*.xlsx 文件
-  const allFiles = await listFilesInDirectory(dirHandle);
+  const allFiles = await listFilesInDirectory(handle!);
   const bomFiles = allFiles.filter((f) => f.startsWith('BOM_') && f.endsWith('.xlsx'));
 
   // 解析 BOM 文件，建立 (件号|版本) → BOM 行 映射
@@ -817,7 +824,7 @@ export async function previewAssembliesImport(): Promise<ImportPreview> {
   for (const bf of bomFiles) {
     const parsed = parseBOMFilename(bf);
     if (!parsed) continue;
-    const buf = await readFileAsBuffer(dirHandle, bf);
+    const buf = await readFileAsBuffer(handle!, bf);
     if (!buf) continue;
     const bomWb = XLSX.read(buf, { type: 'array' });
     const bomWs = bomWb.Sheets['BOM'];
@@ -968,7 +975,7 @@ export async function executeAssembliesImport(
       const parentId = codeVersionToId.get(parentKey);
       if (!parentId) continue;
 
-      const buf = await readFileAsBuffer(dirHandle, bf);
+    const buf = await readFileAsBuffer(dirHandle!, bf);
       if (!buf) continue;
       const bomWb = XLSX.read(buf, { type: 'array' });
       const bomWs = bomWb.Sheets['BOM'];
@@ -1091,8 +1098,8 @@ export async function executeAssembliesImport(
  * 导出图文档到文件夹
  * 包含 图文档清单.xlsx + attachments/ 附件子文件夹
  */
-export async function exportDocumentsToFolder(): Promise<void> {
-  if (!supportsFileSystemAccess()) {
+export async function exportDocumentsToFolder(dirHandle?: FileSystemDirectoryHandle): Promise<void> {
+  if (!dirHandle && !supportsFileSystemAccess()) {
     throw new Error('您的浏览器不支持文件夹操作，请使用 Chrome 86+ 或 Edge 86+');
   }
 
@@ -1101,7 +1108,7 @@ export async function exportDocumentsToFolder(): Promise<void> {
     throw new Error('没有可导出的图文档数据');
   }
 
-  const dirHandle = await window.showDirectoryPicker({
+  const handle = dirHandle || await window.showDirectoryPicker({
     mode: 'readwrite',
     startIn: 'downloads',
   });
@@ -1142,7 +1149,7 @@ export async function exportDocumentsToFolder(): Promise<void> {
 
   const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
   await writeBlobToDirectory(
-    dirHandle,
+    handle,
     '图文档清单.xlsx',
     new Blob([buf], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -1151,7 +1158,7 @@ export async function exportDocumentsToFolder(): Promise<void> {
 
   // ===== attachments/ 子文件夹 =====
   try {
-    const attDirHandle = await dirHandle.getDirectoryHandle('attachments', {
+    const attDirHandle = await handle.getDirectoryHandle('attachments', {
       create: true,
     });
 
@@ -1198,15 +1205,15 @@ export async function exportDocumentsToFolder(): Promise<void> {
 /**
  * 预览图文档导入
  */
-export async function previewDocumentsImport(): Promise<ImportPreview> {
-  if (!supportsFileSystemAccess()) {
+export async function previewDocumentsImport(dirHandle?: FileSystemDirectoryHandle): Promise<ImportPreview> {
+  if (!dirHandle && !supportsFileSystemAccess()) {
     throw new Error('您的浏览器不支持文件夹操作，请使用 Chrome 86+ 或 Edge 86+');
   }
 
-  const dirHandle = await window.showDirectoryPicker({ mode: 'read' });
-  _importDirHandle = dirHandle;
+  const handle = dirHandle || await window.showDirectoryPicker({ mode: 'read' });
+  _importDirHandle = handle;
 
-  const manifestBuf = await readFileAsBuffer(dirHandle, '图文档清单.xlsx');
+  const manifestBuf = await readFileAsBuffer(handle, '图文档清单.xlsx');
   if (!manifestBuf) throw new Error('文件夹中未找到 "图文档清单.xlsx"');
 
   const wb = XLSX.read(manifestBuf, { type: 'array' });
@@ -1227,7 +1234,7 @@ export async function previewDocumentsImport(): Promise<ImportPreview> {
   // 扫描 attachments/ 目录
   let attDirHandle: FileSystemDirectoryHandle | null = null;
   try {
-    attDirHandle = await dirHandle.getDirectoryHandle('attachments');
+    attDirHandle = await handle.getDirectoryHandle('attachments');
   } catch {
     // 没有附件目录也继续
   }
@@ -1389,4 +1396,309 @@ export async function pickDirectoryForImport(): Promise<FileSystemDirectoryHandl
     throw new Error('您的浏览器不支持文件夹操作，请使用 Chrome 86+ 或 Edge 86+');
   }
   return await window.showDirectoryPicker({ mode: 'read' });
+}
+
+// ================================================================
+// CUSTOM FIELD DEFS EXPORT
+// ================================================================
+
+/**
+ * 导出自定义字段定义到指定目录
+ */
+export async function exportCustomFieldDefs(dirHandle?: FileSystemDirectoryHandle): Promise<void> {
+  const defs = useDataStore.getState().customFieldDefs;
+  if (defs.length === 0) return;
+
+  const handle = dirHandle || (supportsFileSystemAccess()
+    ? await window.showDirectoryPicker({ mode: 'readwrite', startIn: 'downloads' })
+    : null);
+
+  // 字段定义
+  const defRows = defs.map((d) => ({
+    字段名称: d.name,
+    字段标识: d.field_key,
+    字段类型: d.field_type === 'text' ? '单行文本' : d.field_type === 'number' ? '数字' : '下拉选择',
+     选项: (d.options || []).join('_'),
+     是否必填: d.is_required ? '是' : '否',
+     适用类型: (Array.isArray(d.applies_to) ? d.applies_to : [d.applies_to])
+       .map((t: string) => t === 'part' ? '零件' : t === 'component' ? '部件' : '图文档')
+       .join('_'),
+    排序: d.sort_order,
+  }));
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(defRows);
+  ws['!cols'] = [
+    { wch: 16 }, { wch: 18 }, { wch: 12 }, { wch: 30 },
+    { wch: 10 }, { wch: 20 }, { wch: 8 },
+  ];
+  XLSX.utils.book_append_sheet(wb, ws, '字段定义');
+
+  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([buf], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+
+  if (handle) {
+    await writeBlobToDirectory(handle, '自定义字段定义.xlsx', blob);
+  } else {
+    downloadBlob(blob, `自定义字段定义_${todayStr()}.xlsx`);
+  }
+}
+
+/**
+ * 从 Excel 文件导入自定义字段定义
+ * 字段标识相同则更新，否则新增
+ */
+export async function importCustomFieldDefs(file: File): Promise<{ created: number; updated: number }> {
+  const buffer = await file.arrayBuffer();
+  const wb = XLSX.read(buffer, { type: 'array' });
+  const ws = wb.Sheets['字段定义'];
+  if (!ws) throw new Error('未找到"字段定义" Sheet，请确认文件格式正确');
+
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
+  if (rows.length === 0) throw new Error('文件中无字段定义数据');
+
+  const existingDefs = useDataStore.getState().customFieldDefs;
+  const existingMap = new Map<string, CustomFieldDefinition>();
+  for (const d of existingDefs) {
+    existingMap.set(d.field_key, d);
+  }
+
+  let created = 0;
+  let updated = 0;
+
+  for (const row of rows) {
+    const name = String(row['字段名称'] || '').trim();
+    const fieldKey = String(row['字段标识'] || '').trim();
+    const fieldTypeRaw = String(row['字段类型'] || '').trim();
+
+    if (!name || !fieldKey) continue;
+
+    const fieldTypeMap: Record<string, string> = {
+      '单行文本': 'text', '数字': 'number', '下拉选择': 'select',
+    };
+    const fieldType = fieldTypeMap[fieldTypeRaw] || 'text';
+
+    const optionsRaw = String(row['选项'] || '');
+    const options = optionsRaw ? optionsRaw.split('_').map(s => s.trim()).filter(Boolean) : [];
+
+    const isRequired = String(row['是否必填'] || '').trim() === '是';
+
+    const appliesToRaw = String(row['适用类型'] || '');
+    const appliesToMap: Record<string, string> = {
+      '零件': 'part', '部件': 'component', '图文档': 'document',
+    };
+    const appliesTo = appliesToRaw
+      ? appliesToRaw.split('_').map(s => appliesToMap[s.trim()] || s.trim()).filter(Boolean)
+      : ['part'];
+
+    const sortOrder = Number(row['排序']) || 0;
+
+    const payload = {
+      name,
+      field_key: fieldKey,
+      field_type: fieldType,
+      options,
+      is_required: isRequired,
+      applies_to: appliesTo,
+      sort_order: sortOrder,
+    };
+
+    const existing = existingMap.get(fieldKey);
+    if (existing) {
+      await customFieldsApi.updateDefinition(existing.id, payload);
+      updated++;
+    } else {
+      await customFieldsApi.createDefinition(payload);
+      created++;
+    }
+  }
+
+  // 刷新 store
+  const res = await customFieldsApi.listDefinitions();
+  useDataStore.getState().setCustomFieldDefs(Array.isArray(res.data) ? res.data : []);
+
+  return { created, updated };
+}
+
+// ================================================================
+// EXPORT ALL DATA (统一导出)
+// ================================================================
+
+/**
+ * 导出零件到指定目录
+ */
+async function exportPartsToDir(dirHandle: FileSystemDirectoryHandle): Promise<void> {
+  const parts = useDataStore.getState().parts;
+  if (parts.length === 0) return;
+
+  const wb = await _buildPartsWorkbook();
+  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  await writeBlobToDirectory(
+    dirHandle,
+    '零件清单.xlsx',
+    new Blob([buf], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    }),
+  );
+}
+
+export type ExportProgressCallback = (message: string) => void;
+
+/**
+ * 统一导出全部数据到同一个文件夹
+ * 顺序：图文档 → 零件 → 部件
+ * 通过 onProgress 回调报告进度
+ */
+export async function exportAllData(
+  onProgress?: ExportProgressCallback,
+): Promise<void> {
+  if (!supportsFileSystemAccess()) {
+    throw new Error('您的浏览器不支持文件夹操作，请使用 Chrome 86+ 或 Edge 86+');
+  }
+
+  const dirHandle = await window.showDirectoryPicker({
+    mode: 'readwrite',
+    startIn: 'downloads',
+  });
+
+  // 先刷新数据确保最新
+  onProgress?.('正在同步最新数据...');
+  await useDataStore.getState().syncAll();
+
+  // 0. 导出自定义字段定义
+  const defs = useDataStore.getState().customFieldDefs;
+  if (defs.length > 0) {
+    onProgress?.(`正在导出自定义字段定义 (${defs.length} 个字段)...`);
+    await exportCustomFieldDefs(dirHandle);
+  }
+
+  // 1. 导出图文档（含附件）
+  const docs = useDataStore.getState().documents;
+  if (docs.length > 0) {
+    const attCount = docs.filter((d) => d.file_id).length;
+    onProgress?.(`正在导出图文档 (${docs.length} 条记录, ${attCount} 个附件)...`);
+    await exportDocumentsToFolder(dirHandle);
+  } else {
+    onProgress?.('图文档: 无数据，跳过');
+  }
+
+  // 2. 导出零件
+  const parts = useDataStore.getState().parts;
+  if (parts.length > 0) {
+    onProgress?.(`正在导出零件 (${parts.length} 条记录)...`);
+    await exportPartsToDir(dirHandle);
+  } else {
+    onProgress?.('零件: 无数据，跳过');
+  }
+
+  // 3. 导出部件
+  const assemblies = useDataStore.getState().assemblies;
+  if (assemblies.length > 0) {
+    onProgress?.(`正在导出部件 (${assemblies.length} 条记录)...`);
+    await exportAssembliesToFolder(dirHandle);
+  } else {
+    onProgress?.('部件: 无数据，跳过');
+  }
+
+  onProgress?.('全部数据导出完成');
+}
+
+// ================================================================
+// IMPORT ALL DATA (统一导入)
+// ================================================================
+
+/**
+ * 从目录中读取 xlsx 文件并解析为 JSON 行
+ */
+async function _readXlsxFromDir(
+  dirHandle: FileSystemDirectoryHandle,
+  fileName: string,
+): Promise<Record<string, unknown>[]> {
+  const buf = await readFileAsBuffer(dirHandle, fileName);
+  if (!buf) return [];
+  const wb = XLSX.read(buf, { type: 'array' });
+  const sheetName = wb.SheetNames[0];
+  if (!sheetName) return [];
+  const ws = wb.Sheets[sheetName];
+  return XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
+}
+
+/** 从目录中读取 xlsx 文件并返回为 File（用于 importCustomFieldDefs） */
+async function _readXlsxAsFile(
+  dirHandle: FileSystemDirectoryHandle,
+  fileName: string,
+): Promise<File | null> {
+  try {
+    const fileHandle = await dirHandle.getFileHandle(fileName);
+    const file = await fileHandle.getFile();
+    return file;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 统一导入全部数据
+ * 顺序：自定义字段 → 图文档 → 零件 → 部件
+ */
+export async function importAllData(
+  onProgress?: ExportProgressCallback,
+): Promise<void> {
+  if (!supportsFileSystemAccess()) {
+    throw new Error('您的浏览器不支持文件夹操作，请使用 Chrome 86+ 或 Edge 86+');
+  }
+
+  const dirHandle = await window.showDirectoryPicker({ mode: 'read' });
+  // 设置全局目录句柄，供 executeXxxImport 使用（附件上传、BOM 文件读取）
+  _importDirHandle = dirHandle;
+
+  // ===== 1. 导入自定义字段 =====
+  onProgress?.('正在导入自定义字段...');
+  const cfFile = await _readXlsxAsFile(dirHandle, '自定义字段定义.xlsx');
+  if (cfFile) {
+    const result = await importCustomFieldDefs(cfFile);
+    onProgress?.(`自定义字段: 新增 ${result.created} 个, 更新 ${result.updated} 个`);
+  } else {
+    onProgress?.('自定义字段: 无文件，跳过');
+  }
+
+  // ===== 2. 导入图文档 =====
+  const docRows = await _readXlsxFromDir(dirHandle, '图文档清单.xlsx');
+  if (docRows.length > 0) {
+    onProgress?.(`正在导入图文档 (${docRows.length} 条)...`);
+    const preview = await previewDocumentsImport(dirHandle);
+    await executeDocumentsImport(preview);
+    onProgress?.('图文档导入完成');
+  } else {
+    onProgress?.('图文档: 无数据，跳过');
+  }
+
+  // ===== 3. 导入零件 =====
+  const partRows = await _readXlsxFromDir(dirHandle, '零件清单.xlsx');
+  if (partRows.length > 0) {
+    onProgress?.(`正在导入零件 (${partRows.length} 条)...`);
+    const partFile = await _readXlsxAsFile(dirHandle, '零件清单.xlsx');
+    if (partFile) {
+      const preview = await previewPartsImport(partFile);
+      await executePartsImport(preview);
+    }
+    onProgress?.('零件导入完成');
+  } else {
+    onProgress?.('零件: 无数据，跳过');
+  }
+
+  // ===== 4. 导入部件（含 BOM） =====
+  const asmRows = await _readXlsxFromDir(dirHandle, '部件清单.xlsx');
+  if (asmRows.length > 0) {
+    onProgress?.(`正在导入部件 (${asmRows.length} 条)...`);
+    const preview = await previewAssembliesImport(dirHandle);
+    await executeAssembliesImport(preview);
+    onProgress?.('部件导入完成');
+  } else {
+    onProgress?.('部件: 无数据，跳过');
+  }
+
+  onProgress?.('全部数据导入完成');
 }
