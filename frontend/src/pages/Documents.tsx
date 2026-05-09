@@ -65,6 +65,7 @@ export default function Documents() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [searchField, setSearchField] = useState('all');
   const [status, setStatus] = useState('');
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -87,6 +88,8 @@ export default function Documents() {
   const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDefinition[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
   const [loadingCustomFields, setLoadingCustomFields] = useState(false);
+  // 自定义字段值映射：{ entityId: { fieldId: value } }
+  const [customFieldValuesMap, setCustomFieldValuesMap] = useState<Record<string, Record<string, any>>>({});
 
   // 附件管理
   const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
@@ -108,10 +111,77 @@ export default function Documents() {
 
   const { sortedData, handleSort, getSortIcon } = useTableSort<Document>(documents);
 
+  // 获取图文档适用的自定义字段定义
+  const documentCustomDefs = customFieldDefs.filter((d) => d.applies_to?.includes('document'));
+
+  // 筛选逻辑
+  const filteredData = sortedData.filter(doc => {
+    if (status && doc.status !== status) return false;
+    if (search) {
+      const keyword = search.toLowerCase();
+      const match = (val: string | undefined) => val?.toLowerCase().includes(keyword);
+      // 基础字段搜索
+      if (searchField === 'all') {
+        if (match(doc.code) || match(doc.name) || match(doc.version) || match(doc.remark)) return true;
+        // 搜索自定义字段
+        const docCustomValues = customFieldValuesMap[doc.id] || {};
+        for (const def of documentCustomDefs) {
+          const val = docCustomValues[def.id];
+          if (val != null && String(val).toLowerCase().includes(keyword)) return true;
+        }
+        return false;
+      }
+      if (searchField === 'code') return match(doc.code);
+      if (searchField === 'name') return match(doc.name);
+      if (searchField === 'version') return match(doc.version);
+      if (searchField === 'status') return match(doc.status);
+      if (searchField === 'remark') return match(doc.remark);
+      // 自定义字段搜索
+      if (searchField.startsWith('cf_')) {
+        const fieldId = searchField.replace('cf_', '');
+        const docCustomValues = customFieldValuesMap[doc.id] || {};
+        const val = docCustomValues[fieldId];
+        return val != null && String(val).toLowerCase().includes(keyword);
+      }
+      return true;
+    }
+    return true;
+  });
+
   const loadDocuments = () => {
     const localDocuments = useDataStore.getState().documents;
     setDocuments(localDocuments);
     setLoading(false);
+    // 加载自定义字段定义（同步版本）
+    const localDefs = useDataStore.getState().customFieldDefs;
+    setCustomFieldDefs(localDefs.filter((d: CustomFieldDefinition) =>
+      d.applies_to?.includes('document')
+    ));
+    // 加载所有图文档的自定义字段值
+    loadAllCustomFieldValues(localDocuments);
+  };
+
+  // 批量加载所有图文档的自定义字段值
+  const loadAllCustomFieldValues = async (docsList: Document[]) => {
+    if (docsList.length === 0) return;
+    try {
+      const results = await Promise.allSettled(
+        docsList.map(doc => customFieldsApi.getValues('document', doc.id))
+      );
+      const map: Record<string, Record<string, any>> = {};
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          const values: Record<string, any> = {};
+          (result.value.data || []).forEach((v: CustomFieldValue) => {
+            values[v.field_id] = v.value;
+          });
+          map[docsList[index].id] = values;
+        }
+      });
+      setCustomFieldValuesMap(map);
+    } catch (error) {
+      console.error('加载自定义字段值失败', error);
+    }
   };
 
   const loadCustomFields = async () => {
@@ -470,9 +540,24 @@ export default function Documents() {
       </div>
 
       <div className="flex gap-2 mb-4">
+        <select
+          value={searchField}
+          onChange={(e) => setSearchField(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+        >
+          <option value="all">全部字段</option>
+          <option value="code">编号</option>
+          <option value="name">名称</option>
+          <option value="version">版本</option>
+          <option value="status">状态</option>
+          <option value="remark">备注</option>
+          {documentCustomDefs.map(def => (
+            <option key={def.id} value={`cf_${def.id}`}>{def.name}</option>
+          ))}
+        </select>
         <input
           type="text"
-          placeholder="搜索图文档编号/名称..."
+          placeholder={searchField === 'all' ? '搜索全部字段...' : searchField.startsWith('cf_') ? `搜索${documentCustomDefs.find(d => d.id === searchField.replace('cf_', ''))?.name || '自定义字段'}...` : `搜索${searchField === 'code' ? '编号' : searchField === 'name' ? '名称' : searchField === 'version' ? '版本' : searchField === 'status' ? '状态' : '备注'}...`}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 flex-1"
@@ -504,10 +589,10 @@ export default function Documents() {
           <tbody className="divide-y divide-gray-200">
             {loading ? (
               <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
-            ) : sortedData.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
+            ) : filteredData.length === 0 ? (
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">无匹配数据</td></tr>
             ) : (
-              sortedData.map((doc) => (
+              filteredData.map((doc) => (
                 <tr key={doc.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleView(doc)}>
                   <td className="px-4 py-3 text-sm font-medium">{doc.code}</td>
                   <td className="px-4 py-3 text-sm">{doc.name}</td>

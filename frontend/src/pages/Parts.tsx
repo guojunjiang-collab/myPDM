@@ -38,6 +38,7 @@ export default function Parts() {
   const [parts, setParts] = useState<Part[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [searchField, setSearchField] = useState('all');
   const [status, setStatus] = useState('');
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -55,6 +56,7 @@ export default function Parts() {
 
   // 从 store 订阅数据（store 更新时自动触发重新渲染）
   const storeParts = useDataStore((s) => s.parts);
+  const storeCustomDefs = useDataStore((s) => s.customFieldDefs);
 
   // 导入导出
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
@@ -67,18 +69,85 @@ export default function Parts() {
   const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDefinition[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
   const [loadingCustomFields, setLoadingCustomFields] = useState(false);
+  // 自定义字段值映射：{ entityId: { fieldId: value } }
+  const [customFieldValuesMap, setCustomFieldValuesMap] = useState<Record<string, Record<string, any>>>({});
 
   const { sortedData, handleSort, getSortIcon } = useTableSort<Part>(parts);
 
+  // 获取零件适用的自定义字段定义
+  const partCustomDefs = customFieldDefs.filter((d) => d.applies_to?.includes('part'));
+
+  // 筛选逻辑
+  const filteredData = sortedData.filter(part => {
+    if (status && part.status !== status) return false;
+    if (search) {
+      const keyword = search.toLowerCase();
+      const match = (val: string | undefined) => val?.toLowerCase().includes(keyword);
+      // 基础字段搜索
+      if (searchField === 'all') {
+        if (match(part.code) || match(part.name) || match(part.spec) || match(part.version) || match(part.remark)) return true;
+        // 搜索自定义字段
+        const partCustomValues = customFieldValuesMap[part.id] || {};
+        for (const def of partCustomDefs) {
+          const val = partCustomValues[def.id];
+          if (val != null && String(val).toLowerCase().includes(keyword)) return true;
+        }
+        return false;
+      }
+      if (searchField === 'code') return match(part.code);
+      if (searchField === 'name') return match(part.name);
+      if (searchField === 'spec') return match(part.spec);
+      if (searchField === 'version') return match(part.version);
+      if (searchField === 'status') return match(part.status);
+      if (searchField === 'remark') return match(part.remark);
+      // 自定义字段搜索
+      if (searchField.startsWith('cf_')) {
+        const fieldId = searchField.replace('cf_', '');
+        const partCustomValues = customFieldValuesMap[part.id] || {};
+        const val = partCustomValues[fieldId];
+        return val != null && String(val).toLowerCase().includes(keyword);
+      }
+      return true;
+    }
+    return true;
+  });
+
   useEffect(() => {
     loadParts();
-  }, [search, status, storeParts]); // storeParts 变化时也重新加载
+  }, [search, status, storeParts, storeCustomDefs]); // storeParts、storeCustomDefs 变化时也重新加载
 
   const loadParts = () => {
     // 仅从本地 store 取数据，不自动调 API
     const localParts = useDataStore.getState().parts;
     setParts(localParts);
     setLoading(false);
+    // 加载自定义字段定义
+    loadCustomFields();
+    // 加载所有零件的自定义字段值
+    loadAllCustomFieldValues(localParts);
+  };
+
+  // 批量加载所有零件的自定义字段值
+  const loadAllCustomFieldValues = async (partsList: Part[]) => {
+    if (partsList.length === 0) return;
+    try {
+      const results = await Promise.allSettled(
+        partsList.map(part => customFieldsApi.getValues('part', part.id))
+      );
+      const map: Record<string, Record<string, any>> = {};
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          const values: Record<string, any> = {};
+          (result.value.data || []).forEach((v: CustomFieldValue) => {
+            values[v.field_id] = v.value;
+          });
+          map[partsList[index].id] = values;
+        }
+      });
+      setCustomFieldValuesMap(map);
+    } catch (error) {
+      console.error('加载自定义字段值失败', error);
+    }
   };
 
   const loadCustomFields = () => {
@@ -354,9 +423,25 @@ export default function Parts() {
       </div>
 
       <div className="flex gap-2 mb-4">
+        <select
+          value={searchField}
+          onChange={(e) => setSearchField(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+        >
+          <option value="all">全部字段</option>
+          <option value="code">件号</option>
+          <option value="name">中文名称</option>
+          <option value="spec">规格型号</option>
+          <option value="version">版本</option>
+          <option value="status">状态</option>
+          <option value="remark">备注</option>
+          {partCustomDefs.map(def => (
+            <option key={def.id} value={`cf_${def.id}`}>{def.name}</option>
+          ))}
+        </select>
         <input
           type="text"
-          placeholder="搜索件号/中文名称..."
+          placeholder={searchField === 'all' ? '搜索全部字段...' : searchField.startsWith('cf_') ? `搜索${partCustomDefs.find(d => d.id === searchField.replace('cf_', ''))?.name || '自定义字段'}...` : `搜索${searchField === 'code' ? '件号' : searchField === 'name' ? '中文名称' : searchField === 'spec' ? '规格型号' : searchField === 'version' ? '版本' : searchField === 'status' ? '状态' : '备注'}...`}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 flex-1"
@@ -391,12 +476,12 @@ export default function Parts() {
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-gray-500">加载中...</td>
               </tr>
-            ) : sortedData.length === 0 ? (
+            ) : filteredData.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">暂无数据</td>
+                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">无匹配数据</td>
               </tr>
             ) : (
-              sortedData.map((part) => (
+              filteredData.map((part) => (
                 <tr key={part.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleView(part)}>
                   <td className="px-4 py-3 text-sm font-medium">{part.code}</td>
                   <td className="px-4 py-3 text-sm">{part.name}</td>

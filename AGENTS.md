@@ -212,8 +212,9 @@ docker restart bom_backend
 ### 修改前端
 
 1. 编辑 `frontend/src/` 下的源码
-2. 构建：`cd frontend && npm run build`
+2. 构建：`cd frontend; npm run build`（PowerShell 不支持 `&&`，需分开执行）
 3. 刷新浏览器（注意清缓存 Ctrl+F5）
+4. **重要**：每次前端修改后必须立即构建，无需用户提醒
 
 ### 新增 API
 

@@ -67,6 +67,7 @@ export default function Components() {
   const [assemblies, setAssemblies] = useState<Assembly[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [searchField, setSearchField] = useState('all');
   const [status, setStatus] = useState('');
 
   /* ---- 编辑弹窗 ---- */
@@ -112,6 +113,8 @@ export default function Components() {
   const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDefinition[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, unknown>>({});
   const [loadingCustomFields, setLoadingCustomFields] = useState(false);
+  // 自定义字段值映射：{ entityId: { fieldId: value } }
+  const [customFieldValuesMap, setCustomFieldValuesMap] = useState<Record<string, Record<string, unknown>>>({});
 
   const storeAssemblies = useDataStore((s) => s.assemblies);
 
@@ -121,6 +124,44 @@ export default function Components() {
 
   const { sortedData, handleSort, getSortIcon } = useTableSort<Assembly>(assemblies);
 
+  // 获取部件适用的自定义字段定义
+  const componentCustomDefs = customFieldDefs.filter((d) => d.applies_to?.includes('component'));
+
+  // 筛选逻辑
+  const filteredData = sortedData.filter(assembly => {
+    if (status && assembly.status !== status) return false;
+    if (search) {
+      const keyword = search.toLowerCase();
+      const match = (val: string | undefined) => val?.toLowerCase().includes(keyword);
+      // 基础字段搜索
+      if (searchField === 'all') {
+        if (match(assembly.code) || match(assembly.name) || match(assembly.spec) || match(assembly.version) || match(assembly.remark)) return true;
+        // 搜索自定义字段
+        const asmCustomValues = customFieldValuesMap[assembly.id] || {};
+        for (const def of componentCustomDefs) {
+          const val = asmCustomValues[def.id];
+          if (val != null && String(val).toLowerCase().includes(keyword)) return true;
+        }
+        return false;
+      }
+      if (searchField === 'code') return match(assembly.code);
+      if (searchField === 'name') return match(assembly.name);
+      if (searchField === 'spec') return match(assembly.spec);
+      if (searchField === 'version') return match(assembly.version);
+      if (searchField === 'status') return match(assembly.status);
+      if (searchField === 'remark') return match(assembly.remark);
+      // 自定义字段搜索
+      if (searchField.startsWith('cf_')) {
+        const fieldId = searchField.replace('cf_', '');
+        const asmCustomValues = customFieldValuesMap[assembly.id] || {};
+        const val = asmCustomValues[fieldId];
+        return val != null && String(val).toLowerCase().includes(keyword);
+      }
+      return true;
+    }
+    return true;
+  });
+
   useEffect(() => {
     loadAssemblies();
   }, [search, status, storeAssemblies]);
@@ -129,6 +170,33 @@ export default function Components() {
     const localAssemblies = useDataStore.getState().assemblies;
     setAssemblies(localAssemblies);
     setLoading(false);
+    // 加载自定义字段定义
+    loadCustomFields();
+    // 加载所有部件的自定义字段值
+    loadAllCustomFieldValues(localAssemblies);
+  };
+
+  // 批量加载所有部件的自定义字段值
+  const loadAllCustomFieldValues = async (assembliesList: Assembly[]) => {
+    if (assembliesList.length === 0) return;
+    try {
+      const results = await Promise.allSettled(
+        assembliesList.map(asm => customFieldsApi.getValues('component', asm.id))
+      );
+      const map: Record<string, Record<string, unknown>> = {};
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          const values: Record<string, unknown> = {};
+          (result.value.data || []).forEach((v: CustomFieldValue) => {
+            values[v.field_id] = v.value;
+          });
+          map[assembliesList[index].id] = values;
+        }
+      });
+      setCustomFieldValuesMap(map);
+    } catch (error) {
+      console.error('加载自定义字段值失败', error);
+    }
   };
 
   const loadCustomFields = useCallback(() => {
@@ -768,9 +836,25 @@ export default function Components() {
 
       {/* 搜索 & 筛选 */}
       <div className="flex gap-2 mb-4">
+        <select
+          value={searchField}
+          onChange={(e) => setSearchField(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+        >
+          <option value="all">全部字段</option>
+          <option value="code">件号</option>
+          <option value="name">中文名称</option>
+          <option value="spec">规格型号</option>
+          <option value="version">版本</option>
+          <option value="status">状态</option>
+          <option value="remark">备注</option>
+          {componentCustomDefs.map(def => (
+            <option key={def.id} value={`cf_${def.id}`}>{def.name}</option>
+          ))}
+        </select>
         <input
           type="text"
-          placeholder="搜索件号/中文名称..."
+          placeholder={searchField === 'all' ? '搜索全部字段...' : searchField.startsWith('cf_') ? `搜索${componentCustomDefs.find(d => d.id === searchField.replace('cf_', ''))?.name || '自定义字段'}...` : `搜索${searchField === 'code' ? '件号' : searchField === 'name' ? '中文名称' : searchField === 'spec' ? '规格型号' : searchField === 'version' ? '版本' : searchField === 'status' ? '状态' : '备注'}...`}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 flex-1"
@@ -808,14 +892,14 @@ export default function Components() {
                   加载中...
                 </td>
               </tr>
-            ) : sortedData.length === 0 ? (
+            ) : filteredData.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                  暂无数据
+                  无匹配数据
                 </td>
               </tr>
             ) : (
-              sortedData.map((assembly) => (
+              filteredData.map((assembly) => (
                 <tr
                   key={assembly.id}
                   className="hover:bg-gray-50 cursor-pointer"

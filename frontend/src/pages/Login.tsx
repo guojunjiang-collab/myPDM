@@ -80,11 +80,6 @@ export default function Login() {
             {loading ? '登录中...' : '登 录'}
           </button>
         </form>
-
-        <div className="mt-6 text-center text-sm text-gray-500">
-          <p>演示账号：admin / 123456（管理员）</p>
-          <p>engineer / 123456（工程师）｜ guest / 123456（访客）</p>
-        </div>
       </div>
     </div>
   );
