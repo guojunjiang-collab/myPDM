@@ -4,6 +4,9 @@ import { useAuthStore } from '../stores/auth';
 import type { CustomFieldDefinition } from '../types';
 import { Modal } from '../components/Modal';
 import { useDataStore } from '../stores/data';
+import { exportAllData, exportCustomFieldDefs, importCustomFieldDefs, importAllData } from '../services/importExport';
+import Users from './Users';
+import Logs from './Logs';
 
 const FIELD_TYPES = [
   { value: 'text', label: '单行文本' },
@@ -39,7 +42,7 @@ export default function Settings() {
   const currentUser = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'password' | 'customFields' | 'dataManagement'>('password');
+  const [activeTab, setActiveTab] = useState<'password' | 'users' | 'logs' | 'customFields' | 'dataManagement'>('password');
 
   // Password change state
   const [passwordForm, setPasswordForm] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
@@ -54,6 +57,12 @@ export default function Settings() {
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetPassword, setResetPassword] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState('');
 
   useEffect(() => {
     if (activeTab === 'customFields') {
@@ -205,10 +214,61 @@ export default function Settings() {
     }
   };
 
+  const handleExportAll = async () => {
+    setExporting(true);
+    setExportProgress('准备导出...');
+    try {
+      await exportAllData((msg) => setExportProgress(msg));
+    } catch (e: any) {
+      setExportProgress('');
+      alert(e?.message || '导出失败，请重试');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleImportAll = async () => {
+    setImporting(true);
+    setImportProgress('准备导入...');
+    try {
+      await importAllData((msg) => setImportProgress(msg));
+    } catch (e: any) {
+      setImportProgress('');
+      alert(e?.message || '导入失败，请重试');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleExportFields = async () => {
+    try {
+      await exportCustomFieldDefs();
+    } catch (e: any) {
+      alert(e?.message || '导出字段定义失败');
+    }
+  };
+
+  const handleImportFields = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const result = await importCustomFieldDefs(file);
+      alert(`导入完成：新增 ${result.created} 个，更新 ${result.updated} 个`);
+    } catch (err: any) {
+      alert(err?.message || '导入失败，请确认文件格式正确');
+    }
+    // 重置 input 以便重复选择同一文件
+    e.target.value = '';
+  };
+
   const handleResetData = async () => {
+    if (!resetPassword.trim()) {
+      alert('请输入管理员密码');
+      return;
+    }
     setResetting(true);
     try {
-      await customFieldsApi.resetData();
+      await customFieldsApi.resetData(resetPassword);
       // 清空本地缓存
       localStorage.removeItem('data-storage');
       // 清空本地 store 中的业务数据
@@ -216,9 +276,11 @@ export default function Settings() {
       useDataStore.getState().setAssemblies([]);
       useDataStore.getState().setDocuments([]);
       useDataStore.getState().setCustomFieldDefs([]);
+      setShowResetConfirm(false);
+      setResetPassword('');
       alert('系统数据已清空');
     } catch (error: any) {
-      alert(error.response?.data?.detail || '重置失败，请重试');
+      alert(error?.response?.data?.detail || '重置失败，请确认密码正确');
     } finally {
       setResetting(false);
     }
@@ -244,14 +306,14 @@ export default function Settings() {
       {/* Tabs */}
       <div className="flex gap-2 mb-4">
         <button
-          onClick={() => setActiveTab('password')}
+          onClick={() => setActiveTab('users')}
           className={`px-4 py-2 rounded-lg ${
-            activeTab === 'password'
+            activeTab === 'users'
               ? 'bg-primary-600 text-white'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
-          修改密码
+          用户管理
         </button>
         <button
           onClick={() => setActiveTab('customFields')}
@@ -273,85 +335,54 @@ export default function Settings() {
         >
           数据管理
         </button>
+        <button
+          onClick={() => setActiveTab('password')}
+          className={`px-4 py-2 rounded-lg ${
+            activeTab === 'password'
+              ? 'bg-primary-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          修改密码
+        </button>
+        <button
+          onClick={() => setActiveTab('logs')}
+          className={`px-4 py-2 rounded-lg ${
+            activeTab === 'logs'
+              ? 'bg-primary-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          操作日志
+        </button>
       </div>
 
-      {/* 修改密码 */}
-      {activeTab === 'password' && (
-        <div className="max-w-md">
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h3 className="text-lg font-medium mb-4">修改密码</h3>
-            <p className="text-sm text-gray-500 mb-4">
-              当前用户: <span className="font-medium">{currentUser?.username}</span>
-            </p>
-
-            {passwordSuccess ? (
-              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
-                {passwordSuccess}
-              </div>
-            ) : (
-              <form onSubmit={handleChangePassword} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">原密码</label>
-                  <input
-                    type="password"
-                    value={passwordForm.oldPassword}
-                    onChange={(e) => setPasswordForm({ ...passwordForm, oldPassword: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">新密码</label>
-                  <input
-                    type="password"
-                    value={passwordForm.newPassword}
-                    onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    required
-                    minLength={6}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">确认新密码</label>
-                  <input
-                    type="password"
-                    value={passwordForm.confirmPassword}
-                    onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    required
-                  />
-                </div>
-
-                {passwordError && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
-                    {passwordError}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={changingPassword}
-                  className="w-full py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
-                >
-                  {changingPassword ? '提交中...' : '确认修改'}
-                </button>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
+      {/* 用户管理 */}
+      {activeTab === 'users' && <Users />}
 
       {/* 自定义字段 */}
       {activeTab === 'customFields' && (
         <div>
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm text-gray-500">自定义字段用于扩展零件、部件、图文档的结构</p>
-            <button
-              onClick={openCreateModal}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-            >
-              新增字段
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleExportFields}
+                className="px-4 py-2 border border-green-600 text-green-600 rounded-lg hover:bg-green-50"
+              >
+                导出字段
+              </button>
+              <label className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 cursor-pointer">
+                导入
+                <input type="file" accept=".xlsx" onChange={handleImportFields} className="hidden" />
+              </label>
+              <button
+                onClick={openCreateModal}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+              >
+                新增字段
+              </button>
+            </div>
           </div>
 
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -429,32 +460,149 @@ export default function Settings() {
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <h3 className="text-lg font-medium mb-2">导出全部数据</h3>
             <p className="text-sm text-gray-500 mb-4">
-              将系统中的所有零件、部件、图文档数据导出为文件备份。
+              将系统中的所有零件、部件、图文档数据导出为文件备份。请选择目标文件夹。
             </p>
             <button
-              onClick={() => alert('功能开发中')}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              onClick={handleExportAll}
+              disabled={exporting}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
             >
-              导出全部数据
+              {exporting ? '导出中...' : '导出全部数据'}
             </button>
+            {exportProgress && (
+              <p className={`mt-3 text-sm ${exporting ? 'text-blue-600' : 'text-green-600'}`}>
+                {exporting ? '⏳' : '✅'} {exportProgress}
+              </p>
+            )}
+          </div>
+
+          {/* 导入全部数据 */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-medium mb-2">导入全部数据</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              从导出的文件夹中选择"自定义字段定义.xlsx + 图文档清单.xlsx + 零件清单.xlsx + 部件清单.xlsx"等文件所在的文件夹，批量导入全部数据。
+            </p>
+            <button
+              onClick={handleImportAll}
+              disabled={importing}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {importing ? '导入中...' : '导入全部数据'}
+            </button>
+            {importProgress && (
+              <p className={`mt-3 text-sm ${importing ? 'text-blue-600' : 'text-green-600'}`}>
+                {importing ? '⏳' : '✅'} {importProgress}
+              </p>
+            )}
           </div>
 
           {/* 重置系统数据 */}
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <h3 className="text-lg font-medium mb-2">重置系统数据</h3>
             <p className="text-sm text-gray-500 mb-4">
-              清空所有零件、部件、图文档数据，自定义字段和用户账号不受影响。此操作不可逆，请谨慎操作。
+              清空所有零件、部件、图文档、自定义字段、附件文件及看板数据。需验证管理员密码。此操作不可逆，请谨慎操作。
             </p>
             <button
-              onClick={handleResetData}
+              onClick={() => { setShowResetConfirm(true); setResetPassword(''); }}
               disabled={resetting}
               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
             >
               {resetting ? '重置中...' : '重置系统数据'}
             </button>
           </div>
+
+          {/* ---- Reset Confirm Modal ---- */}
+          <Modal open={showResetConfirm} title="确认重置" onClose={() => setShowResetConfirm(false)} width="sm">
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">此操作将清空所有业务数据（零件、部件、图文档、附件、自定义字段、看板），且不可恢复。请输入管理员密码确认：</p>
+              <input
+                type="password"
+                value={resetPassword}
+                onChange={(e) => setResetPassword(e.target.value)}
+                placeholder="请输入管理员密码"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                autoFocus
+                onKeyDown={(e) => e.key === 'Enter' && handleResetData()}
+              />
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setShowResetConfirm(false)} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
+                <button type="button" onClick={handleResetData} disabled={resetting} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50">
+                  {resetting ? '重置中...' : '确认重置'}
+                </button>
+              </div>
+            </div>
+          </Modal>
         </div>
       )}
+
+      {/* 修改密码 */}
+      {activeTab === 'password' && (
+        <div className="max-w-md">
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-medium mb-4">修改密码</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              当前用户: <span className="font-medium">{currentUser?.username}</span>
+            </p>
+
+            {passwordSuccess ? (
+              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
+                {passwordSuccess}
+              </div>
+            ) : (
+              <form onSubmit={handleChangePassword} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">原密码</label>
+                  <input
+                    type="password"
+                    value={passwordForm.oldPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, oldPassword: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">新密码</label>
+                  <input
+                    type="password"
+                    value={passwordForm.newPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    required
+                    minLength={6}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">确认新密码</label>
+                  <input
+                    type="password"
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    required
+                  />
+                </div>
+
+                {passwordError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
+                    {passwordError}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={changingPassword}
+                  className="w-full py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                >
+                  {changingPassword ? '提交中...' : '确认修改'}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 操作日志 */}
+      {activeTab === 'logs' && <Logs />}
 
       {/* 自定义字段 Modal */}
       <Modal
