@@ -54,12 +54,13 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
       - ./frontend/dist:/usr/share/nginx/html
+      - ./certs:/etc/nginx/certs
     depends_on:
       - backend
     networks:
       - bom_network
     ports:
-      - "${NGINX_HOST_PORT:-8080}:80"
+      - "${NGINX_HOST_PORT:-8080}:443"
 
 networks:
   bom_network:
