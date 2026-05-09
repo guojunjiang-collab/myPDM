@@ -99,6 +99,8 @@ export const documentsApi = {
   listAttachments: (docId: string) => api.get(`/documents/${docId}/attachments/`),
   getAttachment: (docId: string, attId: string) => api.get(`/documents/${docId}/attachments/${attId}`),
   deleteAttachment: (docId: string, attId: string) => api.delete(`/documents/${docId}/attachments/${attId}`),
+  /** 图文档反查：查询引用该文档的零件、部件和用户看板 */
+  references: (docId: string) => api.get(`/documents/${docId}/references`),
 };
 
 // BOM API
@@ -226,7 +228,7 @@ export const customFieldsApi = {
     api.get(`/custom-fields/values/${entityType}/${entityId}`),
   setValues: (entityType: string, entityId: string, values: unknown[]) =>
     api.put(`/custom-fields/values/${entityType}/${entityId}`, { values }),
-  resetData: () => api.post('/custom-fields/reset-data'),
+  resetData: (password: string) => api.post('/custom-fields/reset-data', { password }),
 };
 
 export default api;

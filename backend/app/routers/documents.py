@@ -16,7 +16,9 @@ async def list_documents(skip: int = 0, limit: int = 100, keyword: str = None, s
     query = db.query(Document)
     if keyword:
         kw = f"%{keyword.strip().lower()}%"
-        query = query.filter(Document.name.ilike(kw))
+        query = query.filter(
+            (Document.code.ilike(kw)) | (Document.name.ilike(kw))
+        )
     if status:
         query = query.filter(Document.status == status)
     docs = query.offset(skip).limit(limit).all()
