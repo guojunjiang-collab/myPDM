@@ -80,7 +80,7 @@ CREATE TABLE documents (
     name VARCHAR(255) NOT NULL,
     version VARCHAR(32) DEFAULT 'A',
     status VARCHAR(32) NOT NULL DEFAULT 'draft',
-    description TEXT,
+    remark TEXT,
     file_name VARCHAR(255),
     file_id UUID,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -111,7 +111,7 @@ CREATE TABLE custom_field_definitions (
     field_type VARCHAR(32) NOT NULL,
     options JSONB DEFAULT '[]',
     is_required INTEGER DEFAULT 0,
-    applies_to VARCHAR(32) NOT NULL DEFAULT 'both',
+    applies_to JSONB DEFAULT '["part"]' NOT NULL,
     sort_order INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

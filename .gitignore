@@ -20,6 +20,7 @@ Thumbs.db
 *.log
 *.tmp
 
-# Uploads
-uploads/
+# Data
 pgdata/
+uploads/
+certs/
