@@ -145,21 +145,18 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
     }
   };
 
-  const handleDownload = async (fileId: string, fileName: string) => {
-    try {
-      const res = await attachmentApi.download(fileId);
-      const blob = res.data as Blob;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName || 'download';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch {
-      alert('下载失败');
+  const handleDownload = (fileId: string, fileName: string) => {
+    const token = useAuthStore.getState().token;
+    if (!token) {
+      alert('登录已过期，请重新登录');
+      return;
     }
+    const a = document.createElement('a');
+    a.href = `/api/v2/attachments/${fileId}/direct-download?token=${encodeURIComponent(token)}`;
+    a.download = fileName || 'download';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   const handlePreviewAttachment = (fileId: string, fileName: string) => {

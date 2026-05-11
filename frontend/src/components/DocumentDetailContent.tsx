@@ -49,26 +49,19 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
     loadAttachments();
   }, [doc.id]);
 
-  // 下载附件
-  const handleDownload = async (attId: string, fileName: string) => {
-    try {
-      const res = await documentsApi.getAttachment(doc.id, attId);
-      const data = res.data as { file_data?: string };
-
-      if (data.file_data) {
-        const link = document.createElement('a');
-        link.href = `data:application/octet-stream;base64,${data.file_data}`;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } else {
-        alert('文件数据获取失败');
-      }
-    } catch (error) {
-      console.error('下载失败', error);
-      alert('下载失败，请重试');
+  // 下载附件（直接流式下载，不阻塞界面）
+  const handleDownload = (attId: string, fileName: string) => {
+    const token = useAuthStore.getState().token;
+    if (!token) {
+      alert('登录已过期，请重新登录');
+      return;
     }
+    const a = document.createElement('a');
+    a.href = `/api/v2/attachments/${attId}/direct-download?token=${encodeURIComponent(token)}`;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   // 预览附件
