@@ -61,9 +61,7 @@ const StatusTag = ({ status }: { status: string }) => {
    ================================================================ */
 
 function flattenItems(folder: FolderNode): DashboardItem[] {
-  const result = [...folder.items];
-  for (const c of folder.children) result.push(...flattenItems(c));
-  return result;
+  return [...folder.items];
 }
 
 function findFolderById(folders: FolderNode[], id: string): FolderNode | null {
@@ -165,9 +163,7 @@ export default function Board() {
 
   /* Count items recursively */
   const countItems = (folder: FolderNode): number => {
-    let c = folder.items.length;
-    for (const ch of folder.children) c += countItems(ch);
-    return c;
+    return folder.items.length;
   };
 
   /* ---- Actions ---- */
@@ -616,7 +612,7 @@ function BoardTreeNode({
   const hasChildren = node.children.length > 0;
   const isExpanded = expandedIds.has(node.id);
   const isSelected = selectedId === node.id;
-  const count = node.items.length + node.children.reduce((s, c) => s + c.items.length + c.children.reduce((s2, c2) => s2 + c2.items.length + c2.children.length, 0), 0);
+  const count = node.items.length;
 
   return (
     <>
@@ -691,9 +687,9 @@ function ItemPicker({ open, onClose, onConfirm, existingIds, storeParts, storeAs
   const candidates = useMemo(() => {
     const kw = search.trim().toLowerCase();
     const all: any[] = [];
-    if (tab === 'all' || tab === 'part') storeParts.forEach((p: any) => { if (!existingIds.has(p.id)) all.push({ t: 'part', id: p.id, code: p.code, name: p.name }); });
-    if (tab === 'all' || tab === 'assembly') storeAssemblies.forEach((a: any) => { if (!existingIds.has(a.id)) all.push({ t: 'assembly', id: a.id, code: a.code, name: a.name }); });
-    if (tab === 'all' || tab === 'document') storeDocuments.forEach((d: any) => { if (!existingIds.has(d.id)) all.push({ t: 'document', id: d.id, code: d.code, name: d.name }); });
+    if (tab === 'all' || tab === 'part') storeParts.forEach((p: any) => { if (!existingIds.has(p.id)) all.push({ t: 'part', id: p.id, code: p.code, name: p.name, version: p.version || '', status: p.status || '' }); });
+    if (tab === 'all' || tab === 'assembly') storeAssemblies.forEach((a: any) => { if (!existingIds.has(a.id)) all.push({ t: 'assembly', id: a.id, code: a.code, name: a.name, version: a.version || '', status: a.status || '' }); });
+    if (tab === 'all' || tab === 'document') storeDocuments.forEach((d: any) => { if (!existingIds.has(d.id)) all.push({ t: 'document', id: d.id, code: d.code, name: d.name, version: d.version || '', status: d.status || '' }); });
     return kw ? all.filter((i) => i.code.toLowerCase().includes(kw) || i.name.toLowerCase().includes(kw)) : all;
   }, [tab, search, storeParts, storeAssemblies, storeDocuments, existingIds]);
 
@@ -716,7 +712,7 @@ function ItemPicker({ open, onClose, onConfirm, existingIds, storeParts, storeAs
             <div className="max-h-32 overflow-y-auto">
               <table className="w-full text-sm"><tbody className="divide-y divide-gray-100">
                 {selectedList.map((item) => (
-                  <tr key={item.id}><td className="px-3 py-1.5"><span className="mr-1">{ENTITY_ICON[item.t]}</span>{item.code}</td><td className="px-3 py-1.5 text-gray-500">{item.name}</td><td className="px-3 py-1.5 text-right"><button type="button" onClick={() => { const n = new Map(selected); n.delete(item.id); setSelected(n); }} className="text-red-500 text-xs">✕</button></td></tr>
+                  <tr key={item.id}><td className="px-3 py-1.5"><span className="mr-1">{ENTITY_ICON[item.t]}</span>{item.code}</td><td className="px-3 py-1.5 text-gray-500">{item.version || '-'}</td><td className="px-3 py-1.5 text-gray-500">{item.name}</td><td className="px-3 py-1.5 text-right"><button type="button" onClick={() => { const n = new Map(selected); n.delete(item.id); setSelected(n); }} className="text-red-500 text-xs">✕</button></td></tr>
                 ))}
               </tbody></table>
             </div>
@@ -737,14 +733,18 @@ function ItemPicker({ open, onClose, onConfirm, existingIds, storeParts, storeAs
             <table className="w-full text-sm"><thead className="bg-gray-50 border-b sticky top-0"><tr>
               <th className="px-3 py-2 text-left text-gray-500 font-medium">类型</th>
               <th className="px-3 py-2 text-left text-gray-500 font-medium">编号</th>
+              <th className="px-3 py-2 text-left text-gray-500 font-medium">版本</th>
               <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
-               <th className="px-3 py-2 text-center text-gray-500 font-medium w-20">操作</th>
+              <th className="px-3 py-2 text-left text-gray-500 font-medium">状态</th>
+               <th className="px-3 py-2 text-center text-gray-500 font-medium w-16">操作</th>
             </tr></thead><tbody className="divide-y divide-gray-100">
               {candidates.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50">
                   <td className="px-3 py-2"><span className="mr-1">{ENTITY_ICON[item.t]}</span><span className="text-xs text-gray-500">{ENTITY_LABEL[item.t]}</span></td>
                   <td className="px-3 py-2 font-medium">{item.code}</td>
+                  <td className="px-3 py-2 text-gray-500">{item.version || '-'}</td>
                   <td className="px-3 py-2">{item.name}</td>
+                  <td className="px-3 py-2"><StatusTag status={item.status} /></td>
                   <td className="px-3 py-2 text-center">{selected.has(item.id) ? <span className="text-xs text-green-600">已选</span> : <button type="button" onClick={() => setSelected(new Map(selected).set(item.id, item))} className="px-2.5 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">添加</button>}</td>
                 </tr>
               ))}
