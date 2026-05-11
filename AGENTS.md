@@ -10,12 +10,12 @@
 
 ### 基本信息
 
-| 属性 | 值 |
-|------|-----|
-| 项目名称 | 网页版 BOM 管理工具 (PDM 系统) |
-| 项目类型 | 前后端分离 Web 应用 |
-| 版本 | v1.0.0 |
-| 架构 | React SPA + RESTful API (Docker 部署) |
+| 属性   | 值                                   |
+| ---- | ----------------------------------- |
+| 项目名称 | 网页版 BOM 管理工具 (PDM 系统)               |
+| 项目类型 | 前后端分离 Web 应用                        |
+| 版本   | v1.0.0                              |
+| 架构   | React SPA + RESTful API (Docker 部署) |
 
 ### 核心功能
 
@@ -32,43 +32,43 @@
 
 ### 后端
 
-| 类别 | 技术 |
-|------|------|
-| 框架 | FastAPI |
-| ASGI 服务器 | Uvicorn |
-| ORM | SQLAlchemy 2.0 |
-| 数据验证 | Pydantic 2.x |
-| 认证 | JWT (python-jose + passlib/bcrypt) |
-| 数据库 | PostgreSQL 16 |
-| 缓存 | Redis 7 |
-| 文件存储 | 本地文件系统 (`./uploads/`) |
-| 3D 转换 | PythonOCC (STP → glTF/glb) |
+| 类别       | 技术                                 |
+| -------- | ---------------------------------- |
+| 框架       | FastAPI                            |
+| ASGI 服务器 | Uvicorn                            |
+| ORM      | SQLAlchemy 2.0                     |
+| 数据验证     | Pydantic 2.x                       |
+| 认证       | JWT (python-jose + passlib/bcrypt) |
+| 数据库      | PostgreSQL 16                      |
+| 缓存       | Redis 7                            |
+| 文件存储     | 本地文件系统 (`./uploads/`)              |
+| 3D 转换    | PythonOCC (STP → glTF/glb)         |
 
 **依赖文件**: `backend/requirements.txt`
 
 ### 前端
 
-| 类别 | 技术 |
-|------|------|
-| 框架 | React 18 + TypeScript |
-| 构建工具 | Vite 5 |
-| 样式 | Tailwind CSS 3 |
-| 路由 | React Router 6 |
-| 状态管理 | Zustand |
-| HTTP 客户端 | Axios |
-| 存储 | localStorage + sessionStorage |
+| 类别       | 技术                            |
+| -------- | ----------------------------- |
+| 框架       | React 18 + TypeScript         |
+| 构建工具     | Vite 5                        |
+| 样式       | Tailwind CSS 3                |
+| 路由       | React Router 6                |
+| 状态管理     | Zustand                       |
+| HTTP 客户端 | Axios                         |
+| 存储       | localStorage + sessionStorage |
 
 **源码目录**: `frontend/`
 **构建输出**: `frontend/dist/`
 
 ### 基础设施
 
-| 服务 | 容器名 | 端口 |
-|------|--------|------|
-| Nginx | bom_nginx | 80 (映射 `${NGINX_HOST_PORT:-8080}`) |
-| FastAPI | bom_backend | 8000 |
-| PostgreSQL | bom_postgres | 5432 |
-| Redis | bom_redis | 6379 |
+| 服务         | 容器名          | 端口                                 |
+| ---------- | ------------ | ---------------------------------- |
+| Nginx      | bom_nginx    | 80 (映射 `${NGINX_HOST_PORT:-8080}`) |
+| FastAPI    | bom_backend  | 8000                               |
+| PostgreSQL | bom_postgres | 5432                               |
+| Redis      | bom_redis    | 6379                               |
 
 ---
 
@@ -140,6 +140,7 @@ D:\OpenCode\myPDM\
 3. **OpenCode 默认**
 
 **Python 特定规则**:
+
 - **类型注解**: 必须使用 Type Hints（函数参数、返回值）
 - **Pydantic**: 用于 API 请求/响应验证
 - **SQLAlchemy 2.0**: 使用新版 Declarative API
@@ -161,12 +162,12 @@ D:\OpenCode\myPDM\
 
 ### 用户角色
 
-| 角色 | 标识 | 说明 |
-|------|------|------|
-| 管理员 | `admin` | 全部功能，管理用户 |
-| 工程师 | `engineer` | 创建/编辑，无删除主体权限 |
-| 生产人员 | `production` | 查看、下载、导出 |
-| 访客 | `guest` | 仅查看 |
+| 角色   | 标识           | 说明            |
+| ---- | ------------ | ------------- |
+| 管理员  | `admin`      | 全部功能，管理用户     |
+| 工程师  | `engineer`   | 创建/编辑，无删除主体权限 |
+| 生产人员 | `production` | 查看、下载、导出      |
+| 访客   | `guest`      | 仅查看           |
 
 ### API 权限控制
 
@@ -185,12 +186,12 @@ current_user: User = Depends(require_role(["admin", "engineer", "production", "g
 
 ### 前端权限检查
 
-| 方法 | 用途 |
-|------|------|
-| `Auth.isAdmin()` | 删除按钮 |
-| `Auth.canEdit()` | 新增/编辑按钮 |
-| `Auth.canDownload()` | 导出/下载 |
-| `Auth.canPreview()` | PDF 预览 |
+| 方法                   | 用途      |
+| -------------------- | ------- |
+| `Auth.isAdmin()`     | 删除按钮    |
+| `Auth.canEdit()`     | 新增/编辑按钮 |
+| `Auth.canDownload()` | 导出/下载   |
+| `Auth.canPreview()`  | PDF 预览  |
 
 ---
 
@@ -199,12 +200,14 @@ current_user: User = Depends(require_role(["admin", "engineer", "production", "g
 ### 修改后端
 
 后端目录通过 Docker volume 挂载：
+
 ```yaml
 volumes:
   - ./backend/app:/app/app
 ```
 
 修改后需重启容器：
+
 ```powershell
 docker restart bom_backend
 ```
@@ -280,6 +283,7 @@ docker ps
 ```
 
 4 个容器均为 Up 时正常：
+
 - bom_nginx      :80 → localhost:${NGINX_HOST_PORT:-8080}
 - bom_backend   :8000
 - bom_postgres  :5432
@@ -317,11 +321,11 @@ docker-compose up -d
 
 ### 存储路径总览
 
-| 数据 | 宿主机默认路径 | 容器内路径 | 配置方式 |
-|------|---------------|-----------|---------|
-| Nginx 端口 | `8080` | 80 | `.env` → `NGINX_HOST_PORT` |
-| PostgreSQL 数据 | `./pgdata/` | `/var/lib/postgresql/data` | `.env` → `PGDATA_HOST_PATH` |
-| 上传附件 | `./uploads/` | `/app/uploads` | `.env` → `UPLOADS_HOST_PATH` |
+| 数据            | 宿主机默认路径      | 容器内路径                      | 配置方式                         |
+| ------------- | ------------ | -------------------------- | ---------------------------- |
+| Nginx 端口      | `8080`       | 80                         | `.env` → `NGINX_HOST_PORT`   |
+| PostgreSQL 数据 | `./pgdata/`  | `/var/lib/postgresql/data` | `.env` → `PGDATA_HOST_PATH`  |
+| 上传附件          | `./uploads/` | `/app/uploads`             | `.env` → `UPLOADS_HOST_PATH` |
 
 ### 修改存储位置
 
@@ -345,6 +349,7 @@ docker-compose up -d
 ```
 
 > **注意**: 修改路径后旧数据不会自动迁移，需手动复制：
+> 
 > ```powershell
 > # 停服务
 > docker-compose down
@@ -359,10 +364,10 @@ docker-compose up -d
 
 后端 `backend/app/file_storage.py` 通过环境变量读取容器内路径：
 
-| 环境变量 | 当前值 | 说明 |
-|---------|--------|------|
-| `UPLOAD_DIR` | `/app/uploads` | 附件根目录（容器内） |
-| `CHUNK_DIR` | `/app/uploads/chunks` | 分块上传临时目录 |
+| 环境变量         | 当前值                   | 说明         |
+| ------------ | --------------------- | ---------- |
+| `UPLOAD_DIR` | `/app/uploads`        | 附件根目录（容器内） |
+| `CHUNK_DIR`  | `/app/uploads/chunks` | 分块上传临时目录   |
 
 一般无需修改——宿主机路径通过 volume 映射到容器内，改 `UPLOADS_HOST_PATH` 即可。
 
@@ -370,27 +375,27 @@ docker-compose up -d
 
 ## 🔧 常用命令
 
-| 操作 | 命令 |
-|------|------|
-| 启动所有服务 | `docker-compose up -d` |
-| 停止服务 | `docker-compose down` |
-| 清除数据（慎用） | `docker-compose down -v` |
-| 查看后端日志 | `docker logs bom_backend -f` |
-| 重启后端 | `docker restart bom_backend` |
-| 构建前端 | `cd frontend && npm run build` |
-| 重启 Nginx | `docker-compose up -d --force-recreate nginx` |
-| 备份数据库 | `docker exec bom_postgres pg_dump -U bomadmin bom_system > backup.sql` |
+| 操作       | 命令                                                                     |
+| -------- | ---------------------------------------------------------------------- |
+| 启动所有服务   | `docker-compose up -d`                                                 |
+| 停止服务     | `docker-compose down`                                                  |
+| 清除数据（慎用） | `docker-compose down -v`                                               |
+| 查看后端日志   | `docker logs bom_backend -f`                                           |
+| 重启后端     | `docker restart bom_backend`                                           |
+| 构建前端     | `cd frontend && npm run build`                                         |
+| 重启 Nginx | `docker-compose up -d --force-recreate nginx`                          |
+| 备份数据库    | `docker exec bom_postgres pg_dump -U bomadmin bom_system > backup.sql` |
 
 ---
 
 ## 👤 演示账号
 
-| 角色 | 用户名 | 密码 |
-|------|--------|------|
-| 管理员 | admin | 123456 |
-| 工程师 | engineer | 123456 |
+| 角色   | 用户名        | 密码     |
+| ---- | ---------- | ------ |
+| 管理员  | admin      | 123456 |
+| 工程师  | engineer   | 123456 |
 | 生产人员 | production | 123456 |
-| 访客 | guest | 123456 |
+| 访客   | guest      | 123456 |
 
 ---
 
@@ -429,16 +434,16 @@ docker-compose up -d
 
 ### 附件管理 (V2)
 
-| 端点 | 说明 |
-|------|------|
-| `POST /api/v2/attachments/upload` | Multipart 上传 |
-| `GET /api/v2/attachments/{id}/stream` | 流式下载（二进制） |
-| `GET /api/v2/attachments/{id}/download` | Base64 下载 |
-| `GET /api/v2/attachments/{id}/preview?token=` | **浏览器内联预览**（PDF 流式加载） |
-| `GET /api/v2/attachments/{id}/direct-download?token=` | 浏览器原生下载（显示进度） |
-| `GET /api/v2/attachments/{id}/gltf` | STP → glTF 3D 预览 |
-| `POST /api/v2/attachments/chunk/*` | 分块上传（init/upload/complete） |
-| `DELETE /api/v2/attachments/{id}` | 删除附件 |
+| 端点                                                    | 说明                         |
+| ----------------------------------------------------- | -------------------------- |
+| `POST /api/v2/attachments/upload`                     | Multipart 上传               |
+| `GET /api/v2/attachments/{id}/stream`                 | 流式下载（二进制）                  |
+| `GET /api/v2/attachments/{id}/download`               | Base64 下载                  |
+| `GET /api/v2/attachments/{id}/preview?token=`         | **浏览器内联预览**（PDF 流式加载）      |
+| `GET /api/v2/attachments/{id}/direct-download?token=` | 浏览器原生下载（显示进度）              |
+| `GET /api/v2/attachments/{id}/gltf`                   | STP → glTF 3D 预览           |
+| `POST /api/v2/attachments/chunk/*`                    | 分块上传（init/upload/complete） |
+| `DELETE /api/v2/attachments/{id}`                     | 删除附件                       |
 
 ### 用户管理（仅 admin）
 
@@ -480,6 +485,7 @@ docker-compose up -d
 ## 📞 何时询问用户
 
 在以下情况前先询问：
+
 - 添加新依赖项
 - 重大架构变更
 - 在多个有效方案中选择
