@@ -13,6 +13,7 @@ import { useDataStore } from '../stores/data';
 import { useTableSort } from '../hooks/useTableSort';
 import {
   exportAssembliesToFolder,
+  exportSingleAssemblyBOM,
   previewAssembliesImport,
   executeAssembliesImport,
 } from '../services/importExport';
@@ -622,6 +623,14 @@ export default function Components() {
     }
   };
 
+  const handleExportSingleBOM = async (assemblyId: string) => {
+    try {
+      await exportSingleAssemblyBOM(assemblyId);
+    } catch (err: any) {
+      alert(err.message || '导出失败');
+    }
+  };
+
   const handleImportAssembliesClick = async () => {
     setImportLoading(true);
     try {
@@ -916,7 +925,7 @@ export default function Components() {
       {/* 列表头部 */}
       <div className="flex items-center justify-end mb-4">
         <div className="flex gap-2">
-          {canDownload() && (
+          {isAdmin() && (
             <button
               onClick={handleExportAssemblies}
               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
@@ -1041,12 +1050,22 @@ export default function Components() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => handleEdit(assembly)}
-                      className="text-primary-600 hover:text-primary-800 mr-3"
-                    >
-                      编辑
-                    </button>
+                    {canDownload() && (
+                      <button
+                        onClick={() => handleExportSingleBOM(assembly.id)}
+                        className="text-green-600 hover:text-green-800 mr-3"
+                      >
+                        导出
+                      </button>
+                    )}
+                    {canEdit() && (
+                      <button
+                        onClick={() => handleEdit(assembly)}
+                        className="text-primary-600 hover:text-primary-800 mr-3"
+                      >
+                        编辑
+                      </button>
+                    )}
                     {isAdmin() && (
                       <button
                         onClick={() => setDeleteId(assembly.id)}

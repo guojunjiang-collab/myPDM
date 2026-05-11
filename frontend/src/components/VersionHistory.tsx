@@ -62,10 +62,10 @@ export default function VersionHistory({ entityType, entityId, onViewVersion }: 
       <table className="w-full text-sm">
         <thead className="bg-gray-50 border-b">
           <tr>
-            <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-            <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">状态</th>
-            <th className="px-3 py-2 text-left text-gray-500 font-medium w-40">创建时间</th>
-            <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">创建人</th>
+            <th className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap min-w-[5rem]">版本</th>
+            <th className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap min-w-[4rem]">状态</th>
+            <th className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap min-w-[9rem]">创建时间</th>
+            <th className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap min-w-[5rem]">创建人</th>
             <th className="px-3 py-2 text-left text-gray-500 font-medium">备注</th>
           </tr>
         </thead>

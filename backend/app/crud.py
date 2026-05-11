@@ -560,7 +560,7 @@ def upgrade_assembly(db, assembly_id, user: str = None):
             'version': new_version,
             'parent_version': source.version,
             'action': 'upgraded_from',
-            'user': username,
+            'user': user,
             'timestamp': datetime.now(timezone.utc).isoformat(),
         }],
     )
@@ -609,7 +609,7 @@ def upgrade_document(db, doc_id, user: str = None):
             'version': new_version,
             'parent_version': source.version,
             'action': 'upgraded_from',
-            'user': username,
+            'user': user,
             'timestamp': datetime.now(timezone.utc).isoformat(),
         }],
     )

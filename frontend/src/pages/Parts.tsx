@@ -546,7 +546,7 @@ export default function Parts() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                    <button onClick={() => handleEdit(part)} className="text-primary-600 hover:text-primary-800 mr-3">编辑</button>
+                    {canEdit() && <button onClick={() => handleEdit(part)} className="text-primary-600 hover:text-primary-800 mr-3">编辑</button>}
                     {isAdmin() && (
                       <button onClick={() => setDeleteId(part.id)} className="text-red-600 hover:text-red-800">删除</button>
                     )}

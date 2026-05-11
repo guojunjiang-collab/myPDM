@@ -592,6 +592,8 @@ interface BOMRow {
   版本: string;
   状态: string;
   用量: number;
+  _entityType?: string;
+  _entityId?: string;
 }
 
 /** 递归收集 BOM 树 */
@@ -615,6 +617,8 @@ async function gatherBOMTree(
         版本: detail?.version || '',
         状态: statusToZh(detail?.status),
         用量: item.quantity,
+        _entityType: item.childType,
+        _entityId: detail?.id || '',
       });
 
       // 如果是部件，递归收集子项
@@ -755,6 +759,168 @@ export async function exportAssembliesToFolder(dirHandle?: FileSystemDirectoryHa
       }),
     );
   }
+}
+
+/**
+ * 导出单个部件的完整信息
+ * 包含 Sheet1: 部件信息(含自定义字段), Sheet2: BOM(含自定义字段), Sheet3: 关联图文档
+ */
+export async function exportSingleAssemblyBOM(assemblyId: string): Promise<void> {
+  const assemblies = useDataStore.getState().assemblies;
+  const asm = assemblies.find((a) => a.id === assemblyId);
+  if (!asm) {
+    throw new Error('未找到该部件');
+  }
+
+  const asmDefs = getCustomFieldDefs('component');
+  const [cfValuesMap, docMap, bomRows] = await Promise.all([
+    asmDefs.length > 0 ? loadCustomFieldValues('component', [asm.id]) : Promise.resolve(new Map()),
+    loadEntityDocuments('assembly', [asm.id]),
+    gatherBOMTree(asm.id),
+  ]);
+
+  const cfValues = cfValuesMap.get(asm.id) || {};
+
+  // Sheet 1: 部件信息(含自定义字段)
+  const infoRow: Record<string, unknown> = {
+    件号: asm.code,
+    中文名称: asm.name,
+    规格型号: asm.spec || '',
+    版本: asm.version || '',
+    状态: statusToZh(asm.status),
+    备注: asm.remark || '',
+    创建时间: asm.created_at || '',
+    更新时间: asm.updated_at || '',
+  };
+  for (const def of asmDefs) {
+    infoRow[def.name] = cfValues[def.id] ?? '';
+  }
+
+  // Sheet 2: BOM (含自定义字段)
+  // 自身上级行
+  const selfRow: BOMRow = {
+    层级: 0,
+    类型: '部件',
+    件号: asm.code,
+    中文名称: asm.name,
+    规格型号: asm.spec || '',
+    版本: asm.version || '',
+    状态: statusToZh(asm.status),
+    用量: 1,
+    _entityType: 'component',
+    _entityId: asm.id,
+  };
+  const allBomRows = [selfRow, ...bomRows];
+
+  // 收集 BOM 中所有实体的 ID（按类型分组）
+  const partIds: string[] = [];
+  const componentIds: string[] = [];
+  for (const row of allBomRows) {
+    if (row._entityId) {
+      if (row._entityType === 'part') {
+        partIds.push(row._entityId);
+      } else if (row._entityType === 'component') {
+        componentIds.push(row._entityId);
+      }
+    }
+  }
+
+  // 加载零件和部件的自定义字段
+  const partDefs = getCustomFieldDefs('part');
+  const allDefs = [...asmDefs, ...partDefs];
+  const [partCfMap, compCfMap] = await Promise.all([
+    partIds.length > 0 && partDefs.length > 0
+      ? loadCustomFieldValues('part', partIds)
+      : Promise.resolve(new Map()),
+    componentIds.length > 0 && asmDefs.length > 0
+      ? loadCustomFieldValues('component', componentIds)
+      : Promise.resolve(new Map()),
+  ]);
+
+  // 构建带自定义字段的 BOM 行
+  const bomSheetRows: Record<string, unknown>[] = allBomRows.map((row) => {
+    const r: Record<string, unknown> = {
+      层级: row.层级,
+      类型: row.类型,
+      件号: row.件号,
+      中文名称: row.中文名称,
+      规格型号: row.规格型号,
+      版本: row.版本,
+      状态: row.状态,
+      用量: row.用量,
+    };
+
+    // 填充该实体类型的自定义字段
+    const defsForType = row._entityType === 'part' ? partDefs : asmDefs;
+    const cfMap = row._entityType === 'part' ? partCfMap : compCfMap;
+    if (row._entityId && defsForType.length > 0) {
+      const values = cfMap.get(row._entityId) || {};
+      for (const def of defsForType) {
+        r[def.name] = values[def.id] ?? '';
+      }
+    }
+
+    // 对于该实体不存在的字段类型，填充空值
+    const otherDefs = row._entityType === 'part' ? asmDefs : partDefs;
+    for (const def of otherDefs) {
+      if (!(def.name in r)) {
+        r[def.name] = '';
+      }
+    }
+
+    return r;
+  });
+
+  // Sheet 3: 关联图文档
+  const docs = docMap.get(asm.id) || [];
+  const docRows: Record<string, unknown>[] = [];
+  if (docs.length === 0) {
+    docRows.push({ 件号: asm.code, 部件版本: asm.version || '' });
+  } else {
+    for (const ed of docs) {
+      docRows.push({
+        件号: asm.code,
+        部件版本: asm.version || '',
+        图文档编号: ed.document?.code || '',
+        图文档名称: ed.document?.name || '',
+        图文档版本: ed.document?.version || '',
+      });
+    }
+  }
+
+  const wb = XLSX.utils.book_new();
+
+  const s1 = XLSX.utils.json_to_sheet([infoRow]);
+  XLSX.utils.book_append_sheet(wb, s1, '部件信息');
+
+  const s2 = XLSX.utils.json_to_sheet(bomSheetRows);
+  const baseCols = 8;
+  const cfColCount = allDefs.length;
+  const s2Cols = Array.from({ length: baseCols + cfColCount }, (_, i) => {
+    if (i < baseCols) {
+      return { wch: [6, 8, 18, 24, 20, 8, 8, 8][i] };
+    }
+    return { wch: 16 };
+  });
+  s2['!cols'] = s2Cols;
+  XLSX.utils.book_append_sheet(wb, s2, 'BOM');
+
+  if (docRows.length > 0) {
+    const s3 = XLSX.utils.json_to_sheet(docRows);
+    s3['!cols'] = [
+      { wch: 18 }, { wch: 10 }, { wch: 20 }, { wch: 30 }, { wch: 10 },
+    ];
+    XLSX.utils.book_append_sheet(wb, s3, '关联图文档');
+  }
+
+  const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const filename = `BOM_${asm.code}_${asm.version || 'A'}.xlsx`;
+  downloadBlob(
+    new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    }),
+    filename,
+  );
 }
 
 // ================================================================
