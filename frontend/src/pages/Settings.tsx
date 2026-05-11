@@ -5,7 +5,7 @@ import type { CustomFieldDefinition } from '../types';
 import { Modal } from '../components/Modal';
 import { useDataStore } from '../stores/data';
 import { exportAllData, exportCustomFieldDefs, importCustomFieldDefs, importAllData } from '../services/importExport';
-import Users from './Users';
+
 import Logs from './Logs';
 
 const FIELD_TYPES = [
@@ -42,7 +42,7 @@ export default function Settings() {
   const currentUser = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'password' | 'users' | 'logs' | 'customFields' | 'dataManagement'>('password');
+  const [activeTab, setActiveTab] = useState<'password' | 'logs' | 'customFields' | 'dataManagement'>('password');
 
   // Password change state
   const [passwordForm, setPasswordForm] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
@@ -305,16 +305,6 @@ export default function Settings() {
       {/* Tabs */}
       <div className="flex gap-2 mb-4">
         <button
-          onClick={() => setActiveTab('users')}
-          className={`px-4 py-2 rounded-lg ${
-            activeTab === 'users'
-              ? 'bg-primary-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-        >
-          用户管理
-        </button>
-        <button
           onClick={() => setActiveTab('customFields')}
           className={`px-4 py-2 rounded-lg ${
             activeTab === 'customFields'
@@ -355,9 +345,6 @@ export default function Settings() {
           操作日志
         </button>
       </div>
-
-      {/* 用户管理 */}
-      {activeTab === 'users' && <Users />}
 
       {/* 自定义字段 */}
       {activeTab === 'customFields' && (

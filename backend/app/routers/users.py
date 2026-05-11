@@ -10,7 +10,7 @@ from .auth import require_role
 router = APIRouter(prefix="/users", tags=["用户管理"])
 
 @router.get("/", response_model=list[schemas.UserResponse])
-async def list_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin"]))):
+async def list_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
     return crud.get_users(db, skip=skip, limit=limit)
 
 @router.post("/", response_model=schemas.UserResponse)

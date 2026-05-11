@@ -274,7 +274,7 @@ async def upload_document_attachment(doc_id: uuid.UUID, body: schemas.DocumentAt
     return {"id": att.id, "file_name": att.file_name, "file_size": att.file_size, "created_at": att.created_at}
 
 @router.get("/{doc_id}/attachments/{att_id}")
-async def download_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def download_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
     from ..file_storage import file_storage
     att = db.query(DocumentAttachment).filter(DocumentAttachment.id == att_id, DocumentAttachment.document_id == doc_id).first()
     if not att:
