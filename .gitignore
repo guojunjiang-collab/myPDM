@@ -23,3 +23,9 @@ Thumbs.db
 # Data
 pgdata/
 uploads/
+
+# Server migration scripts (one-off, not part of standard init)
+migrations/
+
+# Sisyphus work plans
+.sisyphus/

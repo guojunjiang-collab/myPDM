@@ -58,7 +58,7 @@ CREATE TABLE bom_items (
     parent_id UUID NOT NULL,
     child_type VARCHAR(16) NOT NULL,
     child_id UUID NOT NULL,
-    quantity DECIMAL(10, 3) NOT NULL DEFAULT 1,
+    quantity INTEGER NOT NULL DEFAULT 1,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

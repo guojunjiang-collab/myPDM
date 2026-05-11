@@ -1155,7 +1155,7 @@ export async function executeAssembliesImport(
         const childCode = String(bomRow['件号'] || '').trim();
         const childTypeStr = String(bomRow['类型'] || '').trim();
         const childVersion = String(bomRow['版本'] || '').trim();
-        const quantity = Number(bomRow['用量']) || 1;
+        const quantity = Math.floor(Number(bomRow['用量'])) || 1;
         if (!childCode) continue;
 
         const isPart = childTypeStr === '零件';

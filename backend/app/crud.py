@@ -199,7 +199,7 @@ def get_assembly_parts(db, assembly_id):
             "childType": child_type_local,          # 本地格式字段
             "child_type": child_type,               # 保留原字段（兼容性）
             "child_id": item.child_id,              # 保留原字段（兼容性）
-            "quantity": float(item.quantity),
+            "quantity": int(item.quantity),
             "created_at": item.created_at
         }
         # 根据类型设置 componentId 或 partId（本地格式核心字段）

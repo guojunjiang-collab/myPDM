@@ -76,7 +76,7 @@ async def get_all_bom_items_route(db: Session = Depends(get_db), current_user: U
             "parent_id": str(item.parent_id),
             "child_type": item.child_type,
             "child_id": str(item.child_id),
-            "quantity": float(item.quantity) if item.quantity else 1,
+            "quantity": int(item.quantity) if item.quantity else 1,
         }
         for item in items
     ]
@@ -102,7 +102,7 @@ async def get_bom_tree(item_type: str, item_id: uuid.UUID, db: Session = Depends
             "id": str(item.id),
             "child_type": item.child_type,
             "child_id": str(item.child_id),
-            "quantity": float(item.quantity),
+            "quantity": int(item.quantity),
             "child_detail": child_detail
         })
     return result
@@ -178,7 +178,7 @@ async def get_bom_trace(
             "parent_assembly": parent_assembly,
             "parent_part": parent_part,
             "child_entity": child_entity,
-            "quantity": float(row.quantity) if row.quantity else 1,
+            "quantity": int(row.quantity) if row.quantity else 1,
         })
 
     return result

@@ -98,13 +98,13 @@ class BOMItemBase(BaseSchema):
     parent_id: Optional[uuid.UUID] = None  # 后端接口会覆盖此字段
     child_type: str
     child_id: uuid.UUID
-    quantity: float = 1.0
+    quantity: int = 1
 
 class BOMItemCreate(BOMItemBase):
     id: Optional[uuid.UUID] = None
 
 class BOMItemUpdate(BaseSchema):
-    quantity: Optional[float] = None
+    quantity: Optional[int] = None
 
 class BOMItemResponse(BOMItemBase):
     id: uuid.UUID
@@ -174,7 +174,7 @@ class BOMTraceItem(BaseSchema):
     parent_assembly: Optional[Dict[str, Any]] = None
     parent_part: Optional[Dict[str, Any]] = None
     child_entity: Optional[Dict[str, Any]] = None
-    quantity: float
+    quantity: int
 
 
 # ===== 自定义字段 Schema =====

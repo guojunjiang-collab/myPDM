@@ -798,10 +798,10 @@ export default function Components() {
                     <input
                       type="number"
                       min={1}
-                      step="any"
+                      step={1}
                       value={part.quantity}
                       onChange={(e) => {
-                        const qty = parseFloat(e.target.value);
+                        const qty = Math.floor(parseFloat(e.target.value));
                         if (!isNaN(qty) && qty > 0) {
                           setEditParts((prev) =>
                             prev.map((p) => (p.id === part.id ? { ...p, quantity: qty } : p)),
