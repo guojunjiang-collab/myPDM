@@ -752,7 +752,7 @@ export default function Components() {
       ) : editParts.length === 0 ? (
         <div className="px-4 py-8 text-center text-sm text-gray-400">暂无子项</div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="max-h-[240px] overflow-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b">
               <tr>
@@ -914,8 +914,7 @@ export default function Components() {
   return (
     <div>
       {/* 列表头部 */}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold">部件管理</h2>
+      <div className="flex items-center justify-end mb-4">
         <div className="flex gap-2">
           {canDownload() && (
             <button
@@ -1122,29 +1121,35 @@ export default function Components() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">状态</label>
-            <select
-              value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="draft">草稿</option>
-              <option value="frozen">冻结</option>
-              <option value="released">发布</option>
-              <option value="obsolete">作废</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">备注</label>
-            <textarea
-              value={formData.remark}
-              onChange={(e) => setFormData({ ...formData, remark: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              rows={2}
-              placeholder="可选"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">状态</label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="draft">草稿</option>
+                <option value="frozen">冻结</option>
+                <option value="released">发布</option>
+                <option value="obsolete">作废</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">备注</label>
+              <textarea
+                value={formData.remark}
+                onChange={(e) => setFormData({ ...formData, remark: e.target.value })}
+                onInput={(e) => {
+                  const el = e.currentTarget;
+                  el.style.height = 'auto';
+                  el.style.height = el.scrollHeight + 'px';
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+                rows={1}
+                placeholder="可选"
+              />
+            </div>
           </div>
 
           {/* 自定义字段 */}
@@ -1154,7 +1159,7 @@ export default function Components() {
               {loadingCustomFields ? (
                 <div className="text-sm text-gray-500">加载中...</div>
               ) : (
-                <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3 gap-x-4">
                   {customFieldDefs.map((def) => (
                     <div key={def.id}>
                       <label className="block text-sm font-medium text-gray-700 mb-1">

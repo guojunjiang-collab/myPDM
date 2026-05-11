@@ -80,7 +80,6 @@ export default function Logs() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-4">操作日志</h2>
 
       {/* Filters */}
       <form onSubmit={handleSearch} className="bg-white rounded-lg border border-gray-200 p-4 mb-4">

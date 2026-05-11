@@ -549,8 +549,7 @@ export default function Documents() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold">图文档管理</h2>
+      <div className="flex items-center justify-end mb-4">
         <div className="flex gap-2">
           {canDownload() && (
             <button

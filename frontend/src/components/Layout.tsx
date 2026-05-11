@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/auth';
 import { useDataStore } from '../stores/data';
+import { ConfirmModal } from './Modal';
 
 const navItems = [
   { path: '/dashboard', label: '仪表盘', icon: '📊', roles: ['admin', 'engineer', 'production', 'guest'] },
@@ -22,6 +23,8 @@ export default function Layout() {
   const { user, logout } = useAuthStore();
   const { syncAll, isSyncing, clearCache } = useDataStore();
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const [confirmSyncOpen, setConfirmSyncOpen] = useState(false);
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const userRole = user?.role || 'guest';
 
   const visibleNavItems = navItems.filter((item) =>
@@ -29,6 +32,7 @@ export default function Layout() {
   );
 
   const handleSync = async () => {
+    setConfirmSyncOpen(false);
     setSyncMsg(null);
     try {
       await syncAll();
@@ -41,6 +45,7 @@ export default function Layout() {
   };
 
   const handleClearCache = () => {
+    setConfirmClearOpen(false);
     clearCache();
     localStorage.removeItem('data-storage');
     setSyncMsg('缓存已清除');
@@ -58,8 +63,8 @@ export default function Layout() {
   return (
     <div className="flex h-screen bg-gray-50">
       {/* 侧边栏 */}
-      <aside className="w-56 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-4 border-b border-gray-200">
+      <aside className="w-56 min-w-56 bg-white border-r border-gray-200 flex flex-col">
+        <div className="h-14 bg-white border-b border-gray-200 flex items-center px-4">
           <h1 className="text-lg font-semibold">🏗️ PDM系统</h1>
         </div>
         <nav className="flex-1 p-2">
@@ -78,26 +83,9 @@ export default function Layout() {
             </a>
           ))}
         </nav>
-        <div className="p-2 border-t border-gray-200 space-y-1">
-          <button
-            onClick={handleSync}
-            disabled={isSyncing}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg text-blue-600 hover:bg-blue-50 disabled:opacity-50 border border-blue-200"
-            title="从服务器检出最新数据到本地"
-          >
-            <span>⬇</span>
-            <span>{isSyncing ? '同步中...' : '检出数据'}</span>
-          </button>
-          <button
-            onClick={handleClearCache}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg text-red-600 hover:bg-red-50 border border-red-200"
-            title="清除本地缓存数据"
-          >
-            <span>🗑</span>
-            <span>清除缓存</span>
-          </button>
+        <div className="p-2 border-t border-gray-200">
           {syncMsg && (
-            <div className={`text-xs px-2 py-1 rounded text-center ${syncMsg.includes('成功') || syncMsg.includes('已清除') ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+            <div className={`text-xs px-2 py-1 rounded text-center mb-1 ${syncMsg.includes('成功') || syncMsg.includes('已清除') ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
               {syncMsg}
             </div>
           )}
@@ -110,7 +98,7 @@ export default function Layout() {
         {/* 顶部栏 */}
         <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4">
           <div className="left">
-            <span className="text-gray-600">
+            <span className="text-lg font-semibold text-gray-800">
               {navItems.find((item) => item.path === location.pathname)?.label || ''}
             </span>
           </div>
@@ -120,6 +108,21 @@ export default function Layout() {
               {{ admin: '管理员', engineer: '工程师', production: '生产人员', guest: '访客' }[user?.role || 'guest'] || user?.role}
             </span>
             <span className="text-gray-300">|</span>
+            <button
+              onClick={() => setConfirmSyncOpen(true)}
+              disabled={isSyncing}
+              className="px-3 py-1 text-sm text-blue-600 border border-blue-200 rounded hover:bg-blue-50 disabled:opacity-50"
+              title="从服务器检出最新数据到本地"
+            >
+              {isSyncing ? '同步中...' : '检出数据'}
+            </button>
+            <button
+              onClick={() => setConfirmClearOpen(true)}
+              className="px-3 py-1 text-sm text-red-600 border border-red-200 rounded hover:bg-red-50"
+              title="清除本地缓存数据"
+            >
+              清除缓存
+            </button>
             <button
               onClick={handleLogout}
               className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
@@ -134,6 +137,27 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+
+      <ConfirmModal
+        open={confirmSyncOpen}
+        title="检出数据"
+        content="将从服务器检出最新数据到本地缓存，确认继续？"
+        confirmText="检出"
+        cancelText="取消"
+        type="info"
+        onConfirm={handleSync}
+        onCancel={() => setConfirmSyncOpen(false)}
+      />
+      <ConfirmModal
+        open={confirmClearOpen}
+        title="清除缓存"
+        content="将清除所有本地缓存数据，页面将自动刷新，确认继续？"
+        confirmText="清除"
+        cancelText="取消"
+        type="danger"
+        onConfirm={handleClearCache}
+        onCancel={() => setConfirmClearOpen(false)}
+      />
     </div>
   );
 }

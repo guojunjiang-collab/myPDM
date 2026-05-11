@@ -409,7 +409,6 @@ export default function BOM() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-4">管理工具</h2>
 
       {/* 模式切换 */}
       <div className="flex gap-2 mb-4">

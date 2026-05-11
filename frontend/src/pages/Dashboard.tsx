@@ -110,7 +110,6 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-6">仪表盘</h2>
 
       {!hasData && (
         <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-700 text-sm">

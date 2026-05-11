@@ -174,8 +174,7 @@ export default function Users() {
   return (
     <div>
       {/* 头部 */}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold">用户管理</h2>
+      <div className="flex items-center justify-end mb-4">
         {isAdmin() && (
           <button onClick={handleAdd} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
             + 新增用户

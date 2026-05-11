@@ -301,7 +301,6 @@ export default function Settings() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-4">系统设置</h2>
 
       {/* Tabs */}
       <div className="flex gap-2 mb-4">
