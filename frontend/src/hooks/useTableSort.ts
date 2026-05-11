@@ -10,9 +10,13 @@ interface UseTableSortReturn<T> {
   getSortIcon: (field: keyof T) => string;
 }
 
-export function useTableSort<T extends Record<string, any>>(data: T[]): UseTableSortReturn<T> {
-  const [sortField, setSortField] = useState<keyof T | null>(null);
-  const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+export function useTableSort<T extends Record<string, any>>(
+  data: T[],
+  defaultSortField?: keyof T,
+  defaultSortDirection?: 'asc' | 'desc'
+): UseTableSortReturn<T> {
+  const [sortField, setSortField] = useState<keyof T | null>(defaultSortField ?? null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>(defaultSortDirection ?? null);
 
   const handleSort = useCallback((field: keyof T) => {
     if (sortField === field) {

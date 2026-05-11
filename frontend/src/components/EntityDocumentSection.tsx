@@ -6,6 +6,7 @@ import { useDataStore } from '../stores/data';
 import { Modal } from './Modal';
 import DocumentPicker from './DocumentPicker';
 import DocumentDetailContent from './DocumentDetailContent';
+import VersionSelectModal from './VersionSelectModal';
 
 /* ----------------------------------------------------------------
    Types
@@ -109,11 +110,9 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
   /* 操作 */
   const handleAddDocs = async (items: { document_id: string }[]) => {
     try {
-      await Promise.all(
-        items.map((it, idx) =>
-          entityDocumentsApi.add(entityType, entityId, { document_id: it.document_id, sort_order: idx }),
-        ),
-      );
+      for (const it of items) {
+        await entityDocumentsApi.add(entityType, entityId, { document_id: it.document_id });
+      }
       await load();
       setPickerOpen(false);
     } catch {
@@ -127,6 +126,22 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
       await load();
     } catch {
       alert('移除关联失败');
+    }
+  };
+
+  /** 版本选择 */
+  const [versionSelectState, setVersionSelectState] = useState<{ edocId: string; documentId: string; docCode: string } | null>(null);
+
+  const handleVersionSelect = async (selectedVersionId: string) => {
+    if (!versionSelectState) return;
+    try {
+      await entityDocumentsApi.remove(entityType, entityId, versionSelectState.edocId);
+      await entityDocumentsApi.add(entityType, entityId, { document_id: selectedVersionId });
+      await load();
+    } catch {
+      alert('切换版本失败');
+    } finally {
+      setVersionSelectState(null);
     }
   };
 
@@ -147,7 +162,6 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
     }
   };
 
-  /** 预览附件（仅 PDF 支持，其余弹窗提示） */
   const handlePreviewAttachment = (fileId: string, fileName: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase() || '';
     if (ext !== 'pdf') {
@@ -255,28 +269,39 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
                       </td>
                       <td className="px-3 py-2 text-center whitespace-nowrap">
                         <span className="inline-flex items-center gap-2">
-                          {ed.document.file_id && (
+                          {hasEditableAction ? (
                             <>
                               <button
                                 type="button"
-                                onClick={(e) => { e.stopPropagation(); handlePreviewAttachment(ed.document.file_id!, ed.document.file_name!); }}
-                                className="text-blue-600 hover:text-blue-800 text-xs"
-                                title="预览"
-                              >
-                                预览
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); handleDownload(ed.document.file_id!, ed.document.file_name!); }}
+                                onClick={(e) => { e.stopPropagation(); setVersionSelectState({ edocId: ed.id, documentId: ed.document_id, docCode: ed.document.code }); }}
                                 className="text-primary-600 hover:text-primary-800 text-xs"
-                                title={`下载 ${ed.document.file_name}`}
+                                title="选择版本"
                               >
-                                下载
+                                选择
                               </button>
+                              <button type="button" onClick={(e) => { e.stopPropagation(); handleRemove(ed.id); }} className="text-red-500 hover:text-red-700 text-xs" title="移除关联">移除</button>
                             </>
-                          )}
-                          {hasEditableAction && (
-                            <button type="button" onClick={(e) => { e.stopPropagation(); handleRemove(ed.id); }} className="text-red-500 hover:text-red-700 text-xs" title="移除关联">移除</button>
+                          ) : (
+                            ed.document.file_id && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); handlePreviewAttachment(ed.document.file_id!, ed.document.file_name!); }}
+                                  className="text-blue-600 hover:text-blue-800 text-xs"
+                                  title="预览"
+                                >
+                                  预览
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); handleDownload(ed.document.file_id!, ed.document.file_name!); }}
+                                  className="text-primary-600 hover:text-primary-800 text-xs"
+                                  title={`下载 ${ed.document.file_name}`}
+                                >
+                                  下载
+                                </button>
+                              </>
+                            )
                           )}
                         </span>
                       </td>
@@ -308,6 +333,17 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
           />
         )}
       </Modal>
+
+      {/* 版本选择弹窗 */}
+      <VersionSelectModal
+        open={!!versionSelectState}
+        entityType="document"
+        entityId={versionSelectState?.documentId || ''}
+        entityName={versionSelectState?.docCode}
+        currentVersionId={versionSelectState?.documentId}
+        onSelect={handleVersionSelect}
+        onClose={() => setVersionSelectState(null)}
+      />
     </div>
   );
 }

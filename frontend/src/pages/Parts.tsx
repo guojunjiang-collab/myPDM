@@ -74,7 +74,7 @@ export default function Parts() {
   // 自定义字段值映射：{ entityId: { fieldId: value } }
   const [customFieldValuesMap, setCustomFieldValuesMap] = useState<Record<string, Record<string, any>>>({});
 
-  const { sortedData, handleSort, getSortIcon } = useTableSort<Part>(parts);
+  const { sortedData, handleSort, getSortIcon } = useTableSort<Part>(parts, 'code', 'asc');
 
   // 获取零件适用的自定义字段定义
   const partCustomDefs = customFieldDefs.filter((d) => d.applies_to?.includes('part'));

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 import uuid
 
 from ..database import get_db
@@ -180,6 +181,7 @@ async def add_part_document(part_id: uuid.UUID, body: schemas.EntityDocumentCrea
     links = part.document_links or []
     links.append(link)
     part.document_links = links
+    flag_modified(part, 'document_links')
     db.commit()
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username, "关联图文档", "part_doc", str(part_id), f"文档:{doc.code}", ip)
@@ -206,6 +208,7 @@ async def update_part_document(part_id: uuid.UUID, link_id: uuid.UUID, body: sch
     if not found:
         raise HTTPException(status_code=404, detail="关联不存在")
     part.document_links = links
+    flag_modified(part, 'document_links')
     db.commit()
     return {"message": "关联已更新"}
 
@@ -222,6 +225,7 @@ async def delete_part_document(part_id: uuid.UUID, link_id: uuid.UUID, db: Sessi
     if len(new_links) == len(links):
         raise HTTPException(status_code=404, detail="关联不存在")
     part.document_links = new_links
+    flag_modified(part, 'document_links')
     db.commit()
     return {"message": "关联已移除"}
 

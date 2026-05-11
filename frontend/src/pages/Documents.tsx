@@ -111,7 +111,7 @@ export default function Documents() {
     loadDocuments();
   }, [search, status, storeDocuments]);
 
-  const { sortedData, handleSort, getSortIcon } = useTableSort<Document>(documents);
+  const { sortedData, handleSort, getSortIcon } = useTableSort<Document>(documents, 'code', 'asc');
 
   // 获取图文档适用的自定义字段定义
   const documentCustomDefs = customFieldDefs.filter((d) => d.applies_to?.includes('document'));

@@ -83,22 +83,6 @@ async def upload_file(
         }
     
     try:
-        # 如果是图文档，先删除旧附件
-        if entity_type == "document":
-            doc = db.query(Document).filter(Document.id == uuid.UUID(entity_id)).first()
-            if doc and doc.file_id:
-                # 查询旧附件记录
-                old_att = db.query(DocumentAttachment).filter(DocumentAttachment.id == doc.file_id).first()
-                if old_att:
-                    # 删除文件系统中的旧文件
-                    if hasattr(old_att, 'file_path') and old_att.file_path:
-                        try:
-                            file_storage.delete_file(old_att.file_path)
-                        except Exception as e:
-                            print(f"[WARNING] Failed to delete old file {old_att.file_path}: {e}")
-                    # 删除数据库中的旧附件记录
-                    db.delete(old_att)
-        
         # 保存文件到文件系统
         result = file_storage.save_file(
             file_data,
@@ -256,22 +240,6 @@ async def complete_chunked_upload(
     try:
         result = chunked_uploader.complete_upload(upload_id)
         file_info = result["file_info"]
-        
-        # 如果是图文档，先删除旧附件
-        if file_info["entity_type"] == "document":
-            doc = db.query(Document).filter(Document.id == uuid.UUID(file_info["entity_id"])).first()
-            if doc and doc.file_id:
-                # 查询旧附件记录
-                old_att = db.query(DocumentAttachment).filter(DocumentAttachment.id == doc.file_id).first()
-                if old_att:
-                    # 删除文件系统中的旧文件
-                    if hasattr(old_att, 'file_path') and old_att.file_path:
-                        try:
-                            file_storage.delete_file(old_att.file_path)
-                        except Exception as e:
-                            print(f"[WARNING] Failed to delete old file {old_att.file_path}: {e}")
-                    # 删除数据库中的旧附件记录
-                    db.delete(old_att)
         
         # 创建数据库记录
         att_id = str(uuid.uuid4())

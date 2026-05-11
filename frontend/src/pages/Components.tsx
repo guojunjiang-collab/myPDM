@@ -6,6 +6,7 @@ import { Modal, ConfirmModal } from '../components/Modal';
 import AssemblyDetailContent from '../components/AssemblyDetailContent';
 import PartDetailContent from '../components/PartDetailContent';
 import VersionHistory from '../components/VersionHistory';
+import VersionSelectModal from '../components/VersionSelectModal';
 import AssemblyPartPicker from '../components/AssemblyPartPicker';
 import EntityDocumentSection from '../components/EntityDocumentSection';
 import { useDataStore } from '../stores/data';
@@ -91,6 +92,7 @@ export default function Components() {
   const [editParts, setEditParts] = useState<AssemblyPartItem[]>([]);
   const [loadingEditParts, setLoadingEditParts] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [versionSelectState, setVersionSelectState] = useState<{ itemId: string; childId: string; childType: string; childName: string } | null>(null);
 
 /* ---- 详情弹窗 ---- */
   const [viewingAssembly, setViewingAssembly] = useState<Assembly | null>(null);
@@ -131,7 +133,7 @@ export default function Components() {
      Data Loading
      ============================================================== */
 
-  const { sortedData, handleSort, getSortIcon } = useTableSort<Assembly>(assemblies);
+  const { sortedData, handleSort, getSortIcon } = useTableSort<Assembly>(assemblies, 'code', 'asc');
 
   // 获取部件适用的自定义字段定义
   const componentCustomDefs = customFieldDefs.filter((d) => d.applies_to?.includes('component'));
@@ -330,6 +332,25 @@ export default function Components() {
       await loadEditParts(editingAssembly.id);
     } catch {
       alert('删除子项失败');
+    }
+  };
+
+  const handleVersionSelectChild = async (selectedVersionId: string) => {
+    if (!editingAssembly || !versionSelectState) return;
+    const item = editParts.find(p => p.id === versionSelectState.itemId);
+    if (!item) return;
+    try {
+      await assemblyPartsApi.remove(editingAssembly.id, versionSelectState.itemId);
+      await assemblyPartsApi.add(editingAssembly.id, {
+        child_type: versionSelectState.childType,
+        child_id: selectedVersionId,
+        quantity: item.quantity,
+      });
+      await loadEditParts(editingAssembly.id);
+    } catch {
+      alert('切换版本失败');
+    } finally {
+      setVersionSelectState(null);
     }
   };
 
@@ -787,17 +808,34 @@ export default function Components() {
                       className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
                     />
                   </td>
-                  <td className="px-3 py-2 text-right">
-                    {isAdmin() && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemovePart(part.id)}
-                        className="text-red-500 hover:text-red-700 text-xs"
-                        title="移除子项"
-                      >
-                        移除
-                      </button>
-                    )}
+                  <td className="px-3 py-2 text-right whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1">
+                      {canEdit() && (
+                        <button
+                          type="button"
+                          onClick={() => setVersionSelectState({
+                            itemId: part.id,
+                            childId: part.child_id,
+                            childType: part.childType === 'component' ? 'assembly' : part.childType,
+                            childName: part.child_detail?.code || part.child_detail?.name || '',
+                          })}
+                          className="text-primary-600 hover:text-primary-800 text-xs"
+                          title="选择版本"
+                        >
+                          选择
+                        </button>
+                      )}
+                      {isAdmin() && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePart(part.id)}
+                          className="text-red-500 hover:text-red-700 text-xs"
+                          title="移除子项"
+                        >
+                          移除
+                        </button>
+                      )}
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -1193,6 +1231,17 @@ export default function Components() {
         onConfirm={handleAddParts}
         currentAssemblyId={editingAssembly?.id}
         existingChildIds={existingChildIds}
+      />
+
+      {/* 子项版本选择弹窗 */}
+      <VersionSelectModal
+        open={!!versionSelectState}
+        entityType={versionSelectState?.childType as 'part' | 'assembly' || 'part'}
+        entityId={versionSelectState?.childId || ''}
+        entityName={versionSelectState?.childName}
+        currentVersionId={versionSelectState?.childId}
+        onSelect={handleVersionSelectChild}
+        onClose={() => setVersionSelectState(null)}
       />
 
       {/* 删除确认 */}
