@@ -326,3 +326,33 @@ async def delete_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, request: Reque
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username, "删除附件", "document_att", str(doc_id), f"文件ID:{att_id}", ip)
     return {"message": "附件已删除"}
+
+
+# ===== 版本控制 (升版) =====
+
+@router.post("/{doc_id}/upgrade")
+async def upgrade_document_endpoint(doc_id: uuid.UUID, body: schemas.UpgradeRequest, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+    db_doc, err = crud.upgrade_document(db, doc_id, current_user.real_name or current_user.username)
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    ip = request.client.host if request.client else None
+    crud.create_log(db, current_user.id, current_user.username, "图文档升版", "document", str(db_doc.id), f"编号:{db_doc.code} 版本:{db_doc.version}", ip)
+    return {
+        "id": db_doc.id, "code": db_doc.code, "name": db_doc.name,
+        "version": db_doc.version, "status": db_doc.status,
+        "remark": db_doc.remark,
+        "file_name": db_doc.file_name, "file_id": db_doc.file_id,
+        "created_at": db_doc.created_at, "updated_at": db_doc.updated_at,
+    }
+
+
+@router.get("/{doc_id}/versions")
+async def get_document_versions_endpoint(doc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+    versions = crud.get_document_versions(db, doc_id)
+    return [{
+        "id": v.id, "code": v.code, "name": v.name,
+        "version": v.version, "status": v.status,
+        "remark": v.remark,
+        "file_name": v.file_name, "file_id": v.file_id,
+        "created_at": v.created_at, "updated_at": v.updated_at,
+    } for v in versions]

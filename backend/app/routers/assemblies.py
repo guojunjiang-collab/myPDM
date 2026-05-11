@@ -266,3 +266,21 @@ async def delete_assembly_document(assembly_id: uuid.UUID, link_id: uuid.UUID, d
     db_assembly.document_links = new_links
     db.commit()
     return {"message": "关联已移除"}
+
+
+# ===== 版本控制 (升版) =====
+
+@router.post("/{assembly_id}/upgrade")
+async def upgrade_assembly_endpoint(assembly_id: uuid.UUID, body: schemas.UpgradeRequest, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+    db_assembly, err = crud.upgrade_assembly(db, assembly_id, current_user.real_name or current_user.username)
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    ip = request.client.host if request.client else None
+    crud.create_log(db, current_user.id, current_user.username, "部件升版", "assembly", str(db_assembly.id), f"编码:{db_assembly.code} 版本:{db_assembly.version}", ip)
+    return _assembly_response(db_assembly)
+
+
+@router.get("/{assembly_id}/versions")
+async def get_assembly_versions_endpoint(assembly_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+    versions = crud.get_assembly_versions(db, assembly_id)
+    return [_assembly_response(v) for v in versions]

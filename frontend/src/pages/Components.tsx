@@ -5,9 +5,9 @@ import { canEdit, isAdmin, canDownload } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
 import AssemblyDetailContent from '../components/AssemblyDetailContent';
 import PartDetailContent from '../components/PartDetailContent';
+import VersionHistory from '../components/VersionHistory';
 import AssemblyPartPicker from '../components/AssemblyPartPicker';
 import EntityDocumentSection from '../components/EntityDocumentSection';
-import { getNextVersion } from '../constants';
 import { useDataStore } from '../stores/data';
 import { useTableSort } from '../hooks/useTableSort';
 import {
@@ -70,6 +70,7 @@ export default function Components() {
   const [search, setSearch] = useState('');
   const [searchField, setSearchField] = useState('all');
   const [status, setStatus] = useState('');
+  const [showAllVersions, setShowAllVersions] = useState(false);
 
   /* ---- 编辑弹窗 ---- */
   const [modalOpen, setModalOpen] = useState(false);
@@ -95,6 +96,7 @@ export default function Components() {
   const [viewingAssembly, setViewingAssembly] = useState<Assembly | null>(null);
   const [viewingCustomDefs, setViewingCustomDefs] = useState<CustomFieldDefinition[]>([]);
   const [viewingCustomValues, setViewingCustomValues] = useState<Record<string, unknown>>({});
+  const [detailTab, setDetailTab] = useState<'detail' | 'versions'>('detail');
   // 子项点击 → 嵌套详情弹窗
   const [nestedEntity, setNestedEntity] = useState<{ type: 'part' | 'assembly'; id: string } | null>(null);
   const [nestedData, setNestedData] = useState<any>(null);
@@ -168,6 +170,24 @@ export default function Components() {
     }
     return true;
   });
+
+  // 版本计数
+  const versionCountMap: Record<string, number> = {};
+  assemblies.forEach(a => {
+    versionCountMap[a.code] = (versionCountMap[a.code] || 0) + 1;
+  });
+
+  // 仅显示最新版本
+  const displayData = showAllVersions ? filteredData : (() => {
+    const latestMap: Record<string, typeof filteredData[0]> = {};
+    filteredData.forEach(a => {
+      const existing = latestMap[a.code];
+      if (!existing || new Date(a.created_at || 0) > new Date(existing.created_at || 0)) {
+        latestMap[a.code] = a;
+      }
+    });
+    return Object.values(latestMap);
+  })();
 
   useEffect(() => {
     loadAssemblies();
@@ -513,8 +533,27 @@ export default function Components() {
     }
   };
 
+  const handleUpgrade = async () => {
+    if (!editingAssembly) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const res = await assembliesApi.upgrade(editingAssembly.id);
+      const newAssembly = res.data;
+      useDataStore.getState().setAssemblies([...useDataStore.getState().assemblies, newAssembly]);
+      setModalOpen(false);
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { detail?: unknown } } };
+      const detail = err?.response?.data?.detail;
+      setSaveError(typeof detail === 'string' ? detail : '升版失败，请重试');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleView = async (assembly: Assembly) => {
     setViewingAssembly(assembly);
+    setDetailTab('detail');
     setExpandedIds(new Set());
     const allDefs = useDataStore.getState().customFieldDefs;
     setViewingCustomDefs(allDefs.filter((d: CustomFieldDefinition) => d.applies_to?.includes('component')));
@@ -904,6 +943,15 @@ export default function Components() {
           <option value="released">发布</option>
           <option value="obsolete">作废</option>
         </select>
+        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm">
+          <input
+            type="checkbox"
+            checked={showAllVersions}
+            onChange={(e) => setShowAllVersions(e.target.checked)}
+            className="w-4 h-4 text-primary-600 rounded"
+          />
+          显示全部版本
+        </label>
       </div>
 
       {/* 列表表格 */}
@@ -933,13 +981,20 @@ export default function Components() {
                 </td>
               </tr>
             ) : (
-              filteredData.map((assembly) => (
+              displayData.map((assembly) => (
                 <tr
                   key={assembly.id}
                   className="hover:bg-gray-50 cursor-pointer"
                   onClick={() => handleView(assembly)}
                 >
-                  <td className="px-4 py-3 text-sm font-medium">{assembly.code}</td>
+                  <td className="px-4 py-3 text-sm font-medium">
+                    {assembly.code}
+                    {!showAllVersions && (versionCountMap[assembly.code] || 0) > 1 && (
+                      <span className="ml-1.5 text-xs text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded">
+                        {(versionCountMap[assembly.code] || 0)}个版本
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-sm">{assembly.name}</td>
                   <td className="px-4 py-3 text-sm text-gray-500">{assembly.spec || '-'}</td>
                   <td className="px-4 py-3 text-sm text-gray-500">{assembly.version || '-'}</td>
@@ -1096,19 +1151,18 @@ export default function Components() {
           )}
 
           {/* 底部操作 */}
-          <div className="flex justify-between items-center gap-2 pt-4 border-t">
+           <div className="flex justify-between items-center gap-2 pt-4 border-t">
             <div>
               {editingAssembly &&
                 (editingAssembly.status === 'released' || editingAssembly.status === 'obsolete') && (
                   <button
                     type="button"
-                    onClick={() =>
-                      setFormData({ ...formData, version: getNextVersion(formData.version) })
-                    }
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    onClick={handleUpgrade}
+                    disabled={saving}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
                     title="升版"
                   >
-                    升版
+                    {saving ? '升版中...' : '升版'}
                   </button>
                 )}
             </div>
@@ -1161,12 +1215,52 @@ export default function Components() {
         width="full"
       >
         {viewingAssembly && (
-          <AssemblyDetailContent
-            assembly={viewingAssembly}
-            customFieldDefs={viewingCustomDefs}
-            customFieldValues={viewingCustomValues}
-            onSubItemClick={(item) => handleNestedView(item.childType === 'part' ? 'part' : 'assembly', item.child_id)}
-          />
+          <div>
+            <div className="flex gap-1 mb-4 border-b">
+              <button
+                onClick={() => setDetailTab('detail')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  detailTab === 'detail'
+                    ? 'border-primary-600 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                基本信息
+              </button>
+              <button
+                onClick={() => setDetailTab('versions')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  detailTab === 'versions'
+                    ? 'border-primary-600 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                版本历史
+              </button>
+            </div>
+
+            {detailTab === 'detail' ? (
+              <AssemblyDetailContent
+                assembly={viewingAssembly}
+                customFieldDefs={viewingCustomDefs}
+                customFieldValues={viewingCustomValues}
+                onSubItemClick={(item) => handleNestedView(item.childType === 'part' ? 'part' : 'assembly', item.child_id)}
+              />
+            ) : (
+              <VersionHistory
+                entityType="assembly"
+                entityId={viewingAssembly.id}
+                onViewVersion={async (id) => {
+                  try {
+                    const res = await assembliesApi.get(id);
+                    handleView(res.data);
+                  } catch {
+                    alert('加载版本失败');
+                  }
+                }}
+              />
+            )}
+          </div>
         )}
       </Modal>
 

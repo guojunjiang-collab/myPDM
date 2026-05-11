@@ -224,3 +224,21 @@ async def delete_part_document(part_id: uuid.UUID, link_id: uuid.UUID, db: Sessi
     part.document_links = new_links
     db.commit()
     return {"message": "关联已移除"}
+
+
+# ===== 版本控制 (升版) =====
+
+@router.post("/{part_id}/upgrade")
+async def upgrade_part_endpoint(part_id: uuid.UUID, body: schemas.UpgradeRequest, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+    db_part, err = crud.upgrade_part(db, part_id, current_user.real_name or current_user.username)
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    ip = request.client.host if request.client else None
+    crud.create_log(db, current_user.id, current_user.username, "零件升版", "part", str(db_part.id), f"编码:{db_part.code} 版本:{db_part.version}", ip)
+    return _part_response(db_part)
+
+
+@router.get("/{part_id}/versions")
+async def get_part_versions_endpoint(part_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+    versions = crud.get_part_versions(db, part_id)
+    return [_part_response(v) for v in versions]

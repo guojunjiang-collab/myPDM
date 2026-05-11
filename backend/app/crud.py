@@ -455,3 +455,197 @@ def set_custom_field_values(db, entity_type, entity_id, values):
             db.add(new_val)
     db.commit()
     return True
+
+
+# ===== 版本控制 (升版) =====
+
+VERSION_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
+
+
+def _to_version_string(index: int) -> str:
+    """将索引转为版本字符串 A=0, B=1, ..."""
+    if index < 0:
+        index = 0
+    result = ''
+    num = index
+    while True:
+        result = VERSION_CHARS[num % 24] + result
+        num = num // 24 - 1
+        if num < 0:
+            break
+    return result
+
+
+def _get_next_version(db, model_class, code: str) -> str:
+    """根据同编码已有版本数，生成下一版本号"""
+    count = db.query(model_class).filter(model_class.code == code).count()
+    return _to_version_string(count)
+
+
+def _copy_custom_field_values(db, entity_type: str, old_entity_id, new_entity_id):
+    """复制自定义字段值"""
+    old_values = db.query(models.CustomFieldValue).filter(
+        models.CustomFieldValue.entity_type == entity_type,
+        models.CustomFieldValue.entity_id == old_entity_id
+    ).all()
+    for ov in old_values:
+        new_val = models.CustomFieldValue(
+            field_id=ov.field_id,
+            entity_type=entity_type,
+            entity_id=new_entity_id,
+            value_text=ov.value_text,
+            value_number=ov.value_number,
+            value_json=ov.value_json,
+        )
+        db.add(new_val)
+    if old_values:
+        db.flush()
+
+
+def upgrade_part(db, part_id, user: str = None):
+    """零件升版：创建新版本零件，复制自定义字段"""
+    from datetime import datetime, timezone
+    source = db.query(models.Part).filter(models.Part.id == part_id).first()
+    if not source:
+        return None, "零件不存在"
+    if source.status not in ('released', 'obsolete'):
+        return None, "仅发布或作废状态的零件允许升版"
+
+    new_version = _get_next_version(db, models.Part, source.code)
+    new_part = models.Part(
+        code=source.code,
+        name=source.name,
+        spec=source.spec,
+        version=new_version,
+        status='draft',
+        remark=source.remark,
+        document_links=source.document_links or [],
+        revision_parent_id=source.id,
+        revisions=[{
+            'version': new_version,
+            'parent_version': source.version,
+            'action': 'upgraded_from',
+            'user': user,
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+        }],
+    )
+    db.add(new_part)
+    db.flush()
+    _copy_custom_field_values(db, 'part', source.id, new_part.id)
+    db.commit()
+    db.refresh(new_part)
+    return new_part, None
+
+
+def upgrade_assembly(db, assembly_id, user: str = None):
+    """部件升版：创建新版本部件，复制自定义字段和BOM结构"""
+    from datetime import datetime, timezone
+    source = db.query(models.Assembly).filter(models.Assembly.id == assembly_id).first()
+    if not source:
+        return None, "部件不存在"
+    if source.status not in ('released', 'obsolete'):
+        return None, "仅发布或作废状态的部件允许升版"
+
+    new_version = _get_next_version(db, models.Assembly, source.code)
+    new_assembly = models.Assembly(
+        code=source.code,
+        name=source.name,
+        spec=source.spec,
+        version=new_version,
+        status='draft',
+        remark=source.remark,
+        document_links=source.document_links or [],
+        revision_parent_id=source.id,
+        revisions=[{
+            'version': new_version,
+            'parent_version': source.version,
+            'action': 'upgraded_from',
+            'user': username,
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+        }],
+    )
+    db.add(new_assembly)
+    db.flush()
+    _copy_custom_field_values(db, 'assembly', source.id, new_assembly.id)
+
+    # 深拷贝 BOM 结构
+    source_bom_items = db.query(models.BOMItem).filter(
+        models.BOMItem.parent_type == 'assembly',
+        models.BOMItem.parent_id == source.id
+    ).all()
+    for item in source_bom_items:
+        new_bom_item = models.BOMItem(
+            parent_type='assembly',
+            parent_id=new_assembly.id,
+            child_type=item.child_type,
+            child_id=item.child_id,
+            quantity=item.quantity,
+        )
+        db.add(new_bom_item)
+
+    db.commit()
+    db.refresh(new_assembly)
+    return new_assembly, None
+
+
+def upgrade_document(db, doc_id, user: str = None):
+    """图文档升版：创建新版本图文档，复制自定义字段（不拷贝附件）"""
+    from datetime import datetime, timezone
+    source = db.query(models.Document).filter(models.Document.id == doc_id).first()
+    if not source:
+        return None, "图文档不存在"
+    if source.status not in ('released', 'obsolete'):
+        return None, "仅发布或作废状态的图文档允许升版"
+
+    new_version = _get_next_version(db, models.Document, source.code)
+    new_doc = models.Document(
+        code=source.code,
+        name=source.name,
+        version=new_version,
+        status='draft',
+        remark=source.remark,
+        revision_parent_id=source.id,
+        revisions=[{
+            'version': new_version,
+            'parent_version': source.version,
+            'action': 'upgraded_from',
+            'user': username,
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+        }],
+    )
+    db.add(new_doc)
+    db.flush()
+    _copy_custom_field_values(db, 'document', source.id, new_doc.id)
+    db.commit()
+    db.refresh(new_doc)
+    return new_doc, None
+
+
+def get_part_versions(db, part_id):
+    """获取指定零件的所有版本（同编码）"""
+    part = db.query(models.Part).filter(models.Part.id == part_id).first()
+    if not part:
+        return []
+    return db.query(models.Part).filter(
+        models.Part.code == part.code
+    ).order_by(models.Part.created_at).all()
+
+
+def get_assembly_versions(db, assembly_id):
+    """获取指定部件的所有版本（同编码）"""
+    assembly = db.query(models.Assembly).filter(models.Assembly.id == assembly_id).first()
+    if not assembly:
+        return []
+    return db.query(models.Assembly).filter(
+        models.Assembly.code == assembly.code
+    ).order_by(models.Assembly.created_at).all()
+
+
+def get_document_versions(db, doc_id):
+    """获取指定图文档的所有版本（同编码）"""
+    doc = db.query(models.Document).filter(models.Document.id == doc_id).first()
+    if not doc:
+        return []
+    return db.query(models.Document).filter(
+        models.Document.code == doc.code
+    ).order_by(models.Document.created_at).all()

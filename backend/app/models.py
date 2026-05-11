@@ -29,6 +29,7 @@ class Part(Base):
     status = Column(String(32), nullable=False, default="draft")
     remark = Column(Text)
     revisions = Column(JSONB, default=[])
+    revision_parent_id = Column(UUID(as_uuid=True), nullable=True)
     document_links = Column(JSONB, default=[])  # [{id, document_id, category, sort_order}]
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -40,10 +41,11 @@ class Assembly(Base):
     code = Column(String(64), nullable=False)
     name = Column(String(255), nullable=False)
     spec = Column(String(255))
-    version = Column(String(32), default="V1.0")
+    version = Column(String(32), default="A")
     status = Column(String(32), nullable=False, default="draft")
     remark = Column(Text)
     revisions = Column(JSONB, default=[])
+    revision_parent_id = Column(UUID(as_uuid=True), nullable=True)
     document_links = Column(JSONB, default=[])  # [{id, document_id, category, sort_order}]
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -82,6 +84,8 @@ class Document(Base):
     remark = Column(Text)
     file_name = Column(String(255))
     file_id = Column(UUID(as_uuid=True), ForeignKey('document_attachments.id', ondelete='SET NULL'))
+    revisions = Column(JSONB, default=[])
+    revision_parent_id = Column(UUID(as_uuid=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

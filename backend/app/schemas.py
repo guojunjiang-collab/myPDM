@@ -71,7 +71,7 @@ class AssemblyBase(BaseSchema):
     code: str = Field(..., min_length=1, max_length=64)
     name: str = Field(..., min_length=1, max_length=255)
     spec: Optional[str] = None
-    version: str = "V1.0"
+    version: str = "A"
     status: str = "draft"
     remark: Optional[str] = None
     revisions: Optional[List[Any]] = None
@@ -347,3 +347,16 @@ class DashboardResponse(BaseSchema):
     name: str
     created_at: datetime
     updated_at: datetime
+
+
+# ===== 升版 Schema =====
+
+class UpgradeRequest(BaseSchema):
+    note: Optional[str] = None
+
+class VersionItem(BaseSchema):
+    id: uuid.UUID
+    version: str
+    status: str
+    created_at: Optional[datetime] = None
+    revision_parent_id: Optional[uuid.UUID] = None

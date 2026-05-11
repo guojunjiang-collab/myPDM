@@ -20,6 +20,7 @@ export interface Part {
   version?: string;
   status: 'draft' | 'frozen' | 'released' | 'obsolete';
   remark?: string;
+  revision_parent_id?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -32,6 +33,7 @@ export interface Assembly {
   version?: string;
   status: 'draft' | 'frozen' | 'released' | 'obsolete';
   remark?: string;
+  revision_parent_id?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -45,6 +47,7 @@ export interface Document {
   remark?: string;
   file_name?: string;
   file_id?: string;
+  revision_parent_id?: string;
   created_at?: string;
   updated_at?: string;
 }

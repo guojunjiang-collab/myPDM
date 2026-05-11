@@ -69,6 +69,8 @@ export const partsApi = {
   create: (data: unknown) => api.post('/parts/', data),
   update: (id: string, data: unknown) => api.put(`/parts/${id}`, data),
   delete: (id: string) => api.delete(`/parts/${id}`),
+  upgrade: (id: string, note?: string) => api.post(`/parts/${id}/upgrade`, { note }),
+  versions: (id: string) => api.get(`/parts/${id}/versions`),
   exportExcel: (params?: { status?: string }) =>
     api.get('/parts/export', { params, responseType: 'blob' }),
 };
@@ -81,6 +83,8 @@ export const assembliesApi = {
   create: (data: unknown) => api.post('/assemblies/', data),
   update: (id: string, data: unknown) => api.put(`/assemblies/${id}`, data),
   delete: (id: string) => api.delete(`/assemblies/${id}`),
+  upgrade: (id: string, note?: string) => api.post(`/assemblies/${id}/upgrade`, { note }),
+  versions: (id: string) => api.get(`/assemblies/${id}/versions`),
   exportBOM: (id: string) =>
     api.get(`/assemblies/${id}/bom/export`, { responseType: 'blob' }),
 };
@@ -93,6 +97,8 @@ export const documentsApi = {
   create: (data: unknown) => api.post('/documents/', data),
   update: (id: string, data: unknown) => api.put(`/documents/${id}`, data),
   delete: (id: string) => api.delete(`/documents/${id}`),
+  upgrade: (id: string, note?: string) => api.post(`/documents/${id}/upgrade`, { note }),
+  versions: (id: string) => api.get(`/documents/${id}/versions`),
   // 图文档附件
   uploadAttachment: (docId: string, data: { id?: string; file_name: string; file_data: string }) =>
     api.post(`/documents/${docId}/attachments`, data),

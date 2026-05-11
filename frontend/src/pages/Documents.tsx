@@ -4,7 +4,7 @@ import type { Document, CustomFieldDefinition, CustomFieldValue, DocumentAttachm
 import { canEdit, isAdmin, canDownload } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
 import DocumentDetailContent from '../components/DocumentDetailContent';
-import { getNextVersion } from '../constants';
+import VersionHistory from '../components/VersionHistory';
 import { useDataStore } from '../stores/data';
 import { useTableSort } from '../hooks/useTableSort';
 import {
@@ -67,6 +67,7 @@ export default function Documents() {
   const [search, setSearch] = useState('');
   const [searchField, setSearchField] = useState('all');
   const [status, setStatus] = useState('');
+  const [showAllVersions, setShowAllVersions] = useState(false);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<Document | null>(null);
@@ -80,6 +81,7 @@ export default function Documents() {
   const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
   const [viewingCustomDefs, setViewingCustomDefs] = useState<CustomFieldDefinition[]>([]);
   const [viewingCustomValues, setViewingCustomValues] = useState<Record<string, any>>({});
+  const [detailTab, setDetailTab] = useState<'detail' | 'versions'>('detail');
 
   // 从 store 订阅数据
   const storeDocuments = useDataStore((s) => s.documents);
@@ -147,6 +149,24 @@ export default function Documents() {
     }
     return true;
   });
+
+  // 版本计数
+  const versionCountMap: Record<string, number> = {};
+  documents.forEach(d => {
+    versionCountMap[d.code] = (versionCountMap[d.code] || 0) + 1;
+  });
+
+  // 仅显示最新版本
+  const displayData = showAllVersions ? filteredData : (() => {
+    const latestMap: Record<string, typeof filteredData[0]> = {};
+    filteredData.forEach(d => {
+      const existing = latestMap[d.code];
+      if (!existing || new Date(d.created_at || 0) > new Date(existing.created_at || 0)) {
+        latestMap[d.code] = d;
+      }
+    });
+    return Object.values(latestMap);
+  })();
 
   const loadDocuments = () => {
     const localDocuments = useDataStore.getState().documents;
@@ -401,8 +421,26 @@ export default function Documents() {
     }
   };
 
+  const handleUpgrade = async () => {
+    if (!editingDoc) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const res = await documentsApi.upgrade(editingDoc.id);
+      const newDoc = res.data;
+      useDataStore.getState().setDocuments([...useDataStore.getState().documents, newDoc]);
+      setModalOpen(false);
+    } catch (error: any) {
+      const detail = error.response?.data?.detail;
+      setSaveError(typeof detail === 'string' ? detail : '升版失败，请重试');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleView = async (doc: Document) => {
     setViewingDoc(doc);
+    setDetailTab('detail');
     const allDefs = useDataStore.getState().customFieldDefs;
     const docDefs = allDefs.filter((d: CustomFieldDefinition) => d.applies_to?.includes('document'));
     setViewingCustomDefs(docDefs);
@@ -573,6 +611,15 @@ export default function Documents() {
           <option value="released">发布</option>
           <option value="obsolete">作废</option>
         </select>
+        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm">
+          <input
+            type="checkbox"
+            checked={showAllVersions}
+            onChange={(e) => setShowAllVersions(e.target.checked)}
+            className="w-4 h-4 text-primary-600 rounded"
+          />
+          显示全部版本
+        </label>
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -592,9 +639,16 @@ export default function Documents() {
             ) : filteredData.length === 0 ? (
               <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">无匹配数据</td></tr>
             ) : (
-              filteredData.map((doc) => (
+              displayData.map((doc) => (
                 <tr key={doc.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleView(doc)}>
-                  <td className="px-4 py-3 text-sm font-medium">{doc.code}</td>
+                  <td className="px-4 py-3 text-sm font-medium">
+                    {doc.code}
+                    {!showAllVersions && (versionCountMap[doc.code] || 0) > 1 && (
+                      <span className="ml-1.5 text-xs text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded">
+                        {(versionCountMap[doc.code] || 0)}个版本
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-sm">{doc.name}</td>
                   <td className="px-4 py-3 text-sm text-gray-500">{doc.version || '-'}</td>
                   <td className="px-4 py-3">
@@ -788,16 +842,17 @@ export default function Documents() {
             </div>
           )}
 
-          <div className="flex justify-between items-center gap-2 pt-4 border-t">
+           <div className="flex justify-between items-center gap-2 pt-4 border-t">
             <div>
               {editingDoc && (editingDoc.status === 'released' || editingDoc.status === 'obsolete') && (
                 <button
                   type="button"
-                  onClick={() => setFormData({ ...formData, version: getNextVersion(formData.version) })}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  onClick={handleUpgrade}
+                  disabled={saving}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
                   title="升版"
                 >
-                  升版
+                  {saving ? '升版中...' : '升版'}
                 </button>
               )}
             </div>
@@ -830,11 +885,51 @@ export default function Documents() {
         width="full"
       >
         {viewingDoc && (
-          <DocumentDetailContent
-            doc={viewingDoc}
-            customFieldDefs={viewingCustomDefs}
-            customFieldValues={viewingCustomValues}
-          />
+          <div>
+            <div className="flex gap-1 mb-4 border-b">
+              <button
+                onClick={() => setDetailTab('detail')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  detailTab === 'detail'
+                    ? 'border-primary-600 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                基本信息
+              </button>
+              <button
+                onClick={() => setDetailTab('versions')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  detailTab === 'versions'
+                    ? 'border-primary-600 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                版本历史
+              </button>
+            </div>
+
+            {detailTab === 'detail' ? (
+              <DocumentDetailContent
+                doc={viewingDoc}
+                customFieldDefs={viewingCustomDefs}
+                customFieldValues={viewingCustomValues}
+              />
+            ) : (
+              <VersionHistory
+                entityType="document"
+                entityId={viewingDoc.id}
+                onViewVersion={async (id) => {
+                  try {
+                    const res = await documentsApi.get(id);
+                    handleView(res.data);
+                  } catch {
+                    alert('加载版本失败');
+                  }
+                }}
+              />
+            )}
+          </div>
         )}
       </Modal>
 

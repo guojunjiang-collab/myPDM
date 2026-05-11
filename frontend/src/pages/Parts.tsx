@@ -4,8 +4,8 @@ import type { Part, CustomFieldDefinition, CustomFieldValue } from '../types';
 import { canEdit, isAdmin, canDownload } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
 import PartDetailContent from '../components/PartDetailContent';
+import VersionHistory from '../components/VersionHistory';
 import EntityDocumentSection from '../components/EntityDocumentSection';
-import { getNextVersion } from '../constants';
 import { useDataStore } from '../stores/data';
 import { useTableSort } from '../hooks/useTableSort';
 import {
@@ -40,6 +40,7 @@ export default function Parts() {
   const [search, setSearch] = useState('');
   const [searchField, setSearchField] = useState('all');
   const [status, setStatus] = useState('');
+  const [showAllVersions, setShowAllVersions] = useState(false);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPart, setEditingPart] = useState<Part | null>(null);
@@ -53,6 +54,7 @@ export default function Parts() {
   const [viewingPart, setViewingPart] = useState<Part | null>(null);
   const [viewingCustomDefs, setViewingCustomDefs] = useState<CustomFieldDefinition[]>([]);
   const [viewingCustomValues, setViewingCustomValues] = useState<Record<string, any>>({});
+  const [detailTab, setDetailTab] = useState<'detail' | 'versions'>('detail');
 
   // 从 store 订阅数据（store 更新时自动触发重新渲染）
   const storeParts = useDataStore((s) => s.parts);
@@ -111,6 +113,24 @@ export default function Parts() {
     }
     return true;
   });
+
+  // 版本计数（用于显示"已有N个版本"）
+  const versionCountMap: Record<string, number> = {};
+  parts.forEach(p => {
+    versionCountMap[p.code] = (versionCountMap[p.code] || 0) + 1;
+  });
+
+  // 仅显示最新版本（按创建时间）
+  const displayData = showAllVersions ? filteredData : (() => {
+    const latestMap: Record<string, typeof filteredData[0]> = {};
+    filteredData.forEach(p => {
+      const existing = latestMap[p.code];
+      if (!existing || new Date(p.created_at || 0) > new Date(existing.created_at || 0)) {
+        latestMap[p.code] = p;
+      }
+    });
+    return Object.values(latestMap);
+  })();
 
   useEffect(() => {
     loadParts();
@@ -264,8 +284,26 @@ export default function Parts() {
     }
   };
 
+  const handleUpgrade = async () => {
+    if (!editingPart) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const res = await partsApi.upgrade(editingPart.id);
+      const newPart = res.data;
+      useDataStore.getState().setParts([...useDataStore.getState().parts, newPart]);
+      setModalOpen(false);
+    } catch (error: any) {
+      const detail = error.response?.data?.detail;
+      setSaveError(typeof detail === 'string' ? detail : '升版失败，请重试');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleView = async (part: Part) => {
     setViewingPart(part);
+    setDetailTab('detail');
     // 加载该零件的自定义字段定义（适用于零件的）
     const allDefs = useDataStore.getState().customFieldDefs;
     const partDefs = allDefs.filter((d: CustomFieldDefinition) => d.applies_to?.includes('part'));
@@ -457,6 +495,15 @@ export default function Parts() {
           <option value="released">发布</option>
           <option value="obsolete">作废</option>
         </select>
+        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm">
+          <input
+            type="checkbox"
+            checked={showAllVersions}
+            onChange={(e) => setShowAllVersions(e.target.checked)}
+            className="w-4 h-4 text-primary-600 rounded"
+          />
+          显示全部版本
+        </label>
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -481,9 +528,16 @@ export default function Parts() {
                 <td colSpan={6} className="px-4 py-8 text-center text-gray-500">无匹配数据</td>
               </tr>
             ) : (
-              filteredData.map((part) => (
+              displayData.map((part) => (
                 <tr key={part.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleView(part)}>
-                  <td className="px-4 py-3 text-sm font-medium">{part.code}</td>
+                  <td className="px-4 py-3 text-sm font-medium">
+                    {part.code}
+                    {!showAllVersions && (versionCountMap[part.code] || 0) > 1 && (
+                      <span className="ml-1.5 text-xs text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded">
+                        {(versionCountMap[part.code] || 0)}个版本
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-sm">{part.name}</td>
                   <td className="px-4 py-3 text-sm text-gray-500">{part.spec || '-'}</td>
                   <td className="px-4 py-3 text-sm text-gray-500">{part.version || '-'}</td>
@@ -614,16 +668,17 @@ export default function Parts() {
             <EntityDocumentSection entityType="part" entityId={editingPart.id} editable />
           )}
 
-          <div className="flex justify-between items-center gap-2 pt-4 border-t">
+           <div className="flex justify-between items-center gap-2 pt-4 border-t">
             <div>
               {editingPart && (editingPart.status === 'released' || editingPart.status === 'obsolete') && (
                 <button
                   type="button"
-                  onClick={() => setFormData({ ...formData, version: getNextVersion(formData.version) })}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  onClick={handleUpgrade}
+                  disabled={saving}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
                   title="升版"
                 >
-                  升版
+                  {saving ? '升版中...' : '升版'}
                 </button>
               )}
             </div>
@@ -656,11 +711,52 @@ export default function Parts() {
         width="full"
       >
         {viewingPart && (
-          <PartDetailContent
-            part={viewingPart}
-            customFieldDefs={viewingCustomDefs}
-            customFieldValues={viewingCustomValues}
-          />
+          <div>
+            {/* Tab 切换 */}
+            <div className="flex gap-1 mb-4 border-b">
+              <button
+                onClick={() => setDetailTab('detail')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  detailTab === 'detail'
+                    ? 'border-primary-600 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                基本信息
+              </button>
+              <button
+                onClick={() => setDetailTab('versions')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  detailTab === 'versions'
+                    ? 'border-primary-600 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                版本历史
+              </button>
+            </div>
+
+            {detailTab === 'detail' ? (
+              <PartDetailContent
+                part={viewingPart}
+                customFieldDefs={viewingCustomDefs}
+                customFieldValues={viewingCustomValues}
+              />
+            ) : (
+              <VersionHistory
+                entityType="part"
+                entityId={viewingPart.id}
+                onViewVersion={async (id) => {
+                  try {
+                    const res = await partsApi.get(id);
+                    handleView(res.data);
+                  } catch {
+                    alert('加载版本失败');
+                  }
+                }}
+              />
+            )}
+          </div>
         )}
       </Modal>
 
