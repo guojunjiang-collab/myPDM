@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuthStore } from '../stores/auth';
 import { useDataStore } from '../stores/data';
 import { ConfirmModal } from './Modal';
@@ -70,9 +70,9 @@ export default function Layout() {
         </div>
         <nav className="flex-1 p-2">
           {visibleNavItems.map((item) => (
-            <a
+            <Link
               key={item.path}
-              href={item.path}
+              to={item.path}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg mb-1 transition-colors ${
                 location.pathname === item.path
                   ? 'bg-primary-50 text-primary-600'
@@ -81,7 +81,7 @@ export default function Layout() {
             >
               <span>{item.icon}</span>
               <span>{item.label}</span>
-            </a>
+            </Link>
           ))}
         </nav>
         <div className="p-2 border-t border-gray-200">
