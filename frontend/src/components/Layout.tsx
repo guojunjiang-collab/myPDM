@@ -15,7 +15,7 @@ const navItems = [
   { path: '/ecn', label: '变更管理', icon: '🔄', roles: ['admin', 'engineer', 'production', 'guest'] },
   { path: '/business', label: '业务管理', icon: '💼', roles: ['admin', 'engineer', 'production', 'guest'] },
   { path: '/users', label: '用户管理', icon: '👥', roles: ['admin', 'engineer', 'production', 'guest'] },
-  { path: '/settings', label: '系统设置', icon: '⚙️', roles: ['admin'] },
+  { path: '/settings', label: '系统设置', icon: '⚙️', roles: ['admin', 'engineer', 'production', 'guest'] },
 ];
 
 export default function Layout() {

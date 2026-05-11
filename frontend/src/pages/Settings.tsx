@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { customFieldsApi, authApi } from '../services/api';
 import { useAuthStore } from '../stores/auth';
+import { isAdmin } from '../stores/auth';
 import type { CustomFieldDefinition } from '../types';
 import { Modal } from '../components/Modal';
 import { useDataStore } from '../stores/data';
@@ -304,26 +305,30 @@ export default function Settings() {
 
       {/* Tabs */}
       <div className="flex gap-2 mb-4">
-        <button
-          onClick={() => setActiveTab('customFields')}
-          className={`px-4 py-2 rounded-lg ${
-            activeTab === 'customFields'
-              ? 'bg-primary-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-        >
-          自定义字段
-        </button>
-        <button
-          onClick={() => setActiveTab('dataManagement')}
-          className={`px-4 py-2 rounded-lg ${
-            activeTab === 'dataManagement'
-              ? 'bg-primary-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-        >
-          数据管理
-        </button>
+        {isAdmin() && (
+          <>
+            <button
+              onClick={() => setActiveTab('customFields')}
+              className={`px-4 py-2 rounded-lg ${
+                activeTab === 'customFields'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              自定义字段
+            </button>
+            <button
+              onClick={() => setActiveTab('dataManagement')}
+              className={`px-4 py-2 rounded-lg ${
+                activeTab === 'dataManagement'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              数据管理
+            </button>
+          </>
+        )}
         <button
           onClick={() => setActiveTab('password')}
           className={`px-4 py-2 rounded-lg ${
@@ -334,16 +339,18 @@ export default function Settings() {
         >
           修改密码
         </button>
-        <button
-          onClick={() => setActiveTab('logs')}
-          className={`px-4 py-2 rounded-lg ${
-            activeTab === 'logs'
-              ? 'bg-primary-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-        >
-          操作日志
-        </button>
+        {isAdmin() && (
+          <button
+            onClick={() => setActiveTab('logs')}
+            className={`px-4 py-2 rounded-lg ${
+              activeTab === 'logs'
+                ? 'bg-primary-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            操作日志
+          </button>
+        )}
       </div>
 
       {/* 自定义字段 */}
