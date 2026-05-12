@@ -31,6 +31,7 @@ class UserCreate(UserBase):
 
 class UserUpdate(BaseSchema):
     real_name: Optional[str] = None
+    role: Optional[str] = None
     department: Optional[str] = None
     phone: Optional[str] = None
     status: Optional[str] = None
