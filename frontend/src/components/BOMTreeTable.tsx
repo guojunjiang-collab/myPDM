@@ -4,7 +4,7 @@ import { assemblyPartsApi } from '../services/api';
 
 interface BOMTreeTableProps {
   assemblyId: string;
-  maxHeight?: string; // Tailwind max-height class, default 'max-h-96'
+  maxHeight?: string; // Tailwind max-height class, default 'max-h-[calc(100vh-300px)]'
   onRowClick?: (item: AssemblyPartItem) => void;
 }
 
@@ -27,7 +27,7 @@ const statusTag = (s: string) => {
   return map[s] || { label: s, cls: 'bg-gray-100 text-gray-800' };
 };
 
-export default function BOMTreeTable({ assemblyId, maxHeight = 'max-h-96', onRowClick }: BOMTreeTableProps) {
+export default function BOMTreeTable({ assemblyId, maxHeight = 'max-h-[calc(100vh-300px)]', onRowClick }: BOMTreeTableProps) {
   const [viewParts, setViewParts] = useState<TreeNode[]>([]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [loadingViewParts, setLoadingViewParts] = useState(false);
