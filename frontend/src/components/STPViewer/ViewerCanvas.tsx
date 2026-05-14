@@ -2,8 +2,6 @@ import { Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
 import { ModelLoader } from './ModelLoader';
-import { Toolbar } from './Toolbar';
-import { useViewerStore } from '../../stores/viewerStore';
 
 interface ViewerCanvasProps {
   url: string;
@@ -21,7 +19,6 @@ export function ViewerCanvas({ url }: ViewerCanvasProps) {
       <Suspense fallback={null}>
         <ModelLoader url={url} />
       </Suspense>
-      <Toolbar />
       <OrbitControls makeDefault />
       <Environment preset="warehouse" />
     </Canvas>

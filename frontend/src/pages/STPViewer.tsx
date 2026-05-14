@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ViewerCanvas } from '../components/STPViewer/ViewerCanvas';
+import { Toolbar } from '../components/STPViewer/Toolbar';
 import axios from 'axios';
 
 export default function STPViewerPage() {
@@ -47,8 +48,9 @@ export default function STPViewerPage() {
   if (state === 'error') return <div className="w-screen h-screen flex items-center justify-center text-red-500">加载失败，请关闭后重试</div>;
 
   return (
-    <div className="w-screen h-screen">
+    <div className="w-screen h-screen relative">
       <ViewerCanvas url={url!} />
+      <Toolbar />
     </div>
   );
 }
