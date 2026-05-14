@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import { useLoader } from '@react-three/fiber';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
-import { useGLTF } from '@react-three/drei';
+import { Center, Bounds } from '@react-three/drei';
 import { useViewerStore } from '../../stores/viewerStore';
 
 const dracoLoader = new DRACOLoader();
@@ -16,27 +18,30 @@ export function ModelLoader({ url }: ModelLoaderProps) {
     useViewerStore();
   const groupRef = useRef<THREE.Group>(null);
 
-  const { scene } = useGLTF(url, true, false, (loader: any) => {
-    loader.setDRACOLoader?.(dracoLoader);
+  const gltf = useLoader(GLTFLoader, url, (loader) => {
+    loader.setDRACOLoader(dracoLoader);
   });
 
   useEffect(() => {
-    if (scene) setLoadingState('ready');
-  }, [scene, setLoadingState]);
+    if (gltf) setLoadingState('ready');
+  }, [gltf, setLoadingState]);
 
   useEffect(() => {
     if (!groupRef.current) return;
     groupRef.current.traverse((child) => {
       if (child instanceof THREE.Mesh) {
-        const mat = child.material as THREE.MeshStandardMaterial;
-        mat.wireframe = wireframe;
+        const mat = child.material;
+        if (Array.isArray(mat)) return;
+        if (mat instanceof THREE.MeshStandardMaterial) {
+          mat.wireframe = wireframe;
+        }
         const name = child.name || child.uuid;
         if (visibleParts.size > 0 && !visibleParts.has(name)) child.visible = false;
         else child.visible = true;
-        if (highlightedPartId === name) {
+        if (highlightedPartId === name && mat instanceof THREE.MeshStandardMaterial) {
           mat.emissive = new THREE.Color(0x4488ff);
           mat.emissiveIntensity = 0.6;
-        } else {
+        } else if (mat instanceof THREE.MeshStandardMaterial) {
           mat.emissive = new THREE.Color(0x000000);
           mat.emissiveIntensity = 0;
         }
@@ -50,8 +55,12 @@ export function ModelLoader({ url }: ModelLoaderProps) {
   };
 
   return (
-    <group ref={groupRef}>
-      <primitive object={scene} onClick={handleClick} />
-    </group>
+    <Center>
+      <Bounds fit clip observe margin={1}>
+        <group ref={groupRef}>
+          <primitive object={gltf.scene} onClick={handleClick} />
+        </group>
+      </Bounds>
+    </Center>
   );
 }

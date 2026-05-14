@@ -13,8 +13,9 @@ interface ViewerCanvasProps {
 export function ViewerCanvas({ url }: ViewerCanvasProps) {
   return (
     <Canvas
-      camera={{ position: [5, 3, 5], fov: 45 }}
-      style={{ width: '100%', height: '100%', background: '#f0f0f0' }}
+      camera={{ position: [5, 5, 5], fov: 45 }}
+      style={{ width: '100%', height: '100%', background: '#e8e8e8' }}
+      gl={{ preserveDrawingBuffer: true }}
     >
       <ambientLight intensity={0.5} />
       <directionalLight position={[10, 10, 5]} intensity={1} />
