@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
 import { useAuthStore } from './stores/auth';
 import Layout from './components/Layout';
 import Login from './pages/Login';
@@ -14,6 +15,7 @@ import Settings from './pages/Settings';
 import ECN from './pages/ECN';
 import Inventory from './pages/Inventory';
 import Business from './pages/Business';
+const STPViewer = lazy(() => import('./pages/STPViewer'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
@@ -28,6 +30,16 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route
+          path="/stp-viewer"
+          element={
+            <ProtectedRoute>
+              <Suspense fallback={<div className="w-screen h-screen flex items-center justify-center text-gray-400">加载中...</div>}>
+                <STPViewer />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/"
           element={

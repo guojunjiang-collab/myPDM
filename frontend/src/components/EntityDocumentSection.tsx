@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { entityDocumentsApi, customFieldsApi, attachmentApi, documentsApi } from '../services/api';
 import type { EntityDocument, CustomFieldDefinition, CustomFieldValue, Document } from '../types';
 import { canEdit, useAuthStore } from '../stores/auth';
@@ -8,8 +8,6 @@ import DocumentPicker from './DocumentPicker';
 import DocumentDetailContent from './DocumentDetailContent';
 import VersionSelectModal from './VersionSelectModal';
 import ArchiveTreeModal from './ArchiveTreeModal';
-
-const STPViewerModal = lazy(() => import('./STPViewer').then(m => ({ default: m.STPViewerModal })));
 
 /* ----------------------------------------------------------------
    Types
@@ -65,7 +63,6 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
   const [viewDocCustomDefs, setViewDocCustomDefs] = useState<CustomFieldDefinition[]>([]);
   const [viewDocCustomValues, setViewDocCustomValues] = useState<Record<string, any>>({});
   const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
-const [stpPreview, setStpPreview] = useState<{ attId: string; fileName: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -179,9 +176,12 @@ const [stpPreview, setStpPreview] = useState<{ attId: string; fileName: string }
       setArchivePreview({ attId: fileId, fileName });
       return;
     }
-    // STP — 三维预览（Modal 弹窗）
+    // STP — 三维预览（新窗口）
     if (ext === 'stp' || ext === 'step') {
-      setStpPreview({ attId: fileId, fileName });
+      const token = useAuthStore.getState().token;
+      if (token) {
+        window.open(`/stp-viewer?id=${fileId}&token=${encodeURIComponent(token)}`, '_blank');
+      }
       return;
     }
     alert('该格式暂不支持预览');
@@ -364,17 +364,6 @@ const [stpPreview, setStpPreview] = useState<{ attId: string; fileName: string }
           fileName={archivePreview.fileName}
           token={useAuthStore.getState().token || ''}
         />
-      )}
-
-      {stpPreview && (
-        <Suspense fallback={null}>
-          <STPViewerModal
-            open={!!stpPreview}
-            onClose={() => setStpPreview(null)}
-            attachmentId={stpPreview.attId}
-            fileName={stpPreview.fileName}
-          />
-        </Suspense>
       )}
     </div>
   );

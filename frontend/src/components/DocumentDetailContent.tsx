@@ -1,11 +1,9 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect } from 'react';
 import type { Document, CustomFieldDefinition, DocumentAttachment } from '../types';
 import { documentsApi } from '../services/api';
 import { useAuthStore } from '../stores/auth';
 import { formatDateTime } from '../utils/date';
 import ArchiveTreeModal from './ArchiveTreeModal';
-
-const STPViewerModal = lazy(() => import('./STPViewer').then(m => ({ default: m.STPViewerModal })));
 
 interface DocumentDetailContentProps {
   doc: Document;
@@ -34,7 +32,6 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
   const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
   const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
-const [stpPreview, setStpPreview] = useState<{ attId: string; fileName: string } | null>(null);
 
   // 加载附件列表
   const loadAttachments = async () => {
@@ -85,9 +82,9 @@ const [stpPreview, setStpPreview] = useState<{ attId: string; fileName: string }
       setArchivePreview({ attId, fileName });
       return;
     }
-    // STP — 三维预览（Modal 弹窗）
+    // STP — 三维预览（新窗口）
     if (ext === 'stp' || ext === 'step') {
-      setStpPreview({ attId, fileName });
+      window.open(`/stp-viewer?id=${attId}&token=${encodeURIComponent(token)}`, '_blank');
       return;
     }
     alert('该格式暂不支持预览');
@@ -209,17 +206,6 @@ const [stpPreview, setStpPreview] = useState<{ attId: string; fileName: string }
           fileName={archivePreview.fileName}
           token={useAuthStore.getState().token || ''}
         />
-      )}
-
-      {stpPreview && (
-        <Suspense fallback={null}>
-          <STPViewerModal
-            open={!!stpPreview}
-            onClose={() => setStpPreview(null)}
-            attachmentId={stpPreview.attId}
-            fileName={stpPreview.fileName}
-          />
-        </Suspense>
       )}
     </div>
   );
