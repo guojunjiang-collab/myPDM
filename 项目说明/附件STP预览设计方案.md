@@ -44,7 +44,7 @@ model-viewer 自动加载 Draco 解码器 (Google CDN) → Unlit 渲染（准确
 | 1 | gmsh (Python API) | STP → 内存网格 | 曲率自适应三角网格，直接提取顶点/面（无 STL 中间文件） |
 | 2 | trimesh | 内存网格 → glb | 构建 Trimesh 对象，赋材质色，计算法线 |
 | 3 | export_glb() | glb → bytes | 显式导出 NORMAL + COLOR_0 + POSITION |
-| 3 | gltf-draco-transcoder | glb → Draco glb | C++ 后端 Draco 压缩（17-21x 压缩比） |
+| 4 | gltf-draco-transcoder | glb → Draco glb | C++ 后端 Draco 压缩（17-21x 压缩比） |
 
 **关键优化**（v5.0）:
 - **消除 STL 中间文件**: gmsh `getNodes()/getElements()` 直接内存提取，跳过磁盘 I/O
@@ -149,9 +149,8 @@ Mesh.Algorithm = 6                   Frontal-Delaunay，三角形更规整
 
 **视觉风格**:
 - 白底 (`#ffffff`) + 浅灰工具栏
-- 模型材质色 `#c8d6e5`（CAD 零件色）
+- 模型材质色 `#c8d6e5`（CAD 零件色，Unlit 渲染无视光照）
 - `tone-mapping="aces"` 高对比度渲染
-- `shadow-intensity="1"` 全强度阴影增强立体感
 
 **核心实现**:
 1. 从 CDN (jsdelivr) 加载 `<model-viewer>` Web Component
@@ -216,7 +215,7 @@ HTML 中的 `<model-viewer>` 标签在 CDN 脚本加载前被解析为未知元�
 
 | 文件 | 操作 | 说明 |
 |------|------|------|
-| `frontend/public/stp-viewer.html` | **新建** | 独立 3D 预览页面（model-viewer CDN + 动态创建 + 白底 + aces 色调映射） |
+| `frontend/public/stp-viewer.html` | **新建** | 独立 3D 预览页面（model-viewer CDN + 动态创建 + Unlit rendering） |
 | `frontend/src/components/DocumentDetailContent.tsx` | 修改 | `handlePreview()` 增加 `.stp/.step` → `window.open()` |
 | `frontend/src/components/EntityDocumentSection.tsx` | 修改 | `handlePreviewAttachment()` 同上 |
 
@@ -231,7 +230,7 @@ HTML 中的 `<model-viewer>` 标签在 CDN 脚本加载前被解析为未知元�
 | 数据 | 路径 | 格式 |
 |------|------|------|
 | STP 源文件 | `uploads/documents/{doc_id}/{file_name}.stp` | STEP |
-| glb 缓存 | `uploads/gltf_cache/{attachment_id}.glb` | 二进制 glTF |
+| glb 缓存 | `uploads/gltf_cache/{attachment_id}.glb` | Draco-compressed 二进制 glTF |
 
 ### 4.5 数据流
 
@@ -305,7 +304,7 @@ HTML 中的 `<model-viewer>` 标签在 CDN 脚本加载前被解析为未知元�
 ### 6.1 动机
 
 **当前痛点**:
-1. 大文件 STP（>5MB）后端 gmsh 转换超时（300s），用户预览失败
+1. 大文件 STP（>5MB）gmsh 转换超时 300s，用户预览失败
 2. model-viewer 功能受限：无剖切、无测量、无 BOM 叠加、无零件点击
 3. 串行锁导致多用户排队等待
 
@@ -317,9 +316,29 @@ HTML 中的 `<model-viewer>` 标签在 CDN 脚本加载前被解析为未知元�
 
 ---
 
-### 6.2 后端方案对比与选型
+### 6.2 后端方案对比
 
-#### 方案 A：cascadio（🏆 推荐）
+#### 方案 A：Mayo CLI（🏆 推荐）
+
+| 属性 | 值 |
+|------|-----|
+| 项目 | [fougue/mayo](https://github.com/fougue/mayo) |
+| 架构 | C++ QtCore + OCCT，独立 CLI（`mayo-conv`） |
+| CLI | `mayo-conv input.stp --export output.glb` |
+| 集成 | 子进程调用，替换 `CONVERTER_SCRIPT` |
+| Docker | AppImage (~48MB) + `xvfb-run`（QtCore 需要虚拟显示） |
+| License | BSD-2-Clause |
+
+**预测性能**（基于 OCC 原生基准 RapidMade 2026）:
+
+| 指标 | gmsh (当前) | Mayo | 提升 |
+|------|------------|------|------|
+| 冷启动 | 2.1s | **~1.5s** | 1.4x |
+| 150MB STEP 三角剖分 | 85s | **~40s** | 2.1x |
+| 内存峰值 | 1.2GB | **~750MB** | 1.6x |
+| 并行支持 | 单线程（串行锁） | 多进程并行 | — |
+
+#### 方案 B：cascadio（备选）
 
 | 属性 | 值 |
 |------|-----|
@@ -327,96 +346,78 @@ HTML 中的 `<model-viewer>` 标签在 CDN 脚本加载前被解析为未知元�
 | 维护者 | mikedh（trimesh 作者，同一生态） |
 | 架构 | C++ pybind11 绑定 + OCCT 7.9.x，PyPI wheel 分发 |
 | API | `import cascadio` → Python 直接调用 |
-| 集成 | 替换 `stp_to_gltf.py` 中 gmsh 三角剖分，保留 trimesh + Draco |
-| Docker | `pip install cascadio`（预编译 wheel），无额外 apt 依赖 |
+| 集成 | 替换 gmsh 三角剖分，保留 trimesh + Draco 管道 |
+| Docker | `pip install cascadio`（预编译 wheel），无额外 apt |
 | License | 与 trimesh 相同 |
 
-**预测性能**（基于 OCC 原生基准数据）:
+**对比**:
 
-| 指标 | gmsh (当前) | cascadio | 提升 |
-|------|------------|----------|------|
-| 冷启动 | 2.1s | **<0.5s** | 4x |
-| 150MB STEP 三角剖分 | 85s | **~35s** | 2.4x |
-| 内存峰值 | 1.2GB | **~680MB** | 1.8x |
-| 并行支持 | 单线程（串行锁） | 面级并行 | — |
+| 维度 | Mayo | cascadio |
+|------|------|----------|
+| 成熟度 | 稳定 v0.9 ✅ | 早期 v0.x ⚠️ |
+| 集成方式 | 子进程（磁盘文件） | Python `import`（内存） |
+| Docker 增量 | ~100MB | ~50MB ✅ |
+| 生态契合度 | ❌ 外部项目 | ✅ trimesh 同作者 |
+| 维护复杂度 | 中（子进程 + AppImage 版本） | 低（pip 依赖）✅ |
 
-#### 方案 B：Mayo CLI（备选）
-
-| 属性 | 值 |
-|------|-----|
-| 项目 | [fougue/mayo](https://github.com/fougue/mayo) |
-| 架构 | C++ QtCore + OCCT，独立 CLI 可执行文件 |
-| CLI 语法 | `mayo-conv input.stp --export output.glb` |
-| 集成 | 子进程调用（类似当前 gmsh），替换 `CONVERTER_SCRIPT` |
-| Docker | AppImage (~48MB) + `xvfb-run`（QtCore 需要虚拟显示） |
-| License | BSD-2-Clause |
-
-**方案对比**:
-
-| 维度 | cascadio | Mayo |
-|------|----------|------|
-| 集成方式 | Python `import`（内存传递） | 子进程（磁盘文件） |
-| Docker 镜像增量 | ~50MB（pip wheel） | ~100MB（AppImage + xvfb + QtCore） |
-| 维护复杂度 | 低（pip 依赖） | 中（子进程管理 + AppImage 版本更新） |
-| 生态契合度 | ✅ trimesh 同作者 | ❌ 外部独立项目 |
-| 成熟度 | 早期（v0.x） | 稳定（v0.9，2K stars） |
-
-**结论**: cascadio 优选（Python 原生 + 同生态），Mayo 备选（更成熟但集成重）。
+**结论**: Mayo CLI 优先（更成熟稳定，2K stars，BSD 开源），cascadio 备选（若 Mayo 效果不佳则切换）。
 
 ---
 
-### 6.3 后端分阶段实施
+### 6.3 后端实施（Mayo CLI 路径）
 
-#### B1: 替换三角剖分核心（核心改动，1 周）
+#### B1: 替换 gmsh 子进程为 Mayo CLI
 
-**文件**: `backend/app/stp_to_gltf.py`
+**文件**: `backend/app/stp_to_gltf.py`（重写） + `backend/app/stp_converter.py`（微调）
 
+**核心改动**:
 ```python
-# 改动前（gmsh）
-import gmsh
-gmsh.initialize()
-gmsh.open(input_path)
+# 当前 (gmsh)
+import gmsh, trimesh, numpy as np
+gmsh.initialize(); gmsh.open(input_path)
 gmsh.model.mesh.generate(2)
 node_tags, coords, _ = gmsh.model.mesh.getNodes()
-element_types, _, node_tags_list = gmsh.model.mesh.getElements()
-# ... 提取三角形面 ...
+# ... 手动提取面 + 索引映射 + trimesh 构建 + Draco ...
 gmsh.finalize()
 
-# 改动后（cascadio）
-import cascadio
-mesh_data = cascadio.tessellate(
+# 改为 (Mayo CLI)
+import subprocess, os
+MAYO_CONV = "/usr/local/bin/MayoConv"
+
+# 根据文件大小选择网格精度
+file_size_mb = os.path.getsize(input_path) / 1024 / 1024
+quality = "VeryCoarse" if file_size_mb > 10 else \
+          "Coarse" if file_size_mb > 5 else "Normal"
+
+# 生成配置文件
+settings_path = _write_mayo_settings(quality)
+
+# 调用 Mayo CLI
+subprocess.run([
+    "xvfb-run", "--auto-servernum",
+    MAYO_CONV,
+    "--use-settings", settings_path,
     input_path,
-    tolerance=0.1,         # 线性偏转
-    angular_tolerance=0.5,  # 角度偏转
-)
-vertices = mesh_data.vertices    # numpy (N, 3)
-faces = mesh_data.faces          # numpy (M, 3)
-# 保留后续流程：trimesh → fix_normals → 材质色 → Draco
+    "--export", output_path
+], timeout=120, check=True)
+# Mayo 直接输出 GLB，无需 trimesh 后处理
 ```
 
 **依赖变更**:
-- `requirements.txt`: `gmsh==4.15.2` → `cascadio`
-- `Dockerfile`: 移除 `apt-get install gmsh libgmsh4.13`（大幅减重）
+- `requirements.txt`: 移除 `gmsh==4.15.2` `trimesh` `scipy` `numpy` `gltf-draco-transcoder`
+- `Dockerfile`: 移除 `apt-get install gmsh libgmsh4.13`；新增 MayoConv AppImage 下载 + `xvfb libfuse2`
+- Mayo 原生输出紧凑 glTF，文件尺寸仍远小于 gmsh + Draco 产物
 
-#### B2: 移除串行锁，支持并行（1 天）
+#### B2: 调整并发策略
 
 **文件**: `backend/app/stp_converter.py`
 
-cascadio 是纯函数调用（无全局状态），无需串行化。gmsh 的 `threading.Lock` 可以移除。
+Mayo CLI 作为独立进程，可多进程并行（不受 GIL 限制）：
+- 保留 `threading.Lock` 改为 `Semaphore(2)`（限制同时 2 个 Mayo 进程，避免 CPU/内存过载）
+- 超时从 300s 降为 120s（Mayo 更快）
+- 异步上传转换仍通过 `asyncio.run_in_executor()` 触发
 
-```python
-# 改动前
-_stp_lock = threading.Lock()
-with _stp_lock:
-    result = subprocess.run([...])
-
-# 改动后
-# 使用线程池限制并发数（避免 CPU/内存过载）
-_executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
-future = _executor.submit(convert_stp_to_gltf, stp_path, attachment_id)
-```
-
-#### B3: API 异步化，解决超时体验（2 天）
+#### B3: API 异步化
 
 **文件**: `backend/app/routers/attachments_v2.py`
 
@@ -426,18 +427,33 @@ async def get_gltf(...):
     glb_path = get_gltf_path_for_attachment(attachment_id)
     if glb_path:
         return FileResponse(glb_path, media_type="model/gltf-binary")
-    
-    # 缓存未命中 → 异步触发，返回状态码
-    background_tasks.add_task(
-        convert_stp_to_gltf, str(stp_full_path), str(attachment_id)
-    )
+    # 缓存未命中 → 异步触发，返回 202
+    background_tasks.add_task(convert_stp_to_gltf, ...)
     return JSONResponse(status_code=202, content={
-        "status": "converting",
-        "estimated_seconds": estimate_time(file_size)
+        "status": "converting", "estimated_seconds": estimate_time(file_size)
     })
 ```
 
-**前端配合**: `stp-viewer.html` 收到 202 → 轮询 `/gltf`（间隔 2s）→ 直到 200 → 渲染模型。
+前端轮询 `/gltf`（间隔 2s），直到 200。
+
+#### B4: Docker 集成
+
+**Dockerfile 改动**:
+```dockerfile
+# 下载 MayoConv AppImage（预编译，开箱即用）
+ADD https://github.com/fougue/mayo/releases/download/v0.9.0/MayoConv-0.9.0-x86_64.AppImage \
+    /usr/local/bin/MayoConv
+RUN chmod +x /usr/local/bin/MayoConv && \
+    apt-get install -y xvfb libfuse2 && \
+    rm -rf /var/lib/apt/lists/*
+```
+
+**Mayo 配置文件模板**（`/app/mayo_settings.ini`）:
+```ini
+[Exchange]
+meshingQuality=Normal
+# 可选: VeryCoarse / Coarse / Normal / Fine / VeryFine
+```
 
 ---
 
@@ -451,54 +467,51 @@ async def get_gltf(...):
 | 辅助库 | `@react-three/drei` v9 | OrbitControls, Html, useGLTF |
 | 状态管理 | Zustand | 多 store 模式 |
 | GLB 加载 | `useGLTF` + `DRACOLoader` | 支持 Draco 压缩 |
-| 剪裁面 | `useThree` + `clippingPlanes` | Three.js 原生支持 |
+| 剪裁面 | `clippingPlanes` | Three.js 原生支持 |
 | 标注标签 | CSS2DRenderer / `drei/Html` | HTML 标签跟踪 3D 位置 |
-| 零件选择 | Raycasting + emissive 高亮 | 点击高亮 + 侧边栏同步 |
 
 #### 组件架构
 
 ```
-<STPViewerModal>                    ← React Portal 弹窗
-├── Zustand viewerStore
+<STPViewerModal>              ← React Portal 弹窗
+├── viewerStore (Zustand)     ← 集中状态管理
 │   ├── modelUrl, loadingState
 │   ├── selectedPartId, visibleParts
 │   ├── clipPlanes[], measureMode
-│   └── bomData (从父组件 props 注入)
+│   └── bomData (从父组件注入)
 │
-├── <Canvas>                        ← R3F Canvas
-│   ├── <ambientLight />
-│   ├── <directionalLight />
-│   ├── <Model>                     ← useGLTF(url) + DRACOLoader
-│   ├── <ClippingPlanes />          ← renderer.clippingPlanes
-│   ├── <MeasureTool />             ← Raycaster + SVG overlay
-│   ├── <PartHighlighter />         ← emissive 材质切换
+├── <Canvas>                  ← R3F 渲染
+│   ├── <Model />             ← useGLTF(url) + DRACOLoader
+│   ├── <ClippingPlanes />    ← 剖切面
+│   ├── <MeasureTool />       ← 测量工具
+│   ├── <PartHighlighter />   ← 零件高亮
 │   └── <OrbitControls />
 │
-├── HTML Overlay (z-index above canvas)
-│   ├── <BOMPanel />                ← 右侧 BOM 树（与 3D 同步高亮）
-│   ├── <Toolbar />                 ← 剖切/测量/爆炸图/重置
-│   └── <PartLabels />              ← drei Html 跟踪 3D 位置
+├── HTML Overlay              ← 浮层 UI
+│   ├── <BOMPanel />          ← BOM 树（双向同步）
+│   ├── <Toolbar />           ← 工具栏
+│   └── <PartLabels />        ← 3D 位置标注
 ```
 
-#### 前端分阶段实施
+#### 分阶段实施
 
 | 阶段 | 功能 | 预估 |
 |------|------|------|
-| **F1** | 基础查看器：GLB 加载 + OrbitControls + Draco + Unlit 材质 | 1 周 |
-| **F2** | BOM 面板 + 零件点击高亮 + 双向同步（点击 BOM→高亮 3D，点击 3D→高亮 BOM） | 2 周 |
-| **F3** | 剖切面（X/Y/Z + 自定义角度）+ 剖面封盖 | 2 周 |
-| **F4** | 测量工具（点距/角度/半径）+ 标注标签 | 2 周 |
-| **F5** | 爆炸图 + 动画过渡 + Wireframe 模式 | 1 周 |
+| F1 | 基础查看器：GLB 加载 + Controls + Draco + 材质色 | 1 周 |
+| F2 | BOM 面板 + 零件点击高亮 + 双向同步 | 2 周 |
+| F3 | 剖切面（X/Y/Z + 自定义角度） | 2 周 |
+| F4 | 测量工具（距离/角度/半径）+ 标注标签 | 2 周 |
+| F5 | 爆炸图 + 动画过渡 | 1 周 |
 
 #### Bundle 体积控制
 
 | 策略 | 预期效果 |
 |------|----------|
 | 动态 `import()` 按需加载 R3F | 主 bundle 不含 three.js |
-| `DRACOLoader` 解码器 CDN 加载 | ~100KB 异步，不进 bundle |
+| DRACOLoader 解码器 CDN 加载 | ~100KB 异步，不进 bundle |
 | drei 按需导入（避免全量 three-stdlib） | 减少 ~200KB |
 
-目标：首屏 bundle 增量 < 200KB（gzip），高级功能按需加载。
+目标：首屏增量 < 200KB gzipped。
 
 ---
 
@@ -506,215 +519,29 @@ async def get_gltf(...):
 
 | 层 | 文件 | 操作 | 阶段 |
 |------|------|------|------|
-| 后端 | `backend/app/stp_to_gltf.py` | 重写：gmsh → cascadio | B1 |
-| 后端 | `backend/app/stp_converter.py` | 移除串行锁，增加并行线程池 | B2 |
-| 后端 | `backend/app/routers/attachments_v2.py` | `/gltf` 异步化（202 状态码） | B3 |
-| 后端 | `backend/requirements.txt` | `gmsh` → `cascadio`，移除不必要的 `scipy` | B1 |
-| 后端 | `backend/Dockerfile` | 移除 `gmsh libgmsh4.13`，镜像减重 | B1 |
-| 前端 | `frontend/src/components/STPViewer/` | **新建** 查看器组件目录（Modal/Canvas/ModelLoader/Toolbar） | F1-F5 |
-| 前端 | `frontend/src/stores/viewerStore.ts` | **新建** Zustand store | F1 |
-| 前端 | `frontend/src/components/DocumentDetailContent.tsx` | 预览入口改为 `<STPViewerModal>` 弹窗 | F1 |
-| 前端 | `frontend/package.json` | 新增 `@react-three/fiber` `drei` `three` `zustand` | F1 |
-| 文档 | `项目说明/附件STP预览设计方案.md` | 本文档，持续更新 | 持续 |
+| 后端 | `stp_to_gltf.py` | 重写: gmsh → Mayo CLI 子进程 | B1 |
+| 后端 | `stp_converter.py` | Semaphore(2) 替代 Lock + 超时 120s | B2 |
+| 后端 | `attachments_v2.py` | `/gltf` 异步化（202 状态码） | B3 |
+| 后端 | `requirements.txt` | 移除 gmsh/trimesh/scipy/numpy/gltf-draco-transcoder | B1 |
+| 后端 | `Dockerfile` | 移除 gmsh apt，新增 MayoConv AppImage + xvfb + libfuse2 | B1,B4 |
+| 前端 | `STPViewer/` 组件目录 | **新建** R3F 查看器 | F1-F5 |
+| 前端 | `viewerStore.ts` | **新建** Zustand | F1 |
+| 前端 | `DocumentDetailContent.tsx` | 改用 `<STPViewerModal>` | F1 |
+| 前端 | `package.json` | +three +R3F +drei +zustand | F1 |
 
 ---
 
 ### 6.6 风险评估与缓解
 
-| 风险 | 概率 | 缓解措施 |
-|------|------|----------|
-| cascadio 预编译 wheel 在 Debian slim 不兼容 | 中 | 备选 Mayo CLI（子进程方案更稳，见方案 B） |
-| cascadio API 不稳定（早期 v0.x） | 中 | 封装适配层 `_tessellate_stp()`，隔离 API 变动 |
-| R3F 打包体积影响首页加载 | 中 | 动态 `import()`，查看器组件独立 chunk |
-| 并行转换 CPU/内存超限 | 中 | ThreadPoolExecutor 限制 2-4 并发，大文件自动降级 |
-| cascadio 输出的无压缩 GLB 过大 | 低 | 保留 gltf-draco-transcoder 后处理步骤 |
-| Mayo 无 Draco 压缩输出 | 高 | 保留 gltf-draco-transcoder 后处理步骤 |
-
----
-
-*文档版本: v6.0-plan — 2026-05-14*
-
-| 属性 | 值 |
-|------|-----|
-| 项目 | [trimesh/cascadio](https://github.com/trimesh/cascadio) |
-| 维护者 | mikedh（trimesh 作者） |
-| 架构 | C++ pybind11 绑定 OCCT 7.9.x，PyPI wheel 分发 |
-| API | `import cascadio`，Python 直接调用 |
-| 集成 | 替换 `stp_to_gltf.py` 中 gmsh 部分，保留 trimesh + Draco |
-| Docker | `pip install cascadio`（预编译 wheel），无额外 apt |
-| License | 与 trimesh 相同 |
-
-**预测性能**（基于 OCC 原生基准 RapidMade 2026）:
-| 指标 | gmsh (当前) | cascadio | 提升 |
-|------|------------|----------|------|
-| 冷启动 | 2.1s | **<0.5s** | 4x |
-| 150MB STEP 三角剖分 | 85s | **~35s** | 2.4x |
-| 内存峰值 | 1.2GB | **~680MB** | 1.8x |
-| 并行支持 | 单线程（串行锁） | 面级并行 | — |
-
-#### 方案 B：Mayo CLI（备选）
-
-| 属性 | 值 |
-|------|-----|
-| 项目 | [fougue/mayo](https://github.com/fougue/mayo) |
-| 架构 | C++ QtCore + OCCT，独立 CLI（`mayo-conv`） |
-| CLI | `mayo-conv input.stp --export output.glb` |
-| 集成 | 子进程调用，替换 `CONVERTER_SCRIPT` |
-| Docker | AppImage (~48MB) + `xvfb-run`，或源码编译 |
-| License | BSD-2-Clause |
-
-**对比**:
-| 维度 | cascadio | Mayo |
-|------|----------|------|
-| 集成 | Python `import` ✅ | 子进程 |
-| 文件 I/O | 内存传递 ✅ | 磁盘文件 |
-| Docker 增量 | ~50MB ✅ | ~100MB |
-| trimesh 生态 | 同作者 ✅ | 外部工具 |
-| 成熟度 | v0.x ⚠️ | v0.9（2025）✅ |
-
-**结论**: cascadio 优先（Python 原生），Mayo 备选（子进程方案更稳）。
-
----
-
-### 6.3 后端实施（cascadio 路径）
-
-#### Phase B1: 替换 gmsh 三角剖分
-
-**文件**: `backend/app/stp_to_gltf.py`
-
-**核心改动**:
-```python
-# 当前 (gmsh)
-import gmsh
-gmsh.initialize()
-gmsh.open(input_path)
-gmsh.model.mesh.generate(2)
-node_tags, coords, _ = gmsh.model.mesh.getNodes()
-# ... 提取面 ...
-
-# 改为 (cascadio)
-import cascadio
-mesh_data = cascadio.tessellate(input_path, tolerance=0.1)
-vertices = mesh_data.vertices   # np.ndarray (N, 3)
-faces = mesh_data.faces         # np.ndarray (M, 3)
-# 后续不变：trimesh 构建 → fix_normals → unlit → Draco
-```
-
-**依赖**:
-- 移除: `gmsh==4.15.2`（pip） + `gmsh libgmsh4.13`（apt）
-- 新增: `cascadio`（pip）
-- Docker: 移除 gmsh apt 依赖，镜像缩小
-
-#### Phase B2: 移除串行锁，支持并行
-
-**文件**: `backend/app/stp_converter.py`
-
-cascadio 是纯函数调用（无全局状态），可安全并行：
-- 移除 `threading.Lock`
-- 用 `concurrent.futures.ThreadPoolExecutor(max_workers=4)` 管理并发
-
-#### Phase B3: API 异步化
-
-**文件**: `backend/app/routers/attachments_v2.py`
-
-```python
-@router.get("/{attachment_id}/gltf")
-async def get_gltf(...):
-    glb_path = get_gltf_path_for_attachment(attachment_id)
-    if glb_path:
-        return FileResponse(glb_path, media_type="model/gltf-binary")
-    # 缓存未命中 → 异步触发 → 返回状态
-    background_tasks.add_task(convert_stp_to_gltf, ...)
-    return JSONResponse(status_code=202, content={
-        "status": "converting", "estimated_seconds": 30
-    })
-```
-
-前端轮询 `/gltf`（间隔 2s），直到 200。
-
----
-
-### 6.4 前端：R3F 替代 model-viewer
-
-#### 技术选型
-
-| 组件 | 选型 | 说明 |
-|------|------|------|
-| 渲染框架 | `@react-three/fiber` | React 声明式 three.js |
-| 辅助库 | `@react-three/drei` | OrbitControls, Html, useGLTF |
-| 状态管理 | Zustand | 多 store 模式 |
-| Draco | `DRACOLoader` + CDN 解码器 | 异步加载，不进 bundle |
-
-#### 架构
-
-```
-STPViewerModal
-├── Zustand store (viewerStore)
-│   ├── modelUrl, selectedPartId, clipPlanes[]
-│   ├── measureMode, explodeDistance
-│   └── bomData (从父组件注入)
-│
-├── R3F Canvas
-│   ├── <Model url={...} onPartClick={...} />
-│   │   └── useGLTF + DRACOLoader
-│   ├── <ClippingPlanes />
-│   ├── <MeasureTool />
-│   ├── <ExplodeView />
-│   └── <OrbitControls />
-│
-├── HTML Overlay
-│   ├── BOM Panel（零件树，与 3D 双向同步高亮）
-│   ├── Toolbar（剖切/测量/爆炸图/重置视角）
-│   └── Part Labels（CSS2DRenderer 跟踪 3D 位置）
-```
-
-#### 分阶段实施
-
-| 阶段 | 功能 | 预估 |
-|------|------|------|
-| **F1** | 基础查看器：GLB 加载 + OrbitControls + Draco + 材质色 | 1 周 |
-| **F2** | BOM 面板 + 零件点击高亮 + 双向同步 + 显隐切换 | 2 周 |
-| **F3** | 剖切面（X/Y/Z + 自定义角度） | 2 周 |
-| **F4** | 测量工具（距离/角度/半径） + 标注标签 | 2 周 |
-| **F5** | 爆炸图 + 动画过渡 | 1 周 |
-
-#### Bundle 控制
-
-| 策略 | 效果 |
-|------|------|
-| `import()` 动态加载 R3F 查看器 | 主 bundle 不含 three.js |
-| DRACOLoader CDN 解码 | ~100KB 异步加载 |
-| drei 按需导入 | 减少 ~200KB |
-
-目标：首屏增量 < 200KB gzipped。
-
----
-
-### 6.5 文件变更
-
-| 层 | 文件 | 操作 | 阶段 |
-|------|------|------|------|
-| 后端 | `stp_to_gltf.py` | 重写: gmsh → cascadio | B1 |
-| 后端 | `stp_converter.py` | 移除串行锁 + 并行池 | B2 |
-| 后端 | `attachments_v2.py` | `/gltf` 异步化（202） | B3 |
-| 后端 | `requirements.txt` | gmsh → cascadio | B1 |
-| 后端 | `Dockerfile` | 移除 gmsh apt | B1 |
-| 前端 | `STPViewerModal.tsx` | **新建** R3F 查看器 | F1-F5 |
-| 前端 | `stores/viewerStore.ts` | **新建** Zustand | F1 |
-| 前端 | `package.json` | +three +R3F +drei +zustand | F1 |
-| 文档 | `附件STP预览设计方案.md` | 本文档 | — |
-
----
-
-### 6.6 风险与缓解
-
 | 风险 | 概率 | 缓解 |
 |------|------|------|
-| cascadio wheel 不兼容 Debian slim | 中 | 备选 Mayo CLI 子进程 |
-| cascadio API 不稳定（v0.x） | 中 | 封装适配层隔离 |
+| Mayo AppImage 与 Debian slim 不兼容 | 中 | 备选 cascadio（pip wheel，更轻量） |
+| Mayo 输出无 Draco 压缩，文件偏大 | 中 | 保留 gltf-draco-transcoder 后处理 |
+| Mayo CLI 某些 STEP 文件转换失败 | 低 | 保留 gmsh 降级路径（feature flag 切换） |
 | R3F bundle 过大 | 中 | 动态 import + CDN 解码器 |
-| R3F 低端设备性能不足 | 低 | 保留 model-viewer 降级路径 |
-| 并行转换 CPU/内存超限 | 中 | Executor 限制并发 + 大文件检测降级 |
+| 并行转换 CPU/内存超限 | 中 | Semaphore(2) 限制并发 + 大文件检测降级 |
+| R3F 低端设备性能不足 | 低 | 保留 model-viewer 降级 |
+| Mayo 无 Draco 压缩 | 高 | 保留 gltf-draco-transcoder 后处理 |
 
 ---
 
