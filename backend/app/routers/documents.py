@@ -8,6 +8,7 @@ from ..database import get_db
 from ..models import User, Document, DocumentAttachment, Part, Assembly
 from .. import crud, schemas
 from .auth import require_role
+from ..stp_converter import is_stp_file, delete_glb_cache
 
 router = APIRouter(prefix="/documents", tags=["图文档管理"])
 
@@ -235,6 +236,9 @@ async def delete_document(doc_id: uuid.UUID, request: Request, db: Session = Dep
             try:
                 from ..file_storage import file_storage
                 file_storage.delete_file(att.file_path)
+                # 同步删除 glb 缓存
+                if is_stp_file(att.file_name):
+                    delete_glb_cache(str(att.id))
             except Exception as e:
                 print(f"[WARNING] Failed to delete file {att.file_path}: {e}")
     
@@ -269,6 +273,16 @@ async def upload_document_attachment(doc_id: uuid.UUID, body: schemas.DocumentAt
     d.file_name = body.file_name
     d.file_id = att.id
     db.commit()
+    
+    # 异步转换 STP → glb
+    if is_stp_file(body.file_name):
+        import asyncio
+        from ..stp_converter import convert_stp_to_gltf
+        full_path = file_storage.base_dir / result["file_path"]
+        asyncio.get_event_loop().run_in_executor(
+            None, convert_stp_to_gltf, str(full_path), str(att.id)
+        )
+    
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username, "上传附件", "document_att", str(doc_id), f"文件:{body.file_name}", ip)
     return {"id": att.id, "file_name": att.file_name, "file_size": att.file_size, "created_at": att.created_at}
@@ -317,6 +331,9 @@ async def delete_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, request: Reque
         except Exception as e:
             print(f"[WARNING] {e}")
     
+    # 删除对应的 glb 缓存
+    if is_stp_file(att.file_name):
+        delete_glb_cache(str(att.id))
     d = db.query(Document).filter(Document.id == doc_id).first()
     if d and d.file_id == att.id:
         d.file_id = None

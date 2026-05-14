@@ -172,8 +172,16 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
       return;
     }
     // 压缩包 — 树形预览
-    if (['zip', 'tar', 'gz', 'tgz'].includes(ext)) {
+    if (['zip', 'tar', 'gz', 'tgz', 'rar', '7z'].includes(ext)) {
       setArchivePreview({ attId: fileId, fileName });
+      return;
+    }
+    // STP — 三维预览（新窗口）
+    if (ext === 'stp' || ext === 'step') {
+      const token = useAuthStore.getState().token;
+      if (token) {
+        window.open(`/stp-viewer.html?id=${fileId}&token=${encodeURIComponent(token)}`, '_blank');
+      }
       return;
     }
     alert('该格式暂不支持预览');

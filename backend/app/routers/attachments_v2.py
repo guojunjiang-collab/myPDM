@@ -14,7 +14,7 @@ from ..database import get_db
 from ..models import User, DocumentAttachment, Document
 from ..file_storage import file_storage, chunked_uploader, MAX_FILE_SIZE, CHUNK_SIZE
 from .auth import require_role
-from ..stp_converter import is_stp_file, convert_stp_to_gltf
+from ..stp_converter import is_stp_file, convert_stp_to_gltf, get_gltf_path_for_attachment, delete_glb_cache
 from ..bom.archive_reader import read_archive_tree, extract_file, SUPPORTED_EXTENSIONS
 import zipfile
 import tarfile
@@ -123,7 +123,7 @@ async def upload_file(
         if is_stp_file(result["filename"]):
             full_path = file_storage.base_dir / result["file_path"]
             asyncio.get_event_loop().run_in_executor(
-                None, convert_stp_to_gltf, str(full_path)
+                None, convert_stp_to_gltf, str(full_path), str(new_att.id)
             )
         
         return {
@@ -276,7 +276,7 @@ async def complete_chunked_upload(
         if is_stp_file(file_info["filename"]):
             full_path = file_storage.base_dir / file_info["file_path"]
             asyncio.get_event_loop().run_in_executor(
-                None, convert_stp_to_gltf, str(full_path)
+                None, convert_stp_to_gltf, str(full_path), str(new_att.id)
             )
         
         return {
@@ -548,10 +548,29 @@ async def preview_attachment(
 @router.get("/{attachment_id}/gltf")
 async def get_gltf(
     attachment_id: uuid.UUID,
+    token: str = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
 ):
-    """获取 STP 对应的 glTF/glb 文件（用于前端三维预览）"""
+    """获取 STP 对应的 glTF/glb 文件（用于前端三维预览）
+    
+    认证方式: ?token= JWT 查询参数（浏览器 <model-viewer> src 加载）
+    """
+    # JWT 验证
+    if not token:
+        raise HTTPException(status_code=401, detail="缺少认证令牌")
+    from jose import JWTError, jwt
+    from .auth import SECRET_KEY, ALGORITHM
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        user_role = payload.get("role", "")
+        if not username:
+            raise HTTPException(status_code=401, detail="无效的认证令牌")
+        if user_role == "guest":
+            raise HTTPException(status_code=403, detail="访客无预览权限")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="认证令牌验证失败")
+
     att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
@@ -562,15 +581,13 @@ async def get_gltf(
     if not att.file_path:
         raise HTTPException(status_code=404, detail="附件文件路径为空")
 
-    stp_full_path = file_storage.base_dir / att.file_path
-
-    # 尝试获取已转换的 glb 文件
-    from ..stp_converter import get_gltf_path
-    glb_path = get_gltf_path(str(stp_full_path))
+    # 从缓存目录获取 glb
+    glb_path = get_gltf_path_for_attachment(str(attachment_id))
 
     if not glb_path:
         # 触发转换
-        glb_path = convert_stp_to_gltf(str(stp_full_path))
+        stp_full_path = file_storage.base_dir / att.file_path
+        glb_path = convert_stp_to_gltf(str(stp_full_path), str(attachment_id))
 
     if not glb_path:
         raise HTTPException(status_code=500, detail="STP 文件转换失败，请稍后重试")
@@ -596,6 +613,10 @@ async def delete_attachment(
     # 如果有文件路径，从文件系统删除
     if hasattr(att, 'file_path') and att.file_path:
         file_storage.delete_file(att.file_path)
+    
+    # 删除对应的 glb 缓存
+    if is_stp_file(att.file_name):
+        delete_glb_cache(str(attachment_id))
     
     # 从数据库删除
     db.delete(att)

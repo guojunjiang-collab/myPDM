@@ -78,8 +78,13 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
       return;
     }
     // 压缩包 — 树形预览
-    if (['zip', 'tar', 'gz', 'tgz'].includes(ext)) {
+    if (['zip', 'tar', 'gz', 'tgz', 'rar', '7z'].includes(ext)) {
       setArchivePreview({ attId, fileName });
+      return;
+    }
+    // STP — 三维预览（新窗口）
+    if (ext === 'stp' || ext === 'step') {
+      window.open(`/stp-viewer.html?id=${attId}&token=${encodeURIComponent(token)}`, '_blank');
       return;
     }
     alert('该格式暂不支持预览');

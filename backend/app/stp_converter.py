@@ -1,18 +1,28 @@
 """
-STP/OCC 三维模型转换服务
-- 上传 STP 文件后自动转换为 glTF 格式
-- 供前端 Three.js 渲染预览
+STP 三维模型转换服务
+- 上传 STP 后自动转换为 glTF (.glb)
+- glb 文件统一存入 uploads/gltf_cache/ 目录
+- 删除 STP 附件时同步清理对应的 glb 缓存
+- 使用锁串行化转换，防止并发 gmsh 占满 CPU
 """
 import os
+import shutil
 import subprocess
 import logging
+import threading
 from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# PythonOCC 在 Docker 容器内的路径
-PYTHONOCC_SCRIPT = "/app/app/stp_to_gltf.py"
+# glb 缓存目录（容器内路径，对应宿主机 uploads/gltf_cache/）
+GLTF_CACHE_DIR = Path("/app/uploads/gltf_cache")
+
+# 转换脚本路径
+CONVERTER_SCRIPT = "/app/app/stp_to_gltf.py"
+
+# 串行化锁：同一时间只允许一个 gmsh 转换运行，防止并发占满 CPU
+_stp_lock = threading.Lock()
 
 
 def is_stp_file(filename: str) -> bool:
@@ -23,67 +33,93 @@ def is_stp_file(filename: str) -> bool:
     return ext in ('.stp', '.step')
 
 
-def convert_stp_to_gltf(stp_path: str) -> Optional[str]:
+def get_glb_cache_path(attachment_id: str) -> Path:
+    """获取附件对应的 glb 缓存文件路径"""
+    GLTF_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    return GLTF_CACHE_DIR / f"{attachment_id}.glb"
+
+
+def convert_stp_to_gltf(stp_path: str, attachment_id: str) -> Optional[str]:
     """
-    将 STP 文件转换为 glTF 格式（.glb）
+    将 STP 文件转换为 glTF (.glb)，存入缓存目录
+    使用 _stp_lock 确保同一时间只有一个 gmsh 进程在运行
 
     Args:
-        stp_path: STP 文件的绝对路径
+        stp_path: STP 文件绝对路径
+        attachment_id: 附件 UUID（用于命名缓存文件）
 
     Returns:
-        生成的 .glb 文件路径，失败返回 None
+        glb 文件路径，失败返回 None
     """
     stp_file = Path(stp_path)
     if not stp_file.exists():
         logger.error(f"STP 文件不存在: {stp_path}")
         return None
 
-    # 输出文件名与 STP 同名，后缀改为 .glb
-    glb_path = stp_file.with_suffix('.glb')
+    glb_path = get_glb_cache_path(attachment_id)
 
-    # 如果已存在转换结果且比 STP 新，跳过
-    if glb_path.exists() and glb_path.stat().st_mtime >= stp_file.stat().st_mtime:
-        logger.info(f"glTF 已存在且最新，跳过转换: {glb_path}")
+    # 已有转换结果 → 跳过
+    if glb_path.exists():
+        logger.info(f"glTF 缓存已存在: {glb_path}")
         return str(glb_path)
 
-    try:
-        logger.info(f"开始转换 STP → glTF: {stp_path}")
-        result = subprocess.run(
-            ['python3', PYTHONOCC_SCRIPT, str(stp_file), str(glb_path)],
-            capture_output=True,
-            text=True,
-            timeout=120,  # 最多 2 分钟
-        )
+    # 创建临时输出文件（避免直接写入缓存）
+    tmp_glb = stp_file.with_suffix('.tmp.glb')
 
-        if result.returncode != 0:
-            logger.error(f"转换失败 (exit={result.returncode}): {result.stderr}")
-            return None
-
+    # 串行化：同一时间只允许一个 gmsh 进程
+    logger.info(f"排队等待转换: {stp_path}")
+    with _stp_lock:
+        # 再次检查缓存（可能在排队期间已由其他任务生成）
         if glb_path.exists():
-            size_mb = glb_path.stat().st_size / 1024 / 1024
-            logger.info(f"转换成功: {glb_path} ({size_mb:.2f} MB)")
+            logger.info(f"glTF 缓存已存在（排队期间生成）: {glb_path}")
             return str(glb_path)
-        else:
-            logger.error(f"转换完成但输出文件不存在: {glb_path}")
+
+        logger.info(f"开始转换 STP → glTF: {stp_path}")
+        try:
+            result = subprocess.run(
+                ['python3', CONVERTER_SCRIPT, str(stp_file), str(tmp_glb)],
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+
+            if result.returncode != 0:
+                logger.error(f"转换失败 (exit={result.returncode}): {result.stderr}")
+                if tmp_glb.exists():
+                    tmp_glb.unlink()
+                return None
+
+            if tmp_glb.exists():
+                GLTF_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(tmp_glb), str(glb_path))
+                size_mb = glb_path.stat().st_size / 1024 / 1024
+                logger.info(f"转换成功: {glb_path} ({size_mb:.2f} MB)")
+                return str(glb_path)
+            else:
+                logger.error(f"转换完成但输出文件不存在")
+                return None
+
+        except subprocess.TimeoutExpired:
+            logger.error(f"转换超时 (300s): {stp_path}")
+            if tmp_glb.exists():
+                tmp_glb.unlink()
+            return None
+        except Exception as e:
+            logger.error(f"转换异常: {e}")
+            if tmp_glb.exists():
+                tmp_glb.unlink()
             return None
 
-    except subprocess.TimeoutExpired:
-        logger.error(f"转换超时 (120s): {stp_path}")
-        return None
-    except Exception as e:
-        logger.error(f"转换异常: {e}")
-        return None
 
-
-def get_gltf_path(stp_path: str) -> Optional[str]:
-    """
-    获取 STP 文件对应的 glTF 文件路径（不触发转换）
-
-    Args:
-        stp_path: STP 文件的绝对路径
-
-    Returns:
-        .glb 文件路径，不存在返回 None
-    """
-    glb_path = Path(stp_path).with_suffix('.glb')
+def get_gltf_path_for_attachment(attachment_id: str) -> Optional[str]:
+    """获取附件对应的 glb 缓存文件路径（不触发转换）"""
+    glb_path = get_glb_cache_path(attachment_id)
     return str(glb_path) if glb_path.exists() else None
+
+
+def delete_glb_cache(attachment_id: str):
+    """删除附件对应的 glb 缓存文件"""
+    glb_path = get_glb_cache_path(attachment_id)
+    if glb_path.exists():
+        glb_path.unlink()
+        logger.info(f"已删除 glb 缓存: {glb_path}")

@@ -3,7 +3,7 @@ WORKDIR /app
 RUN sed -i 's|deb.debian.org/d|mirrors.aliyun.com/d|g' /etc/apt/sources.list.d/debian.sources && \
     sed -i 's|security.debian.org/d|mirrors.aliyun.com/d|g' /etc/apt/sources.list.d/debian.sources && \
     sed -i 's/Components: main/Components: main non-free/g' /etc/apt/sources.list.d/debian.sources && \
-    apt-get update && apt-get install -y libpq-dev gcc unrar && rm -rf /var/lib/apt/lists/*
+    apt-get update && apt-get install -y libpq-dev gcc unrar gmsh libgmsh4.13 && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .
 RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/ && \
     pip install --no-cache-dir -r requirements.txt
