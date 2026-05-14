@@ -3,7 +3,6 @@ import * as THREE from 'three';
 import { useLoader } from '@react-three/fiber';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
-import { Center, Bounds } from '@react-three/drei';
 import { useViewerStore } from '../../stores/viewerStore';
 
 const dracoLoader = new DRACOLoader();
@@ -22,8 +21,19 @@ export function ModelLoader({ url }: ModelLoaderProps) {
     loader.setDRACOLoader(dracoLoader);
   });
 
+  // Auto-center and scale model to fill the view
   useEffect(() => {
-    if (gltf) setLoadingState('ready');
+    if (!gltf?.scene || !groupRef.current) return;
+    setLoadingState('ready');
+
+    const box = new THREE.Box3().setFromObject(gltf.scene);
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const scale = maxDim > 0 ? 4 / maxDim : 1;
+    groupRef.current.scale.setScalar(scale);
+
+    const center = box.getCenter(new THREE.Vector3());
+    groupRef.current.position.copy(center).multiplyScalar(-scale);
   }, [gltf, setLoadingState]);
 
   useEffect(() => {
@@ -55,12 +65,8 @@ export function ModelLoader({ url }: ModelLoaderProps) {
   };
 
   return (
-    <Center>
-      <Bounds fit clip observe margin={1}>
-        <group ref={groupRef}>
-          <primitive object={gltf.scene} onClick={handleClick} />
-        </group>
-      </Bounds>
-    </Center>
+    <group ref={groupRef}>
+      <primitive object={gltf.scene} onClick={handleClick} />
+    </group>
   );
 }
