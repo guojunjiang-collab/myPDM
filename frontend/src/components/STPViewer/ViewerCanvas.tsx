@@ -25,7 +25,7 @@ export function ViewerCanvas({ url }: ViewerCanvasProps) {
       <SectionPlanes />
       <MeasureTool />
       <ExplodeView />
-      <OrbitControls makeDefault enableDamping={false} zoomSpeed={2} />
+      <OrbitControls makeDefault enableDamping={false} zoomSpeed={1.5} />
       <Environment preset="warehouse" />
     </Canvas>
   );
