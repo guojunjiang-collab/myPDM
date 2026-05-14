@@ -13,6 +13,7 @@ type MeasurePhase = 0 | 1 | 2;
  */
 export function MeasureTool() {
   const measureMode = useViewerStore((s) => s.measureMode);
+  const modelScale = useViewerStore((s) => s.modelScale);
   const { gl, camera, raycaster, scene } = useThree();
 
   const [pointA, setPointA] = useState<THREE.Vector3 | null>(null);
@@ -91,7 +92,7 @@ export function MeasureTool() {
     ? new THREE.Vector3().addVectors(pointA, pointB).multiplyScalar(0.5)
     : pointA.clone();
 
-  const distance = pointB ? pointA.distanceTo(pointB) : 0;
+  const distance = pointB ? pointA.distanceTo(pointB) / Math.max(modelScale, 0.001) : 0;
 
   return (
     <>

@@ -12,6 +12,7 @@ export interface ViewerState {
   visibleParts: Set<string>;
 
   // 视图
+  modelScale: number;
   clipPlanes: { axis: 'x' | 'y' | 'z'; position: number }[];
   measureMode: 'off' | 'distance' | 'angle';
   explodeDistance: number;
@@ -19,6 +20,7 @@ export interface ViewerState {
 
   // Actions
   setModelUrl: (url: string | null) => void;
+  setModelScale: (s: number) => void;
   setLoadingState: (state: ViewerState['loadingState'], msg?: string) => void;
   selectPart: (id: string | null) => void;
   highlightPart: (id: string | null) => void;
@@ -38,6 +40,7 @@ const initialState = {
   selectedPartId: null as string | null,
   highlightedPartId: null as string | null,
   visibleParts: new Set<string>(),
+  modelScale: 1,
   clipPlanes: [] as { axis: 'x' | 'y' | 'z'; position: number }[],
   measureMode: 'off' as const,
   explodeDistance: 0,
@@ -48,6 +51,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   ...initialState,
 
   setModelUrl: (url) => set({ modelUrl: url }),
+  setModelScale: (s) => set({ modelScale: s }),
   setLoadingState: (state, msg = '') =>
     set({ loadingState: state, errorMessage: msg }),
 

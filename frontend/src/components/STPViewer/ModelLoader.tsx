@@ -13,7 +13,7 @@ interface ModelLoaderProps {
 }
 
 export function ModelLoader({ url }: ModelLoaderProps) {
-  const { setLoadingState, selectPart, highlightedPartId, visibleParts, wireframe } =
+  const { setLoadingState, setModelScale, selectPart, highlightedPartId, visibleParts, wireframe } =
     useViewerStore();
   const groupRef = useRef<THREE.Group>(null);
 
@@ -30,6 +30,7 @@ export function ModelLoader({ url }: ModelLoaderProps) {
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z);
     const scale = maxDim > 0 ? 4 / maxDim : 1;
+    setModelScale(scale);
     groupRef.current.scale.setScalar(scale);
 
     const center = box.getCenter(new THREE.Vector3());
