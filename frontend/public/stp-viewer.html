@@ -18,6 +18,10 @@
 <body>
   <div id="loading">模型加载中...</div>
   <div id="error">模型加载失败<br><small style="color:#bbb">请确认 STP 文件转换是否成功</small></div>
+  <div id="converting" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:10;background:#fff;color:#666;font-size:14px;text-align:center;padding:20px;flex-direction:column;gap:8px">
+    <div>模型转换中，请稍后...</div>
+    <div style="color:#999;font-size:12px" id="converting-hint">正在自动重试</div>
+  </div>
 
   <div id="viewer-container" style="width:100vw;height:100vh"></div>
 
@@ -38,6 +42,8 @@
     const container = document.getElementById('viewer-container');
     const loading = document.getElementById('loading');
     const error = document.getElementById('error');
+    const converting = document.getElementById('converting');
+    const convertingHint = document.getElementById('converting-hint');
 
     if (!id || !token) {
       error.style.display = 'flex';
@@ -45,11 +51,76 @@
       loading.style.display = 'none';
     } else {
       const url = `/api/v2/attachments/${id}/gltf?token=${encodeURIComponent(token)}`;
-      console.log('[STP Viewer] 等待 model-viewer 注册...');
+      loadModel(url);
+    }
 
+    async function loadModel(url) {
+      // 先检查后端是否返回 GLB（200）还是转换中（202）
+      try {
+        const resp = await fetch(url, { method: 'HEAD' });
+        if (resp.status === 202) {
+          // 转换中 → 显示提示 + 轮询
+          loading.style.display = 'none';
+          converting.style.display = 'flex';
+          await pollUntilReady(url);
+          return;
+        }
+        if (!resp.ok) {
+          throw new Error('HTTP ' + resp.status);
+        }
+      } catch (e) {
+        // HEAD 可能不支持，直接尝试加载
+        console.log('[STP Viewer] HEAD check skipped, trying direct load');
+      }
+
+      console.log('[STP Viewer] 等待 model-viewer 注册...');
       const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('CDN超时')), 10000));
-      Promise.race([customElements.whenDefined('model-viewer'), timeout])
-        .then(() => {
+      try {
+        await Promise.race([customElements.whenDefined('model-viewer'), timeout]);
+      } catch (e) {
+        loading.style.display = 'none';
+        error.style.display = 'flex';
+        error.innerHTML = '3D组件加载失败<br><small>CDN资源可能无法访问</small>';
+        return;
+      }
+      createViewer(url);
+    }
+
+    async function pollUntilReady(url) {
+      let retries = 0;
+      const maxRetries = 30; // 最多轮询 60 秒
+      while (retries < maxRetries) {
+        await new Promise(r => setTimeout(r, 2000));
+        retries++;
+        try {
+          const resp = await fetch(url, { method: 'HEAD' });
+          if (resp.status === 200) {
+            convertingHint.textContent = '转换完成，加载模型中...';
+            await customElements.whenDefined('model-viewer');
+            converting.style.display = 'none';
+            createViewer(url);
+            return;
+          }
+          if (resp.status === 202) {
+            convertingHint.textContent = `正在自动重试 (${retries}/${maxRetries})`;
+            continue;
+          }
+          // 非 200/202 → 出错
+          throw new Error('HTTP ' + resp.status);
+        } catch (e) {
+          converting.style.display = 'none';
+          error.style.display = 'flex';
+          error.innerHTML = '模型加载失败<br><small>' + e.message + '</small>';
+          return;
+        }
+      }
+      // 超时
+      converting.style.display = 'none';
+      error.style.display = 'flex';
+      error.innerHTML = '转换超时<br><small>请关闭后重试</small>';
+    }
+
+    function createViewer(url) {
           console.log('[STP Viewer] 创建 model-viewer, src:', url);
           const viewer = document.createElement('model-viewer');
           viewer.setAttribute('src', url);
@@ -76,13 +147,6 @@
 
           container.appendChild(viewer);
           window._viewer = viewer;
-        })
-        .catch((e) => {
-          console.error('[STP Viewer]', e.message);
-          loading.style.display = 'none';
-          error.style.display = 'flex';
-          error.innerHTML = '3D组件加载失败<br><small>CDN资源可能无法访问</small>';
-        });
     }
 
     function resetCamera() {

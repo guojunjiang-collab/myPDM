@@ -2,7 +2,7 @@
 附件管理路由 - 支持文件系统存储和分块上传
 """
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from sqlalchemy.orm import Session
 import uuid
 import os
@@ -554,6 +554,10 @@ async def get_gltf(
     """获取 STP 对应的 glTF/glb 文件（用于前端三维预览）
     
     认证方式: ?token= JWT 查询参数（浏览器 <model-viewer> src 加载）
+    
+    流程:
+    - 缓存存在 → 直接返回 GLB (200)
+    - 缓存不存在 → 后台异步转换 + 返回 202（前端轮询重试）
     """
     # JWT 验证
     if not token:
@@ -585,12 +589,19 @@ async def get_gltf(
     glb_path = get_gltf_path_for_attachment(str(attachment_id))
 
     if not glb_path:
-        # 触发转换
+        # 缓存未命中 → 后台异步转换 + 返回 202
+        import asyncio
         stp_full_path = file_storage.base_dir / att.file_path
-        glb_path = convert_stp_to_gltf(str(stp_full_path), str(attachment_id))
-
-    if not glb_path:
-        raise HTTPException(status_code=500, detail="STP 文件转换失败，请稍后重试")
+        loop = asyncio.get_event_loop()
+        loop.run_in_executor(None, convert_stp_to_gltf, str(stp_full_path), str(attachment_id))
+        return JSONResponse(
+            status_code=202,
+            content={
+                "status": "converting",
+                "message": "模型转换中，请稍后重试",
+                "retry_seconds": 2
+            }
+        )
 
     return FileResponse(
         path=glb_path,

@@ -157,7 +157,11 @@ def convert(input_path: str, output_path: str):
     try:
         from gltf_draco_transcoder import compress_gltf
         import tempfile as tmpmod
-        fd, tmp_draco = tmpmod.mkstemp(suffix='.glb', prefix='draco_')
+        # 在同目录创建临时文件，避免跨设备 os.replace 失败
+        fd, tmp_draco = tmpmod.mkstemp(
+            suffix='.glb', prefix='draco_',
+            dir=os.path.dirname(output_path) or '.'
+        )
         os.close(fd)
         try:
             compressed = compress_gltf(output_path, qp=14, qn=10, cl=9)
