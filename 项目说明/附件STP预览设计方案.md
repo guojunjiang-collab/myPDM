@@ -2,7 +2,7 @@
 
 > **状态**: 已实现（v5.0 优化版）  
 > **创建**: 2026-05-14  
-> **更新**: 2026-05-14（Draco 压缩 + 内存网格提取 + Unlit 渲染 + 法线计算）  
+> **更新**: 2026-05-14（Mayo CLI + Draco 双引擎 v6.0 后端已上线）  
 > **目标**: 图文档 STP/STEP 附件支持浏览器内三维模型预览，快速转换 + 极小文件 + 无视光照的准确着色
 
 ---
@@ -295,28 +295,56 @@ HTML 中的 `<model-viewer>` 标签在 CDN 脚本加载前被解析为未知元�
 
 ---
 
-## 六、v6.0 优化升级计划
+## 六、v6.0 优化升级
 
-> **状态**: 规划中  
+> **状态**: 后端 ✅ 已上线 | 前端 ⏳ 规划中  
 > **创建**: 2026-05-14  
+> **更新**: 2026-05-14（实施完成：Mayo+Draco 后端）  
 > **目标**: 后端 OCC 原生转换（大文件不超时） + 前端 R3F 高级交互（BOM 叠加/剖切/测量）
 
-### 6.1 动机
+### 6.1 后端实施结果（✅ 已完成）
 
-**当前痛点**:
-1. 大文件 STP（>5MB）gmsh 转换超时 300s，用户预览失败
-2. model-viewer 功能受限：无剖切、无测量、无 BOM 叠加、无零件点击
-3. 串行锁导致多用户排队等待
+#### 最终架构
 
-**目标架构**:
 ```
-上传 STP → [后端] OCC 原生 2D 三角剖分 → Draco GLB（<5s 冷启动，大文件分钟级→秒级）
-预览   → [前端] R3F 查看器 → 剖切/测量/BOM 标签/零件高亮/爆炸图
+上传 STP → Mayo CLI (OCC原生, ~1.5s冷启动) → GLB
+         → gltf-draco-transcoder (Draco压缩) → 缓存 → /gltf端点
 ```
+
+#### 实测性能
+
+| 模型 | STP 大小 | 旧方案(gmsh) | 新方案(Mayo) | Mayo+Draco |
+|------|---------|-------------|-------------|-----------|
+| EngineBlock | 95 KB | 64.5 KB (✅) | 218 KB (✅) | **48 KB** (4.5x) |
+| AssemblyExample | 503 KB | 92.6 KB (✅) | 489 KB (✅) | — |
+| MD_V61 | 7 MB | ❌ **300s 超时** | 1,866 KB (✅) | 1,823 KB (1.0x) |
+
+**核心成就**:
+- ✅ **大文件不再超时**: 7MB STP 在 120s 内完成（gmsh 300s 超时失败）
+- ✅ **依赖精简**: 移除 5 个 pip 包（gmsh/trimesh/scipy/numpy），仅保留 gltf-draco-transcoder
+- ✅ **Docker 减重**: 镜像从 1.82GB → 1.37GB（-450MB，移除 gmsh + OCC 系统库）
+- ✅ **并发提升**: Lock(1) → Semaphore(2)，两个 Mayo 进程可同时运行
+- ✅ **Draco 后处理**: 中小文件 4-5x 额外压缩（可选，自动检测）
+
+#### 文件变更
+
+| 文件 | 改动 |
+|------|------|
+| `stp_to_gltf.py` | 重写：Mayo CLI 子进程 + auto mesh quality + Draco 后处理 |
+| `stp_converter.py` | Lock→Semaphore(2)，超时 300s→120s |
+| `requirements.txt` | 移除 gmsh/trimesh/scipy/numpy，保留 gltf-draco-transcoder |
+| `Dockerfile` | MayoConv.AppImage COPY + xvfb + Qt 运行时库 |
+
+#### Docker 要点
+
+- MayoConv AppImage 需手动下载放入 `backend/` 目录（已加入 .gitignore）
+- 容器内通过 `--appimage-extract-and-run` 绕过 FUSE 限制
+- `xvfb-run` 提供虚拟显示（QtCore 需要）
+- 额外依赖：`libfontconfig1 libgl1 libglib2.0-0 libxkbcommon0 libegl1`
 
 ---
 
-### 6.2 后端方案对比
+### 6.2 动机（前端部分）
 
 #### 方案 A：Mayo CLI（🏆 推荐）
 
