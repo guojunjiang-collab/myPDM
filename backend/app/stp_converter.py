@@ -3,7 +3,7 @@ STP 三维模型转换服务
 - 上传 STP 后自动转换为 glTF (.glb)
 - glb 文件统一存入 uploads/gltf_cache/ 目录
 - 删除 STP 附件时同步清理对应的 glb 缓存
-- 使用锁串行化转换，防止并发 gmsh 占满 CPU
+- 使用 Semaphore 限制并发 Mayo 进程，防止 CPU/内存过载
 """
 import os
 import shutil
@@ -21,8 +21,8 @@ GLTF_CACHE_DIR = Path("/app/uploads/gltf_cache")
 # 转换脚本路径
 CONVERTER_SCRIPT = "/app/app/stp_to_gltf.py"
 
-# 串行化锁：同一时间只允许一个 gmsh 转换运行，防止并发占满 CPU
-_stp_lock = threading.Lock()
+# 并发控制：最多同时运行 2 个 Mayo 进程（OCC 三角剖分 CPU 密集）
+_stp_semaphore = threading.Semaphore(2)
 
 
 def is_stp_file(filename: str) -> bool:
@@ -42,7 +42,7 @@ def get_glb_cache_path(attachment_id: str) -> Path:
 def convert_stp_to_gltf(stp_path: str, attachment_id: str) -> Optional[str]:
     """
     将 STP 文件转换为 glTF (.glb)，存入缓存目录
-    使用 _stp_lock 确保同一时间只有一个 gmsh 进程在运行
+    使用 _stp_semaphore 限制并发 Mayo 进程数（最多 2 个）
 
     Args:
         stp_path: STP 文件绝对路径
@@ -66,9 +66,9 @@ def convert_stp_to_gltf(stp_path: str, attachment_id: str) -> Optional[str]:
     # 创建临时输出文件（避免直接写入缓存）
     tmp_glb = stp_file.with_suffix('.tmp.glb')
 
-    # 串行化：同一时间只允许一个 gmsh 进程
-    logger.info(f"排队等待转换: {stp_path}")
-    with _stp_lock:
+    # 获取信号量（限制并发 Mayo 进程数）
+    logger.info(f"等待转换槽位: {stp_path}")
+    with _stp_semaphore:
         # 再次检查缓存（可能在排队期间已由其他任务生成）
         if glb_path.exists():
             logger.info(f"glTF 缓存已存在（排队期间生成）: {glb_path}")
@@ -80,7 +80,7 @@ def convert_stp_to_gltf(stp_path: str, attachment_id: str) -> Optional[str]:
                 ['python3', CONVERTER_SCRIPT, str(stp_file), str(tmp_glb)],
                 capture_output=True,
                 text=True,
-                timeout=300,
+                timeout=120,
             )
 
             if result.returncode != 0:
