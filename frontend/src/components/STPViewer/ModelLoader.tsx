@@ -21,26 +21,25 @@ export function ModelLoader({ url }: ModelLoaderProps) {
     loader.setDRACOLoader(dracoLoader);
   });
 
-  // Auto-center and scale model to fill the view
+  // Mark ready immediately, then compute scale in background
   useEffect(() => {
     if (!gltf?.scene || !groupRef.current) return;
     setLoadingState('ready');
 
-    const box = new THREE.Box3().setFromObject(gltf.scene);
-    if (box.isEmpty()) return;
-    const size = box.getSize(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z);
-    // 目标：模型最长边占视口约 4 个单位
-    const scale = maxDim > 0.001 ? 4 / maxDim : 1;
-    // 单位检测：maxDim < 0.5 大概率是米（STP 常见）
-    const unitScale = maxDim < 0.5 ? 1000 : 1;
-
-    // modelScale: 视口测量值 → 真实 mm 的除数
-    const modelScaleVal = (unitScale > 1) ? scale / unitScale : scale;
-    setModelScale(modelScaleVal);
-
-    groupRef.current.scale.setScalar(scale);
-    groupRef.current.position.copy(box.getCenter(new THREE.Vector3()).multiplyScalar(-scale));
+    // Use requestAnimationFrame to let React unmount the overlay first
+    requestAnimationFrame(() => {
+      if (!groupRef.current) return;
+      const box = new THREE.Box3().setFromObject(gltf.scene);
+      if (box.isEmpty()) return;
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const scale = maxDim > 0.001 ? 4 / maxDim : 1;
+      const unitScale = maxDim < 0.5 ? 1000 : 1;
+      const modelScaleVal = (unitScale > 1) ? scale / unitScale : scale;
+      setModelScale(modelScaleVal);
+      groupRef.current.scale.setScalar(scale);
+      groupRef.current.position.copy(box.getCenter(new THREE.Vector3()).multiplyScalar(-scale));
+    });
   }, [gltf, setLoadingState, setModelScale]);
 
   useEffect(() => {
