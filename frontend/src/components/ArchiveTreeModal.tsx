@@ -2,6 +2,7 @@ import React from 'react';
 import { useState, useEffect } from 'react';
 import { Modal } from './Modal';
 import { attachmentApi } from '../services/api';
+import { useAuthStore } from '../stores/auth';
 import type { ArchiveTreeNode, ArchiveTreeResponse } from '../types';
 
 interface ArchiveTreeModalProps {
@@ -19,37 +20,59 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1048576).toFixed(1)} MB`;
 }
 
+/** 构建提取/预览 URL */
+function extractUrl(attId: string, filePath: string, token: string, inline: boolean): string {
+  return `/api/v2/attachments/${attId}/extract-file?path=${encodeURIComponent(filePath)}&token=${encodeURIComponent(token)}&disposition=${inline ? 'inline' : 'attachment'}`;
+}
+
+/** 判断文件是否可预览 */
+function canPreview(fileName: string): boolean {
+  const ext = fileName.split('.').pop()?.toLowerCase() || '';
+  return ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'svg', 'txt', 'md', 'csv', 'json', 'xml', 'stp', 'step'].includes(ext);
+}
+
 /** 递归渲染树节点 */
-function TreeNodeItem({ node, depth = 0 }: { node: ArchiveTreeNode; depth?: number }) {
+function TreeNodeItem({ node, depth, attId, token }: { node: ArchiveTreeNode; depth: number; attId: string; token: string }) {
   const [expanded, setExpanded] = useState(depth < 1);
   const isDir = node.type === 'dir';
   const hasChildren = isDir && (node.children?.length ?? 0) > 0;
 
   return (
     <React.Fragment>
-      <tr
-        className={`hover:bg-gray-50 ${isDir ? 'cursor-pointer' : ''}`}
-        onClick={() => { if (isDir) setExpanded(!expanded); }}
-      >
+      <tr className={`hover:bg-gray-50 ${isDir ? 'cursor-pointer' : ''}`}
+        onClick={() => { if (isDir) setExpanded(!expanded); }}>
         <td className="px-3 py-1.5 text-xs whitespace-nowrap" style={{ paddingLeft: `${16 + depth * 20}px` }}>
           <span className="inline-flex items-center gap-1">
-            {hasChildren && (
-              <span className="text-gray-400 w-3 inline-block text-center">
-                {expanded ? '▼' : '▶'}
-              </span>
-            )}
+            {hasChildren && (<span className="text-gray-400 w-3 inline-block text-center">{expanded ? '▼' : '▶'}</span>)}
             {!hasChildren && isDir && <span className="w-3 inline-block" />}
-            <span className={isDir ? 'font-medium' : ''}>
-              {isDir ? '📁 ' : '📄 '}{node.name}
-            </span>
+            <span className={isDir ? 'font-medium' : ''}>{isDir ? '📁 ' : '📄 '}{node.name}</span>
           </span>
         </td>
-        <td className="px-3 py-1.5 text-xs text-gray-500 w-24 text-right">
+        <td className="px-2 py-1.5 text-xs text-gray-500 w-20 text-right">
           {isDir ? '-' : formatSize(node.size)}
+        </td>
+        <td className="px-2 py-1.5 text-center w-24" onClick={e => e.stopPropagation()}>
+          {!isDir && (
+            <span className="inline-flex gap-1">
+              <a href={extractUrl(attId, node.path || node.name, token, false)} target="_blank" rel="noreferrer"
+                 className="text-blue-600 hover:text-blue-800 text-xs" title="下载">
+                下载
+              </a>
+              {canPreview(node.name) && (
+                <>
+                  <span className="text-gray-300">|</span>
+                  <a href={extractUrl(attId, node.path || node.name, token, true)} target="_blank" rel="noreferrer"
+                     className="text-green-600 hover:text-green-800 text-xs" title="预览">
+                    预览
+                  </a>
+                </>
+              )}
+            </span>
+          )}
         </td>
       </tr>
       {expanded && hasChildren && node.children!.map((child, i) => (
-        <TreeNodeItem key={`${child.name}-${i}`} node={child} depth={depth + 1} />
+        <TreeNodeItem key={`${child.name}-${i}`} node={child} depth={depth + 1} attId={attId} token={token} />
       ))}
     </React.Fragment>
   );
@@ -86,17 +109,18 @@ export default function ArchiveTreeModal({
             <span>总大小 {formatSize(data.total_size)}</span>
           </div>
           <div className="border rounded-lg overflow-auto max-h-[60vh]">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-xs text-gray-500 border-b">
-                  <th className="px-3 py-1.5 text-left">名称</th>
-                  <th className="px-3 py-1.5 text-right w-24">大小</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {data.tree.map((node, i) => (
-                  <TreeNodeItem key={i} node={node} depth={0} />
-                ))}
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 text-xs text-gray-500 border-b">
+                    <th className="px-3 py-1.5 text-left">名称</th>
+                    <th className="px-2 py-1.5 text-right w-20">大小</th>
+                    <th className="px-2 py-1.5 text-center w-24">操作</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {data.tree.map((node, i) => (
+                    <TreeNodeItem key={i} node={node} depth={0} attId={attachmentId} token={token} />
+                  ))}
               </tbody>
             </table>
           </div>

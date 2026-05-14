@@ -1,22 +1,20 @@
 """
 压缩包内容读取工具
 
-支持格式: ZIP (.zip), TAR (.tar, .tar.gz, .tgz)
-依赖: 仅 Python 标准库 (zipfile, tarfile)
-
-用法:
-    from .bom.archive_reader import read_archive_tree, SUPPORTED_EXTENSIONS
-    result = read_archive_tree("/path/to/file.zip")
-    # result = { "tree": [...], "total_files": 42, "total_size": 1048576 }
+支持格式: ZIP, TAR/TAR.GZ, RAR, 7Z
+依赖: zipfile/tarfile (stdlib), rarfile, py7zr
 """
 
 import zipfile
 import tarfile
+import tempfile
+import os
+import shutil
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
-# 支持的压缩包扩展名
-SUPPORTED_EXTENSIONS = {'.zip', '.tar', '.gz', '.tgz'}
+# 支持的扩展名
+SUPPORTED_EXTENSIONS = {'.zip', '.tar', '.gz', '.tgz', '.rar', '.7z'}
 
 
 def read_archive_tree(file_path: str) -> Dict[str, Any]:
@@ -46,10 +44,14 @@ def read_archive_tree(file_path: str) -> Dict[str, Any]:
 
     if ext == '.zip':
         return _read_zip(file_path)
+    elif ext == '.rar':
+        return _read_rar(file_path)
+    elif ext == '.7z':
+        return _read_7z(file_path)
     elif ext in ('.tar',) or is_tar_gz or ext in ('.tgz',):
         return _read_tar(file_path)
     else:
-        raise ValueError(f"不支持的压缩格式: {ext}，仅支持 ZIP / TAR / TAR.GZ")
+        raise ValueError(f"不支持的压缩格式: {ext}，仅支持 ZIP / TAR / TAR.GZ / RAR / 7Z")
 
 
 def _read_zip(path: str) -> Dict[str, Any]:
@@ -81,6 +83,84 @@ def _read_tar(path: str) -> Dict[str, Any]:
                 "size": member.size,
             })
     return _build_tree(entries)
+
+
+def _read_rar(path: str) -> Dict[str, Any]:
+    """读取 RAR 文件内容（需要系统安装 unrar）"""
+    import rarfile
+    entries: List[Dict[str, Any]] = []
+    with rarfile.RarFile(path, 'r') as rf:
+        for info in rf.infolist():
+            entries.append({
+                "path": info.filename.rstrip('/'),
+                "type": "dir" if info.isdir() else "file",
+                "size": info.file_size,
+                "compressed_size": info.compress_size,
+            })
+    return _build_tree(entries)
+
+
+def _read_7z(path: str) -> Dict[str, Any]:
+    """读取 7Z 文件内容"""
+    import py7zr
+    entries: List[Dict[str, Any]] = []
+    with py7zr.SevenZipFile(path, 'r') as szf:
+        for info in szf.list():
+            is_dir = info.is_directory if hasattr(info, 'is_directory') else False
+            entries.append({
+                "path": info.filename.rstrip('/'),
+                "type": "dir" if is_dir else "file",
+                "size": info.uncompressed_size if hasattr(info, 'uncompressed_size') else getattr(info, 'size', 0),
+            })
+    return _build_tree(entries)
+
+
+def extract_file(archive_path: str, file_path_in_archive: str) -> str:
+    """从压缩包中提取单个文件到临时目录，返回提取后文件路径"""
+    archive_path_obj = Path(archive_path)
+    ext = archive_path_obj.suffix.lower()
+    suffixes = [s.lower() for s in archive_path_obj.suffixes]
+    is_tar_gz = suffixes == ['.tar', '.gz']
+    
+    tmp_dir = tempfile.mkdtemp(prefix='myPDM_extract_')
+    
+    if ext == '.zip':
+        with zipfile.ZipFile(archive_path, 'r') as zf:
+            mp = _match_member(zf.namelist(), file_path_in_archive)
+            if not mp: raise KeyError(f"文件不存在: {file_path_in_archive}")
+            return zf.extract(mp, tmp_dir)
+    elif ext == '.rar':
+        import rarfile
+        with rarfile.RarFile(archive_path, 'r') as rf:
+            mp = _match_member(rf.namelist(), file_path_in_archive)
+            if not mp: raise KeyError(f"文件不存在: {file_path_in_archive}")
+            rf.extract(mp, tmp_dir)
+            return os.path.join(tmp_dir, mp)
+    elif ext == '.7z':
+        import py7zr
+        with py7zr.SevenZipFile(archive_path, 'r') as szf:
+            names = [f.filename for f in szf.list()]
+            mp = _match_member(names, file_path_in_archive)
+            if not mp: raise KeyError(f"文件不存在: {file_path_in_archive}")
+            szf.extract(tmp_dir, targets=[mp])
+            return os.path.join(tmp_dir, mp)
+    elif ext in ('.tar',) or is_tar_gz or ext in ('.tgz',):
+        with tarfile.open(archive_path, 'r:*') as tf:
+            mp = _match_member([m.name for m in tf.getmembers()], file_path_in_archive)
+            if not mp: raise KeyError(f"文件不存在: {file_path_in_archive}")
+            tf.extract(mp, tmp_dir)
+            return os.path.join(tmp_dir, mp)
+    else:
+        raise ValueError(f"不支持的格式: {ext}")
+
+
+def _match_member(names: List[str], target: str) -> Optional[str]:
+    """在文件列表中匹配目标路径"""
+    target = target.replace('\\', '/').strip('/')
+    for name in names:
+        if name.rstrip('/') == target:
+            return name
+    return None
 
 
 def _build_tree(entries: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -136,6 +216,7 @@ def _build_tree(entries: List[Dict[str, Any]]) -> Dict[str, Any]:
             filename = parts[-1]
             node: Dict[str, Any] = {
                 "name": filename,
+                "path": entry["path"],
                 "type": "file",
                 "size": entry["size"]
             }

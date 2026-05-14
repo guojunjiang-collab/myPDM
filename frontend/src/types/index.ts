@@ -216,6 +216,7 @@ export interface BOMTraceItem {
 /** 压缩包内容树节点 */
 export interface ArchiveTreeNode {
   name: string;
+  path?: string;
   type: 'file' | 'dir';
   size: number;
   compressed_size?: number;
@@ -230,19 +231,3 @@ export interface ArchiveTreeResponse {
   tree: ArchiveTreeNode[];
 }
 
-/** 压缩包内容树节点 */
-export interface ArchiveTreeNode {
-  name: string;
-  type: 'file' | 'dir';
-  size: number;
-  compressed_size?: number;
-  children?: ArchiveTreeNode[];
-}
-
-/** 压缩包内容树 API 响应 */
-export interface ArchiveTreeResponse {
-  file_name: string;
-  total_files: number;
-  total_size: number;
-  tree: ArchiveTreeNode[];
-}

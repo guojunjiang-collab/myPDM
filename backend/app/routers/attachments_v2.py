@@ -15,7 +15,7 @@ from ..models import User, DocumentAttachment, Document
 from ..file_storage import file_storage, chunked_uploader, MAX_FILE_SIZE, CHUNK_SIZE
 from .auth import require_role
 from ..stp_converter import is_stp_file, convert_stp_to_gltf
-from ..bom.archive_reader import read_archive_tree, SUPPORTED_EXTENSIONS
+from ..bom.archive_reader import read_archive_tree, extract_file, SUPPORTED_EXTENSIONS
 import zipfile
 import tarfile
 
@@ -676,3 +676,62 @@ async def get_archive_tree(
         "file_name": att.file_name,
         **result
     }
+
+
+@router.get("/{attachment_id}/extract-file")
+async def extract_archive_file(
+    attachment_id: uuid.UUID,
+    path: str,
+    token: str = None,
+    disposition: str = "attachment",
+    db: Session = Depends(get_db)
+):
+    """从压缩包中提取单个文件并返回"""
+    from jose import JWTError, jwt
+    from .auth import SECRET_KEY, ALGORITHM
+
+    if not token:
+        raise HTTPException(status_code=401, detail="缺少认证令牌")
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        user_role = payload.get("role", "")
+        if not username:
+            raise HTTPException(status_code=401, detail="无效的认证令牌")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="认证令牌验证失败")
+    if user_role == "guest":
+        raise HTTPException(status_code=403, detail="访客无预览权限")
+
+    att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
+    if not att:
+        raise HTTPException(status_code=404, detail="附件不存在")
+
+    ext = Path(att.file_name).suffix.lower()
+    suffixes = [s.lower() for s in Path(att.file_name).suffixes]
+    if ext not in SUPPORTED_EXTENSIONS and suffixes != ['.tar', '.gz']:
+        raise HTTPException(status_code=400, detail="非压缩包文件")
+
+    file_path = None
+    if hasattr(att, 'file_path') and att.file_path:
+        full_path = file_storage.base_dir / att.file_path
+        if full_path.exists():
+            file_path = full_path
+    if not file_path:
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    try:
+        extracted_path = extract_file(str(file_path), path)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"提取失败: {str(e)}")
+
+    import mimetypes
+    from urllib.parse import quote
+    mime_type = mimetypes.guess_type(extracted_path)[0] or "application/octet-stream"
+    filename = Path(extracted_path).name
+    encoded = quote(filename)
+
+    headers = {"Content-Disposition": f"{disposition}; filename*=UTF-8''{encoded}"}
+    return FileResponse(path=extracted_path, filename=filename, media_type=mime_type, headers=headers)
