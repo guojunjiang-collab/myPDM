@@ -122,7 +122,7 @@ export function MeasureTool() {
           {/* Distance label */}
           <Html position={midPoint.add(new THREE.Vector3(0, 0.15, 0))} center style={{ pointerEvents: 'none' }}>
             <div className="rounded bg-gray-900/85 px-2 py-1 text-xs text-white shadow-lg whitespace-nowrap">
-              {distance.toFixed(1)} mm{(modelScale !== 1 ? ` (×${(1/modelScale).toFixed(0)})` : '')}
+              {distance.toFixed(1)} mm{(modelScale > 0 && modelScale !== 1 ? ` (×${(1/modelScale).toFixed(0)})` : '')}
             </div>
           </Html>
         </>
