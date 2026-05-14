@@ -41,11 +41,6 @@ export function ModelLoader({ url }: ModelLoaderProps) {
 
     groupRef.current.scale.setScalar(scale);
     groupRef.current.position.copy(box.getCenter(new THREE.Vector3()).multiplyScalar(-scale));
-
-    console.log('[ModelLoader] maxDim:', maxDim.toFixed(2),
-      'unit:', unitScale > 1 ? 'm→mm' : 'mm',
-      'modelScale:', modelScaleVal.toFixed(4),
-      '(1unit =', (maxDim * unitScale / 4).toFixed(1), 'mm)');
   }, [gltf, setLoadingState, setModelScale]);
 
   useEffect(() => {
