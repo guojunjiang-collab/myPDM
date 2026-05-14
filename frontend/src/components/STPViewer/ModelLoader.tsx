@@ -32,10 +32,10 @@ export function ModelLoader({ url }: ModelLoaderProps) {
     const maxDim = Math.max(size.x, size.y, size.z);
     // 目标：模型最长边占视口约 4 个单位
     const scale = maxDim > 0.001 ? 4 / maxDim : 1;
+    // 单位检测：maxDim < 0.5 大概率是米（STP 常见）
+    const unitScale = maxDim < 0.5 ? 1000 : 1;
 
     // modelScale: 视口测量值 → 真实 mm 的除数
-    // 视觉缩放把 maxDim 映射到 ~4 单位，所以 1 视口单位 = maxDim*unitScale/4 mm
-    // 测量转换: distance / modelScale → distance * 4 / (maxDim*unitScale) mm
     const modelScaleVal = (unitScale > 1) ? scale / unitScale : scale;
     setModelScale(modelScaleVal);
 
@@ -46,7 +46,6 @@ export function ModelLoader({ url }: ModelLoaderProps) {
       'unit:', unitScale > 1 ? 'm→mm' : 'mm',
       'modelScale:', modelScaleVal.toFixed(4),
       '(1unit =', (maxDim * unitScale / 4).toFixed(1), 'mm)');
-    groupRef.current.position.copy(box.getCenter(new THREE.Vector3()).multiplyScalar(-scale));
   }, [gltf, setLoadingState, setModelScale]);
 
   useEffect(() => {
