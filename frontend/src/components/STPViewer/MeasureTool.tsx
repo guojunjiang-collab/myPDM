@@ -92,11 +92,8 @@ export function MeasureTool() {
     ? new THREE.Vector3().addVectors(pointA, pointB).multiplyScalar(0.5)
     : pointA.clone();
 
-  // 还原真实尺寸：模型被缩放填满视口，测量值 / scale = 原始值
+  // modelScale 含单位转换（m→mm=1000），相除得真实 mm
   const distance = pointB ? pointA.distanceTo(pointB) / Math.max(modelScale, 0.001) : 0;
-  const scaleLabel = modelScale > 0 && modelScale !== 1
-    ? ` (1:${(1/modelScale).toFixed(1)})`
-    : '';
 
   return (
     <>

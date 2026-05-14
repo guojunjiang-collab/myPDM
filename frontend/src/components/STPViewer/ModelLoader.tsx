@@ -32,11 +32,18 @@ export function ModelLoader({ url }: ModelLoaderProps) {
     const maxDim = Math.max(size.x, size.y, size.z);
     // 目标：模型最长边占视口约 4 个单位
     const scale = maxDim > 0.001 ? 4 / maxDim : 1;
-    setModelScale(scale);
-    groupRef.current.scale.setScalar(scale);
-    groupRef.current.position.copy(box.getCenter(new THREE.Vector3()).multiplyScalar(-scale));
 
-    console.log('[ModelLoader] bbox maxDim:', maxDim.toFixed(2), 'scale:', scale.toFixed(4), '1/scale:', (1/scale).toFixed(0));
+    // 单位检测：maxDim < 0.5 大概率是米（STP 常见），转换为毫米显示
+    const unitScale = maxDim < 0.5 ? 1000 : 1;
+    const displayScale = scale * unitScale;
+    setModelScale(displayScale);
+    groupRef.current.scale.setScalar(scale);
+
+    console.log('[ModelLoader] bbox maxDim:', maxDim.toFixed(2), 
+      'scale:', scale.toFixed(4), 
+      'unit:', unitScale > 1 ? 'm→mm' : 'mm',
+      'total:', displayScale.toFixed(4));
+    groupRef.current.position.copy(box.getCenter(new THREE.Vector3()).multiplyScalar(-scale));
   }, [gltf, setLoadingState, setModelScale]);
 
   useEffect(() => {
