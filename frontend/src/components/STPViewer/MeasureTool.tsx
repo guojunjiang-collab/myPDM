@@ -92,8 +92,11 @@ export function MeasureTool() {
     ? new THREE.Vector3().addVectors(pointA, pointB).multiplyScalar(0.5)
     : pointA.clone();
 
-  // 还原真实尺寸：模型被 scale 缩放，测量值需除以 scale 还原
+  // 还原真实尺寸：模型被缩放填满视口，测量值 / scale = 原始值
   const distance = pointB ? pointA.distanceTo(pointB) / Math.max(modelScale, 0.001) : 0;
+  const scaleLabel = modelScale > 0 && modelScale !== 1
+    ? ` (1:${(1/modelScale).toFixed(1)})`
+    : '';
 
   return (
     <>
@@ -122,7 +125,7 @@ export function MeasureTool() {
           {/* Distance label */}
           <Html position={midPoint.add(new THREE.Vector3(0, 0.15, 0))} center style={{ pointerEvents: 'none' }}>
             <div className="rounded bg-gray-900/85 px-2 py-1 text-xs text-white shadow-lg whitespace-nowrap">
-              {distance.toFixed(1)} mm{(modelScale > 0 && modelScale !== 1 ? ` (×${(1/modelScale).toFixed(0)})` : '')}
+              {distance.toFixed(1)} mm{scaleLabel}
             </div>
           </Html>
         </>
