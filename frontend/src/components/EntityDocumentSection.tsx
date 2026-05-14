@@ -7,6 +7,7 @@ import { Modal } from './Modal';
 import DocumentPicker from './DocumentPicker';
 import DocumentDetailContent from './DocumentDetailContent';
 import VersionSelectModal from './VersionSelectModal';
+import ArchiveTreeModal from './ArchiveTreeModal';
 
 /* ----------------------------------------------------------------
    Types
@@ -61,6 +62,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
   const [viewDoc, setViewDoc] = useState<Document | null>(null);
   const [viewDocCustomDefs, setViewDocCustomDefs] = useState<CustomFieldDefinition[]>([]);
   const [viewDocCustomValues, setViewDocCustomValues] = useState<Record<string, any>>({});
+  const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -161,16 +163,20 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
 
   const handlePreviewAttachment = (fileId: string, fileName: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase() || '';
-    if (ext !== 'pdf') {
-      alert('该格式暂不支持预览');
-      return;
-    }
     const token = useAuthStore.getState().token;
-    if (!token) {
-      alert('登录已过期，请重新登录');
+    if (!token) { alert('登录已过期，请重新登录'); return; }
+
+    // PDF — 浏览器内嵌预览
+    if (ext === 'pdf') {
+      window.open(`/api/v2/attachments/${fileId}/preview?token=${encodeURIComponent(token)}`, '_blank');
       return;
     }
-    window.open(`/api/v2/attachments/${fileId}/preview?token=${encodeURIComponent(token)}`, '_blank');
+    // 压缩包 — 树形预览
+    if (['zip', 'tar', 'gz', 'tgz'].includes(ext)) {
+      setArchivePreview({ attId: fileId, fileName });
+      return;
+    }
+    alert('该格式暂不支持预览');
   };
 
   /** 查看图文档详情 */
@@ -341,6 +347,16 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
         onSelect={handleVersionSelect}
         onClose={() => setVersionSelectState(null)}
       />
+
+      {archivePreview && (
+        <ArchiveTreeModal
+          open={!!archivePreview}
+          onClose={() => setArchivePreview(null)}
+          attachmentId={archivePreview.attId}
+          fileName={archivePreview.fileName}
+          token={useAuthStore.getState().token || ''}
+        />
+      )}
     </div>
   );
 }

@@ -1,0 +1,107 @@
+import React from 'react';
+import { useState, useEffect } from 'react';
+import { Modal } from './Modal';
+import { attachmentApi } from '../services/api';
+import type { ArchiveTreeNode, ArchiveTreeResponse } from '../types';
+
+interface ArchiveTreeModalProps {
+  open: boolean;
+  onClose: () => void;
+  attachmentId: string;
+  fileName: string;
+  token: string;
+}
+
+/** 文件大小格式化 */
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1048576).toFixed(1)} MB`;
+}
+
+/** 递归渲染树节点 */
+function TreeNodeItem({ node, depth = 0 }: { node: ArchiveTreeNode; depth?: number }) {
+  const [expanded, setExpanded] = useState(depth < 1);
+  const isDir = node.type === 'dir';
+  const hasChildren = isDir && (node.children?.length ?? 0) > 0;
+
+  return (
+    <React.Fragment>
+      <tr
+        className={`hover:bg-gray-50 ${isDir ? 'cursor-pointer' : ''}`}
+        onClick={() => { if (isDir) setExpanded(!expanded); }}
+      >
+        <td className="px-3 py-1.5 text-xs whitespace-nowrap" style={{ paddingLeft: `${16 + depth * 20}px` }}>
+          <span className="inline-flex items-center gap-1">
+            {hasChildren && (
+              <span className="text-gray-400 w-3 inline-block text-center">
+                {expanded ? '▼' : '▶'}
+              </span>
+            )}
+            {!hasChildren && isDir && <span className="w-3 inline-block" />}
+            <span className={isDir ? 'font-medium' : ''}>
+              {isDir ? '📁 ' : '📄 '}{node.name}
+            </span>
+          </span>
+        </td>
+        <td className="px-3 py-1.5 text-xs text-gray-500 w-24 text-right">
+          {isDir ? '-' : formatSize(node.size)}
+        </td>
+      </tr>
+      {expanded && hasChildren && node.children!.map((child, i) => (
+        <TreeNodeItem key={`${child.name}-${i}`} node={child} depth={depth + 1} />
+      ))}
+    </React.Fragment>
+  );
+}
+
+export default function ArchiveTreeModal({
+  open, onClose, attachmentId, fileName, token
+}: ArchiveTreeModalProps) {
+  const [data, setData] = useState<ArchiveTreeResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!open || !attachmentId || !token) return;
+    setLoading(true);
+    setError('');
+    setData(null);
+    attachmentApi.archiveTree(attachmentId, token)
+      .then(res => setData(res.data))
+      .catch(err => setError(err?.response?.data?.detail || '读取压缩包失败'))
+      .finally(() => setLoading(false));
+  }, [open, attachmentId, token]);
+
+  return (
+    <Modal open={open} title={`压缩包预览：${fileName}`} onClose={onClose} width="lg">
+      {loading ? (
+        <div className="py-8 text-center text-sm text-gray-400">读取中...</div>
+      ) : error ? (
+        <div className="py-8 text-center text-sm text-red-500">{error}</div>
+      ) : data ? (
+        <>
+          <div className="flex gap-4 mb-3 px-2 text-xs text-gray-500">
+            <span>共 {data.total_files} 个文件</span>
+            <span>总大小 {formatSize(data.total_size)}</span>
+          </div>
+          <div className="border rounded-lg overflow-auto max-h-[60vh]">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-xs text-gray-500 border-b">
+                  <th className="px-3 py-1.5 text-left">名称</th>
+                  <th className="px-3 py-1.5 text-right w-24">大小</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {data.tree.map((node, i) => (
+                  <TreeNodeItem key={i} node={node} depth={0} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : null}
+    </Modal>
+  );
+}

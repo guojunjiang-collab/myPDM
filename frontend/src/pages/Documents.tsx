@@ -267,7 +267,7 @@ export default function Documents() {
     setUploadingFileName(file.name);
     
     // 不阻塞 UI，后台上传
-    const uploadPromise = (async () => {
+    (async () => {
       try {
         const fileData = await fileToBase64(file);
         const attachmentId = generateUUID();
@@ -278,7 +278,6 @@ export default function Documents() {
           file_data: fileData,
         });
 
-        // 上传完成后刷新列表
         await loadAttachments(editingDoc.id);
       } catch (error) {
         console.error('上传失败', error);
@@ -286,9 +285,7 @@ export default function Documents() {
       } finally {
         setUploading(false);
         setUploadingFileName('');
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+        if (fileInputRef.current) fileInputRef.current.value = '';
       }
     })();
   };

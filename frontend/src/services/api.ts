@@ -208,6 +208,8 @@ export const entityDocumentsApi = {
 // 附件下载
 export const attachmentApi = {
   download: (id: string) => api.get(`/v2/attachments/${id}/download`, { responseType: 'blob' }),
+  archiveTree: (id: string, token: string) =>
+    api.get<import('../types').ArchiveTreeResponse>(`/v2/attachments/${id}/archive-tree`, { params: { token } }),
 };
 
 // 部件子项 API

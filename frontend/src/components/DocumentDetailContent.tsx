@@ -3,6 +3,7 @@ import type { Document, CustomFieldDefinition, DocumentAttachment } from '../typ
 import { documentsApi } from '../services/api';
 import { useAuthStore } from '../stores/auth';
 import { formatDateTime } from '../utils/date';
+import ArchiveTreeModal from './ArchiveTreeModal';
 
 interface DocumentDetailContentProps {
   doc: Document;
@@ -30,6 +31,7 @@ const statusTag = (s: string) => {
 export default function DocumentDetailContent({ doc, customFieldDefs, customFieldValues }: DocumentDetailContentProps) {
   const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
+  const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
 
   // 加载附件列表
   const loadAttachments = async () => {
@@ -67,16 +69,20 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
   // 预览附件
   const handlePreview = (attId: string, fileName: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase() || '';
-    if (ext !== 'pdf') {
-      alert('该格式暂不支持预览');
-      return;
-    }
     const token = useAuthStore.getState().token;
-    if (!token) {
-      alert('登录已过期，请重新登录');
+    if (!token) { alert('登录已过期，请重新登录'); return; }
+
+    // PDF — 浏览器内嵌预览
+    if (ext === 'pdf') {
+      window.open(`/api/v2/attachments/${attId}/preview?token=${encodeURIComponent(token)}`, '_blank');
       return;
     }
-    window.open(`/api/v2/attachments/${attId}/preview?token=${encodeURIComponent(token)}`, '_blank');
+    // 压缩包 — 树形预览
+    if (['zip', 'tar', 'gz', 'tgz'].includes(ext)) {
+      setArchivePreview({ attId, fileName });
+      return;
+    }
+    alert('该格式暂不支持预览');
   };
 
   return (
@@ -186,6 +192,16 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
           </div>
         )}
       </div>
+
+      {archivePreview && (
+        <ArchiveTreeModal
+          open={!!archivePreview}
+          onClose={() => setArchivePreview(null)}
+          attachmentId={archivePreview.attId}
+          fileName={archivePreview.fileName}
+          token={useAuthStore.getState().token || ''}
+        />
+      )}
     </div>
   );
 }

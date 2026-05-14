@@ -15,6 +15,9 @@ from ..models import User, DocumentAttachment, Document
 from ..file_storage import file_storage, chunked_uploader, MAX_FILE_SIZE, CHUNK_SIZE
 from .auth import require_role
 from ..stp_converter import is_stp_file, convert_stp_to_gltf
+from ..bom.archive_reader import read_archive_tree, SUPPORTED_EXTENSIONS
+import zipfile
+import tarfile
 
 logger = logging.getLogger(__name__)
 
@@ -599,3 +602,77 @@ async def delete_attachment(
     db.commit()
     
     return {"message": "附件已删除"}
+
+
+@router.get("/{attachment_id}/archive-tree")
+async def get_archive_tree(
+    attachment_id: uuid.UUID,
+    token: str = None,
+    db: Session = Depends(get_db)
+):
+    """
+    获取压缩包内容树（ZIP / TAR / TAR.GZ）
+    返回内部文件夹层级和文件列表
+    """
+    from jose import JWTError, jwt
+    from .auth import SECRET_KEY, ALGORITHM
+
+    # JWT 认证（复用 /preview 端点的逻辑）
+    if not token:
+        raise HTTPException(status_code=401, detail="缺少认证令牌")
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        user_role = payload.get("role", "")
+        if not username:
+            raise HTTPException(status_code=401, detail="无效的认证令牌")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="认证令牌验证失败")
+
+    # 权限：访客不可预览
+    if user_role == "guest":
+        raise HTTPException(status_code=403, detail="访客无预览权限")
+
+    # 获取附件记录
+    att = db.query(DocumentAttachment).filter(
+        DocumentAttachment.id == attachment_id
+    ).first()
+    if not att:
+        raise HTTPException(status_code=404, detail="附件不存在")
+
+    # 检查文件类型
+    ext = Path(att.file_name).suffix.lower()
+    # 特殊处理 .tar.gz
+    file_path_obj = Path(att.file_name)
+    suffixes = [s.lower() for s in file_path_obj.suffixes]
+    is_tar_gz = suffixes == ['.tar', '.gz']
+
+    if ext not in SUPPORTED_EXTENSIONS and not is_tar_gz:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的压缩格式: {ext}，仅支持 ZIP / TAR / TAR.GZ"
+        )
+
+    # 定位文件
+    file_path = None
+    if hasattr(att, 'file_path') and att.file_path:
+        full_path = file_storage.base_dir / att.file_path
+        if full_path.exists():
+            file_path = full_path
+
+    if not file_path:
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    # 读取压缩包内容
+    try:
+        result = read_archive_tree(str(file_path))
+    except (zipfile.BadZipFile, tarfile.ReadError) as e:
+        raise HTTPException(status_code=500, detail=f"压缩包读取失败: {str(e)}")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return {
+        "file_name": att.file_name,
+        **result
+    }

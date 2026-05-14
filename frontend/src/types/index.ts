@@ -212,3 +212,37 @@ export interface BOMTraceItem {
   child_entity: { id: string; code: string; name: string; type: string; };
   quantity: number;
 }
+
+/** 压缩包内容树节点 */
+export interface ArchiveTreeNode {
+  name: string;
+  type: 'file' | 'dir';
+  size: number;
+  compressed_size?: number;
+  children?: ArchiveTreeNode[];
+}
+
+/** 压缩包内容树 API 响应 */
+export interface ArchiveTreeResponse {
+  file_name: string;
+  total_files: number;
+  total_size: number;
+  tree: ArchiveTreeNode[];
+}
+
+/** 压缩包内容树节点 */
+export interface ArchiveTreeNode {
+  name: string;
+  type: 'file' | 'dir';
+  size: number;
+  compressed_size?: number;
+  children?: ArchiveTreeNode[];
+}
+
+/** 压缩包内容树 API 响应 */
+export interface ArchiveTreeResponse {
+  file_name: string;
+  total_files: number;
+  total_size: number;
+  tree: ArchiveTreeNode[];
+}
