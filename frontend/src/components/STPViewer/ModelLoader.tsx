@@ -33,16 +33,19 @@ export function ModelLoader({ url }: ModelLoaderProps) {
     // 目标：模型最长边占视口约 4 个单位
     const scale = maxDim > 0.001 ? 4 / maxDim : 1;
 
-    // 单位检测：maxDim < 0.5 大概率是米（STP 常见），转换为毫米显示
+    // 单位检测：maxDim < 0.5 大概率是米（STP 常见），转换为毫米
     const unitScale = maxDim < 0.5 ? 1000 : 1;
-    const displayScale = scale * unitScale;
-    setModelScale(displayScale);
+    // modelScale = 每个视口单位对应多少 mm
+    // 视觉缩放后 maxDim → 4单位，所以 4单位 = maxDim*unitScale mm → 1单位 = maxDim*unitScale/4 mm
+    const modelScaleVal = (maxDim * unitScale) / 4;
+    setModelScale(modelScaleVal);
     groupRef.current.scale.setScalar(scale);
 
-    console.log('[ModelLoader] bbox maxDim:', maxDim.toFixed(2), 
+    console.log('[ModelLoader] maxDim:', maxDim.toFixed(2), 
       'scale:', scale.toFixed(4), 
       'unit:', unitScale > 1 ? 'm→mm' : 'mm',
-      'total:', displayScale.toFixed(4));
+      'modelScale:', modelScaleVal.toFixed(4),
+      '(1unit =', (maxDim * unitScale / 4).toFixed(1), 'mm)');
     groupRef.current.position.copy(box.getCenter(new THREE.Vector3()).multiplyScalar(-scale));
   }, [gltf, setLoadingState, setModelScale]);
 
