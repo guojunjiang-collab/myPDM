@@ -2,6 +2,8 @@ import { Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
 import { ModelLoader } from './ModelLoader';
+import { SectionPlanes } from './SectionPlanes';
+import { MeasureTool } from './MeasureTool';
 import { useViewerStore } from '../../stores/viewerStore';
 
 interface ViewerCanvasProps {
@@ -9,8 +11,6 @@ interface ViewerCanvasProps {
 }
 
 export function ViewerCanvas({ url }: ViewerCanvasProps) {
-  const explodeDistance = useViewerStore((s) => s.explodeDistance);
-
   return (
     <Canvas
       camera={{ position: [5, 3, 5], fov: 45 }}
@@ -21,6 +21,8 @@ export function ViewerCanvas({ url }: ViewerCanvasProps) {
       <Suspense fallback={null}>
         <ModelLoader url={url} />
       </Suspense>
+      <SectionPlanes />
+      <MeasureTool />
       <OrbitControls makeDefault />
       <Environment preset="warehouse" />
     </Canvas>

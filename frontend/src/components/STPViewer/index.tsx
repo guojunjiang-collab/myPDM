@@ -1,6 +1,8 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { Modal } from '../Modal';
 import { ViewerCanvas } from './ViewerCanvas';
+import { Toolbar } from './Toolbar';
+import { BOMPanel } from './BOMPanel';
 import { useViewerStore } from '../../stores/viewerStore';
 import { useAuthStore } from '../../stores/auth';
 import axios from 'axios';
@@ -112,7 +114,13 @@ export function STPViewerModal({ open, attachmentId, fileName, onClose }: STPVie
 
         {/* Viewer */}
         {modelUrl && (
-          <ViewerCanvas url={modelUrl} />
+          <div className="flex h-full">
+            <div className="flex-1 relative">
+              <ViewerCanvas url={modelUrl} />
+              <Toolbar />
+            </div>
+            <BOMPanel />
+          </div>
         )}
       </div>
     </Modal>
