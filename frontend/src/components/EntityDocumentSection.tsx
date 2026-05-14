@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { entityDocumentsApi, customFieldsApi, attachmentApi, documentsApi } from '../services/api';
 import type { EntityDocument, CustomFieldDefinition, CustomFieldValue, Document } from '../types';
 import { canEdit, useAuthStore } from '../stores/auth';
@@ -8,7 +8,8 @@ import DocumentPicker from './DocumentPicker';
 import DocumentDetailContent from './DocumentDetailContent';
 import VersionSelectModal from './VersionSelectModal';
 import ArchiveTreeModal from './ArchiveTreeModal';
-import { STPViewerModal } from './STPViewer';
+
+const STPViewerModal = lazy(() => import('./STPViewer').then(m => ({ default: m.STPViewerModal })));
 
 /* ----------------------------------------------------------------
    Types
@@ -366,12 +367,14 @@ const [stpPreview, setStpPreview] = useState<{ attId: string; fileName: string }
       )}
 
       {stpPreview && (
-        <STPViewerModal
-          open={!!stpPreview}
-          onClose={() => setStpPreview(null)}
-          attachmentId={stpPreview.attId}
-          fileName={stpPreview.fileName}
-        />
+        <Suspense fallback={null}>
+          <STPViewerModal
+            open={!!stpPreview}
+            onClose={() => setStpPreview(null)}
+            attachmentId={stpPreview.attId}
+            fileName={stpPreview.fileName}
+          />
+        </Suspense>
       )}
     </div>
   );

@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import type { Document, CustomFieldDefinition, DocumentAttachment } from '../types';
 import { documentsApi } from '../services/api';
 import { useAuthStore } from '../stores/auth';
 import { formatDateTime } from '../utils/date';
 import ArchiveTreeModal from './ArchiveTreeModal';
-import { STPViewerModal } from './STPViewer';
+
+const STPViewerModal = lazy(() => import('./STPViewer').then(m => ({ default: m.STPViewerModal })));
 
 interface DocumentDetailContentProps {
   doc: Document;
@@ -211,12 +212,14 @@ const [stpPreview, setStpPreview] = useState<{ attId: string; fileName: string }
       )}
 
       {stpPreview && (
-        <STPViewerModal
-          open={!!stpPreview}
-          onClose={() => setStpPreview(null)}
-          attachmentId={stpPreview.attId}
-          fileName={stpPreview.fileName}
-        />
+        <Suspense fallback={null}>
+          <STPViewerModal
+            open={!!stpPreview}
+            onClose={() => setStpPreview(null)}
+            attachmentId={stpPreview.attId}
+            fileName={stpPreview.fileName}
+          />
+        </Suspense>
       )}
     </div>
   );
