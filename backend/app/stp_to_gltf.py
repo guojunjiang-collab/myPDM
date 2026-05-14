@@ -151,7 +151,27 @@ def convert(input_path: str, output_path: str):
         sys.exit(1)
 
     size_kb = os.path.getsize(output_path) / 1024
-    logger.info(f"转换完成 ({size_kb:.1f} KB)")
+    logger.info(f"Mayo 转换完成 ({size_kb:.1f} KB)")
+
+    # ── Step 4: Draco 压缩（可选，进一步减小文件体积） ──
+    try:
+        from gltf_draco_transcoder import compress_gltf
+        import tempfile as tmpmod
+        fd, tmp_draco = tmpmod.mkstemp(suffix='.glb', prefix='draco_')
+        os.close(fd)
+        try:
+            compressed = compress_gltf(output_path, qp=14, qn=10, cl=9)
+            with open(tmp_draco, 'wb') as f:
+                f.write(compressed.getvalue())
+            draco_size = os.path.getsize(tmp_draco) / 1024
+            ratio = size_kb / draco_size if draco_size > 0 else 1
+            logger.info(f"Draco 压缩: {size_kb:.1f} KB → {draco_size:.1f} KB ({ratio:.1f}:1)")
+            os.replace(tmp_draco, output_path)
+        finally:
+            if os.path.exists(tmp_draco):
+                os.unlink(tmp_draco)
+    except ImportError:
+        logger.debug("gltf-draco-transcoder 未安装，跳过 Draco 压缩")
 
 
 if __name__ == '__main__':
