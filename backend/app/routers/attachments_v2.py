@@ -545,6 +545,7 @@ async def preview_attachment(
     )
 
 
+@router.head("/{attachment_id}/gltf")
 @router.get("/{attachment_id}/gltf")
 async def get_gltf(
     attachment_id: uuid.UUID,
