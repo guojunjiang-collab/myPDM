@@ -176,11 +176,19 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
       setArchivePreview({ attId: fileId, fileName });
       return;
     }
-    // STP — 三维预览（新窗口）
+    // STP — 三维预览（新窗口，半屏）
     if (ext === 'stp' || ext === 'step') {
       const token = useAuthStore.getState().token;
       if (token) {
-        window.open(`/stp-viewer?id=${fileId}&token=${encodeURIComponent(token)}`, '_blank');
+        const w = Math.floor(screen.width * 0.55);
+        const h = Math.floor(screen.height * 0.8);
+        const l = Math.floor((screen.width - w) / 2);
+        const t = Math.floor((screen.height - h) / 2);
+        window.open(
+          `/stp-viewer?id=${fileId}&token=${encodeURIComponent(token)}`,
+          '_blank',
+          `width=${w},height=${h},left=${l},top=${t}`
+        );
       }
       return;
     }
