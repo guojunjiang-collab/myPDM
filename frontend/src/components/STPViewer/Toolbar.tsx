@@ -19,15 +19,28 @@ export function Toolbar() {
       {(['x', 'y', 'z'] as const).map((axis) => {
         const plane = getPlane(axis);
         return (
-          <label key={axis} className="flex items-center gap-1 text-xs font-medium uppercase text-gray-600 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={!!plane}
-              onChange={(e) => e.target.checked ? setClipPlane(axis, 0) : removeClipPlane(axis)}
-              className="h-3.5 w-3.5 accent-blue-500"
-            />
-            {axis}
-          </label>
+          <div key={axis} className="flex items-center gap-1">
+            <label className="flex items-center gap-1 text-xs font-medium uppercase text-gray-600 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={!!plane}
+                onChange={(e) => e.target.checked ? setClipPlane(axis, 0) : removeClipPlane(axis)}
+                className="h-3.5 w-3.5 accent-blue-500"
+              />
+              {axis}
+            </label>
+            {plane && (
+              <input
+                type="range"
+                min={-5}
+                max={5}
+                step={0.1}
+                value={plane.position}
+                onChange={(e) => setClipPlane(axis, Number(e.target.value))}
+                className="w-12 h-1 accent-blue-500"
+              />
+            )}
+          </div>
         );
       })}
 
