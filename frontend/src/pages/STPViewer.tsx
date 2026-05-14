@@ -5,9 +5,9 @@ import { useViewerStore } from '../stores/viewerStore';
 import axios from 'axios';
 
 export default function STPViewerPage() {
-  const [state, setState] = useState<'checking' | 'converting' | 'loading' | 'ready' | 'error'>('checking');
+  const [state, setState] = useState<'checking' | 'converting' | 'loading' | 'parsing' | 'ready' | 'error'>('checking');
   const [url, setUrl] = useState<string | null>(null);
-  const [progress, setProgress] = useState(0);
+  const [downloadPct, setDownloadPct] = useState(0);
   const loadingState = useViewerStore((s) => s.loadingState);
 
   useEffect(() => {
@@ -20,9 +20,9 @@ export default function STPViewerPage() {
     checkAndLoad(gltfUrl);
   }, []);
 
-  // Track loading progress from ModelLoader
+  // Track parse completion from ModelLoader
   useEffect(() => {
-    if (state === 'loading' && loadingState === 'ready') {
+    if (state === 'parsing' && loadingState === 'ready') {
       setState('ready');
     }
   }, [loadingState, state]);
@@ -30,12 +30,29 @@ export default function STPViewerPage() {
   async function checkAndLoad(gltfUrl: string) {
     try {
       const resp = await axios.head(gltfUrl);
-      if (resp.status === 200) { setUrl(gltfUrl); setState('loading'); return; }
+      if (resp.status === 200) { downloadFile(gltfUrl); return; }
       if (resp.status === 202) { setState('converting'); poll(gltfUrl); return; }
       setState('error');
     } catch (e: any) {
       if (e.response?.status === 202) { setState('converting'); poll(gltfUrl); }
       else setState('error');
+    }
+  }
+
+  async function downloadFile(gltfUrl: string) {
+    setState('loading');
+    try {
+      const resp = await axios.get(gltfUrl, {
+        responseType: 'blob',
+        onDownloadProgress: (e) => {
+          if (e.total) setDownloadPct(Math.round((e.loaded / e.total) * 100));
+        },
+      });
+      const blobUrl = URL.createObjectURL(resp.data);
+      setUrl(blobUrl);
+      setState('parsing');
+    } catch {
+      setState('error');
     }
   }
 
@@ -45,7 +62,7 @@ export default function STPViewerPage() {
       tries++;
       try {
         const resp = await axios.head(gltfUrl);
-        if (resp.status === 200) { clearInterval(t); setUrl(gltfUrl); setState('loading'); }
+        if (resp.status === 200) { clearInterval(t); downloadFile(gltfUrl); }
       } catch (e: any) {
         if (e.response?.status !== 202) { clearInterval(t); setState('error'); }
       }
@@ -59,15 +76,28 @@ export default function STPViewerPage() {
 
   return (
     <div className="w-screen h-screen relative">
-      <ViewerCanvas url={url!} />
+      {url && <ViewerCanvas url={url} />}
       <Toolbar />
-      {/* 加载遮罩：Canvas 在背后渲染，遮罩盖在上面 */}
-      {state === 'loading' && (
+      {(state === 'loading' || state === 'parsing') && (
         <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/90 gap-4">
-          <div className="text-gray-500 text-sm">正在加载模型...</div>
-          <div className="w-64 h-2 bg-gray-200 rounded-full overflow-hidden">
-            <div className="h-full bg-blue-500 rounded-full animate-pulse" style={{ width: '60%' }} />
-          </div>
+          {/* 下载进度 */}
+          {state === 'loading' && (
+            <>
+              <div className="text-gray-500 text-sm">正在下载模型... {downloadPct}%</div>
+              <div className="w-72 h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div className="h-full bg-blue-500 rounded-full transition-all duration-300" style={{ width: `${downloadPct}%` }} />
+              </div>
+            </>
+          )}
+          {/* 解析进度 */}
+          {state === 'parsing' && (
+            <>
+              <div className="text-gray-500 text-sm">正在解析渲染...</div>
+              <div className="w-72 h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div className="h-full bg-green-500 rounded-full animate-pulse" style={{ width: '70%' }} />
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
