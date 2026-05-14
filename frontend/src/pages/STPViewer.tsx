@@ -55,20 +55,21 @@ export default function STPViewerPage() {
 
   if (state === 'checking') return <div className="w-screen h-screen flex items-center justify-center text-gray-500">加载中...</div>;
   if (state === 'converting') return <div className="w-screen h-screen flex items-center justify-center text-gray-500">模型转换中，请稍后...</div>;
-  if (state === 'loading') return (
-    <div className="w-screen h-screen flex flex-col items-center justify-center bg-white gap-4">
-      <div className="text-gray-500 text-sm">正在加载模型...</div>
-      <div className="w-64 h-2 bg-gray-200 rounded-full overflow-hidden">
-        <div className="h-full bg-blue-500 rounded-full animate-pulse" style={{ width: '60%' }} />
-      </div>
-    </div>
-  );
   if (state === 'error') return <div className="w-screen h-screen flex items-center justify-center text-red-500">加载失败，请关闭后重试</div>;
 
   return (
     <div className="w-screen h-screen relative">
       <ViewerCanvas url={url!} />
       <Toolbar />
+      {/* 加载遮罩：Canvas 在背后渲染，遮罩盖在上面 */}
+      {state === 'loading' && (
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/90 gap-4">
+          <div className="text-gray-500 text-sm">正在加载模型...</div>
+          <div className="w-64 h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div className="h-full bg-blue-500 rounded-full animate-pulse" style={{ width: '60%' }} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
