@@ -8,6 +8,7 @@ import DocumentPicker from './DocumentPicker';
 import DocumentDetailContent from './DocumentDetailContent';
 import VersionSelectModal from './VersionSelectModal';
 import ArchiveTreeModal from './ArchiveTreeModal';
+import { STPViewerModal } from './STPViewer';
 
 /* ----------------------------------------------------------------
    Types
@@ -63,6 +64,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
   const [viewDocCustomDefs, setViewDocCustomDefs] = useState<CustomFieldDefinition[]>([]);
   const [viewDocCustomValues, setViewDocCustomValues] = useState<Record<string, any>>({});
   const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
+const [stpPreview, setStpPreview] = useState<{ attId: string; fileName: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -176,12 +178,9 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
       setArchivePreview({ attId: fileId, fileName });
       return;
     }
-    // STP — 三维预览（新窗口）
+    // STP — 三维预览（Modal 弹窗）
     if (ext === 'stp' || ext === 'step') {
-      const token = useAuthStore.getState().token;
-      if (token) {
-        window.open(`/stp-viewer.html?id=${fileId}&token=${encodeURIComponent(token)}`, '_blank');
-      }
+      setStpPreview({ attId: fileId, fileName });
       return;
     }
     alert('该格式暂不支持预览');
@@ -363,6 +362,15 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
           attachmentId={archivePreview.attId}
           fileName={archivePreview.fileName}
           token={useAuthStore.getState().token || ''}
+        />
+      )}
+
+      {stpPreview && (
+        <STPViewerModal
+          open={!!stpPreview}
+          onClose={() => setStpPreview(null)}
+          attachmentId={stpPreview.attId}
+          fileName={stpPreview.fileName}
         />
       )}
     </div>

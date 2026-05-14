@@ -4,6 +4,7 @@ import { documentsApi } from '../services/api';
 import { useAuthStore } from '../stores/auth';
 import { formatDateTime } from '../utils/date';
 import ArchiveTreeModal from './ArchiveTreeModal';
+import { STPViewerModal } from './STPViewer';
 
 interface DocumentDetailContentProps {
   doc: Document;
@@ -32,6 +33,7 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
   const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
   const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
+const [stpPreview, setStpPreview] = useState<{ attId: string; fileName: string } | null>(null);
 
   // 加载附件列表
   const loadAttachments = async () => {
@@ -82,9 +84,9 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
       setArchivePreview({ attId, fileName });
       return;
     }
-    // STP — 三维预览（新窗口）
+    // STP — 三维预览（Modal 弹窗）
     if (ext === 'stp' || ext === 'step') {
-      window.open(`/stp-viewer.html?id=${attId}&token=${encodeURIComponent(token)}`, '_blank');
+      setStpPreview({ attId, fileName });
       return;
     }
     alert('该格式暂不支持预览');
@@ -205,6 +207,15 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
           attachmentId={archivePreview.attId}
           fileName={archivePreview.fileName}
           token={useAuthStore.getState().token || ''}
+        />
+      )}
+
+      {stpPreview && (
+        <STPViewerModal
+          open={!!stpPreview}
+          onClose={() => setStpPreview(null)}
+          attachmentId={stpPreview.attId}
+          fileName={stpPreview.fileName}
         />
       )}
     </div>

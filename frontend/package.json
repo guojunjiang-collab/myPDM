@@ -12,13 +12,17 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css,js,jsx}\""
   },
   "dependencies": {
+    "@react-three/drei": "^9.122.0",
+    "@react-three/fiber": "^8.18.0",
+    "@types/three": "^0.184.1",
+    "axios": "^1.7.7",
+    "dayjs": "^1.11.13",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.0",
-    "zustand": "^4.5.4",
-    "axios": "^1.7.7",
-    "dayjs": "^1.11.13",
-    "xlsx": "^0.18.5"
+    "three": "^0.184.0",
+    "xlsx": "^0.18.5",
+    "zustand": "^4.5.4"
   },
   "devDependencies": {
     "@types/react": "^18.3.11",
