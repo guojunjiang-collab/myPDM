@@ -64,6 +64,10 @@ export default function Settings() {
   const [exportProgress, setExportProgress] = useState('');
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState('');
+  const [batchConverting, setBatchConverting] = useState(false);
+  const [batchStatus, setBatchStatus] = useState('');
+const [batchConverting, setBatchConverting] = useState(false);
+const [batchStatus, setBatchStatus] = useState('');
 
   useEffect(() => {
     if (activeTab === 'customFields') {
@@ -241,6 +245,29 @@ export default function Settings() {
     }
   };
 
+  // STP 批量转换
+  const handleBatchConvert = async () => {
+    setBatchConverting(true);
+    setBatchStatus('正在启动...');
+    try {
+      const token = useAuthStore.getState().token;
+      const resp = await fetch('/api/v2/attachments/convert-pending', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const data = await resp.json();
+      if (data.status === 'started') {
+        setBatchStatus(`已开始，共 ${data.pending} 个待转换文件`);
+      } else {
+        setBatchStatus(data.message || '启动失败');
+        setBatchConverting(false);
+      }
+    } catch {
+      setBatchStatus('请求失败');
+      setBatchConverting(false);
+    }
+  };
+
   const handleExportFields = async () => {
     try {
       await exportCustomFieldDefs();
@@ -260,6 +287,29 @@ export default function Settings() {
     }
     // 重置 input 以便重复选择同一文件
     e.target.value = '';
+  };
+
+  // STP 批量转换
+  const handleBatchConvert = async () => {
+    setBatchConverting(true);
+    setBatchStatus('正在启动...');
+    try {
+      const token = useAuthStore.getState().token;
+      const resp = await fetch('/api/v2/attachments/convert-pending', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const data = await resp.json();
+      setBatchConverting(false);
+      if (data.status === 'started') {
+        setBatchStatus(`已开始，共 ${data.pending} 个待转换文件`);
+      } else {
+        setBatchStatus(data.message || '已完成');
+      }
+    } catch {
+      setBatchStatus('请求失败');
+      setBatchConverting(false);
+    }
   };
 
   const handleResetData = async () => {
@@ -487,6 +537,27 @@ export default function Settings() {
                 {importing ? '⏳' : '✅'} {importProgress}
               </p>
             )}
+          </div>
+
+          {/* STP 批量转换 */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-medium mb-2">STP 批量转换</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              将系统中所有未转换的 STP/STEP 附件转换为 GLB 格式，方便预览时直接加载。
+              建议在空闲时段执行，转换过程使用最多 2 个并发进程。
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleBatchConvert}
+                disabled={batchConverting}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {batchConverting ? '转换中...' : '批量转换 STP'}
+              </button>
+              {batchStatus && (
+                <span className="text-sm text-gray-500">{batchStatus}</span>
+              )}
+            </div>
           </div>
 
           {/* 重置系统数据 */}

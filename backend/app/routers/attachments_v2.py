@@ -756,3 +756,63 @@ async def extract_archive_file(
 
     headers = {"Content-Disposition": f"{disposition}; filename*=UTF-8''{encoded}"}
     return FileResponse(path=extracted_path, filename=filename, media_type=mime_type, headers=headers)
+
+
+# ── 管理端点：批量转换待处理的 STP 文件 ──
+
+@router.post("/convert-pending")
+async def convert_pending_stp(
+    current_user: User = Depends(require_role(["admin"])),
+    db: Session = Depends(get_db),
+):
+    """扫描所有未转换的 STP 附件并后台批量转换（仅管理员）
+    
+    可用于：
+    - 空闲时段批量预转换（cron 定时触发）
+    - 管理员手动触发
+    """
+    # 查询所有 STP 附件
+    stp_atts = db.query(DocumentAttachment).filter(
+        (DocumentAttachment.file_name.ilike('%.stp')) |
+        (DocumentAttachment.file_name.ilike('%.step'))
+    ).all()
+
+    pending = []
+    for att in stp_atts:
+        glb_path = get_gltf_path_for_attachment(str(att.id))
+        if glb_path is None:
+            pending.append(att)
+
+    if not pending:
+        return {"status": "done", "message": "所有 STP 文件已转换", "converted": 0, "total": 0}
+
+    # 后台异步转换（顺序执行，Semaphore(2) 自动限流）
+    loop = asyncio.get_event_loop()
+
+    async def batch_convert():
+        converted = 0
+        failed = 0
+        for att in pending:
+            try:
+                stp_path = file_storage.base_dir / att.file_path
+                if not stp_path.exists():
+                    failed += 1
+                    continue
+                # run_in_executor 会等待 Semaphore 槽位
+                await loop.run_in_executor(
+                    None, convert_stp_to_gltf, str(stp_path), str(att.id)
+                )
+                converted += 1
+            except Exception:
+                failed += 1
+        logger.info(f"批量转换完成: {converted} 成功, {failed} 失败, 共 {len(pending)}")
+
+    # 不阻塞响应，后台执行
+    asyncio.create_task(batch_convert())
+
+    return {
+        "status": "started",
+        "message": f"开始批量转换 {len(pending)} 个 STP 文件",
+        "pending": len(pending),
+        "total_stp": len(stp_atts),
+    }
