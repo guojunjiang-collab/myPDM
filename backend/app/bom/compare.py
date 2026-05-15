@@ -288,8 +288,7 @@ def compare_bom_trees(
                 "child_spec": left_node["child_spec"],
                 "child_version": left_node["child_version"],
                 "child_status": left_node["child_status"],
-                "quantity": left_node["quantity"],
-                "sort": left_node["sort"]
+                "quantity": left_node["quantity"]
             }
             
             right_detail = {
@@ -298,8 +297,7 @@ def compare_bom_trees(
                 "child_spec": right_node["child_spec"],
                 "child_version": right_node["child_version"],
                 "child_status": right_node["child_status"],
-                "quantity": right_node["quantity"],
-                "sort": right_node["sort"]
+                "quantity": right_node["quantity"]
             }
             
             # 检查是否相同

@@ -20,6 +20,24 @@ interface TraceTreeNode {
   expanded: boolean;
 }
 
+/** 检测 modify 类型下哪些字段发生了变化 */
+function getChangedFields(node: BOMCompareNode): Set<string> {
+  const changed = new Set<string>();
+  if (node.change_type !== 'modify' || !node.left || !node.right) return changed;
+
+  if (node.left.detail.code !== node.right.detail.code) changed.add('code');
+  if (node.left.detail.name !== node.right.detail.name) changed.add('name');
+  if (node.left.detail.spec !== node.right.detail.spec) changed.add('spec');
+  if (node.left.detail.version !== node.right.detail.version) changed.add('version');
+  if (node.left.detail.status !== node.right.detail.status) changed.add('status');
+  if (node.left.quantity !== node.right.quantity) changed.add('quantity');
+
+  return changed;
+}
+
+/** 变更格子高亮样式 */
+const CHANGED_CELL_CLASS = 'bg-amber-100 font-semibold text-amber-900 rounded px-1';
+
 function getChangeLabel(node: BOMCompareNode): string {
   const { change_type, left, right } = node;
   switch (change_type) {
@@ -42,6 +60,15 @@ function getChangeLabel(node: BOMCompareNode): string {
         }
         if (left.detail.spec !== right.detail.spec) {
           parts.push(`规格变更 ${left.detail.spec || '-'}→${right.detail.spec || '-'}`);
+        }
+        if (left.detail.code !== right.detail.code) {
+          parts.push(`件号变更 ${left.detail.code}→${right.detail.code}`);
+        }
+        if (left.detail.name !== right.detail.name) {
+          parts.push(`名称变更 ${left.detail.name}→${right.detail.name}`);
+        }
+        if (left.detail.status !== right.detail.status) {
+          parts.push(`状态变更 ${getStatusLabel(left.detail.status)}→${getStatusLabel(right.detail.status)}`);
         }
       }
       return parts.length > 0 ? parts.join('，') : '已修改';
@@ -726,6 +753,7 @@ export default function BOM() {
                   <tbody>
                     {compareResult.comparison.map((node: BOMCompareNode, idx: number) => {
                       const bgClass = getRowBgClass(node.change_type);
+                      const changed = getChangedFields(node);
 
                       return (
                         <tr
@@ -767,12 +795,12 @@ export default function BOM() {
                               </span>
                             ) : '-'}
                           </td>
-                          <td className="px-2 py-1 text-xs font-medium">{node.right?.detail.code || '-'}</td>
-                          <td className="px-2 py-1 text-xs text-gray-700">{node.right?.detail.name || '-'}</td>
-                          <td className="px-2 py-1 text-xs text-gray-500">{node.right?.detail.spec || '-'}</td>
-                          <td className="px-2 py-1 text-xs text-gray-500">{node.right?.detail.version || '-'}</td>
-                          <td className="px-2 py-1 text-xs">{getStatusLabel(node.right?.detail.status || '-')}</td>
-                          <td className="px-2 py-1 text-xs text-right font-medium">{node.right?.quantity ?? '-'}</td>
+                          <td className={`px-2 py-1 text-xs font-medium ${changed.has('code') ? CHANGED_CELL_CLASS : ''}`}>{node.right?.detail.code || '-'}</td>
+                          <td className={`px-2 py-1 text-xs ${changed.has('name') ? CHANGED_CELL_CLASS : 'text-gray-700'}`}>{node.right?.detail.name || '-'}</td>
+                          <td className={`px-2 py-1 text-xs ${changed.has('spec') ? CHANGED_CELL_CLASS : 'text-gray-500'}`}>{node.right?.detail.spec || '-'}</td>
+                          <td className={`px-2 py-1 text-xs ${changed.has('version') ? CHANGED_CELL_CLASS : 'text-gray-500'}`}>{node.right?.detail.version || '-'}</td>
+                          <td className={`px-2 py-1 text-xs ${changed.has('status') ? CHANGED_CELL_CLASS : ''}`}>{getStatusLabel(node.right?.detail.status || '-')}</td>
+                          <td className={`px-2 py-1 text-xs text-right font-medium ${changed.has('quantity') ? CHANGED_CELL_CLASS : ''}`}>{node.right?.quantity ?? '-'}</td>
 
                           <td className="w-px bg-gray-200 p-0" />
 
