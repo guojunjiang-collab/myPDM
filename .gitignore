@@ -29,6 +29,3 @@ migrations/
 
 # Sisyphus work plans
 .sisyphus/
-
-# Mayo CLI binary (large AppImage, not tracked in git)
-backend/MayoConv*.AppImage
