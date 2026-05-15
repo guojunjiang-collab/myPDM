@@ -442,4 +442,64 @@ interface ViewerState {
 
 ---
 
+## 九、批量转换管理
+
+> **状态**: 已实现
+
+### 9.1 设计原则
+
+- **上传不转换**：上传 STP 时不自动触发 GLB 转换，避免批量导入时 CPU 过载
+- **预览按需转**：用户点击预览时，后端检测缓存 → 命中直接返回，未命中后台转换 + 前端轮询
+- **已有不重复**：已有 GLB 缓存的文件自动跳过，不重复转换
+- **并发限流**：Semaphore(2) 确保最多 2 个 Mayo 进程同时运行
+
+### 9.2 API 端点
+
+| 方法 | 端点 | 认证 | 说明 |
+|------|------|------|------|
+| `POST` | `/api/v2/attachments/convert-pending` | 管理员 | 扫描未转换 STP，后台批量转换 |
+| `GET` | `/api/v2/attachments/convert-status` | 管理员 | 查询待转换数量（轮询用） |
+
+**convert-pending 响应**:
+```json
+{
+  "status": "started",
+  "message": "开始批量转换 5 个 STP 文件",
+  "pending": 5,
+  "total_stp": 8
+}
+```
+
+**convert-status 响应**:
+```json
+{
+  "pending": 3,
+  "total": 8
+}
+```
+
+### 9.3 前端界面
+
+**位置**：系统设置 → 数据管理 → STP 批量转换
+
+**交互流程**：
+```
+点击「批量转换 STP」
+  → POST /convert-pending
+  → "已开始，共 N 个待转换文件"
+  → 每 3s GET /convert-status（轮询）
+  → "转换中... 剩余 3 / 8"
+  → "✅ 全部转换完成"
+```
+
+### 9.4 已知问题记录
+
+| 问题 | 根因 | 修复 |
+|------|------|------|
+| 401 Unauthorized | fetch 未使用 axios Bearer 拦截器 | 改用 `api.post/get` |
+| 422 / 404 | `/{attachment_id}` 通配路由拦截了 `/convert-status` | 管理端点移到通配路由之前 |
+| 后端未加载新路由 | FastAPI 路由在启动时注册 | 重启后端容器 |
+
+---
+
 *文档版本: v6.0 — 2026-05-14*
