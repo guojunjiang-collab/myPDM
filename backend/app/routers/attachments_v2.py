@@ -816,3 +816,17 @@ async def convert_pending_stp(
         "pending": len(pending),
         "total_stp": len(stp_atts),
     }
+
+
+@router.get("/convert-status")
+async def convert_status(
+    current_user: User = Depends(require_role(["admin"])),
+    db: Session = Depends(get_db),
+):
+    """查询待转换的 STP 数量（用于轮询批量转换进度）"""
+    stp_atts = db.query(DocumentAttachment).filter(
+        (DocumentAttachment.file_name.ilike('%.stp')) |
+        (DocumentAttachment.file_name.ilike('%.step'))
+    ).all()
+    pending = sum(1 for att in stp_atts if get_gltf_path_for_attachment(str(att.id)) is None)
+    return {"pending": pending, "total": len(stp_atts)}

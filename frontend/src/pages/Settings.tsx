@@ -256,14 +256,37 @@ export default function Settings() {
       const data = await resp.json();
       if (data.status === 'started') {
         setBatchStatus(`已开始，共 ${data.pending} 个待转换文件`);
+        pollConvertStatus(token!);
       } else {
-        setBatchStatus(data.message || '启动失败');
+        setBatchStatus(data.message || '已完成，无需转换');
         setBatchConverting(false);
       }
     } catch {
       setBatchStatus('请求失败');
       setBatchConverting(false);
     }
+  };
+
+  const pollConvertStatus = (token: string) => {
+    const t = setInterval(async () => {
+      try {
+        const resp = await fetch('/api/v2/attachments/convert-status', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        const data = await resp.json();
+        if (data.pending === 0) {
+          clearInterval(t);
+          setBatchStatus('✅ 全部转换完成');
+          setBatchConverting(false);
+        } else {
+          setBatchStatus(`转换中... 剩余 ${data.pending} / ${data.total}`);
+        }
+      } catch {
+        clearInterval(t);
+        setBatchStatus('状态查询失败');
+        setBatchConverting(false);
+      }
+    }, 3000);
   };
 
   const handleExportFields = async () => {
