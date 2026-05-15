@@ -1,3 +1,6 @@
+// 应用版本
+export const APP_VERSION = 'v1.2.0';
+
 // 状态选项
 export const STATUS_OPTIONS = [
   { value: 'draft', label: '草稿', color: 'blue' },

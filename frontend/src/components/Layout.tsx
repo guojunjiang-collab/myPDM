@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuthStore } from '../stores/auth';
 import { useDataStore } from '../stores/data';
+import { APP_VERSION } from '../constants';
 import { ConfirmModal } from './Modal';
 
 const navItems = [
@@ -90,7 +91,7 @@ export default function Layout() {
               {syncMsg}
             </div>
           )}
-          <div className="text-xs text-gray-400 text-center">v1.0 · PDM系统</div>
+          <div className="text-xs text-gray-400 text-center">{APP_VERSION} · PDM系统</div>
         </div>
       </aside>
 
