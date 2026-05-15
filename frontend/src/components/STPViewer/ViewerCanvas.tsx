@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
 import { ModelLoader } from './ModelLoader';
+import { GLTFErrorBoundary } from './GLTFErrorBoundary';
 import { SectionPlanes } from './SectionPlanes';
 import { MeasureTool } from './MeasureTool';
 import { ExplodeView } from './ExplodeView';
@@ -20,7 +21,9 @@ export function ViewerCanvas({ url }: ViewerCanvasProps) {
       <ambientLight intensity={0.5} />
       <directionalLight position={[10, 10, 5]} intensity={1} />
       <Suspense fallback={null}>
-        <ModelLoader url={url} />
+        <GLTFErrorBoundary>
+          <ModelLoader url={url} />
+        </GLTFErrorBoundary>
       </Suspense>
       <SectionPlanes />
       <MeasureTool />

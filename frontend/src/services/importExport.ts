@@ -29,13 +29,14 @@ declare global {
     showDirectoryPicker(options?: { mode?: 'read' | 'readwrite'; startIn?: string }): Promise<FileSystemDirectoryHandle>;
   }
 }
-import {
+import api, {
   partsApi,
   assembliesApi,
   documentsApi,
   entityDocumentsApi,
   assemblyPartsApi,
   customFieldsApi,
+  usersApi,
 } from './api';
 import { useDataStore } from '../stores/data';
 import type {
@@ -73,7 +74,7 @@ export interface ImportRow {
 
 /** 导入预览结果 */
 export interface ImportPreview {
-  type: 'part' | 'assembly' | 'document';
+  type: 'part' | 'assembly' | 'document' | 'user' | 'dashboard';
   rows: ImportRow[];
   /** 关联图文档未找到数 */
   docWarnings?: number;
@@ -83,6 +84,8 @@ export interface ImportPreview {
   bomMatched?: number;
   /** 关联图文档数 */
   docRelationCount?: number;
+  /** 用户看板导入数据（看板导入时使用） */
+  _dashboardData?: unknown[];
 }
 
 // ================================================================
@@ -1338,8 +1341,8 @@ export async function exportDocumentsToFolder(dirHandle?: FileSystemDirectoryHan
 
         if (data?.file_data) {
           const fileName = doc.file_name || 'unknown';
-          // 格式: 编号_版本_文件名
-          const exportName = `${doc.code}_${doc.version || 'A'}_${fileName}`;
+          // 格式: 编号#版本#文件名
+          const exportName = `${doc.code}#${doc.version || 'A'}#${fileName}`;
           // 解码 base64 并写入
           const binaryStr = atob(data.file_data);
           const bytes = new Uint8Array(binaryStr.length);
@@ -1506,7 +1509,7 @@ export async function executeDocumentsImport(preview: ImportPreview): Promise<vo
 
       // 上传附件
       if (docId && attDirHandle) {
-        const expectedPrefix = `${row.code}_${row.version || 'A'}_`;
+        const expectedPrefix = `${row.code}#${row.version || 'A'}#`;
         const attFiles = await listFilesInDirectory(attDirHandle);
         const matchingFiles = attFiles.filter((f) => f.startsWith(expectedPrefix));
 
@@ -1528,7 +1531,7 @@ export async function executeDocumentsImport(preview: ImportPreview): Promise<vo
             }
             const base64 = btoa(binary);
 
-            // 提取原始文件名（去掉编号_版本_前缀）
+            // 提取原始文件名（去掉编号#版本#前缀）
             const originalName = attFileName.slice(expectedPrefix.length);
 
             // 如果 > 1GB 给出警告
@@ -1689,6 +1692,558 @@ export async function importCustomFieldDefs(file: File): Promise<{ created: numb
 }
 
 // ================================================================
+// USER EXPORT
+// ================================================================
+
+/** 角色英文→中文映射 */
+const ROLE_EN_TO_ZH: Record<string, string> = {
+  admin: '管理员',
+  engineer: '工程师',
+  production: '生产人员',
+  guest: '访客',
+};
+
+/** 角色中文→英文映射 */
+const ROLE_ZH_TO_EN: Record<string, string> = {
+  '管理员': 'admin',
+  '工程师': 'engineer',
+  '生产人员': 'production',
+  '访客': 'guest',
+};
+
+/** 用户状态英文→中文 */
+const USER_STATUS_EN_TO_ZH: Record<string, string> = {
+  active: '启用',
+  inactive: '禁用',
+};
+
+/** 用户状态中文→英文 */
+const USER_STATUS_ZH_TO_EN: Record<string, string> = {
+  '启用': 'active',
+  '禁用': 'inactive',
+};
+
+/**
+ * 导出用户到目录
+ */
+export async function exportUsers(dirHandle?: FileSystemDirectoryHandle): Promise<void> {
+  if (!dirHandle && !supportsFileSystemAccess()) {
+    throw new Error('您的浏览器不支持文件夹操作，请使用 Chrome 86+ 或 Edge 86+');
+  }
+
+  const res = await usersApi.list({ page_size: 10000 });
+  const users = (res.data as { items?: unknown[] } | unknown[]) || [];
+  const userList: unknown[] = Array.isArray(users)
+    ? users
+    : (users as { items?: unknown[] }).items || [];
+
+  if (userList.length === 0) return;
+
+  const handle = dirHandle || await window.showDirectoryPicker({
+    mode: 'readwrite',
+    startIn: 'downloads',
+  });
+
+  const rows = userList.map((u: any) => ({
+    '用户名': u.username || '',
+    '姓名': u.real_name || '',
+    '角色': ROLE_EN_TO_ZH[u.role] || u.role || '',
+    '部门': u.department || '',
+    '电话': u.phone || '',
+    '状态': USER_STATUS_EN_TO_ZH[u.status] || u.status || '启用',
+    '创建时间': u.created_at || '',
+    '更新时间': u.updated_at || '',
+  }));
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [
+    { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 16 },
+    { wch: 16 }, { wch: 8 }, { wch: 20 }, { wch: 20 },
+  ];
+  XLSX.utils.book_append_sheet(wb, ws, '用户清单');
+
+  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([buf], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+
+  if (dirHandle) {
+    await writeBlobToDirectory(dirHandle, '用户清单.xlsx', blob);
+  } else {
+    await writeBlobToDirectory(handle, '用户清单.xlsx', blob);
+  }
+}
+
+// ================================================================
+// USER IMPORT
+// ================================================================
+
+/**
+ * 预览用户导入
+ */
+export async function previewUsersImport(file: File): Promise<ImportPreview> {
+  const buffer = await file.arrayBuffer();
+  const wb = XLSX.read(buffer, { type: 'array' });
+
+  const ws = wb.Sheets['用户清单'] || wb.Sheets[wb.SheetNames[0]];
+  if (!ws) throw new Error('Excel 中未找到用户数据 Sheet');
+
+  const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
+  if (rawRows.length === 0) throw new Error('Excel 中无用户数据');
+
+  // 获取现有用户列表（按用户名索引）
+  const existingRes = await usersApi.list({ page_size: 10000 });
+  const existingAll = (existingRes.data as { items?: unknown[] } | unknown[]) || [];
+  const existingList: any[] = Array.isArray(existingAll)
+    ? existingAll
+    : (existingAll as { items?: unknown[] }).items || [];
+  const existingMap = new Map<string, any>();
+  for (const u of existingList) {
+    existingMap.set(u.username, u);
+  }
+
+  const rows: ImportRow[] = rawRows.map((raw) => {
+    const username = String(raw['用户名'] || '').trim();
+    const name = String(raw['姓名'] || '').trim();
+
+    if (!username) {
+      return {
+        status: '错误' as const,
+        code: username,
+        name,
+        version: '',
+        error: '缺少必填字段（用户名）',
+      };
+    }
+
+    const existing = existingMap.get(username);
+    const status = existing ? ('更新' as const) : ('新增' as const);
+
+    const roleZh = String(raw['角色'] || '').trim();
+    const roleEn = ROLE_ZH_TO_EN[roleZh] || roleZh.toLowerCase();
+
+    const statusZh = String(raw['状态'] || '').trim();
+    const statusEn = USER_STATUS_ZH_TO_EN[statusZh] || 'active';
+
+    return {
+      status,
+      code: username,
+      name,
+      version: '',
+      remark: String(raw['部门'] || ''),
+      _data: existing
+        ? { username, id: existing.id }
+        : {
+            username,
+            password: '123456',
+            real_name: name,
+            role: roleEn,
+            department: String(raw['部门'] || ''),
+            phone: String(raw['电话'] || ''),
+            status: statusEn,
+          } as Record<string, unknown>,
+    };
+  });
+
+  return {
+    type: 'user',
+    rows,
+  };
+}
+
+/**
+ * 执行用户导入
+ */
+export async function executeUsersImport(preview: ImportPreview): Promise<void> {
+  const results = await Promise.allSettled(
+    preview.rows
+      .filter((r) => r.status !== '错误')
+      .map(async (row) => {
+        const data = row._data!;
+        try {
+          if (row.status === '更新') {
+            // 更新：只更新非密码字段
+            const existingRes = await usersApi.list({ page_size: 10000 });
+            const existingAll = (existingRes.data as { items?: unknown[] } | unknown[]) || [];
+            const existingList: any[] = Array.isArray(existingAll)
+              ? existingAll
+              : (existingAll as { items?: unknown[] }).items || [];
+            const existing = existingList.find((u: any) => u.username === row.code);
+            if (existing) {
+              await usersApi.update(existing.id, {
+                real_name: data.real_name,
+                role: data.role,
+                department: data.department,
+                phone: data.phone,
+                status: data.status,
+              });
+            }
+          } else {
+            // 新增
+            await usersApi.create(data);
+          }
+        } catch (err: any) {
+          console.error(`导入用户失败: ${row.code}`, err);
+          throw err;
+        }
+        return null;
+      }),
+  );
+
+  const errors = results.filter((r) => r.status === 'rejected');
+  if (errors.length > 0) {
+    throw new Error(`用户导入完成，但有 ${errors.length} 条记录导入失败（请查看控制台日志）`);
+  }
+}
+
+// ================================================================
+// DASHBOARD EXPORT
+// ================================================================
+
+/**
+ * 导出用户看板到目录
+ */
+export async function exportDashboard(dirHandle?: FileSystemDirectoryHandle): Promise<void> {
+  if (!dirHandle && !supportsFileSystemAccess()) {
+    throw new Error('您的浏览器不支持文件夹操作，请使用 Chrome 86+ 或 Edge 86+');
+  }
+
+  const res = await api.get('/dashboard/export-all');
+  const dashboardData: any[] = Array.isArray(res.data) ? res.data : [];
+
+  if (dashboardData.length === 0) return;
+
+  const handle = dirHandle || await window.showDirectoryPicker({
+    mode: 'readwrite',
+    startIn: 'downloads',
+  });
+
+  // Sheet 1: 看板概览
+  const overviewRows: Record<string, unknown>[] = [];
+  // Sheet 2: 文件夹
+  const folderRows: Record<string, unknown>[] = [];
+  // Sheet 3: 关联项目
+  const itemRows: Record<string, unknown>[] = [];
+  // Sheet 4: 共享
+  const shareRows: Record<string, unknown>[] = [];
+
+  for (const entry of dashboardData) {
+    const username = entry.username || '';
+    const realName = entry.real_name || '';
+    const dashboardName = entry.dashboard?.name || '';
+
+    overviewRows.push({
+      '用户名': username,
+      '姓名': realName,
+      '看板名称': dashboardName,
+    });
+
+    // 构建 folder_id → folder_name 的映射（供 items/shares 使用）
+    const folderIdToName: Record<string, string> = {};
+
+    // 文件夹
+    if (Array.isArray(entry.folders)) {
+      for (const folder of entry.folders) {
+        const fid = folder.id || '';
+        const fname = folder.name || '';
+        folderIdToName[fid] = fname;
+        folderRows.push({
+          '用户名': username,
+          '文件夹ID': fid,
+          '父文件夹ID': folder.parent_id || '',
+          '文件夹名称': fname,
+          '排序': folder.sort_order ?? 0,
+        });
+      }
+    }
+
+    // 关联项目（同时保留 ID、编码和名称，确保导入时可还原）
+    if (Array.isArray(entry.items)) {
+      for (const item of entry.items) {
+        const fid = item.folder_id || '';
+        const ecode = item.entity_code || '';
+        const ename = item.entity_name || '';
+        itemRows.push({
+          '用户名': username,
+          '文件夹ID': fid,
+          '文件夹名称': folderIdToName[fid] || fid,
+          '实体类型': item.entity_type || '',
+          '实体ID': item.entity_id || '',
+          '实体编码': ecode,
+          '实体名称': ename,
+        });
+      }
+    }
+
+    // 共享（同时保留 ID 和名称）
+    if (Array.isArray(entry.shares)) {
+      for (const share of entry.shares) {
+        const fid = share.folder_id || '';
+        shareRows.push({
+          '文件夹ID': fid,
+          '文件夹名称': folderIdToName[fid] || fid,
+          '共享给用户ID': share.shared_with_user_id || '',
+          '权限': share.permission || '',
+        });
+      }
+    }
+  }
+
+  const wb = XLSX.utils.book_new();
+
+  // Sheet: 看板概览
+  const ws1 = XLSX.utils.json_to_sheet(overviewRows);
+  ws1['!cols'] = [{ wch: 16 }, { wch: 16 }, { wch: 20 }];
+  XLSX.utils.book_append_sheet(wb, ws1, '看板概览');
+
+  // Sheet: 文件夹
+  if (folderRows.length > 0) {
+    const ws2 = XLSX.utils.json_to_sheet(folderRows);
+    ws2['!cols'] = [{ wch: 16 }, { wch: 40 }, { wch: 40 }, { wch: 20 }, { wch: 8 }];
+    XLSX.utils.book_append_sheet(wb, ws2, '文件夹');
+  }
+
+  // Sheet: 关联项目
+  if (itemRows.length > 0) {
+    const ws3 = XLSX.utils.json_to_sheet(itemRows);
+    ws3['!cols'] = [{ wch: 16 }, { wch: 40 }, { wch: 20 }, { wch: 12 }, { wch: 40 }, { wch: 20 }, { wch: 30 }];
+    XLSX.utils.book_append_sheet(wb, ws3, '关联项目');
+  }
+
+  // Sheet: 共享
+  if (shareRows.length > 0) {
+    const ws4 = XLSX.utils.json_to_sheet(shareRows);
+    ws4['!cols'] = [{ wch: 40 }, { wch: 20 }, { wch: 16 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(wb, ws4, '共享');
+  }
+
+  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([buf], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+
+  if (dirHandle) {
+    await writeBlobToDirectory(dirHandle, '用户看板.xlsx', blob);
+  } else {
+    await writeBlobToDirectory(handle, '用户看板.xlsx', blob);
+  }
+}
+
+// ================================================================
+// DASHBOARD IMPORT
+// ================================================================
+
+/**
+ * 预览用户看板导入（从目录读取 XLSX 并转换为后端所需 JSON）
+ */
+export async function previewDashboardImport(
+  dirHandle: FileSystemDirectoryHandle,
+): Promise<ImportPreview> {
+  const buffer = await readFileAsBuffer(dirHandle, '用户看板.xlsx');
+  if (!buffer) throw new Error('未找到"用户看板.xlsx"文件');
+
+  const wb = XLSX.read(buffer, { type: 'array' });
+
+  // 读取各 Sheet
+  const overviewSheet = wb.Sheets['看板概览'];
+  const folderSheet = wb.Sheets['文件夹'];
+  const itemSheet = wb.Sheets['关联项目'];
+  const shareSheet = wb.Sheets['共享'];
+
+  const overviewRows = overviewSheet
+    ? XLSX.utils.sheet_to_json<Record<string, unknown>>(overviewSheet)
+    : [];
+  const folderRows = folderSheet
+    ? XLSX.utils.sheet_to_json<Record<string, unknown>>(folderSheet)
+    : [];
+  const itemRows = itemSheet
+    ? XLSX.utils.sheet_to_json<Record<string, unknown>>(itemSheet)
+    : [];
+  const shareRows = shareSheet
+    ? XLSX.utils.sheet_to_json<Record<string, unknown>>(shareSheet)
+    : [];
+
+  // 按用户名分组
+  const userMap = new Map<string, {
+    username: string;
+    real_name: string;
+    dashboard_name: string;
+    folders: any[];
+    items: any[];
+    shares: any[];
+  }>();
+
+  for (const row of overviewRows) {
+    const username = String(row['用户名'] || '').trim();
+    if (!username) continue;
+    userMap.set(username, {
+      username,
+      real_name: String(row['姓名'] || '').trim(),
+      dashboard_name: String(row['看板名称'] || '').trim(),
+      folders: [],
+      items: [],
+      shares: [],
+    });
+  }
+
+  for (const row of folderRows) {
+    const username = String(row['用户名'] || '').trim();
+    const entry = userMap.get(username);
+    if (entry) {
+      entry.folders.push({
+        id: String(row['文件夹ID'] || ''),
+        parent_id: row['父文件夹ID'] ? String(row['父文件夹ID']) : null,
+        name: String(row['文件夹名称'] || ''),
+        sort_order: Number(row['排序']) || 0,
+      });
+    }
+  }
+
+  for (const row of itemRows) {
+    const username = String(row['用户名'] || '').trim();
+    const entry = userMap.get(username);
+    if (entry) {
+      // 优先使用文件夹ID，兼容旧格式只有文件夹名称的情况
+      const folderId = String(row['文件夹ID'] || '');
+      entry.items.push({
+        folder_id: folderId || String(row['文件夹名称'] || ''),
+        entity_type: String(row['实体类型'] || ''),
+        entity_id: String(row['实体ID'] || ''),
+        entity_code: String(row['实体编码'] || ''),
+      });
+    }
+  }
+
+  for (const row of shareRows) {
+    // 共享数据优先使用文件夹ID，兼容旧格式
+    const folderId = String(row['文件夹ID'] || '');
+    const folderName = String(row['文件夹名称'] || '').trim();
+    let assigned = false;
+    for (const [, entry] of userMap) {
+      let found: any = null;
+      if (folderId) {
+        found = entry.folders.find((f: any) => f.id === folderId);
+      }
+      if (!found && folderName) {
+        found = entry.folders.find((f: any) => f.name === folderName);
+      }
+      if (found) {
+        entry.shares.push({
+          folder_id: folderId || folderName,
+          folder_name: folderName,
+          shared_with_user_id: String(row['共享给用户ID'] || ''),
+          permission: String(row['权限'] || ''),
+        });
+        assigned = true;
+        break;
+      }
+    }
+    // 如果找不到所属用户，也记录（可能属于被跳过的用户）
+    if (!assigned && folderName) {
+      for (const [, entry] of userMap) {
+        entry.shares.push({
+          folder_id: folderId || folderName,
+          folder_name: folderName,
+          shared_with_user_id: String(row['共享给用户ID'] || ''),
+          permission: String(row['权限'] || ''),
+        });
+        break;
+      }
+    }
+  }
+
+  // 获取所有用户，将 username 映射到 user_id
+  const usersRes = await usersApi.list({ page_size: 10000 });
+  const usersAll = (usersRes.data as { items?: unknown[] } | unknown[]) || [];
+  const usersList: any[] = Array.isArray(usersAll) ? usersAll : (usersAll as { items?: unknown[] }).items || [];
+  const usernameToUserId: Record<string, string> = {};
+  for (const u of usersList) {
+    usernameToUserId[u.username] = u.id;
+  }
+
+  // 构建后端所需格式的数据
+  const dashboardData: any[] = [];
+  for (const [username, userEntry] of userMap) {
+    const userId = usernameToUserId[username];
+    if (!userId) continue; // 跳过不存在的用户
+
+    // 文件夹：保留 XLSX 中的 ID，否则生成新 UUID
+    const folders = (userEntry.folders || []).map((f: any) => ({
+      id: f.id || crypto.randomUUID(),
+      parent_id: f.parent_id || null,
+      name: f.name || '',
+      sort_order: f.sort_order ?? 0,
+    }));
+
+    // 关联项目：使用 folder_id，传递 entity_code 供后端按编码查找
+    const items = (userEntry.items || []).map((it: any) => ({
+      id: crypto.randomUUID(),
+      folder_id: it.folder_id || '',
+      entity_type: it.entity_type || 'part',
+      entity_id: it.entity_id || '',
+      entity_code: it.entity_code || '',
+    }));
+
+    // 共享：使用 folder_id
+    const shares = (userEntry.shares || []).map((sh: any) => ({
+      id: crypto.randomUUID(),
+      folder_id: sh.folder_id || '',
+      shared_with_user_id: sh.shared_with_user_id || '',
+      permission: sh.permission || 'view',
+    }));
+
+    dashboardData.push({
+      user_id: userId,
+      username,
+      real_name: userEntry.real_name,
+      dashboard: { name: userEntry.dashboard_name || '我的看板' },
+      folders,
+      items,
+      shares,
+    });
+  }
+
+  const totalEntries = overviewRows.length;
+
+  const rows: ImportRow[] = overviewRows.map((row) => {
+    const username = String(row['用户名'] || '').trim();
+    const name = String(row['姓名'] || '');
+    return {
+      status: '新增' as const,
+      code: username,
+      name,
+      version: '',
+      remark: `看板: ${row['看板名称'] || ''}`,
+    };
+  });
+
+  return {
+    type: 'dashboard',
+    rows,
+    docRelationCount: totalEntries,
+    _dashboardData: dashboardData,
+  };
+}
+
+/**
+ * 执行用户看板导入
+ */
+export async function executeDashboardImport(preview: ImportPreview): Promise<void> {
+  const dashboardData = preview._dashboardData;
+  if (!dashboardData || dashboardData.length === 0) {
+    throw new Error('无看板数据可导入');
+  }
+
+  try {
+    await api.post('/dashboard/import-all', dashboardData);
+  } catch (err: any) {
+    console.error('导入用户看板失败', err);
+    throw err;
+  }
+}
+
+// ================================================================
 // EXPORT ALL DATA (统一导出)
 // ================================================================
 
@@ -1714,7 +2269,7 @@ export type ExportProgressCallback = (message: string) => void;
 
 /**
  * 统一导出全部数据到同一个文件夹
- * 顺序：图文档 → 零件 → 部件
+ * 顺序：自定义字段 → 用户 → 看板 → 图文档 → 零件 → 部件
  * 通过 onProgress 回调报告进度
  */
 export async function exportAllData(
@@ -1739,6 +2294,22 @@ export async function exportAllData(
     onProgress?.(`正在导出自定义字段定义 (${defs.length} 个字段)...`);
     await exportCustomFieldDefs(dirHandle);
   }
+
+  // 0.5. 导出用户
+  const userRes = await usersApi.list({ page_size: 10000 });
+  const userList: unknown[] = Array.isArray(userRes.data)
+    ? userRes.data
+    : ((userRes.data as { items?: unknown[] })?.items || []);
+  if (userList.length > 0) {
+    onProgress?.(`正在导出用户 (${userList.length} 条记录)...`);
+    await exportUsers(dirHandle);
+  } else {
+    onProgress?.('用户: 无数据，跳过');
+  }
+
+  // 0.6. 导出用户看板
+  onProgress?.('正在导出用户看板...');
+  await exportDashboard(dirHandle);
 
   // 1. 导出图文档（含附件）
   const docs = useDataStore.getState().documents;
@@ -1807,7 +2378,7 @@ async function _readXlsxAsFile(
 
 /**
  * 统一导入全部数据
- * 顺序：自定义字段 → 图文档 → 零件 → 部件
+ * 顺序：自定义字段 → 用户 → 图文档 → 零件 → 部件 → 用户看板
  */
 export async function importAllData(
   onProgress?: ExportProgressCallback,
@@ -1828,6 +2399,17 @@ export async function importAllData(
     onProgress?.(`自定义字段: 新增 ${result.created} 个, 更新 ${result.updated} 个`);
   } else {
     onProgress?.('自定义字段: 无文件，跳过');
+  }
+
+  // ===== 1.5. 导入用户 =====
+  const userFile = await _readXlsxAsFile(dirHandle, '用户清单.xlsx');
+  if (userFile) {
+    onProgress?.('正在导入用户...');
+    const userPreview = await previewUsersImport(userFile);
+    await executeUsersImport(userPreview);
+    onProgress?.('用户导入完成');
+  } else {
+    onProgress?.('用户: 无文件，跳过');
   }
 
   // ===== 2. 导入图文档 =====
@@ -1864,6 +2446,17 @@ export async function importAllData(
     onProgress?.('部件导入完成');
   } else {
     onProgress?.('部件: 无数据，跳过');
+  }
+
+  // ===== 5. 导入用户看板（最后导入，因为关联了图文档和零部件） =====
+  const dashFile = await _readXlsxAsFile(dirHandle, '用户看板.xlsx');
+  if (dashFile) {
+    onProgress?.('正在导入用户看板...');
+    const dashPreview = await previewDashboardImport(dirHandle);
+    await executeDashboardImport(dashPreview);
+    onProgress?.('用户看板导入完成');
+  } else {
+    onProgress?.('用户看板: 无文件，跳过');
   }
 
   onProgress?.('全部数据导入完成');

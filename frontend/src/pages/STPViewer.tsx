@@ -5,10 +5,11 @@ import { useViewerStore } from '../stores/viewerStore';
 import axios from 'axios';
 
 export default function STPViewerPage() {
-  const [state, setState] = useState<'checking' | 'converting' | 'loading' | 'parsing' | 'ready' | 'error'>('checking');
+  const [state, setState] = useState<'checking' | 'converting' | 'loading' | 'ready' | 'error'>('checking');
   const [url, setUrl] = useState<string | null>(null);
   const [downloadPct, setDownloadPct] = useState(0);
   const loadingState = useViewerStore((s) => s.loadingState);
+  const errorMessage = useViewerStore((s) => s.errorMessage);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -19,13 +20,6 @@ export default function STPViewerPage() {
     const gltfUrl = `/api/v2/attachments/${id}/gltf?token=${encodeURIComponent(token)}`;
     checkAndLoad(gltfUrl);
   }, []);
-
-  // Track parse completion from ModelLoader
-  useEffect(() => {
-    if (state === 'parsing' && loadingState === 'ready') {
-      setState('ready');
-    }
-  }, [loadingState, state]);
 
   async function checkAndLoad(gltfUrl: string) {
     try {
@@ -50,7 +44,8 @@ export default function STPViewerPage() {
       });
       const blobUrl = URL.createObjectURL(resp.data);
       setUrl(blobUrl);
-      setState('parsing');
+      // Go directly to ready — ModelLoader will handle parse status via loadingState
+      setState('ready');
     } catch {
       setState('error');
     }
@@ -78,26 +73,30 @@ export default function STPViewerPage() {
     <div className="w-screen h-screen relative">
       {url && <ViewerCanvas url={url} />}
       <Toolbar />
-      {(state === 'loading' || state === 'parsing') && (
+      {/* Download progress overlay */}
+      {state === 'loading' && (
         <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/90 gap-4">
-          {/* 下载进度 */}
-          {state === 'loading' && (
-            <>
-              <div className="text-gray-500 text-sm">正在下载模型... {downloadPct}%</div>
-              <div className="w-72 h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 rounded-full transition-all duration-300" style={{ width: `${downloadPct}%` }} />
-              </div>
-            </>
-          )}
-          {/* 解析进度 */}
-          {state === 'parsing' && (
-            <>
-              <div className="text-gray-500 text-sm">正在解析渲染...</div>
-              <div className="w-72 h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-green-500 rounded-full animate-pulse" style={{ width: '70%' }} />
-              </div>
-            </>
-          )}
+          <div className="text-gray-500 text-sm">正在下载模型... {downloadPct}%</div>
+          <div className="w-72 h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div className="h-full bg-blue-500 rounded-full transition-all duration-300" style={{ width: `${downloadPct}%` }} />
+          </div>
+        </div>
+      )}
+      {/* Parsing overlay — show while ModelLoader hasn't finished yet */}
+      {url && state === 'ready' && loadingState !== 'ready' && loadingState !== 'error' && (
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/90 gap-4">
+          <div className="text-gray-500 text-sm">正在解析渲染...</div>
+          <div className="w-72 h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div className="h-full bg-green-500 rounded-full animate-pulse" style={{ width: '70%' }} />
+          </div>
+        </div>
+      )}
+      {/* Model loading error — GLTFErrorBoundary sets this */}
+      {url && loadingState === 'error' && (
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/90 gap-4">
+          <div className="text-red-500 text-sm">模型加载失败</div>
+          {errorMessage && <div className="text-gray-400 text-xs">{errorMessage}</div>}
+          <div className="text-gray-400 text-xs mt-1">请关闭后重试</div>
         </div>
       )}
     </div>
