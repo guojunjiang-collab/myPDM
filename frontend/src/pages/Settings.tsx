@@ -66,8 +66,6 @@ export default function Settings() {
   const [importProgress, setImportProgress] = useState('');
   const [batchConverting, setBatchConverting] = useState(false);
   const [batchStatus, setBatchStatus] = useState('');
-const [batchConverting, setBatchConverting] = useState(false);
-const [batchStatus, setBatchStatus] = useState('');
 
   useEffect(() => {
     if (activeTab === 'customFields') {
@@ -287,29 +285,6 @@ const [batchStatus, setBatchStatus] = useState('');
     }
     // 重置 input 以便重复选择同一文件
     e.target.value = '';
-  };
-
-  // STP 批量转换
-  const handleBatchConvert = async () => {
-    setBatchConverting(true);
-    setBatchStatus('正在启动...');
-    try {
-      const token = useAuthStore.getState().token;
-      const resp = await fetch('/api/v2/attachments/convert-pending', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      const data = await resp.json();
-      setBatchConverting(false);
-      if (data.status === 'started') {
-        setBatchStatus(`已开始，共 ${data.pending} 个待转换文件`);
-      } else {
-        setBatchStatus(data.message || '已完成');
-      }
-    } catch {
-      setBatchStatus('请求失败');
-      setBatchConverting(false);
-    }
   };
 
   const handleResetData = async () => {
