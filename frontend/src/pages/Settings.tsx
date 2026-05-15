@@ -249,7 +249,7 @@ export default function Settings() {
     setBatchStatus('正在启动...');
     try {
       const token = useAuthStore.getState().token;
-      const resp = await fetch('/api/v2/attachments/convert-pending', {
+      const resp = await fetch('/api/v2/convert-pending', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
       });
