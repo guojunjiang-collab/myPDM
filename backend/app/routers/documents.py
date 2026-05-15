@@ -274,14 +274,7 @@ async def upload_document_attachment(doc_id: uuid.UUID, body: schemas.DocumentAt
     d.file_id = att.id
     db.commit()
     
-    # 异步转换 STP → glb
-    if is_stp_file(body.file_name):
-        import asyncio
-        from ..stp_converter import convert_stp_to_gltf
-        full_path = file_storage.base_dir / result["file_path"]
-        asyncio.get_event_loop().run_in_executor(
-            None, convert_stp_to_gltf, str(full_path), str(att.id)
-        )
+    # STP 文件不再自动转换，改为预览时按需转换（避免批量导入卡死）
     
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username, "上传附件", "document_att", str(doc_id), f"文件:{body.file_name}", ip)

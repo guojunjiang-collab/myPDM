@@ -119,13 +119,7 @@ async def upload_file(
         db.commit()
         db.refresh(new_att)
         
-        # 异步转换 STP → glTF（不阻塞上传响应）
-        if is_stp_file(result["filename"]):
-            full_path = file_storage.base_dir / result["file_path"]
-            asyncio.get_event_loop().run_in_executor(
-                None, convert_stp_to_gltf, str(full_path), str(new_att.id)
-            )
-        
+        # STP 文件不再自动转换，改为预览时按需转换（避免批量导入卡死）
         return {
             "id": new_att.id,
             "file_name": result["filename"],
@@ -272,13 +266,7 @@ async def complete_chunked_upload(
         db.commit()
         db.refresh(new_att)
         
-        # 异步转换 STP → glTF
-        if is_stp_file(file_info["filename"]):
-            full_path = file_storage.base_dir / file_info["file_path"]
-            asyncio.get_event_loop().run_in_executor(
-                None, convert_stp_to_gltf, str(full_path), str(new_att.id)
-            )
-        
+        # STP 文件不再自动转换，改为预览时按需转换（避免批量导入卡死）
         return {
             "id": new_att.id,
             "file_name": file_info["filename"],
