@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { customFieldsApi, authApi } from '../services/api';
+import api from '../services/api';
 import { useAuthStore } from '../stores/auth';
 import { isAdmin } from '../stores/auth';
 import type { CustomFieldDefinition } from '../types';
@@ -248,15 +249,10 @@ export default function Settings() {
     setBatchConverting(true);
     setBatchStatus('正在启动...');
     try {
-      const token = useAuthStore.getState().token;
-      const resp = await fetch('/api/v2/attachments/convert-pending', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      const data = await resp.json();
+      const { data } = await api.post('/v2/attachments/convert-pending');
       if (data.status === 'started') {
         setBatchStatus(`已开始，共 ${data.pending} 个待转换文件`);
-        pollConvertStatus(token!);
+        pollConvertStatus();
       } else {
         setBatchStatus(data.message || '已完成，无需转换');
         setBatchConverting(false);
@@ -267,13 +263,10 @@ export default function Settings() {
     }
   };
 
-  const pollConvertStatus = (token: string) => {
+  const pollConvertStatus = () => {
     const t = setInterval(async () => {
       try {
-        const resp = await fetch('/api/v2/attachments/convert-status', {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        const data = await resp.json();
+        const { data } = await api.get('/v2/attachments/convert-status');
         if (data.pending === 0) {
           clearInterval(t);
           setBatchStatus('✅ 全部转换完成');
