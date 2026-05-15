@@ -350,8 +350,9 @@ def reorder_custom_field_definitions(db, items):
     return True
 
 def reset_business_data(db):
-    """清除所有业务数据：零件、部件、BOM、图文档、附件文件、自定义字段、看板、日志"""
+    """清除所有业务数据：零件、部件、BOM、图文档、附件文件、自定义字段、看板、日志、非管理员用户；重置 admin 密码为 admin123"""
     import os
+    import shutil
     from .file_storage import UPLOAD_DIR
 
     # 先收集所有要删除的附件文件路径
@@ -374,6 +375,15 @@ def reset_business_data(db):
     db.query(models.Assembly).delete()
     db.query(models.CustomFieldDefinition).delete()
     db.query(models.OperationLog).delete()
+
+    # 删除非管理员用户，保留 admin
+    db.query(models.User).filter(models.User.username != "admin").delete(synchronize_session='fetch')
+
+    # 重置 admin 密码为 admin123
+    admin = db.query(models.User).filter(models.User.username == "admin").first()
+    if admin:
+        admin.password_hash = get_password_hash("admin123")
+
     db.commit()
 
     # 删除附件实体文件
@@ -388,6 +398,15 @@ def reset_business_data(db):
                 os.rmdir(dir_path)  # 仅删除空目录
             except OSError:
                 pass
+        except Exception:
+            pass
+
+    # 清理 glb 缓存文件（STP 转换生成的 glTF 缓存）
+    gltf_cache_dir = os.path.join(UPLOAD_DIR, "gltf_cache")
+    if os.path.exists(gltf_cache_dir):
+        try:
+            shutil.rmtree(gltf_cache_dir)
+            os.makedirs(gltf_cache_dir, exist_ok=True)
         except Exception:
             pass
 

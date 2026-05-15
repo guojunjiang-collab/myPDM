@@ -86,12 +86,18 @@ async def upload_file(
         }
     
     try:
-        # 保存文件到文件系统
+        # 保存文件到文件系统（图文档使用 编号_版本 作为文件夹名）
+        folder_name = None
+        if entity_type == "document":
+            doc = db.query(Document).filter(Document.id == uuid.UUID(entity_id)).first()
+            if doc:
+                folder_name = f"{doc.code}_{doc.version}"
         result = file_storage.save_file(
             file_data,
             entity_type,
             entity_id,
-            file.filename or "unnamed"
+            file.filename or "unnamed",
+            folder_name=folder_name,
         )
         
         # 创建数据库记录
@@ -160,12 +166,19 @@ async def init_chunked_upload(
     total_chunks = (file_size + CHUNK_SIZE - 1) // CHUNK_SIZE
     
     try:
+        # 图文档使用 编号_版本 作为文件夹名
+        folder_name = None
+        if entity_type == "document":
+            doc = db.query(Document).filter(Document.id == uuid.UUID(entity_id)).first()
+            if doc:
+                folder_name = f"{doc.code}_{doc.version}"
         meta = chunked_uploader.init_upload(
             filename,
             file_size,
             entity_type,
             entity_id,
-            total_chunks
+            total_chunks,
+            folder_name=folder_name,
         )
         
         return {

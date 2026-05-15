@@ -341,6 +341,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
             doc={viewDoc}
             customFieldDefs={viewDocCustomDefs}
             customFieldValues={viewDocCustomValues}
+            onArchivePreview={(attId, fileName) => setArchivePreview({ attId, fileName })}
           />
         )}
       </Modal>

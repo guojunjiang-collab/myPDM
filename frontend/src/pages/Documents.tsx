@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { documentsApi, customFieldsApi, bomApi } from '../services/api';
 import type { Document, CustomFieldDefinition, CustomFieldValue, DocumentAttachment } from '../types';
-import { canEdit, isAdmin, canDownload } from '../stores/auth';
+import { canEdit, isAdmin, canDownload, useAuthStore } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
 import DocumentDetailContent from '../components/DocumentDetailContent';
 import VersionHistory from '../components/VersionHistory';
@@ -14,6 +14,7 @@ import {
 } from '../services/importExport';
 import type { ImportPreview } from '../services/importExport';
 import ImportPreviewModal from '../components/ImportPreviewModal';
+import ArchiveTreeModal from '../components/ArchiveTreeModal';
 
 /** 生成 UUID */
 function generateUUID(): string {
@@ -82,6 +83,7 @@ export default function Documents() {
   const [viewingCustomDefs, setViewingCustomDefs] = useState<CustomFieldDefinition[]>([]);
   const [viewingCustomValues, setViewingCustomValues] = useState<Record<string, any>>({});
   const [detailTab, setDetailTab] = useState<'detail' | 'versions'>('detail');
+  const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
 
   // 从 store 订阅数据
   const storeDocuments = useDataStore((s) => s.documents);
@@ -910,6 +912,7 @@ export default function Documents() {
                 doc={viewingDoc}
                 customFieldDefs={viewingCustomDefs}
                 customFieldValues={viewingCustomValues}
+                onArchivePreview={(attId, fileName) => setArchivePreview({ attId, fileName })}
               />
             ) : (
               <VersionHistory
@@ -940,6 +943,16 @@ export default function Documents() {
         }}
         onConfirm={handleImportDocumentsConfirm}
       />
+
+      {archivePreview && (
+        <ArchiveTreeModal
+          open={!!archivePreview}
+          onClose={() => setArchivePreview(null)}
+          attachmentId={archivePreview.attId}
+          fileName={archivePreview.fileName}
+          token={useAuthStore.getState().token || ''}
+        />
+      )}
     </div>
   );
 }

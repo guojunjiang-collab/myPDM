@@ -4,7 +4,9 @@ import { useDataStore } from '../stores/data';
 import { Modal, ConfirmModal } from '../components/Modal';
 import PartDetailContent from '../components/PartDetailContent';
 import DocumentDetailContent from '../components/DocumentDetailContent';
+import ArchiveTreeModal from '../components/ArchiveTreeModal';
 import AssemblyDetailContent from '../components/AssemblyDetailContent';
+import { useAuthStore } from '../stores/auth';
 import type { CustomFieldDefinition, CustomFieldValue } from '../types';
 
 /* ================================================================
@@ -125,6 +127,7 @@ export default function Board() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailCustomDefs, setDetailCustomDefs] = useState<CustomFieldDefinition[]>([]);
   const [detailCustomValues, setDetailCustomValues] = useState<Record<string, any>>({});
+  const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
 
   /* Load */
   const loadDashboard = useCallback(async () => {
@@ -583,6 +586,7 @@ export default function Board() {
             doc={detailData}
             customFieldDefs={detailCustomDefs}
             customFieldValues={detailCustomValues}
+            onArchivePreview={(attId, fileName) => setArchivePreview({ attId, fileName })}
           />
         )}
       </Modal>
@@ -592,6 +596,16 @@ export default function Board() {
 
       {/* ---- Remove Shared Folder Confirm ---- */}
       <ConfirmModal open={!!removeShareId} title="移除共享文件夹" content="确定要移除该共享文件夹吗？将从您的看板中移除该文件夹及其所有子文件夹。" confirmText="移除" cancelText="取消" type="danger" onConfirm={handleRemoveSharedFolder} onCancel={() => setRemoveShareId(null)} />
+
+      {archivePreview && (
+        <ArchiveTreeModal
+          open={!!archivePreview}
+          onClose={() => setArchivePreview(null)}
+          attachmentId={archivePreview.attId}
+          fileName={archivePreview.fileName}
+          token={useAuthStore.getState().token || ''}
+        />
+      )}
     </div>
   );
 }

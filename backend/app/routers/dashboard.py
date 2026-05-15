@@ -767,7 +767,7 @@ async def export_all_dashboards(
             doc_map = {str(d.id): d for d in docs}
 
         def _get_entity_info(entity_type, entity_id):
-            """获取实体的 code 和 name"""
+            """获取实体的 code、name 和 version"""
             eid = str(entity_id)
             if entity_type == "part":
                 e = part_map.get(eid)
@@ -776,14 +776,28 @@ async def export_all_dashboards(
             elif entity_type == "document":
                 e = doc_map.get(eid)
             else:
-                return "", ""
+                return "", "", ""
             if e:
-                return e.code or "", e.name or ""
-            return "", ""
+                return e.code or "", e.name or "", e.version or ""
+            return "", "", ""
 
         shares = db.query(DashboardFolderShare).filter(
             DashboardFolderShare.folder_id.in_(folder_ids)
         ).all() if folder_ids else []
+
+        # 构建 shared_with_user_id → username 映射
+        share_user_ids = list(set(s.shared_with_user_id for s in shares))
+        share_user_map = {}
+        if share_user_ids:
+            users = db.query(User).filter(User.id.in_(share_user_ids)).all()
+            share_user_map = {str(u.id): u.username for u in users}
+
+        # 构建 user_id → username 映射，用于 shares
+        share_user_ids = [s.shared_with_user_id for s in shares]
+        user_map = {}
+        if share_user_ids:
+            share_users = db.query(User).filter(User.id.in_(share_user_ids)).all()
+            user_map = {str(u.id): u.username for u in share_users}
 
         result.append({
             "user_id": str(user.id),
@@ -810,6 +824,7 @@ async def export_all_dashboards(
                     "entity_id": str(i.entity_id),
                     "entity_code": _get_entity_info(i.entity_type, i.entity_id)[0],
                     "entity_name": _get_entity_info(i.entity_type, i.entity_id)[1],
+                    "entity_version": _get_entity_info(i.entity_type, i.entity_id)[2],
                 }
                 for i in items
             ],
@@ -818,6 +833,7 @@ async def export_all_dashboards(
                     "id": str(s.id),
                     "folder_id": str(s.folder_id),
                     "shared_with_user_id": str(s.shared_with_user_id),
+                    "shared_with_username": share_user_map.get(str(s.shared_with_user_id), ""),
                     "permission": s.permission,
                 }
                 for s in shares
@@ -850,6 +866,9 @@ async def import_all_dashboards(
     total_folders = 0
     total_items = 0
     total_shares = 0
+    skipped_items = 0
+    skipped_reasons = []
+    per_entry = []
 
     for entry in data:
         user_id_str = entry.get("user_id")
@@ -857,6 +876,9 @@ async def import_all_dashboards(
             continue
 
         dash = _ensure_dashboard(db, uuid.UUID(str(user_id_str)))
+        username = entry.get("username", "?")
+        entry_items_input = len(entry.get("items", []))
+        entry_items_created = 0
 
         # 清空现有数据
         existing_folders = db.query(DashboardFolder).filter(
@@ -916,9 +938,12 @@ async def import_all_dashboards(
         db.flush()
 
         # 创建关联项（支持按编码查找实体，处理 ID 变化的情况）
-        for i_data in entry.get("items", []):
+        items_data = entry.get("items", [])
+        for i_data in items_data:
             folder_id = _opt_uuid(i_data.get("folder_id"))
             if not folder_id:
+                skipped_items += 1
+                skipped_reasons.append(f"item folder_id invalid: {i_data.get('folder_id')}")
                 continue
 
             # 解析实体引用：优先按 entity_id 查找，失败则按 entity_code 查找
@@ -953,6 +978,10 @@ async def import_all_dashboards(
                     resolved_entity_id = e.id
 
             if not resolved_entity_id:
+                skipped_items += 1
+                skipped_reasons.append(
+                    f"entity not found: type={entity_type}, id={i_data.get('entity_id')}, code='{entity_code}'"
+                )
                 continue  # 实体不存在，跳过该关联项
 
             iid = _opt_uuid(i_data.get("id"))
@@ -964,6 +993,7 @@ async def import_all_dashboards(
             )
             db.add(item)
             total_items += 1
+            entry_items_created += 1
 
         db.flush()
 
@@ -985,6 +1015,11 @@ async def import_all_dashboards(
 
         db.flush()
         imported_count += 1
+        per_entry.append({
+            "username": username,
+            "items_input": entry_items_input,
+            "items_created": entry_items_created,
+        })
 
     db.commit()
 
@@ -993,6 +1028,9 @@ async def import_all_dashboards(
         "folders": total_folders,
         "items": total_items,
         "shares": total_shares,
+        "skipped_items": skipped_items,
+        "skipped_reasons": skipped_reasons[:10],
+        "per_entry": per_entry,
     }
 
 

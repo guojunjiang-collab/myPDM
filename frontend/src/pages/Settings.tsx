@@ -6,7 +6,7 @@ import { isAdmin } from '../stores/auth';
 import type { CustomFieldDefinition } from '../types';
 import { Modal } from '../components/Modal';
 import { useDataStore } from '../stores/data';
-import { exportAllData, exportCustomFieldDefs, importCustomFieldDefs, importAllData } from '../services/importExport';
+import { exportAllData, exportCustomFieldDefs, importCustomFieldDefs, importAllData, exportDashboardFile, previewDashboardImportFromFile, executeDashboardImport } from '../services/importExport';
 
 import Logs from './Logs';
 
@@ -67,6 +67,8 @@ export default function Settings() {
   const [importProgress, setImportProgress] = useState('');
   const [batchConverting, setBatchConverting] = useState(false);
   const [batchStatus, setBatchStatus] = useState('');
+  const [dashExporting, setDashExporting] = useState(false);
+  const [dashImporting, setDashImporting] = useState(false);
 
   useEffect(() => {
     if (activeTab === 'customFields') {
@@ -320,11 +322,45 @@ export default function Settings() {
       useDataStore.getState().setCustomFieldDefs([]);
       setShowResetConfirm(false);
       setResetPassword('');
-      alert('系统数据已清空');
+      alert('系统已重置。admin 密码已重置为 admin123，请重新登录。');
+      // admin 密码已变更，强制重新登录
+      logout();
+      window.location.href = '/login';
     } catch (error: any) {
       alert(error?.response?.data?.detail || '重置失败，请确认密码正确');
     } finally {
       setResetting(false);
+    }
+  };
+
+  // 导出用户看板（直接下载文件）
+  const handleDashExport = async () => {
+    setDashExporting(true);
+    try {
+      await exportDashboardFile();
+    } catch (e: any) {
+      alert(e?.message || '导出失败，请重试');
+    } finally {
+      setDashExporting(false);
+    }
+  };
+
+  // 导入用户看板（直接选择文件）
+  const handleDashImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setDashImporting(true);
+    try {
+      await useDataStore.getState().syncAll();
+      const preview = await previewDashboardImportFromFile(file);
+      await executeDashboardImport(preview);
+      await useDataStore.getState().syncAll();
+      alert('用户看板导入完成');
+    } catch (e: any) {
+      alert(e?.message || '导入失败，请重试');
+    } finally {
+      setDashImporting(false);
+      e.target.value = '';
     }
   };
 
@@ -489,12 +525,13 @@ export default function Settings() {
 
       {/* 数据管理 */}
       {activeTab === 'dataManagement' && (
-        <div className="space-y-6">
+        <>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* 导出全部数据 */}
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <h3 className="text-lg font-medium mb-2">导出全部数据</h3>
             <p className="text-sm text-gray-500 mb-4">
-              将系统中的所有零件、部件、图文档数据导出为文件备份。请选择目标文件夹。
+              将系统中的所有零件、部件、图文档、用户看板数据导出为文件备份。请选择目标文件夹。
             </p>
             <button
               onClick={handleExportAll}
@@ -527,6 +564,41 @@ export default function Settings() {
               <p className={`mt-3 text-sm ${importing ? 'text-blue-600' : 'text-green-600'}`}>
                 {importing ? '⏳' : '✅'} {importProgress}
               </p>
+            )}
+          </div>
+
+          {/* 导出用户看板 */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-medium mb-2">导出用户看板</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              仅导出所有用户的看板数据（文件夹、关联项目、共享设置），保存为 Excel 文件。
+            </p>
+            <button
+              onClick={handleDashExport}
+              disabled={dashExporting}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+            >
+              {dashExporting ? '导出中...' : '导出用户看板'}
+            </button>
+            {dashExporting && (
+              <p className="mt-3 text-sm text-blue-600">⏳ 导出中...</p>
+            )}
+          </div>
+
+          {/* 导入用户看板 */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-medium mb-2">导入用户看板</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              选择已导出的"用户看板.xlsx"文件，导入用户看板数据。
+            </p>
+            <label
+              className={`inline-block px-4 py-2 rounded-lg cursor-pointer text-white ${dashImporting ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'}`}
+            >
+              {dashImporting ? '导入中...' : '导入用户看板'}
+              <input type="file" accept=".xlsx" onChange={handleDashImport} className="hidden" disabled={dashImporting} />
+            </label>
+            {dashImporting && (
+              <p className="mt-3 text-sm text-blue-600">⏳ 导入中...</p>
             )}
           </div>
 
@@ -565,29 +637,30 @@ export default function Settings() {
               {resetting ? '重置中...' : '重置系统数据'}
             </button>
           </div>
-
-          {/* ---- Reset Confirm Modal ---- */}
-          <Modal open={showResetConfirm} title="确认重置" onClose={() => setShowResetConfirm(false)} width="sm">
-            <div className="space-y-4">
-              <p className="text-sm text-gray-600">此操作将清空所有业务数据（零件、部件、图文档、附件、自定义字段、看板），且不可恢复。请输入管理员密码确认：</p>
-              <input
-                type="password"
-                value={resetPassword}
-                onChange={(e) => setResetPassword(e.target.value)}
-                placeholder="请输入管理员密码"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                autoFocus
-                onKeyDown={(e) => e.key === 'Enter' && handleResetData()}
-              />
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setShowResetConfirm(false)} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-                <button type="button" onClick={handleResetData} disabled={resetting} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50">
-                  {resetting ? '重置中...' : '确认重置'}
-                </button>
-              </div>
-            </div>
-          </Modal>
         </div>
+
+        {/* ---- Reset Confirm Modal ---- */}
+        <Modal open={showResetConfirm} title="确认重置" onClose={() => setShowResetConfirm(false)} width="sm">
+          <div className="space-y-4">
+              <p className="text-sm text-gray-600">此操作将清空所有业务数据（零件、部件、图文档、附件、自定义字段、看板、glTF缓存），删除所有非管理员用户，并将 admin 密码重置为 admin123。此操作不可逆，请输入管理员密码确认：</p>
+            <input
+              type="password"
+              value={resetPassword}
+              onChange={(e) => setResetPassword(e.target.value)}
+              placeholder="请输入管理员密码"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+              autoFocus
+              onKeyDown={(e) => e.key === 'Enter' && handleResetData()}
+            />
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setShowResetConfirm(false)} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
+              <button type="button" onClick={handleResetData} disabled={resetting} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50">
+                {resetting ? '重置中...' : '确认重置'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+        </>
       )}
 
       {/* 修改密码 */}

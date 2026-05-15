@@ -29,15 +29,26 @@ class FileStorage:
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.chunk_dir.mkdir(parents=True, exist_ok=True)
     
-    def _get_file_path(self, entity_type: str, entity_id: str, filename: str) -> Path:
-        """获取文件存储路径"""
-        # 按实体类型和ID组织目录结构
-        entity_dir = self.base_dir / entity_type / str(entity_id)
+    def _get_file_path(self, entity_type: str, entity_id: str, filename: str, folder_name: str = None) -> Path:
+        """获取文件存储路径
+        
+        Args:
+            folder_name: 可选的文件夹名，若提供则替代 entity_id 作为目录名
+        """
+        dir_name = str(entity_id)
+        if folder_name:
+            # 替换文件系统非法字符为下划线
+            illegal_chars = r'\/:*?"<>|'
+            sanitized = folder_name
+            for ch in illegal_chars:
+                sanitized = sanitized.replace(ch, '_')
+            dir_name = sanitized
+        entity_dir = self.base_dir / entity_type / dir_name
         entity_dir.mkdir(parents=True, exist_ok=True)
         return entity_dir / filename
     
     def save_file(self, file_data: bytes, entity_type: str, entity_id: str, 
-                  filename: str) -> Dict[str, Any]:
+                  filename: str, folder_name: str = None) -> Dict[str, Any]:
         """
         保存文件到文件系统
         
@@ -46,6 +57,7 @@ class FileStorage:
             entity_type: 实体类型 (document, part, assembly)
             entity_id: 实体ID
             filename: 文件名
+            folder_name: 可选的目录名称，若提供则替代 entity_id 作为文件夹名
             
         Returns:
             包含文件信息的字典
@@ -59,14 +71,14 @@ class FileStorage:
         file_hash = hashlib.sha256(file_data).hexdigest()
         
         # 获取存储路径
-        file_path = self._get_file_path(entity_type, entity_id, filename)
+        file_path = self._get_file_path(entity_type, entity_id, filename, folder_name)
         
         # 如果文件已存在，添加时间戳
         if file_path.exists():
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             name, ext = os.path.splitext(filename)
             filename = f"{name}_{timestamp}{ext}"
-            file_path = self._get_file_path(entity_type, entity_id, filename)
+            file_path = self._get_file_path(entity_type, entity_id, filename, folder_name)
         
         # 保存文件
         with open(file_path, 'wb') as f:
@@ -179,7 +191,7 @@ class ChunkedUploader:
         return self.chunk_dir / f"{upload_id}_{chunk_index}.chunk"
     
     def init_upload(self, filename: str, file_size: int, entity_type: str, 
-                    entity_id: str, total_chunks: int) -> Dict[str, Any]:
+                    entity_id: str, total_chunks: int, folder_name: str = None) -> Dict[str, Any]:
         """
         初始化分块上传
         
@@ -189,6 +201,7 @@ class ChunkedUploader:
             entity_type: 实体类型
             entity_id: 实体ID
             total_chunks: 总分块数
+            folder_name: 可选的文件夹名，若提供则替代 entity_id 作为目录名
             
         Returns:
             上传信息字典
@@ -207,6 +220,7 @@ class ChunkedUploader:
             "file_size": file_size,
             "entity_type": entity_type,
             "entity_id": entity_id,
+            "folder_name": folder_name,
             "total_chunks": total_chunks,
             "uploaded_chunks": [],
             "created_at": datetime.now().isoformat(),
@@ -302,6 +316,7 @@ class ChunkedUploader:
             meta["entity_type"],
             meta["entity_id"],
             meta["filename"],
+            folder_name=meta.get("folder_name"),
         )
         
         # 清理临时文件

@@ -92,6 +92,18 @@ export interface ImportPreview {
 // Utilities
 // ================================================================
 
+/** 实体类型 中英文 映射 */
+const ENTITY_TYPE_TO_ZH: Record<string, string> = {
+  part: '零件',
+  assembly: '部件',
+  document: '图文档',
+};
+const ENTITY_TYPE_FROM_ZH: Record<string, string> = {
+  '零件': 'part',
+  '部件': 'assembly',
+  '图文档': 'document',
+};
+
 /** 存储导入时的目录句柄（在 preview 阶段打开，execute 阶段复用） */
 let _importDirHandle: FileSystemDirectoryHandle | null = null;
 
@@ -595,22 +607,27 @@ interface BOMRow {
   版本: string;
   状态: string;
   用量: number;
-  _entityType?: string;
-  _entityId?: string;
 }
 
-/** 递归收集 BOM 树 */
+interface BOMEntityRef {
+  type: 'part' | 'component';
+  id: string;
+}
+
+/** 递归收集 BOM 树，同时返回实体引用用于自定义字段加载 */
 async function gatherBOMTree(
   assemblyId: string,
   level: number = 1,
-): Promise<BOMRow[]> {
+): Promise<{ rows: BOMRow[]; refs: BOMEntityRef[] }> {
   const rows: BOMRow[] = [];
+  const refs: BOMEntityRef[] = [];
   try {
     const res = await assemblyPartsApi.list(assemblyId);
     const items: AssemblyPartItem[] = res.data || [];
 
     for (const item of items) {
       const detail = item.child_detail;
+      refs.push({ type: item.childType as 'part' | 'component', id: detail?.id || '' });
       rows.push({
         层级: level,
         类型: item.childType === 'part' ? '零件' : '部件',
@@ -620,20 +637,19 @@ async function gatherBOMTree(
         版本: detail?.version || '',
         状态: statusToZh(detail?.status),
         用量: item.quantity,
-        _entityType: item.childType,
-        _entityId: detail?.id || '',
       });
 
       // 如果是部件，递归收集子项
       if (item.childType === 'component' && detail?.id) {
-        const children = await gatherBOMTree(detail.id, level + 1);
-        rows.push(...children);
+        const child = await gatherBOMTree(detail.id, level + 1);
+        rows.push(...child.rows);
+        refs.push(...child.refs);
       }
     }
   } catch (err) {
     console.error(`获取 BOM 树失败: ${assemblyId}`, err);
   }
-  return rows;
+  return { rows, refs };
 }
 
 /**
@@ -728,7 +744,7 @@ export async function exportAssembliesToFolder(dirHandle?: FileSystemDirectoryHa
 
   // ===== 2. 每个部件的 BOM_xxx.xlsx =====
   for (const asm of assemblies) {
-    const bomRows = await gatherBOMTree(asm.id);
+    const { rows: bomRows } = await gatherBOMTree(asm.id);
     // 加上自身行（层级0）
     const allRows: BOMRow[] = [
       {
@@ -776,11 +792,13 @@ export async function exportSingleAssemblyBOM(assemblyId: string): Promise<void>
   }
 
   const asmDefs = getCustomFieldDefs('component');
-  const [cfValuesMap, docMap, bomRows] = await Promise.all([
+  const [cfValuesMap, docMap, bomResult] = await Promise.all([
     asmDefs.length > 0 ? loadCustomFieldValues('component', [asm.id]) : Promise.resolve(new Map()),
     loadEntityDocuments('assembly', [asm.id]),
     gatherBOMTree(asm.id),
   ]);
+  const bomRows = bomResult.rows;
+  const bomRefs = bomResult.refs;
 
   const cfValues = cfValuesMap.get(asm.id) || {};
 
@@ -810,21 +828,18 @@ export async function exportSingleAssemblyBOM(assemblyId: string): Promise<void>
     版本: asm.version || '',
     状态: statusToZh(asm.status),
     用量: 1,
-    _entityType: 'component',
-    _entityId: asm.id,
   };
   const allBomRows = [selfRow, ...bomRows];
 
   // 收集 BOM 中所有实体的 ID（按类型分组）
+  // selfRow 是自身部件，#0 对应 asm.id / 'component'
+  // bomRefs[i] 对应 allBomRows[i+1]
   const partIds: string[] = [];
-  const componentIds: string[] = [];
-  for (const row of allBomRows) {
-    if (row._entityId) {
-      if (row._entityType === 'part') {
-        partIds.push(row._entityId);
-      } else if (row._entityType === 'component') {
-        componentIds.push(row._entityId);
-      }
+  const componentIds: string[] = [asm.id]; // 自身
+  for (const ref of bomRefs) {
+    if (ref.id) {
+      if (ref.type === 'part') partIds.push(ref.id);
+      else componentIds.push(ref.id);
     }
   }
 
@@ -840,8 +855,14 @@ export async function exportSingleAssemblyBOM(assemblyId: string): Promise<void>
       : Promise.resolve(new Map()),
   ]);
 
+  // 构建 BOM 行 → 实体信息的索引
+  const entityInfo: { type: string; id: string }[] = [
+    { type: 'component', id: asm.id }, // selfRow
+    ...bomRefs.map(r => ({ type: r.type, id: r.id })),
+  ];
+
   // 构建带自定义字段的 BOM 行
-  const bomSheetRows: Record<string, unknown>[] = allBomRows.map((row) => {
+  const bomSheetRows: Record<string, unknown>[] = allBomRows.map((row, idx) => {
     const r: Record<string, unknown> = {
       层级: row.层级,
       类型: row.类型,
@@ -854,17 +875,18 @@ export async function exportSingleAssemblyBOM(assemblyId: string): Promise<void>
     };
 
     // 填充该实体类型的自定义字段
-    const defsForType = row._entityType === 'part' ? partDefs : asmDefs;
-    const cfMap = row._entityType === 'part' ? partCfMap : compCfMap;
-    if (row._entityId && defsForType.length > 0) {
-      const values = cfMap.get(row._entityId) || {};
+    const info = entityInfo[idx] || { type: 'component', id: '' };
+    const defsForType = info.type === 'part' ? partDefs : asmDefs;
+    const cfMap = info.type === 'part' ? partCfMap : compCfMap;
+    if (info.id && defsForType.length > 0) {
+      const values = cfMap.get(info.id) || {};
       for (const def of defsForType) {
         r[def.name] = values[def.id] ?? '';
       }
     }
 
     // 对于该实体不存在的字段类型，填充空值
-    const otherDefs = row._entityType === 'part' ? asmDefs : partDefs;
+    const otherDefs = info.type === 'part' ? asmDefs : partDefs;
     for (const def of otherDefs) {
       if (!(def.name in r)) {
         r[def.name] = '';
@@ -1921,12 +1943,40 @@ export async function exportDashboard(dirHandle?: FileSystemDirectoryHandle): Pr
 
   // Sheet 1: 看板概览
   const overviewRows: Record<string, unknown>[] = [];
-  // Sheet 2: 文件夹
+  // Sheet 2: 文件夹（使用 文件夹路径 替代 UUID）
   const folderRows: Record<string, unknown>[] = [];
-  // Sheet 3: 关联项目
+  // Sheet 3: 关联项目（使用 文件夹路径 + 实体编码+版本 替代 UUID）
   const itemRows: Record<string, unknown>[] = [];
-  // Sheet 4: 共享
+  // Sheet 4: 共享（使用 文件夹路径 + 共享给用户名 替代 UUID）
   const shareRows: Record<string, unknown>[] = [];
+
+  /** 从 folders 列表构建 folder_id → 路径 的映射 */
+  function buildFolderPaths(folders: any[]): Map<string, string> {
+    const idToName = new Map<string, string>();
+    const idToParent = new Map<string, string | null>();
+    for (const f of folders) {
+      idToName.set(f.id || '', f.name || '');
+      idToParent.set(f.id || '', f.parent_id || null);
+    }
+    const pathMap = new Map<string, string>();
+    function getPath(fid: string): string {
+      if (pathMap.has(fid)) return pathMap.get(fid)!;
+      const name = idToName.get(fid) || fid;
+      const parentId = idToParent.get(fid);
+      if (parentId && idToName.has(parentId)) {
+        const parentPath = getPath(parentId);
+        const p = parentPath ? `${parentPath}/${name}` : name;
+        pathMap.set(fid, p);
+        return p;
+      }
+      pathMap.set(fid, name);
+      return name;
+    }
+    for (const fid of idToName.keys()) {
+      getPath(fid);
+    }
+    return pathMap;
+  }
 
   for (const entry of dashboardData) {
     const username = entry.username || '';
@@ -1939,51 +1989,46 @@ export async function exportDashboard(dirHandle?: FileSystemDirectoryHandle): Pr
       '看板名称': dashboardName,
     });
 
-    // 构建 folder_id → folder_name 的映射（供 items/shares 使用）
-    const folderIdToName: Record<string, string> = {};
+    const folders = Array.isArray(entry.folders) ? entry.folders : [];
+    const folderPaths = buildFolderPaths(folders);
 
-    // 文件夹
-    if (Array.isArray(entry.folders)) {
-      for (const folder of entry.folders) {
-        const fid = folder.id || '';
-        const fname = folder.name || '';
-        folderIdToName[fid] = fname;
-        folderRows.push({
-          '用户名': username,
-          '文件夹ID': fid,
-          '父文件夹ID': folder.parent_id || '',
-          '文件夹名称': fname,
-          '排序': folder.sort_order ?? 0,
-        });
-      }
+    // 文件夹：使用路径替代 UUID
+    for (const folder of folders) {
+      const fid = folder.id || '';
+      const fname = folder.name || '';
+      const fpath = folderPaths.get(fid) || fname;
+      folderRows.push({
+        '用户名': username,
+        '文件夹路径': fpath,
+        '排序': folder.sort_order ?? 0,
+      });
     }
 
-    // 关联项目（同时保留 ID、编码和名称，确保导入时可还原）
+    // 关联项目：使用 文件夹路径 + 实体编码+版本 替代 UUID
     if (Array.isArray(entry.items)) {
       for (const item of entry.items) {
         const fid = item.folder_id || '';
-        const ecode = item.entity_code || '';
-        const ename = item.entity_name || '';
+        const fpath = folderPaths.get(fid) || fid;
+        const eversion = item.entity_version || '';
         itemRows.push({
           '用户名': username,
-          '文件夹ID': fid,
-          '文件夹名称': folderIdToName[fid] || fid,
-          '实体类型': item.entity_type || '',
-          '实体ID': item.entity_id || '',
-          '实体编码': ecode,
-          '实体名称': ename,
+          '文件夹路径': fpath,
+          '实体类型': ENTITY_TYPE_TO_ZH[item.entity_type] || item.entity_type || '',
+          '实体编码': item.entity_code || '',
+          '实体版本': eversion,
+          '实体名称': item.entity_name || '',
         });
       }
     }
 
-    // 共享（同时保留 ID 和名称）
+    // 共享：使用 文件夹路径 + 共享给用户名 替代 UUID
     if (Array.isArray(entry.shares)) {
       for (const share of entry.shares) {
         const fid = share.folder_id || '';
+        const fpath = folderPaths.get(fid) || fid;
         shareRows.push({
-          '文件夹ID': fid,
-          '文件夹名称': folderIdToName[fid] || fid,
-          '共享给用户ID': share.shared_with_user_id || '',
+          '文件夹路径': fpath,
+          '共享给用户名': share.shared_with_username || '',
           '权限': share.permission || '',
         });
       }
@@ -2000,21 +2045,21 @@ export async function exportDashboard(dirHandle?: FileSystemDirectoryHandle): Pr
   // Sheet: 文件夹
   if (folderRows.length > 0) {
     const ws2 = XLSX.utils.json_to_sheet(folderRows);
-    ws2['!cols'] = [{ wch: 16 }, { wch: 40 }, { wch: 40 }, { wch: 20 }, { wch: 8 }];
+    ws2['!cols'] = [{ wch: 16 }, { wch: 50 }, { wch: 8 }];
     XLSX.utils.book_append_sheet(wb, ws2, '文件夹');
   }
 
   // Sheet: 关联项目
   if (itemRows.length > 0) {
     const ws3 = XLSX.utils.json_to_sheet(itemRows);
-    ws3['!cols'] = [{ wch: 16 }, { wch: 40 }, { wch: 20 }, { wch: 12 }, { wch: 40 }, { wch: 20 }, { wch: 30 }];
+    ws3['!cols'] = [{ wch: 16 }, { wch: 50 }, { wch: 12 }, { wch: 20 }, { wch: 10 }, { wch: 30 }];
     XLSX.utils.book_append_sheet(wb, ws3, '关联项目');
   }
 
   // Sheet: 共享
   if (shareRows.length > 0) {
     const ws4 = XLSX.utils.json_to_sheet(shareRows);
-    ws4['!cols'] = [{ wch: 40 }, { wch: 20 }, { wch: 16 }, { wch: 12 }];
+    ws4['!cols'] = [{ wch: 50 }, { wch: 16 }, { wch: 12 }];
     XLSX.utils.book_append_sheet(wb, ws4, '共享');
   }
 
@@ -2028,6 +2073,109 @@ export async function exportDashboard(dirHandle?: FileSystemDirectoryHandle): Pr
   } else {
     await writeBlobToDirectory(handle, '用户看板.xlsx', blob);
   }
+}
+
+/**
+ * 直接导出用户看板为文件下载（不选文件夹）
+ */
+export async function exportDashboardFile(): Promise<void> {
+  const res = await api.get('/dashboard/export-all');
+  const dashboardData: any[] = Array.isArray(res.data) ? res.data : [];
+  if (dashboardData.length === 0) {
+    throw new Error('没有可导出的看板数据');
+  }
+
+  // 复用 exportDashboard 的 XLSX 构建逻辑
+  const overviewRows: Record<string, unknown>[] = [];
+  const folderRows: Record<string, unknown>[] = [];
+  const itemRows: Record<string, unknown>[] = [];
+  const shareRows: Record<string, unknown>[] = [];
+
+  function buildFolderPaths(folders: any[]): Map<string, string> {
+    const idToName = new Map<string, string>();
+    const idToParent = new Map<string, string | null>();
+    for (const f of folders) {
+      idToName.set(f.id || '', f.name || '');
+      idToParent.set(f.id || '', f.parent_id || null);
+    }
+    const pathMap = new Map<string, string>();
+    function getPath(fid: string): string {
+      if (pathMap.has(fid)) return pathMap.get(fid)!;
+      const name = idToName.get(fid) || fid;
+      const parentId = idToParent.get(fid);
+      if (parentId && idToName.has(parentId)) {
+        const pp = getPath(parentId);
+        pathMap.set(fid, pp ? `${pp}/${name}` : name);
+        return pathMap.get(fid)!;
+      }
+      pathMap.set(fid, name);
+      return name;
+    }
+    for (const fid of idToName.keys()) getPath(fid);
+    return pathMap;
+  }
+
+  for (const entry of dashboardData) {
+    const username = entry.username || '';
+    overviewRows.push({
+      '用户名': username,
+      '姓名': entry.real_name || '',
+      '看板名称': entry.dashboard?.name || '',
+    });
+    const folders = Array.isArray(entry.folders) ? entry.folders : [];
+    const folderPaths = buildFolderPaths(folders);
+    for (const f of folders) {
+      const fpath = folderPaths.get(f.id || '') || f.name || '';
+      folderRows.push({ '用户名': username, '文件夹路径': fpath, '排序': f.sort_order ?? 0 });
+    }
+    if (Array.isArray(entry.items)) {
+      for (const it of entry.items) {
+        const fpath = folderPaths.get(it.folder_id || '') || it.folder_id || '';
+        itemRows.push({
+          '用户名': username,
+          '文件夹路径': fpath,
+          '实体类型': ENTITY_TYPE_TO_ZH[it.entity_type] || it.entity_type || '',
+          '实体编码': it.entity_code || '',
+          '实体版本': it.entity_version || '',
+          '实体名称': it.entity_name || '',
+        });
+      }
+    }
+    if (Array.isArray(entry.shares)) {
+      for (const s of entry.shares) {
+        const fpath = folderPaths.get(s.folder_id || '') || s.folder_id || '';
+        shareRows.push({
+          '文件夹路径': fpath,
+          '共享给用户名': s.shared_with_username || '',
+          '权限': s.permission || '',
+        });
+      }
+    }
+  }
+
+  const wb = XLSX.utils.book_new();
+  const ws1 = XLSX.utils.json_to_sheet(overviewRows);
+  ws1['!cols'] = [{ wch: 16 }, { wch: 16 }, { wch: 20 }];
+  XLSX.utils.book_append_sheet(wb, ws1, '看板概览');
+  if (folderRows.length) {
+    const ws2 = XLSX.utils.json_to_sheet(folderRows);
+    ws2['!cols'] = [{ wch: 16 }, { wch: 50 }, { wch: 8 }];
+    XLSX.utils.book_append_sheet(wb, ws2, '文件夹');
+  }
+  if (itemRows.length) {
+    const ws3 = XLSX.utils.json_to_sheet(itemRows);
+    ws3['!cols'] = [{ wch: 16 }, { wch: 50 }, { wch: 12 }, { wch: 20 }, { wch: 10 }, { wch: 30 }];
+    XLSX.utils.book_append_sheet(wb, ws3, '关联项目');
+  }
+  if (shareRows.length) {
+    const ws4 = XLSX.utils.json_to_sheet(shareRows);
+    ws4['!cols'] = [{ wch: 50 }, { wch: 16 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(wb, ws4, '共享');
+  }
+
+  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  downloadBlob(blob, `用户看板_${todayStr()}.xlsx`);
 }
 
 // ================================================================
@@ -2087,66 +2235,104 @@ export async function previewDashboardImport(
     });
   }
 
+  // 解析文件夹（路径格式: "根/子1/子2"，按路径重建层级）
   for (const row of folderRows) {
     const username = String(row['用户名'] || '').trim();
     const entry = userMap.get(username);
-    if (entry) {
+    if (!entry) continue;
+    const folderPath = String(row['文件夹路径'] || '').trim();
+    if (!folderPath) continue;
+    const sortOrder = Number(row['排序']) || 0;
+    const parts = folderPath.split('/').map(p => p.trim()).filter(Boolean);
+    // 为路径上每一段生成或查找已有的 folder
+    let parentId: string | null = null;
+    for (let i = 0; i < parts.length; i++) {
+      const name = parts[i];
+      const existing = entry.folders.find(
+        (f: any) => f.name === name && f._parentId === parentId,
+      );
+      if (existing) {
+        parentId = existing._id;
+        continue;
+      }
+      const fid = crypto.randomUUID();
       entry.folders.push({
-        id: String(row['文件夹ID'] || ''),
-        parent_id: row['父文件夹ID'] ? String(row['父文件夹ID']) : null,
-        name: String(row['文件夹名称'] || ''),
-        sort_order: Number(row['排序']) || 0,
+        _id: fid,
+        _parentId: parentId,
+        name,
+        parent_id: parentId,
+        sort_order: i === parts.length - 1 ? sortOrder : 0,
       });
+      parentId = fid;
     }
   }
 
+  // 解析关联项目（使用 文件夹路径 + 实体编码+版本 定位）
   for (const row of itemRows) {
     const username = String(row['用户名'] || '').trim();
     const entry = userMap.get(username);
-    if (entry) {
-      // 优先使用文件夹ID，兼容旧格式只有文件夹名称的情况
-      const folderId = String(row['文件夹ID'] || '');
-      entry.items.push({
-        folder_id: folderId || String(row['文件夹名称'] || ''),
-        entity_type: String(row['实体类型'] || ''),
-        entity_id: String(row['实体ID'] || ''),
-        entity_code: String(row['实体编码'] || ''),
-      });
+    if (!entry) continue;
+    const folderPath = String(row['文件夹路径'] || '').trim();
+    const entityTypeRaw = String(row['实体类型'] || '').trim();
+    const entityType = ENTITY_TYPE_FROM_ZH[entityTypeRaw] || entityTypeRaw;
+    const entityCode = String(row['实体编码'] || '').trim();
+    const entityVersion = String(row['实体版本'] || '').trim();
+    if (!entityCode) continue;
+    // 查找文件夹：路径完全匹配
+    let folderId = '';
+    if (folderPath) {
+      const parts = folderPath.split('/').map(p => p.trim()).filter(Boolean);
+      let parentId: string | null = null;
+      for (const name of parts) {
+        const f = entry.folders.find(
+          (ff: any) => ff.name === name && ff._parentId === parentId,
+        );
+        if (f) {
+          folderId = f._id;
+          parentId = f._id;
+        } else {
+          folderId = '';
+          break;
+        }
+      }
     }
+    entry.items.push({
+      folder_id: folderId,
+      entity_type: entityType,
+      entity_code: entityCode,
+      entity_version: entityVersion,
+    });
   }
 
+  // 解析共享（使用 文件夹路径 + 共享给用户名 定位）
   for (const row of shareRows) {
-    // 共享数据优先使用文件夹ID，兼容旧格式
-    const folderId = String(row['文件夹ID'] || '');
-    const folderName = String(row['文件夹名称'] || '').trim();
-    let assigned = false;
+    const folderPath = String(row['文件夹路径'] || '').trim();
+    const sharedUsername = String(row['共享给用户名'] || '').trim();
+    const permission = String(row['权限'] || 'view').trim();
+    if (!folderPath || !sharedUsername) continue;
+    // 查找文件夹：路径完全匹配
+    let folderId = '';
     for (const [, entry] of userMap) {
-      let found: any = null;
+      const parts = folderPath.split('/').map(p => p.trim()).filter(Boolean);
+      let parentId: string | null = null;
+      for (const name of parts) {
+        const f = entry.folders.find(
+          (ff: any) => ff.name === name && ff._parentId === parentId,
+        );
+        if (f) {
+          folderId = f._id;
+          parentId = f._id;
+        } else {
+          folderId = '';
+          break;
+        }
+      }
       if (folderId) {
-        found = entry.folders.find((f: any) => f.id === folderId);
-      }
-      if (!found && folderName) {
-        found = entry.folders.find((f: any) => f.name === folderName);
-      }
-      if (found) {
         entry.shares.push({
-          folder_id: folderId || folderName,
-          folder_name: folderName,
-          shared_with_user_id: String(row['共享给用户ID'] || ''),
-          permission: String(row['权限'] || ''),
-        });
-        assigned = true;
-        break;
-      }
-    }
-    // 如果找不到所属用户，也记录（可能属于被跳过的用户）
-    if (!assigned && folderName) {
-      for (const [, entry] of userMap) {
-        entry.shares.push({
-          folder_id: folderId || folderName,
-          folder_name: folderName,
-          shared_with_user_id: String(row['共享给用户ID'] || ''),
-          permission: String(row['权限'] || ''),
+          folder_id: folderId,
+          shared_with_username: sharedUsername,
+          shared_with_user_id: '', // 稍后按 username 查找
+          permission,
         });
         break;
       }
@@ -2162,34 +2348,50 @@ export async function previewDashboardImport(
     usernameToUserId[u.username] = u.id;
   }
 
-  // 构建后端所需格式的数据
+  // 构建后端所需格式的数据（将可读标识转换为 UUID）
   const dashboardData: any[] = [];
+
+  // 获取所有实体用于按 code+version 解析 entity_id
+  // 优先从 store，兜底从 API
+  const partMap = new Map<string, string>();
+  const asmMap = new Map<string, string>();
+  const docMap = new Map<string, string>();
+  for (const p of useDataStore.getState().parts) partMap.set(`${p.code}|${p.version || ''}`, p.id);
+  for (const a of useDataStore.getState().assemblies) asmMap.set(`${a.code}|${a.version || ''}`, a.id);
+  for (const d of useDataStore.getState().documents) docMap.set(`${d.code}|${d.version || ''}`, d.id);
+
+  function resolveEntityId(entityType: string, code: string, version: string): string {
+    const key = `${code}|${version}`;
+    const map = entityType === 'part' ? partMap : entityType === 'assembly' ? asmMap : docMap;
+    return map.get(key) || '';
+  }
+
   for (const [username, userEntry] of userMap) {
     const userId = usernameToUserId[username];
     if (!userId) continue; // 跳过不存在的用户
 
-    // 文件夹：保留 XLSX 中的 ID，否则生成新 UUID
+    // 文件夹：使用解析时生成的 _id 和 _parentId
     const folders = (userEntry.folders || []).map((f: any) => ({
-      id: f.id || crypto.randomUUID(),
-      parent_id: f.parent_id || null,
+      id: f._id || crypto.randomUUID(),
+      parent_id: f._parentId || null,
       name: f.name || '',
       sort_order: f.sort_order ?? 0,
     }));
 
-    // 关联项目：使用 folder_id，传递 entity_code 供后端按编码查找
+    // 关联项目：按 entity_code + entity_version 查找 entity_id
     const items = (userEntry.items || []).map((it: any) => ({
       id: crypto.randomUUID(),
       folder_id: it.folder_id || '',
       entity_type: it.entity_type || 'part',
-      entity_id: it.entity_id || '',
+      entity_id: resolveEntityId(it.entity_type || 'part', it.entity_code || '', it.entity_version || ''),
       entity_code: it.entity_code || '',
     }));
 
-    // 共享：使用 folder_id
+    // 共享：按 shared_with_username 解析 shared_with_user_id
     const shares = (userEntry.shares || []).map((sh: any) => ({
       id: crypto.randomUUID(),
       folder_id: sh.folder_id || '',
-      shared_with_user_id: sh.shared_with_user_id || '',
+      shared_with_user_id: usernameToUserId[sh.shared_with_username] || '',
       permission: sh.permission || 'view',
     }));
 
@@ -2227,6 +2429,185 @@ export async function previewDashboardImport(
 }
 
 /**
+ * 从单个文件导入用户看板（不选文件夹）
+ */
+export async function previewDashboardImportFromFile(file: File): Promise<ImportPreview> {
+  const arrayBuffer = await file.arrayBuffer();
+  const wb = XLSX.read(arrayBuffer, { type: 'array' });
+
+  // 读取各 Sheet
+  const overviewRows = wb.Sheets['看板概览']
+    ? XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets['看板概览'])
+    : [];
+  const folderRows = wb.Sheets['文件夹']
+    ? XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets['文件夹'])
+    : [];
+  const itemRows = wb.Sheets['关联项目']
+    ? XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets['关联项目'])
+    : [];
+  const shareRows = wb.Sheets['共享']
+    ? XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets['共享'])
+    : [];
+
+  if (overviewRows.length === 0) throw new Error('文件中无看板数据');
+
+  // 以下与 previewDashboardImport 的解析逻辑完全一致
+  // 获取所有用户
+  const usersRes = await usersApi.list({ page_size: 10000 });
+  const usersAll = (usersRes.data as { items?: unknown[] } | unknown[]) || [];
+  const usersList: any[] = Array.isArray(usersAll) ? usersAll : (usersAll as { items?: unknown[] }).items || [];
+  const usernameToUserId: Record<string, string> = {};
+  for (const u of usersList) {
+    usernameToUserId[u.username] = u.id;
+  }
+
+  // 按用户名分组
+  const userMap = new Map<string, {
+    username: string;
+    real_name: string;
+    dashboard_name: string;
+    folders: any[];
+    items: any[];
+    shares: any[];
+  }>();
+
+  for (const row of overviewRows) {
+    const username = String(row['用户名'] || '').trim();
+    if (!username) continue;
+    userMap.set(username, {
+      username,
+      real_name: String(row['姓名'] || '').trim(),
+      dashboard_name: String(row['看板名称'] || '').trim(),
+      folders: [],
+      items: [],
+      shares: [],
+    });
+  }
+
+  // 解析文件夹
+  for (const row of folderRows) {
+    const username = String(row['用户名'] || '').trim();
+    const entry = userMap.get(username);
+    if (!entry) continue;
+    const folderPath = String(row['文件夹路径'] || '').trim();
+    if (!folderPath) continue;
+    const sortOrder = Number(row['排序']) || 0;
+    const parts = folderPath.split('/').map(p => p.trim()).filter(Boolean);
+    let parentId: string | null = null;
+    for (let i = 0; i < parts.length; i++) {
+      const name = parts[i];
+      const existing = entry.folders.find(
+        (f: any) => f.name === name && f._parentId === parentId,
+      );
+      if (existing) {
+        parentId = existing._id;
+        continue;
+      }
+      const fid = crypto.randomUUID();
+      entry.folders.push({
+        _id: fid,
+        _parentId: parentId,
+        name,
+        parent_id: parentId,
+        sort_order: i === parts.length - 1 ? sortOrder : 0,
+      });
+      parentId = fid;
+    }
+  }
+
+  // 解析关联项目
+  for (const row of itemRows) {
+    const username = String(row['用户名'] || '').trim();
+    const entry = userMap.get(username);
+    if (!entry) continue;
+    const folderPath = String(row['文件夹路径'] || '').trim();
+    const entityTypeRaw = String(row['实体类型'] || '').trim();
+    const entityType = ENTITY_TYPE_FROM_ZH[entityTypeRaw] || entityTypeRaw;
+    const entityCode = String(row['实体编码'] || '').trim();
+    const entityVersion = String(row['实体版本'] || '').trim();
+    if (!entityCode) continue;
+    let folderId = '';
+    if (folderPath) {
+      const parts = folderPath.split('/').map(p => p.trim()).filter(Boolean);
+      let parentId: string | null = null;
+      for (const name of parts) {
+        const f = entry.folders.find((ff: any) => ff.name === name && ff._parentId === parentId);
+        if (f) { folderId = f._id; parentId = f._id; }
+        else { folderId = ''; break; }
+      }
+    }
+    entry.items.push({ folder_id: folderId, entity_type: entityType, entity_code: entityCode, entity_version: entityVersion });
+  }
+
+  // 解析共享
+  for (const row of shareRows) {
+    const folderPath = String(row['文件夹路径'] || '').trim();
+    const sharedUsername = String(row['共享给用户名'] || '').trim();
+    const permission = String(row['权限'] || 'view').trim();
+    if (!folderPath || !sharedUsername) continue;
+    let folderId = '';
+    for (const [, entry] of userMap) {
+      const parts = folderPath.split('/').map(p => p.trim()).filter(Boolean);
+      let parentId: string | null = null;
+      for (const name of parts) {
+        const f = entry.folders.find((ff: any) => ff.name === name && ff._parentId === parentId);
+        if (f) { folderId = f._id; parentId = f._id; }
+        else { folderId = ''; break; }
+      }
+      if (folderId) {
+        entry.shares.push({ folder_id: folderId, shared_with_username: sharedUsername, shared_with_user_id: '', permission });
+        break;
+      }
+    }
+  }
+
+  // 构建后端数据
+  const dashboardData: any[] = [];
+  const partMap = new Map<string, string>();
+  const asmMap = new Map<string, string>();
+  const docMap = new Map<string, string>();
+  for (const p of useDataStore.getState().parts) partMap.set(`${p.code}|${p.version || ''}`, p.id);
+  for (const a of useDataStore.getState().assemblies) asmMap.set(`${a.code}|${a.version || ''}`, a.id);
+  for (const d of useDataStore.getState().documents) docMap.set(`${d.code}|${d.version || ''}`, d.id);
+
+  for (const [username, userEntry] of userMap) {
+    const userId = usernameToUserId[username];
+    if (!userId) continue;
+    const folders = (userEntry.folders || []).map((f: any) => ({
+      id: f._id || crypto.randomUUID(), parent_id: f._parentId || null,
+      name: f.name || '', sort_order: f.sort_order ?? 0,
+    }));
+    const items = (userEntry.items || []).map((it: any) => {
+      const key = `${it.entity_code || ''}|${it.entity_version || ''}`;
+      const map = it.entity_type === 'part' ? partMap : it.entity_type === 'assembly' ? asmMap : docMap;
+      return {
+        id: crypto.randomUUID(), folder_id: it.folder_id || '',
+        entity_type: it.entity_type || 'part', entity_id: map.get(key) || '', entity_code: it.entity_code || '',
+      };
+    });
+    const shares = (userEntry.shares || []).map((sh: any) => ({
+      id: crypto.randomUUID(), folder_id: sh.folder_id || '',
+      shared_with_user_id: usernameToUserId[sh.shared_with_username] || '',
+      permission: sh.permission || 'view',
+    }));
+    dashboardData.push({
+      user_id: userId, username, real_name: userEntry.real_name,
+      dashboard: { name: userEntry.dashboard_name || '我的看板' }, folders, items, shares,
+    });
+  }
+
+  const rows: ImportRow[] = overviewRows.map((row) => ({
+    status: '新增' as const,
+    code: String(row['用户名'] || '').trim(),
+    name: String(row['姓名'] || ''),
+    version: '',
+    remark: `看板: ${row['看板名称'] || ''}`,
+  }));
+
+  return { type: 'dashboard', rows, docRelationCount: overviewRows.length, _dashboardData: dashboardData };
+}
+
+/**
  * 执行用户看板导入
  */
 export async function executeDashboardImport(preview: ImportPreview): Promise<void> {
@@ -2235,8 +2616,13 @@ export async function executeDashboardImport(preview: ImportPreview): Promise<vo
     throw new Error('无看板数据可导入');
   }
 
+  const totalItems = dashboardData.reduce((s, e: any) => s + ((e as any).items?.length || 0), 0);
+  console.log('[dashboardImport] sending to backend:', dashboardData.length, 'entries,', totalItems, 'items');
+
   try {
-    await api.post('/dashboard/import-all', dashboardData);
+    const res = await api.post('/dashboard/import-all', dashboardData);
+    console.log('[dashboardImport] backend response:', res.data);
+    return res.data;
   } catch (err: any) {
     console.error('导入用户看板失败', err);
     throw err;

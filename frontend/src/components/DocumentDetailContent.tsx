@@ -3,12 +3,12 @@ import type { Document, CustomFieldDefinition, DocumentAttachment } from '../typ
 import { documentsApi } from '../services/api';
 import { useAuthStore } from '../stores/auth';
 import { formatDateTime } from '../utils/date';
-import ArchiveTreeModal from './ArchiveTreeModal';
 
 interface DocumentDetailContentProps {
   doc: Document;
   customFieldDefs: CustomFieldDefinition[];
   customFieldValues: Record<string, any>;
+  onArchivePreview?: (attId: string, fileName: string) => void;
 }
 
 /** 文件大小格式化 */
@@ -28,10 +28,9 @@ const statusTag = (s: string) => {
   return tags[s] || { label: s, class: 'bg-gray-100 text-gray-800' };
 };
 
-export default function DocumentDetailContent({ doc, customFieldDefs, customFieldValues }: DocumentDetailContentProps) {
+export default function DocumentDetailContent({ doc, customFieldDefs, customFieldValues, onArchivePreview }: DocumentDetailContentProps) {
   const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
-  const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
 
   // 加载附件列表
   const loadAttachments = async () => {
@@ -79,7 +78,7 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
     }
     // 压缩包 — 树形预览
     if (['zip', 'tar', 'gz', 'tgz', 'rar', '7z'].includes(ext)) {
-      setArchivePreview({ attId, fileName });
+      onArchivePreview?.(attId, fileName);
       return;
     }
     // STP — 三维预览（新窗口）
@@ -197,16 +196,6 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
           </div>
         )}
       </div>
-
-      {archivePreview && (
-        <ArchiveTreeModal
-          open={!!archivePreview}
-          onClose={() => setArchivePreview(null)}
-          attachmentId={archivePreview.attId}
-          fileName={archivePreview.fileName}
-          token={useAuthStore.getState().token || ''}
-        />
-      )}
     </div>
   );
 }
