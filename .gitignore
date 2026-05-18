@@ -29,3 +29,6 @@ migrations/
 
 # Sisyphus work plans
 .sisyphus/
+
+# Project docs
+项目说明/*.md
