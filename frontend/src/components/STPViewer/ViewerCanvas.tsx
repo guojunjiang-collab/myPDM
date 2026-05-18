@@ -1,11 +1,26 @@
 import { Suspense } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Environment } from '@react-three/drei';
+import { Canvas, useThree } from '@react-three/fiber';
+import { ArcballControls, Environment } from '@react-three/drei';
 import { ModelLoader } from './ModelLoader';
 import { GLTFErrorBoundary } from './GLTFErrorBoundary';
 import { SectionPlanes } from './SectionPlanes';
 import { MeasureTool } from './MeasureTool';
 import { ExplodeView } from './ExplodeView';
+import { useEffect, useRef } from 'react';
+
+function ControlsWrapper() {
+  const controlsRef = useRef<any>(null);
+  const { gl } = useThree();
+  
+  useEffect(() => {
+    if (controlsRef.current) {
+      // Increase rotation speed by 30%
+      (controlsRef.current as any).rotateSpeed = 1.3;
+    }
+  }, []);
+  
+  return <ArcballControls ref={controlsRef} makeDefault />;
+}
 
 interface ViewerCanvasProps {
   url: string;
@@ -28,8 +43,7 @@ export function ViewerCanvas({ url }: ViewerCanvasProps) {
       <SectionPlanes />
       <MeasureTool />
       <ExplodeView />
-      <OrbitControls makeDefault enableDamping={false} zoomSpeed={1}
-        minPolarAngle={0.01} maxPolarAngle={Math.PI - 0.01} />
+      <ControlsWrapper />
       <Environment preset="warehouse" />
     </Canvas>
   );
