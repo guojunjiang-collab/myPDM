@@ -88,7 +88,7 @@ async def upload_file(
     try:
         # 保存文件到文件系统（图文档使用 编号_版本 作为文件夹名）
         folder_name = None
-        if entity_type == "document":
+        if entity_type in ("document", "documents"):
             doc = db.query(Document).filter(Document.id == uuid.UUID(entity_id)).first()
             if doc:
                 folder_name = f"{doc.code}_{doc.version}"
@@ -104,9 +104,8 @@ async def upload_file(
         att_id = str(uuid.uuid4())
         new_att = DocumentAttachment(
             id=att_id,
-            document_id=uuid.UUID(entity_id) if entity_type == "document" else None,
+            document_id=uuid.UUID(entity_id) if entity_type in ("document", "documents") else None,
             file_name=result["filename"],
-            file_data=None,  # 不再存储在数据库
             file_size=result["file_size"],
             file_path=result["file_path"],  # 保存文件路径
             file_hash=result.get("file_hash", ""),  # 保存文件哈希
@@ -116,7 +115,7 @@ async def upload_file(
         db.flush()  # 先刷新到数据库，确保记录被创建
         
         # 如果是图文档，更新 documents 表的 file_name 和 file_id
-        if entity_type == "document":
+        if entity_type in ("document", "documents"):
             doc = db.query(Document).filter(Document.id == uuid.UUID(entity_id)).first()
             if doc:
                 doc.file_name = result["filename"]
@@ -148,6 +147,7 @@ async def init_chunked_upload(
     file_size: int = Form(...),
     entity_type: str = Form("document"),
     entity_id: str = Form(...),
+    db: Session = Depends(get_db),
     current_user: User = Depends(require_role(["admin", "engineer"]))
 ):
     """
@@ -168,7 +168,7 @@ async def init_chunked_upload(
     try:
         # 图文档使用 编号_版本 作为文件夹名
         folder_name = None
-        if entity_type == "document":
+        if entity_type in ("document", "documents"):
             doc = db.query(Document).filter(Document.id == uuid.UUID(entity_id)).first()
             if doc:
                 folder_name = f"{doc.code}_{doc.version}"
@@ -255,9 +255,8 @@ async def complete_chunked_upload(
         att_id = str(uuid.uuid4())
         new_att = DocumentAttachment(
             id=att_id,
-            document_id=uuid.UUID(file_info["entity_id"]) if file_info["entity_type"] == "document" else None,
+            document_id=uuid.UUID(file_info["entity_id"]) if file_info["entity_type"] in ("document", "documents") else None,
             file_name=file_info["filename"],
-            file_data=None,  # 不再存储在数据库
             file_size=file_info["file_size"],
             file_path=file_info["file_path"],  # 保存文件路径
             file_hash=file_info.get("file_hash", ""),  # 保存文件哈希
@@ -268,7 +267,7 @@ async def complete_chunked_upload(
         
         # 如果是图文档，更新 documents 表的 file_name 和 file_id
         print(f"[DEBUG] entity_type: {file_info['entity_type']}, entity_id: {file_info['entity_id']}")
-        if file_info["entity_type"] == "document":
+        if file_info["entity_type"] in ("document", "documents"):
             doc = db.query(Document).filter(Document.id == uuid.UUID(file_info["entity_id"])).first()
             print(f"[DEBUG] doc query result: {doc}")
             if doc:

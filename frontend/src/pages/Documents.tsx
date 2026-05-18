@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { documentsApi, customFieldsApi, bomApi } from '../services/api';
+import { documentsApi, customFieldsApi, bomApi, v2UploadApi, CHUNK_SIZE, CHUNK_THRESHOLD } from '../services/api';
 import type { Document, CustomFieldDefinition, CustomFieldValue, DocumentAttachment } from '../types';
 import { canEdit, isAdmin, canDownload, useAuthStore } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
@@ -100,6 +100,7 @@ export default function Documents() {
   const [loadingAttachments, setLoadingAttachments] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadingFileName, setUploadingFileName] = useState<string>('');
+  const [uploadProgress, setUploadProgress] = useState<number>(0); // 上传进度百分比
   const [deletingAttId, setDeletingAttId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -265,31 +266,85 @@ export default function Documents() {
     const file = e.target.files?.[0];
     if (!file || !editingDoc) return;
 
+    // 文件大小限制检查 (1GB)
+    const MAX_ALLOWED = 1073741824;
+    if (file.size > MAX_ALLOWED) {
+      alert(`文件大小 ${formatFileSize(file.size)} 超过系统限制 1GB`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
     setUploading(true);
     setUploadingFileName(file.name);
-    
-    // 不阻塞 UI，后台上传
-    (async () => {
-      try {
-        const fileData = await fileToBase64(file);
-        const attachmentId = generateUUID();
+    setUploadProgress(0);
 
-        await documentsApi.uploadAttachment(editingDoc.id, {
-          id: attachmentId,
-          file_name: file.name,
-          file_data: fileData,
+    try {
+      // 根据文件大小选择上传方式
+      if (file.size > CHUNK_THRESHOLD) {
+        // 大文件：分块上传
+        await uploadLargeFile(file, editingDoc.id, (progress) => {
+          setUploadProgress(progress);
         });
-
-        await loadAttachments(editingDoc.id);
-      } catch (error) {
-        console.error('上传失败', error);
-        alert('上传失败，请重试');
-      } finally {
-        setUploading(false);
-        setUploadingFileName('');
-        if (fileInputRef.current) fileInputRef.current.value = '';
+      } else {
+        // 小文件：直接 multipart 上传
+        await v2UploadApi.uploadSmallFile(file, 'documents', editingDoc.id, (progress) => {
+          setUploadProgress(progress);
+        });
       }
-    })();
+
+      // 上传成功后刷新附件列表
+      await loadAttachments(editingDoc.id);
+    } catch (error) {
+      console.error('上传失败', error);
+      alert('上传失败，请重试');
+    } finally {
+      setUploading(false);
+      setUploadingFileName('');
+      setUploadProgress(0);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  /**
+   * 分块上传大文件
+   */
+  const uploadLargeFile = async (
+    file: File,
+    docId: string,
+    onProgress: (percent: number) => void
+  ): Promise<void> => {
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+    // 1. 初始化分块上传
+    const initResult = await v2UploadApi.initChunkedUpload(
+      file.name,
+      file.size,
+      'documents',
+      docId
+    );
+
+    const uploadId = initResult.upload_id;
+    let uploadedChunks = 0;
+
+    // 2. 逐个上传分块
+    for (let i = 0; i < totalChunks; i++) {
+      const start = i * CHUNK_SIZE;
+      const end = Math.min(start + CHUNK_SIZE, file.size);
+      const chunk = file.slice(start, end);
+
+      await v2UploadApi.uploadChunk(uploadId, i, chunk);
+      uploadedChunks++;
+
+      // 更新进度 (包含初始化和完成两个阶段，各占 5%)
+      const uploadProgress = Math.round(
+        5 + (uploadedChunks / totalChunks) * 90
+      );
+      onProgress(uploadProgress);
+    }
+
+    // 3. 完成分块上传
+    await v2UploadApi.completeChunkedUpload(uploadId);
+    onProgress(100);
   };
 
   // 删除附件
@@ -783,8 +838,21 @@ export default function Documents() {
 
               {/* 上传状态提示 - 不阻塞保存操作 */}
               {uploading && (
-                <div className="mb-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
-                  正在上传附件 "{uploadingFileName}"，您可以先保存...
+                <div className="mb-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-blue-700">
+                      正在上传 "{uploadingFileName}"
+                    </span>
+                    <span className="text-blue-600 font-medium">
+                      {uploadProgress}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-blue-200 rounded-full h-2">
+                    <div
+                      className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
                 </div>
               )}
 

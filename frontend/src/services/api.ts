@@ -212,6 +212,133 @@ export const attachmentApi = {
     api.get<import('../types').ArchiveTreeResponse>(`/v2/attachments/${id}/archive-tree`, { params: { token } }),
 };
 
+// ============================================================
+// V2 分块上传 API (支持大文件上传)
+// ============================================================
+
+// 创建专用于大文件上传的 axios 实例 (10 分钟超时)
+const uploadAxios = axios.create({
+  baseURL: '/api',
+  timeout: 600000, // 10 分钟
+  headers: {
+    'Content-Type': 'multipart/form-data',
+  },
+});
+
+// 上传请求拦截器
+uploadAxios.interceptors.request.use((config) => {
+  const token = useAuthStore.getState().token;
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// V2 大文件上传 API
+export const v2UploadApi = {
+  /**
+   * 小文件直接上传 (multipart)
+   * 适用于文件 < CHUNK_SIZE * 2 (默认 10MB)
+   */
+  uploadSmallFile: (
+    file: File,
+    entityType: string = 'documents',
+    entityId: string,
+    onProgress?: (percent: number) => void
+  ): Promise<{ id: string; file_name: string; file_size: number; file_path: string }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('entity_type', entityType);
+    formData.append('entity_id', entityId);
+
+    return uploadAxios.post('/v2/attachments/upload', formData, {
+      onUploadProgress: (progressEvent) => {
+        if (onProgress && progressEvent.total) {
+          const percent = Math.round((progressEvent.loaded / progressEvent.total) * 100);
+          onProgress(percent);
+        }
+      },
+    }).then(res => res.data);
+  },
+
+  /**
+   * 初始化分块上传
+   * 返回 upload_id 和分块信息
+   */
+  initChunkedUpload: (
+    filename: string,
+    fileSize: number,
+    entityType: string = 'documents',
+    entityId: string
+  ): Promise<{
+    upload_id: string;
+    total_chunks: number;
+    chunk_size: number;
+  }> => {
+    const formData = new FormData();
+    formData.append('filename', filename);
+    formData.append('file_size', String(fileSize));
+    formData.append('entity_type', entityType);
+    formData.append('entity_id', entityId);
+
+    return uploadAxios.post('/v2/attachments/chunk/init', formData)
+      .then(res => res.data);
+  },
+
+  /**
+   * 上传单个分块
+   */
+  uploadChunk: (
+    uploadId: string,
+    chunkIndex: number,
+    chunk: Blob,
+    onProgress?: (percent: number) => void
+  ): Promise<{
+    upload_id: string;
+    chunk_index: number;
+    uploaded_chunks: number[];
+    total_chunks: number;
+    progress: number;
+    is_complete: boolean;
+  }> => {
+    const formData = new FormData();
+    formData.append('upload_id', uploadId);
+    formData.append('chunk_index', String(chunkIndex));
+    formData.append('chunk', chunk);
+
+    return uploadAxios.post('/v2/attachments/chunk/upload', formData, {
+      onUploadProgress: (progressEvent) => {
+        if (onProgress && progressEvent.total) {
+          const percent = Math.round((progressEvent.loaded / progressEvent.total) * 100);
+          onProgress(percent);
+        }
+      },
+    }).then(res => res.data);
+  },
+
+  /**
+   * 完成分块上传，合并文件
+   */
+  completeChunkedUpload: (
+    uploadId: string
+  ): Promise<{
+    id: string;
+    file_name: string;
+    file_size: number;
+    file_path: string;
+  }> => {
+    const formData = new FormData();
+    formData.append('upload_id', uploadId);
+
+    return uploadAxios.post('/v2/attachments/chunk/complete', formData)
+      .then(res => res.data);
+  },
+};
+
+// 分块大小阈值 (10MB) - 与后端 CHUNK_SIZE * 2 保持一致
+export const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
+export const CHUNK_THRESHOLD = CHUNK_SIZE * 2; // 10MB
+
 // 部件子项 API
 export const assemblyPartsApi = {
   list: (assemblyId: string) => api.get(`/assemblies/${assemblyId}/parts`),
