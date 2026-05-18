@@ -352,7 +352,7 @@ async def convert_pending_stp(
     ).all()
     pending = []
     for att in stp_atts:
-        if get_gltf_path_for_attachment(str(att.id)) is None:
+        if get_gltf_path_for_attachment(str(att.id), att.file_path) is None:
             pending.append(att)
     if not pending:
         return {"status": "done", "message": "所有 STP 文件已转换", "converted": 0, "total": 0}
@@ -363,7 +363,7 @@ async def convert_pending_stp(
             try:
                 stp_path = file_storage.base_dir / att.file_path
                 if not stp_path.exists(): failed += 1; continue
-                await loop.run_in_executor(None, convert_stp_to_gltf, str(stp_path), str(att.id))
+                await loop.run_in_executor(None, convert_stp_to_gltf, str(stp_path), str(att.id), att.file_path)
                 converted += 1
             except Exception: failed += 1
     asyncio.create_task(batch_convert())
@@ -380,7 +380,7 @@ async def convert_status(
         (DocumentAttachment.file_name.ilike('%.stp')) |
         (DocumentAttachment.file_name.ilike('%.step'))
     ).all()
-    pending = sum(1 for att in stp_atts if get_gltf_path_for_attachment(str(att.id)) is None)
+    pending = sum(1 for att in stp_atts if get_gltf_path_for_attachment(str(att.id), att.file_path) is None)
     return {"pending": pending, "total": len(stp_atts)}
 
 
@@ -632,15 +632,15 @@ async def get_gltf(
     if not att.file_path:
         raise HTTPException(status_code=404, detail="附件文件路径为空")
 
-    # 从缓存目录获取 glb
-    glb_path = get_gltf_path_for_attachment(str(attachment_id))
+    # 获取 glb 文件路径
+    glb_path = get_gltf_path_for_attachment(str(attachment_id), att.file_path)
 
     if not glb_path:
         # 缓存未命中 → 后台异步转换 + 返回 202
         import asyncio
         stp_full_path = file_storage.base_dir / att.file_path
         loop = asyncio.get_event_loop()
-        loop.run_in_executor(None, convert_stp_to_gltf, str(stp_full_path), str(attachment_id))
+        loop.run_in_executor(None, convert_stp_to_gltf, str(stp_full_path), str(attachment_id), att.file_path)
         return JSONResponse(
             status_code=202,
             content={
@@ -674,7 +674,7 @@ async def delete_attachment(
     
     # 删除对应的 glb 缓存
     if is_stp_file(att.file_name):
-        delete_glb_cache(str(attachment_id))
+        delete_glb_cache(str(attachment_id), att.file_path)
     
     # 从数据库删除
     db.delete(att)

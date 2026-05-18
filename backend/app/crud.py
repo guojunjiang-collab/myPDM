@@ -402,7 +402,7 @@ def reset_business_data(db):
             pass
 
     # 清理 glb 缓存文件（STP 转换生成的 glTF 缓存）
-    gltf_cache_dir = os.path.join(UPLOAD_DIR, "gltf_cache")
+    gltf_cache_dir = os.path.join(UPLOAD_DIR, "glb_cache")
     if os.path.exists(gltf_cache_dir):
         try:
             shutil.rmtree(gltf_cache_dir)
