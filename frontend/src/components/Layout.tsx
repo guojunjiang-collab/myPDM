@@ -13,7 +13,7 @@ const navItems = [
   { path: '/components', label: '部件管理', icon: '📦', roles: ['admin', 'engineer', 'production', 'guest'] },
   { path: '/documents', label: '图文档管理', icon: '📄', roles: ['admin', 'engineer', 'production', 'guest'] },
   { path: '/inventory', label: '库存管理', icon: '🏗️', roles: ['admin', 'engineer', 'production', 'guest'] },
-  { path: '/ecn', label: '变更管理', icon: '🔄', roles: ['admin', 'engineer', 'production', 'guest'] },
+  { path: '/ec', label: '变更管理', icon: '🔄', roles: ['admin', 'engineer', 'production', 'guest'] },
   { path: '/business', label: '业务管理', icon: '💼', roles: ['admin', 'engineer', 'production', 'guest'] },
   { path: '/users', label: '用户管理', icon: '👥', roles: ['admin', 'engineer', 'production', 'guest'] },
   { path: '/settings', label: '系统设置', icon: '⚙️', roles: ['admin', 'engineer', 'production', 'guest'] },

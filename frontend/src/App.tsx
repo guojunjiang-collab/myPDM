@@ -12,7 +12,7 @@ import BOM from './pages/BOM';
 import Users from './pages/Users';
 import Logs from './pages/Logs';
 import Settings from './pages/Settings';
-import ECN from './pages/ECN';
+import EC from './pages/EC';
 import Inventory from './pages/Inventory';
 import Business from './pages/Business';
 const STPViewer = lazy(() => import('./pages/STPViewer'));
@@ -56,7 +56,7 @@ export default function App() {
           <Route path="documents" element={<Documents />} />
           <Route path="bom" element={<BOM />} />
           <Route path="inventory" element={<Inventory />} />
-          <Route path="ecn" element={<ECN />} />
+          <Route path="ec" element={<EC />} />
           <Route path="business" element={<Business />} />
           <Route path="users" element={<Users />} />
           <Route path="logs" element={<Logs />} />
