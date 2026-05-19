@@ -205,3 +205,70 @@ CREATE TABLE dashboard_folder_shares (
 CREATE INDEX idx_dashboard_shares_folder_id ON dashboard_folder_shares(folder_id);
 CREATE INDEX idx_dashboard_shares_user_id ON dashboard_folder_shares(shared_with_user_id);
 CREATE UNIQUE INDEX uix_folder_share_user ON dashboard_folder_shares(folder_id, shared_with_user_id);
+
+-- ===== 变更管理 - ECR =====
+
+CREATE TABLE ecrs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ecr_number VARCHAR(32) UNIQUE NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    reason VARCHAR(64) NOT NULL,
+    priority VARCHAR(16) NOT NULL DEFAULT 'normal',
+    category VARCHAR(32),
+    status VARCHAR(16) NOT NULL DEFAULT 'draft',
+    reviewers JSONB NOT NULL DEFAULT '[]',
+    review_mode VARCHAR(8) NOT NULL DEFAULT 'all',
+    creator_id UUID NOT NULL REFERENCES users(id),
+    document_links JSONB NOT NULL DEFAULT '[]',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    reviewed_at TIMESTAMP WITH TIME ZONE,
+    closed_at TIMESTAMP WITH TIME ZONE,
+    eco_id UUID
+);
+
+CREATE TABLE ecr_affected_items (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ecr_id UUID NOT NULL REFERENCES ecrs(id) ON DELETE CASCADE,
+    entity_type VARCHAR(16) NOT NULL,
+    entity_id UUID NOT NULL,
+    entity_code VARCHAR(64),
+    entity_name VARCHAR(255),
+    entity_version VARCHAR(32),
+    change_description TEXT,
+    change_type VARCHAR(32),
+    bom_impact JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE ecr_review_records (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ecr_id UUID NOT NULL REFERENCES ecrs(id) ON DELETE CASCADE,
+    reviewer_id UUID NOT NULL REFERENCES users(id),
+    reviewer_name VARCHAR(64),
+    decision VARCHAR(16) NOT NULL,
+    comment TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE ecr_status_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ecr_id UUID NOT NULL REFERENCES ecrs(id) ON DELETE CASCADE,
+    from_status VARCHAR(16),
+    to_status VARCHAR(16) NOT NULL,
+    operator_id UUID NOT NULL REFERENCES users(id),
+    operator_name VARCHAR(64),
+    comment TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_ecrs_status ON ecrs(status);
+CREATE INDEX idx_ecrs_creator ON ecrs(creator_id);
+CREATE INDEX idx_ecrs_priority ON ecrs(priority);
+CREATE INDEX idx_ecrs_number ON ecrs(ecr_number);
+CREATE INDEX idx_ecr_affected_items_ecr ON ecr_affected_items(ecr_id);
+CREATE INDEX idx_ecr_affected_items_entity ON ecr_affected_items(entity_type, entity_id);
+CREATE INDEX idx_ecr_review_records_ecr ON ecr_review_records(ecr_id);
+CREATE INDEX idx_ecr_review_records_reviewer ON ecr_review_records(reviewer_id);
+CREATE INDEX idx_ecr_status_logs_ecr ON ecr_status_logs(ecr_id);
