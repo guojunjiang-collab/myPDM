@@ -231,3 +231,120 @@ export interface ArchiveTreeResponse {
   tree: ArchiveTreeNode[];
 }
 
+// ECR Types
+export interface ECRReviewer {
+  user_id: string;
+  user_name: string;
+  role: string;
+  seq: number;
+}
+
+export interface ECRRequest {
+  id: string;
+  ecr_number: string;
+  title: string;
+  description?: string;
+  reason: string;
+  priority: 'urgent' | 'high' | 'normal' | 'low';
+  category?: string;
+  status: 'draft' | 'reviewing' | 'approved' | 'rejected' | 'closed';
+  review_mode: 'all' | 'any';
+  creator_id: string;
+  creator_name: string;
+  reviewers: ECRReviewer[];
+  reviewers_count: number;
+  approved_count: number;
+  affected_count: number;
+  document_links: ECRDocumentLink[];
+  affected_items?: ECRAffectedItem[];
+  created_at: string;
+  updated_at: string;
+  reviewed_at?: string;
+  closed_at?: string;
+  eco_id?: string;
+}
+
+export interface ECRReviewRecord {
+  id: string;
+  reviewer_id: string;
+  reviewer_name: string;
+  decision: 'approved' | 'rejected' | 'returned';
+  comment?: string;
+  created_at: string;
+}
+
+export interface BomImpactNode {
+  level?: number;
+  entity_type: 'part' | 'assembly';
+  entity_id: string;
+  entity_code: string;
+  entity_name: string;
+  entity_version: string;
+  quantity: number;
+  action: 'upgrade' | 'qty_change' | 'delete' | 'add_existing' | 'add_new' | 'no_change';
+  target_version?: string;
+  quantity_change?: { from: number; to: number };
+  change_description?: string;
+  parent_entity_id?: string;
+  parent_entity_code?: string;
+  parent_target_version?: string;
+  is_change_target?: boolean;
+  selected?: boolean;
+  new_item_type?: string;
+  new_item_code?: string;
+  new_item_name?: string;
+  new_item_spec?: string;
+}
+
+export interface ECRAffectedItem {
+  id: string;
+  entity_type: 'part' | 'assembly';
+  entity_id: string;
+  entity_code: string;
+  entity_name: string;
+  entity_version: string;
+  change_description?: string;
+  change_type?: string;
+  bom_impact?: {
+    upward_chain: BomImpactNode[];
+    downward_items: BomImpactNode[];
+  };
+}
+
+export interface ECRStatusLog {
+  id: string;
+  from_status?: string;
+  to_status: string;
+  operator_name: string;
+  comment?: string;
+  created_at: string;
+}
+
+export interface ECRDocumentLink {
+  document_id: string;
+  document_code: string;
+  document_name: string;
+  document_version: string;
+}
+
+export interface ECRCreateData {
+  title: string;
+  description?: string;
+  reason: string;
+  priority: string;
+  category?: string;
+  reviewers: { user_id: string; seq: number }[];
+  review_mode: string;
+  document_links: ECRDocumentLink[];
+  affected_items?: { entity_type: string; entity_id: string; change_description?: string; change_type?: string }[];
+}
+
+export interface ECRListParams {
+  page?: number;
+  page_size?: number;
+  search?: string;
+  status?: string;
+  priority?: string;
+  creator_id?: string;
+}
+

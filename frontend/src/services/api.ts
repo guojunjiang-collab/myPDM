@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { useAuthStore } from '../stores/auth';
+import type { ECRListParams, ECRCreateData } from '../types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -364,6 +365,38 @@ export const customFieldsApi = {
   setValues: (entityType: string, entityId: string, values: unknown[]) =>
     api.put(`/custom-fields/values/${entityType}/${entityId}`, { values }),
   resetData: (password: string) => api.post('/custom-fields/reset-data', { password }),
+};
+
+// ECR API
+export const ecrApi = {
+  list: (params?: ECRListParams) =>
+    api.get('/ecrs/', { params }),
+  get: (id: string) =>
+    api.get(`/ecrs/${id}`),
+  create: (data: ECRCreateData) =>
+    api.post('/ecrs/', data),
+  update: (id: string, data: Partial<ECRCreateData>) =>
+    api.put(`/ecrs/${id}`, data),
+  delete: (id: string) =>
+    api.delete(`/ecrs/${id}`),
+  submit: (id: string) =>
+    api.post(`/ecrs/${id}/submit`),
+  withdraw: (id: string) =>
+    api.post(`/ecrs/${id}/withdraw`),
+  review: (id: string, decision: string, comment?: string) =>
+    api.post(`/ecrs/${id}/review`, { decision, comment }),
+  close: (id: string, comment?: string) =>
+    api.post(`/ecrs/${id}/close`, { comment }),
+  addAffectedItem: (ecrId: string, data: { entity_type: string; entity_id: string; change_description?: string; change_type?: string }) =>
+    api.post(`/ecrs/${ecrId}/affected-items`, data),
+  removeAffectedItem: (ecrId: string, itemId: string) =>
+    api.delete(`/ecrs/${ecrId}/affected-items/${itemId}`),
+  getStatusLogs: (ecrId: string) =>
+    api.get(`/ecrs/${ecrId}/status-logs`),
+  bomTrace: (ecrId: string, entityType: string, entityId: string) =>
+    api.post(`/ecrs/${ecrId}/bom-trace/${entityType}/${entityId}`),
+  updateAffectedItem: (ecrId: string, itemId: string, data: unknown) =>
+    api.put(`/ecrs/${ecrId}/affected-items/${itemId}`, data),
 };
 
 export default api;
