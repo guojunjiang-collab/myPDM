@@ -424,14 +424,16 @@ export default function BOM() {
   }, [traceResult]);
 
   // 展开/收起反查树节点
-  const toggleTraceNode = (target: TraceTreeNode) => {
-    const toggle = (nodes: TraceTreeNode[]): TraceTreeNode[] =>
-      nodes.map(n => {
-        if (n === target) return { ...n, expanded: !n.expanded };
-        if (n.children.length > 0) return { ...n, children: toggle(n.children) };
-        return n;
-      });
-    setTraceTree(toggle(traceTree));
+  const toggleTraceNode = (targetId: string) => {
+    setTraceTree(prev => {
+      const toggle = (nodes: TraceTreeNode[]): TraceTreeNode[] =>
+        nodes.map(n => {
+          if (n.item.bom_item_id === targetId) return { ...n, expanded: !n.expanded };
+          if (n.children.length > 0) return { ...n, children: toggle(n.children) };
+          return n;
+        });
+      return toggle(prev);
+    });
   };
 
   return (
@@ -972,11 +974,12 @@ export default function BOM() {
                             handleViewEntity(type, parent.id);
                           }}
                         >
-                          <td className="px-3 py-2 whitespace-nowrap">
+                          <td className="px-3 py-2 whitespace-nowrap text-left">
                             <span className="inline-flex items-center gap-0.5">
+                              <span className="text-xs text-gray-400">{'-'.repeat(item.level)}{item.level}</span>
                               {hasChildren ? (
                                 <button
-                                  onClick={(e) => { e.stopPropagation(); toggleTraceNode(node); }}
+                                  onClick={(e) => { e.stopPropagation(); toggleTraceNode(item.bom_item_id); }}
                                   className="w-4 h-4 inline-flex items-center justify-center text-gray-500 hover:bg-gray-200 rounded"
                                 >
                                   {node.expanded ? '▼' : '▶'}
@@ -984,7 +987,6 @@ export default function BOM() {
                               ) : (
                                 <span className="w-4 inline-block" />
                               )}
-                              <span className="text-xs text-gray-400">L{item.level}</span>
                             </span>
                           </td>
                           <td className="px-3 py-2">

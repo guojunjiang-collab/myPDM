@@ -166,7 +166,7 @@ export default function BOMTreeTable({ assemblyId, maxHeight = 'max-h-[calc(100v
     return (
       <tr key={item.id} className="hover:bg-gray-50">
         <td className="px-3 py-2 text-gray-400 whitespace-nowrap">
-          <span className="text-xs text-gray-400">L{level + 1}</span>
+          <span className="text-xs text-gray-400">{'-'.repeat(level + 1)}{level + 1}</span>
           {hasChildren && (
               <button
                 onClick={(e) => { e.stopPropagation(); toggleExpand(node); }}

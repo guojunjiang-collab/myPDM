@@ -29,3 +29,44 @@ body {
 #root {
   min-height: 100vh;
 }
+
+/* Print styles */
+@media print {
+  @page {
+    size: A4;
+    margin: 10mm 12mm;
+  }
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  body * {
+    visibility: hidden;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .print-area [class*="max-h-"],
+  .print-area [class*="overflow-"] {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .print\:hidden {
+    display: none !important;
+  }
+  .print-area table {
+    break-inside: avoid;
+  }
+  .print-area h4 {
+    break-after: avoid;
+  }
+}
