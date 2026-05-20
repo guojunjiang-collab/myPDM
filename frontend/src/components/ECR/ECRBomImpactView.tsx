@@ -1,18 +1,23 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import type { BomImpactNode } from '../../types';
 
 // ─── Action config ───────────────────────────────────────────────
+const ACTION_ROW_CLASS: Record<string, string> = {
+  upgrade: 'bg-blue-50',
+  qty_change: 'bg-orange-50',
+  delete: 'bg-red-50',
+  no_change: '',
+};
+
 const ACTION_CONFIG: Record<string, { label: string; color: string }> = {
   upgrade: { label: '升版', color: 'bg-blue-100 text-blue-800' },
   qty_change: { label: '数量修改', color: 'bg-orange-100 text-orange-800' },
   delete: { label: '删除', color: 'bg-red-100 text-red-800' },
-  add_existing: { label: '新增现有', color: 'bg-green-100 text-green-800' },
-  add_new: { label: '新建', color: 'bg-purple-100 text-purple-800' },
   no_change: { label: '不变', color: 'bg-gray-100 text-gray-600' },
 };
 
 const UPWARD_ACTIONS = ['upgrade', 'qty_change', 'delete', 'no_change'] as const;
-const DOWNWARD_ACTIONS = [...UPWARD_ACTIONS, 'add_existing', 'add_new'] as const;
+const DOWNWARD_ACTIONS = ['upgrade', 'qty_change', 'delete', 'no_change'] as const;
 
 // ─── Props ───────────────────────────────────────────────────────
 interface ECRBomImpactViewProps {
@@ -23,12 +28,41 @@ interface ECRBomImpactViewProps {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────
-function updateNodeAt<T extends BomImpactNode>(
-  nodes: T[],
-  index: number,
-  patch: Partial<T>,
-): T[] {
+function updateNodeAt<T extends BomImpactNode>(nodes: T[], index: number, patch: Partial<T>): T[] {
   return nodes.map((n, i) => (i === index ? { ...n, ...patch } : n));
+}
+
+const isQuantityEditable = (action: string): boolean =>
+  action === 'qty_change';
+
+const getQuantityValue = (node: BomImpactNode): number => {
+  if (node.quantity_change?.to) return node.quantity_change.to;
+  return node.quantity;
+};
+
+// ─── Upward tree structure ──────────────────────────────────────
+interface UpwardTreeNode {
+  node: BomImpactNode;
+  children: UpwardTreeNode[];
+}
+
+function buildUpwardTree(items: BomImpactNode[]): UpwardTreeNode[] {
+  const filtered = items.filter((item) => item.level !== 0 && !item.is_change_target);
+  const roots: UpwardTreeNode[] = [];
+  const stack: UpwardTreeNode[] = [];
+  for (const item of filtered) {
+    const treeNode: UpwardTreeNode = { node: item, children: [] };
+    while (stack.length > 0 && stack[stack.length - 1].node.level! >= item.level!) {
+      stack.pop();
+    }
+    if (stack.length > 0) {
+      stack[stack.length - 1].children.push(treeNode);
+    } else {
+      roots.push(treeNode);
+    }
+    stack.push(treeNode);
+  }
+  return roots;
 }
 
 // ─── Component ───────────────────────────────────────────────────
@@ -38,6 +72,43 @@ export function ECRBomImpactView({
   onChange,
   editable,
 }: ECRBomImpactViewProps) {
+  // ── Upward tree state ──────────────────────────────────────────
+  const upwardTree = useMemo(() => buildUpwardTree(upwardChain), [upwardChain]);
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set());
+
+  const flattenUpwardTreeExpanded = useCallback(
+    (nodes: UpwardTreeNode[], keys: Set<string>): UpwardTreeNode[] => {
+      const result: UpwardTreeNode[] = [];
+      for (const n of nodes) {
+        result.push(n);
+        const key = `${n.node.entity_id}:${n.node.level}`;
+        if (keys.has(key) && n.children.length > 0) {
+          result.push(...flattenUpwardTreeExpanded(n.children, keys));
+        }
+      }
+      return result;
+    },
+    [],
+  );
+
+  const flatUpward = useMemo(
+    () => flattenUpwardTreeExpanded(upwardTree, expandedKeys),
+    [upwardTree, expandedKeys, flattenUpwardTreeExpanded],
+  );
+
+  const toggleUpwardNode = (treeNode: UpwardTreeNode) => {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      const key = `${treeNode.node.entity_id}:${treeNode.node.level}`;
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
   // ── Upstream helpers ───────────────────────────────────────────
   const handleUpwardAction = useCallback(
     (index: number, action: BomImpactNode['action']) => {
@@ -47,20 +118,11 @@ export function ECRBomImpactView({
     [upwardChain, downwardItems, onChange],
   );
 
-  const handleUpwardTargetVersion = useCallback(
+  const handleUpwardQty = useCallback(
     (index: number, value: string) => {
-      const updated = updateNodeAt(upwardChain, index, { target_version: value || undefined });
-      onChange(updated, downwardItems);
-    },
-    [upwardChain, downwardItems, onChange],
-  );
-
-  const handleUpwardQtyChange = useCallback(
-    (index: number, field: 'from' | 'to', value: string) => {
-      const num = value === '' ? 0 : Number(value);
-      const cur = upwardChain[index].quantity_change || { from: 0, to: 0 };
+      const num = value === '' ? '' : Math.max(1, parseInt(value) || 1);
       const updated = updateNodeAt(upwardChain, index, {
-        quantity_change: { ...cur, [field]: Number.isNaN(num) ? 0 : num },
+        quantity_change: { from: upwardChain[index].quantity, to: num === '' ? upwardChain[index].quantity : num as number },
       });
       onChange(updated, downwardItems);
     },
@@ -92,20 +154,11 @@ export function ECRBomImpactView({
     [upwardChain, downwardItems, onChange],
   );
 
-  const handleDownwardTargetVersion = useCallback(
+  const handleDownwardQty = useCallback(
     (index: number, value: string) => {
-      const updated = updateNodeAt(downwardItems, index, { target_version: value || undefined });
-      onChange(upwardChain, updated);
-    },
-    [upwardChain, downwardItems, onChange],
-  );
-
-  const handleDownwardQtyChange = useCallback(
-    (index: number, field: 'from' | 'to', value: string) => {
-      const num = value === '' ? 0 : Number(value);
-      const cur = downwardItems[index].quantity_change || { from: 0, to: 0 };
+      const num = value === '' ? '' : Math.max(1, parseInt(value) || 1);
       const updated = updateNodeAt(downwardItems, index, {
-        quantity_change: { ...cur, [field]: Number.isNaN(num) ? 0 : num },
+        quantity_change: { from: downwardItems[index].quantity, to: num === '' ? downwardItems[index].quantity : num as number },
       });
       onChange(upwardChain, updated);
     },
@@ -119,13 +172,6 @@ export function ECRBomImpactView({
     },
     [upwardChain, downwardItems, onChange],
   );
-
-  // ── Summary ────────────────────────────────────────────────────
-  const summary = useMemo(() => {
-    const upwardChanged = upwardChain.filter((n) => n.action !== 'no_change').length;
-    const downwardSelected = downwardItems.filter((n) => n.selected).length;
-    return `向上影响 ${upwardChain.length} 节点(需变更 ${upwardChanged}) | 向下选中 ${downwardSelected} 项`;
-  }, [upwardChain, downwardItems]);
 
   // ── Render helpers ─────────────────────────────────────────────
   const renderActionBadge = (action: string) => {
@@ -169,140 +215,130 @@ export function ECRBomImpactView({
 
       {/* ─── Upward chain table ──────────────────────────── */}
       <div>
-        <div className="text-xs font-medium text-gray-500 mb-1.5">向上溯源链</div>
+        <div className="text-xs font-semibold text-gray-800 mb-1.5">向上溯源链</div>
         <div className="overflow-x-auto border border-gray-200 rounded-lg">
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-50">
-                <th className={thClass}>层级</th>
+                <th className={`${thClass} w-20`}>层级</th>
                 <th className={thClass}>编码</th>
                 <th className={thClass}>名称</th>
                 <th className={thClass}>版本</th>
-                <th className={thClass}>父项编码</th>
-                <th className={thClass}>操作</th>
-                <th className={thClass}>目标版本</th>
-                <th className={thClass}>数量变更</th>
+                <th className={thClass}>子项用量</th>
+                <th className={`${thClass} w-24`}>操作</th>
+                <th className={thClass}>目标用量</th>
                 <th className={thClass}>变更说明</th>
               </tr>
             </thead>
             <tbody>
               {upwardChain.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-2 py-6 text-center text-xs text-gray-400">
+                  <td colSpan={8} className="px-2 py-6 text-center text-xs text-gray-400">
                     暂无向上溯源数据
                   </td>
                 </tr>
               ) : (
-                upwardChain.map((node, idx) => (
-                  <tr key={`up-${idx}`} className={node.is_change_target ? 'bg-yellow-50' : 'hover:bg-gray-50'}>
-                    <td className={tdClass}>L{node.level ?? idx}</td>
-                    <td className={`${tdClass} font-mono`}>{node.entity_code}</td>
-                    <td className={tdClass}>{node.entity_name}</td>
-                    <td className={tdClass}>{node.entity_version}</td>
-                    <td className={`${tdClass} font-mono`}>{node.parent_entity_code || '—'}</td>
-                    <td className={tdClass}>
-                      {editable ? (
-                        renderActionSelect(node.action, (val) => handleUpwardAction(idx, val), UPWARD_ACTIONS)
-                      ) : (
-                        renderActionBadge(node.action)
-                      )}
-                    </td>
-                    <td className={tdClass}>
-                      {editable ? (
-                        <input
-                          type="text"
-                          value={node.target_version || ''}
-                          onChange={(e) => handleUpwardTargetVersion(idx, e.target.value)}
-                          className="w-16 text-xs border border-gray-300 rounded px-1.5 py-1 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                          placeholder="—"
-                        />
-                      ) : (
-                        <span className="text-xs text-gray-500">{node.target_version || '—'}</span>
-                      )}
-                    </td>
-                    <td className={tdClass}>
-                      {editable ? (
-                        <div className="flex items-center gap-1">
+                flatUpward.map((treeNode) => {
+                  const node = treeNode.node;
+                  const idx = upwardChain.indexOf(node);
+                  const hasChildren = treeNode.children.length > 0;
+                  return (
+                    <tr key={`up-${idx}`} className={node.action && node.action !== 'no_change' ? ACTION_ROW_CLASS[node.action] || '' : 'hover:bg-gray-50'}>
+                      <td className={`${tdClass} whitespace-nowrap`}>
+                        <span className="inline-flex items-center gap-0.5">
+                          <span className="text-xs text-gray-400">{'-'.repeat(node.level ?? 0)}{node.level ?? 0}</span>
+                          {hasChildren ? (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); toggleUpwardNode(treeNode); }}
+                              className="w-4 h-4 inline-flex items-center justify-center text-gray-500 hover:bg-gray-200 rounded"
+                            >
+                              {expandedKeys.has(`${treeNode.node.entity_id}:${treeNode.node.level}`) ? '▼' : '▶'}
+                            </button>
+                          ) : (
+                            <span className="w-4 inline-block" />
+                          )}
+                        </span>
+                      </td>
+                      <td className={`${tdClass} font-mono whitespace-nowrap`}>{node.entity_code}</td>
+                      <td className={tdClass}>{node.entity_name}</td>
+                      <td className={tdClass}>{node.entity_version}</td>
+                      <td className={tdClass}>{node.quantity}</td>
+                      <td className={tdClass}>
+                        {editable ? (
+                          renderActionSelect(node.action, (val) => handleUpwardAction(idx, val), UPWARD_ACTIONS)
+                        ) : (
+                          renderActionBadge(node.action)
+                        )}
+                      </td>
+                      <td className={tdClass}>
+                        {editable && isQuantityEditable(node.action) ? (
                           <input
                             type="number"
-                            value={node.quantity_change?.from ?? ''}
-                            onChange={(e) => handleUpwardQtyChange(idx, 'from', e.target.value)}
-                            className="w-12 text-xs border border-gray-300 rounded px-1 py-1 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                            placeholder="从"
+                            min="1"
+                            step="1"
+                            value={getQuantityValue(node)}
+                            onChange={(e) => handleUpwardQty(idx, e.target.value)}
+                            className="w-20 text-xs border rounded px-1.5 py-0.5 focus:ring-1 focus:ring-blue-500"
                           />
-                          <span className="text-gray-400 text-xs">→</span>
+                        ) : (
+                          <span className="text-xs">{node.quantity}</span>
+                        )}
+                      </td>
+                      <td className={tdClass}>
+                        {editable ? (
                           <input
-                            type="number"
-                            value={node.quantity_change?.to ?? ''}
-                            onChange={(e) => handleUpwardQtyChange(idx, 'to', e.target.value)}
-                            className="w-12 text-xs border border-gray-300 rounded px-1 py-1 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                            placeholder="到"
+                            type="text"
+                            value={node.change_description || ''}
+                            onChange={(e) => handleUpwardDescription(idx, e.target.value)}
+                            disabled={node.action === 'no_change'}
+                            className="w-full text-xs border border-gray-300 rounded px-1.5 py-1 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                            placeholder="变更说明"
                           />
-                        </div>
-                      ) : node.quantity_change ? (
-                        <span className="text-xs text-gray-500">
-                          {node.quantity_change.from}→{node.quantity_change.to}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-400">—</span>
-                      )}
-                    </td>
-                    <td className={tdClass}>
-                      {editable ? (
-                        <input
-                          type="text"
-                          value={node.change_description || ''}
-                          onChange={(e) => handleUpwardDescription(idx, e.target.value)}
-                          className="w-full text-xs border border-gray-300 rounded px-1.5 py-1 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                          placeholder="变更说明"
-                        />
-                      ) : (
-                        <span className="text-xs text-gray-500 max-w-32 truncate block">
-                          {node.change_description || '—'}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                        ) : (
+                          <span className="text-xs text-gray-500 max-w-32 truncate block">
+                            {node.change_description || '—'}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* ─── Downward items table (only when present) ──────────── */}
+      {/* ─── Downward items table ──────────────────────────── */}
       {downwardItems.length > 0 && (
         <div>
-          <div className="text-xs font-medium text-gray-500 mb-1.5">
-            向下子项 <span className="text-gray-400">（一级 BOM）</span>
+          <div className="text-xs font-semibold text-gray-800 mb-1.5">
+            向下子项：<span className="font-normal text-gray-400">一级BOM</span>
           </div>
+
           <div className="overflow-x-auto border border-gray-200 rounded-lg">
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-gray-50">
-                  <th className={`${thClass} w-8`}>勾选</th>
                   <th className={thClass}>编码</th>
                   <th className={thClass}>名称</th>
                   <th className={thClass}>版本</th>
                   <th className={thClass}>当前数量</th>
                   <th className={thClass}>操作</th>
-                  <th className={thClass}>目标版本</th>
-                  <th className={thClass}>数量变更</th>
+                  <th className={thClass}>目标用量</th>
                   <th className={thClass}>变更说明</th>
                 </tr>
               </thead>
               <tbody>
-                {downwardItems.map((node, idx) => (
-                  <tr key={`down-${idx}`} className={node.selected ? 'bg-primary-50' : 'hover:bg-gray-50'}>
-                    <td className={`${tdClass} text-center`}>
-                      <input
-                        type="checkbox"
-                        checked={!!node.selected}
-                        onChange={(e) => handleDownwardSelected(idx, e.target.checked)}
-                        disabled={!editable}
-                        className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                      />
+                {downwardItems.length === 0 ? (
+                  <tr>
+<td colSpan={7} className="px-2 py-6 text-center text-xs text-gray-400">
+                      暂无向下子项，点击上方按钮添加
                     </td>
+                  </tr>
+                ) : (
+                downwardItems.map((node, idx) => (
+                  <tr key={`down-${idx}`} className={node.action && node.action !== 'no_change' ? ACTION_ROW_CLASS[node.action] || '' : 'hover:bg-gray-50'}>
                     <td className={`${tdClass} font-mono`}>{node.entity_code}</td>
                     <td className={tdClass}>{node.entity_name}</td>
                     <td className={tdClass}>{node.entity_version}</td>
@@ -315,43 +351,17 @@ export function ECRBomImpactView({
                       )}
                     </td>
                     <td className={tdClass}>
-                      {editable ? (
+                      {editable && isQuantityEditable(node.action) ? (
                         <input
-                          type="text"
-                          value={node.target_version || ''}
-                          onChange={(e) => handleDownwardTargetVersion(idx, e.target.value)}
-                          className="w-16 text-xs border border-gray-300 rounded px-1.5 py-1 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                          placeholder="—"
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={getQuantityValue(node)}
+                          onChange={(e) => handleDownwardQty(idx, e.target.value)}
+                          className="w-20 text-xs border rounded px-1.5 py-0.5 focus:ring-1 focus:ring-blue-500"
                         />
                       ) : (
-                        <span className="text-xs text-gray-500">{node.target_version || '—'}</span>
-                      )}
-                    </td>
-                    <td className={tdClass}>
-                      {editable ? (
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="number"
-                            value={node.quantity_change?.from ?? ''}
-                            onChange={(e) => handleDownwardQtyChange(idx, 'from', e.target.value)}
-                            className="w-12 text-xs border border-gray-300 rounded px-1 py-1 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                            placeholder="从"
-                          />
-                          <span className="text-gray-400 text-xs">→</span>
-                          <input
-                            type="number"
-                            value={node.quantity_change?.to ?? ''}
-                            onChange={(e) => handleDownwardQtyChange(idx, 'to', e.target.value)}
-                            className="w-12 text-xs border border-gray-300 rounded px-1 py-1 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                            placeholder="到"
-                          />
-                        </div>
-                      ) : node.quantity_change ? (
-                        <span className="text-xs text-gray-500">
-                          {node.quantity_change.from}→{node.quantity_change.to}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-400">—</span>
+                        <span className="text-xs">{node.quantity}</span>
                       )}
                     </td>
                     <td className={tdClass}>
@@ -360,6 +370,7 @@ export function ECRBomImpactView({
                           type="text"
                           value={node.change_description || ''}
                           onChange={(e) => handleDownwardDescription(idx, e.target.value)}
+                          disabled={node.action === 'no_change'}
                           className="w-full text-xs border border-gray-300 rounded px-1.5 py-1 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                           placeholder="变更说明"
                         />
@@ -370,16 +381,30 @@ export function ECRBomImpactView({
                       )}
                     </td>
                   </tr>
-                ))}
+                ))
+                )}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      {/* ─── Summary line ─────────────────────────────────── */}
-      <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
-        <p className="text-xs text-gray-600">{summary}</p>
+      {/* Summary */}
+      <div className="text-xs text-gray-500 pt-2 border-t border-gray-100">
+        <span className="font-semibold text-gray-800">结论：</span>
+        {(() => {
+          const upParents = upwardChain.filter((n) => n.level !== 0 && !n.is_change_target);
+          const upChanged = upParents.filter((n) => n.action !== 'no_change').length;
+          const downChanged = downwardItems.filter((n) => n.action !== 'no_change').length;
+          const parts: string[] = [];
+          if (upParents.length > 0) {
+            parts.push(`向上影响 ${upChanged}/${upParents.length} 节点需变更`);
+          }
+          if (downwardItems.length > 0) {
+            parts.push(`向下影响 ${downChanged}/${downwardItems.length} 子项需变更`);
+          }
+          return parts.join(' | ');
+        })()}
       </div>
     </div>
   );

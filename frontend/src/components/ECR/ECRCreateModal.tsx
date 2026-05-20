@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Modal } from '../Modal';
 import { toast } from '../Toast';
 import { ecrApi, usersApi } from '../../services/api';
+import { useAuthStore } from '../../stores/auth';
 import type { ECRRequest, ECRCreateData, ECRReviewer, ECRDocumentLink, BomImpactNode } from '../../types';
 import { ECRAffectedItemPicker } from './ECRAffectedItemPicker';
 import { ECRBomImpactView } from './ECRBomImpactView';
@@ -50,6 +51,7 @@ const CHANGE_TYPE_OPTIONS = [
 ];
 
 interface AffectedItemForm {
+  id?: string;
   entity_type: 'part' | 'assembly';
   entity_id: string;
   entity_code: string;
@@ -85,6 +87,7 @@ interface ECRCreateModalProps {
 
 export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCreateModalProps) {
   const isEditing = !!editingEcr;
+  const currentUserId = useAuthStore((s) => s.user?.id);
 
   // Form state
   const [title, setTitle] = useState('');
@@ -187,7 +190,50 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
         change_description: '',
         traceLoading: false,
       }));
+    const newStartIndex = affectedItems.length;
     setAffectedItems([...affectedItems, ...newItems]);
+    setShowAffectedPicker(false);
+
+    // Auto-trace each new item
+    const traceEcrId = editingEcr?.id || '00000000-0000-0000-0000-000000000000';
+    newItems.forEach((item, i) => {
+      const actualIndex = newStartIndex + i;
+      setAffectedItems((prev) => {
+        const updated = [...prev];
+        if (updated[actualIndex]) {
+          updated[actualIndex] = { ...updated[actualIndex], traceLoading: true };
+        }
+        return updated;
+      });
+      ecrApi.bomTrace(traceEcrId, item.entity_type, item.entity_id)
+        .then((resp) => {
+          const data = resp.data as { upward_chain: BomImpactNode[]; downward_items: BomImpactNode[] };
+          setAffectedItems((prev) => {
+            const updated = [...prev];
+            if (updated[actualIndex]) {
+              updated[actualIndex] = {
+                ...updated[actualIndex],
+                traceLoading: false,
+                bom_impact: {
+                  upward_chain: data.upward_chain || [],
+                  downward_items: data.downward_items || [],
+                },
+              };
+            }
+            return updated;
+          });
+        })
+        .catch(() => {
+          setAffectedItems((prev) => {
+            const updated = [...prev];
+            if (updated[actualIndex]) {
+              updated[actualIndex] = { ...updated[actualIndex], traceLoading: false };
+            }
+            return updated;
+          });
+          toast.error('BOM 溯源分析失败');
+        });
+    });
   };
 
   const removeAffectedItem = (index: number) => {
@@ -283,12 +329,57 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
         })),
       };
 
+      let ecrId = editingEcr?.id;
       if (isEditing && editingEcr) {
         await ecrApi.update(editingEcr.id, data);
+
+        // Delete affected items that were removed during editing
+        const originalIds = new Set(
+          ((editingEcr.affected_items as unknown as Array<{ id: string }>) || []).map((a) => a.id)
+        );
+        const currentIds = new Set(affectedItems.filter((a) => a.id).map((a) => a.id!));
+        const removedIds = [...originalIds].filter((id) => !currentIds.has(id));
+        for (const id of removedIds) {
+          try { await ecrApi.removeAffectedItem(ecrId!, id); } catch { /* ignore */ }
+        }
+
         toast.success('ECR 更新成功');
       } else {
-        await ecrApi.create(data);
+        const response = await ecrApi.create(data);
+        const responseData = response.data as { id?: string };
+        if (responseData?.id) {
+          ecrId = responseData.id;
+        }
         toast.success('ECR 创建成功');
+      }
+
+      // Save bom_impact for each affected item
+      if (ecrId && affectedItems.length > 0) {
+        const savePromises = affectedItems.map(async (item) => {
+          try {
+            // Step 1: Create the affected item (if not already exists)
+            let affectedItemId: string | undefined;
+            if (item.id) {
+              affectedItemId = item.id;
+            } else {
+              // New ECR: need to create affected item first
+              const createdResp = await ecrApi.addAffectedItem(ecrId, {
+                entity_type: item.entity_type,
+                entity_id: item.entity_id,
+              });
+              const createdData = (createdResp.data || createdResp) as { id?: string };
+              affectedItemId = createdData?.id;
+            }
+
+            // Step 2: Save bom_impact if we have an item ID
+            if (affectedItemId && item.bom_impact) {
+              await ecrApi.updateAffectedItem(ecrId, affectedItemId, { bom_impact: item.bom_impact });
+            }
+          } catch {
+            // Silently fail - bom_impact will be lost but ECR is saved
+          }
+        });
+        await Promise.allSettled(savePromises);
       }
 
       onSuccess();
@@ -474,43 +565,10 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
                   </span>
                   <span className="text-sm font-medium text-gray-900">{item.entity_code}</span>
                   <span className="text-sm text-gray-600">{item.entity_name}</span>
-                  <span className="text-xs text-gray-400">v{item.entity_version}</span>
+                  <span className="text-xs text-gray-400">{item.entity_version}</span>
 
                   <div className="flex-1" />
-
-                  <select
-                    value={item.change_type}
-                    onChange={(e) => updateAffectedItem(index, 'change_type', e.target.value)}
-                    className="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    {CHANGE_TYPE_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-
-                  <input
-                    type="text"
-                    value={item.change_description}
-                    onChange={(e) => updateAffectedItem(index, 'change_description', e.target.value)}
-                    placeholder="变更说明"
-                    className="text-xs border border-gray-300 rounded px-2 py-1 w-40 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() => traceAffectedItem(index)}
-                    disabled={item.traceLoading || (!isEditing)}
-                    title={!isEditing ? '请先保存 ECR 后再进行溯源分析' : 'BOM 溯源分析'}
-                    className={`text-xs px-2 py-1 rounded transition-colors ${
-                      item.traceLoading
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        : 'bg-orange-50 text-orange-600 hover:bg-orange-100'
-                    }`}
-                  >
-                    {item.traceLoading ? '分析中...' : '🔄 溯源分析'}
-                  </button>
+                  <span className="text-xs text-gray-400">变更操作：升版</span>
 
                   <button
                     type="button"
@@ -591,7 +649,7 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
                   <option value="">
                     {usersLoading ? '加载中...' : '请选择审批人'}
                   </option>
-                  {users.map((u) => (
+                  {users.filter((u) => u.id !== currentUserId).map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.real_name} ({u.username}) - {u.role}
                     </option>

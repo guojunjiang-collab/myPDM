@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Modal } from '../Modal';
 import { toast } from '../Toast';
 import { partsApi, assembliesApi } from '../../services/api';
+import { useTableSort } from '../../hooks/useTableSort';
 import type { Part, Assembly } from '../../types';
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -147,6 +148,8 @@ export function ECRAffectedItemPicker({
     return result;
   }, [parts, assemblies, activeTab, alreadySelected]);
 
+  const { sortedData, handleSort, getSortIcon } = useTableSort(rows, 'entity_code', 'asc');
+
   // ── Handlers ───────────────────────────────────────────────────
   const makeKey = (type: string, id: string) => `${type}:${id}`;
 
@@ -167,22 +170,20 @@ export function ECRAffectedItemPicker({
 
   const toggleAll = useCallback(() => {
     setSelectedMap((prev) => {
-      if (prev.size === rows.length) {
-        // Deselect all
+      if (prev.size === sortedData.length) {
         return new Set();
       }
-      // Select all visible
-      return new Set(rows.map((r) => makeKey(r.entity_type, r.entity_id)));
+      return new Set(sortedData.map((r) => makeKey(r.entity_type, r.entity_id)));
     });
-  }, [rows]);
+  }, [sortedData]);
 
   const handleConfirm = useCallback(() => {
-    const selected = rows.filter((r) => isSelected(r));
+    const selected = sortedData.filter((r) => isSelected(r));
     onSelect(selected);
     onClose();
-  }, [rows, selectedMap, onSelect, onClose]);
+  }, [sortedData, selectedMap, onSelect, onClose]);
 
-  const allChecked = rows.length > 0 && rows.every((r) => isSelected(r));
+  const allChecked = sortedData.length > 0 && sortedData.every((r) => isSelected(r));
 
   // ── Render ─────────────────────────────────────────────────────
   return (
@@ -236,22 +237,34 @@ export function ECRAffectedItemPicker({
                       className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                     />
                   </th>
-                  <th className="px-2 py-2 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">
-                    类型
+                  <th
+                    className="px-2 py-2 text-left text-xs font-semibold text-gray-500 whitespace-nowrap cursor-pointer select-none"
+                    onClick={() => handleSort('entity_type')}
+                  >
+                    类型 {getSortIcon('entity_type')}
                   </th>
-                  <th className="px-2 py-2 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">
-                    编码
+                  <th
+                    className="px-2 py-2 text-left text-xs font-semibold text-gray-500 whitespace-nowrap cursor-pointer select-none"
+                    onClick={() => handleSort('entity_code')}
+                  >
+                    编码 {getSortIcon('entity_code')}
                   </th>
-                  <th className="px-2 py-2 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">
-                    名称
+                  <th
+                    className="px-2 py-2 text-left text-xs font-semibold text-gray-500 whitespace-nowrap cursor-pointer select-none"
+                    onClick={() => handleSort('entity_name')}
+                  >
+                    名称 {getSortIcon('entity_name')}
                   </th>
-                  <th className="px-2 py-2 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">
-                    版本
+                  <th
+                    className="px-2 py-2 text-left text-xs font-semibold text-gray-500 whitespace-nowrap cursor-pointer select-none"
+                    onClick={() => handleSort('entity_version')}
+                  >
+                    版本 {getSortIcon('entity_version')}
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
+                {sortedData.map((row) => (
                   <tr
                     key={makeKey(row.entity_type, row.entity_id)}
                     onClick={() => toggleItem(row)}
@@ -259,7 +272,7 @@ export function ECRAffectedItemPicker({
                       isSelected(row) ? 'bg-primary-50' : 'hover:bg-gray-50'
                     }`}
                   >
-                    <td className="px-2 py-1.5 text-center">
+                    <td className="px-2 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={isSelected(row)}
