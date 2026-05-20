@@ -8,7 +8,7 @@ import Board from './pages/Board';
 import Parts from './pages/Parts';
 import Components from './pages/Components';
 import Documents from './pages/Documents';
-import BOM from './pages/BOM';
+import BOM from './pages/BOM/BOM';
 import Users from './pages/Users';
 import Logs from './pages/Logs';
 import Settings from './pages/Settings';
