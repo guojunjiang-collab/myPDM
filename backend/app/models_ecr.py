@@ -27,6 +27,7 @@ class ECR(Base):
     review_mode = Column(String(8), nullable=False, default="all")
     creator_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     document_links = Column(JSONB, nullable=False, default=[])
+    cc_users = Column(JSONB, nullable=False, default=[])  # 知会用户列表 [{"user_id": "xxx", "user_name": "xxx"}]
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     reviewed_at = Column(DateTime(timezone=True), nullable=True)

@@ -114,6 +114,7 @@ def _build_ecr_detail(db: Session, ecr: ECRModel) -> dict:
         "reviewers": reviewers_detail,
         "review_records": review_record_items,
         "document_links": ecr.document_links or [],
+        "cc_users": ecr.cc_users or [],
         "affected_items": affected_item_list,
         "status_logs": status_log_items,
         "reviewed_at": ecr.reviewed_at,
@@ -135,24 +136,24 @@ async def list_ecrs(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
 ):
-    """获取 ECR 列表（分页 + 筛选）"""
-    params = schemas_ecr.ECRListParams(
-        page=page, page_size=page_size,
-        search=search, status=status, priority=priority
-    )
-    items, total = crud_ecr.get_ecrs(db, params)
-    # 将 UUID 转为字符串
-    items_serialized = []
-    for item in items:
-        serialized = {**item}
-        serialized["id"] = str(serialized["id"])
-        items_serialized.append(serialized)
-    return {
-        "items": items_serialized,
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-    }
+  """获取 ECR 列表（分页 + 筛选）。非管理员用户看不到他人创建的草稿 ECR"""
+  params = schemas_ecr.ECRListParams(
+      page=page, page_size=page_size,
+      search=search, status=status, priority=priority
+  )
+  items, total = crud_ecr.get_ecrs(db, params, current_user)
+  # 将 UUID 转为字符串
+  items_serialized = []
+  for item in items:
+      serialized = {**item}
+      serialized["id"] = str(serialized["id"])
+      items_serialized.append(serialized)
+  return {
+      "items": items_serialized,
+      "total": total,
+      "page": page,
+      "page_size": page_size,
+  }
 
 
 # ─────────────────────────────────────────────────────
@@ -246,17 +247,21 @@ async def withdraw_ecr(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(["admin", "engineer"]))
 ):
-    """撤回评审，将 ECR 从评审中退回到草稿状态"""
-    ecr = crud_ecr.get_ecr(db, ecr_id)
-    if ecr.status != "reviewing":
-        raise HTTPException(status_code=400, detail="仅评审中状态的 ECR 可以撤回")
-    # 仅创建人或 admin 可撤回
-    if ecr.creator_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="仅创建人或管理员可以撤回")
-    ecr = crud_ecr.change_ecr_status(
-        db, ecr_id, "draft", current_user.id, "撤回评审"
-    )
-    return _build_ecr_detail(db, ecr)
+  """撤回评审，将 ECR 从评审中退回到草稿状态"""
+  ecr = crud_ecr.get_ecr(db, ecr_id)
+  if ecr.status != "reviewing":
+      raise HTTPException(status_code=400, detail="仅评审中状态的 ECR 可以撤回")
+  # 仅创建人或 admin 可撤回
+  if ecr.creator_id != current_user.id and current_user.role != "admin":
+      raise HTTPException(status_code=403, detail="仅创建人或管理员可以撤回")
+  # 撤回时清空旧审批记录
+  db.query(ECRReviewRecord).filter(
+      ECRReviewRecord.ecr_id == ecr_id
+  ).delete()
+  ecr = crud_ecr.change_ecr_status(
+      db, ecr_id, "draft", current_user.id, "撤回评审"
+  )
+  return _build_ecr_detail(db, ecr)
 
 
 # ─────────────────────────────────────────────────────
@@ -269,47 +274,69 @@ async def review_ecr(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(["admin", "engineer"]))
 ):
-    """审批操作（通过/驳回/退回）"""
-    ecr = crud_ecr.get_ecr(db, ecr_id)
-    if ecr.status != "reviewing":
-        raise HTTPException(status_code=400, detail="仅评审中状态的 ECR 可进行审批")
+  """审批操作（通过/驳回/退回）"""
+  ecr = crud_ecr.get_ecr(db, ecr_id)
+  if ecr.status != "reviewing":
+      raise HTTPException(status_code=400, detail="仅评审中状态的 ECR 可进行审批")
 
-    # 检查当前用户是否为审批人（admin 可越权审批）
-    reviewer_ids = set()
-    for r in (ecr.reviewers or []):
-        try:
-            reviewer_ids.add(uuid.UUID(r["user_id"]))
-        except (ValueError, KeyError):
-            pass
-    if current_user.role != "admin" and current_user.id not in reviewer_ids:
-        raise HTTPException(status_code=403, detail="您不是该 ECR 的指定审批人")
+  # 检查当前用户是否为审批人（admin 可越权审批）
+  reviewer_ids = set()
+  for r in (ecr.reviewers or []):
+      try:
+          reviewer_ids.add(uuid.UUID(r["user_id"]))
+      except (ValueError, KeyError):
+          pass
+  if current_user.role != "admin" and current_user.id not in reviewer_ids:
+      raise HTTPException(status_code=403, detail="您不是该 ECR 的指定审批人")
 
-    # 保存审批记录
-    crud_ecr.add_ecr_review_record(
-        db, ecr_id, current_user.id, data.decision, data.comment
-    )
+  # 退回/驳回时，先清除旧的审批记录，再创建新记录，最后流转状态
+  if data.decision == "returned":
+      db.query(ECRReviewRecord).filter(
+          ECRReviewRecord.ecr_id == ecr_id
+      ).delete()
+      # 退回不创建审批记录，直接流转状态（保留状态日志）
+      crud_ecr.change_ecr_status(
+          db, ecr_id, "draft", current_user.id,
+          comment=data.comment or "退回修改"
+      )
+      db.refresh(ecr)
+      return _build_ecr_detail(db, ecr)
 
-    # 根据审批决定触发状态流转
-    if data.decision == "approved":
-        # 检查是否所有审批人都通过了
-        if crud_ecr.check_all_approved(db, ecr_id):
-            crud_ecr.change_ecr_status(
-                db, ecr_id, "approved", current_user.id,
-                comment="所有审批人已通过，自动批准"
-            )
-    elif data.decision == "rejected":
-        crud_ecr.change_ecr_status(
-            db, ecr_id, "rejected", current_user.id,
-            comment=data.comment or "审批驳回"
-        )
-    elif data.decision == "returned":
-        crud_ecr.change_ecr_status(
-            db, ecr_id, "draft", current_user.id,
-            comment=data.comment or "退回修改"
-        )
+  # 保存审批记录（通过/驳回）
+  crud_ecr.add_ecr_review_record(
+      db, ecr_id, current_user.id, data.decision, data.comment
+  )
 
-    db.refresh(ecr)
-    return _build_ecr_detail(db, ecr)
+  # 记录审批操作到状态日志
+  decision_labels = {"approved": "审批通过", "rejected": "审批驳回"}
+  if data.decision in decision_labels:
+      log = ECRStatusLog(
+          ecr_id=ecr_id,
+          from_status=ecr.status,
+          to_status=ecr.status,  # 个人审批不改变状态
+          operator_id=current_user.id,
+          operator_name=current_user.real_name,
+          comment=f"{decision_labels[data.decision]}" + (f": {data.comment}" if data.comment else ""),
+      )
+      db.add(log)
+      db.commit()
+
+  # 根据审批决定触发状态流转
+  if data.decision == "approved":
+      # 检查是否所有审批人都通过了
+      if crud_ecr.check_all_approved(db, ecr_id):
+          crud_ecr.change_ecr_status(
+              db, ecr_id, "approved", current_user.id,
+              comment="所有审批人已通过，自动批准"
+          )
+  elif data.decision == "rejected":
+      crud_ecr.change_ecr_status(
+          db, ecr_id, "rejected", current_user.id,
+          comment=data.comment or "审批驳回"
+      )
+
+  db.refresh(ecr)
+  return _build_ecr_detail(db, ecr)
 
 
 # ─────────────────────────────────────────────────────
@@ -451,7 +478,7 @@ async def get_bom_trace(
     if not obj:
         raise HTTPException(status_code=404, detail="实体不存在")
 
-    # ── 向上溯源（复用 BOM trace 递归 CTE） ──
+    # ── 向上溯源（复用 BOM trace 递归 CTE，构建树结构） ──
     from sqlalchemy import text
     sql = text("""
     WITH RECURSIVE trace AS (
@@ -472,16 +499,57 @@ async def get_bom_trace(
     """)
     rows = db.execute(sql, {"entity_id": entity_id, "entity_type": entity_type}).fetchall()
 
-    # 变更对象自身（level 0）
+    # 构建节点查找表：entity_id -> {code, name, version, entity_type}
+    nodes_by_id = {}
+    for row in rows:
+        pk = str(row.parent_id)
+        if pk not in nodes_by_id:
+            if row.parent_type == "assembly":
+                p = db.query(Assembly).filter(Assembly.id == row.parent_id).first()
+            else:
+                p = db.query(Part).filter(Part.id == row.parent_id).first()
+            if p:
+                nodes_by_id[pk] = {
+                    "entity_type": row.parent_type,
+                    "entity_code": p.code,
+                    "entity_name": p.name,
+                    "entity_version": p.version,
+                }
+
+    # 构建查询映射和边数据
+    # 向上方向：从 child（下一层）查找其 parent（上一层）
+    # child_to_parents: child_id -> [parent_id]  (一个下级可能有多个上级)
+    # parent_meta:      parent_id -> {child_id, quantity}  边的数量
+    child_to_parents = {}
+    parent_meta = {}
+    for row in rows:
+        ck = str(row.child_id)
+        pk = str(row.parent_id)
+        # child -> parents
+        if ck not in child_to_parents:
+            child_to_parents[ck] = []
+        if pk not in child_to_parents[ck]:
+            child_to_parents[ck].append(pk)
+        # parent meta: child & quantity (keep lowest-level = closest to target)
+        if pk not in parent_meta or row.level < parent_meta[pk].get("_cte_level", 999):
+            parent_meta[pk] = {"child_id": ck, "quantity": float(row.quantity), "_cte_level": row.level}
+
+    # 变更对象自身（level 0，树根）
+    target_id = str(entity_id)
+    target_qty = 0
+    if target_id in child_to_parents:
+        first_parent = child_to_parents[target_id][0]
+        target_qty = parent_meta.get(first_parent, {}).get("quantity", 1)
+
     upward_chain.append({
         "level": 0,
         "entity_type": entity_type,
-        "entity_id": str(obj.id),
+        "entity_id": target_id,
         "entity_code": obj.code,
         "entity_name": obj.name,
         "entity_version": obj.version,
-        "quantity": rows[0].quantity if rows else 1,
-        "parent_entity_id": str(rows[0].parent_id) if rows else None,
+        "quantity": target_qty,
+        "parent_entity_id": None,
         "parent_entity_code": None,
         "parent_target_version": None,
         "is_change_target": True,
@@ -489,48 +557,81 @@ async def get_bom_trace(
         "target_version": None,
         "quantity_change": None,
         "change_description": "",
+        "tree_path": "",
+        "tree_connector": "",
+        "has_sibling": False,
+        "is_last_child": True,
     })
 
-    # 向上父级链
-    for i, row in enumerate(rows):
-        parent_info = None
-        parent_code = None
-        parent_version = None
-        if row.parent_type == "assembly":
-            p = db.query(Assembly).filter(Assembly.id == row.parent_id).first()
-        else:
-            p = db.query(Part).filter(Part.id == row.parent_id).first()
-        if p:
-            parent_info = str(p.id)
-            parent_code = p.code
-            parent_version = p.version
+    # 递归向上构建树
+    def build_upward_tree(node_id, depth, tree_prefix, is_last_of_parent):
+        parents = child_to_parents.get(node_id, [])
+        for i, parent_id in enumerate(parents):
+            node_info = nodes_by_id.get(parent_id, {})
+            qty = parent_meta.get(parent_id, {}).get("quantity", 1)
+            is_last = (i == len(parents) - 1)
 
-        grandparent = None
-        if i + 1 < len(rows):
-            next_row = rows[i + 1]
-            grandparent = str(next_row.parent_id)
+            connector = "└── " if is_last else "├── "
+            child_prefix = "    " if is_last else "│   "
 
-        upward_chain.append({
-            "level": i + 1,
-            "entity_type": row.parent_type,
-            "entity_id": str(row.parent_id),
-            "entity_code": parent_code,
-            "entity_name": p.name if p else "",
-            "entity_version": parent_version,
-            "quantity": rows[i + 1].quantity if i + 1 < len(rows) else 1,
-            "parent_entity_id": grandparent,
-            "parent_entity_code": None,
-            "parent_target_version": None,
-            "is_change_target": False,
-            "action": "no_change",
-            "target_version": None,
-            "quantity_change": None,
-            "change_description": "",
-        })
+            upward_chain.append({
+                "level": depth,
+                "entity_type": node_info.get("entity_type", "assembly"),
+                "entity_id": parent_id,
+                "entity_code": node_info.get("entity_code", ""),
+                "entity_name": node_info.get("entity_name", ""),
+                "entity_version": node_info.get("entity_version", ""),
+                "quantity": qty,
+                "parent_entity_id": node_id,
+                "parent_entity_code": obj.code if node_id == target_id else nodes_by_id.get(node_id, {}).get("entity_code"),
+                "parent_target_version": None,
+                "is_change_target": False,
+                "action": "no_change",
+                "target_version": None,
+                "quantity_change": None,
+                "change_description": "",
+                "tree_path": tree_prefix,
+                "tree_connector": connector,
+                "has_sibling": len(parents) > 1,
+                "is_last_child": is_last,
+            })
 
-    # 顶层 parent_entity_id 设为 null
-    if upward_chain:
-        upward_chain[-1]["parent_entity_id"] = None
+            build_upward_tree(parent_id, depth + 1, tree_prefix + child_prefix, is_last)
+
+    # 从变更目标开始向上构建
+    if target_id in child_to_parents:
+        parents = child_to_parents[target_id]
+        for i, parent_id in enumerate(parents):
+            node_info = nodes_by_id.get(parent_id, {})
+            qty = parent_meta.get(parent_id, {}).get("quantity", 1)
+            is_last = (i == len(parents) - 1)
+
+            connector = "└── " if is_last else "├── "
+            child_prefix = "    " if is_last else "│   "
+
+            upward_chain.append({
+                "level": 1,
+                "entity_type": node_info.get("entity_type", "assembly"),
+                "entity_id": parent_id,
+                "entity_code": node_info.get("entity_code", ""),
+                "entity_name": node_info.get("entity_name", ""),
+                "entity_version": node_info.get("entity_version", ""),
+                "quantity": qty,
+                "parent_entity_id": target_id,
+                "parent_entity_code": obj.code,
+                "parent_target_version": None,
+                "is_change_target": False,
+                "action": "no_change",
+                "target_version": None,
+                "quantity_change": None,
+                "change_description": "",
+                "tree_path": "",
+                "tree_connector": connector,
+                "has_sibling": len(parents) > 1,
+                "is_last_child": is_last,
+            })
+
+            build_upward_tree(parent_id, 2, child_prefix, is_last)
 
     # ── 向下展开（仅部件） ──
     if entity_type == "assembly":
@@ -571,3 +672,48 @@ async def get_bom_trace(
         "upward_chain": upward_chain,
         "downward_items": downward_items,
     }
+
+
+# ─────────────────────────────────────────────────────
+# 13. 知会用户
+# ─────────────────────────────────────────────────────
+@router.post("/{ecr_id}/cc")
+async def cc_ecr(
+    ecr_id: uuid.UUID,
+    data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
+):
+    """知会其他用户"""
+    ecr = crud_ecr.get_ecr(db, ecr_id)
+    user_ids = data.get("user_ids", [])
+    if not user_ids:
+        raise HTTPException(status_code=400, detail="请选择要知会的用户")
+    
+    cc_list = list(ecr.cc_users or [])
+    existing = {c["user_id"] for c in cc_list}
+    for uid in user_ids:
+        if uid not in existing:
+            user = db.query(User).filter(User.id == uid).first()
+            if user:
+                cc_list.append({"user_id": str(user.id), "user_name": user.real_name})
+    
+    ecr.cc_users = cc_list
+    db.commit()
+    return {"message": "知会成功", "cc_users": cc_list}
+
+
+@router.delete("/{ecr_id}/cc/{user_id}")
+async def uncc_ecr(
+    ecr_id: uuid.UUID,
+    user_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
+):
+    """取消知会"""
+    ecr = crud_ecr.get_ecr(db, ecr_id)
+    cc_list = list(ecr.cc_users or [])
+    uid = str(user_id)
+    ecr.cc_users = [c for c in cc_list if c["user_id"] != uid]
+    db.commit()
+    return {"message": "取消知会成功", "cc_users": ecr.cc_users}

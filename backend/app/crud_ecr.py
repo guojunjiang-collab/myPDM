@@ -95,9 +95,21 @@ def create_ecr(db: Session, data: ECRCreate, creator_id: uuid.UUID) -> ECR:
     return db_ecr
 
 
-def get_ecrs(db: Session, params: ECRListParams):
-    """查询 ECR 列表（分页 + 筛选），返回 (items, total)"""
+def get_ecrs(db: Session, params: ECRListParams, current_user=None):
+    """查询 ECR 列表（分页 + 筛选）。非管理员只看与自己相关的 ECR"""
+    from sqlalchemy import or_, cast, String
     q = db.query(ECR)
+
+    # 非管理员用户：只看自己创建的或被指定为审批人的 ECR
+    if current_user and current_user.role != "admin":
+        uid = str(current_user.id)
+        q = q.filter(
+            or_(
+                ECR.creator_id == current_user.id,
+                ECR.reviewers.cast(String).contains(f'"user_id": "{uid}"'),
+                ECR.cc_users.cast(String).contains(f'"user_id": "{uid}"')
+            )
+        )
 
     # 按状态筛选
     if params.status:
@@ -143,6 +155,7 @@ def get_ecrs(db: Session, params: ECRListParams):
             "status": ecr.status,
             "priority": ecr.priority,
             "category": ecr.category,
+            "creator_id": str(ecr.creator_id),
             "creator_name": creator_name,
             "reviewers_count": reviewers_count,
             "approved_count": approved_count,
@@ -190,10 +203,8 @@ def update_ecr(db: Session, ecr_id: uuid.UUID, data: ECREdit) -> ECR:
 
 
 def delete_ecr(db: Session, ecr_id: uuid.UUID):
-    """删除 ECR（仅 draft 状态可删除）"""
+    """删除 ECR（级联删除关联数据）"""
     ecr = get_ecr(db, ecr_id)
-    if ecr.status != "draft":
-        raise HTTPException(status_code=400, detail="仅草稿状态的 ECR 可以删除")
     db.delete(ecr)
     db.commit()
 
@@ -203,7 +214,8 @@ def change_ecr_status(
     ecr_id: uuid.UUID,
     to_status: str,
     operator_id: uuid.UUID,
-    comment: str | None = None
+    comment: str | None = None,
+    skip_log: bool = False,
 ) -> ECR:
     """变更 ECR 状态，校验流转合法性，写入状态日志"""
     ecr = get_ecr(db, ecr_id)
@@ -221,16 +233,17 @@ def change_ecr_status(
     operator = db.query(User).filter(User.id == operator_id).first()
     operator_name = operator.real_name if operator else ""
 
-    # 创建状态日志
-    log = ECRStatusLog(
-        ecr_id=ecr_id,
-        from_status=from_status,
-        to_status=to_status,
-        operator_id=operator_id,
-        operator_name=operator_name,
-        comment=comment,
-    )
-    db.add(log)
+    # 创建状态日志（审批触发的状态变更不重复记录）
+    if not skip_log:
+        log = ECRStatusLog(
+            ecr_id=ecr_id,
+            from_status=from_status,
+            to_status=to_status,
+            operator_id=operator_id,
+            operator_name=operator_name,
+            comment=comment,
+        )
+        db.add(log)
 
     # 更新 ECR 状态
     ecr.status = to_status
@@ -240,6 +253,7 @@ def change_ecr_status(
     elif to_status == "closed":
         ecr.closed_at = now
     ecr.updated_at = now
+
     db.commit()
     db.refresh(ecr)
     return ecr
