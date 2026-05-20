@@ -7,6 +7,7 @@ import { ECRStatusBadge, ECRPriorityBadge } from './ECRStatusBadge';
 import { ConfirmModal } from '../Modal';
 import { ECRCreateModal } from './ECRCreateModal';
 import { ECRDetailModal } from './ECRDetailModal';
+import { ECRCcPicker } from './ECRCcPicker';
 
 const PAGE_SIZE = 20;
 
@@ -25,6 +26,13 @@ const priorityLabels: Record<string, string> = {
   low: '低',
 };
 
+const categoryLabels: Record<string, string> = {
+  design_change: '设计变更',
+  process_change: '工艺变更',
+  material_change: '物料变更',
+  other: '其他',
+};
+
 export function ECRList() {
   const user = useAuthStore((s) => s.user);
   const [ecrs, setEcrs] = useState<ECRRequest[]>([]);
@@ -40,6 +48,7 @@ export function ECRList() {
   const [detailEcrId, setDetailEcrId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editEcr, setEditEcr] = useState<ECRRequest | null>(null);
+  const [ccEcrId, setCcEcrId] = useState<string | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -78,6 +87,16 @@ export function ECRList() {
   const handleStatusChange = (value: string) => {
     setStatusFilter(value);
     setPage(1);
+  };
+
+  const handleEdit = async (ecr: ECRRequest) => {
+    try {
+      const resp = await ecrApi.get(ecr.id);
+      const detail = (resp.data || resp) as ECRRequest;
+      setEditEcr(detail);
+    } catch {
+      toast.error('获取 ECR 详情失败');
+    }
   };
 
   const handlePriorityChange = (value: string) => {
@@ -158,14 +177,14 @@ export function ECRList() {
     switch (ecr.status) {
       case 'draft':
         return (
-          <div className="flex gap-1">
+          <div className="flex gap-1 justify-end">
             {(isCreator || admin) && (
               <>
                 <button onClick={() => handleSubmit(ecr.id)} disabled={isBusy}
                   className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50">
                   {isBusy ? '...' : '提交'}
                 </button>
-                <button onClick={() => setEditEcr(ecr)}
+                <button onClick={() => handleEdit(ecr)}
                   className="text-xs px-2 py-1 rounded bg-gray-50 text-gray-700 hover:bg-gray-100">
                   编辑
                 </button>
@@ -175,24 +194,28 @@ export function ECRList() {
                 </button>
               </>
             )}
-            {admin && (
+            {(isCreator || admin) && (
               <button onClick={() => setDeleteId(ecr.id)}
                 className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 hover:bg-red-100">
                 删除
               </button>
             )}
+            <button onClick={(e) => { e.stopPropagation(); setCcEcrId(ecr.id); }}
+              className="text-xs px-2 py-1 rounded bg-purple-50 text-purple-700 hover:bg-purple-100">
+              知会
+            </button>
           </div>
         );
       case 'reviewing':
         return (
-          <div className="flex gap-1">
+          <div className="flex gap-1 justify-end">
             {isCreator && (
               <>
                 <button onClick={() => handleSubmit(ecr.id, true)} disabled={isBusy}
                   className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50">
                   {isBusy ? '...' : '撤回'}
                 </button>
-                <button onClick={() => setEditEcr(ecr)}
+                <button onClick={() => handleEdit(ecr)}
                   className="text-xs px-2 py-1 rounded bg-gray-50 text-gray-700 hover:bg-gray-100">
                   编辑
                 </button>
@@ -214,22 +237,55 @@ export function ECRList() {
                 </button>
               </>
             )}
+            {admin && (
+              <button onClick={() => setDeleteId(ecr.id)}
+                className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 hover:bg-red-100">
+                删除
+              </button>
+            )}
+            <button onClick={(e) => { e.stopPropagation(); setCcEcrId(ecr.id); }}
+              className="text-xs px-2 py-1 rounded bg-purple-50 text-purple-700 hover:bg-purple-100">
+              知会
+            </button>
           </div>
         );
       case 'approved':
       case 'rejected':
         return (
-          <div className="flex gap-1">
-            {(isCreator || admin) && (
+          <div className="flex gap-1 justify-end">
+            {admin && (
               <button onClick={() => handleClose(ecr.id)} disabled={isBusy}
                 className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50">
                 {isBusy ? '...' : '关闭'}
               </button>
             )}
+            {admin && (
+              <button onClick={() => setDeleteId(ecr.id)}
+                className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 hover:bg-red-100">
+                删除
+              </button>
+            )}
+            <button onClick={(e) => { e.stopPropagation(); setCcEcrId(ecr.id); }}
+              className="text-xs px-2 py-1 rounded bg-purple-50 text-purple-700 hover:bg-purple-100">
+              知会
+            </button>
           </div>
         );
       case 'closed':
-        return null;
+        return (
+          <div className="flex gap-1 justify-end">
+            {admin && (
+              <button onClick={() => setDeleteId(ecr.id)}
+                className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 hover:bg-red-100">
+                删除
+              </button>
+            )}
+            <button onClick={(e) => { e.stopPropagation(); setCcEcrId(ecr.id); }}
+              className="text-xs px-2 py-1 rounded bg-purple-50 text-purple-700 hover:bg-purple-100">
+              知会
+            </button>
+          </div>
+        );
       default:
         return null;
     }
@@ -308,7 +364,7 @@ export function ECRList() {
                 优先级
               </th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">
-                类别
+                变更类别
               </th>
               <th className="px-4 py-3 text-center text-sm font-medium text-gray-500 whitespace-nowrap">
                 影响项
@@ -357,7 +413,7 @@ export function ECRList() {
                     <ECRPriorityBadge priority={ecr.priority} />
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
-                    {ecr.category || '-'}
+                    {categoryLabels[ecr.category || ''] || ecr.category || '-'}
                   </td>
                   <td className="px-4 py-3 text-sm text-center">
                     <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-gray-700 text-xs font-medium">
@@ -386,7 +442,7 @@ export function ECRList() {
           <span className="text-sm text-gray-500">
             共 {total} 条，第 {page} / {totalPages} 页
           </span>
-          <div className="flex gap-1">
+          <div className="flex gap-1 justify-end">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
@@ -452,6 +508,13 @@ export function ECRList() {
         type="danger"
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}
+      />
+
+      {/* 知会用户选择 */}
+      <ECRCcPicker
+        open={!!ccEcrId}
+        ecrId={ccEcrId || ''}
+        onClose={() => setCcEcrId(null)}
       />
     </div>
   );

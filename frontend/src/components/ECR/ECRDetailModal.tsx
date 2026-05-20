@@ -193,27 +193,8 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
     if (!detail) return null;
     const busy = actionLoading;
     const isCreator = detail.creator_id === currentUserId;
-    const admin = isAdmin();
 
     switch (detail.status) {
-      case 'draft':
-        return (
-          <div className="flex gap-2 flex-wrap">
-            {(isCreator || admin) && (
-              <button onClick={handleSubmit} disabled={busy}
-                className="px-4 py-2 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50">
-                {busy ? '处理中...' : '提交评审'}
-              </button>
-            )}
-            {(isCreator || admin) && (
-              <button onClick={() => setShowCloseForm(!showCloseForm)}
-                className="px-4 py-2 text-sm rounded bg-red-500 text-white hover:bg-red-600">
-                {showCloseForm ? '取消关闭' : '关闭'}
-              </button>
-            )}
-          </div>
-        );
-
       case 'reviewing':
         return (
           <div className="flex gap-2 flex-wrap">
@@ -223,34 +204,10 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
                 {busy ? '处理中...' : '撤回评审'}
               </button>
             )}
-            {(isCreator || admin) && (
-              <button onClick={() => setShowCloseForm(!showCloseForm)}
-                className="px-4 py-2 text-sm rounded bg-red-500 text-white hover:bg-red-600">
-                {showCloseForm ? '取消关闭' : '关闭'}
-              </button>
-            )}
             {isCurrentReviewer() && hasPendingReview() && (
               <span className="text-sm text-blue-600 self-center">👆 请在上方审批区域进行操作</span>
             )}
           </div>
-        );
-
-      case 'approved':
-      case 'rejected':
-        return (
-          <div className="flex gap-2">
-            {(isCreator || admin) && (
-              <button onClick={() => setShowCloseForm(!showCloseForm)}
-                className="px-4 py-2 text-sm rounded bg-gray-500 text-white hover:bg-gray-600">
-                {showCloseForm ? '取消关闭' : '关闭'}
-              </button>
-            )}
-          </div>
-        );
-
-      case 'closed':
-        return (
-          <span className="text-sm text-gray-500">此 ECR 已关闭，无可用操作</span>
         );
 
       default:
@@ -261,28 +218,19 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
   return (
     <Modal
       open={open}
-      title="ECR 详情"
       onClose={onClose}
       width="full"
     >
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold">ECR 详情</h3>
+        <button onClick={() => window.print()} className="text-sm px-3 py-1.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 print:hidden">🖨️ 打印</button>
+      </div>
       {loading && !detail ? (
         <div className="flex items-center justify-center py-12">
           <div className="flex items-center gap-2 text-gray-500">
             <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-                fill="none"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-              />
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
             加载中...
           </div>
@@ -290,7 +238,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
       ) : !detail ? (
         <div className="text-center text-gray-500 py-12">暂无数据</div>
       ) : (
-        <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-1">
+        <div className="print-area space-y-6 max-h-[70vh] overflow-y-auto pr-1">
           {/* Header */}
           <div className="flex items-center justify-between pb-4 border-b border-gray-200">
             <div>
@@ -527,12 +475,6 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
           {/* Action buttons */}
           <div className="pt-4 border-t border-gray-200 flex items-center justify-between">
             {renderActions()}
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm rounded border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              关闭
-            </button>
           </div>
         </div>
       )}
