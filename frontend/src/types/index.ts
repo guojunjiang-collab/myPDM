@@ -294,6 +294,10 @@ export interface BomImpactNode {
   new_item_code?: string;
   new_item_name?: string;
   new_item_spec?: string;
+  tree_path?: string;
+  tree_connector?: string;
+  has_sibling?: boolean;
+  is_last_child?: boolean;
 }
 
 export interface ECRAffectedItem {

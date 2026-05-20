@@ -4,9 +4,9 @@ import { ECRList } from '../components/ECR/ECRList';
 type TabKey = 'ecr' | 'eco' | 'ecn';
 
 const tabs: { key: TabKey; label: string; enabled: boolean }[] = [
-  { key: 'ecr', label: '变更请求 (ECR)', enabled: true },
-  { key: 'eco', label: '变更单 (ECO)', enabled: false },
-  { key: 'ecn', label: '变更通知 (ECN)', enabled: false },
+  { key: 'ecr', label: '工程变更请求(ECR)', enabled: true },
+  { key: 'eco', label: '工程变更指令(ECO)', enabled: false },
+  { key: 'ecn', label: '工程变更通知(ECN)', enabled: false },
 ];
 
 export default function EC() {

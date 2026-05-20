@@ -397,6 +397,10 @@ export const ecrApi = {
     api.post(`/ecrs/${ecrId}/bom-trace/${entityType}/${entityId}`),
   updateAffectedItem: (ecrId: string, itemId: string, data: unknown) =>
     api.put(`/ecrs/${ecrId}/affected-items/${itemId}`, data),
+  cc: (ecrId: string, userIds: string[]) =>
+    api.post(`/ecrs/${ecrId}/cc`, { user_ids: userIds }),
+  uncc: (ecrId: string, userId: string) =>
+    api.delete(`/ecrs/${ecrId}/cc/${userId}`),
 };
 
 export default api;
