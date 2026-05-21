@@ -404,3 +404,47 @@ export const ecrApi = {
 };
 
 export default api;
+
+// ECO API
+export const ecoApi = {
+  list: (params: { page?: number; page_size?: number; search?: string; status?: string; priority?: string }) =>
+    api.get('/ecos/', { params }),
+  detail: (id: string) =>
+    api.get(`/ecos/${id}`),
+  create: (data: unknown) =>
+    api.post('/ecos/', data),
+  update: (id: string, data: unknown) =>
+    api.put(`/ecos/${id}`, data),
+  delete: (id: string) =>
+    api.delete(`/ecos/${id}`),
+  submit: (id: string) =>
+    api.post(`/ecos/${id}/submit`),
+  withdraw: (id: string) =>
+    api.post(`/ecos/${id}/withdraw`),
+  review: (id: string, decision: string, comment?: string) =>
+    api.post(`/ecos/${id}/review`, { decision, comment }),
+  close: (id: string, comment?: string) =>
+    api.post(`/ecos/${id}/close`, { comment }),
+  startExecution: (id: string) =>
+    api.post(`/ecos/${id}/execute`),
+  executeItem: (ecoId: string, itemId: string) =>
+    api.post(`/ecos/${ecoId}/execute-item/${itemId}`),
+  executeAll: (id: string) =>
+    api.post(`/ecos/${id}/execute-all`),
+  getExecutionItems: (ecoId: string) =>
+    api.get(`/ecos/${ecoId}/execution-items`),
+  addExecutionItem: (ecoId: string, data: unknown) =>
+    api.post(`/ecos/${ecoId}/execution-items`, data),
+  updateExecutionItem: (ecoId: string, itemId: string, data: unknown) =>
+    api.put(`/ecos/${ecoId}/execution-items/${itemId}`, data),
+  deleteExecutionItem: (ecoId: string, itemId: string) =>
+    api.delete(`/ecos/${ecoId}/execution-items/${itemId}`),
+  getStatusLogs: (ecoId: string) =>
+    api.get(`/ecos/${ecoId}/status-logs`),
+  cc: (ecoId: string, userIds: string[]) =>
+    api.post(`/ecos/${ecoId}/cc`, { user_ids: userIds }),
+  uncc: (ecoId: string, userId: string) =>
+    api.delete(`/ecos/${ecoId}/cc/${userId}`),
+  bomTrace: (ecoId: string, entityType: string, entityId: string) =>
+    api.post(`/ecos/${ecoId}/bom-trace/${entityType}/${entityId}`),
+};

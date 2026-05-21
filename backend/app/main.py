@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from .routers import auth_router, users_router, parts_router, assemblies_router, bom_router, logs_router, custom_fields_router, documents_router, dashboard_router, ecr_router
+from .routers import auth_router, users_router, parts_router, assemblies_router, bom_router, logs_router, custom_fields_router, documents_router, dashboard_router, ecr_router, eco_router
 from .routers.attachments_v2 import router as attachments_v2_router
 from .database import SessionLocal
 
@@ -33,6 +33,7 @@ app.include_router(custom_fields_router, prefix="/api")
 app.include_router(documents_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
 app.include_router(ecr_router, prefix="/api")
+app.include_router(eco_router, prefix="/api")
 
 @app.on_event("startup")
 async def startup_event():

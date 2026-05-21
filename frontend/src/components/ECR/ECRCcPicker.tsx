@@ -3,13 +3,22 @@ import { Modal } from '../Modal';
 import { toast } from '../Toast';
 import { ecrApi, usersApi } from '../../services/api';
 
+interface CcPickerApi {
+  get: (id: string) => Promise<any>;
+  cc: (id: string, userIds: string[]) => Promise<any>;
+  uncc: (id: string, userId: string) => Promise<any>;
+}
+
 interface ECRCcPickerProps {
   open: boolean;
   ecrId: string;
   onClose: () => void;
+  /** Optional: custom API for non-ECR usage (e.g., ECO) */
+  api?: CcPickerApi;
 }
 
-export function ECRCcPicker({ open, ecrId, onClose }: ECRCcPickerProps) {
+export function ECRCcPicker({ open, ecrId, onClose, api }: ECRCcPickerProps) {
+  const entityApi = api || ecrApi;
   const [users, setUsers] = useState<any[]>([]);
   const [ccUserIds, setCcUserIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -23,7 +32,7 @@ export function ECRCcPicker({ open, ecrId, onClose }: ECRCcPickerProps) {
       setLoading(true);
       Promise.all([
         usersApi.list({ page_size: 200 }),
-        ecrApi.get(ecrId).catch(() => ({ data: { cc_users: [] } })),
+        entityApi.get(ecrId).catch(() => ({ data: { cc_users: [] } })),
       ]).then(([usersResp, ecrResp]) => {
         const userData = usersResp.data?.items || usersResp.data || [];
         setUsers(Array.isArray(userData) ? userData : []);
@@ -42,7 +51,7 @@ export function ECRCcPicker({ open, ecrId, onClose }: ECRCcPickerProps) {
   const handleUncc = async (uid: string) => {
     setUnccLoading(uid);
     try {
-      await ecrApi.uncc(ecrId, uid);
+      await entityApi.uncc(ecrId, uid);
       setCcUserIds((prev) => prev.filter((id) => id !== uid));
       toast.success('已取消知会');
     } catch {
@@ -56,7 +65,7 @@ export function ECRCcPicker({ open, ecrId, onClose }: ECRCcPickerProps) {
     if (selectedIds.length === 0) return;
     setSubmitting(true);
     try {
-      await ecrApi.cc(ecrId, selectedIds);
+      await entityApi.cc(ecrId, selectedIds);
       toast.success('知会成功');
       onClose();
     } catch {

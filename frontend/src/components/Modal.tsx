@@ -5,7 +5,7 @@ interface ModalProps {
   title?: string;
   onClose: () => void;
   children: ReactNode;
-  width?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  width?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | '3xl';
   zIndex?: number;
 }
 
@@ -33,6 +33,7 @@ export function Modal({ open, title, onClose, children, width = 'md', zIndex = 5
     lg: 'max-w-lg',
     xl: 'max-w-xl',
     full: 'max-w-4xl',
+    '3xl': 'max-w-6xl',
   };
 
   if (!visible && !open) return null;

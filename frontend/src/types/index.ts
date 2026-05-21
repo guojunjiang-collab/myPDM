@@ -352,3 +352,187 @@ export interface ECRListParams {
   creator_id?: string;
 }
 
+// ECO Types
+export interface ECOReviewer {
+  user_id: string;
+  user_name: string;
+  role: string;
+  seq: number;
+}
+
+export interface ECORequest {
+  id: string;
+  eco_number: string;
+  title: string;
+  description?: string;
+  reason: string;
+  priority: 'urgent' | 'high' | 'normal' | 'low';
+  category?: string;
+  status: 'draft' | 'reviewing' | 'approved' | 'rejected' | 'executing' | 'completed' | 'closed';
+  review_mode: 'all' | 'any';
+  creator_id: string;
+  creator_name: string;
+  executor_id?: string;
+  executor_name?: string;
+  reviewers: ECOReviewer[];
+  reviewers_count: number;
+  approved_count: number;
+  execution_count: number;
+  execution_completed_count: number;
+  document_links: ECRDocumentLink[];
+  execution_items?: ECOExecutionItem[];
+  ecr_id?: string;
+  ecr_number?: string;
+  created_at: string;
+  updated_at: string;
+  reviewed_at?: string;
+  executed_at?: string;
+  closed_at?: string;
+}
+
+export interface ECOReviewRecord {
+  id: string;
+  reviewer_id: string;
+  reviewer_name: string;
+  decision: 'approved' | 'rejected' | 'returned';
+  comment?: string;
+  created_at: string;
+}
+
+export interface ECOExecutionItem {
+  id: string;
+  eco_id?: string;
+  source: 'ecr' | 'manual';
+  affected_item_id?: string;
+  entity_type: 'part' | 'assembly';
+  entity_id?: string;
+  entity_code?: string;
+  entity_name: string;
+  action: 'create' | 'upgrade' | 'qty_change' | 'delete' | 'no_change';
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped';
+  detail?: Record<string, unknown>;
+  new_entity_id?: string;
+  new_version?: string;
+  parent_entity_id?: string;
+  parent_new_entity_id?: string;
+  error_message?: string;
+  sort_order: number;
+  executed_at?: string;
+}
+
+export interface ECOStatusLog {
+  id: string;
+  from_status?: string;
+  to_status: string;
+  operator_name: string;
+  comment?: string;
+  created_at: string;
+}
+
+export interface ECOCreateData {
+  title: string;
+  description?: string;
+  reason: string;
+  priority: string;
+  category?: string;
+  reviewers: { user_id: string; seq: number }[];
+  review_mode: string;
+  document_links: ECRDocumentLink[];
+  ecr_id?: string;
+  executor_id?: string;
+  execution_items?: {
+    source?: string;
+    entity_type: string;
+    entity_name: string;
+    action: string;
+    entity_id?: string;
+    entity_code?: string;
+    parent_entity_id?: string;
+  }[];
+}
+
+export interface ECOListParams {
+  page?: number;
+  page_size?: number;
+  search?: string;
+  status?: string;
+  priority?: string;
+}
+
+// ECO Types
+export interface ECOReviewer {
+  user_id: string;
+  user_name: string;
+  role: string;
+  seq: number;
+}
+
+export interface ECOExecutionItem {
+  id: string;
+  source: 'ecr' | 'manual';
+  entity_type: 'part' | 'assembly';
+  entity_id?: string;
+  entity_code?: string;
+  entity_name: string;
+  action: 'create' | 'upgrade' | 'qty_change' | 'delete' | 'no_change';
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped';
+  detail?: Record<string, unknown>;
+  new_entity_id?: string;
+  new_version?: string;
+  parent_entity_id?: string;
+  parent_new_entity_id?: string;
+  error_message?: string;
+  sort_order: number;
+  executed_at?: string;
+}
+
+export interface ECOStatusLog {
+  id: string;
+  from_status?: string;
+  to_status: string;
+  operator_name: string;
+  comment?: string;
+  created_at: string;
+}
+
+export interface ECOReviewRecord {
+  id: string;
+  reviewer_id: string;
+  reviewer_name: string;
+  decision: 'approved' | 'rejected' | 'returned';
+  comment?: string;
+  created_at: string;
+}
+
+export interface ECORequest {
+  id: string;
+  eco_number: string;
+  ecr_id?: string;
+  title: string;
+  description?: string;
+  reason: string;
+  priority: 'urgent' | 'high' | 'normal' | 'low';
+  category?: string;
+  status: 'draft' | 'reviewing' | 'approved' | 'rejected' | 'executing' | 'completed' | 'closed';
+  review_mode: 'all' | 'any';
+  creator_id: string;
+  creator_name: string;
+  executor_id?: string;
+  executor_name?: string;
+  reviewers: ECOReviewer[];
+  reviewers_count: number;
+  approved_count: number;
+  execution_count: number;
+  execution_completed_count: number;
+  document_links: ECRDocumentLink[];
+  execution_items?: ECOExecutionItem[];
+  review_records?: ECOReviewRecord[];
+  status_logs?: ECOStatusLog[];
+  cc_users?: { user_id: string; user_name: string }[];
+  created_at: string;
+  updated_at: string;
+  reviewed_at?: string;
+  executed_at?: string;
+  closed_at?: string;
+}
+

@@ -6,6 +6,7 @@ import { useAuthStore, canEdit, isAdmin } from '../../stores/auth';
 import { ECRStatusBadge, ECRPriorityBadge } from './ECRStatusBadge';
 import { ECRReviewPanel } from './ECRReviewPanel';
 import { ECRBomImpactView } from './ECRBomImpactView';
+import { ECOCreateModal } from '../ECO/ECOCreateModal';
 import type { ECRRequest, ECRReviewRecord, ECRAffectedItem, ECRStatusLog, ECRDocumentLink } from '../../types';
 
 const REASON_LABELS: Record<string, string> = {
@@ -67,6 +68,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
   // Review action state
   const [showCloseForm, setShowCloseForm] = useState(false);
   const [closeComment, setCloseComment] = useState('');
+  const [showEcoCreate, setShowEcoCreate] = useState(false);
 
   const loadDetail = useCallback(async () => {
     if (!ecrId) return;
@@ -210,12 +212,25 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
           </div>
         );
 
+      case 'approved':
+        return (
+          <div className="flex gap-2">
+            {(isCreator || isAdmin()) && (
+              <button onClick={() => setShowEcoCreate(true)} disabled={busy}
+                className="px-4 py-2 text-sm rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50">
+                创建 ECO
+              </button>
+            )}
+          </div>
+        );
+
       default:
         return null;
     }
   };
 
   return (
+    <>
     <Modal
       open={open}
       onClose={onClose}
@@ -479,6 +494,22 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
         </div>
       )}
     </Modal>
+    {showEcoCreate && detail && (
+      <ECOCreateModal
+        open={showEcoCreate}
+        onClose={() => setShowEcoCreate(false)}
+        onCreated={() => { setShowEcoCreate(false); onSuccess(); }}
+        ecrId={detail.id}
+        ecrTitle={detail.title}
+        ecrItems={(detail.affected_items || []).map((ai) => ({
+          entity_type: ai.entity_type,
+          entity_name: ai.entity_name || '',
+          entity_id: ai.entity_id,
+          action: 'upgrade',
+        }))}
+      />
+    )}
+  </>
   );
 }
 
