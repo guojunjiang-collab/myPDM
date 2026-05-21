@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Modal } from '../Modal';
 import { toast } from '../Toast';
-import { ecoApi, usersApi, documentsApi } from '../../services/api';
+import { ecoApi, usersApi, documentsApi, ecrApi } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
 import type { ECORequest, ECRDocumentLink } from '../../types';
 
@@ -86,6 +86,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
   const [bomData, setBomData] = useState<{ up: any[]; down: any[] } | null>(null);
   const [documentLinks, setDocumentLinks] = useState<ECRDocumentLink[]>([]);
   const [showDocPicker, setShowDocPicker] = useState(false);
+  const [showEcrPicker, setShowEcrPicker] = useState(false);
   const [docData, setDocData] = useState<Record<string, any>>({});
   const [docAttachments, setDocAttachments] = useState<Record<string, any[]>>({});
   const onCloseRef = useRef(onClose);
@@ -202,6 +203,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         });
       }
       if (ecrId) data.ecr_id = ecrId;
+      if (localEco?.ecr_id) data.ecr_id = localEco.ecr_id;
       if (editingEco) {
         await ecoApi.update(editingEco.id, data);
         toast.success('ECO 更新成功');
@@ -233,39 +235,46 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
           {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
         </div>
 
-        {/* 变更原因 */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">变更原因 <span className="text-red-500">*</span></label>
-          <select value={reason} onChange={(e) => setReason(e.target.value)}
-            className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${errors.reason ? 'border-red-500' : 'border-gray-300'}`}>
-            {REASON_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          {errors.reason && <p className="text-red-500 text-xs mt-1">{errors.reason}</p>}
-        </div>
-
-        {/* 优先级 + 类别 */}
+        {/* 变更原因 + 变更类别 */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">优先级</label>
-            <select value={priority} onChange={(e) => setPriority(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-              {PRIORITY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            <label className="block text-sm font-medium text-gray-700 mb-1">变更原因 <span className="text-red-500">*</span></label>
+            <select value={reason} onChange={(e) => setReason(e.target.value)}
+              className={`w-full px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.reason ? 'border-red-400' : 'border-gray-300'}`}>
+              {REASON_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
+            {errors.reason && <p className="text-red-500 text-xs mt-1">{errors.reason}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">变更类别</label>
             <select value={category} onChange={(e) => setCategory(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+              className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
               {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
         </div>
 
-        {/* 描述 */}
+        {/* 优先级 — radio 单选项 */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">详细描述</label>
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+          <label className="block text-sm font-medium text-gray-700 mb-1">优先级</label>
+          <div className="flex gap-3 flex-wrap">
+            {PRIORITY_OPTIONS.map((o) => (
+              <label key={o.value} className="flex items-center gap-1.5 cursor-pointer">
+                <input type="radio" name="priority" value={o.value} checked={priority === o.value}
+                  onChange={(e) => setPriority(e.target.value)} className="text-blue-600" />
+                <span className="text-sm text-gray-700">{o.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* 描述 — 自适应高度 */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">变更描述</label>
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)}
+            onInput={(e) => { e.currentTarget.style.height = 'auto'; e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px'; }}
+            rows={1} style={{ minHeight: '38px', resize: 'none' }}
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 overflow-hidden"
             placeholder="变更详细描述（选填）" />
         </div>
 
@@ -288,8 +297,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
           </div>
         </div>
 
-        {/* 审批人选择 */}
-        <div>
+        {editingEco && <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-gray-700">👤 审批人</label>
             <button type="button" onClick={addReviewer}
@@ -326,7 +334,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
               </div>
             ))}
           </div>
-        </div>
+        </div>}
 
         {ecrItems && ecrItems.length > 0 && (
           <div>
@@ -342,6 +350,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
           </div>
         )}
 
+        {editingEco && <div>
         {/* 关联图文档 */}
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
@@ -387,6 +396,32 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
             )}
           </div>
         </div>
+        </div>}
+
+        {/* 关联 ECR（仅编辑模式） */}
+        {!!localEco && (
+        <div className="border-t pt-4">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-medium text-gray-700">关联 ECR</h4>
+            <div className="flex gap-2">
+              <span className="text-xs text-gray-500 self-center">{localEco.ecr_number || '未关联'}</span>
+              <button type="button" onClick={() => setShowEcrPicker(true)}
+                className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">
+                {localEco.ecr_id ? '更换' : '+ 关联 ECR'}
+              </button>
+              {localEco.ecr_id && (
+                <button type="button" onClick={async () => {
+                  try {
+                    await ecoApi.update(localEco.id, { ecr_id: null } as any);
+                    setLocalEco({ ...localEco, ecr_id: undefined, ecr_number: undefined });
+                    toast.success('已解除 ECR 关联');
+                  } catch { toast.error('操作失败'); }
+                }} className="text-xs px-2 py-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50">解除</button>
+              )}
+            </div>
+          </div>
+        </div>
+        )}
 
         {/* ECR BOM 影响分析（编辑模式） */}
         {!!localEco && (
@@ -395,7 +430,6 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
               try {
                 await ecoApi.update(localEco.id, { ecr_id: newEcrId } as any);
                 setLocalEco({ ...localEco, ecr_id: newEcrId });
-                onCreated();
                 toast.success('ECR 关联成功');
               } catch { toast.error('关联失败'); }
             }} onBomChange={setBomData} />
@@ -428,6 +462,83 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         }}
         alreadyLinked={documentLinks.map(d => d.document_id)}
       />
+
+      {/* ECR 选择弹窗 */}
+      {showEcrPicker && (
+      <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center" onClick={() => setShowEcrPicker(false)}>
+        <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[70vh] overflow-auto p-4" onClick={e => e.stopPropagation()}>
+          <h4 className="text-sm font-semibold mb-3">选择 ECR</h4>
+          <EcrPicker onSelect={async (id, number) => {
+            try {
+              await ecoApi.update(localEco!.id, { ecr_id: id } as any);
+              setLocalEco(prev => prev ? { ...prev, ecr_id: id, ecr_number: number } : prev);
+              toast.success('ECR 关联成功');
+            } catch { toast.error('关联失败'); }
+            setShowEcrPicker(false);
+          }} />
+        </div>
+      </div>
+      )}
     </Modal>
+  );
+}
+
+function EcrPicker({ onSelect }: { onSelect: (id: string, number: string) => void }) {
+  const [search, setSearch] = useState('');
+  const [results, setResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    if (!loaded) {
+      setSearching(true);
+      ecrApi.list({ page_size: 100 }).then(r => setResults(r.data?.items || r.data || [])).catch(() => {}).finally(() => { setSearching(false); setLoaded(true); });
+    }
+  }, [loaded]);
+  const handleSearch = async () => {
+    if (!search.trim()) {
+      setSearching(true);
+      ecrApi.list({ page_size: 100 }).then(r => setResults(r.data?.items || r.data || [])).catch(() => {}).finally(() => setSearching(false));
+      return;
+    }
+    setSearching(true);
+    try {
+      const r = await ecrApi.list({ search: search.trim(), page_size: 10 });
+      setResults(r.data?.items || r.data || []);
+    } catch {}
+    finally { setSearching(false); }
+  };
+  const stl = (s: string) => {
+    const map: Record<string, string> = { draft: '草稿', reviewing: '审核中', approved: '已批准', rejected: '已驳回', executing: '执行中', completed: '已完成', closed: '已关闭' };
+    return map[s] || s;
+  };
+  return (
+    <div>
+      <div className="flex gap-2 mb-3">
+        <input value={search} onChange={e => setSearch(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSearch()}
+          placeholder="搜索 ECR 编号或标题..." className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm" />
+        <button onClick={handleSearch} disabled={searching}
+          className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm disabled:opacity-50">搜索</button>
+      </div>
+      {searching ? <p className="text-xs text-gray-400 text-center py-4">加载中...</p> : (
+        <table className="w-full text-sm border-collapse">
+          <thead><tr className="bg-gray-50 border-b">
+            <th className="px-3 py-2 text-left text-gray-500 font-medium text-xs">ECR 编号</th>
+            <th className="px-3 py-2 text-left text-gray-500 font-medium text-xs">标题</th>
+            <th className="px-3 py-2 text-left text-gray-500 font-medium text-xs w-20">状态</th>
+          </tr></thead>
+          <tbody className="divide-y">
+            {results.map(e => (
+              <tr key={e.id || e.ecr_number} className="hover:bg-blue-50 cursor-pointer" onClick={() => onSelect(e.id || e.ecr_number, e.ecr_number)}>
+                <td className="px-3 py-2 font-mono text-xs text-blue-600">{e.ecr_number || '-'}</td>
+                <td className="px-3 py-2 text-xs truncate max-w-0">{e.title || '无标题'}</td>
+                <td className="px-3 py-2 text-xs">{stl(e.status)}</td>
+              </tr>
+            ))}
+            {results.length === 0 && <tr><td colSpan={3} className="text-xs text-gray-400 text-center py-4">无数据</td></tr>}
+          </tbody>
+        </table>
+      )}
+    </div>
   );
 }

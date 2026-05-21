@@ -147,6 +147,7 @@ class ECOEdit(BaseSchema):
     review_mode: Optional[Literal["all", "any"]] = None
     document_links: Optional[List[ECODocumentLinkItem]] = None
     executor_id: Optional[str] = None
+    ecr_id: Optional[str] = None
 
 
 # ============================================================

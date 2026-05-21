@@ -321,29 +321,7 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly }: Props
   return (
     <div className="space-y-6">
       {!ecrId && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h4 className="text-sm font-semibold text-blue-800 mb-1">关联 ECR</h4>
-          <p className="text-xs text-blue-600 mb-2">搜索并关联已批准的 ECR</p>
-          <div className="flex gap-2">
-            <input value={searchText} onChange={e => setSearchText(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && search()}
-              placeholder="ECR 编号或标题..." className="flex-1 px-3 py-1.5 border border-blue-300 rounded text-sm" />
-            <button onClick={search} disabled={searching}
-              className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm disabled:opacity-50">搜索</button>
-          </div>
-          {results.length > 0 && (
-            <div className="mt-2 border border-blue-200 rounded bg-white divide-y max-h-40 overflow-auto">
-              {results.map((e: any) => (
-                <div key={e.id} className="px-3 py-2 text-sm flex items-center gap-2 hover:bg-blue-50 cursor-pointer"
-                  onClick={() => onEcrLinked(e.id)}>
-                  <span className="font-mono text-xs text-blue-600">{e.ecr_number}</span>
-                  <span className="flex-1 truncate">{e.title}</span>
-                  <span className="text-xs text-gray-400">{e.status}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <p className="text-xs text-gray-400 text-center py-4">未关联 ECR，无法显示变更分析</p>
       )}
 
       {ecrId && loading && <p className="text-xs text-gray-400 text-center py-4">加载中...</p>}
