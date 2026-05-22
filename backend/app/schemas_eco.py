@@ -79,17 +79,18 @@ class ECOExecutionItemCreate(BaseSchema):
     source: Literal["ecr", "manual"] = "ecr"
     entity_type: Literal["part", "assembly"]
     entity_name: str = Field(..., max_length=255)
-    action: Literal["create", "upgrade", "qty_change", "delete", "no_change"]
+    action: Literal["create", "upgrade", "qty_change", "delete", "no_change", "add_existing"]
     entity_id: Optional[str] = None
     entity_code: Optional[str] = None
     parent_entity_id: Optional[str] = None
     affected_item_id: Optional[str] = None
+    detail: Optional[Dict[str, Any]] = None
 
 
 class ECOExecutionItemEdit(BaseSchema):
     """编辑执行项请求"""
     entity_name: Optional[str] = Field(None, max_length=255)
-    action: Optional[Literal["create", "upgrade", "qty_change", "delete", "no_change"]] = None
+    action: Optional[Literal["create", "upgrade", "qty_change", "delete", "no_change", "add_existing"]] = None
     entity_code: Optional[str] = None
     parent_entity_id: Optional[str] = None
     sort_order: Optional[int] = None
@@ -148,6 +149,7 @@ class ECOEdit(BaseSchema):
     document_links: Optional[List[ECODocumentLinkItem]] = None
     executor_id: Optional[str] = None
     ecr_id: Optional[str] = None
+    execution_items: Optional[List[ECOExecutionItemCreate]] = None
 
 
 # ============================================================

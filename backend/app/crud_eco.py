@@ -128,6 +128,7 @@ def create_eco(db: Session, data: ECOCreate, creator_id: uuid.UUID) -> ECO:
     eco_number = generate_eco_number(db)
     reviewers_json = _build_reviewers_json(db, data.reviewers) if data.reviewers else []
     document_links_json = [dl.model_dump() if hasattr(dl, "model_dump") else dl for dl in data.document_links]
+    ecr_id_val = uuid.UUID(data.ecr_id) if data.ecr_id else None
 
     db_eco = ECO(
         eco_number=eco_number,
@@ -141,7 +142,7 @@ def create_eco(db: Session, data: ECOCreate, creator_id: uuid.UUID) -> ECO:
         review_mode=data.review_mode,
         creator_id=creator_id,
         document_links=document_links_json,
-        ecr_id=uuid.UUID(data.ecr_id) if data.ecr_id else None,
+        ecr_id=ecr_id_val,
         executor_id=uuid.UUID(data.executor_id) if data.executor_id else None,
     )
     db.add(db_eco)
@@ -166,19 +167,11 @@ def create_eco(db: Session, data: ECOCreate, creator_id: uuid.UUID) -> ECO:
         db.commit()
 
     # ECR 回填: 如果从 ECR 创建，更新 ECR.eco_id
-    if ecr_id:
+    if ecr_id_val:
         from app.models_ecr import ECR
-        ecr = db.query(ECR).filter(ECR.id == ecr_id).first()
+        ecr = db.query(ECR).filter(ECR.id == ecr_id_val).first()
         if ecr:
             ecr.eco_id = db_eco.id
-            db.commit()
-
-    # 回填 ECR 的 eco_id
-    if ecr_id:
-        from app.models_ecr import ECR as ECRModel
-        ecr_obj = db.query(ECRModel).filter(ECRModel.id == ecr_id).first()
-        if ecr_obj:
-            ecr_obj.eco_id = db_eco.id
             db.commit()
 
     return db_eco
@@ -281,6 +274,25 @@ def update_eco(db: Session, eco: ECO, data: ECOEdit):
             setattr(eco, field, uuid.UUID(value) if value else None)
         elif field == "document_links" and value is not None:
             setattr(eco, field, [dl.model_dump() if hasattr(dl, "model_dump") else dl for dl in value])
+        elif field == "execution_items" and value is not None:
+            # 替换所有执行项
+            db.query(ECOExecutionItem).filter(ECOExecutionItem.eco_id == eco.id).delete()
+            for idx, item in enumerate(value):
+                ei_data = item if isinstance(item, dict) else item.model_dump() if hasattr(item, "model_dump") else {}
+                ei = ECOExecutionItem(
+                    eco_id=eco.id,
+                    source=ei_data.get("source", "manual"),
+                    entity_type=ei_data.get("entity_type", "part"),
+                    entity_name=ei_data.get("entity_name", ""),
+                    action=ei_data.get("action", "no_change"),
+                    entity_id=uuid.UUID(ei_data["entity_id"]) if ei_data.get("entity_id") else None,
+                    entity_code=ei_data.get("entity_code"),
+                    parent_entity_id=uuid.UUID(ei_data["parent_entity_id"]) if ei_data.get("parent_entity_id") else None,
+                    detail=ei_data.get("detail"),
+                    status="pending",
+                    sort_order=idx,
+                )
+                db.add(ei)
         else:
             setattr(eco, field, value)
 

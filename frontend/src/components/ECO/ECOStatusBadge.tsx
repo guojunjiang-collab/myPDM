@@ -24,6 +24,8 @@ const actionConfig: Record<string, { label: string; class: string }> = {
   qty_change: { label: '数量变更', class: 'bg-orange-100 text-orange-800' },
   delete: { label: '删除', class: 'bg-red-100 text-red-800' },
   no_change: { label: '不变', class: 'bg-gray-100 text-gray-600' },
+  add_existing: { label: '新增', class: 'bg-teal-100 text-teal-800' },
+  add_new: { label: '新建', class: 'bg-green-100 text-green-800' },
 };
 
 const execStatusConfig: Record<string, { label: string; class: string }> = {

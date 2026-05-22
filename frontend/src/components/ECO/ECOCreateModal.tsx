@@ -193,13 +193,31 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
       };
       // Merge BOM modifications into execution_items
       if (bomData) {
-        const modified: Record<string, string> = {};
-        (bomData.up || []).concat(bomData.down || []).forEach((n: any) => {
-          if (n.entity_id && n.action) modified[n.entity_id] = n.action;
-        });
         const items = data.execution_items as any[];
+        const existingIds = new Set(items.map((it: any) => it.entity_id).filter(Boolean));
+        // Update actions on existing items
+        const actionMap: Record<string, string> = {};
+        (bomData.up || []).concat(bomData.down || []).forEach((n: any) => {
+          if (n.entity_id && n.action) actionMap[n.entity_id] = n.action;
+        });
         items.forEach((it: any) => {
-          if (it.entity_id && modified[it.entity_id]) it.action = modified[it.entity_id];
+          if (it.entity_id && actionMap[it.entity_id]) it.action = actionMap[it.entity_id];
+        });
+        // Add new items from bomData (add_new / add_existing) that aren't already in execution_items
+        (bomData.down || []).forEach((n: any) => {
+          if ((n.action === 'add_new' || n.action === 'add_existing') && n.entity_code && n.entity_name) {
+            if (!existingIds.has(n.entity_id)) {
+              items.push({
+                source: 'manual',
+                entity_type: n.entity_type || 'part',
+                entity_name: n.entity_name,
+                entity_code: n.entity_code,
+                action: n.action,
+                parent_entity_id: n.parent_entity_id || undefined,
+                detail: { _targetQty: n._targetQty || 1, _desc: n._desc || '' },
+              });
+            }
+          }
         });
       }
       if (ecrId) data.ecr_id = ecrId;
@@ -426,13 +444,13 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         {/* ECR BOM 影响分析（编辑模式） */}
         {!!localEco && (
           <div className="pt-4 border-t border-gray-200">
-            <ECOEditView ecrId={localEco.ecr_id} onEcrLinked={async (newEcrId) => {
-              try {
-                await ecoApi.update(localEco.id, { ecr_id: newEcrId } as any);
-                setLocalEco({ ...localEco, ecr_id: newEcrId });
-                toast.success('ECR 关联成功');
-              } catch { toast.error('关联失败'); }
-            }} onBomChange={setBomData} />
+          <ECOEditView ecrId={localEco.ecr_id} onEcrLinked={async (newEcrId) => {
+            try {
+              await ecoApi.update(localEco.id, { ecr_id: newEcrId } as any);
+              setLocalEco({ ...localEco, ecr_id: newEcrId });
+              toast.success('ECR 关联成功');
+            } catch { toast.error('关联失败'); }
+          }} onBomChange={setBomData} executionItems={localEco.execution_items} />
           </div>
         )}
 

@@ -375,8 +375,9 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
             if (affectedItemId && item.bom_impact) {
               await ecrApi.updateAffectedItem(ecrId, affectedItemId, { bom_impact: item.bom_impact });
             }
-          } catch {
-            // Silently fail - bom_impact will be lost but ECR is saved
+          } catch (err: unknown) {
+            const emsg = err instanceof Error ? err.message : '保存 BOM 影响分析失败';
+            console.error('bom_impact save error:', emsg);
           }
         });
         await Promise.allSettled(savePromises);
