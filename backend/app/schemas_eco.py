@@ -134,6 +134,7 @@ class ECOCreate(BaseSchema):
     document_links: List[ECODocumentLinkItem] = []
     ecr_id: Optional[str] = None
     executor_id: Optional[str] = None
+    release_items: Optional[List[Dict[str, Any]]] = None  # 工程预变更关联零部件
     execution_items: List[ECOExecutionItemCreate] = []
 
 
@@ -149,6 +150,7 @@ class ECOEdit(BaseSchema):
     document_links: Optional[List[ECODocumentLinkItem]] = None
     executor_id: Optional[str] = None
     ecr_id: Optional[str] = None
+    release_items: Optional[List[Dict[str, Any]]] = None
     execution_items: Optional[List[ECOExecutionItemCreate]] = None
 
 

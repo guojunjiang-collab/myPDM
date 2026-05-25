@@ -381,6 +381,7 @@ export interface ECORequest {
   execution_completed_count: number;
   document_links: ECRDocumentLink[];
   execution_items?: ECOExecutionItem[];
+  release_items?: Array<{ entity_type: string; entity_id: string; entity_code: string; entity_name: string; entity_version: string }>;
   ecr_id?: string;
   ecr_number?: string;
   created_at: string;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ecoApi, documentsApi } from '../../services/api';
+import { ecoApi, documentsApi, assemblyPartsApi, partsApi, assembliesApi } from '../../services/api';
 import type { ECORequest, Document } from '../../types';
 import { ECOStatusBadge, ECOPriorityBadge, ECOActionBadge, ECOExecStatusBadge } from './ECOStatusBadge';
 import { Modal } from '../Modal';
@@ -7,9 +7,11 @@ import { toast } from '../Toast';
 import { useAuthStore, isAdmin } from '../../stores/auth';
 import { ECOEditView } from './ECOEditView';
 import { ECRReviewPanel } from '../ECR/ECRReviewPanel';
+import PartDetailContent from '../PartDetailContent';
+import AssemblyDetailContent from '../AssemblyDetailContent';
 
 const statusTag = (s: string) => {
-  const labels: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '已发布', obsolete: '已作废' };
+  const labels: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' };
   const colors: Record<string, string> = {
     draft: 'bg-blue-100 text-blue-800', frozen: 'bg-orange-100 text-orange-800',
     released: 'bg-green-100 text-green-800', obsolete: 'bg-red-100 text-red-800',
@@ -38,6 +40,9 @@ export function ECODetailModal({ ecoId, onClose, onRefresh }: Props) {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [nestedDetail, setNestedDetail] = useState<{ type: string; id: string } | null>(null);
+  const [nestedData, setNestedData] = useState<any>(null);
+  const [nestedLoading, setNestedLoading] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -59,6 +64,17 @@ export function ECODetailModal({ ecoId, onClose, onRefresh }: Props) {
     setActionLoading(true);
     try { await fn(); toast.success(msg); load(); } catch { toast.error('操作失败'); }
     finally { setActionLoading(false); }
+  };
+
+  const viewItem = async (entityType: string, entityId: string) => {
+    setNestedDetail({ type: entityType, id: entityId });
+    setNestedLoading(true);
+    try {
+      const api = entityType === 'assembly' ? assembliesApi : partsApi;
+      const r = await api.get(entityId);
+      setNestedData(r.data);
+    } catch { toast.error('加载详情失败'); }
+    finally { setNestedLoading(false); }
   };
 
   return (
@@ -183,6 +199,11 @@ export function ECODetailModal({ ecoId, onClose, onRefresh }: Props) {
             </div>
           )}
 
+          {/* 工程预变更关联零部件 */}
+          {eco.release_items && eco.release_items.length > 0 && (
+            <ReleaseItemsTable items={eco.release_items} onViewItem={viewItem} />
+          )}
+
           {/* Review panel is handled by ECRReviewPanel inside reviewers section */}
 
           {/* Execute panel */}
@@ -256,6 +277,24 @@ export function ECODetailModal({ ecoId, onClose, onRefresh }: Props) {
 
         </div>
       )}
+
+      {/* 嵌套详情弹窗 */}
+      {nestedDetail && (
+        <Modal open={true} title={nestedDetail.type === 'assembly' ? '部件详情' : '零件详情'}
+          onClose={() => { setNestedDetail(null); setNestedData(null); }} width="full">
+          {nestedLoading ? (
+            <div className="text-center py-8 text-sm text-gray-400">加载中...</div>
+          ) : nestedData ? (
+            nestedDetail.type === 'assembly' ? (
+              <AssemblyDetailContent assembly={nestedData} customFieldDefs={[]} customFieldValues={{}} />
+            ) : (
+              <PartDetailContent part={nestedData} customFieldDefs={[]} customFieldValues={{}} />
+            )
+          ) : (
+            <div className="text-center py-8 text-sm text-gray-400">未找到数据</div>
+          )}
+        </Modal>
+      )}
     </Modal>
   );
 }
@@ -267,6 +306,98 @@ function InfoItem({ label, value, icon }: { label: string; value: string; icon?:
       <div className="text-sm text-gray-900 font-medium">
         {icon && <span className="mr-1">{icon}</span>}
         {value}
+      </div>
+    </div>
+  );
+}
+
+function ReleaseItemsTable({ items, onViewItem }: { items: any[]; onViewItem: (type: string, id: string) => void }) {
+  const [expanded, setExpanded] = useState<Record<string, any[]>>({});
+  const [loadingIdx, setLoadingIdx] = useState<string | null>(null);
+
+  const toggleExpand = async (idx: string, entityId: string, entityType: string) => {
+    if (expanded[idx]) { setExpanded(prev => { const n = {...prev}; delete n[idx]; return n; }); return; }
+    if (entityType !== 'assembly') return;
+    setLoadingIdx(idx);
+    try {
+      const r = await assemblyPartsApi.list(entityId);
+      const children = (r.data || []).map((c: any) => ({
+        entity_type: c.childType === 'component' || c.childType === 'assembly' ? 'assembly' : 'part',
+        entity_id: c.child_id,
+        entity_code: c.child_detail?.code || '',
+        entity_name: c.child_detail?.name || '',
+        entity_version: c.child_detail?.version || '',
+        spec: c.child_detail?.spec || '',
+        status: c.child_detail?.status || '',
+        quantity: c.quantity || 1,
+      }));
+      setExpanded(prev => ({ ...prev, [idx]: children }));
+    } catch { toast.error('加载子项失败'); }
+    finally { setLoadingIdx(null); }
+  };
+
+  const renderRow = (ri: any, level: number, idx: string): React.ReactNode => {
+    const isAssembly = ri.entity_type === 'assembly';
+    const childRows = expanded[idx];
+    const openDetail = () => {
+      onViewItem(isAssembly ? 'assembly' : 'part', ri.entity_id);
+    };
+    return (
+      <>
+        <tr key={idx} className="hover:bg-gray-50 cursor-pointer"
+          onClick={openDetail}>
+          <td className="px-3 py-1.5 text-xs text-gray-400 whitespace-nowrap">
+            <span>{'-'.repeat(level)}{level}</span>
+            {isAssembly && (
+              <button onClick={(e) => { e.stopPropagation(); toggleExpand(idx, ri.entity_id, ri.entity_type); }}
+                className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
+                {childRows ? '▼' : '▶'}
+              </button>
+            )}
+          </td>
+          <td className="px-3 py-1.5 text-xs">
+            <span className={`px-1.5 py-0.5 rounded text-xs ${isAssembly ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+              {isAssembly ? '部件' : '零件'}
+            </span>
+          </td>
+          <td className="px-3 py-1.5 text-xs font-mono">{ri.entity_code}</td>
+          <td className="px-3 py-1.5 text-xs">{ri.entity_name}</td>
+          <td className="px-3 py-1.5 text-xs text-gray-500">{ri.spec || '-'}</td>
+          <td className="px-3 py-1.5 text-xs">{ri.entity_version || 'A'}</td>
+          <td className="px-3 py-1.5 text-xs whitespace-nowrap">{ri.status ? <span className={`px-1.5 py-0.5 rounded text-xs ${statusTag(ri.status).cls}`}>{statusTag(ri.status).label}</span> : '-'}</td>
+          <td className="px-3 py-1.5 text-xs text-center">{ri.quantity || 1}</td>
+        </tr>
+        {childRows && childRows.map((child: any, j: number) =>
+          renderRow(child, level + 1, `${idx}-${j}`)
+        )}
+        {loadingIdx === idx && (
+          <tr><td colSpan={8} className="px-3 py-1.5 text-xs text-gray-400 text-center">加载中...</td></tr>
+        )}
+      </>
+    );
+  };
+
+  return (
+    <div className="border-t pt-3">
+      <h4 className="text-sm font-bold text-gray-700 mb-1.5">工程预变更</h4>
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-20">层级</th>
+              <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-16">类型</th>
+              <th className="px-3 py-1.5 text-left text-xs text-gray-500">件号</th>
+              <th className="px-3 py-1.5 text-left text-xs text-gray-500">中文名称</th>
+              <th className="px-3 py-1.5 text-left text-xs text-gray-500">规格型号</th>
+              <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-14">版本</th>
+              <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-20">状态</th>
+              <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-12">用量</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {items.map((ri, i) => renderRow(ri, 0, String(i)))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

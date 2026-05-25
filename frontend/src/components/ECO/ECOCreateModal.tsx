@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Modal } from '../Modal';
 import { toast } from '../Toast';
-import { ecoApi, usersApi, documentsApi, ecrApi } from '../../services/api';
+import { ecoApi, usersApi, documentsApi, ecrApi, partsApi, assembliesApi } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
 import type { ECORequest, ECRDocumentLink } from '../../types';
 
 const statusTag = (s: string) => {
-  const labels: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '已发布', obsolete: '已作废' };
+  const labels: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' };
   const colors: Record<string, string> = {
     draft: 'bg-blue-100 text-blue-800', frozen: 'bg-orange-100 text-orange-800',
     released: 'bg-green-100 text-green-800', obsolete: 'bg-red-100 text-red-800',
@@ -15,6 +15,7 @@ const statusTag = (s: string) => {
 };
 import { ECOEditView } from './ECOEditView';
 import { ECRDocumentPicker } from '../ECR/ECRDocumentPicker';
+import AssemblyPartPicker from '../AssemblyPartPicker';
 
 const REASON_OPTIONS = [
   { value: 'quality_defect', label: '质量缺陷' },
@@ -87,6 +88,8 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
   const [documentLinks, setDocumentLinks] = useState<ECRDocumentLink[]>([]);
   const [showDocPicker, setShowDocPicker] = useState(false);
   const [showEcrPicker, setShowEcrPicker] = useState(false);
+  const [showReleasePicker, setShowReleasePicker] = useState(false);
+  const [releaseItems, setReleaseItems] = useState<any[]>([]);
   const [docData, setDocData] = useState<Record<string, any>>({});
   const [docAttachments, setDocAttachments] = useState<Record<string, any[]>>({});
   const onCloseRef = useRef(onClose);
@@ -136,6 +139,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         setReviewers((editingEco.reviewers || []).map((r: { user_id: string; seq: number }) => ({ user_id: r.user_id, seq: r.seq })));
         setReviewMode(editingEco.review_mode || 'all');
         setDocumentLinks(editingEco.document_links || []);
+        setReleaseItems(editingEco.release_items || []);
       } else {
         setTitle('');
         setReason('design_opt');
@@ -144,6 +148,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         setDescription('');
         setReviewers([]);
         setReviewMode('all');
+        setReleaseItems([]);
       }
       setErrors({});
     }
@@ -242,6 +247,13 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
           action: it.action || 'upgrade',
           parent_entity_id: it.parent_entity_id || undefined,
           detail: it.detail || undefined,
+        }));
+      }
+      if (releaseItems.length > 0) {
+        data.release_items = releaseItems.map((ri: any) => ({
+          entity_type: ri.entity_type, entity_id: ri.entity_id,
+          entity_code: ri.entity_code, entity_name: ri.entity_name, entity_version: ri.entity_version,
+          spec: ri.spec || '', status: ri.status || 'draft',
         }));
       }
       if (ecrId) data.ecr_id = ecrId;
@@ -396,7 +408,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         {/* 关联图文档 */}
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-medium text-gray-700">关联图文档</h4>
+            <h4 className="text-sm font-bold text-gray-700">关联图文档</h4>
             <button type="button" onClick={() => setShowDocPicker(true)}
               className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 关联图文档</button>
           </div>
@@ -444,9 +456,9 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         {!!localEco && (
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-medium text-gray-700">关联 ECR</h4>
+            <h4 className="text-sm font-bold text-gray-700">关联 ECR</h4>
             <div className="flex gap-2">
-              <span className="text-xs text-gray-500 self-center">{localEco.ecr_number || '未关联'}</span>
+              <span className="text-xs text-gray-400">{localEco.ecr_number || '未关联'}</span>
               <button type="button" onClick={() => setShowEcrPicker(true)}
                 className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">
                 {localEco.ecr_id ? '更换' : '+ 关联 ECR'}
@@ -462,12 +474,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
               )}
             </div>
           </div>
-        </div>
-        )}
-
-        {/* ECR BOM 影响分析（编辑模式） */}
-        {!!localEco && (
-          <div className="pt-4 border-t border-gray-200">
+          {/* ECR BOM 影响分析 */}
           <ECOEditView ecrId={localEco.ecr_id} onEcrLinked={async (newEcrId) => {
             try {
               await ecoApi.update(localEco.id, { ecr_id: newEcrId } as any);
@@ -475,8 +482,86 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
               toast.success('ECR 关联成功');
             } catch { toast.error('关联失败'); }
           }} onBomChange={setBomData} executionItems={localEco.execution_items} />
-          </div>
+        </div>
         )}
+
+        {/* 工程预变更（仅编辑模式） */}
+        {!!localEco && (
+        <div className="border-t pt-4">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-bold text-gray-700">工程预变更</h4>
+            <div className="flex gap-2">
+              {releaseItems.length > 0 && (
+                <button type="button" onClick={() => setReleaseItems([])}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded text-gray-500 hover:bg-gray-50">清空</button>
+              )}
+              <button type="button" onClick={() => setShowReleasePicker(true)}
+                className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">关联零部件</button>
+            </div>
+          </div>
+          {releaseItems.length === 0 ? (
+            <p className="text-xs text-gray-400">点击"关联零部件"选择要纳入工程预变更的零部件</p>
+          ) : (
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-16">类型</th>
+                    <th className="px-3 py-1.5 text-left text-xs text-gray-500">件号</th>
+                    <th className="px-3 py-1.5 text-left text-xs text-gray-500">中文名称</th>
+                    <th className="px-3 py-1.5 text-left text-xs text-gray-500">规格型号</th>
+                    <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-14">版本</th>
+                    <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-20">状态</th>
+                    <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-24">操作</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {releaseItems.map((ri, i) => (
+                    <tr key={i} className="hover:bg-gray-50">
+                      <td className="px-3 py-1.5 text-xs">
+                        <span className={`px-1.5 py-0.5 rounded text-xs ${ri.entity_type === 'assembly' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                          {ri.entity_type === 'assembly' ? '部件' : '零件'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-1.5 text-xs font-mono">{ri.entity_code}</td>
+                      <td className="px-3 py-1.5 text-xs">{ri.entity_name}</td>
+                      <td className="px-3 py-1.5 text-xs text-gray-500">{ri.spec || '-'}</td>
+                      <td className="px-3 py-1.5 text-xs">{ri.entity_version || 'A'}</td>
+                      <td className="px-3 py-1.5 text-xs whitespace-nowrap">{ri.status ? <span className={`px-1.5 py-0.5 rounded text-xs ${statusTag(ri.status).cls}`}>{statusTag(ri.status).label}</span> : '-'}</td>
+                      <td className="px-3 py-1.5 text-center">
+                        <div className="flex gap-1 justify-center">
+                          <button onClick={() => setReleaseItems(prev => prev.filter((_, j) => j !== i))}
+                            className="text-xs text-red-500 hover:text-red-700">移除</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        )}
+
+        {/* AssemblyPartPicker 复用 */}
+        <AssemblyPartPicker open={showReleasePicker} onClose={() => setShowReleasePicker(false)}
+          onConfirm={async (items) => {
+            for (const item of items) {
+              let code = ''; let name = ''; let ver = ''; let spec = ''; let status = '';
+              if (item.child_type === 'part' || item.child_type === 'component') {
+                try { const r = await partsApi.get(item.child_id); code = r.data.code; name = r.data.name; ver = r.data.version || 'A'; spec = r.data.spec || ''; status = r.data.status || 'draft'; } catch {}
+              } else {
+                try { const r = await assembliesApi.get(item.child_id); code = r.data.code; name = r.data.name; ver = r.data.version || 'A'; spec = r.data.spec || ''; status = r.data.status || 'draft'; } catch {}
+              }
+              const key = `${item.child_id}_${item.child_type}`;
+              setReleaseItems(prev => {
+                if (prev.some(r => `${r.entity_id}_${r.entity_type}` === key)) return prev;
+                return [...prev, { entity_type: item.child_type === 'assembly' ? 'assembly' : 'part', entity_id: item.child_id, entity_code: code, entity_name: name, entity_version: ver, spec, status }];
+              });
+            }
+            setShowReleasePicker(false);
+          }}
+        />
 
         {/* 按钮 */}
         <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">

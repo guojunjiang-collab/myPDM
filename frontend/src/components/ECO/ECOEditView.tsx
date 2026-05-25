@@ -326,7 +326,7 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
       {ecrId && loading && <p className="text-xs text-gray-400 text-center py-4">加载中...</p>}
       {ecrId && !loading && ecrData && (<>
         <div className="flex items-center justify-between mb-2">
-          <h4 className="text-sm font-semibold text-gray-800">ECR {ecrData.ecr_number} 变更分析</h4>
+          <h4 className="text-sm font-normal text-gray-800">ECR {ecrData.ecr_number} 变更分析</h4>
           {!readOnly && <button onClick={resetToEcr} className="text-xs px-3 py-1 border border-gray-300 rounded text-gray-600 hover:bg-gray-50">还原</button>}
         </div>
 

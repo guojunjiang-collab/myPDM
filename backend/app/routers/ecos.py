@@ -106,6 +106,7 @@ def _build_eco_detail(db: Session, eco: ECO) -> dict:
         "execution_items": execution_item_list,
         "status_logs": status_log_items,
         "cc_users": eco.cc_users or [],
+        "release_items": eco.release_items or [],
         "executor_name": executor_name,
         "executor_id": str(eco.executor_id) if eco.executor_id else None,
         "reviewed_at": eco.reviewed_at, "executed_at": eco.executed_at,

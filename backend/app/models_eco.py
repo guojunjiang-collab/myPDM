@@ -30,6 +30,7 @@ class ECO(Base):
     executor_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     document_links = Column(JSONB, nullable=False, default=[])
     cc_users = Column(JSONB, nullable=False, default=[])
+    release_items = Column(JSONB, nullable=False, default=[])  # 工程预变更关联的零部件列表
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
