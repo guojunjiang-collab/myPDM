@@ -409,7 +409,196 @@ ECO 执行时的行为:
   1. create 先于 upgrade（先建后用）
   2. 子项变更先于父项变更（自底向上）
   3. qty_change / delete 在它们的父项升版之前
-  4. 同一层级无依赖的可并行执行（但系统串行处理）
+   4. 同一层级无依赖的可并行执行（但系统串行处理）
+```
+
+### 5.7 评估→执行完整流程
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     ECO 生命周期                              │
+│                                                              │
+│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌────────┐ │
+│  │  草稿     │───→│  评审中   │───→│  已批准   │───→│ 执行中  │ │
+│  │  draft   │    │ reviewing│    │ approved │    │executing│ │
+│  └──────────┘    └──────────┘    └──────────┘    └────────┘ │
+│       │                                               │      │
+│       │ 评估阶段                                       │ 自动  │
+│       │ (ECOEditView)                                 ↓      │
+│       │                                         ┌────────┐  │
+│       ├─ 编辑各受影响项操作/用量                  │  已完成  │  │
+│       ├─ 调整向上溯源链                          │completed│  │
+│       ├─ 添加/删除向下子项                       └────────┘  │
+│       └─ 保存→execution_items                            │   │
+│           (entity_id|_affectedCode 复合键)                │   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**两阶段模型**:
+
+| 阶段 | 操作方 | 界面 | 输出 |
+|------|--------|------|------|
+| **评估** | 工程师（创建/编辑 ECO） | ECOEditView 分组卡片 | `execution_items[]`（操作+用量+说明） |
+| **执行** | 执行负责人（批准后） | ECOExecutionPanel | 数据库实际写入（升版/BOM 更新/新建） |
+
+### 5.8 执行流程总览
+
+```
+  execution_items[]（评估产物）
+        │
+        ▼
+  ┌─────────────────────────────────────────┐
+  │           执行引擎 (execute_all)          │
+  │                                          │
+  │  Phase 1: 新建 (create)                  │
+  │    ├─ 新建零件/部件 → status=released     │
+  │    └─ 有 parent 则创建 BOMItem            │
+  │                                          │
+  │  Phase 2: 升版 + BOM 变更（自底向上）      │
+  │    ├─ upgrade:  复制实体→新版本→released   │
+  │    │   └─ 更新 BOMItem child_id→新版本     │
+  │    ├─ qty_change: 父项升版→改BOMItem.quantity│
+  │    │   └─ 级联上层受影响父项               │
+  │    ├─ delete:    父项升版→移除BOMItem      │
+  │    │   └─ 级联上层受影响父项               │
+  │    └─ add_existing: 父项升版→添加BOMItem   │
+  │        └─ 子项已存在，仅建立关联           │
+  │                                          │
+  │  Phase 3: 完成检查 + 自动发布              │
+  │    ├─ 全部执行项 completed → ECO=completed │
+  │    └─ 所有新实体 status 已为 released      │
+  └─────────────────────────────────────────┘
+```
+
+### 5.9 执行排序规则
+
+执行项 `sort_order` 按以下规则自动编号，保证依赖正确：
+
+```
+规则 1（先建后用）:
+  create < upgrade / qty_change / delete / add_existing
+
+规则 2（自底向上）:
+  向下子项先于向上溯源链（子项改完再改父项）
+  BOM 层级: level 越大越先执行（叶子先于根）
+
+规则 3（父项依赖）:
+  qty_change / delete 的父项在子项之后
+
+实际排序结果示例:
+  sort_order | entity_code | action     | 说明
+  -----------|-------------|------------|------
+  1          | PART-NEW    | create     | 先建新实体
+  2          | CHILD-A     | upgrade    | 子项升版（BOM level 2）
+  3          | SUB-1       | qty_change | 子项数量变更
+  4          | SUB-2       | delete     | 子项删除
+  5          | ASS-TOP     | upgrade    | 父项升版（BOM level 0,向上溯源）
+  6          | ASS-PARENT  | qty_change | 父项数量变更（级联）
+```
+
+### 5.10 级联升版规则（向上溯源链）
+
+```
+当执行项涉及 BOM 变更（qty_change / delete / add_existing）时：
+
+  当前实体 (entity_id)
+    └→ 查询 ECR 受影响对象分析 (ecr_affected_items.bom_impact)
+       └→ 获取 upward_chain（向上溯源链）
+          └→ 筛选有 change_type 标记的父项（is_change_target=true）
+             └→ 仅对这些父项执行级联升版
+                └→ 未标记的父项保持不变
+
+  示例:
+    受影响项: 螺栓 A → 向上溯源: 车轮总成 → 底盘总成 → 整车
+    如果仅 "车轮总成" 被标记为受影响:
+      - 执行 qty_change 后: 车轮总成升版，底盘总成和整车不变
+    如果 "车轮总成" 和 "底盘总成" 都被标记:
+      - 两者依次升版，整车不变
+```
+
+### 5.11 执行事务边界
+
+| 粒度 | 策略 | 说明 |
+|------|------|------|
+| 单项执行 | 每项独立事务 | 单项失败不影响其他项；失败可重试 |
+| 批量执行 | 串行+独立事务 | `execute_all` 按 sort_order 逐项执行，每项提交一次 |
+| 状态转换 | 严格校验 | `pending/failed → in_progress → completed/failed` |
+| 回滚策略 | 不回滚已完成项 | 某项失败时，后续项停止，已完成的保留 |
+
+```
+execute_all 伪代码:
+
+for item in items.sorted_by(sort_order):
+    try:
+        item.status = "in_progress"; commit()
+        result = dispatch(action):
+            create:      INSERT parts/assemblies (status=released) + optional BOMItem
+            upgrade:     clone_entity → new_version (status=released) → update BOMItem refs
+            qty_change:  clone_parent → modify BOMItem.quantity → cascade_upgrade_parents
+            delete:      clone_parent → remove BOMItem → cascade_upgrade_parents
+            add_existing:clone_parent → add BOMItem → cascade_upgrade_parents
+            no_change:   skip
+        item.status = "completed"; commit()
+    except Exception:
+        item.status = "failed"; item.error_message = e; commit()
+        break  // 停止后续执行
+
+if all_completed:
+    eco.status = "completed"; eco.executed_at = now(); commit()
+```
+
+### 5.12 执行项 `detail` 入参与出参对照
+
+| action | 输入（评估阶段写入） | 输出（执行后回写） |
+|--------|---------------------|-------------------|
+| `create` | `{_targetQty, _desc, _affectedCode}` | `{code, name, version:"A", new_entity_id}` |
+| `upgrade` | `{_targetQty, _desc, _affectedCode}` | `{old_version, new_version, new_entity_id, cascade_upgraded_parents[]}` |
+| `qty_change` | `{_targetQty, _desc, _affectedCode}` | `{parent_type, parent_id, parent_new_id, old_quantity, new_quantity}` |
+| `delete` | `{_targetQty, _desc, _affectedCode}` | `{parent_type, parent_id, parent_new_id, removed_child_id, removed_quantity}` |
+| `add_existing` | `{_targetQty, _desc, _affectedCode}` | `{parent_type, parent_id, parent_new_id, added_child_id, quantity}` |
+| `no_change` | `{}` | `{}` （无操作） |
+
+> `_targetQty` / `_desc` / `_affectedCode` 为评估阶段编辑界面产生的字段，执行阶段不直接使用（仅用于 merge 回 UI）。
+
+### 5.13 自动发布规则
+
+```
+ECO 执行完成后自动发布逻辑:
+
+  create:
+    新实体 INSERT 时 status 直接设为 "released"
+    （不需要额外步骤）
+
+  upgrade / qty_change / delete / add_existing:
+    升版产生的新实体 INSERT 时 status 设为 "released"
+    旧版本实体 status 保持不变（不自动设为 obsolete）
+
+  no_change:
+    无新实体产生，无 status 变更
+
+  原则:
+    - 通过 ECO 审批的变更产物 = 正式发布版本
+    - 旧版本不自动作废（可能仍被其他装配件引用）
+    - 用户可在零件/部件管理页面手动将旧版本设为 obsolete
+```
+
+### 5.14 执行后 clean-up
+
+```
+ECO 执行完成后:
+
+  1. 所有执行项 status = "completed"
+  2. ECO.status = "completed"; eco.executed_at = 当前时间
+  3. execution_item 回写字段:
+     - new_entity_id: 新实体 UUID
+     - new_version: 新版本号
+     - parent_new_entity_id: 父项新实体 UUID
+     - detail: 完整执行结果详情
+  4. 新实体 status = "released"，可在零件/部件管理页面查看
+  5. BOM 树中:
+     - 旧版本仍然存在（保留历史）
+     - 新版本 BOMItem 指向新 child/parent
+     - 级联升版的父项也指向新版本
 ```
 
 ---
