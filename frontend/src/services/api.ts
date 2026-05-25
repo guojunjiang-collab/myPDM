@@ -372,7 +372,7 @@ export const ecrApi = {
   list: (params?: ECRListParams) =>
     api.get('/ecrs/', { params }),
   get: (id: string) =>
-    api.get(`/ecrs/${id}`),
+    api.get(`/ecrs/${id}?t=${Date.now()}`),
   create: (data: ECRCreateData) =>
     api.post('/ecrs/', data),
   update: (id: string, data: Partial<ECRCreateData>) =>
@@ -410,7 +410,7 @@ export const ecoApi = {
   list: (params: { page?: number; page_size?: number; search?: string; status?: string; priority?: string }) =>
     api.get('/ecos/', { params }),
   detail: (id: string) =>
-    api.get(`/ecos/${id}`),
+    api.get(`/ecos/${id}?t=${Date.now()}`),
   create: (data: unknown) =>
     api.post('/ecos/', data),
   update: (id: string, data: unknown) =>

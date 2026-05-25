@@ -281,7 +281,7 @@ export function ECRBomImpactView({
                             className="w-20 text-xs border rounded px-1.5 py-0.5 focus:ring-1 focus:ring-blue-500"
                           />
                         ) : (
-                          <span className="text-xs">{node.quantity}</span>
+                          <span className="text-xs">{getQuantityValue(node)}</span>
                         )}
                       </td>
                       <td className={tdClass}>
@@ -361,7 +361,7 @@ export function ECRBomImpactView({
                           className="w-20 text-xs border rounded px-1.5 py-0.5 focus:ring-1 focus:ring-blue-500"
                         />
                       ) : (
-                        <span className="text-xs">{node.quantity}</span>
+                        <span className="text-xs">{getQuantityValue(node)}</span>
                       )}
                     </td>
                     <td className={tdClass}>

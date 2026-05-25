@@ -195,13 +195,17 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
       if (bomData) {
         const items = data.execution_items as any[];
         const existingIds = new Set(items.map((it: any) => it.entity_id).filter(Boolean));
-        // Update actions on existing items
-        const actionMap: Record<string, string> = {};
+        // Build lookup from bomData
+        const bomById: Record<string, any> = {};
         (bomData.up || []).concat(bomData.down || []).forEach((n: any) => {
-          if (n.entity_id && n.action) actionMap[n.entity_id] = n.action;
+          if (n.entity_id) bomById[n.entity_id] = n;
         });
+        // Update actions + detail on existing items
         items.forEach((it: any) => {
-          if (it.entity_id && actionMap[it.entity_id]) it.action = actionMap[it.entity_id];
+          const b = bomById[it.entity_id];
+          if (!b) return;
+          if (b.action) it.action = b.action;
+          it.detail = { ...(it.detail || {}), _targetQty: b._targetQty ?? (it.detail?._targetQty || b.quantity), _desc: b._desc || it.detail?._desc || '' };
         });
         // Add new items from bomData (add_new / add_existing) that aren't already in execution_items
         (bomData.down || []).forEach((n: any) => {

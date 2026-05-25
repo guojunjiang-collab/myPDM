@@ -376,8 +376,8 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
               await ecrApi.updateAffectedItem(ecrId, affectedItemId, { bom_impact: item.bom_impact });
             }
           } catch (err: unknown) {
-            const emsg = err instanceof Error ? err.message : '保存 BOM 影响分析失败';
-            console.error('bom_impact save error:', emsg);
+            const emsg = err instanceof Error ? err.message : String(err);
+            toast.error('保存 BOM 影响分析失败: ' + emsg);
           }
         });
         await Promise.allSettled(savePromises);

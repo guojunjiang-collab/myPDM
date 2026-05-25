@@ -179,7 +179,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh }: Props) {
           {eco.ecr_id && (
             <div className="border-t pt-3">
               <h4 className="text-xs font-semibold text-gray-700 mb-1.5">ECR 变更分析</h4>
-              <ECOEditView ecrId={eco.ecr_id} onEcrLinked={() => {}} readOnly />
+              <ECOEditView ecrId={eco.ecr_id} onEcrLinked={() => {}} readOnly executionItems={eco.execution_items} />
             </div>
           )}
 
@@ -254,14 +254,6 @@ export function ECODetailModal({ ecoId, onClose, onRefresh }: Props) {
             {eco.closed_at && <div><span className="text-gray-400">关闭</span> {fmt(eco.closed_at)}</div>}
           </div>
 
-          {/* Actions */}
-          <div className="border-t pt-3 flex justify-end gap-2">
-            {isAdmin() && eco.status !== 'closed' && (
-              <button onClick={async () => { await act(() => ecoApi.close(ecoId), '已关闭'); onRefresh(); onClose(); }} disabled={actionLoading}
-                className="px-4 py-1.5 border border-gray-300 rounded text-sm text-red-500 hover:bg-red-50 disabled:opacity-50">关闭 ECO</button>
-            )}
-            <button onClick={onClose} className="px-4 py-1.5 border border-gray-300 rounded text-sm">关闭</button>
-          </div>
         </div>
       )}
     </Modal>
