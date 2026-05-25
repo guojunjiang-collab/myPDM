@@ -218,7 +218,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
                 entity_code: n.entity_code,
                 action: n.action,
                 parent_entity_id: n.parent_entity_id || undefined,
-                detail: { _targetQty: n._targetQty || 1, _desc: n._desc || '' },
+                detail: { _targetQty: n._targetQty || 1, _desc: n._desc || '', _affectedCode: n._affectedCode || '' },
               });
             }
           }

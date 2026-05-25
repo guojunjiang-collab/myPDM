@@ -252,7 +252,8 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
         executionItems.forEach((ei: any) => {
           const key = ei.entity_id || ei.entity_code;
           if (key && !ecrIds.has(key) && (ei.action === 'add_existing' || ei.action === 'add_new' || !ei.action)) {
-            down.push({ entity_type: ei.entity_type || 'part', entity_id: ei.entity_id || '', entity_code: ei.entity_code || '', entity_name: ei.entity_name || '', entity_version: ei.entity_version || 'A', quantity: 0, _targetQty: ei.detail?._targetQty || 1, action: 'add_existing', _desc: ei.detail?._desc || '', parent_entity_id: ei.parent_entity_id || undefined, level: 1 } as any);
+            const parentAff = r.data.affected_items?.find((a: any) => a.entity_id === ei.parent_entity_id);
+            down.push({ entity_type: ei.entity_type || 'part', entity_id: ei.entity_id || '', entity_code: ei.entity_code || '', entity_name: ei.entity_name || '', entity_version: ei.entity_version || 'A', quantity: 0, _targetQty: ei.detail?._targetQty || 1, action: 'add_existing', _desc: ei.detail?._desc || '', parent_entity_id: ei.parent_entity_id || undefined, level: 1, _affectedCode: parentAff?.entity_code || ei._affectedCode, _affectedName: parentAff?.entity_name || ei._affectedName } as any);
           }
         });
       }
