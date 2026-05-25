@@ -183,46 +183,66 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         reviewers: reviewers.map((r) => ({ user_id: r.user_id, seq: r.seq })),
         review_mode: reviewMode,
         document_links: documentLinks,
-        execution_items: (ecrItems || []).map((it) => ({
-          source: 'ecr',
-          entity_type: it.entity_type,
-          entity_name: it.entity_name,
-          action: it.action || 'upgrade',
-          entity_id: it.entity_id || undefined,
-        })),
       };
-      // Merge BOM modifications into execution_items
-      if (bomData) {
-        const items = data.execution_items as any[];
-        const existingIds = new Set(items.map((it: any) => it.entity_id).filter(Boolean));
-        // Build lookup from bomData
-        const bomById: Record<string, any> = {};
-        (bomData.up || []).concat(bomData.down || []).forEach((n: any) => {
-          if (n.entity_id) bomById[n.entity_id] = n;
+      // Build execution_items from bomData (composite key: entity_id|_affectedCode per group)
+      const compKey = (it: any) => {
+        const base = it.entity_id || it.entity_code || '';
+        const aff = it.detail?._affectedCode || it._affectedCode || '';
+        return base ? base + '|' + aff : '';
+      };
+      const oldMap = new Map<string, any>();
+      (localEco?.execution_items || ecrItems || []).forEach((it: any) => {
+        const ck = compKey(it);
+        if (ck) oldMap.set(ck, it);
+      });
+      if (bomData && (bomData.up?.length || bomData.down?.length)) {
+        // Source of truth: bomData nodes → one execution_item per node per group
+        const allNodes = [...(bomData.up || []), ...(bomData.down || [])];
+        const seen = new Set<string>();
+        const items: any[] = [];
+        allNodes.forEach((n: any) => {
+          const ck = compKey(n);
+          if (!ck || seen.has(ck)) return;
+          seen.add(ck);
+          const old = oldMap.get(ck);
+          items.push({
+            source: old?.source || 'ecr',
+            entity_type: n.entity_type || 'part',
+            entity_id: n.entity_id || undefined,
+            entity_code: n.entity_code || undefined,
+            entity_name: n.entity_name || '',
+            action: n.action || 'no_change',
+            parent_entity_id: old?.parent_entity_id || n.parent_entity_id || undefined,
+            detail: { _targetQty: n._targetQty ?? n.quantity, _desc: n._desc || '', _affectedCode: n._affectedCode || '' },
+          });
         });
-        // Update actions + detail on existing items
-        items.forEach((it: any) => {
-          const b = bomById[it.entity_id];
-          if (!b) return;
-          if (b.action) it.action = b.action;
-          it.detail = { ...(it.detail || {}), _targetQty: b._targetQty ?? (it.detail?._targetQty || b.quantity), _desc: b._desc || it.detail?._desc || '' };
-        });
-        // Add new items from bomData (add_new / add_existing) that aren't already in execution_items
-        (bomData.down || []).forEach((n: any) => {
-          if ((n.action === 'add_new' || n.action === 'add_existing') && n.entity_code && n.entity_name) {
-            if (!existingIds.has(n.entity_id)) {
-              items.push({
-                source: 'manual',
-                entity_type: n.entity_type || 'part',
-                entity_name: n.entity_name,
-                entity_code: n.entity_code,
-                action: n.action,
-                parent_entity_id: n.parent_entity_id || undefined,
-                detail: { _targetQty: n._targetQty || 1, _desc: n._desc || '', _affectedCode: n._affectedCode || '' },
-              });
-            }
+        // Preserve old manual items not found in bomData (e.g. directly added items)
+        oldMap.forEach((it: any, ck: string) => {
+          if (!seen.has(ck) && it.source === 'manual' && it.entity_name) {
+            items.push({
+              source: it.source,
+              entity_type: it.entity_type,
+              entity_id: it.entity_id || undefined,
+              entity_code: it.entity_code || undefined,
+              entity_name: it.entity_name,
+              action: it.action || 'no_change',
+              parent_entity_id: it.parent_entity_id || undefined,
+              detail: it.detail || {},
+            });
           }
         });
+        data.execution_items = items;
+      } else {
+        data.execution_items = (localEco?.execution_items || ecrItems || []).map((it: any) => ({
+          source: it.source || 'ecr',
+          entity_type: it.entity_type,
+          entity_id: it.entity_id || undefined,
+          entity_code: it.entity_code || undefined,
+          entity_name: it.entity_name,
+          action: it.action || 'upgrade',
+          parent_entity_id: it.parent_entity_id || undefined,
+          detail: it.detail || undefined,
+        }));
       }
       if (ecrId) data.ecr_id = ecrId;
       if (localEco?.ecr_id) data.ecr_id = localEco.ecr_id;

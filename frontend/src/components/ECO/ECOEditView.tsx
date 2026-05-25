@@ -98,6 +98,7 @@ function EditableUpward({ rows, onUpdate, displayOnly = false }: { rows: Mutable
             </td>
             <td className={td}>
               {n.action === 'delete' ? <span className="text-red-500 text-xs">—</span>
+              : n.action !== 'qty_change' ? <span className="text-xs">{n._targetQty ?? n.quantity}</span>
               : displayOnly ? <span className="text-xs">{n._targetQty ?? n.quantity}</span>
               : <input type="number" value={n._targetQty ?? n.quantity} min={1} onChange={e => onUpdate(i, { _targetQty: parseInt(e.target.value)||1 })} className="w-16 border border-gray-300 rounded px-1 py-0.5 text-xs text-center" />}
             </td>
@@ -134,6 +135,7 @@ function EditableDownward({ rows, onUpdate, displayOnly = false, onRemove }: { r
             </td>
             <td className={td}>
               {n.action === 'delete' ? <span className="text-red-500 text-xs">—</span>
+              : (n.action !== 'qty_change' && n.action !== 'add_existing' && n.action !== 'add_new') ? <span className="text-xs">{n._targetQty ?? n.quantity}</span>
               : displayOnly ? <span className="text-xs">{n._targetQty ?? n.quantity}</span>
               : <input type="number" value={n._targetQty ?? n.quantity} min={1} onChange={e => onUpdate(i, { _targetQty: parseInt(e.target.value)||1 })} className="w-16 border border-gray-300 rounded px-1 py-0.5 text-xs text-center" />}
             </td>
@@ -230,30 +232,53 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
     ecrApi.get(ecrId).then(r => {
       setEcrData(r.data);
       const { up, down } = cloneNodes(r.data);
-      // Merge saved execution items
+      // Merge saved execution items (composite key: entity_id|_affectedCode)
       if (executionItems && executionItems.length > 0) {
         const savedMap = new Map<string, any>();
-        executionItems.forEach((ei: any) => { const key = ei.entity_id || ei.entity_code; if (key) savedMap.set(key, ei); });
+        executionItems.forEach((ei: any) => {
+          const affCode = ei.detail?._affectedCode || '';
+          const key = ei.entity_id || ei.entity_code;
+          if (!key) return;
+          savedMap.set(key + '|' + affCode, ei);      // composite key for per-group match
+          if (!affCode) savedMap.set(key, ei);         // backward compat: fallback without _affectedCode
+        });
+        const lookup = (n: any) => {
+          const compKey = (n.entity_id || n.entity_code || '') + '|' + (n._affectedCode || '');
+          return savedMap.get(compKey) || savedMap.get(n.entity_id) || savedMap.get(n.entity_code);
+        };
         down.forEach((n: any) => {
-          const saved = savedMap.get(n.entity_id) || savedMap.get(n.entity_code);
-          if (saved && saved.action && saved.action !== 'add_existing' && saved.action !== 'add_new') {
+          const saved = lookup(n);
+          if (!saved) return;
+          if (saved.action && saved.action !== 'add_existing' && saved.action !== 'add_new') {
             n.action = saved.action;
-            if (saved._targetQty) n._targetQty = saved._targetQty;
           }
-          if (saved?.detail?._targetQty) n._targetQty = saved.detail._targetQty;
+          if (saved?.detail?._targetQty != null) n._targetQty = saved.detail._targetQty;
           if (saved?.detail?._desc) n._desc = saved.detail._desc;
         });
         up.forEach((n: any) => {
-          const saved = savedMap.get(n.entity_id);
-          if (saved?.detail?._targetQty) n._targetQty = saved.detail._targetQty;
-          if (saved && saved.action) n.action = saved.action;
+          const saved = lookup(n);
+          if (!saved) return;
+          if (saved?.detail?._targetQty != null) n._targetQty = saved.detail._targetQty;
+          if (saved.action) n.action = saved.action;
         });
-        const ecrIds = new Set(down.map((d: any) => d.entity_id || d.entity_code));
+        // Restore manually added items that were saved but may not be in the ECR analysis
+        const allKeys = new Set<string>();
+        up.forEach((n: any) => {
+          if (n.entity_id) allKeys.add(n.entity_id + '|' + (n._affectedCode || ''));
+          if (n.entity_code) allKeys.add(n.entity_code + '|' + (n._affectedCode || ''));
+        });
+        down.forEach((n: any) => {
+          if (n.entity_id) allKeys.add(n.entity_id + '|' + (n._affectedCode || ''));
+          if (n.entity_code) allKeys.add(n.entity_code + '|' + (n._affectedCode || ''));
+        });
         executionItems.forEach((ei: any) => {
+          const affCode = ei.detail?._affectedCode || '';
           const key = ei.entity_id || ei.entity_code;
-          if (key && !ecrIds.has(key) && (ei.action === 'add_existing' || ei.action === 'add_new' || !ei.action)) {
+          if (!key) return;
+          const compKey = key + '|' + affCode;
+          if (!allKeys.has(compKey) && (ei.action === 'add_existing' || ei.action === 'add_new')) {
             const parentAff = r.data.affected_items?.find((a: any) => a.entity_id === ei.parent_entity_id);
-            down.push({ entity_type: ei.entity_type || 'part', entity_id: ei.entity_id || '', entity_code: ei.entity_code || '', entity_name: ei.entity_name || '', entity_version: ei.entity_version || 'A', quantity: 0, _targetQty: ei.detail?._targetQty || 1, action: 'add_existing', _desc: ei.detail?._desc || '', parent_entity_id: ei.parent_entity_id || undefined, level: 1, _affectedCode: parentAff?.entity_code || ei._affectedCode, _affectedName: parentAff?.entity_name || ei._affectedName } as any);
+            down.push({ entity_type: ei.entity_type || 'part', entity_id: ei.entity_id || '', entity_code: ei.entity_code || '', entity_name: ei.entity_name || '', entity_version: ei.entity_version || 'A', quantity: 0, _targetQty: ei.detail?._targetQty || 1, action: 'add_existing', _desc: ei.detail?._desc || '', parent_entity_id: ei.parent_entity_id || undefined, level: 1, _affectedCode: parentAff?.entity_code || ei.detail?._affectedCode, _affectedName: parentAff?.entity_name || ei._affectedName } as any);
           }
         });
       }
@@ -336,7 +361,7 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
                     <div><div className="text-xs text-gray-500 mb-1">ECR 评估</div><EditableDownward rows={downRows} onUpdate={() => {}} displayOnly /></div>
                     <div><div className="text-xs text-gray-500 mb-1">ECO 执行后</div><ReadOnlyDownward rows={downRows} /></div>
                   </>) : (<>
-                    <div><div className="text-xs text-gray-500 mb-1">ECR 评估（可编辑）</div><EditableDownward rows={downRows} onUpdate={(i) => { const origIdx = localDown.indexOf(downRows[i]); if (origIdx >= 0) updateDown(origIdx, {}); }} onRemove={(i) => { const origIdx = localDown.indexOf(downRows[i]); if (origIdx >= 0) setLocalDown(prev => prev.filter((_, idx) => idx !== origIdx)); }} /></div>
+                    <div><div className="text-xs text-gray-500 mb-1">ECR 评估（可编辑）</div><EditableDownward rows={downRows} onUpdate={(i, patch) => { const origIdx = localDown.indexOf(downRows[i]); if (origIdx >= 0) updateDown(origIdx, patch); }} onRemove={(i) => { const origIdx = localDown.indexOf(downRows[i]); if (origIdx >= 0) setLocalDown(prev => prev.filter((_, idx) => idx !== origIdx)); }} /></div>
                     <div><div className="text-xs text-gray-500 mb-1">ECO 执行后</div><ReadOnlyDownward rows={downRows} /></div>
                   </>)}
                 </div>
@@ -375,7 +400,7 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
                     <div><div className="text-xs text-gray-500 mb-1">ECR 评估</div><EditableDownward rows={orphanDown} onUpdate={() => {}} displayOnly /></div>
                     <div><div className="text-xs text-gray-500 mb-1">ECO 执行后</div><ReadOnlyDownward rows={orphanDown} /></div>
                   </>) : (<>
-                    <div><div className="text-xs text-gray-500 mb-1">ECR 评估（可编辑）</div><EditableDownward rows={orphanDown} onUpdate={(i) => { const origIdx = localDown.indexOf(orphanDown[i]); if (origIdx >= 0) updateDown(origIdx, {}); }} onRemove={(i) => { const origIdx = localDown.indexOf(orphanDown[i]); if (origIdx >= 0) setLocalDown(prev => prev.filter((_, idx) => idx !== origIdx)); }} /></div>
+                    <div><div className="text-xs text-gray-500 mb-1">ECR 评估（可编辑）</div><EditableDownward rows={orphanDown} onUpdate={(i, patch) => { const origIdx = localDown.indexOf(orphanDown[i]); if (origIdx >= 0) updateDown(origIdx, patch); }} onRemove={(i) => { const origIdx = localDown.indexOf(orphanDown[i]); if (origIdx >= 0) setLocalDown(prev => prev.filter((_, idx) => idx !== origIdx)); }} /></div>
                     <div><div className="text-xs text-gray-500 mb-1">ECO 执行后</div><ReadOnlyDownward rows={orphanDown} /></div>
                   </>)}
                 </div>
