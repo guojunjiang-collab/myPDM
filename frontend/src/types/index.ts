@@ -537,3 +537,36 @@ export interface ECORequest {
   closed_at?: string;
 }
 
+// ──────────────────────────────────────────
+// 构型配置
+// ──────────────────────────────────────────
+
+export interface ConfigurationItem {
+  id: string;
+  code: string;
+  name: string;
+  spec?: string;
+  remark?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ConfigPartItem {
+  id: string;
+  configuration_item_id: string;
+  part_type: 'part' | 'assembly';
+  part_id: string;
+  is_required: boolean;
+  sort_order: number;
+  part_detail?: { id: string; code: string; name: string; version?: string; spec?: string; status?: string };
+}
+
+export interface ConfigChildItem {
+  id: string;
+  parent_id: string;
+  child_id: string;
+  is_required: boolean;
+  sort_order: number;
+  child_detail?: { id: string; code: string; name: string; spec?: string; status?: string };
+}
+

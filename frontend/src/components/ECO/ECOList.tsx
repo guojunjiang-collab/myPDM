@@ -99,7 +99,7 @@ export function ECOList() {
     const admin = isAdmin();
     const ccBtn = (
       <button onClick={(e) => { e.stopPropagation(); setCcEcoId(eco.id); }}
-        className="text-xs px-2 py-1 rounded bg-purple-50 text-purple-700 hover:bg-purple-100">
+        className="px-2 py-1 rounded bg-purple-50 text-purple-700 hover:bg-purple-100">
         知会
       </button>
     );
@@ -109,13 +109,13 @@ export function ECOList() {
           <div className="flex gap-1 justify-end">
             {(isCreator || admin) && <>
               <button onClick={(e) => { e.stopPropagation(); handleSubmit(eco.id); }} disabled={busy}
-                className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50">{busy ? '...' : '提交'}</button>
+                className="px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50">{busy ? '...' : '提交'}</button>
               <button onClick={(e) => { e.stopPropagation(); handleClose(eco.id); }} disabled={busy}
-                className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50">{busy ? '...' : '关闭'}</button>
+                className="px-2 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50">{busy ? '...' : '关闭'}</button>
               <button onClick={(e) => { e.stopPropagation(); handleEdit(eco); }}
-                className="text-xs px-2 py-1 rounded bg-gray-50 text-gray-700 hover:bg-gray-100">编辑</button>
+                className="px-2 py-1 rounded bg-gray-50 text-gray-700 hover:bg-gray-100">编辑</button>
               <button onClick={(e) => { e.stopPropagation(); handleDelete(eco.id); }} disabled={busy}
-                className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50">{busy ? '...' : '删除'}</button>
+                className="px-2 py-1 rounded bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50">{busy ? '...' : '删除'}</button>
             </>}
             {ccBtn}
           </div>);
@@ -123,14 +123,14 @@ export function ECOList() {
         return (
           <div className="flex gap-1 justify-end">
             {isCreator && <button onClick={(e) => { e.stopPropagation(); handleWithdraw(eco.id); }} disabled={busy}
-              className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50">{busy ? '...' : '撤回'}</button>}
+              className="px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50">{busy ? '...' : '撤回'}</button>}
             {ccBtn}
           </div>);
       case 'approved':
         return (
           <div className="flex gap-1 justify-end">
             {(isCreator || admin) && <button onClick={(e) => { e.stopPropagation(); handleExecute(eco.id); }} disabled={busy}
-              className="text-xs px-2 py-1 rounded bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-50">{busy ? '...' : '开始执行'}</button>}
+              className="px-2 py-1 rounded bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-50">{busy ? '...' : '开始执行'}</button>}
             {ccBtn}
           </div>);
       case 'executing':
@@ -143,14 +143,14 @@ export function ECOList() {
         return (
           <div className="flex gap-1 justify-end">
             {admin && <button onClick={(e) => { e.stopPropagation(); handleClose(eco.id); }} disabled={busy}
-              className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50">{busy ? '...' : '关闭'}</button>}
+              className="px-2 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50">{busy ? '...' : '关闭'}</button>}
             {ccBtn}
           </div>);
       case 'rejected':
         return (
           <div className="flex gap-1 justify-end">
             {admin && <button onClick={(e) => { e.stopPropagation(); handleClose(eco.id); }} disabled={busy}
-              className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50">{busy ? '...' : '关闭'}</button>}
+              className="px-2 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50">{busy ? '...' : '关闭'}</button>}
             {ccBtn}
           </div>);
       case 'closed':

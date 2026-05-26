@@ -18,9 +18,12 @@ from . import schemas_configuration as schemas
 def get_config_items(
     db: Session, search: Optional[str] = None,
     skip: int = 0, limit: int = 50,
+    exclude_ids: set | None = None,
 ) -> Tuple[List[models.ConfigurationItem], int]:
     """构型项列表"""
     q = db.query(models.ConfigurationItem)
+    if exclude_ids:
+        q = q.filter(models.ConfigurationItem.id.notin_(exclude_ids))
     if search:
         like = f"%{search}%"
         q = q.filter(or_(

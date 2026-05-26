@@ -448,3 +448,34 @@ export const ecoApi = {
   bomTrace: (ecoId: string, entityType: string, entityId: string) =>
     api.post(`/ecos/${ecoId}/bom-trace/${entityType}/${entityId}`),
 };
+
+// ──────────────────────────────────────────
+// 构型配置 API
+// ──────────────────────────────────────────
+
+export const configurationApi = {
+  listItems: (params?: any) =>
+    api.get('/configurations/items', { params }),
+  getItem: (id: string) =>
+    api.get(`/configurations/items/${id}`),
+  createItem: (data: { code: string; name: string; spec?: string; remark?: string }) =>
+    api.post('/configurations/items', data),
+  updateItem: (id: string, data: Record<string, unknown>) =>
+    api.put(`/configurations/items/${id}`, data),
+  deleteItem: (id: string) =>
+    api.delete(`/configurations/items/${id}`),
+
+  addParts: (id: string, items: { part_type: string; part_id: string; is_required: boolean }[]) =>
+    api.post(`/configurations/items/${id}/parts`, { items }),
+  updatePart: (id: string, partId: string, data: { is_required?: boolean }) =>
+    api.put(`/configurations/items/${id}/parts/${partId}`, data),
+  removePart: (id: string, partId: string) =>
+    api.delete(`/configurations/items/${id}/parts/${partId}`),
+
+  addChildren: (id: string, items: { child_id: string; is_required: boolean }[]) =>
+    api.post(`/configurations/items/${id}/children`, { items }),
+  updateChild: (id: string, childId: string, data: { is_required?: boolean }) =>
+    api.put(`/configurations/items/${id}/children/${childId}`, data),
+  removeChild: (id: string, childId: string) =>
+    api.delete(`/configurations/items/${id}/children/${childId}`),
+};

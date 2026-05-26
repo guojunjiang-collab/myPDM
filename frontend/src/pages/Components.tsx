@@ -1326,7 +1326,7 @@ export default function Components() {
         width="full"
       >
         {viewingAssembly && (
-          <div>
+          <div className="max-h-[70vh] overflow-y-auto pr-1">
             <div className="flex gap-1 mb-4 border-b">
               <button
                 onClick={() => setDetailTab('detail')}
@@ -1382,6 +1382,7 @@ export default function Components() {
         onClose={() => setNestedEntity(null)}
         width="full"
       >
+        <div className="max-h-[70vh] overflow-y-auto pr-1">
         {nestedLoading ? (
           <div className="py-8 text-center text-sm text-gray-400">加载中...</div>
         ) : !nestedData ? (
@@ -1391,6 +1392,7 @@ export default function Components() {
         ) : (
           <AssemblyDetailContent assembly={nestedData} customFieldDefs={nestedCustomDefs} customFieldValues={nestedCustomValues} onSubItemClick={(item) => handleNestedView(item.childType === 'part' ? 'part' : 'assembly', item.child_id)} />
         )}
+        </div>
       </Modal>
 
       {/* 导入预览弹窗 */}

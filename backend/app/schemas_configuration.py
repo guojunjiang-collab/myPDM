@@ -1,0 +1,101 @@
+"""
+构型配置 - Pydantic Schemas
+==============================
+"""
+
+from pydantic import BaseModel, ConfigDict
+from typing import Optional, List
+from datetime import datetime
+import uuid
+
+
+class BaseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ============================================================
+# 构型项（库）
+# ============================================================
+
+class ConfigurationItemCreate(BaseSchema):
+    code: str
+    name: str
+    spec: Optional[str] = None
+    remark: Optional[str] = None
+
+
+class ConfigurationItemUpdate(BaseSchema):
+    code: Optional[str] = None
+    name: Optional[str] = None
+    spec: Optional[str] = None
+    remark: Optional[str] = None
+
+
+class ConfigurationItemResponse(BaseSchema):
+    id: uuid.UUID
+    code: str
+    name: str
+    spec: Optional[str] = None
+    remark: Optional[str] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+
+# ============================================================
+# 关联零部件
+# ============================================================
+
+class ConfigPartCreate(BaseSchema):
+    part_type: str  # 'part' | 'assembly'
+    part_id: uuid.UUID
+    is_required: bool = True
+    sort_order: int = 0
+
+
+class ConfigPartUpdate(BaseSchema):
+    is_required: Optional[bool] = None
+    sort_order: Optional[int] = None
+
+
+class ConfigPartResponse(BaseSchema):
+    id: uuid.UUID
+    configuration_item_id: uuid.UUID
+    part_type: str
+    part_id: uuid.UUID
+    is_required: bool
+    sort_order: int
+    created_at: datetime
+    part_detail: Optional[dict] = None
+
+
+class ConfigPartBulkCreate(BaseSchema):
+    items: List[ConfigPartCreate]
+
+
+# ============================================================
+# 子构型项
+# ============================================================
+
+class ConfigChildCreate(BaseSchema):
+    child_id: uuid.UUID
+    is_required: bool = True
+    sort_order: int = 0
+
+
+class ConfigChildUpdate(BaseSchema):
+    is_required: Optional[bool] = None
+    sort_order: Optional[int] = None
+
+
+class ConfigChildResponse(BaseSchema):
+    id: uuid.UUID
+    parent_id: uuid.UUID
+    child_id: uuid.UUID
+    is_required: bool
+    sort_order: int
+    created_at: datetime
+    child_detail: Optional[dict] = None
+
+
+class ConfigChildBulkCreate(BaseSchema):
+    items: List[ConfigChildCreate]

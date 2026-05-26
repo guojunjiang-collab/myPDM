@@ -69,10 +69,10 @@ export default function VersionSelectModal({
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
+                <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">版本</th>
                 <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
-                <th className="px-3 py-2 text-left text-gray-500 font-medium w-36">创建时间</th>
-                <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">创建人</th>
+                <th className="px-3 py-2 text-left text-gray-500 font-medium w-40">创建时间</th>
+                <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">创建人</th>
                 <th className="px-3 py-2 text-left text-gray-500 font-medium">备注</th>
                 <th className="px-3 py-2 text-center text-gray-500 font-medium w-16">操作</th>
               </tr>
@@ -83,19 +83,19 @@ export default function VersionSelectModal({
                 const creator = v.revisions && v.revisions.length > 0 ? v.revisions[0].user : null;
                 return (
                   <tr key={v.id} className={isCurrent ? 'bg-blue-50' : 'hover:bg-gray-50'}>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 whitespace-nowrap">
                       <span className={`font-medium ${isCurrent ? 'text-blue-700' : 'text-gray-800'}`}>
                         {v.version}
                         {isCurrent && ' (当前)'}
                       </span>
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 whitespace-nowrap">
                       <span className={`inline-block px-2 py-0.5 text-xs rounded-full ${statusTag(v.status).cls}`}>
                         {statusTag(v.status).label}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-gray-500">{formatDateTime(v.created_at)}</td>
-                    <td className="px-3 py-2 text-gray-500">{creator || '-'}</td>
+                    <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{formatDateTime(v.created_at)}</td>
+                    <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{creator || '-'}</td>
                     <td className="px-3 py-2 text-gray-500 max-w-60 truncate">{v.remark || '-'}</td>
                     <td className="px-3 py-2 text-center">
                       {!isCurrent ? (
