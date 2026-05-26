@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Modal } from '../Modal';
 import { configurationApi, assemblyPartsApi } from '../../services/api';
 import type { ConfigPartItem, ConfigChildItem } from '../../types';
+import EntityDocumentSection from '../EntityDocumentSection';
 
 interface Props {
   itemId: string | null;
@@ -197,6 +198,9 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
               </table>
             ) : <div className="text-sm text-gray-400 py-2">暂无子构型项</div>}
           </div>
+
+          {/* 关联图文档 */}
+          <EntityDocumentSection entityType="configuration" entityId={data.id} editable={false} />
         </div>
       )}
     </Modal>

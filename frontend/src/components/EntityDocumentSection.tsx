@@ -14,7 +14,7 @@ import ArchiveTreeModal from './ArchiveTreeModal';
    ---------------------------------------------------------------- */
 
 interface EntityDocumentSectionProps {
-  entityType: 'part' | 'assembly';
+  entityType: 'part' | 'assembly' | 'configuration';
   entityId: string;
   editable: boolean;
 }

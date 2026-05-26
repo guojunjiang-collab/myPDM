@@ -196,14 +196,22 @@ export const dashboardApi = {
 
 // 实体-图文档关联 API
 export const entityDocumentsApi = {
-  list: (entityType: 'part' | 'assembly', entityId: string) =>
-    api.get(`/${entityType === 'part' ? 'parts' : 'assemblies'}/${entityId}/documents`),
-  add: (entityType: 'part' | 'assembly', entityId: string, data: { document_id: string; category?: string; sort_order?: number }) =>
-    api.post(`/${entityType === 'part' ? 'parts' : 'assemblies'}/${entityId}/documents`, data),
-  update: (entityType: 'part' | 'assembly', entityId: string, edocId: string, data: { category?: string; sort_order?: number }) =>
-    api.put(`/${entityType === 'part' ? 'parts' : 'assemblies'}/${entityId}/documents/${edocId}`, data),
-  remove: (entityType: 'part' | 'assembly', entityId: string, edocId: string) =>
-    api.delete(`/${entityType === 'part' ? 'parts' : 'assemblies'}/${entityId}/documents/${edocId}`),
+  list: (entityType: 'part' | 'assembly' | 'configuration', entityId: string) => {
+    const base = entityType === 'part' ? 'parts' : entityType === 'assembly' ? 'assemblies' : 'configurations/items';
+    return api.get(`/${base}/${entityId}/documents`);
+  },
+  add: (entityType: 'part' | 'assembly' | 'configuration', entityId: string, data: { document_id: string; category?: string; sort_order?: number }) => {
+    const base = entityType === 'part' ? 'parts' : entityType === 'assembly' ? 'assemblies' : 'configurations/items';
+    return api.post(`/${base}/${entityId}/documents`, data);
+  },
+  update: (entityType: 'part' | 'assembly' | 'configuration', entityId: string, edocId: string, data: { category?: string; sort_order?: number }) => {
+    const base = entityType === 'part' ? 'parts' : entityType === 'assembly' ? 'assemblies' : 'configurations/items';
+    return api.put(`/${base}/${entityId}/documents/${edocId}`, data);
+  },
+  remove: (entityType: 'part' | 'assembly' | 'configuration', entityId: string, edocId: string) => {
+    const base = entityType === 'part' ? 'parts' : entityType === 'assembly' ? 'assemblies' : 'configurations/items';
+    return api.delete(`/${base}/${entityId}/documents/${edocId}`);
+  },
 };
 
 // 附件下载
@@ -478,4 +486,46 @@ export const configurationApi = {
     api.put(`/configurations/items/${id}/children/${childId}`, data),
   removeChild: (id: string, childId: string) =>
     api.delete(`/configurations/items/${id}/children/${childId}`),
+};
+
+// ──────────────────────────────────────────
+// 构型配置 API
+// ──────────────────────────────────────────
+
+export const configurationProfileApi = {
+  list: (params?: { page?: number; page_size?: number; search?: string; status?: string }) =>
+    api.get('/configurations/profiles', { params }),
+
+  get: (id: string) =>
+    api.get(`/configurations/profiles/${id}`),
+
+  create: (data: {
+    code: string; name: string; configuration_item_id?: string;
+    effectivity_start?: string; effectivity_end?: string; remark?: string;
+  }) =>
+    api.post('/configurations/profiles', data),
+
+  update: (id: string, data: {
+    code?: string; name?: string; configuration_item_id?: string | null;
+    effectivity_start?: string; effectivity_end?: string; remark?: string;
+  }) =>
+    api.put(`/configurations/profiles/${id}`, data),
+
+  delete: (id: string) =>
+    api.delete(`/configurations/profiles/${id}`),
+
+  activate: (id: string) =>
+    api.post(`/configurations/profiles/${id}/activate`),
+
+  archive: (id: string) =>
+    api.post(`/configurations/profiles/${id}/archive`),
+
+  updateItem: (profileId: string, itemId: string, data: { is_selected: boolean }) =>
+    api.put(`/configurations/profiles/${profileId}/items/${itemId}`, data),
+
+  toggleConfigNode: (profileId: string, configItemId: string) =>
+    api.put(`/configurations/profiles/${profileId}/config-items/${configItemId}/toggle`),
+
+  updateStatus: (profileId: string, status: string) =>
+    api.put(`/configurations/profiles/${profileId}/status`, { status }),
 };

@@ -285,6 +285,7 @@ CREATE TABLE configuration_items (
     spec VARCHAR(255),
     status VARCHAR(32) NOT NULL DEFAULT 'draft',
     remark TEXT,
+    document_links JSONB NOT NULL DEFAULT '[]',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -315,3 +316,39 @@ CREATE TABLE configuration_item_children (
 );
 
 CREATE INDEX idx_cic_parent_id ON configuration_item_children(parent_id);
+
+-- 构型配置主表
+CREATE TABLE configuration_profiles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    code VARCHAR(64) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    configuration_item_id UUID REFERENCES configuration_items(id),
+    status VARCHAR(16) NOT NULL DEFAULT 'draft',
+    effectivity_start VARCHAR(32),
+    effectivity_end VARCHAR(32),
+    remark TEXT,
+    creator_id UUID NOT NULL REFERENCES users(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_cp_config_item_id ON configuration_profiles(configuration_item_id);
+CREATE INDEX idx_cp_status ON configuration_profiles(status);
+
+-- 构型配置清单明细
+CREATE TABLE configuration_profile_items (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    profile_id UUID NOT NULL REFERENCES configuration_profiles(id) ON DELETE CASCADE,
+    source_config_item_id UUID REFERENCES configuration_items(id),
+    item_type VARCHAR(16) NOT NULL,
+    item_id UUID NOT NULL,
+    item_code VARCHAR(64),
+    item_name VARCHAR(255),
+    is_required BOOLEAN NOT NULL DEFAULT TRUE,
+    is_selected BOOLEAN NOT NULL DEFAULT FALSE,
+    source_type VARCHAR(16) NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_cpi_profile_id ON configuration_profile_items(profile_id);

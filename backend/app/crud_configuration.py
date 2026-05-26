@@ -159,3 +159,173 @@ def remove_config_child(db: Session, child_id: str) -> bool:
     db.delete(child)
     db.commit()
     return True
+
+
+# ============================================================
+# 构型配置 CRUD
+# ============================================================
+
+def _generate_checklist(db: Session, profile_id: str, config_item_id: str, source_type: str = "direct"):
+    """递归展开构型项，生成配置清单"""
+    from app.models import Part, Assembly
+
+    parts = db.query(models.ConfigurationItemPart).filter(
+        models.ConfigurationItemPart.configuration_item_id == config_item_id
+    ).order_by(models.ConfigurationItemPart.sort_order).all()
+
+    for p in parts:
+        item_code = None
+        item_name = None
+        if p.part_type == "part":
+            entity = db.query(Part).filter(Part.id == p.part_id).first()
+        else:
+            entity = db.query(Assembly).filter(Assembly.id == p.part_id).first()
+        if entity:
+            item_code = entity.code
+            item_name = entity.name
+
+        item = models.ConfigurationProfileItem(
+            profile_id=profile_id,
+            source_config_item_id=config_item_id,
+            item_type=p.part_type,
+            item_id=p.part_id,
+            item_code=item_code,
+            item_name=item_name,
+            is_required=p.is_required,
+            is_selected=p.is_required,
+            source_type=source_type,
+            sort_order=p.sort_order,
+        )
+        db.add(item)
+
+    children = db.query(models.ConfigurationItemChild).filter(
+        models.ConfigurationItemChild.parent_id == config_item_id
+    ).order_by(models.ConfigurationItemChild.sort_order).all()
+
+    for child in children:
+        _generate_checklist(db, profile_id, str(child.child_id), source_type="child")
+
+
+def get_profiles(
+    db: Session, search: Optional[str] = None,
+    status: Optional[str] = None,
+    skip: int = 0, limit: int = 20,
+) -> Tuple[List[models.ConfigurationProfile], int]:
+    q = db.query(models.ConfigurationProfile)
+    if status:
+        q = q.filter(models.ConfigurationProfile.status == status)
+    if search:
+        like = f"%{search}%"
+        q = q.filter(or_(
+            models.ConfigurationProfile.code.ilike(like),
+            models.ConfigurationProfile.name.ilike(like),
+        ))
+    total = q.count()
+    items = q.order_by(models.ConfigurationProfile.code).offset(skip).limit(limit).all()
+    return items, total
+
+
+def get_profile(db: Session, profile_id: str) -> Optional[models.ConfigurationProfile]:
+    return db.query(models.ConfigurationProfile).filter(
+        models.ConfigurationProfile.id == profile_id
+    ).first()
+
+
+def get_profile_by_code(db: Session, code: str) -> Optional[models.ConfigurationProfile]:
+    return db.query(models.ConfigurationProfile).filter(
+        models.ConfigurationProfile.code == code
+    ).first()
+
+
+def create_profile(
+    db: Session, data: schemas.ConfigurationProfileCreate, creator_id: str,
+) -> models.ConfigurationProfile:
+    profile = models.ConfigurationProfile(
+        code=data.code, name=data.name,
+        configuration_item_id=data.configuration_item_id,
+        effectivity_start=data.effectivity_start,
+        effectivity_end=data.effectivity_end,
+        remark=data.remark,
+        creator_id=creator_id,
+    )
+    db.add(profile)
+    db.flush()
+
+    if data.configuration_item_id:
+        _generate_checklist(db, str(profile.id), str(data.configuration_item_id))
+
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+def update_profile(
+    db: Session, profile_id: str, data: schemas.ConfigurationProfileUpdate,
+) -> Optional[models.ConfigurationProfile]:
+    profile = get_profile(db, profile_id)
+    if not profile:
+        return None
+
+    # 处理构型项变更（单独处理，支持置空）
+    if data.configuration_item_id is not None:
+        # 清除旧清单
+        db.query(models.ConfigurationProfileItem).filter(
+            models.ConfigurationProfileItem.profile_id == profile_id
+        ).delete()
+        # 重新生成
+        if data.configuration_item_id:
+            profile.configuration_item_id = data.configuration_item_id
+            _generate_checklist(db, profile_id, str(data.configuration_item_id))
+        else:
+            profile.configuration_item_id = None
+
+    # 更新其他字段
+    update_data = data.model_dump(exclude_unset=True)
+    update_data.pop("configuration_item_id", None)
+    for k, v in update_data.items():
+        setattr(profile, k, v)
+
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+def delete_profile(db: Session, profile_id: str) -> bool:
+    profile = get_profile(db, profile_id)
+    if not profile:
+        return False
+    db.delete(profile)
+    db.commit()
+    return True
+
+
+def change_profile_status(db: Session, profile_id: str, new_status: str) -> Optional[models.ConfigurationProfile]:
+    profile = get_profile(db, profile_id)
+    if not profile:
+        return None
+    profile.status = new_status
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+def get_profile_items(db: Session, profile_id: str) -> List[models.ConfigurationProfileItem]:
+    return db.query(models.ConfigurationProfileItem).filter(
+        models.ConfigurationProfileItem.profile_id == profile_id
+    ).order_by(models.ConfigurationProfileItem.sort_order).all()
+
+
+def update_profile_item(
+    db: Session, item_id: str, is_selected: bool, force: bool = False,
+) -> Optional[models.ConfigurationProfileItem]:
+    item = db.query(models.ConfigurationProfileItem).filter(
+        models.ConfigurationProfileItem.id == item_id
+    ).first()
+    if not item:
+        return None
+    if item.is_required and not force:
+        return None
+    item.is_selected = is_selected
+    db.commit()
+    db.refresh(item)
+    return item

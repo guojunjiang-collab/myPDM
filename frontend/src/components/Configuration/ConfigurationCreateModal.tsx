@@ -3,6 +3,7 @@ import { Modal } from '../Modal';
 import { configurationApi, partsApi, assembliesApi } from '../../services/api';
 import AssemblyPartPicker from '../AssemblyPartPicker';
 import VersionSelectModal from '../VersionSelectModal';
+import EntityDocumentSection from '../EntityDocumentSection';
 import type { ConfigurationItem } from '../../types';
 
 interface Props {
@@ -95,15 +96,18 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
       }
       // Save parts
       if (isEdit) {
-        // Full replace: remove all existing parts/children, then add
-        const existingParts = parts.filter(p => p.id);
-        for (const p of existingParts) {
-          try { await configurationApi.removePart(configId, p.id!); } catch {}
-        }
-        const existingChildren = children.filter(c => c.id);
-        for (const c of existingChildren) {
-          try { await configurationApi.removeChild(configId, c.id!); } catch {}
-        }
+        // Full replace: fetch existing data, remove all, then re-add current state
+        try {
+          const current = await configurationApi.getItem(configId);
+          const existingParts = current.data?.parts || [];
+          const existingChildren = current.data?.children || [];
+          for (const p of existingParts) {
+            try { await configurationApi.removePart(configId, p.id); } catch {}
+          }
+          for (const c of existingChildren) {
+            try { await configurationApi.removeChild(configId, c.id); } catch {}
+          }
+        } catch {}
       }
       if (parts.length > 0) {
         await configurationApi.addParts(configId, parts.map(p => ({
@@ -376,6 +380,11 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
             </div>
           )}
         </div>
+
+        {/* 关联图文档（仅编辑模式） */}
+        {isEdit && item && (
+          <EntityDocumentSection entityType="configuration" entityId={item.id} editable />
+        )}
 
         <div className="flex justify-end gap-2 pt-2 border-t">
           <button onClick={onClose} className="px-4 py-2 border border-gray-200 rounded-lg text-sm">取消</button>

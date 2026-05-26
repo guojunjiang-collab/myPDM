@@ -1,0 +1,666 @@
+import { useState, useEffect } from 'react';
+import { Modal } from '../Modal';
+import { configurationApi, configurationProfileApi } from '../../services/api';
+import { isAdmin } from '../../stores/auth';
+import type { ConfigurationProfileDetail, ConfigTreeNode } from '../../types';
+
+interface Props {
+  open: boolean;
+  profileId?: string;
+  readOnly?: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+interface ConfigItemOption {
+  id: string;
+  code: string;
+  name: string;
+}
+
+const statusBadge = (status: string) => {
+  const map: Record<string, string> = {
+    draft: 'bg-blue-100 text-blue-700',
+    active: 'bg-green-100 text-green-700',
+    archived: 'bg-gray-100 text-gray-600',
+  };
+  const label: Record<string, string> = {
+    draft: '草稿',
+    active: '生效中',
+    archived: '已归档',
+  };
+  return (
+    <span className={`px-1.5 py-0.5 rounded text-xs ${map[status] || 'bg-gray-100 text-gray-600'}`}>
+      {label[status] || status}
+    </span>
+  );
+};
+
+export default function ProfileEditModal({ open, profileId, readOnly, onClose, onSaved }: Props) {
+  const isCreate = !profileId;
+  const isView = !!profileId && !!readOnly;
+  const [form, setForm] = useState({
+    code: '',
+    name: '',
+    configuration_item_id: '',
+    effectivity_start: '',
+    effectivity_end: '',
+    remark: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [configItems, setConfigItems] = useState<ConfigItemOption[]>([]);
+  const [profile, setProfile] = useState<ConfigurationProfileDetail | null>(null);
+  const [configTree, setConfigTree] = useState<ConfigTreeNode | null>(null);
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+  const [cfgPickerOpen, setCfgPickerOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // Load config items for dropdown
+  useEffect(() => {
+    if (open) {
+      configurationApi.listItems({ page: 1, page_size: 100 })
+        .then(r => setConfigItems(r.data.items || []))
+        .catch(() => setConfigItems([]));
+    }
+  }, [open]);
+
+  // Load profile for VIEW/EDIT mode
+  const loadProfile = async () => {
+    if (!profileId) return;
+    setLoading(true);
+    try {
+      const r = await configurationProfileApi.get(profileId);
+      const data: ConfigurationProfileDetail = r.data;
+      setProfile(data);
+      setConfigTree(data.config_tree || null);
+      // Default expand all nodes
+      if (data.config_tree) {
+        const expanded = new Set<string>();
+        const walk = (node: ConfigTreeNode) => {
+          expanded.add(node.id);
+          node.children.forEach(walk);
+        };
+        walk(data.config_tree);
+        setExpandedNodes(expanded);
+      }
+      setForm({
+        code: data.code,
+        name: data.name,
+        configuration_item_id: data.configuration_item_id,
+        effectivity_start: data.effectivity_start || '',
+        effectivity_end: data.effectivity_end || '',
+        remark: data.remark || '',
+      });
+    } catch (e: any) {
+      setError('加载配置详情失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open) {
+      setError('');
+      if (isCreate) {
+        setForm({ code: '', name: '', configuration_item_id: '', effectivity_start: '', effectivity_end: '', remark: '' });
+        setProfile(null);
+        setConfigTree(null);
+        setExpandedNodes(new Set());
+      } else {
+        loadProfile();
+      }
+    }
+  }, [open, profileId]);
+
+  const canEdit = profile && !readOnly && profile.status === 'draft';
+  const fieldDisabled = isView || (profile && !canEdit && !isCreate);
+
+  // CREATE submit
+  const handleSubmit = async () => {
+    if (!form.code.trim() || !form.name.trim()) { setError('编号和名称不能为空'); return; }
+    setSaving(true);
+    try {
+      await configurationProfileApi.create({
+        code: form.code.trim(),
+        name: form.name.trim(),
+        configuration_item_id: form.configuration_item_id || undefined,
+        effectivity_start: form.effectivity_start || undefined,
+        effectivity_end: form.effectivity_end || undefined,
+        remark: form.remark || undefined,
+      });
+      onSaved();
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || '保存失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // EDIT update basic info
+  const handleUpdate = async () => {
+    if (!form.code.trim() || !form.name.trim()) { setError('编号和名称不能为空'); return; }
+    setSaving(true);
+    try {
+      await configurationProfileApi.update(profileId!, {
+        code: form.code.trim(),
+        name: form.name.trim(),
+        configuration_item_id: form.configuration_item_id || null,
+        effectivity_start: form.effectivity_start || undefined,
+        effectivity_end: form.effectivity_end || undefined,
+        remark: form.remark || undefined,
+      } as any);
+      onSaved();
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || '保存失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Toggle config item node selection in tree
+  const handleToggleConfigNode = async (configItemId: string) => {
+    try {
+      await configurationProfileApi.toggleConfigNode(profileId!, configItemId);
+      await loadProfile();
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || '操作失败');
+    }
+  };
+
+  // Toggle individual part selection
+  const handleTogglePart = async (itemId: string, currentSelected: boolean) => {
+    try {
+      await configurationProfileApi.updateItem(profileId!, itemId, { is_selected: !currentSelected });
+      await loadProfile();
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || '操作失败');
+    }
+  };
+
+  // Toggle tree node expand/collapse
+  const toggleExpand = (nodeId: string) => {
+    setExpandedNodes(prev => {
+      const next = new Set(prev);
+      if (next.has(nodeId)) next.delete(nodeId);
+      else next.add(nodeId);
+      return next;
+    });
+  };
+
+  // Change associated config item from checklist header
+  const handleChangeConfigItem = async (newItemId: string) => {
+    setCfgPickerOpen(false);
+    if (!newItemId || newItemId === form.configuration_item_id) return;
+    setForm(prev => ({ ...prev, configuration_item_id: newItemId }));
+    try {
+      await configurationProfileApi.update(profileId!, { configuration_item_id: newItemId } as any);
+      await loadProfile();
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || '关联构型项失败');
+    }
+  };
+
+  // ── Status change handlers ──
+  const handleActivate = async () => {
+    setSaving(true);
+    try {
+      await configurationProfileApi.activate(profileId!);
+      await loadProfile();
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || '操作失败');
+    } finally { setSaving(false); }
+  };
+
+  const handleArchive = async () => {
+    setSaving(true);
+    try {
+      await configurationProfileApi.archive(profileId!);
+      await loadProfile();
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || '操作失败');
+    } finally { setSaving(false); }
+  };
+
+  // ── Table rendering helpers ──
+
+  const statusLabel: Record<string, string> = { draft: '草稿', active: '生效', archived: '归档' };
+
+  const handleStatusChange = async (newStatus: string) => {
+    setSaving(true);
+    try {
+      await configurationProfileApi.updateStatus(profileId!, newStatus);
+      await loadProfile();
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || '操作失败');
+    } finally { setSaving(false); }
+  };
+
+  const getStatusLabel = (s: string | undefined) => {
+    if (!s) return '-';
+    const map: Record<string, string> = { draft: '草稿', active: '生效', archived: '归档', released: '已发布' };
+    return map[s] || s;
+  };
+
+  // ── Formal checklist: only selected items, default collapsed ──
+  const [formalExpanded, setFormalExpanded] = useState<Set<string>>(new Set());
+  const toggleFormalExpand = (id: string) => {
+    setFormalExpanded(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const renderFormalRows = (node: ConfigTreeNode, level: number = 0): React.ReactNode[] => {
+    const rows: React.ReactNode[] = [];
+    if (!node.is_selected && !node.is_required) return rows;
+
+    const hasChildren = node.children.length > 0;
+    const isExpanded = formalExpanded.has(node.id);
+    const levelPrefix = level > 0 ? '-'.repeat(level) : '';
+
+    const hasSelectedParts = node.parts.some(p => p.is_selected);
+
+    rows.push(
+      <tr key={node.id} className="bg-gray-50/70">
+        <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+          {levelPrefix}{level}
+          {hasChildren ? (
+            <button type="button" onClick={() => toggleFormalExpand(node.id)}
+              className="inline-flex items-center text-gray-400 hover:text-gray-600 cursor-pointer select-none ml-1">
+              {isExpanded ? '\u25bc' : '\u25b6'}
+            </button>
+          ) : null}
+        </td>
+        <td className="px-3 py-2 text-sm font-medium text-gray-700">{node.code}</td>
+        <td className="px-3 py-2 text-sm text-gray-600">{node.name}</td>
+        <td className="px-3 py-2 text-xs whitespace-nowrap">
+          <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">构型项</span>
+        </td>
+        <td className="px-3 py-2 text-xs text-gray-400">-</td>
+        <td className="px-3 py-2 text-xs text-gray-400">-</td>
+        <td className="px-3 py-2 text-xs text-gray-400">-</td>
+      </tr>
+    );
+
+    // Selected parts (hidden when collapsed)
+    if (!hasChildren || isExpanded) {
+      for (const part of node.parts) {
+        if (!part.is_selected) continue;
+        rows.push(
+          <tr key={part.id}>
+            <td className="px-3 py-2 text-xs text-gray-400 whitespace-nowrap">{'-'.repeat(level)}</td>
+            <td className="px-3 py-2 text-xs text-gray-400">-</td>
+            <td className="px-3 py-2 text-xs text-gray-600">{part.item_name || '-'}</td>
+            <td className="px-3 py-2 text-xs whitespace-nowrap">
+              <span className={`px-1.5 py-0.5 rounded text-xs ${part.item_type === 'assembly' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                {part.item_type === 'assembly' ? '部件' : '零件'}
+              </span>
+            </td>
+            <td className="px-3 py-2 text-sm font-mono text-gray-600">{part.item_code}</td>
+            <td className="px-3 py-2 text-xs text-gray-500">{part.item_version || '-'}</td>
+            <td className="px-3 py-2 text-xs text-gray-500">{getStatusLabel(part.item_status)}</td>
+          </tr>
+        );
+      }
+    }
+
+    // Recurse into selected children (hidden when collapsed)
+    if (hasChildren && isExpanded) {
+      for (const child of node.children) {
+        rows.push(...renderFormalRows(child, level + 1));
+      }
+    }
+
+    return rows;
+  };
+
+  const renderTableRows = (node: ConfigTreeNode, level: number = 0): React.ReactNode[] => {
+    const rows: React.ReactNode[] = [];
+    const isExpanded = expandedNodes.has(node.id);
+    const hasChildren = node.children.length > 0;
+    const levelPrefix = level > 0 ? '-'.repeat(level) : '';
+
+    // ── Config Item Row ──
+    rows.push(
+      <tr key={node.id} className="bg-gray-50/70 hover:bg-gray-100/50 transition-colors">
+        <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+          {levelPrefix}{level}
+          {hasChildren ? (
+            <button
+              type="button"
+              onClick={() => toggleExpand(node.id)}
+              className="inline-flex items-center text-gray-400 hover:text-gray-600 cursor-pointer select-none ml-1"
+            >
+              {isExpanded ? '\u25bc' : '\u25b6'}
+            </button>
+          ) : null}
+        </td>
+        <td className="px-3 py-2 text-sm font-medium text-gray-700">{node.code}</td>
+        <td className="px-3 py-2 text-sm text-gray-600">{node.name}</td>
+        <td className="px-3 py-2 text-xs whitespace-nowrap">
+          <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">构型项</span>
+        </td>
+        <td className="px-3 py-2 text-xs text-gray-400">-</td>
+        <td className="px-3 py-2 text-xs text-gray-400">-</td>
+        <td className="px-3 py-2 text-xs text-gray-400">-</td>
+        <td className="px-3 py-2 text-center whitespace-nowrap">
+          <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={node.is_selected}
+              disabled={node.is_required || !canEdit}
+              onChange={() => { if (!node.is_required && canEdit) handleToggleConfigNode(node.id); }}
+              className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500 disabled:opacity-50"
+            />
+            <span className={`text-xs px-1.5 py-0.5 rounded ${node.is_required ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'}`}>
+              {node.is_required ? '必选' : '可选'}
+            </span>
+          </label>
+        </td>
+      </tr>
+    );
+
+    // ── Part Rows (hidden when collapsed) ──
+    if (!hasChildren || isExpanded) {
+      for (const part of node.parts) {
+        rows.push(
+        <tr key={part.id} className={`${!node.is_selected ? 'opacity-40' : ''} hover:bg-gray-50/50 transition-colors`}>
+          <td className="px-3 py-2 text-xs text-gray-400 whitespace-nowrap">
+            <span className="inline-block w-4 mr-1" />
+            {'-'.repeat(level)}
+          </td>
+          <td className="px-3 py-2 text-xs text-gray-400">-</td>
+          <td className="px-3 py-2 text-xs text-gray-600">{part.item_name || '-'}</td>
+          <td className="px-3 py-2 text-xs whitespace-nowrap">
+            <span className={`px-1.5 py-0.5 rounded text-xs ${part.item_type === 'assembly' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+              {part.item_type === 'assembly' ? '部件' : '零件'}
+            </span>
+          </td>
+          <td className="px-3 py-2 text-sm font-mono text-gray-600">{part.item_code}</td>
+          <td className="px-3 py-2 text-xs text-gray-500">{part.item_version || '-'}</td>
+          <td className="px-3 py-2 text-xs text-gray-500">{getStatusLabel(part.item_status)}</td>
+          <td className="px-3 py-2 text-center whitespace-nowrap">
+            <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={part.is_selected}
+                disabled={part.is_required || !canEdit}
+                onChange={() => { if (canEdit) handleTogglePart(part.id, part.is_selected); }}
+                className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500 disabled:opacity-50"
+              />
+              <span className={`text-xs px-1.5 py-0.5 rounded ${part.is_required ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                {part.is_required ? '必选' : '可选'}
+              </span>
+            </label>
+          </td>
+        </tr>
+      );
+    }
+    }
+
+    // ── Child Config Items (recursive, only when expanded) ──
+    if (hasChildren && isExpanded) {
+      for (const child of node.children) {
+        rows.push(...renderTableRows(child, level + 1));
+      }
+    }
+
+    return rows;
+  };
+
+  // Collect selected items for the formal checklist
+  const collectSelected = (node: ConfigTreeNode): { configName: string; parts: { code: string; type: string }[] }[] => {
+    const result: { configName: string; parts: { code: string; type: string }[] }[] = [];
+    const walk = (n: ConfigTreeNode) => {
+      if (n.is_selected || n.is_required) {
+        const selectedParts = n.parts.filter(p => p.is_selected || p.is_required);
+        if (selectedParts.length > 0) {
+          result.push({
+            configName: n.name,
+            parts: selectedParts.map(p => ({ code: p.item_code, type: p.item_type })),
+          });
+        } else {
+          // Config item itself is selected but no parts
+          result.push({ configName: n.name, parts: [] });
+        }
+      }
+      n.children.forEach(walk);
+    };
+    walk(node);
+    return result;
+  };
+
+  const title = isCreate ? '新建构型配置' : (isView ? '构型配置详情' : '编辑构型配置');
+
+  return (
+    <Modal open={open} onClose={onClose} title={title} width="3xl">
+      <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+        {error && (
+          <div className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{error}</div>
+        )}
+
+        {loading ? (
+          <div className="text-sm text-gray-400 py-8 text-center">加载中...</div>
+        ) : (
+          <>
+            {/* Basic Info Form */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  编号 {isCreate && '*'}
+                </label>
+                <input
+                  value={form.code}
+                  onChange={(e) => setForm({ ...form, code: e.target.value })}
+                  disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
+                  className="w-full px-3 py-2 border border-gray-200 rounded text-sm disabled:bg-gray-50 disabled:text-gray-400"
+                  placeholder="如 CFG-PROFILE-001"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  名称 {isCreate && '*'}
+                </label>
+                <input
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
+                  className="w-full px-3 py-2 border border-gray-200 rounded text-sm disabled:bg-gray-50 disabled:text-gray-400"
+                  placeholder="如 A型机翼配置"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  架次起始
+                </label>
+                <input
+                  value={form.effectivity_start}
+                  onChange={(e) => setForm({ ...form, effectivity_start: e.target.value })}
+                  disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
+                  className="w-full px-3 py-2 border border-gray-200 rounded text-sm disabled:bg-gray-50 disabled:text-gray-400"
+                  placeholder="如 001"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  架次结束
+                </label>
+                <input
+                  value={form.effectivity_end}
+                  onChange={(e) => setForm({ ...form, effectivity_end: e.target.value })}
+                  disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
+                  className="w-full px-3 py-2 border border-gray-200 rounded text-sm disabled:bg-gray-50 disabled:text-gray-400"
+                  placeholder="如 999"
+                />
+              </div>
+              <div className="col-span-2 flex items-start gap-4">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                    备注
+                  </label>
+                  <textarea
+                    value={form.remark}
+                    onChange={(e) => setForm({ ...form, remark: e.target.value })}
+                    rows={1}
+                    disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
+                    className="w-full px-3 py-2 border border-gray-200 rounded text-sm disabled:bg-gray-50 disabled:text-gray-400"
+                  />
+                </div>
+                {!isCreate && profile && (
+                  <div className="flex-1 flex flex-col">
+                    <label className="block text-xs font-medium text-gray-500 mb-1">状态</label>
+                    {isAdmin() && !readOnly ? (
+                      <div className="flex items-center gap-3">
+                        {(['draft', 'active', 'archived'] as const).map(s => (
+                          <label key={s} className="inline-flex items-center gap-1 cursor-pointer select-none">
+                            <input
+                              type="radio"
+                              name="profileStatus"
+                              value={s}
+                              checked={profile.status === s}
+                              onChange={() => handleStatusChange(s)}
+                              disabled={saving}
+                              className="w-3.5 h-3.5 text-primary-600"
+                            />
+                            <span className="text-xs text-gray-600">{statusLabel[s]}</span>
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        {statusBadge(profile.status)}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ── 配置清单（仅编辑模式） ── */}
+            {profile && canEdit && (
+              <div className="border-t pt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-bold text-gray-700">配置清单</h4>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setCfgPickerOpen(!cfgPickerOpen)}
+                      className="text-xs text-primary-600 hover:text-primary-700 border border-gray-200 px-2 py-1 rounded hover:bg-gray-50"
+                    >
+                      {form.configuration_item_id
+                        ? `关联构型项: ${configItems.find(c => c.id === form.configuration_item_id)?.code || '...'}`
+                        : '关联构型项'}
+                    </button>
+                    {cfgPickerOpen && (
+                      <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-[220px] max-h-[200px] overflow-y-auto">
+                        {configItems.length === 0 ? (
+                          <p className="text-xs text-gray-400 px-3 py-2">无可用构型项</p>
+                        ) : (
+                          configItems.map(ci => (
+                            <button
+                              key={ci.id}
+                              type="button"
+                              onClick={() => handleChangeConfigItem(ci.id)}
+                              className={`w-full text-left px-3 py-2 text-xs hover:bg-primary-50 ${ci.id === form.configuration_item_id ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-600'}`}
+                            >
+                              {ci.code} - {ci.name}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Table-based checklist */}
+                {configTree ? (
+                  <div className="border border-gray-200 rounded-lg overflow-hidden max-h-[400px] overflow-y-auto bg-white">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-100 sticky top-0 z-10">
+                        <tr>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-20">层级</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-32">构型号</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-28">名称</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-16 whitespace-nowrap">类型</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-36">零部件件号</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-16">版本</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-16">状态</th>
+                          <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 w-24">可选</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {renderTableRows(configTree)}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="border border-gray-200 rounded-lg p-4 text-center">
+                    <p className="text-xs text-gray-400">
+                      {form.configuration_item_id ? '请先关联构型项以展开配置清单' : '暂无关联构型项，无法生成配置清单'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── 正式配置清单 ── */}
+            {profile && configTree && (
+              <div className="border-t pt-3">
+                <h4 className="text-sm font-bold text-gray-700 mb-2">正式配置清单</h4>
+                <div className="border border-gray-200 rounded-lg overflow-hidden max-h-[400px] overflow-y-auto bg-white">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-100 sticky top-0 z-10">
+                      <tr>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-20">层级</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-32">构型号</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-28">名称</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-16 whitespace-nowrap">类型</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-36">零部件件号</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-16">版本</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-16">状态</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {renderFormalRows(configTree)}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Footer Buttons */}
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 border border-gray-200 rounded-lg text-sm"
+              >
+                关闭
+              </button>
+              {isCreate && (
+                <button
+                  onClick={handleSubmit}
+                  disabled={saving}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm disabled:opacity-50"
+                >
+                  {saving ? '保存中...' : '保存'}
+                </button>
+              )}
+              {canEdit && (
+                <button
+                  onClick={handleUpdate}
+                  disabled={saving}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm disabled:opacity-50"
+                >
+                  {saving ? '保存中...' : '保存'}
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
+  );
+}

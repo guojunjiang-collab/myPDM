@@ -570,3 +570,64 @@ export interface ConfigChildItem {
   child_detail?: { id: string; code: string; name: string; spec?: string; status?: string };
 }
 
+// ──────────────────────────────────────────
+// 构型配置 (Configuration Profile)
+// ──────────────────────────────────────────
+
+export interface ConfigurationProfile {
+  id: string;
+  code: string;
+  name: string;
+  configuration_item_id: string;
+  status: 'draft' | 'active' | 'archived';
+  effectivity_start?: string;
+  effectivity_end?: string;
+  remark?: string;
+  creator_id: string;
+  created_at: string;
+  updated_at?: string;
+  configuration_item?: { id: string; code: string; name: string };
+}
+
+export interface ConfigurationProfileItem {
+  id: string;
+  profile_id: string;
+  source_config_item_id?: string;
+  item_type: 'part' | 'assembly';
+  item_id: string;
+  item_code?: string;
+  item_name?: string;
+  is_required: boolean;
+  is_selected: boolean;
+  source_type: 'direct' | 'child';
+  sort_order: number;
+  source_config_item?: { id: string; code: string; name: string };
+}
+
+export interface ConfigTreePart {
+  id: string;
+  item_type: string;
+  item_code: string;
+  item_name: string;
+  item_version?: string;
+  item_status?: string;
+  is_required: boolean;
+  is_selected: boolean;
+  source_type: string;
+}
+
+export interface ConfigTreeNode {
+  id: string;
+  code: string;
+  name: string;
+  is_required: boolean;
+  is_selected: boolean;
+  parts: ConfigTreePart[];
+  children: ConfigTreeNode[];
+}
+
+export interface ConfigurationProfileDetail extends ConfigurationProfile {
+  items: ConfigurationProfileItem[];
+  config_tree?: ConfigTreeNode | null;
+}
+

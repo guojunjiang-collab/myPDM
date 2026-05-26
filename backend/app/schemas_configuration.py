@@ -99,3 +99,60 @@ class ConfigChildResponse(BaseSchema):
 
 class ConfigChildBulkCreate(BaseSchema):
     items: List[ConfigChildCreate]
+
+
+# ============================================================
+# 构型配置 (Configuration Profile)
+# ============================================================
+
+class ConfigurationProfileCreate(BaseSchema):
+    code: str
+    name: str
+    configuration_item_id: Optional[uuid.UUID] = None
+    effectivity_start: Optional[str] = None
+    effectivity_end: Optional[str] = None
+    remark: Optional[str] = None
+
+
+class ConfigurationProfileUpdate(BaseSchema):
+    code: Optional[str] = None
+    name: Optional[str] = None
+    configuration_item_id: Optional[uuid.UUID] = None
+    effectivity_start: Optional[str] = None
+    effectivity_end: Optional[str] = None
+    remark: Optional[str] = None
+
+
+class ConfigurationProfileResponse(BaseSchema):
+    id: uuid.UUID
+    code: str
+    name: str
+    configuration_item_id: uuid.UUID
+    status: str
+    effectivity_start: Optional[str] = None
+    effectivity_end: Optional[str] = None
+    remark: Optional[str] = None
+    creator_id: uuid.UUID
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    configuration_item: Optional[dict] = None
+
+
+class ConfigurationProfileItemUpdate(BaseSchema):
+    is_selected: Optional[bool] = None
+
+
+class ConfigurationProfileItemResponse(BaseSchema):
+    id: uuid.UUID
+    profile_id: uuid.UUID
+    source_config_item_id: Optional[uuid.UUID] = None
+    item_type: str
+    item_id: uuid.UUID
+    item_code: Optional[str] = None
+    item_name: Optional[str] = None
+    is_required: bool
+    is_selected: bool
+    source_type: str
+    sort_order: int
+    created_at: datetime
+    source_config_item: Optional[dict] = None
