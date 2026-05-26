@@ -12,7 +12,15 @@ import BOMTracePanel from './BOMTracePanel';
 import DocTracePanel from './DocTracePanel';
 
 export default function BOM() {
-  const [mode, setMode] = useState<'tree' | 'compare' | 'trace' | 'doc-trace'>('tree');
+  type ModeKey = 'tree' | 'compare' | 'trace' | 'doc-trace';
+  const [mode, setMode] = useState<ModeKey>('tree');
+
+  const modeTabs: { key: ModeKey; label: string }[] = [
+    { key: 'tree', label: 'BOM 树' },
+    { key: 'compare', label: 'BOM 对比' },
+    { key: 'trace', label: 'BOM 反查' },
+    { key: 'doc-trace', label: '图文档反查' },
+  ];
 
   // 部件列表（BOM 树模式 & BOM 对比模式共用）
   const [assemblies, setAssemblies] = useState<SelectOption[]>([]);
@@ -73,11 +81,20 @@ export default function BOM() {
   return (
     <div>
       {/* 模式切换 */}
-      <div className="flex gap-2 mb-4">
-        <button onClick={() => setMode('tree')}   className={`px-4 py-2 rounded-lg ${mode === 'tree'   ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>BOM 树</button>
-        <button onClick={() => setMode('compare')} className={`px-4 py-2 rounded-lg ${mode === 'compare' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>BOM 对比</button>
-        <button onClick={() => setMode('trace')}   className={`px-4 py-2 rounded-lg ${mode === 'trace'   ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>BOM 反查</button>
-        <button onClick={() => setMode('doc-trace')} className={`px-4 py-2 rounded-lg ${mode === 'doc-trace' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>图文档反查</button>
+      <div className="flex border-b border-gray-200 mb-4">
+        {modeTabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setMode(tab.key)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors cursor-pointer ${
+              mode === tab.key
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* 各模式 Panel */}
