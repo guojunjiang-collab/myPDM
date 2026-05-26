@@ -538,7 +538,7 @@ export interface ECORequest {
 }
 
 // ──────────────────────────────────────────
-// 构型配置
+// 构型项管理
 // ──────────────────────────────────────────
 
 export interface ConfigurationItem {

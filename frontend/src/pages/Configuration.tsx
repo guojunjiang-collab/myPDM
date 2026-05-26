@@ -4,8 +4,8 @@ import ConfigurationList from '../components/Configuration/ConfigurationList';
 type TabKey = 'effectivity' | 'single-config';
 
 const tabs: { key: TabKey; label: string; enabled: boolean }[] = [
-  { key: 'effectivity', label: '构型配置', enabled: true },
-  { key: 'single-config', label: '单机构型管理', enabled: true },
+  { key: 'effectivity', label: '构型项管理', enabled: true },
+  { key: 'single-config', label: '构型配置', enabled: true },
 ];
 
 export default function Configuration() {
