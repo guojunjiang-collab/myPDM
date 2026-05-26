@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { assembliesApi, assemblyPartsApi, customFieldsApi, bomApi, partsApi } from '../services/api';
 import type { Assembly, AssemblyPartItem, CustomFieldDefinition, CustomFieldValue } from '../types';
 import { canEdit, isAdmin, canDownload } from '../stores/auth';
@@ -93,6 +93,44 @@ export default function Components() {
   const [editParts, setEditParts] = useState<AssemblyPartItem[]>([]);
   const [loadingEditParts, setLoadingEditParts] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [editSortField, setEditSortField] = useState<string | null>(null);
+  const [editSortDir, setEditSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const getEditSortIcon = (field: string) => {
+    if (editSortField !== field) return <span className="text-gray-300 ml-0.5">⇅</span>;
+    return editSortDir === 'asc' ? <span className="text-gray-500 ml-0.5">↑</span> : <span className="text-gray-500 ml-0.5">↓</span>;
+  };
+
+  const handleEditSort = (field: string) => {
+    if (editSortField === field) {
+      setEditSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setEditSortField(field);
+      setEditSortDir('asc');
+    }
+  };
+
+  const sortedEditParts = useMemo(() => {
+    if (!editSortField) return editParts;
+    return [...editParts].sort((a, b) => {
+      const getVal = (p: AssemblyPartItem) => {
+        const d = p.child_detail;
+        switch (editSortField) {
+          case 'type': return p.childType === 'part' ? '0零件' : '1部件';
+          case 'code': return d?.code || '';
+          case 'name': return d?.name || '';
+          case 'spec': return d?.spec || '';
+          case 'version': return d?.version || '';
+          case 'status': return d?.status || '';
+          case 'quantity': return p.quantity || 0;
+          default: return '';
+        }
+      };
+      const va = String(getVal(a)); const vb = String(getVal(b));
+      const cmp = va.localeCompare(vb, 'zh-CN');
+      return editSortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [editParts, editSortField, editSortDir]);
   const [versionSelectState, setVersionSelectState] = useState<{ itemId: string; childId: string; childType: string; childName: string } | null>(null);
 
 /* ---- 详情弹窗 ---- */
@@ -765,18 +803,18 @@ export default function Components() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">类型</th>
-                <th className="px-3 py-2 text-left text-gray-500 font-medium">件号</th>
-                <th className="px-3 py-2 text-left text-gray-500 font-medium">中文名称</th>
-                <th className="px-3 py-2 text-left text-gray-500 font-medium">规格型号</th>
-                <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-                <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
-                <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">用量</th>
+                <th onClick={() => handleEditSort('type')} className="px-3 py-2 text-left text-gray-500 font-medium w-16 cursor-pointer select-none whitespace-nowrap">类型 {getEditSortIcon('type')}</th>
+                <th onClick={() => handleEditSort('code')} className="px-3 py-2 text-left text-gray-500 font-medium cursor-pointer select-none whitespace-nowrap">件号 {getEditSortIcon('code')}</th>
+                <th onClick={() => handleEditSort('name')} className="px-3 py-2 text-left text-gray-500 font-medium cursor-pointer select-none whitespace-nowrap">中文名称 {getEditSortIcon('name')}</th>
+                <th onClick={() => handleEditSort('spec')} className="px-3 py-2 text-left text-gray-500 font-medium cursor-pointer select-none whitespace-nowrap">规格型号 {getEditSortIcon('spec')}</th>
+                <th onClick={() => handleEditSort('version')} className="px-3 py-2 text-left text-gray-500 font-medium w-16 cursor-pointer select-none whitespace-nowrap">版本 {getEditSortIcon('version')}</th>
+                <th onClick={() => handleEditSort('status')} className="px-3 py-2 text-left text-gray-500 font-medium w-16 cursor-pointer select-none whitespace-nowrap">状态 {getEditSortIcon('status')}</th>
+                <th onClick={() => handleEditSort('quantity')} className="px-3 py-2 text-left text-gray-500 font-medium w-20 cursor-pointer select-none whitespace-nowrap">用量 {getEditSortIcon('quantity')}</th>
                 <th className="px-3 py-2 text-right text-gray-500 font-medium w-16">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {editParts.map((part) => (
+              {sortedEditParts.map((part) => (
                 <tr key={part.id} className="hover:bg-gray-50">
                   <td className="px-3 py-2">
                     <span className={`px-1.5 py-0.5 text-xs rounded ${

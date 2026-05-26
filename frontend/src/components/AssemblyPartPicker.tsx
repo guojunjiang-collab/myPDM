@@ -71,6 +71,8 @@ export default function AssemblyPartPicker({
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'' | 'part' | 'component'>('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [sortField, setSortField] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   /* ---- 已选 ---- */
   const [selected, setSelected] = useState<Map<string, SelectedItem>>(new Map());
@@ -168,10 +170,18 @@ export default function AssemblyPartPicker({
     return result;
   }, [partsList, assembliesList, existingChildIds, currentAssemblyId]);
 
-  /* 搜索 + 筛选 */
+  /* 搜索 + 筛选 + 排序 */
+  const handlePickerSort = (field: string) => {
+    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortField(field); setSortDir('asc'); }
+  };
+  const getPickerSortIcon = (field: string) => {
+    if (sortField !== field) return <span className="text-gray-300 ml-0.5">⇅</span>;
+    return sortDir === 'asc' ? <span className="text-gray-500 ml-0.5">↑</span> : <span className="text-gray-500 ml-0.5">↓</span>;
+  };
   const filtered = useMemo(() => {
     const keyword = search.trim().toLowerCase();
-    return allCandidates.filter((item) => {
+    let result = allCandidates.filter((item) => {
       if (typeFilter && item.type !== typeFilter) return false;
       if (statusFilter && item.status !== statusFilter) return false;
       if (!keyword) return true;
@@ -180,7 +190,22 @@ export default function AssemblyPartPicker({
         item.name.toLowerCase().includes(keyword)
       );
     });
-  }, [allCandidates, search, typeFilter, statusFilter]);
+    if (sortField) {
+      result = [...result].sort((a, b) => {
+        let va = ''; let vb = '';
+        switch (sortField) {
+          case 'type': va = a.type === 'part' ? '0零件' : '1部件'; vb = b.type === 'part' ? '0零件' : '1部件'; break;
+          case 'code': va = a.code; vb = b.code; break;
+          case 'name': va = a.name; vb = b.name; break;
+          case 'version': va = a.version; vb = b.version; break;
+          case 'status': va = a.status; vb = b.status; break;
+        }
+        const cmp = va.localeCompare(vb, 'zh-CN');
+        return sortDir === 'asc' ? cmp : -cmp;
+      });
+    }
+    return result;
+  }, [allCandidates, search, typeFilter, statusFilter, sortField, sortDir]);
 
   /* ---- 操作 ---- */
 
@@ -339,10 +364,10 @@ export default function AssemblyPartPicker({
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b sticky top-0">
                   <tr>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">件号</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">中文名称</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
+                    <th onClick={() => handlePickerSort('code')} className="px-3 py-2 text-left text-gray-500 font-medium cursor-pointer select-none whitespace-nowrap">件号 {getPickerSortIcon('code')}</th>
+                    <th onClick={() => handlePickerSort('name')} className="px-3 py-2 text-left text-gray-500 font-medium cursor-pointer select-none whitespace-nowrap">中文名称 {getPickerSortIcon('name')}</th>
+                    <th onClick={() => handlePickerSort('version')} className="px-3 py-2 text-left text-gray-500 font-medium w-16 cursor-pointer select-none whitespace-nowrap">版本 {getPickerSortIcon('version')}</th>
+                    <th onClick={() => handlePickerSort('status')} className="px-3 py-2 text-left text-gray-500 font-medium w-16 cursor-pointer select-none whitespace-nowrap">状态 {getPickerSortIcon('status')}</th>
                     <th className="px-3 py-2 text-center text-gray-500 font-medium w-20">操作</th>
                   </tr>
                 </thead>
