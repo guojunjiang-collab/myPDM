@@ -272,3 +272,46 @@ CREATE INDEX idx_ecr_affected_items_entity ON ecr_affected_items(entity_type, en
 CREATE INDEX idx_ecr_review_records_ecr ON ecr_review_records(ecr_id);
 CREATE INDEX idx_ecr_review_records_reviewer ON ecr_review_records(reviewer_id);
 CREATE INDEX idx_ecr_status_logs_ecr ON ecr_status_logs(ecr_id);
+
+-- ============================================================
+-- 构型配置模块
+-- ============================================================
+
+-- 构型库表
+CREATE TABLE configuration_items (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    code VARCHAR(64) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    spec VARCHAR(255),
+    status VARCHAR(32) NOT NULL DEFAULT 'draft',
+    remark TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 构型库关联零部件
+CREATE TABLE configuration_item_parts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    configuration_item_id UUID NOT NULL REFERENCES configuration_items(id) ON DELETE CASCADE,
+    part_type VARCHAR(16) NOT NULL,
+    part_id UUID NOT NULL,
+    is_required BOOLEAN NOT NULL DEFAULT TRUE,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_cip_config_id ON configuration_item_parts(configuration_item_id);
+
+-- 构型库子构型项（自引用）
+CREATE TABLE configuration_item_children (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    parent_id UUID NOT NULL REFERENCES configuration_items(id) ON DELETE CASCADE,
+    child_id UUID NOT NULL REFERENCES configuration_items(id) ON DELETE CASCADE,
+    is_required BOOLEAN NOT NULL DEFAULT TRUE,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uix_config_child UNIQUE (parent_id, child_id),
+    CONSTRAINT ck_no_self_ref CHECK (parent_id != child_id)
+);
+
+CREATE INDEX idx_cic_parent_id ON configuration_item_children(parent_id);
