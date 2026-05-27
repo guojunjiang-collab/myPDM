@@ -21,58 +21,33 @@ const statusTag = (s: string) => {
 export default function PartDetailContent({ part, customFieldDefs, customFieldValues }: PartDetailContentProps) {
   return (
     <div className="space-y-4">
-      {/* 基本属性 */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">件号</label>
-          <div className="text-sm font-medium">{part.code}</div>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">中文名称</label>
-          <div className="text-sm">{part.name}</div>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">规格型号</label>
-          <div className="text-sm">{part.spec || '-'}</div>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">版本</label>
-          <div className="text-sm">{part.version || '-'}</div>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">状态</label>
-          <span className={`inline-block px-2 py-1 text-xs rounded-full ${statusTag(part.status).class}`}>
-            {statusTag(part.status).label}
-          </span>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">备注</label>
-          <div className="text-sm">{part.remark || '-'}</div>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">创建时间</label>
-          <div className="text-sm">{formatDateTime(part.created_at)}</div>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">更新时间</label>
-          <div className="text-sm">{formatDateTime(part.updated_at)}</div>
-        </div>
+      {/* 基本属性 - 卡片式 */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <InfoItem label="件号" value={part.code} />
+        <InfoItem label="中文名称" value={part.name} />
+        <InfoItem label="版本" value={part.version || '-'} />
+        <StatusItem label="状态" status={part.status} />
+        <InfoItem label="规格型号" value={part.spec || '-'} />
+        <InfoItem label="备注" value={part.remark || '-'} />
+        <InfoItem label="创建时间" value={formatDateTime(part.created_at)} />
+        <InfoItem label="更新时间" value={formatDateTime(part.updated_at)} />
       </div>
 
-      {/* 自定义字段 */}
+      {/* 自定义字段 - 卡片式 */}
       {customFieldDefs.length > 0 && (
         <div className="border-t pt-4">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">自定义字段</h4>
-          <div className="grid grid-cols-2 gap-4">
+          <h4 className="text-sm font-bold text-gray-700 mb-2">自定义字段</h4>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {customFieldDefs.map(def => (
-              <div key={def.id}>
-                <label className="block text-xs font-medium text-gray-500 mb-1">{def.name}</label>
-                <div className="text-sm">
-                  {def.field_type === 'select'
-                    ? (def.options || []).find(o => o === customFieldValues[def.id]) || customFieldValues[def.id] || '-'
-                    : (customFieldValues[def.id] ?? '-')}
-                </div>
-              </div>
+              <InfoItem
+                key={def.id}
+                label={def.name}
+                value={
+                  def.field_type === 'select'
+                    ? String((def.options || []).find(o => o === customFieldValues[def.id]) || customFieldValues[def.id] || '-')
+                    : String(customFieldValues[def.id] ?? '-')
+                }
+              />
             ))}
           </div>
         </div>
@@ -80,6 +55,25 @@ export default function PartDetailContent({ part, customFieldDefs, customFieldVa
 
       {/* 关联图文档 */}
       <EntityDocumentSection entityType="part" entityId={part.id} editable={false} />
+    </div>
+  );
+}
+
+function InfoItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
+      <div className="text-sm text-gray-900 font-medium whitespace-pre-wrap">{value}</div>
+    </div>
+  );
+}
+
+function StatusItem({ label, status }: { label: string; status: string }) {
+  const tag = statusTag(status);
+  return (
+    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
+      <span className={`inline-block px-2 py-0.5 text-xs rounded-full ${tag.class}`}>{tag.label}</span>
     </div>
   );
 }

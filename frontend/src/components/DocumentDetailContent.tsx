@@ -91,54 +91,32 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
 
   return (
     <div className="space-y-4">
-      {/* 基本属性 */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">图文档编号</label>
-          <div className="text-sm font-medium">{doc.code}</div>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">图文档名称</label>
-          <div className="text-sm">{doc.name}</div>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">版本</label>
-          <div className="text-sm">{doc.version || '-'}</div>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">状态</label>
-          <span className={`inline-block px-2 py-1 text-xs rounded-full ${statusTag(doc.status).class}`}>
-            {statusTag(doc.status).label}
-          </span>
-        </div>
-        <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-500 mb-1">备注</label>
-          <div className="text-sm">{doc.remark || '-'}</div>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">创建时间</label>
-          <div className="text-sm">{formatDateTime(doc.created_at)}</div>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">更新时间</label>
-          <div className="text-sm">{formatDateTime(doc.updated_at)}</div>
-        </div>
+      {/* 基本属性 - 卡片式 */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <InfoItem label="图文档编号" value={doc.code} />
+        <InfoItem label="图文档名称" value={doc.name} />
+        <InfoItem label="版本" value={doc.version || '-'} />
+        <StatusItem label="状态" status={doc.status} />
+        <InfoItem label="备注" value={doc.remark || '-'} className="col-span-2 md:col-span-2" />
+        <InfoItem label="创建时间" value={formatDateTime(doc.created_at)} />
+        <InfoItem label="更新时间" value={formatDateTime(doc.updated_at)} />
       </div>
 
-      {/* 自定义字段 */}
+      {/* 自定义字段 - 卡片式 */}
       {customFieldDefs.length > 0 && (
         <div className="border-t pt-4">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">自定义字段</h4>
-          <div className="grid grid-cols-2 gap-4">
+          <h4 className="text-sm font-bold text-gray-700 mb-2">自定义字段</h4>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {customFieldDefs.map(def => (
-              <div key={def.id}>
-                <label className="block text-xs font-medium text-gray-500 mb-1">{def.name}</label>
-                <div className="text-sm">
-                  {def.field_type === 'select'
+              <InfoItem
+                key={def.id}
+                label={def.name}
+                value={String(
+                  def.field_type === 'select'
                     ? (def.options || []).find(o => o === customFieldValues[def.id]) || customFieldValues[def.id] || '-'
-                    : (customFieldValues[def.id] ?? '-')}
-                </div>
-              </div>
+                    : customFieldValues[def.id] ?? '-'
+                )}
+              />
             ))}
           </div>
         </div>
@@ -146,7 +124,7 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
 
       {/* 附件区域 - 只显示、预览、下载，无上传/删除 */}
       <div className="border-t pt-4">
-        <h4 className="text-sm font-medium text-gray-700 mb-3">附件</h4>
+        <h4 className="text-sm font-bold text-gray-700 mb-2">附件</h4>
 
         {loadingAttachments ? (
           <div className="text-sm text-gray-500">加载中...</div>
@@ -196,6 +174,25 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function InfoItem({ label, value, className }: { label: string; value: string; className?: string }) {
+  return (
+    <div className={`bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 ${className || ''}`}>
+      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
+      <div className="text-sm text-gray-900 font-medium whitespace-pre-wrap">{value}</div>
+    </div>
+  );
+}
+
+function StatusItem({ label, status }: { label: string; status: string }) {
+  const tag = statusTag(status);
+  return (
+    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
+      <span className={`inline-block px-2 py-0.5 text-xs rounded-full ${tag.class}`}>{tag.label}</span>
     </div>
   );
 }

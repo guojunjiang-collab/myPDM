@@ -220,7 +220,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
   return (
     <div className="border-t pt-4">
       <div className="flex items-center justify-between mb-2">
-        <h4 className="text-sm font-medium text-gray-700">关联图文档</h4>
+        <h4 className="text-sm font-bold text-gray-700">关联图文档</h4>
         {hasEditableAction && (
           <button type="button" onClick={() => setPickerOpen(true)} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">
             + 关联图文档
