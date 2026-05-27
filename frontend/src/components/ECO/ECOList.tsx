@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { ecoApi } from '../../services/api';
 import type { ECORequest } from '../../types';
 import { canEdit, isAdmin, useAuthStore } from '../../stores/auth';
@@ -40,6 +40,7 @@ export function ECOList() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editingEco, setEditingEco] = useState<ECORequest | null>(null);
   const [ccEcoId, setCcEcoId] = useState<string | null>(null);
+  const editReqId = useRef(0);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -87,8 +88,10 @@ export function ECOList() {
     finally { setActionLoading(null); }
   };
   const handleEdit = async (eco: ECORequest) => {
+    const reqId = ++editReqId.current;
     try {
       const resp = await ecoApi.detail(eco.id);
+      if (reqId !== editReqId.current) return; // 忽略过期请求
       setEditingEco(resp.data as ECORequest);
     } catch { toast.error('获取详情失败'); }
   };
@@ -166,7 +169,7 @@ export function ECOList() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-800">工程变更指令 (ECO)</h2>
-        {canEdit() && <button onClick={() => setCreateOpen(true)} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建 ECO</button>}
+        {canEdit() && <button onClick={() => { editReqId.current++; setEditingEco(null); setCreateOpen(true); }} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建 ECO</button>}
       </div>
       <div className="flex gap-2 mb-4">
         <input type="text" placeholder="搜索 ECO 编号、标题..." value={search}
