@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Modal } from '../Modal';
 import ConfigItemPicker from './ConfigItemPicker';
 import ConfigurationDetailModal from './ConfigurationDetailModal';
@@ -18,9 +18,9 @@ interface Props {
 
 const statusBadge = (status: string) => {
   const map: Record<string, string> = {
-    draft: 'bg-blue-100 text-blue-700',
-    active: 'bg-green-100 text-green-700',
-    archived: 'bg-gray-100 text-gray-600',
+    draft: 'bg-blue-100 text-blue-800',
+    active: 'bg-green-100 text-green-800',
+    archived: 'bg-gray-100 text-gray-800',
   };
   const label: Record<string, string> = {
     draft: '草稿',
@@ -122,6 +122,14 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const remarkRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = remarkRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = el.scrollHeight + 'px';
+    }
+  }, [form.remark]);
   const [profile, setProfile] = useState<ConfigurationProfileDetail | null>(null);
   const [configTree, setConfigTree] = useState<ConfigTreeNode | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
@@ -387,8 +395,20 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
 
   const getStatusLabel = (s: string | undefined) => {
     if (!s) return '-';
-    const map: Record<string, string> = { draft: '草稿', active: '生效', archived: '归档', released: '已发布' };
+    const map: Record<string, string> = { draft: '草稿', active: '生效', archived: '归档', released: '发布' };
     return map[s] || s;
+  };
+
+  const partStatusBadge = (s: string | undefined) => {
+    if (!s || s === '-') return <span className="text-gray-400">-</span>;
+    const colorMap: Record<string, string> = {
+      draft: 'bg-blue-100 text-blue-800',
+      frozen: 'bg-orange-100 text-orange-800',
+      released: 'bg-green-100 text-green-800',
+      obsolete: 'bg-red-100 text-red-800',
+    };
+    const labelMap: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' };
+    return <span className={`px-1.5 py-0.5 rounded text-xs ${colorMap[s] || 'bg-gray-100 text-gray-800'}`}>{labelMap[s] || s}</span>;
   };
 
   // ── Formal checklist: only selected items, default collapsed ──
@@ -446,13 +466,13 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
             <td className="px-3 py-2 text-xs text-gray-400">-</td>
             <td className="px-3 py-2 text-xs text-gray-600">{part.item_name || '-'}</td>
             <td className="px-3 py-2 text-xs whitespace-nowrap">
-              <span className={`px-1.5 py-0.5 rounded text-xs ${part.item_type === 'assembly' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+              <span className={`px-1.5 py-0.5 rounded text-xs ${part.item_type === 'assembly' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
                 {part.item_type === 'assembly' ? '部件' : '零件'}
               </span>
             </td>
             <td className="px-3 py-2 text-sm font-mono text-gray-600">{part.item_code}</td>
             <td className="px-3 py-2 text-xs text-gray-500">{part.item_version || '-'}</td>
-            <td className="px-3 py-2 text-xs text-gray-500">{getStatusLabel(part.item_status)}</td>
+            <td className="px-3 py-2 text-xs text-gray-500">{partStatusBadge(part.item_status)}</td>
           </tr>
         );
       }
@@ -506,7 +526,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
               onChange={() => { if (!node.is_required && canEdit) handleToggleConfigNode(node.id); }}
               className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500 disabled:opacity-50"
             />
-            <span className={`text-xs px-1.5 py-0.5 rounded ${node.is_required ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'}`}>
+            <span className={`text-xs px-1.5 py-0.5 rounded ${node.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
               {node.is_required ? '必选' : '可选'}
             </span>
           </label>
@@ -527,13 +547,13 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
           <td className="px-3 py-2 text-xs text-gray-400">-</td>
           <td className="px-3 py-2 text-xs text-gray-600">{part.item_name || '-'}</td>
           <td className="px-3 py-2 text-xs whitespace-nowrap">
-            <span className={`px-1.5 py-0.5 rounded text-xs ${part.item_type === 'assembly' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+            <span className={`px-1.5 py-0.5 rounded text-xs ${part.item_type === 'assembly' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
               {part.item_type === 'assembly' ? '部件' : '零件'}
             </span>
           </td>
           <td className="px-3 py-2 text-sm font-mono text-gray-600">{part.item_code}</td>
           <td className="px-3 py-2 text-xs text-gray-500">{part.item_version || '-'}</td>
-          <td className="px-3 py-2 text-xs text-gray-500">{getStatusLabel(part.item_status)}</td>
+          <td className="px-3 py-2 text-xs text-gray-500">{partStatusBadge(part.item_status)}</td>
           <td className="px-3 py-2 text-center whitespace-nowrap">
             <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
               <input
@@ -543,7 +563,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                 onChange={() => { if (canEdit) handleTogglePart(part.id, part.is_selected); }}
                 className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500 disabled:opacity-50"
               />
-              <span className={`text-xs px-1.5 py-0.5 rounded ${part.is_required ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'}`}>
+              <span className={`text-xs px-1.5 py-0.5 rounded ${part.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
                 {part.is_required ? '必选' : '可选'}
               </span>
             </label>
@@ -601,86 +621,67 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
           <>
             {/* Basic Info */}
             {isView && profile ? (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <InfoItem label="编号" value={profile.code} />
                 <InfoItem label="名称" value={profile.name} />
-                <InfoItem label="架次范围" value={
-                  (profile.effectivity_start || profile.effectivity_end)
-                    ? `${profile.effectivity_start || '-'} ~ ${profile.effectivity_end || '-'}`
-                    : '-'
-                } />
-                <InfoItem label="状态" value={statusLabel[profile.status] || profile.status} />
-                <InfoItem label="备注" value={profile.remark || '-'} className="col-span-2 md:col-span-4" />
+                <InfoItem label="架次起始" value={profile.effectivity_start || '-'} />
+                <InfoItem label="架次结束" value={profile.effectivity_end || '-'} />
+                <div className="col-span-2 flex items-start gap-4">
+                  <div className="flex-1 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-gray-500 mb-0.5">状态</div>
+                    <div className="text-sm text-gray-900 font-medium">{statusLabel[profile.status] || profile.status}</div>
+                  </div>
+                  <InfoItem label="备注" value={profile.remark || '-'} className="flex-1" />
+                </div>
               </div>
             ) : (
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  编号 {isCreate && '*'}
-                </label>
+              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-gray-500 mb-0.5">编号 {isCreate && '*'}</label>
                 <input
                   value={form.code}
                   onChange={(e) => setForm({ ...form, code: e.target.value })}
                   disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
-                  className="w-full px-3 py-2 border border-gray-200 rounded text-sm disabled:bg-gray-50 disabled:text-gray-400"
+                  className="w-full text-sm bg-transparent border-0 p-0 focus:outline-none disabled:text-gray-400 placeholder:text-gray-300"
                   placeholder="如 CFG-PROFILE-001"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  名称 {isCreate && '*'}
-                </label>
+              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-gray-500 mb-0.5">名称 {isCreate && '*'}</label>
                 <input
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
-                  className="w-full px-3 py-2 border border-gray-200 rounded text-sm disabled:bg-gray-50 disabled:text-gray-400"
+                  className="w-full text-sm bg-transparent border-0 p-0 focus:outline-none disabled:text-gray-400 placeholder:text-gray-300"
                   placeholder="如 A型机翼配置"
                 />
               </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  架次起始
-                </label>
+              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-gray-500 mb-0.5">架次起始</label>
                 <input
                   value={form.effectivity_start}
                   onChange={(e) => setForm({ ...form, effectivity_start: e.target.value })}
                   disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
-                  className="w-full px-3 py-2 border border-gray-200 rounded text-sm disabled:bg-gray-50 disabled:text-gray-400"
+                  className="w-full text-sm bg-transparent border-0 p-0 focus:outline-none disabled:text-gray-400 placeholder:text-gray-300"
                   placeholder="如 001"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  架次结束
-                </label>
+              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-gray-500 mb-0.5">架次结束</label>
                 <input
                   value={form.effectivity_end}
                   onChange={(e) => setForm({ ...form, effectivity_end: e.target.value })}
                   disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
-                  className="w-full px-3 py-2 border border-gray-200 rounded text-sm disabled:bg-gray-50 disabled:text-gray-400"
+                  className="w-full text-sm bg-transparent border-0 p-0 focus:outline-none disabled:text-gray-400 placeholder:text-gray-300"
                   placeholder="如 999"
                 />
               </div>
               <div className="col-span-2 flex items-start gap-4">
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-gray-500 mb-1">
-                    备注
-                  </label>
-                  <textarea
-                    value={form.remark}
-                    onChange={(e) => setForm({ ...form, remark: e.target.value })}
-                    rows={1}
-                    disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
-                    className="w-full px-3 py-2 border border-gray-200 rounded text-sm disabled:bg-gray-50 disabled:text-gray-400"
-                  />
-                </div>
                 {!isCreate && profile && (
-                  <div className="flex-1 flex flex-col">
-                    <label className="block text-xs font-medium text-gray-500 mb-1">状态</label>
+                  <div className="flex-1 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                    <label className="block text-xs text-gray-500 mb-0.5">状态</label>
                     {isAdmin() && !readOnly ? (
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 pt-0.5">
                         {(['draft', 'active', 'archived'] as const).map(s => (
                           <label key={s} className="inline-flex items-center gap-1 cursor-pointer select-none">
                             <input
@@ -697,12 +698,28 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                         ))}
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 pt-0.5">
                         {statusBadge(profile.status)}
                       </div>
                     )}
                   </div>
                 )}
+                <div className="flex-1 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                  <label className="block text-xs text-gray-500 mb-0.5">备注</label>
+                  <textarea
+                    ref={remarkRef}
+                    value={form.remark}
+                    onChange={(e) => setForm({ ...form, remark: e.target.value })}
+                    rows={1}
+                    disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
+                    className="w-full text-sm bg-transparent border-0 p-0 focus:outline-none resize-none disabled:text-gray-400"
+                    onInput={(e) => {
+                      const el = e.currentTarget;
+                      el.style.height = 'auto';
+                      el.style.height = el.scrollHeight + 'px';
+                    }}
+                  />
+                </div>
               </div>
             </div>
             )}

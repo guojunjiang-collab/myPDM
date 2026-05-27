@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Modal } from '../Modal';
 import { configurationApi, partsApi, assembliesApi } from '../../services/api';
 import AssemblyPartPicker from '../AssemblyPartPicker';
@@ -39,6 +39,14 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
   const [form, setForm] = useState({ code: '', name: '', spec: '', remark: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const remarkRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = remarkRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = el.scrollHeight + 'px';
+    }
+  }, [form.remark]);
 
   // 关联零部件
   const [parts, setParts] = useState<PartEntry[]>([]);
@@ -147,21 +155,27 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
         {error && <div className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{error}</div>}
 
         {/* 基本信息 */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">构型号 *</label>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-gray-500 mb-0.5">构型号 *</label>
             <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} disabled={isEdit}
-              className="w-full px-3 py-2 border border-gray-200 rounded text-sm" placeholder="如 CFG-001" />
+              className="w-full text-sm bg-transparent border-0 p-0 focus:outline-none disabled:text-gray-400 placeholder:text-gray-300" placeholder="如 CFG-001" />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">中文名称 *</label>
+          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-gray-500 mb-0.5">中文名称 *</label>
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded text-sm" placeholder="如 A型机翼构型" />
+              className="w-full text-sm bg-transparent border-0 p-0 focus:outline-none placeholder:text-gray-300" placeholder="如 A型机翼构型" />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">备注</label>
-            <textarea value={form.remark} onChange={(e) => setForm({ ...form, remark: e.target.value })} rows={1}
-              className="w-full px-3 py-2 border border-gray-200 rounded text-sm" />
+          <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-gray-500 mb-0.5">备注</label>
+            <textarea ref={remarkRef} value={form.remark} onChange={(e) => setForm({ ...form, remark: e.target.value })} rows={1}
+              className="w-full text-sm bg-transparent border-0 p-0 focus:outline-none resize-none"
+              onInput={(e) => {
+                const el = e.currentTarget;
+                el.style.height = 'auto';
+                el.style.height = el.scrollHeight + 'px';
+              }}
+            />
           </div>
         </div>
 
@@ -193,7 +207,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                   {parts.map((p, i) => (
                     <tr key={i} className="hover:bg-gray-50">
                       <td className="px-3 py-1.5 text-xs">
-                        <span className={`px-1.5 py-0.5 rounded text-xs ${p.part_type === 'assembly' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                        <span className={`px-1.5 py-0.5 rounded text-xs ${p.part_type === 'assembly' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
                           {p.part_type === 'assembly' ? '部件' : '零件'}
                         </span>
                       </td>
@@ -202,13 +216,13 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                       <td className="px-3 py-1.5 text-xs text-gray-500">{p.part_spec || '-'}</td>
                       <td className="px-3 py-1.5 text-xs">{p.part_version || '-'}</td>
                       <td className="px-3 py-1.5 text-xs">
-                        <span className={`px-1.5 py-0.5 rounded text-xs ${p.part_status === 'draft' ? 'bg-blue-100 text-blue-700' : p.part_status === 'frozen' ? 'bg-orange-100 text-orange-700' : p.part_status === 'released' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                        <span className={`px-1.5 py-0.5 rounded text-xs ${p.part_status === 'draft' ? 'bg-blue-100 text-blue-800' : p.part_status === 'frozen' ? 'bg-orange-100 text-orange-800' : p.part_status === 'released' ? 'bg-green-100 text-green-800' : p.part_status === 'obsolete' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>
                           {p.part_status === 'draft' ? '草稿' : p.part_status === 'frozen' ? '冻结' : p.part_status === 'released' ? '发布' : p.part_status === 'obsolete' ? '作废' : '-'}
                         </span>
                       </td>
                       <td className="px-3 py-1.5 text-center">
                         <button onClick={() => togglePartRequired(i)}
-                          className={`px-2 py-0.5 text-xs rounded ${p.is_required ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                          className={`px-2 py-0.5 text-xs rounded ${p.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
                           {p.is_required ? '必选' : '可选'}
                         </button>
                       </td>
@@ -360,7 +374,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                       <td className="px-3 py-1.5 text-xs text-gray-500">{c.child_spec || '-'}</td>
                       <td className="px-3 py-1.5 text-center">
                         <button onClick={() => toggleChildRequired(i)}
-                          className={`px-2 py-0.5 text-xs rounded ${c.is_required ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                          className={`px-2 py-0.5 text-xs rounded ${c.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
                           {c.is_required ? '必选' : '可选'}
                         </button>
                       </td>
