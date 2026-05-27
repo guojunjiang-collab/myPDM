@@ -150,6 +150,32 @@ async def startup_event():
             db.execute(text("CREATE INDEX idx_cpi_profile_id ON configuration_profile_items(profile_id)"))
             db.commit()
             print("✓ Created table configuration_profile_items")
+
+        # 检查 configuration_working_items 表是否存在
+        result = db.execute(text("""
+            SELECT table_name FROM information_schema.tables 
+            WHERE table_name = 'configuration_working_items'
+        """))
+        if not result.fetchone():
+            db.execute(text("""
+                CREATE TABLE configuration_working_items (
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    profile_id UUID NOT NULL REFERENCES configuration_profiles(id) ON DELETE CASCADE,
+                    source_config_item_id UUID REFERENCES configuration_items(id),
+                    item_type VARCHAR(16) NOT NULL,
+                    item_id UUID NOT NULL,
+                    item_code VARCHAR(64),
+                    item_name VARCHAR(255),
+                    is_required BOOLEAN NOT NULL DEFAULT TRUE,
+                    is_selected BOOLEAN NOT NULL DEFAULT FALSE,
+                    source_type VARCHAR(16) NOT NULL,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            db.execute(text("CREATE INDEX idx_cwi_profile_id ON configuration_working_items(profile_id)"))
+            db.commit()
+            print("✓ Created table configuration_working_items")
     except Exception as e:
         print(f"✗ Database migration error: {e}")
         db.rollback()

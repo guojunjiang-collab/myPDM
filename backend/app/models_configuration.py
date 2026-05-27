@@ -70,8 +70,26 @@ class ConfigurationProfile(Base):
 
 
 class ConfigurationProfileItem(Base):
-    """构型配置清单明细"""
+    """构型配置清单明细（正式配置清单）"""
     __tablename__ = "configuration_profile_items"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    profile_id = Column(UUID(as_uuid=True), ForeignKey("configuration_profiles.id", ondelete="CASCADE"), nullable=False)
+    source_config_item_id = Column(UUID(as_uuid=True), ForeignKey("configuration_items.id"), nullable=True)
+    item_type = Column(String(16), nullable=False)
+    item_id = Column(UUID(as_uuid=True), nullable=False)
+    item_code = Column(String(64))
+    item_name = Column(String(255))
+    is_required = Column(Boolean, nullable=False, default=True)
+    is_selected = Column(Boolean, nullable=False, default=False)
+    source_type = Column(String(16), nullable=False)
+    sort_order = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ConfigurationWorkingItem(Base):
+    """配置清单工作表（用户实时编辑状态）"""
+    __tablename__ = "configuration_working_items"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     profile_id = Column(UUID(as_uuid=True), ForeignKey("configuration_profiles.id", ondelete="CASCADE"), nullable=False)

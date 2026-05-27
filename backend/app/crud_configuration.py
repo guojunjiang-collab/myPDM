@@ -166,7 +166,7 @@ def remove_config_child(db: Session, child_id: str) -> bool:
 # ============================================================
 
 def _generate_checklist(db: Session, profile_id: str, config_item_id: str, source_type: str = "direct"):
-    """递归展开构型项，生成配置清单"""
+    """递归展开构型项，生成配置清单 → 写入工作表"""
     from app.models import Part, Assembly
 
     parts = db.query(models.ConfigurationItemPart).filter(
@@ -184,7 +184,7 @@ def _generate_checklist(db: Session, profile_id: str, config_item_id: str, sourc
             item_code = entity.code
             item_name = entity.name
 
-        item = models.ConfigurationProfileItem(
+        item = models.ConfigurationWorkingItem(
             profile_id=profile_id,
             source_config_item_id=config_item_id,
             item_type=p.part_type,
@@ -253,6 +253,8 @@ def create_profile(
 
     if data.configuration_item_id:
         _generate_checklist(db, str(profile.id), str(data.configuration_item_id))
+        db.flush()
+        sync_working_to_formal(db, str(profile.id))
 
     db.commit()
     db.refresh(profile)
@@ -266,11 +268,13 @@ def update_profile(
     if not profile:
         return None
 
-    # 处理构型项变更（仅当值变化时才清除并重建清单，避免覆盖用户手动 toggle）
+    # 处理构型项变更（仅当值变化时才清除并重建工作表）
     new_cfg_id = str(data.configuration_item_id) if data.configuration_item_id else None
     old_cfg_id = str(profile.configuration_item_id) if profile.configuration_item_id else None
     if new_cfg_id != old_cfg_id:
-        # 清除旧清单
+        db.query(models.ConfigurationWorkingItem).filter(
+            models.ConfigurationWorkingItem.profile_id == profile_id
+        ).delete()
         db.query(models.ConfigurationProfileItem).filter(
             models.ConfigurationProfileItem.profile_id == profile_id
         ).delete()
@@ -283,6 +287,10 @@ def update_profile(
     update_data.pop("configuration_item_id", None)
     for k, v in update_data.items():
         setattr(profile, k, v)
+
+    db.flush()
+    # 始终同步工作表到正式清单
+    sync_working_to_formal(db, profile_id)
 
     db.commit()
     db.refresh(profile)
@@ -308,38 +316,75 @@ def change_profile_status(db: Session, profile_id: str, new_status: str) -> Opti
     return profile
 
 
+def get_working_items(db: Session, profile_id: str) -> List[models.ConfigurationWorkingItem]:
+    """获取工作清单（用于配置清单展示）"""
+    return db.query(models.ConfigurationWorkingItem).filter(
+        models.ConfigurationWorkingItem.profile_id == profile_id
+    ).order_by(models.ConfigurationWorkingItem.sort_order).all()
+
+
 def get_profile_items(db: Session, profile_id: str) -> List[models.ConfigurationProfileItem]:
+    """获取正式配置清单"""
     return db.query(models.ConfigurationProfileItem).filter(
         models.ConfigurationProfileItem.profile_id == profile_id
     ).order_by(models.ConfigurationProfileItem.sort_order).all()
 
 
+def sync_working_to_formal(db: Session, profile_id: str):
+    """将工作表同步到正式配置清单"""
+    # 清除旧的正式清单
+    db.query(models.ConfigurationProfileItem).filter(
+        models.ConfigurationProfileItem.profile_id == profile_id
+    ).delete()
+    # 从工作表复制（仅复制 is_selected=True 的项）
+    working_items = get_working_items(db, profile_id)
+    for wi in working_items:
+        if wi.is_selected or wi.is_required:
+            formal_item = models.ConfigurationProfileItem(
+                profile_id=wi.profile_id,
+                source_config_item_id=wi.source_config_item_id,
+                item_type=wi.item_type,
+                item_id=wi.item_id,
+                item_code=wi.item_code,
+                item_name=wi.item_name,
+                is_required=wi.is_required,
+                is_selected=wi.is_selected,
+                source_type=wi.source_type,
+                sort_order=wi.sort_order,
+            )
+            db.add(formal_item)
+
+
 def regenerate_profile_checklist(
     db: Session, profile_id: str,
 ) -> Optional[models.ConfigurationProfile]:
-    """强制以最新构型项内容重建配置清单（保留 configuration_item_id 不变）"""
+    """强制以最新构型项内容重建工作清单 + 同步正式清单"""
     profile = get_profile(db, profile_id)
     if not profile:
         return None
     if not profile.configuration_item_id:
         return None
 
-    # 清除旧清单
-    db.query(models.ConfigurationProfileItem).filter(
-        models.ConfigurationProfileItem.profile_id == profile_id
+    # 清除旧工作表
+    db.query(models.ConfigurationWorkingItem).filter(
+        models.ConfigurationWorkingItem.profile_id == profile_id
     ).delete()
-    # 重新生成
+    # 重新生成到工作表
     _generate_checklist(db, profile_id, str(profile.configuration_item_id))
+    db.flush()
+    # 同步到正式清单
+    sync_working_to_formal(db, profile_id)
     db.commit()
     db.refresh(profile)
     return profile
 
 
-def update_profile_item(
+def update_working_item(
     db: Session, item_id: str, is_selected: bool, force: bool = False,
-) -> Optional[models.ConfigurationProfileItem]:
-    item = db.query(models.ConfigurationProfileItem).filter(
-        models.ConfigurationProfileItem.id == item_id
+) -> Optional[models.ConfigurationWorkingItem]:
+    """更新工作表单项的选中态"""
+    item = db.query(models.ConfigurationWorkingItem).filter(
+        models.ConfigurationWorkingItem.id == item_id
     ).first()
     if not item:
         return None
@@ -349,3 +394,10 @@ def update_profile_item(
     db.commit()
     db.refresh(item)
     return item
+
+
+def update_profile_item(
+    db: Session, item_id: str, is_selected: bool, force: bool = False,
+) -> Optional[models.ConfigurationWorkingItem]:
+    """更新工作表单项的选中态（别名，兼容旧调用）"""
+    return update_working_item(db, item_id, is_selected, force)

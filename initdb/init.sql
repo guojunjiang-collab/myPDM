@@ -352,3 +352,21 @@ CREATE TABLE configuration_profile_items (
 );
 
 CREATE INDEX idx_cpi_profile_id ON configuration_profile_items(profile_id);
+
+-- 配置清单工作表（用户实时编辑状态）
+CREATE TABLE configuration_working_items (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    profile_id UUID NOT NULL REFERENCES configuration_profiles(id) ON DELETE CASCADE,
+    source_config_item_id UUID REFERENCES configuration_items(id),
+    item_type VARCHAR(16) NOT NULL,
+    item_id UUID NOT NULL,
+    item_code VARCHAR(64),
+    item_name VARCHAR(255),
+    is_required BOOLEAN NOT NULL DEFAULT TRUE,
+    is_selected BOOLEAN NOT NULL DEFAULT FALSE,
+    source_type VARCHAR(16) NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_cwi_profile_id ON configuration_working_items(profile_id);

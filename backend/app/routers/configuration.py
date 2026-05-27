@@ -407,7 +407,7 @@ async def create_profile(
             raise HTTPException(status_code=404, detail="构型项不存在")
 
     profile = crud.create_profile(db, data, str(current_user.id))
-    items = crud.get_profile_items(db, str(profile.id))
+    items = crud.get_working_items(db, str(profile.id))
     entity_map = _build_entity_map(db, items)
 
     config_item = crud.get_config_item(db, str(profile.configuration_item_id)) if profile.configuration_item_id else None
@@ -440,8 +440,9 @@ async def get_profile(
         raise HTTPException(status_code=404, detail="配置不存在")
 
     config_item = crud.get_config_item(db, str(profile.configuration_item_id)) if profile.configuration_item_id else None
-    items = crud.get_profile_items(db, profile_id)
-    entity_map = _build_entity_map(db, items)
+    working_items = crud.get_working_items(db, profile_id)
+    formal_items = crud.get_profile_items(db, profile_id)
+    entity_map = _build_entity_map(db, working_items)
 
     return {
         "id": str(profile.id), "code": profile.code, "name": profile.name,
@@ -456,8 +457,9 @@ async def get_profile(
         "creator_id": str(profile.creator_id),
         "created_at": profile.created_at.isoformat() if profile.created_at else None,
         "updated_at": profile.updated_at.isoformat() if profile.updated_at else None,
-        "items": [_format_profile_item(item, entity_map) for item in items],
-        "config_tree": _build_config_tree(db, str(profile.configuration_item_id), items, entity_map) if profile.configuration_item_id else None,
+        "items": [_format_profile_item(item, entity_map) for item in working_items],
+        "config_tree": _build_config_tree(db, str(profile.configuration_item_id), working_items, entity_map) if profile.configuration_item_id else None,
+        "formal_items": [_format_profile_item(item) for item in formal_items],
     }
 
 
@@ -573,14 +575,14 @@ async def update_profile_item(
     if profile.status != "draft":
         raise HTTPException(status_code=400, detail="仅草稿状态可修改清单")
 
-    item = crud.get_profile_items(db, profile_id)
+    item = crud.get_working_items(db, profile_id)
     found = next((i for i in item if str(i.id) == item_id), None)
     if not found:
         raise HTTPException(status_code=404, detail="清单项不存在")
     if found.is_required:
         raise HTTPException(status_code=400, detail="必选项不可取消")
 
-    updated = crud.update_profile_item(db, item_id, data.is_selected)
+    updated = crud.update_working_item(db, item_id, data.is_selected)
     if not updated:
         raise HTTPException(status_code=400, detail="更新失败")
     return _format_profile_item(updated)
@@ -694,7 +696,7 @@ async def toggle_config_item_node(
     if profile.status != "draft":
         raise HTTPException(status_code=400, detail="仅草稿状态可修改")
 
-    all_items = crud.get_profile_items(db, profile_id)
+    all_items = crud.get_working_items(db, profile_id)
 
     # 判断当前节点状态：如果其下所有零部件都已勾选，则视为"已选"
     node_selected = _is_config_node_selected(db, config_item_id, all_items)
@@ -706,14 +708,14 @@ async def toggle_config_item_node(
     toggled = []
     for pi in all_items:
         if pi.source_config_item_id and str(pi.source_config_item_id) in target_ids:
-            crud.update_profile_item(db, str(pi.id), not node_selected, force=True)
+            crud.update_working_item(db, str(pi.id), not node_selected, force=True)
             toggled.append(str(pi.id))
 
     # 如果该可选节点下没有任何零部件，创建合成条目记录节点级选中态
     if len(toggled) == 0 and not node_selected:
         config_item = crud.get_config_item(db, config_item_id)
         if config_item:
-            node_item = models.ConfigurationProfileItem(
+            node_item = models.ConfigurationWorkingItem(
                 profile_id=uuid.UUID(profile_id),
                 source_config_item_id=uuid.UUID(config_item_id),
                 item_type='config_item',
@@ -749,7 +751,7 @@ async def regenerate_profile_checklist(
     if not profile:
         raise HTTPException(status_code=400, detail="重建失败，请先关联构型项")
 
-    items = crud.get_profile_items(db, profile_id)
+    items = crud.get_working_items(db, profile_id)
     entity_map = _build_entity_map(db, items)
     return {
         "detail": "ok",

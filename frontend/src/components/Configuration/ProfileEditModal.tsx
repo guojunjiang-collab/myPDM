@@ -65,10 +65,15 @@ function togglePartInTree(root: ConfigTreeNode | null, partId: string, selected:
         return r.node;
       });
     }
-    // Recalculate
-    const is_selected = node.is_required ||
-      newParts.some(p => p.is_selected) ||
-      newChildren.some(c => c.is_selected);
+    // Recalculate — empty optional nodes preserve their existing is_selected
+    let is_selected: boolean;
+    if (!node.is_required && newParts.length === 0 && newChildren.length === 0) {
+      is_selected = node.is_selected;
+    } else {
+      is_selected = node.is_required ||
+        newParts.some(p => p.is_selected) ||
+        newChildren.some(c => c.is_selected);
+    }
     return { node: { ...node, parts: newParts, children: newChildren, is_selected }, found };
   }
   return walk(root).node;
@@ -85,9 +90,15 @@ function toggleNodeInTree(root: ConfigTreeNode | null, nodeId: string, selected:
     if (shouldToggle) {
       parts = node.parts.map(p => ({ ...p, is_selected: selected }));
     }
-    const is_selected = node.is_required ||
-      parts.some(p => p.is_selected) ||
-      children.some(c => c.is_selected);
+    // 空可选节点（无零件无子节点）：直接覆写 is_selected，无零件可翻转
+    let is_selected: boolean;
+    if (isTarget && !node.is_required && parts.length === 0 && children.length === 0) {
+      is_selected = selected;
+    } else {
+      is_selected = node.is_required ||
+        parts.some(p => p.is_selected) ||
+        children.some(c => c.is_selected);
+    }
     return { ...node, parts, children, is_selected };
   }
   return walk(root, false);
