@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { configurationProfileApi } from '../../services/api';
 import type { ConfigurationProfile } from '../../types';
 import { canEdit, isAdmin } from '../../stores/auth';
@@ -19,9 +19,9 @@ const statusBadge = (status: string) => {
 
 export default function ProfileList() {
   const [items, setItems] = useState<ConfigurationProfile[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [searchField, setSearchField] = useState('all');
   const [loading, setLoading] = useState(false);
 
   // 弹窗
@@ -33,15 +33,37 @@ export default function ProfileList() {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await configurationProfileApi.list({ page, page_size: 20, search: search || undefined });
+      const res = await configurationProfileApi.list({ page: 1, page_size: 100 });
       setItems(res.data.items || []);
-      setTotal(res.data.total || 0);
     } catch { } finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, [page]);
+  useEffect(() => { load(); }, []);
 
-  const handleSearch = () => { setPage(1); load(); };
+  // 客户端筛选
+  const filteredData = useMemo(() => {
+    if (!search) return items;
+    const keyword = search.toLowerCase();
+    const match = (val: string | undefined) => val?.toLowerCase().includes(keyword);
+    return items.filter(item => {
+      if (searchField === 'all') {
+        return match(item.code) || match(item.name) || match(item.remark);
+      }
+      if (searchField === 'code') return match(item.code);
+      if (searchField === 'name') return match(item.name);
+      if (searchField === 'remark') return match(item.remark);
+      return true;
+    });
+  }, [items, search, searchField]);
+
+  // 分页
+  const PAGE_SIZE = 20;
+  const total = filteredData.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const pagedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // 搜索变化时重置页码
+  useEffect(() => { setPage(1); }, [search, searchField]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -53,18 +75,28 @@ export default function ProfileList() {
     return new Date(d).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
   };
 
-  const totalPages = Math.max(1, Math.ceil(total / 20));
-
   return (
     <div>
       {/* 搜索 + 新建 */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-4">
+        <select
+          value={searchField}
+          onChange={(e) => setSearchField(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+        >
+          <option value="all">全部字段</option>
+          <option value="code">编号</option>
+          <option value="name">名称</option>
+          <option value="remark">备注</option>
+        </select>
         <input
-          value={search} onChange={(e) => setSearch(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-          placeholder="搜索编号/名称..." className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+          type="text"
+          placeholder={searchField === 'all' ? '搜索...' : `搜索${searchField === 'code' ? '编号' : searchField === 'name' ? '名称' : '备注'}...`}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
-        <button onClick={handleSearch} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm">搜索</button>
+        <div className="flex-1" />
         {canEdit() && (
           <button onClick={() => setCreateOpen(true)} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建配置</button>
         )}
@@ -88,7 +120,9 @@ export default function ProfileList() {
               <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
             ) : items.length === 0 ? (
               <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
-            ) : items.map((profile) => (
+            ) : pagedData.length === 0 ? (
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
+            ) : pagedData.map((profile) => (
               <tr key={profile.id} onClick={() => setDetailId(profile.id)} className="hover:bg-gray-50 cursor-pointer">
                 <td className="px-4 py-3 text-sm font-medium">{profile.code}</td>
                 <td className="px-4 py-3 text-sm">{profile.name}</td>
