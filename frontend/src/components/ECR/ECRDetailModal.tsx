@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Modal } from '../Modal';
 import { toast } from '../Toast';
-import { ecrApi } from '../../services/api';
+import { ecrApi, documentsApi, customFieldsApi } from '../../services/api';
 import { useAuthStore, canEdit, isAdmin } from '../../stores/auth';
+import { useDataStore } from '../../stores/data';
 import { ECRStatusBadge, ECRPriorityBadge } from './ECRStatusBadge';
 import { ECRReviewPanel } from './ECRReviewPanel';
 import { ECRBomImpactView } from './ECRBomImpactView';
-import type { ECRRequest, ECRReviewRecord, ECRAffectedItem, ECRStatusLog, ECRDocumentLink } from '../../types';
+import DocumentDetailContent from '../DocumentDetailContent';
+import type { ECRRequest, ECRReviewRecord, ECRAffectedItem, ECRStatusLog, ECRDocumentLink, Document } from '../../types';
 
 const REASON_LABELS: Record<string, string> = {
   quality_defect: '质量缺陷',
@@ -47,6 +49,12 @@ interface ECRDetail extends ECRRequest {
   affected_items?: ECRAffectedItem[];
 }
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
 interface ECRDetailModalProps {
   open: boolean;
   ecrId: string;
@@ -57,12 +65,17 @@ interface ECRDetailModalProps {
 export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailModalProps) {
   const user = useAuthStore((s) => s.user);
   const currentUserId = user?.id || '';
+  const docFieldDefs = useDataStore((s) => s.customFieldDefs).filter((d) => d.applies_to?.includes('document'));
 
   // Data state
   const [detail, setDetail] = useState<ECRDetail | null>(null);
   const [statusLogs, setStatusLogs] = useState<ECRStatusLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [docDetails, setDocDetails] = useState<Record<string, any>>({});
+  const [docAttachments, setDocAttachments] = useState<Record<string, any[]>>({});
+  const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
+  const [docCustomValues, setDocCustomValues] = useState<Record<string, Record<string, any>>>({});
 
   // Review action state
   const [showCloseForm, setShowCloseForm] = useState(false);
@@ -93,6 +106,54 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
       // Status logs are non-critical
     }
   }, [ecrId]);
+
+  useEffect(() => {
+    if (!detail?.document_links?.length) return;
+    const ids = detail.document_links.map(d => d.document_id).filter(Boolean);
+    ids.forEach(id => {
+      if (!docDetails[id]) {
+        documentsApi.get(id).then(r => setDocDetails(prev => ({...prev, [id]: r.data}))).catch(() => {});
+        documentsApi.listAttachments(id).then(r => setDocAttachments(prev => ({...prev, [id]: r.data||[]}))).catch(() => {});
+      }
+      if (!docCustomValues[id]) {
+        customFieldsApi.getValues('document', id).then(r => {
+          const vals: Record<string, any> = {};
+          (r.data || []).forEach((v: any) => { vals[v.field_id] = v.value; });
+          setDocCustomValues(prev => ({...prev, [id]: vals}));
+        }).catch(() => {});
+      }
+    });
+  }, [detail?.document_links]);
+
+  const handleDocDownload = (attId: string, fileName: string) => {
+    const token = useAuthStore.getState().token;
+    if (!token) { alert('登录已过期'); return; }
+    const a = document.createElement('a');
+    a.href = `/api/v2/attachments/${attId}/direct-download?token=${encodeURIComponent(token)}`;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const handleDocPreview = (attId: string, fileName: string) => {
+    const ext = fileName.split('.').pop()?.toLowerCase() || '';
+    const token = useAuthStore.getState().token;
+    if (!token) { alert('登录已过期'); return; }
+    if (ext === 'pdf') {
+      window.open(`/api/v2/attachments/${attId}/preview?token=${encodeURIComponent(token)}`, '_blank');
+      return;
+    }
+    if (['zip', 'tar', 'gz', 'tgz', 'rar', '7z'].includes(ext)) {
+      window.open(`/api/v2/attachments/${attId}/preview?token=${encodeURIComponent(token)}`, '_blank');
+      return;
+    }
+    if (ext === 'stp' || ext === 'step') {
+      window.open(`/stp-viewer?id=${attId}&token=${encodeURIComponent(token)}`, '_blank');
+      return;
+    }
+    alert('该格式暂不支持预览');
+  };
 
   useEffect(() => {
     if (open && ecrId) {
@@ -219,6 +280,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
   };
 
   return (
+    <>
     <Modal
       open={open}
       onClose={onClose}
@@ -308,6 +370,86 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
             />
           </div>
 
+          {/* Document Links */}
+          {detail.document_links && detail.document_links.length > 0 ? (
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-bold text-gray-700 mb-2">关联图文档</h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档编号</th>
+                      <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档名称</th>
+                      <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
+                      <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
+                      {docFieldDefs.map((def) => (
+                        <th key={def.id} className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap">{def.name}</th>
+                      ))}
+                      <th className="px-3 py-2 text-left text-gray-500 font-medium">附件</th>
+                      <th className="px-3 py-2 text-center text-gray-500 font-medium whitespace-nowrap w-28">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {detail.document_links.map((link, idx) => {
+                      const doc = docDetails[link.document_id];
+                      const atts = docAttachments[link.document_id] || [];
+                      return (
+                        <tr key={link.document_id || idx}
+                          className="hover:bg-gray-50 cursor-pointer"
+                          onClick={() => doc && setViewingDoc(doc)}>
+                          <td className="px-3 py-2 text-sm font-medium">{doc?.code || link.document_code}</td>
+                          <td className="px-3 py-2 text-sm">{doc?.name || link.document_name}</td>
+                          <td className="px-3 py-2 text-sm text-gray-500">{doc?.version || link.document_version || '-'}</td>
+                          <td className="px-3 py-2 text-sm">
+                            {doc?.status ? (
+                              <span className={`px-1.5 py-0.5 rounded text-xs ${
+                                doc.status === 'draft' ? 'bg-blue-100 text-blue-800' :
+                                doc.status === 'frozen' ? 'bg-orange-100 text-orange-800' :
+                                doc.status === 'released' ? 'bg-green-100 text-green-800' :
+                                doc.status === 'obsolete' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {({draft:'草稿', frozen:'冻结', released:'发布', obsolete:'作废'} as Record<string, string>)[doc.status] || doc.status}
+                              </span>
+                            ) : '-'}
+                          </td>
+                          {docFieldDefs.map((def) => {
+                            const vals = docCustomValues[link.document_id] || {};
+                            const val = vals[def.id];
+                            return (
+                              <td key={def.id} className="px-3 py-2 text-sm text-gray-500">
+                                {val !== undefined && val !== null && val !== '' ? String(val) : '-'}
+                              </td>
+                            );
+                          })}
+                          <td className="px-3 py-2 text-sm text-gray-500">
+                            {atts.length > 0 ? atts.map((a: any) => (
+                              <div key={a.id} className="text-xs">{a.file_name} ({formatFileSize(a.file_size)})</div>
+                            )) : '-'}
+                          </td>
+                          <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-center gap-1">
+                              {atts.length > 0 && (
+                                <button onClick={() => handleDocPreview(atts[0].id, atts[0].file_name)}
+                                  className="px-2 py-0.5 text-xs text-blue-600 hover:text-blue-800"
+                                  title="预览">预览</button>
+                              )}
+                              {atts.length > 0 && (
+                                <button onClick={() => handleDocDownload(atts[0].id, atts[0].file_name)}
+                                  className="px-2 py-0.5 text-xs text-green-600 hover:text-green-800"
+                                  title="下载">下载</button>
+                              )}
+                              {atts.length === 0 && <span className="text-xs text-gray-400">-</span>}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+
           {/* Affected Items */}
           {detail.affected_items && detail.affected_items.length > 0 && (
             <div>
@@ -363,33 +505,6 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
             </div>
           )}
 
-          {/* Document Links */}
-          {detail.document_links && detail.document_links.length > 0 && (
-            <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">
-                📄 关联文档 ({detail.document_links.length})
-              </h4>
-              <div className="space-y-2">
-                {detail.document_links.map((doc, idx) => (
-                  <div
-                    key={doc.document_id || idx}
-                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200"
-                  >
-                    <span className="text-lg">📄</span>
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {doc.document_code}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {doc.document_name} v{doc.document_version}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Status Log */}
           {statusLogs.length > 0 && (
             <div>
@@ -431,7 +546,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
                         </span>
                       </div>
                       {log.comment && (
-                        <div className="text-xs text-gray-500 mt-0.5">{log.comment}</div>
+                        <div className="text-sm text-gray-500 mt-0.5">{log.comment}</div>
                       )}
                       <div className="text-xs text-gray-400 mt-0.5">
                         {new Date(log.created_at).toLocaleString('zh-CN')}
@@ -482,6 +597,16 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
         </div>
       )}
     </Modal>
+
+    {/* 图文档详情弹窗 */}
+    <Modal open={!!viewingDoc} title="图文档详情" onClose={() => setViewingDoc(null)} width="full">
+      {viewingDoc && (
+        <div className="max-h-[70vh] overflow-y-auto pr-1">
+          <DocumentDetailContent doc={viewingDoc} customFieldDefs={[]} customFieldValues={{}} />
+        </div>
+      )}
+    </Modal>
+    </>
   );
 }
 
