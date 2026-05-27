@@ -414,10 +414,10 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
     rows.push(
       <tr key={node.id} className="bg-gray-50/70 cursor-pointer hover:bg-purple-50 transition-colors"
         onClick={() => handleFormalRowClick('config_item', node.id)}>
-        <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+        <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
           {levelPrefix}{level}
           {hasChildren ? (
-            <button type="button" onClick={() => toggleFormalExpand(node.id)}
+            <button type="button" onClick={(e) => { e.stopPropagation(); toggleFormalExpand(node.id); }}
               className="inline-flex items-center text-gray-400 hover:text-gray-600 cursor-pointer select-none ml-1">
               {isExpanded ? '\u25bc' : '\u25b6'}
             </button>
@@ -442,7 +442,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         rows.push(
           <tr key={part.id} className="cursor-pointer hover:bg-blue-50 transition-colors"
             onClick={() => handleFormalRowClick(part.item_type, part.item_id)}>
-            <td className="px-3 py-2 text-xs text-gray-400 whitespace-nowrap">{'-'.repeat(level)}</td>
+            <td className="px-3 py-2 text-xs text-gray-400 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>{'-'.repeat(level)}</td>
             <td className="px-3 py-2 text-xs text-gray-400">-</td>
             <td className="px-3 py-2 text-xs text-gray-600">{part.item_name || '-'}</td>
             <td className="px-3 py-2 text-xs whitespace-nowrap">
@@ -762,7 +762,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
             {profile && configTree && (
               <div className="border-t pt-3">
                 <h4 className="text-sm font-bold text-gray-700 mb-2">正式配置清单</h4>
-                <div className="border border-gray-200 rounded-lg overflow-hidden max-h-[500px] overflow-y-auto bg-white">
+                <div className="border border-gray-200 rounded-lg overflow-hidden max-h-[600px] overflow-y-auto bg-white">
                   <table className="w-full text-sm">
                     <thead className="bg-gray-100 sticky top-0 z-10">
                       <tr>
