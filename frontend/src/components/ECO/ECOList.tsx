@@ -167,24 +167,22 @@ export function ECOList() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-800">工程变更指令 (ECO)</h2>
-        {canEdit() && <button onClick={() => { editReqId.current++; setEditingEco(null); setCreateOpen(true); }} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建 ECO</button>}
-      </div>
-      <div className="flex gap-2 mb-4">
-        <input type="text" placeholder="搜索 ECO 编号、标题..." value={search}
+      <div className="flex items-center gap-2 mb-4">
+        <input type="text" placeholder="搜索..." value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 flex-1" />
+          className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
         <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500">
+          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
           <option value="">全部状态</option>
           {Object.entries(statusLabels).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
         <select value={priorityFilter} onChange={(e) => { setPriorityFilter(e.target.value); setPage(1); }}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500">
+          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
           <option value="">全部优先级</option>
           {Object.entries(priorityLabels).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
+        <div className="flex-1" />
+        {canEdit() && <button onClick={() => { editReqId.current++; setEditingEco(null); setCreateOpen(true); }} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建 ECO</button>}
       </div>
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <table className="w-full">
@@ -206,7 +204,7 @@ export function ECOList() {
               : ecos.length === 0 ? (<tr><td colSpan={9} className="px-4 py-12 text-center text-gray-400">暂无数据</td></tr>)
                 : ecos.map(eco => (
                   <tr key={eco.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setDetailId(eco.id)}>
-                    <td className="px-4 py-3 text-sm font-mono text-primary-700 whitespace-nowrap">{eco.eco_number}</td>
+                    <td className="px-4 py-3 text-sm font-medium whitespace-nowrap">{eco.eco_number}</td>
                     <td className="px-4 py-3 text-sm max-w-48 truncate">{eco.title}</td>
                     <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{eco.ecr_number || '独立创建'}</td>
                     <td className="px-4 py-3 whitespace-nowrap"><ECOStatusBadge status={eco.status} /></td>

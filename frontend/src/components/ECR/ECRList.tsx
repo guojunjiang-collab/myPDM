@@ -302,32 +302,19 @@ export function ECRList() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-800">工程变更请求</h2>
-        {canEdit() && (
-          <button
-            onClick={() => setCreateOpen(true)}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm"
-          >
-            + 新建 ECR
-          </button>
-        )}
-      </div>
-
-      {/* Filters */}
-      <div className="flex gap-2 mb-4">
+      {/* Header & Filters */}
+      <div className="flex items-center gap-2 mb-4">
         <input
           type="text"
-          placeholder="搜索 ECR 编号、标题..."
+          placeholder="搜索..."
           value={search}
           onChange={(e) => handleSearchChange(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 flex-1"
+          className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
         <select
           value={statusFilter}
           onChange={(e) => handleStatusChange(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
         >
           <option value="">全部状态</option>
           {Object.entries(statusLabels).map(([value, label]) => (
@@ -337,13 +324,22 @@ export function ECRList() {
         <select
           value={priorityFilter}
           onChange={(e) => handlePriorityChange(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
         >
           <option value="">全部优先级</option>
           {Object.entries(priorityLabels).map(([value, label]) => (
             <option key={value} value={value}>{label}</option>
           ))}
         </select>
+        <div className="flex-1" />
+        {canEdit() && (
+          <button
+            onClick={() => setCreateOpen(true)}
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm"
+          >
+            + 新建 ECR
+          </button>
+        )}
       </div>
 
       {/* Table */}
@@ -400,7 +396,7 @@ export function ECRList() {
                   className="hover:bg-gray-50 cursor-pointer"
                   onClick={() => setDetailEcrId(ecr.id)}
                 >
-                  <td className="px-4 py-3 text-sm font-mono text-primary-700 whitespace-nowrap">
+                  <td className="px-4 py-3 text-sm font-medium whitespace-nowrap">
                     {ecr.ecr_number}
                   </td>
                   <td className="px-4 py-3 text-sm max-w-48 truncate">
