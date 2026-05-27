@@ -433,46 +433,7 @@ export default function Parts() {
 
   return (
     <div>
-      <div className="flex items-center justify-end mb-4">
-        <div className="flex gap-2">
-          {canDownload() && (
-            <button
-              onClick={handleExport}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
-            >
-              📥 导出全部
-            </button>
-          )}
-          {canEdit() && (
-            <>
-              <button
-                onClick={handleImportClick}
-                disabled={importLoading}
-                className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm disabled:opacity-50"
-              >
-                {importLoading ? '解析中...' : '📤 导入'}
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".xlsx,.xls"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-            </>
-          )}
-          {canEdit() && (
-            <button
-              onClick={handleAdd}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-            >
-              + 新增零件
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="flex gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-4">
         <select
           value={searchField}
           onChange={(e) => setSearchField(e.target.value)}
@@ -491,15 +452,15 @@ export default function Parts() {
         </select>
         <input
           type="text"
-          placeholder={searchField === 'all' ? '搜索全部字段...' : searchField.startsWith('cf_') ? `搜索${partCustomDefs.find(d => d.id === searchField.replace('cf_', ''))?.name || '自定义字段'}...` : `搜索${searchField === 'code' ? '件号' : searchField === 'name' ? '中文名称' : searchField === 'spec' ? '规格型号' : searchField === 'version' ? '版本' : searchField === 'status' ? '状态' : '备注'}...`}
+          placeholder={searchField === 'all' ? '搜索...' : searchField.startsWith('cf_') ? `搜索${partCustomDefs.find(d => d.id === searchField.replace('cf_', ''))?.name || '自定义字段'}...` : `搜索${searchField === 'code' ? '件号' : searchField === 'name' ? '名称' : searchField === 'spec' ? '规格型号' : searchField === 'version' ? '版本' : searchField === 'status' ? '状态' : '备注'}...`}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 flex-1"
+          className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
         >
           <option value="">全部状态</option>
           <option value="draft">草稿</option>
@@ -507,15 +468,28 @@ export default function Parts() {
           <option value="released">发布</option>
           <option value="obsolete">作废</option>
         </select>
-        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm">
+        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm whitespace-nowrap">
           <input
             type="checkbox"
             checked={showAllVersions}
             onChange={(e) => setShowAllVersions(e.target.checked)}
-            className="w-4 h-4 text-primary-600 rounded"
+            className="w-3.5 h-3.5"
           />
-          显示全部版本
+          全部版本
         </label>
+        <div className="flex-1" />
+        {canDownload() && (
+          <button onClick={handleExport} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">📥 导出全部</button>
+        )}
+        {canEdit() && (
+          <>
+            <button onClick={handleImportClick} disabled={importLoading} className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm disabled:opacity-50">{importLoading ? '解析中...' : '📤 导入'}</button>
+            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange} />
+          </>
+        )}
+        {canEdit() && (
+          <button onClick={handleAdd} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">+ 新增零件</button>
+        )}
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
