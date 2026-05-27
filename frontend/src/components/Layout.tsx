@@ -5,17 +5,31 @@ import { useDataStore } from '../stores/data';
 import { APP_VERSION } from '../constants';
 import { ConfirmModal } from './Modal';
 
-const navItems = [
+type NavItem = {
+  path: string;
+  label: string;
+  icon: string;
+  roles: string[];
+};
+
+type NavSeparator = {
+  type: 'separator';
+};
+
+const navItems: (NavItem | NavSeparator)[] = [
   { path: '/dashboard', label: '仪表盘', icon: '📊', roles: ['admin', 'engineer', 'production', 'guest'] },
   { path: '/board', label: '用户看板', icon: '📋', roles: ['admin', 'engineer', 'production', 'guest'] },
+  { path: '/bom', label: '管理工作', icon: '🛠️', roles: ['admin', 'engineer', 'production'] },
+  { type: 'separator' },
   { path: '/parts', label: '零件管理', icon: '🔧', roles: ['admin', 'engineer', 'production', 'guest'] },
   { path: '/components', label: '部件管理', icon: '📦', roles: ['admin', 'engineer', 'production', 'guest'] },
   { path: '/documents', label: '图文档管理', icon: '📄', roles: ['admin', 'engineer', 'production', 'guest'] },
-  { path: '/configuration', label: '构型管理', icon: '📐', roles: ['admin', 'engineer', 'production', 'guest'] },
-  { path: '/bom', label: '管理工具', icon: '🛠️', roles: ['admin', 'engineer', 'production'] },
-  { path: '/ec', label: '变更管理', icon: '🔄', roles: ['admin', 'engineer', 'production', 'guest'] },
-  { path: '/inventory', label: '库存管理', icon: '🏗️', roles: ['admin', 'engineer', 'production', 'guest'] },
-  { path: '/business', label: '业务管理', icon: '💼', roles: ['admin', 'engineer', 'production', 'guest'] },
+  { type: 'separator' },
+  { path: '/configuration', label: '构型管理（试用）', icon: '📐', roles: ['admin', 'engineer', 'production', 'guest'] },
+  { path: '/ec', label: '变更管理（试用）', icon: '🔄', roles: ['admin', 'engineer', 'production', 'guest'] },
+  { path: '/inventory', label: '库存管理（开发中）', icon: '🏗️', roles: ['admin', 'engineer', 'production', 'guest'] },
+  { path: '/business', label: '业务管理（开发中）', icon: '💼', roles: ['admin', 'engineer', 'production', 'guest'] },
+  { type: 'separator' },
   { path: '/users', label: '用户管理', icon: '👥', roles: ['admin', 'engineer', 'production', 'guest'] },
   { path: '/settings', label: '系统设置', icon: '⚙️', roles: ['admin', 'engineer', 'production', 'guest'] },
 ];
@@ -30,8 +44,11 @@ export default function Layout() {
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const userRole = user?.role || 'guest';
 
+  const isSeparator = (item: NavItem | NavSeparator): item is NavSeparator =>
+    'type' in item && item.type === 'separator';
+
   const visibleNavItems = navItems.filter((item) =>
-    item.roles.includes(userRole)
+    isSeparator(item) || item.roles.includes(userRole)
   );
 
   const handleSync = async () => {
@@ -71,20 +88,24 @@ export default function Layout() {
           <h1 className="text-lg font-semibold">🏗️ PDM系统</h1>
         </div>
         <nav className="flex-1 p-2">
-          {visibleNavItems.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg mb-1 transition-colors ${
-                location.pathname === item.path
-                  ? 'bg-primary-50 text-primary-600'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              <span>{item.icon}</span>
-              <span>{item.label}</span>
-            </Link>
-          ))}
+          {visibleNavItems.map((item, idx) =>
+            isSeparator(item) ? (
+              <div key={`sep-${idx}`} className="mx-2 my-2 border-t border-gray-300" />
+            ) : (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg mb-1 transition-colors ${
+                  location.pathname === item.path
+                    ? 'bg-primary-50 text-primary-600'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <span>{item.icon}</span>
+                <span>{item.label}</span>
+              </Link>
+            )
+          )}
         </nav>
         <div className="p-2 border-t border-gray-200">
           {syncMsg && (
@@ -102,7 +123,7 @@ export default function Layout() {
         <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4">
           <div className="left">
             <span className="text-lg font-semibold text-gray-800">
-              {navItems.find((item) => item.path === location.pathname)?.label || ''}
+              {(navItems.filter((item): item is NavItem => !isSeparator(item)).find((item) => item.path === location.pathname))?.label || ''}
             </span>
           </div>
           <div className="right flex items-center gap-3">
