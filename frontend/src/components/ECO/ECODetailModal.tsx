@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
-import { ecoApi, documentsApi, assemblyPartsApi, partsApi, assembliesApi } from '../../services/api';
+import { ecoApi, documentsApi, assemblyPartsApi, partsApi, assembliesApi, customFieldsApi } from '../../services/api';
 import type { ECORequest, Document } from '../../types';
 import { ECOStatusBadge, ECOPriorityBadge, ECOActionBadge, ECOExecStatusBadge } from './ECOStatusBadge';
 import { Modal } from '../Modal';
 import { toast } from '../Toast';
 import { useAuthStore, isAdmin } from '../../stores/auth';
+import { useDataStore } from '../../stores/data';
 import { ECOEditView } from './ECOEditView';
 import { ECRReviewPanel } from '../ECR/ECRReviewPanel';
 import PartDetailContent from '../PartDetailContent';
 import AssemblyDetailContent from '../AssemblyDetailContent';
+import DocumentDetailContent from '../DocumentDetailContent';
 
 const statusTag = (s: string) => {
   const labels: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' };
@@ -37,9 +39,13 @@ const CAT: Record<string, string> = {
 export function ECODetailModal({ ecoId, onClose, onRefresh }: Props) {
   const user = useAuthStore((s) => s.user);
   const [eco, setEco] = useState<ECORequest | null>(null);
+  const docFieldDefs = useDataStore((s) => s.customFieldDefs).filter((d) => d.applies_to?.includes('document'));
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [docAttachments, setDocAttachments] = useState<Record<string, any[]>>({});
+  const [docCustomValues, setDocCustomValues] = useState<Record<string, Record<string, any>>>({});
+  const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
   const [nestedDetail, setNestedDetail] = useState<{ type: string; id: string } | null>(null);
   const [nestedData, setNestedData] = useState<any>(null);
   const [nestedLoading, setNestedLoading] = useState(false);
@@ -53,7 +59,17 @@ export function ECODetailModal({ ecoId, onClose, onRefresh }: Props) {
       const docs = r.data.document_links || [];
       if (docs.length > 0) {
         const results = await Promise.allSettled(docs.map((d: any) => documentsApi.get(d.document_id)));
-        setDocuments(results.filter(r => r.status === 'fulfilled').map((r: any) => r.value.data));
+        const loaded = results.filter(r => r.status === 'fulfilled').map((r: any) => r.value.data);
+        setDocuments(loaded);
+        // Load attachments and custom field values
+        loaded.forEach((doc: Document) => {
+          documentsApi.listAttachments(doc.id).then(r => setDocAttachments(prev => ({...prev, [doc.id]: r.data||[]}))).catch(() => {});
+          customFieldsApi.getValues('document', doc.id).then(r => {
+            const vals: Record<string, any> = {};
+            (r.data || []).forEach((v: any) => { vals[v.field_id] = v.value; });
+            setDocCustomValues(prev => ({...prev, [doc.id]: vals}));
+          }).catch(() => {});
+        });
       } else { setDocuments([]); }
     } catch { toast.error('加载失败'); }
     finally { setLoading(false); }
@@ -77,7 +93,29 @@ export function ECODetailModal({ ecoId, onClose, onRefresh }: Props) {
     finally { setNestedLoading(false); }
   };
 
+  const handleDocDownload = (attId: string, fileName: string) => {
+    const token = useAuthStore.getState().token;
+    if (!token) { alert('登录已过期'); return; }
+    const a = document.createElement('a');
+    a.href = `/api/v2/attachments/${attId}/direct-download?token=${encodeURIComponent(token)}`;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const handleDocPreview = (attId: string, fileName: string) => {
+    const ext = fileName.split('.').pop()?.toLowerCase() || '';
+    const token = useAuthStore.getState().token;
+    if (!token) { alert('登录已过期'); return; }
+    if (ext === 'pdf') { window.open(`/api/v2/attachments/${attId}/preview?token=${encodeURIComponent(token)}`, '_blank'); return; }
+    if (['zip', 'tar', 'gz', 'tgz', 'rar', '7z'].includes(ext)) { window.open(`/api/v2/attachments/${attId}/preview?token=${encodeURIComponent(token)}`, '_blank'); return; }
+    if (ext === 'stp' || ext === 'step') { window.open(`/stp-viewer?id=${attId}&token=${encodeURIComponent(token)}`, '_blank'); return; }
+    alert('该格式暂不支持预览');
+  };
+
   return (
+    <>
     <Modal open={true} title="ECO 详情" onClose={onClose} width="3xl">
       {loading ? <div className="py-8 text-center text-gray-400 text-sm">加载中...</div>
       : !eco ? <div className="py-8 text-center text-gray-400 text-sm">未找到 ECO</div>
@@ -139,9 +177,9 @@ export function ECODetailModal({ ecoId, onClose, onRefresh }: Props) {
 
           {/* Document links */}
           {documents.length > 0 && (
-            <div className="border-t pt-3">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">关联图文档</h4>
-              <div className="border rounded-lg overflow-hidden">
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-bold text-gray-700 mb-2">关联图文档</h4>
+              <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 border-b">
                     <tr>
@@ -149,30 +187,55 @@ export function ECODetailModal({ ecoId, onClose, onRefresh }: Props) {
                       <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档名称</th>
                       <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
                       <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
+                      {docFieldDefs.map((def) => (
+                        <th key={def.id} className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap">{def.name}</th>
+                      ))}
                       <th className="px-3 py-2 text-left text-gray-500 font-medium">附件</th>
-                      <th className="px-3 py-2 text-center w-20">操作</th>
+                      <th className="px-3 py-2 text-center text-gray-500 font-medium whitespace-nowrap w-28">操作</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
-                    {documents.map((doc) => (
-                      <tr key={doc.id} className="hover:bg-gray-50">
-                        <td className="px-3 py-2 text-gray-900">{doc.code}</td>
-                        <td className="px-3 py-2 text-gray-600">{doc.name}</td>
-                        <td className="px-3 py-2">{doc.version || '-'}</td>
-                        <td className="px-3 py-2"><span className={`px-1.5 py-0.5 rounded text-xs ${statusTag(doc.status).cls}`}>{statusTag(doc.status).label}</span></td>
-                        <td className="px-3 py-2 text-gray-500">{doc.file_name || '-'}</td>
-                        <td className="px-3 py-2 text-center flex gap-2 justify-center">
-                          {doc.file_id ? (
-                            <>
-                              <button onClick={() => { const t = (useAuthStore.getState() as any).token; if (t) window.open(`/api/v2/attachments/${doc.file_id}/preview?token=${encodeURIComponent(t)}`, '_blank'); else toast.error('未登录'); }}
-                                className="text-blue-500 hover:underline text-xs">预览</button>
-                              <button onClick={() => { const t = (useAuthStore.getState() as any).token; if (t) { const a = document.createElement('a'); a.href = `/api/v2/attachments/${doc.file_id}/direct-download?token=${encodeURIComponent(t)}`; a.download = doc.file_name || 'download'; a.click(); } else toast.error('未登录'); }}
-                                className="text-green-600 hover:underline text-xs">下载</button>
-                            </>
-                          ) : <span className="text-gray-300 text-xs">—</span>}
-                        </td>
-                      </tr>
-                    ))}
+                  <tbody className="divide-y divide-gray-100">
+                    {documents.map((doc) => {
+                      const atts = docAttachments[doc.id] || [];
+                      return (
+                        <tr key={doc.id} className="hover:bg-gray-50 cursor-pointer"
+                          onClick={() => setViewingDoc(doc)}>
+                          <td className="px-3 py-2 text-sm font-medium">{doc.code}</td>
+                          <td className="px-3 py-2 text-sm">{doc.name}</td>
+                          <td className="px-3 py-2 text-sm text-gray-500">{doc.version || '-'}</td>
+                          <td className="px-3 py-2 text-sm">
+                            <span className={`px-1.5 py-0.5 rounded text-xs ${statusTag(doc.status).cls}`}>{statusTag(doc.status).label}</span>
+                          </td>
+                          {docFieldDefs.map((def) => {
+                            const vals = docCustomValues[doc.id] || {};
+                            const val = vals[def.id];
+                            return (
+                              <td key={def.id} className="px-3 py-2 text-sm text-gray-500">
+                                {val !== undefined && val !== null && val !== '' ? String(val) : '-'}
+                              </td>
+                            );
+                          })}
+                          <td className="px-3 py-2 text-sm text-gray-500">
+                            {atts.length > 0 ? atts.map((a: any) => (
+                              <div key={a.id} className="text-xs">{a.file_name} ({formatFileSize(a.file_size)})</div>
+                            )) : (doc.file_name || '-')}
+                          </td>
+                          <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-center gap-1">
+                              {doc.file_id && (
+                                <button onClick={() => handleDocPreview(doc.file_id!, doc.file_name || '')}
+                                  className="px-2 py-0.5 text-xs text-blue-600 hover:text-blue-800">预览</button>
+                              )}
+                              {doc.file_id && (
+                                <button onClick={() => handleDocDownload(doc.file_id!, doc.file_name || '')}
+                                  className="px-2 py-0.5 text-xs text-green-600 hover:text-green-800">下载</button>
+                              )}
+                              {!doc.file_id && <span className="text-xs text-gray-400">-</span>}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -193,8 +256,8 @@ export function ECODetailModal({ ecoId, onClose, onRefresh }: Props) {
 
           {/* BOM impact (if source ECR exists) */}
           {eco.ecr_id && (
-            <div className="border-t pt-3">
-              <h4 className="text-xs font-semibold text-gray-700 mb-1.5">ECR 变更分析</h4>
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-bold text-gray-700 mb-2">ECR 变更分析（{eco.ecr_number || 'ECR'}）</h4>
               <ECOEditView ecrId={eco.ecr_id} onEcrLinked={() => {}} readOnly executionItems={eco.execution_items} />
             </div>
           )}
@@ -296,7 +359,23 @@ export function ECODetailModal({ ecoId, onClose, onRefresh }: Props) {
         </Modal>
       )}
     </Modal>
+
+    {/* 图文档详情弹窗 */}
+    <Modal open={!!viewingDoc} title="图文档详情" onClose={() => setViewingDoc(null)} width="full">
+      {viewingDoc && (
+        <div className="max-h-[70vh] overflow-y-auto pr-1">
+          <DocumentDetailContent doc={viewingDoc} customFieldDefs={docFieldDefs} customFieldValues={docCustomValues[viewingDoc.id] || {}} />
+        </div>
+      )}
+    </Modal>
+    </>
   );
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
 function InfoItem({ label, value, icon }: { label: string; value: string; icon?: string }) {
