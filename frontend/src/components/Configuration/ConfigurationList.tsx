@@ -1,16 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { configurationApi } from '../../services/api';
 import type { ConfigurationItem } from '../../types';
 import { canEdit, isAdmin } from '../../stores/auth';
 import { Modal, ConfirmModal } from '../Modal';
 import ConfigurationCreateModal from './ConfigurationCreateModal';
 import ConfigurationDetailModal from './ConfigurationDetailModal';
+import { useDataStore } from '../../stores/data';
+
+const PAGE_SIZE = 20;
 
 export default function ConfigurationList() {
   const [items, setItems] = useState<ConfigurationItem[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [searchField, setSearchField] = useState('all');
   const [loading, setLoading] = useState(false);
 
   // 弹窗
@@ -19,36 +22,73 @@ export default function ConfigurationList() {
   const [detailItem, setDetailItem] = useState<ConfigurationItem | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  const storeCustomDefs = useDataStore((s) => s.customFieldDefs);
+  const configCustomDefs = storeCustomDefs.filter((d) => d.applies_to?.includes('configuration_item'));
+
   const load = async () => {
     setLoading(true);
     try {
-      const res = await configurationApi.listItems({ page, page_size: 20, search: search || undefined });
+      const res = await configurationApi.listItems({ page: 1, page_size: 100 });
       setItems(res.data.items || []);
-      setTotal(res.data.total || 0);
     } catch { } finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, [page]);
+  useEffect(() => { load(); }, []);
 
-  const handleSearch = () => { setPage(1); load(); };
+  // 客户端筛选
+  const filteredData = useMemo(() => {
+    if (!search) return items;
+    const keyword = search.toLowerCase();
+    const match = (val: string | undefined) => val?.toLowerCase().includes(keyword);
+    return items.filter(item => {
+      if (searchField === 'all') {
+        return match(item.code) || match(item.name) || match(item.spec) || match(item.remark);
+      }
+      if (searchField === 'code') return match(item.code);
+      if (searchField === 'name') return match(item.name);
+      if (searchField === 'spec') return match(item.spec);
+      if (searchField === 'remark') return match(item.remark);
+      return true;
+    });
+  }, [items, search, searchField]);
+
+  // 分页
+  const total = filteredData.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const pagedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // 搜索变化时重置页码
+  useEffect(() => { setPage(1); }, [search, searchField]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
     try { await configurationApi.deleteItem(deleteId); setDeleteId(null); load(); } catch { }
   };
 
-  const totalPages = Math.max(1, Math.ceil(total / 20));
-
   return (
     <div>
       {/* 搜索 + 新建 */}
       <div className="flex gap-2 mb-4">
+        <select
+          value={searchField}
+          onChange={(e) => setSearchField(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+        >
+          <option value="all">全部字段</option>
+          <option value="code">构型号</option>
+          <option value="name">名称</option>
+          <option value="spec">规格型号</option>
+          <option value="remark">备注</option>
+          {configCustomDefs.map(def => (
+            <option key={def.id} value={`cf_${def.id}`}>{def.name}</option>
+          ))}
+        </select>
         <input
+          type="text"
           value={search} onChange={(e) => setSearch(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-          placeholder="搜索构型号/名称..." className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+          placeholder={searchField === 'all' ? '搜索全部字段...' : searchField.startsWith('cf_') ? `搜索${configCustomDefs.find(d => d.id === searchField.replace('cf_', ''))?.name || '自定义字段'}...` : `搜索${searchField === 'code' ? '构型号' : searchField === 'name' ? '名称' : searchField === 'spec' ? '规格型号' : '备注'}...`}
+          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 flex-1"
         />
-        <button onClick={handleSearch} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm">搜索</button>
         {canEdit() && (
           <button onClick={() => setCreateOpen(true)} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建构型</button>
         )}
@@ -61,7 +101,7 @@ export default function ConfigurationList() {
             <tr>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">构型号</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">名称</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">规格型号</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">备注</th>
               <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">操作</th>
             </tr>
           </thead>
@@ -70,11 +110,13 @@ export default function ConfigurationList() {
               <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
             ) : items.length === 0 ? (
               <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
-            ) : items.map((item) => (
+            ) : pagedData.length === 0 ? (
+              <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
+            ) : pagedData.map((item) => (
               <tr key={item.id} onClick={() => setDetailItem(item)} className="hover:bg-gray-50 cursor-pointer">
                 <td className="px-4 py-3 text-sm font-medium">{item.code}</td>
                 <td className="px-4 py-3 text-sm">{item.name}</td>
-                <td className="px-4 py-3 text-sm text-gray-500">{item.spec || '-'}</td>
+                <td className="px-4 py-3 text-sm text-gray-500">{item.remark || '-'}</td>
                 <td className="px-4 py-3 text-right space-x-1">
                   {canEdit() && (
                     <button onClick={(e) => { e.stopPropagation(); setEditItem(item); }} className="text-primary-600 hover:text-primary-800 mr-3">编辑</button>
