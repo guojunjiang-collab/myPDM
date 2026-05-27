@@ -599,7 +599,20 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
           <div className="text-sm text-gray-400 py-8 text-center">加载中...</div>
         ) : (
           <>
-            {/* Basic Info Form */}
+            {/* Basic Info */}
+            {isView && profile ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <InfoItem label="编号" value={profile.code} />
+                <InfoItem label="名称" value={profile.name} />
+                <InfoItem label="架次范围" value={
+                  (profile.effectivity_start || profile.effectivity_end)
+                    ? `${profile.effectivity_start || '-'} ~ ${profile.effectivity_end || '-'}`
+                    : '-'
+                } />
+                <InfoItem label="状态" value={statusLabel[profile.status] || profile.status} />
+                <InfoItem label="备注" value={profile.remark || '-'} className="col-span-2 md:col-span-4" />
+              </div>
+            ) : (
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">
@@ -692,6 +705,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                 )}
               </div>
             </div>
+            )}
 
             {/* ── 配置清单（仅编辑模式） ── */}
             {profile && canEdit && (
@@ -851,4 +865,13 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
     )}
   </>
 );
+}
+
+function InfoItem({ label, value, className }: { label: string; value: string; className?: string }) {
+  return (
+    <div className={`bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 ${className || ''}`}>
+      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
+      <div className="text-sm text-gray-900 font-medium whitespace-pre-wrap">{value}</div>
+    </div>
+  );
 }

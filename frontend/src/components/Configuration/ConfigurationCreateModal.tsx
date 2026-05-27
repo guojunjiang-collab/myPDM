@@ -159,13 +159,8 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
               className="w-full px-3 py-2 border border-gray-200 rounded text-sm" placeholder="如 A型机翼构型" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">规格型号</label>
-            <input value={form.spec} onChange={(e) => setForm({ ...form, spec: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded text-sm" />
-          </div>
-          <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">备注</label>
-            <textarea value={form.remark} onChange={(e) => setForm({ ...form, remark: e.target.value })} rows={2}
+            <textarea value={form.remark} onChange={(e) => setForm({ ...form, remark: e.target.value })} rows={1}
               className="w-full px-3 py-2 border border-gray-200 rounded text-sm" />
           </div>
         </div>

@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Modal } from '../Modal';
-import { configurationApi, assemblyPartsApi } from '../../services/api';
-import type { ConfigPartItem, ConfigChildItem } from '../../types';
+import { configurationApi, assemblyPartsApi, partsApi, assembliesApi, customFieldsApi } from '../../services/api';
+import type { ConfigPartItem, ConfigChildItem, CustomFieldDefinition, CustomFieldValue } from '../../types';
 import EntityDocumentSection from '../EntityDocumentSection';
+import PartDetailContent from '../PartDetailContent';
+import AssemblyDetailContent from '../AssemblyDetailContent';
+import { useDataStore } from '../../stores/data';
 
 interface Props {
   itemId: string | null;
@@ -19,6 +22,17 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
   const [expandedChild, setExpandedChild] = useState<Record<string, any[]>>({});
   const [noChildren, setNoChildren] = useState<Set<string>>(new Set());
   const [loadingChild, setLoadingChild] = useState<string | null>(null);
+
+  // 嵌套详情弹窗（点击行查看零件/部件详情）
+  const [nestedEntity, setNestedEntity] = useState<{ type: 'part' | 'assembly'; id: string } | null>(null);
+  const [nestedData, setNestedData] = useState<any>(null);
+  const [nestedLoading, setNestedLoading] = useState(false);
+  const [nestedCustomDefs, setNestedCustomDefs] = useState<CustomFieldDefinition[]>([]);
+  const [nestedCustomValues, setNestedCustomValues] = useState<Record<string, any>>({});
+  const nestedReqId = useRef(0);
+
+  // 子构型项嵌套详情
+  const [nestedConfigId, setNestedConfigId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!itemId) return;
@@ -73,32 +87,76 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
     finally { setLoadingChild(null); }
   };
 
+  // 行点击 → 弹出嵌套详情（零件/部件）
+  const handleNestedView = async (type: 'part' | 'assembly', id: string) => {
+    const reqId = ++nestedReqId.current;
+    setNestedEntity({ type, id });
+    setNestedData(null);
+    setNestedLoading(true);
+    setNestedCustomDefs([]);
+    setNestedCustomValues({});
+    try {
+      const api = type === 'part' ? partsApi : assembliesApi;
+      const res = await api.get(id);
+      if (reqId !== nestedReqId.current) return;
+      setNestedData(res.data);
+      const allDefs = useDataStore.getState().customFieldDefs;
+      const entityType = type === 'part' ? 'part' : 'component';
+      const defs = allDefs.filter((d: CustomFieldDefinition) => d.applies_to?.includes(entityType));
+      setNestedCustomDefs(defs);
+      if (defs.length > 0) {
+        try {
+          const valuesRes = await customFieldsApi.getValues(entityType, id);
+          if (reqId !== nestedReqId.current) return;
+          const vals: Record<string, any> = {};
+          (valuesRes.data || []).forEach((v: CustomFieldValue) => { vals[v.field_id] = v.value; });
+          setNestedCustomValues(vals);
+        } catch { /* optional */ }
+      }
+    } catch {
+      if (reqId !== nestedReqId.current) return;
+      setNestedData(null);
+    }
+    finally {
+      if (reqId === nestedReqId.current) {
+        setNestedLoading(false);
+      }
+    }
+  };
+
   const renderPartRow = (p: any, level: number, idx: string): React.ReactNode => {
     const isAssembly = p.part_type === 'assembly' || p.entity_type === 'assembly';
     const childRows = expandedParts[idx];
+    const entityId = p.part_id || p.entity_id;
+    const entityType = (p.part_type || p.entity_type || 'part');
+    const onClickRow = entityId ? () => handleNestedView(
+      entityType === 'assembly' ? 'assembly' : 'part',
+      entityId
+    ) : undefined;
+    const rowCls = onClickRow ? 'cursor-pointer' : '';
     return (
       <>
-        <tr key={idx} className="hover:bg-gray-50">
+        <tr key={idx} className={`hover:bg-gray-50 ${rowCls}`}>
           <td className="px-3 py-2 text-sm text-gray-400 whitespace-nowrap">
             <span>{'-'.repeat(level)}{level}</span>
             {isAssembly && (
-              <button onClick={() => togglePart(idx, p.part_id || p.entity_id, p.part_type || p.entity_type)}
+              <button onClick={(e) => { e.stopPropagation(); togglePart(idx, entityId, entityType); }}
                 className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
                 {childRows ? '▼' : '▶'}
               </button>
             )}
           </td>
-          <td className="px-3 py-2 text-sm font-medium">{p.part_detail?.code || p.entity_code || p.part_id}</td>
-          <td className="px-3 py-2 text-sm">{p.part_detail?.name || p.entity_name || '-'}</td>
-          <td className="px-3 py-2 text-sm text-gray-500">{p.part_type === 'assembly' || p.entity_type === 'assembly' ? '部件' : '零件'}</td>
-          <td className="px-3 py-2 text-sm text-gray-500">{p.part_detail?.spec || p.spec || '-'}</td>
-          <td className="px-3 py-2 text-sm">{p.part_detail?.version || p.entity_version || '-'}</td>
-          <td className="px-3 py-2 text-sm whitespace-nowrap">
+          <td className={`px-3 py-2 text-sm font-medium ${rowCls}`} onClick={onClickRow}>{p.part_detail?.code || p.entity_code || p.part_id}</td>
+          <td className={`px-3 py-2 text-sm ${rowCls}`} onClick={onClickRow}>{p.part_detail?.name || p.entity_name || '-'}</td>
+          <td className={`px-3 py-2 text-sm text-gray-500 ${rowCls}`} onClick={onClickRow}>{isAssembly ? '部件' : '零件'}</td>
+          <td className={`px-3 py-2 text-sm text-gray-500 ${rowCls}`} onClick={onClickRow}>{p.part_detail?.spec || p.spec || '-'}</td>
+          <td className={`px-3 py-2 text-sm ${rowCls}`} onClick={onClickRow}>{p.part_detail?.version || p.entity_version || '-'}</td>
+          <td className={`px-3 py-2 text-sm whitespace-nowrap ${rowCls}`} onClick={onClickRow}>
             <span className={`px-1.5 py-0.5 rounded text-sm ${(p.part_detail?.status || p.status) === 'draft' ? 'bg-blue-100 text-blue-700' : (p.part_detail?.status || p.status) === 'released' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
               {(p.part_detail?.status || p.status) === 'draft' ? '草稿' : (p.part_detail?.status || p.status) === 'released' ? '发布' : (p.part_detail?.status || p.status) === 'frozen' ? '冻结' : (p.part_detail?.status || p.status) === 'obsolete' ? '作废' : '-'}
             </span>
           </td>
-          <td className="px-3 py-2 text-center text-sm">
+          <td className={`px-3 py-2 text-center text-sm ${rowCls}`} onClick={onClickRow}>
             <span className={`px-2 py-0.5 text-sm rounded ${p.is_required ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
               {p.is_required != null ? (p.is_required ? '必选' : '可选') : '-'}
             </span>
@@ -113,22 +171,25 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
   const renderChildRow = (c: any, level: number, idx: string): React.ReactNode => {
     const childRows = expandedChild[idx];
     const isEmpty = noChildren.has(idx);
+    const childId = c.child_id || c.child_detail?.id;
+    const onClickRow = childId ? () => setNestedConfigId(childId) : undefined;
+    const rowCls = onClickRow ? 'cursor-pointer' : '';
     return (
       <>
-        <tr key={idx} className="hover:bg-gray-50">
+        <tr key={idx} className={`hover:bg-gray-50 ${rowCls}`}>
           <td className="px-3 py-2 text-sm text-gray-400 whitespace-nowrap">
             <span>{'-'.repeat(level)}{level}</span>
             {!isEmpty && (
-              <button onClick={() => toggleChild(idx, c.child_id || c.child_detail?.id)}
+              <button onClick={(e) => { e.stopPropagation(); toggleChild(idx, childId); }}
                 className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
                 {childRows ? '▼' : '▶'}
               </button>
             )}
           </td>
-          <td className="px-3 py-2 text-sm font-medium">{c.child_detail?.code || c.child_code || c.child_id}</td>
-          <td className="px-3 py-2 text-sm">{c.child_detail?.name || c.child_name || '-'}</td>
-          <td className="px-3 py-2 text-sm text-gray-500">{c.child_detail?.spec || c.spec || '-'}</td>
-          <td className="px-3 py-2 text-center text-sm">
+          <td className={`px-3 py-2 text-sm font-medium ${rowCls}`} onClick={onClickRow}>{c.child_detail?.code || c.child_code || c.child_id}</td>
+          <td className={`px-3 py-2 text-sm ${rowCls}`} onClick={onClickRow}>{c.child_detail?.name || c.child_name || '-'}</td>
+          <td className={`px-3 py-2 text-sm text-gray-500 ${rowCls}`} onClick={onClickRow}>{c.child_detail?.spec || c.spec || '-'}</td>
+          <td className={`px-3 py-2 text-center text-sm ${rowCls}`} onClick={onClickRow}>
             <span className={`px-2 py-0.5 text-sm rounded ${c.is_required ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
               {c.is_required ? '必选' : '可选'}
             </span>
@@ -143,6 +204,7 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
   if (!itemId) return null;
 
   return (
+    <>
     <Modal open={!!itemId} onClose={onClose} title="构型项详情" width="full">
       {loading ? (
         <div className="py-8 text-center text-sm text-gray-400">加载中...</div>
@@ -150,12 +212,11 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
         <div className="py-8 text-center text-sm text-gray-400">加载失败</div>
       ) : (
         <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-1">
-          {/* 基本信息 */}
-          <div className="grid grid-cols-2 gap-x-8 gap-y-3">
-            <div><label className="block text-sm font-medium text-gray-500 mb-1">构型号</label><div className="text-sm font-medium">{data.code}</div></div>
-            <div><label className="block text-sm font-medium text-gray-500 mb-1">中文名称</label><div className="text-sm">{data.name}</div></div>
-            <div><label className="block text-sm font-medium text-gray-500 mb-1">规格型号</label><div className="text-sm">{data.spec || '-'}</div></div>
-            {data.remark && <div className="col-span-2"><label className="block text-sm font-medium text-gray-500 mb-1">备注</label><div className="text-sm text-gray-600">{data.remark}</div></div>}
+          {/* 基本信息 - 卡片式 */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <InfoItem label="构型号" value={data.code} />
+            <InfoItem label="中文名称" value={data.name} />
+            <InfoItem label="备注" value={data.remark || '-'} className="col-span-2 md:col-span-2" />
           </div>
 
           {/* 关联零部件 */}
@@ -204,5 +265,49 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
         </div>
       )}
     </Modal>
+
+    {/* ========== 嵌套详情弹窗（点击配置清单行查看零件/部件详情） ========== */}
+    <Modal
+      open={!!nestedEntity}
+      title={nestedEntity ? (nestedEntity.type === 'part' ? '零件详情' : '部件详情') : ''}
+      onClose={() => { nestedReqId.current++; setNestedEntity(null); setNestedData(null); }}
+      width="full"
+    >
+      <div className="max-h-[70vh] overflow-y-auto pr-1">
+      {nestedLoading ? (
+        <div className="py-8 text-center text-sm text-gray-400">加载中...</div>
+      ) : !nestedData ? (
+        <div className="py-8 text-center text-sm text-gray-400">加载失败</div>
+      ) : nestedEntity?.type === 'part' ? (
+        <PartDetailContent part={nestedData} customFieldDefs={nestedCustomDefs} customFieldValues={nestedCustomValues} />
+      ) : (
+        <AssemblyDetailContent
+          assembly={nestedData}
+          customFieldDefs={nestedCustomDefs}
+          customFieldValues={nestedCustomValues}
+          onSubItemClick={(item) => handleNestedView(item.childType === 'part' ? 'part' : 'assembly', item.child_id)}
+        />
+      )}
+      </div>
+    </Modal>
+
+    {/* ========== 子构型项嵌套详情弹窗 ========== */}
+    <ConfigurationDetailModal
+      itemId={nestedConfigId}
+      onClose={() => setNestedConfigId(null)}
+    />
+    </>
+  );
+}
+
+function InfoItem({ label, value, icon, className }: { label: string; value: string; icon?: string; className?: string }) {
+  return (
+    <div className={`bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 ${className || ''}`}>
+      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
+      <div className="text-sm text-gray-900 font-medium whitespace-pre-wrap">
+        {icon && <span className="mr-1">{icon}</span>}
+        {value}
+      </div>
+    </div>
   );
 }
