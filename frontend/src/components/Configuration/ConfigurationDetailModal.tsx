@@ -76,7 +76,8 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
         child_id: c.child_id,
         child_code: c.child_detail?.code || '',
         child_name: c.child_detail?.name || '',
-        spec: c.child_detail?.spec || '',
+        remark: c.child_detail?.remark || '',
+        has_children: c.has_children,
       }));
       if (children.length > 0) {
         setExpandedChild(p => ({ ...p, [idx]: children }));
@@ -174,6 +175,7 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
 
   const renderChildRow = (c: any, level: number, idx: string): React.ReactNode => {
     const childRows = expandedChild[idx];
+    const hasChildren = c.has_children === true;
     const isEmpty = noChildren.has(idx);
     const childId = c.child_id || c.child_detail?.id;
     const onClickRow = childId ? () => setNestedConfigId(childId) : undefined;
@@ -183,7 +185,7 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
         <tr key={idx} className={`hover:bg-gray-50 ${rowCls}`}>
           <td className="px-3 py-2 text-sm text-gray-400 whitespace-nowrap">
             <span>{'-'.repeat(level)}{level}</span>
-            {!isEmpty && (
+            {hasChildren && !isEmpty && (
               <button onClick={(e) => { e.stopPropagation(); toggleChild(idx, childId); }}
                 className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
                 {childRows ? '▼' : '▶'}
@@ -192,7 +194,7 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
           </td>
           <td className={`px-3 py-2 text-sm font-medium ${rowCls}`} onClick={onClickRow}>{c.child_detail?.code || c.child_code || c.child_id}</td>
           <td className={`px-3 py-2 text-sm ${rowCls}`} onClick={onClickRow}>{c.child_detail?.name || c.child_name || '-'}</td>
-          <td className={`px-3 py-2 text-sm text-gray-500 ${rowCls}`} onClick={onClickRow}>{c.child_detail?.spec || c.spec || '-'}</td>
+          <td className={`px-3 py-2 text-sm text-gray-500 ${rowCls}`} onClick={onClickRow}>{c.child_detail?.remark || c.remark || '-'}</td>
           <td className={`px-3 py-2 text-center text-sm ${rowCls}`} onClick={onClickRow}>
             <span className={`px-2 py-0.5 text-sm rounded ${c.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
               {c.is_required ? '必选' : '可选'}
@@ -228,15 +230,15 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
             <h4 className="text-sm font-bold text-gray-700 mb-2">关联零部件 ({data.parts?.length || 0})</h4>
             {data.parts?.length > 0 ? (
               <table className="w-full text-sm border border-gray-200 rounded">
-                <thead className="bg-gray-50"><tr>
-                  <th className="text-left px-3 py-2 text-sm text-gray-500 w-20">层级</th>
-                  <th className="text-left px-3 py-2 text-sm text-gray-500">件号</th>
-                  <th className="text-left px-3 py-2 text-sm text-gray-500">名称</th>
-                  <th className="text-left px-3 py-2 text-sm text-gray-500 w-16">类型</th>
-                  <th className="text-left px-3 py-2 text-sm text-gray-500">规格型号</th>
-                  <th className="text-left px-3 py-2 text-sm text-gray-500 w-14">版本</th>
-                  <th className="text-left px-3 py-2 text-sm text-gray-500 w-16">状态</th>
-                  <th className="text-center px-3 py-2 text-sm text-gray-500 w-20">必选/可选</th>
+                <thead className="bg-gray-50 border-b"><tr>
+                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">层级</th>
+                  <th className="px-3 py-2 text-left text-gray-500 font-medium">件号</th>
+                  <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
+                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">类型</th>
+                  <th className="px-3 py-2 text-left text-gray-500 font-medium">规格型号</th>
+                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-14">版本</th>
+                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
+                  <th className="px-3 py-2 text-center text-gray-500 font-medium w-24">必选/可选</th>
                 </tr></thead>
                 <tbody className="divide-y divide-gray-100">
                   {(data.parts as ConfigPartItem[]).map((p, i) => renderPartRow(p, 0, String(i)))}
@@ -250,12 +252,12 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
             <h4 className="text-sm font-bold text-gray-700 mb-2">子构型项 ({data.children?.length || 0})</h4>
             {data.children?.length > 0 ? (
               <table className="w-full text-sm border border-gray-200 rounded">
-                <thead className="bg-gray-50"><tr>
-                  <th className="text-left px-3 py-2 text-sm text-gray-500 w-20">层级</th>
-                  <th className="text-left px-3 py-2 text-sm text-gray-500">构型号</th>
-                  <th className="text-left px-3 py-2 text-sm text-gray-500">名称</th>
-                  <th className="text-left px-3 py-2 text-sm text-gray-500">规格型号</th>
-                  <th className="text-center px-3 py-2 text-sm text-gray-500 w-20">必选/可选</th>
+                <thead className="bg-gray-50 border-b"><tr>
+                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">层级</th>
+                  <th className="px-3 py-2 text-left text-gray-500 font-medium">构型号</th>
+                  <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
+                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-48">备注</th>
+                  <th className="px-3 py-2 text-center text-gray-500 font-medium w-24">必选/可选</th>
                 </tr></thead>
                 <tbody className="divide-y divide-gray-100">
                   {(data.children as ConfigChildItem[]).map((c, i) => renderChildRow(c, 0, String(i)))}
