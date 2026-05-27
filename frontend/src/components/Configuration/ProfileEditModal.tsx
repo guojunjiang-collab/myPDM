@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Modal } from '../Modal';
+import ConfigItemPicker from './ConfigItemPicker';
 import { configurationApi, configurationProfileApi } from '../../services/api';
 import { isAdmin } from '../../stores/auth';
 import type { ConfigurationProfileDetail, ConfigTreeNode } from '../../types';
@@ -10,12 +11,6 @@ interface Props {
   readOnly?: boolean;
   onClose: () => void;
   onSaved: () => void;
-}
-
-interface ConfigItemOption {
-  id: string;
-  code: string;
-  name: string;
 }
 
 const statusBadge = (status: string) => {
@@ -36,6 +31,70 @@ const statusBadge = (status: string) => {
   );
 };
 
+/* ──── Tree helpers for optimistic local updates ──── */
+
+/** Recursively deep-clone a config tree node, recalculating is_selected for each node */
+function cloneAndRecalc(node: ConfigTreeNode): ConfigTreeNode {
+  const parts = node.parts.map(p => ({ ...p }));
+  const children = node.children.map(cloneAndRecalc);
+  const is_selected = node.is_required ||
+    parts.some(p => p.is_selected) ||
+    children.some(c => c.is_selected);
+  return { ...node, parts, children, is_selected };
+}
+
+/** Deep clone tree, find part by ID and toggle it, recalculate ancestors */
+function togglePartInTree(root: ConfigTreeNode | null, partId: string, selected: boolean): ConfigTreeNode | null {
+  if (!root) return null;
+  function walk(node: ConfigTreeNode): { node: ConfigTreeNode; found: boolean } {
+    // Check parts at this level
+    const partIdx = node.parts.findIndex(p => p.id === partId);
+    let newParts = node.parts;
+    let found = false;
+    if (partIdx !== -1) {
+      newParts = [...node.parts];
+      newParts[partIdx] = { ...newParts[partIdx], is_selected: selected };
+      found = true;
+    }
+    // Walk children
+    let newChildren = node.children;
+    if (!found) {
+      newChildren = node.children.map(c => {
+        const r = walk(c);
+        if (r.found) found = true;
+        return r.node;
+      });
+    }
+    // Recalculate
+    const is_selected = node.is_required ||
+      newParts.some(p => p.is_selected) ||
+      newChildren.some(c => c.is_selected);
+    return { node: { ...node, parts: newParts, children: newChildren, is_selected }, found };
+  }
+  return walk(root).node;
+}
+
+/** Deep clone tree, find node by ID and toggle all parts in entire subtree, recalculate */
+function toggleNodeInTree(root: ConfigTreeNode | null, nodeId: string, selected: boolean): ConfigTreeNode | null {
+  if (!root) return null;
+  function walk(node: ConfigTreeNode, inTargetSubtree: boolean): ConfigTreeNode {
+    const isTarget = node.id === nodeId;
+    const shouldToggle = inTargetSubtree || isTarget;
+    const children = node.children.map(c => walk(c, shouldToggle));
+    let parts = node.parts;
+    if (shouldToggle) {
+      parts = node.parts.map(p => ({ ...p, is_selected: selected }));
+    }
+    const is_selected = node.is_required ||
+      parts.some(p => p.is_selected) ||
+      children.some(c => c.is_selected);
+    return { ...node, parts, children, is_selected };
+  }
+  return walk(root, false);
+}
+
+/* ──── Component ──── */
+
 export default function ProfileEditModal({ open, profileId, readOnly, onClose, onSaved }: Props) {
   const isCreate = !profileId;
   const isView = !!profileId && !!readOnly;
@@ -49,21 +108,11 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [configItems, setConfigItems] = useState<ConfigItemOption[]>([]);
   const [profile, setProfile] = useState<ConfigurationProfileDetail | null>(null);
   const [configTree, setConfigTree] = useState<ConfigTreeNode | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
-  const [cfgPickerOpen, setCfgPickerOpen] = useState(false);
+  const [cfgPickOpen, setCfgPickOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  // Load config items for dropdown
-  useEffect(() => {
-    if (open) {
-      configurationApi.listItems({ page: 1, page_size: 100 })
-        .then(r => setConfigItems(r.data.items || []))
-        .catch(() => setConfigItems([]));
-    }
-  }, [open]);
 
   // Load profile for VIEW/EDIT mode
   const loadProfile = async () => {
@@ -158,23 +207,48 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
     }
   };
 
-  // Toggle config item node selection in tree
+  // Toggle config item node — optimistic local update, no scroll jump
   const handleToggleConfigNode = async (configItemId: string) => {
+    const node = configTree;
+    if (!node) return;
+    // Read current selected state BEFORE optimistic update
+    const currentSelected = node.is_selected; // 简化：用当前节点选中态判断方向
+    // Actually, find the real node's state
+    const findNode = (n: ConfigTreeNode): ConfigTreeNode | null => {
+      if (n.id === configItemId) return n;
+      for (const c of n.children) {
+        const r = findNode(c);
+        if (r) return r;
+      }
+      return null;
+    };
+    const targetNode = findNode(node);
+    if (!targetNode) return;
+    const newSelected = !targetNode.is_selected;
+    // Optimistic local update
+    setConfigTree(prev => toggleNodeInTree(prev, configItemId, newSelected));
+    // API in background
     try {
       await configurationProfileApi.toggleConfigNode(profileId!, configItemId);
-      await loadProfile();
+      // No reload on success — local state already correct
     } catch (e: any) {
       setError(e?.response?.data?.detail || '操作失败');
+      // Revert on error
+      setConfigTree(prev => toggleNodeInTree(prev, configItemId, !newSelected));
     }
   };
 
-  // Toggle individual part selection
+  // Toggle individual part — optimistic local update, no scroll jump
   const handleTogglePart = async (itemId: string, currentSelected: boolean) => {
+    // Optimistic local update
+    setConfigTree(prev => togglePartInTree(prev, itemId, !currentSelected));
+    // API in background
     try {
       await configurationProfileApi.updateItem(profileId!, itemId, { is_selected: !currentSelected });
-      await loadProfile();
     } catch (e: any) {
       setError(e?.response?.data?.detail || '操作失败');
+      // Revert on error
+      setConfigTree(prev => togglePartInTree(prev, itemId, currentSelected));
     }
   };
 
@@ -188,16 +262,56 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
     });
   };
 
-  // Change associated config item from checklist header
-  const handleChangeConfigItem = async (newItemId: string) => {
-    setCfgPickerOpen(false);
-    if (!newItemId || newItemId === form.configuration_item_id) return;
-    setForm(prev => ({ ...prev, configuration_item_id: newItemId }));
+  // Change associated config item (called from ConfigItemPicker onConfirm)
+  const handleChangeConfigItem = async (item: { id: string; code: string; name: string }) => {
+    if (item.id === form.configuration_item_id) return;
+    setForm(prev => ({ ...prev, configuration_item_id: item.id }));
     try {
-      await configurationProfileApi.update(profileId!, { configuration_item_id: newItemId } as any);
+      await configurationProfileApi.update(profileId!, { configuration_item_id: item.id } as any);
       await loadProfile();
     } catch (e: any) {
       setError(e?.response?.data?.detail || '关联构型项失败');
+    }
+  };
+
+  // Force regenerate checklist from latest config item content
+  const handleRegenerate = async () => {
+    if (!profileId || !form.configuration_item_id) return;
+    setSaving(true);
+    try {
+      const r = await configurationProfileApi.regenerate(profileId);
+      setConfigTree(r.data.config_tree || null);
+      const expanded = new Set<string>();
+      if (r.data.config_tree) {
+        const walk = (node: ConfigTreeNode) => {
+          expanded.add(node.id);
+          node.children.forEach(walk);
+        };
+        walk(r.data.config_tree);
+      }
+      setExpandedNodes(expanded);
+      setError('');
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || '重建清单失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Remove config item association
+  const handleRemoveConfigItem = async () => {
+    if (!profileId) return;
+    setSaving(true);
+    try {
+      await configurationProfileApi.update(profileId, { configuration_item_id: null } as any);
+      setForm(prev => ({ ...prev, configuration_item_id: '' }));
+      setConfigTree(null);
+      setExpandedNodes(new Set());
+      setError('');
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || '删除关联失败');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -287,6 +401,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
     // Selected parts (hidden when collapsed)
     if (!hasChildren || isExpanded) {
       for (const part of node.parts) {
+        if (part.item_type === 'config_item') continue;
         if (!part.is_selected) continue;
         rows.push(
           <tr key={part.id}>
@@ -365,6 +480,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
     // ── Part Rows (hidden when collapsed) ──
     if (!hasChildren || isExpanded) {
       for (const part of node.parts) {
+        if (part.item_type === 'config_item') continue;
         rows.push(
         <tr key={part.id} className={`${!node.is_selected ? 'opacity-40' : ''} hover:bg-gray-50/50 transition-colors`}>
           <td className="px-3 py-2 text-xs text-gray-400 whitespace-nowrap">
@@ -544,40 +660,38 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
               <div className="border-t pt-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-sm font-bold text-gray-700">配置清单</h4>
-                  <div className="relative">
+                  <div className="flex items-center gap-2">
+                    {form.configuration_item_id && (
+                      <>
+                        <button type="button" onClick={handleRegenerate} disabled={saving}
+                          className="text-xs text-blue-600 hover:text-blue-700 border border-blue-200 px-2 py-1 rounded hover:bg-blue-50 disabled:opacity-50">
+                          更新
+                        </button>
+                        <button type="button" onClick={handleRemoveConfigItem} disabled={saving}
+                          className="text-xs text-red-600 hover:text-red-700 border border-red-200 px-2 py-1 rounded hover:bg-red-50 disabled:opacity-50">
+                          删除
+                        </button>
+                      </>
+                    )}
                     <button
                       type="button"
-                      onClick={() => setCfgPickerOpen(!cfgPickerOpen)}
-                      className="text-xs text-primary-600 hover:text-primary-700 border border-gray-200 px-2 py-1 rounded hover:bg-gray-50"
+                      onClick={() => setCfgPickOpen(true)}
+                      className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700"
                     >
-                      {form.configuration_item_id
-                        ? `关联构型项: ${configItems.find(c => c.id === form.configuration_item_id)?.code || '...'}`
-                        : '关联构型项'}
+                      {form.configuration_item_id ? '更换构型项' : '+ 关联构型项'}
                     </button>
-                    {cfgPickerOpen && (
-                      <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-[220px] max-h-[200px] overflow-y-auto">
-                        {configItems.length === 0 ? (
-                          <p className="text-xs text-gray-400 px-3 py-2">无可用构型项</p>
-                        ) : (
-                          configItems.map(ci => (
-                            <button
-                              key={ci.id}
-                              type="button"
-                              onClick={() => handleChangeConfigItem(ci.id)}
-                              className={`w-full text-left px-3 py-2 text-xs hover:bg-primary-50 ${ci.id === form.configuration_item_id ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-600'}`}
-                            >
-                              {ci.code} - {ci.name}
-                            </button>
-                          ))
-                        )}
-                      </div>
-                    )}
                   </div>
                 </div>
+                <ConfigItemPicker
+                  open={cfgPickOpen}
+                  onClose={() => setCfgPickOpen(false)}
+                  onConfirm={handleChangeConfigItem}
+                  excludeId={form.configuration_item_id || undefined}
+                />
 
                 {/* Table-based checklist */}
                 {configTree ? (
-                  <div className="border border-gray-200 rounded-lg overflow-hidden max-h-[400px] overflow-y-auto bg-white">
+                  <div className="border border-gray-200 rounded-lg overflow-hidden max-h-[500px] overflow-y-auto bg-white">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-100 sticky top-0 z-10">
                         <tr>
@@ -610,7 +724,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
             {profile && configTree && (
               <div className="border-t pt-3">
                 <h4 className="text-sm font-bold text-gray-700 mb-2">正式配置清单</h4>
-                <div className="border border-gray-200 rounded-lg overflow-hidden max-h-[400px] overflow-y-auto bg-white">
+                <div className="border border-gray-200 rounded-lg overflow-hidden max-h-[500px] overflow-y-auto bg-white">
                   <table className="w-full text-sm">
                     <thead className="bg-gray-100 sticky top-0 z-10">
                       <tr>

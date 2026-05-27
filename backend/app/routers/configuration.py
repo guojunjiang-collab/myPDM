@@ -650,8 +650,8 @@ def _build_config_tree(db: Session, config_item_id: str, profile_items: list, en
         child_tree = _build_config_tree(db, str(child.child_id), profile_items, entity_map)
         if child_tree:
             child_tree["is_required"] = child.is_required
-            # 子构型项的选中态：如果其下有任意必选项未选中，视为未选中
-            child_tree["is_selected"] = _is_config_node_selected(db, str(child.child_id), profile_items)
+            # 子构型项的选中态：必选项始终选中；可选节点由子零件决定
+            child_tree["is_selected"] = child.is_required or _is_config_node_selected(db, str(child.child_id), profile_items)
             child_nodes.append(child_tree)
 
     return {
@@ -709,7 +709,53 @@ async def toggle_config_item_node(
             crud.update_profile_item(db, str(pi.id), not node_selected, force=True)
             toggled.append(str(pi.id))
 
+    # 如果该可选节点下没有任何零部件，创建合成条目记录节点级选中态
+    if len(toggled) == 0 and not node_selected:
+        config_item = crud.get_config_item(db, config_item_id)
+        if config_item:
+            node_item = models.ConfigurationProfileItem(
+                profile_id=uuid.UUID(profile_id),
+                source_config_item_id=uuid.UUID(config_item_id),
+                item_type='config_item',
+                item_id=uuid.UUID(config_item_id),
+                item_code=config_item.code,
+                item_name=config_item.name,
+                is_required=False,
+                is_selected=True,
+                source_type='child',
+                sort_order=0,
+            )
+            db.add(node_item)
+            db.commit()
+            toggled.append(str(node_item.id))
+
     return {"detail": "ok", "toggled": len(toggled)}
+
+
+@router.post("/profiles/{profile_id}/regenerate", response_model=dict)
+async def regenerate_profile_checklist(
+    profile_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_role(["admin", "engineer"])),
+):
+    """以最新构型项内容强制重建配置清单（仅 draft）"""
+    profile = crud.get_profile(db, profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="配置不存在")
+    if profile.status != "draft":
+        raise HTTPException(status_code=400, detail="仅草稿状态可修改")
+
+    profile = crud.regenerate_profile_checklist(db, profile_id)
+    if not profile:
+        raise HTTPException(status_code=400, detail="重建失败，请先关联构型项")
+
+    items = crud.get_profile_items(db, profile_id)
+    entity_map = _build_entity_map(db, items)
+    return {
+        "detail": "ok",
+        "items": [_format_profile_item(item, entity_map) for item in items],
+        "config_tree": _build_config_tree(db, str(profile.configuration_item_id), items, entity_map),
+    }
 
 
 def _collect_descendant_config_item_ids(db: Session, config_item_id: str) -> set:

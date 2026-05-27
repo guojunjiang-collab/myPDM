@@ -266,18 +266,17 @@ def update_profile(
     if not profile:
         return None
 
-    # 处理构型项变更（单独处理，支持置空）
-    if data.configuration_item_id is not None:
+    # 处理构型项变更（仅当值变化时才清除并重建清单，避免覆盖用户手动 toggle）
+    new_cfg_id = str(data.configuration_item_id) if data.configuration_item_id else None
+    old_cfg_id = str(profile.configuration_item_id) if profile.configuration_item_id else None
+    if new_cfg_id != old_cfg_id:
         # 清除旧清单
         db.query(models.ConfigurationProfileItem).filter(
             models.ConfigurationProfileItem.profile_id == profile_id
         ).delete()
-        # 重新生成
+        profile.configuration_item_id = data.configuration_item_id
         if data.configuration_item_id:
-            profile.configuration_item_id = data.configuration_item_id
             _generate_checklist(db, profile_id, str(data.configuration_item_id))
-        else:
-            profile.configuration_item_id = None
 
     # 更新其他字段
     update_data = data.model_dump(exclude_unset=True)
@@ -313,6 +312,27 @@ def get_profile_items(db: Session, profile_id: str) -> List[models.Configuration
     return db.query(models.ConfigurationProfileItem).filter(
         models.ConfigurationProfileItem.profile_id == profile_id
     ).order_by(models.ConfigurationProfileItem.sort_order).all()
+
+
+def regenerate_profile_checklist(
+    db: Session, profile_id: str,
+) -> Optional[models.ConfigurationProfile]:
+    """强制以最新构型项内容重建配置清单（保留 configuration_item_id 不变）"""
+    profile = get_profile(db, profile_id)
+    if not profile:
+        return None
+    if not profile.configuration_item_id:
+        return None
+
+    # 清除旧清单
+    db.query(models.ConfigurationProfileItem).filter(
+        models.ConfigurationProfileItem.profile_id == profile_id
+    ).delete()
+    # 重新生成
+    _generate_checklist(db, profile_id, str(profile.configuration_item_id))
+    db.commit()
+    db.refresh(profile)
+    return profile
 
 
 def update_profile_item(

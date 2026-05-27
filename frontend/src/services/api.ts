@@ -526,6 +526,9 @@ export const configurationProfileApi = {
   toggleConfigNode: (profileId: string, configItemId: string) =>
     api.put(`/configurations/profiles/${profileId}/config-items/${configItemId}/toggle`),
 
+  regenerate: (profileId: string) =>
+    api.post(`/configurations/profiles/${profileId}/regenerate`),
+
   updateStatus: (profileId: string, status: string) =>
     api.put(`/configurations/profiles/${profileId}/status`, { status }),
 };
