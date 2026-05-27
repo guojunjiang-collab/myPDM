@@ -78,6 +78,18 @@ export default function Components() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAssembly, setEditingAssembly] = useState<Assembly | null>(null);
   const [formData, setFormData] = useState<AssemblyFormData>(initialFormData);
+  const specRef = useRef<HTMLTextAreaElement>(null);
+  const remarkRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (!modalOpen) return;
+    const timer = setTimeout(() => {
+      [specRef, remarkRef].forEach(ref => {
+        const el = ref.current;
+        if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+      });
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [modalOpen, formData.spec, formData.remark]);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -791,20 +803,6 @@ export default function Components() {
   /** 渲染编辑态的子项表格 */
   const renderEditPartsTable = () => (
     <div className="border rounded-lg overflow-hidden mt-1">
-      <div className="bg-gray-50 border-b px-4 py-2 flex items-center justify-between">
-        <span className="text-sm font-medium text-gray-700">
-          子项清单{editParts.length > 0 ? ` (${editParts.length})` : ''}
-        </span>
-        {canEdit() && (
-          <button
-            type="button"
-            onClick={() => setPickerOpen(true)}
-            className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700"
-          >
-            + 添加子项
-          </button>
-        )}
-      </div>
       {loadingEditParts ? (
         <div className="px-4 py-8 text-center text-sm text-gray-400">加载子项中...</div>
       ) : editParts.length === 0 ? (
@@ -1139,63 +1137,45 @@ export default function Components() {
         width="full"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* 基本属性 */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                件号 <span className="text-red-500">*</span>
-              </label>
+          {/* 基本属性 - 卡片式 */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-gray-500 mb-0.5">件号 <span className="text-red-500">*</span></label>
               <input
                 type="text"
                 value={formData.code}
                 onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                disabled={!!editingAssembly}
+                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300 disabled:bg-gray-100 disabled:text-gray-400"
                 required
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                中文名称 <span className="text-red-500">*</span>
-              </label>
+            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-gray-500 mb-0.5">中文名称 <span className="text-red-500">*</span></label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300"
                 required
               />
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">规格型号</label>
-              <input
-                type="text"
-                value={formData.spec}
-                onChange={(e) => setFormData({ ...formData, spec: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">版本</label>
+            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-gray-500 mb-0.5">版本</label>
               <input
                 type="text"
                 value={formData.version}
-                onChange={(e) => setFormData({ ...formData, version: e.target.value.toUpperCase() })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                disabled
+                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300 disabled:bg-gray-100 disabled:text-gray-400"
                 placeholder="如: A, B, V1.0"
               />
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">状态</label>
+            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-gray-500 mb-0.5">状态</label>
               <select
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <option value="draft">草稿</option>
                 <option value="frozen">冻结</option>
@@ -1203,19 +1183,26 @@ export default function Components() {
                 <option value="obsolete">作废</option>
               </select>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">备注</label>
+            <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-gray-500 mb-0.5">规格型号</label>
               <textarea
+                ref={specRef}
+                value={formData.spec}
+                onChange={(e) => setFormData({ ...formData, spec: e.target.value })}
+                onInput={(e) => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }}
+                rows={1}
+                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none placeholder:text-gray-300"
+              />
+            </div>
+            <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-gray-500 mb-0.5">备注</label>
+              <textarea
+                ref={remarkRef}
                 value={formData.remark}
                 onChange={(e) => setFormData({ ...formData, remark: e.target.value })}
-                onInput={(e) => {
-                  const el = e.currentTarget;
-                  el.style.height = 'auto';
-                  el.style.height = el.scrollHeight + 'px';
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+                onInput={(e) => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }}
                 rows={1}
-                placeholder="可选"
+                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none placeholder:text-gray-300"
               />
             </div>
           </div>
@@ -1223,14 +1210,14 @@ export default function Components() {
           {/* 自定义字段 */}
           {customFieldDefs.length > 0 && (
             <div className="border-t pt-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-3">自定义字段</h4>
+              <h4 className="text-sm font-bold text-gray-700 mb-2">自定义字段</h4>
               {loadingCustomFields ? (
                 <div className="text-sm text-gray-500">加载中...</div>
               ) : (
-                <div className="grid grid-cols-2 gap-3 gap-x-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {customFieldDefs.map((def) => (
-                    <div key={def.id}>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                      <label className="block text-xs text-gray-500 mb-0.5">
                         {def.name}
                         {def.is_required && <span className="text-red-500 ml-1">*</span>}
                       </label>
@@ -1247,10 +1234,21 @@ export default function Components() {
             <EntityDocumentSection entityType="assembly" entityId={editingAssembly.id} editable />
           )}
 
-          {/* 子项管理（仅编辑时显示） */}
+          {/* 子项清单（仅编辑时显示） */}
           {editingAssembly && (
             <div className="border-t pt-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">子项管理</h4>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-bold text-gray-700">子项清单</h4>
+                {canEdit() && (
+                  <button
+                    type="button"
+                    onClick={() => setPickerOpen(true)}
+                    className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700"
+                  >
+                    + 添加子项
+                  </button>
+                )}
+              </div>
               {renderEditPartsTable()}
             </div>
           )}

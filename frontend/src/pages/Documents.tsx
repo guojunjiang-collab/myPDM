@@ -73,6 +73,15 @@ export default function Documents() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<Document | null>(null);
   const [formData, setFormData] = useState<DocFormData>(initialFormData);
+  const remarkRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (!modalOpen) return;
+    const timer = setTimeout(() => {
+      const el = remarkRef.current;
+      if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [modalOpen, formData.remark]);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -729,46 +738,45 @@ export default function Documents() {
         width="full"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">编号 <span className="text-red-500">*</span></label>
+          {/* 基本属性 - 卡片式 */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-gray-500 mb-0.5">编号 <span className="text-red-500">*</span></label>
               <input
                 type="text"
                 value={formData.code}
                 onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                disabled={!!editingDoc}
+                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300 disabled:bg-gray-100 disabled:text-gray-400"
                 required
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">名称 <span className="text-red-500">*</span></label>
+            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-gray-500 mb-0.5">名称 <span className="text-red-500">*</span></label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300"
                 required
               />
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">版本</label>
+            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-gray-500 mb-0.5">版本</label>
               <input
                 type="text"
                 value={formData.version}
-                onChange={(e) => setFormData({ ...formData, version: e.target.value.toUpperCase() })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                disabled
+                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300 disabled:bg-gray-100 disabled:text-gray-400"
                 placeholder="如: A, B, V1.0"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">状态</label>
+            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-gray-500 mb-0.5">状态</label>
               <select
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <option value="draft">草稿</option>
                 <option value="frozen">冻结</option>
@@ -776,30 +784,30 @@ export default function Documents() {
                 <option value="obsolete">作废</option>
               </select>
             </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">备注</label>
-            <textarea
-              value={formData.remark}
-              onChange={(e) => setFormData({ ...formData, remark: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              rows={3}
-              placeholder="可选"
-            />
+            <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-gray-500 mb-0.5">备注</label>
+              <textarea
+                ref={remarkRef}
+                value={formData.remark}
+                onChange={(e) => setFormData({ ...formData, remark: e.target.value })}
+                onInput={(e) => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }}
+                rows={1}
+                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none placeholder:text-gray-300"
+              />
+            </div>
           </div>
 
           {/* Custom Fields */}
           {customFieldDefs.length > 0 && (
             <div className="border-t pt-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-3">自定义字段</h4>
+              <h4 className="text-sm font-bold text-gray-700 mb-2">自定义字段</h4>
               {loadingCustomFields ? (
                 <div className="text-sm text-gray-500">加载中...</div>
               ) : (
-                <div className="space-y-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {customFieldDefs.map(def => (
-                    <div key={def.id}>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                      <label className="block text-xs text-gray-500 mb-0.5">
                         {def.name}
                         {def.is_required && <span className="text-red-500 ml-1">*</span>}
                       </label>
