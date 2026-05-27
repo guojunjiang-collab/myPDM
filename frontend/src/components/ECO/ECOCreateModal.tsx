@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Modal } from '../Modal';
 import { toast } from '../Toast';
-import { ecoApi, usersApi, documentsApi, ecrApi, partsApi, assembliesApi } from '../../services/api';
+import { ecoApi, usersApi, documentsApi, ecrApi, partsApi, assembliesApi, customFieldsApi } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
+import { useDataStore } from '../../stores/data';
 import type { ECORequest, ECRDocumentLink } from '../../types';
+import VersionSelectModal from '../VersionSelectModal';
 
 const statusTag = (s: string) => {
   const labels: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' };
@@ -92,6 +94,9 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
   const [releaseItems, setReleaseItems] = useState<any[]>([]);
   const [docData, setDocData] = useState<Record<string, any>>({});
   const [docAttachments, setDocAttachments] = useState<Record<string, any[]>>({});
+  const [docCustomValues, setDocCustomValues] = useState<Record<string, Record<string, any>>>({});
+  const [versionSelectState, setVersionSelectState] = useState<{ docId: string; oldDocId: string } | null>(null);
+  const docFieldDefs = useDataStore((s) => s.customFieldDefs).filter((d) => d.applies_to?.includes('document'));
   const onCloseRef = useRef(onClose);
   const onCreatedRef = useRef(onCreated);
   onCloseRef.current = onClose;
@@ -111,6 +116,11 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
       if (!docData[id]) {
         documentsApi.get(id).then(r => setDocData(prev => ({...prev, [id]: r.data}))).catch(() => {});
         documentsApi.listAttachments(id).then(r => setDocAttachments(prev => ({...prev, [id]: r.data||[]}))).catch(() => {});
+        customFieldsApi.getValues('document', id).then(r => {
+          const vals: Record<string, any> = {};
+          (r.data || []).forEach((v: any) => { vals[v.field_id] = v.value; });
+          setDocCustomValues(prev => ({...prev, [id]: vals}));
+        }).catch(() => {});
       }
     });
   }, [documentLinks]);
@@ -423,8 +433,11 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
                     <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档名称</th>
                     <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
                     <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
+                    {docFieldDefs.map((def) => (
+                      <th key={def.id} className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap">{def.name}</th>
+                    ))}
                     <th className="px-3 py-2 text-left text-gray-500 font-medium">附件</th>
-                    <th className="px-3 py-2 text-center w-20">操作</th>
+                    <th className="px-3 py-2 text-center text-gray-500 font-medium whitespace-nowrap w-28">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -433,14 +446,27 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
                     const atts = docAttachments[link.document_id] || [];
                     return (
                       <tr key={link.document_id} className="hover:bg-gray-50">
-                        <td className="px-3 py-2 text-gray-900">{doc?.code || link.document_code}</td>
-                        <td className="px-3 py-2 text-gray-600">{doc?.name || link.document_name}</td>
-                        <td className="px-3 py-2">{doc?.version || link.document_version || '-'}</td>
+                        <td className="px-3 py-2 text-sm font-medium">{doc?.code || link.document_code}</td>
+                        <td className="px-3 py-2 text-sm">{doc?.name || link.document_name}</td>
+                        <td className="px-3 py-2 text-sm text-gray-500">{doc?.version || link.document_version || '-'}</td>
                         <td className="px-3 py-2">{doc ? <span className={`px-1.5 py-0.5 rounded text-xs ${statusTag(doc.status).cls}`}>{statusTag(doc.status).label}</span> : '-'}</td>
-                        <td className="px-3 py-2 text-gray-500">{doc?.file_name || '-'}</td>
+                        {docFieldDefs.map((def) => {
+                          const vals = docCustomValues[link.document_id] || {};
+                          const val = vals[def.id];
+                          return (
+                            <td key={def.id} className="px-3 py-2 text-sm text-gray-500">
+                              {val !== undefined && val !== null && val !== '' ? String(val) : '-'}
+                            </td>
+                          );
+                        })}
+                        <td className="px-3 py-2 text-sm text-gray-500">{doc?.file_name || atts.map((a: any) => a.file_name).join(', ') || '-'}</td>
                         <td className="px-3 py-2 text-center">
-                          <button onClick={() => setDocumentLinks((prev) => prev.filter((d) => d.document_id !== link.document_id))}
-                            className="text-red-400 hover:text-red-600 text-xs">移除</button>
+                          <div className="flex items-center justify-center gap-1">
+                            <button type="button" onClick={() => setVersionSelectState({ docId: link.document_id, oldDocId: link.document_id })}
+                              className="px-2 py-0.5 text-xs text-blue-600 hover:text-blue-800">选择</button>
+                            <button type="button" onClick={() => setDocumentLinks((prev) => prev.filter((d) => d.document_id !== link.document_id))}
+                              className="px-2 py-0.5 text-xs text-red-400 hover:text-red-600">移除</button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -606,6 +632,27 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         </div>
       </div>
       )}
+
+      {/* 版本选择器 */}
+      <VersionSelectModal
+        open={!!versionSelectState}
+        entityType="document"
+        entityId={versionSelectState?.docId || ''}
+        entityName={docData[versionSelectState?.docId || '']?.code || ''}
+        currentVersionId={versionSelectState?.oldDocId || ''}
+        onSelect={(newVerId) => {
+          if (versionSelectState) {
+            // Replace the old document with the selected version
+            setDocumentLinks(prev => prev.map(d =>
+              d.document_id === versionSelectState.oldDocId
+                ? { document_id: newVerId, document_code: '', document_name: '', document_version: '' }
+                : d
+            ));
+          }
+          setVersionSelectState(null);
+        }}
+        onClose={() => setVersionSelectState(null)}
+      />
     </Modal>
   );
 }
