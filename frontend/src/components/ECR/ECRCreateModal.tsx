@@ -501,186 +501,6 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
             className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" />
         </div>
 
-        {/* Reason + Category row */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              变更原因
-            </label>
-            <select
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              {REASON_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              变更类别
-            </label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              {CATEGORY_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Priority */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            优先级
-          </label>
-          <div className="flex gap-3">
-            {PRIORITY_OPTIONS.map((opt) => (
-              <label
-                key={opt.value}
-                className="flex items-center gap-1.5 cursor-pointer"
-              >
-                <input
-                  type="radio"
-                  name="priority"
-                  value={opt.value}
-                  checked={priority === opt.value}
-                  onChange={(e) => setPriority(e.target.value)}
-                  className="text-blue-600"
-                />
-                <span className="text-sm text-gray-700">{opt.label}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {/* Review mode */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            审批模式
-          </label>
-          <div className="flex gap-4">
-            {REVIEW_MODE_OPTIONS.map((opt) => (
-              <label
-                key={opt.value}
-                className="flex items-center gap-1.5 cursor-pointer"
-              >
-                <input
-                  type="radio"
-                  name="reviewMode"
-                  value={opt.value}
-                  checked={reviewMode === opt.value}
-                  onChange={(e) => setReviewMode(e.target.value)}
-                  className="text-blue-600"
-                />
-                <span className="text-sm text-gray-700">{opt.label}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {/* Description */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            变更描述
-          </label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={4}
-            className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-            placeholder="请描述变更内容和原因"
-          />
-        </div>
-
-        {/* BOM 影响分析 */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium text-gray-700">
-              📦 BOM 影响分析
-            </label>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setShowAffectedPicker(true)}
-                className="text-xs px-3 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-              >
-                + 添加零件/部件
-              </button>
-            </div>
-          </div>
-
-          {affectedItems.length === 0 && (
-            <div className="text-center text-gray-400 py-3 text-sm border border-dashed border-gray-300 rounded-lg">
-              暂未添加受影响物料，请点击上方按钮选择
-            </div>
-          )}
-
-          <div className="space-y-3">
-            {affectedItems.map((item, index) => (
-              <div
-                key={`${item.entity_type}-${item.entity_id}`}
-                className="border border-gray-200 rounded-lg overflow-hidden"
-              >
-                {/* Item header */}
-                <div className="flex items-center gap-3 p-3 bg-gray-50">
-                  <span
-                    className={`px-2 py-0.5 text-xs rounded ${
-                      item.entity_type === 'part'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-emerald-100 text-emerald-700'
-                    }`}
-                  >
-                    {item.entity_type === 'part' ? '零件' : '部件'}
-                  </span>
-                  <span className="text-sm font-medium text-gray-900">{item.entity_code}</span>
-                  <span className="text-sm text-gray-600">{item.entity_name}</span>
-                  <span className="text-xs text-gray-400">{item.entity_version}</span>
-
-                  <div className="flex-1" />
-                  <span className="text-xs text-gray-400">变更操作：升版</span>
-
-                  <button
-                    type="button"
-                    onClick={() => removeAffectedItem(index)}
-                    className="text-red-400 hover:text-red-600 text-sm px-1"
-                    title="移除"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                {/* Bom impact result */}
-                {item.bom_impact && (
-                  <div className="p-3 border-t border-gray-200">
-                    <ECRBomImpactView
-                      upwardChain={item.bom_impact.upward_chain}
-                      downwardItems={item.bom_impact.downward_items}
-                      onChange={(upwardChain, downwardItems) => {
-                        const updated = [...affectedItems];
-                        updated[index] = {
-                          ...updated[index],
-                          bom_impact: { upward_chain: upwardChain, downward_items: downwardItems },
-                        };
-                        setAffectedItems(updated);
-                      }}
-                      editable={true}
-                    />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* Reviewers */}
         <div>
           <div className="flex items-center justify-between mb-2">
@@ -803,6 +623,86 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
           </div>
         </div>
       </div>
+
+        {/* BOM 影响分析 */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium text-gray-700">
+              📦 BOM 影响分析
+            </label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowAffectedPicker(true)}
+                className="text-xs px-3 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+              >
+                + 添加零件/部件
+              </button>
+            </div>
+          </div>
+
+          {affectedItems.length === 0 && (
+            <div className="text-center text-gray-400 py-3 text-sm border border-dashed border-gray-300 rounded-lg">
+              暂未添加受影响物料，请点击上方按钮选择
+            </div>
+          )}
+
+          <div className="space-y-3">
+            {affectedItems.map((item, index) => (
+              <div
+                key={`${item.entity_type}-${item.entity_id}`}
+                className="border border-gray-200 rounded-lg overflow-hidden"
+              >
+                {/* Item header */}
+                <div className="flex items-center gap-3 p-3 bg-gray-50">
+                  <span
+                    className={`px-2 py-0.5 text-xs rounded ${
+                      item.entity_type === 'part'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-emerald-100 text-emerald-700'
+                    }`}
+                  >
+                    {item.entity_type === 'part' ? '零件' : '部件'}
+                  </span>
+                  <span className="text-sm font-medium text-gray-900">{item.entity_code}</span>
+                  <span className="text-sm text-gray-600">{item.entity_name}</span>
+                  <span className="text-xs text-gray-400">{item.entity_version}</span>
+
+                  <div className="flex-1" />
+                  <span className="text-xs text-gray-400">变更操作：升版</span>
+
+                  <button
+                    type="button"
+                    onClick={() => removeAffectedItem(index)}
+                    className="text-red-400 hover:text-red-600 text-sm px-1"
+                    title="移除"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Bom impact result */}
+                {item.bom_impact && (
+                  <div className="p-3 border-t border-gray-200">
+                    <ECRBomImpactView
+                      upwardChain={item.bom_impact.upward_chain}
+                      downwardItems={item.bom_impact.downward_items}
+                      onChange={(upwardChain, downwardItems) => {
+                        const updated = [...affectedItems];
+                        updated[index] = {
+                          ...updated[index],
+                          bom_impact: { upward_chain: upwardChain, downward_items: downwardItems },
+                        };
+                        setAffectedItems(updated);
+                      }}
+                      editable={true}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
 
       {/* Footer */}
       <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
