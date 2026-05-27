@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { assembliesApi, assemblyPartsApi, customFieldsApi, bomApi, partsApi } from '../services/api';
 import type { Assembly, AssemblyPartItem, CustomFieldDefinition, CustomFieldValue } from '../types';
 import { canEdit, isAdmin, canDownload } from '../stores/auth';
@@ -144,6 +144,7 @@ export default function Components() {
   const [nestedLoading, setNestedLoading] = useState(false);
   const [nestedCustomDefs, setNestedCustomDefs] = useState<CustomFieldDefinition[]>([]);
   const [nestedCustomValues, setNestedCustomValues] = useState<Record<string, any>>({});
+  const nestedReqId = useRef(0);
   // Tree state now managed by AssemblyDetailContent - kept for backward compat only
   const [viewParts, setViewPartsState] = useState<TreeNode[]>([]);
   const [expandedIds, setExpandedIdsState] = useState<Set<string>>(new Set());
@@ -624,6 +625,7 @@ export default function Components() {
 
   // 子项行点击 → 弹出嵌套详情
   const handleNestedView = async (type: 'part' | 'assembly', id: string) => {
+    const reqId = ++nestedReqId.current;
     setNestedEntity({ type, id });
     setNestedData(null);
     setNestedLoading(true);
@@ -632,6 +634,7 @@ export default function Components() {
     try {
       const api = type === 'part' ? partsApi : assembliesApi;
       const res = await api.get(id);
+      if (reqId !== nestedReqId.current) return; // 忽略过期请求
       setNestedData(res.data);
       const allDefs = useDataStore.getState().customFieldDefs;
       const entityType = type === 'part' ? 'part' : 'component';
@@ -640,13 +643,21 @@ export default function Components() {
       if (defs.length > 0) {
         try {
           const valuesRes = await customFieldsApi.getValues(entityType, id);
+          if (reqId !== nestedReqId.current) return;
           const vals: Record<string, any> = {};
           (valuesRes.data || []).forEach((v: CustomFieldValue) => { vals[v.field_id] = v.value; });
           setNestedCustomValues(vals);
         } catch { /* optional */ }
       }
-    } catch { setNestedData(null); }
-    finally { setNestedLoading(false); }
+    } catch {
+      if (reqId !== nestedReqId.current) return;
+      setNestedData(null);
+    }
+    finally {
+      if (reqId === nestedReqId.current) {
+        setNestedLoading(false);
+      }
+    }
   };
 
   /* ==============================================================
@@ -1379,7 +1390,7 @@ export default function Components() {
       <Modal
         open={!!nestedEntity}
         title={nestedEntity ? (nestedEntity.type === 'part' ? '零件详情' : '部件详情') : ''}
-        onClose={() => setNestedEntity(null)}
+        onClose={() => { nestedReqId.current++; setNestedEntity(null); setNestedData(null); }}
         width="full"
       >
         <div className="max-h-[70vh] overflow-y-auto pr-1">
