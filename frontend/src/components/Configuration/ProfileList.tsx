@@ -7,9 +7,9 @@ import ProfileEditModal from './ProfileEditModal';
 
 const statusBadge = (status: string) => {
   const map: Record<string, string> = {
-    draft: 'bg-gray-100 text-gray-700',
-    active: 'bg-green-100 text-green-700',
-    archived: 'bg-blue-100 text-blue-700',
+    draft: 'bg-blue-100 text-blue-800',
+    active: 'bg-green-100 text-green-800',
+    archived: 'bg-gray-100 text-gray-800',
   };
   const label: Record<string, string> = {
     draft: '草稿', active: '生效', archived: '归档',
@@ -97,7 +97,7 @@ export default function ProfileList() {
                 <td className="px-4 py-3 text-sm text-gray-500">{formatDate(profile.created_at)}</td>
                 <td className="px-4 py-3 text-right space-x-1">
                   {profile.status === 'draft' && canEdit() && (
-                    <button onClick={(e) => { e.stopPropagation(); setEditId(profile.id); }} className="text-primary-600 hover:text-primary-800">编辑</button>
+                    <button onClick={(e) => { e.stopPropagation(); setEditId(profile.id); }} className="text-primary-600 hover:text-primary-800 mr-3">编辑</button>
                   )}
                   {isAdmin() && (
                     <button onClick={(e) => { e.stopPropagation(); setDeleteId(profile.id); }} className="text-red-600 hover:text-red-800">删除</button>
