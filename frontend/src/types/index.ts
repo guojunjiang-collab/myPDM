@@ -606,6 +606,7 @@ export interface ConfigurationProfileItem {
 
 export interface ConfigTreePart {
   id: string;
+  item_id: string;
   item_type: string;
   item_code: string;
   item_name: string;

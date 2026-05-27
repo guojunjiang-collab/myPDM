@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Modal } from '../Modal';
 import ConfigItemPicker from './ConfigItemPicker';
-import { configurationApi, configurationProfileApi } from '../../services/api';
+import ConfigurationDetailModal from './ConfigurationDetailModal';
+import PartDetailContent from '../PartDetailContent';
+import AssemblyDetailContent from '../AssemblyDetailContent';
+import { configurationApi, configurationProfileApi, partsApi, assembliesApi } from '../../services/api';
 import { isAdmin } from '../../stores/auth';
-import type { ConfigurationProfileDetail, ConfigTreeNode } from '../../types';
+import type { ConfigurationProfileDetail, ConfigTreeNode, Part, Assembly } from '../../types';
 
 interface Props {
   open: boolean;
@@ -124,6 +127,27 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [cfgPickOpen, setCfgPickOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Formal checklist row click → detail modal
+  const [detailModal, setDetailModal] = useState<{ type: string; id: string } | null>(null);
+  const [detailData, setDetailData] = useState<Part | Assembly | null>(null);
+
+  const handleFormalRowClick = async (itemType: string, itemId: string) => {
+    setDetailModal({ type: itemType, id: itemId });
+    if (itemType === 'part') {
+      try {
+        const r = await partsApi.get(itemId);
+        setDetailData(r.data as Part);
+      } catch { setDetailData(null); }
+    } else if (itemType === 'assembly') {
+      try {
+        const r = await assembliesApi.get(itemId);
+        setDetailData(r.data as Assembly);
+      } catch { setDetailData(null); }
+    } else {
+      setDetailData(null);
+    }
+  };
 
   // Load profile for VIEW/EDIT mode
   const loadProfile = async () => {
@@ -388,7 +412,8 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
     const hasSelectedParts = node.parts.some(p => p.is_selected);
 
     rows.push(
-      <tr key={node.id} className="bg-gray-50/70">
+      <tr key={node.id} className="bg-gray-50/70 cursor-pointer hover:bg-purple-50 transition-colors"
+        onClick={() => handleFormalRowClick('config_item', node.id)}>
         <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
           {levelPrefix}{level}
           {hasChildren ? (
@@ -415,7 +440,8 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         if (part.item_type === 'config_item') continue;
         if (!part.is_selected) continue;
         rows.push(
-          <tr key={part.id}>
+          <tr key={part.id} className="cursor-pointer hover:bg-blue-50 transition-colors"
+            onClick={() => handleFormalRowClick(part.item_type, part.item_id)}>
             <td className="px-3 py-2 text-xs text-gray-400 whitespace-nowrap">{'-'.repeat(level)}</td>
             <td className="px-3 py-2 text-xs text-gray-400">-</td>
             <td className="px-3 py-2 text-xs text-gray-600">{part.item_name || '-'}</td>
@@ -562,7 +588,8 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
   const title = isCreate ? '新建构型配置' : (isView ? '构型配置详情' : '编辑构型配置');
 
   return (
-    <Modal open={open} onClose={onClose} title={title} width="3xl">
+    <>
+      <Modal open={open} onClose={onClose} title={title} width="3xl">
       <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
         {error && (
           <div className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{error}</div>
@@ -787,5 +814,41 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         )}
       </div>
     </Modal>
-  );
+
+    {/* ── 正式清单行点击 → 详情弹窗 ── */}
+    {detailModal?.type === 'config_item' && (
+      <ConfigurationDetailModal
+        itemId={detailModal.id}
+        onClose={() => setDetailModal(null)}
+      />
+    )}
+    {detailModal && (detailModal.type === 'part' || detailModal.type === 'assembly') && (
+      <Modal
+        open={!!detailModal}
+        title={detailModal.type === 'part' ? '零件详情' : '部件详情'}
+        onClose={() => { setDetailModal(null); setDetailData(null); }}
+        width="full"
+        zIndex={70}
+      >
+        {detailData && detailModal.type === 'part' && (
+          <PartDetailContent
+            part={detailData as Part}
+            customFieldDefs={[]}
+            customFieldValues={{}}
+          />
+        )}
+        {detailData && detailModal.type === 'assembly' && (
+          <AssemblyDetailContent
+            assembly={detailData as Assembly}
+            customFieldDefs={[]}
+            customFieldValues={{}}
+          />
+        )}
+        {!detailData && (
+          <div className="px-4 py-8 text-center text-sm text-gray-400">加载中...</div>
+        )}
+      </Modal>
+    )}
+  </>
+);
 }
