@@ -222,7 +222,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
     <Modal
       open={open}
       onClose={onClose}
-      width="full"
+      width="3xl"
     >
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold">ECR 详情</h3>
