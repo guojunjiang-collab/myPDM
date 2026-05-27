@@ -146,7 +146,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh }: Props) {
           </div>
 
           {/* Description */}
-          {eco.description && <p className="text-sm text-gray-600">{eco.description}</p>}
+          <InfoItem label="变更描述" value={eco.description || '-'} className="col-span-2 md:col-span-4" />
 
           {/* Reviewers panel — ECR style */}
           {eco.reviewers && eco.reviewers.length > 0 && (
@@ -378,11 +378,11 @@ function formatFileSize(bytes: number): string {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
-function InfoItem({ label, value, icon }: { label: string; value: string; icon?: string }) {
+function InfoItem({ label, value, icon, className }: { label: string; value: string; icon?: string; className?: string }) {
   return (
-    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+    <div className={`bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 ${className || ''}`}>
       <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-      <div className="text-sm text-gray-900 font-medium">
+      <div className="text-sm text-gray-900 font-medium whitespace-pre-wrap">
         {icon && <span className="mr-1">{icon}</span>}
         {value}
       </div>

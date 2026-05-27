@@ -79,6 +79,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
   const [category, setCategory] = useState('design_change');
   const [priority, setPriority] = useState('normal');
   const [description, setDescription] = useState('');
+  const descRef = useRef<HTMLTextAreaElement>(null);
   const [reviewers, setReviewers] = useState<ReviewerFormItem[]>([]);
   const [reviewMode, setReviewMode] = useState('all');
   const [users, setUsers] = useState<UserOption[]>([]);
@@ -96,6 +97,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
   const [docAttachments, setDocAttachments] = useState<Record<string, any[]>>({});
   const [docCustomValues, setDocCustomValues] = useState<Record<string, Record<string, any>>>({});
   const [versionSelectState, setVersionSelectState] = useState<{ docId: string; oldDocId: string } | null>(null);
+  const [resetKey, setResetKey] = useState(0);
   const docFieldDefs = useDataStore((s) => s.customFieldDefs).filter((d) => d.applies_to?.includes('document'));
   const onCloseRef = useRef(onClose);
   const onCreatedRef = useRef(onCreated);
@@ -163,6 +165,16 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
       setErrors({});
     }
   }, [open, editingEco]);
+
+  // Auto-resize description textarea
+  useEffect(() => {
+    if (!open) return;
+    const timer = setTimeout(() => {
+      const el = descRef.current;
+      if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [open, description]);
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
@@ -289,76 +301,68 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
           </div>
         )}
 
-        {/* 标题 */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">标题 <span className="text-red-500">*</span></label>
-          <input type="text" value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${errors.title ? 'border-red-500' : 'border-gray-300'}`}
-            placeholder="请输入 ECO 标题" />
-          {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
+        {/* 基本字段 - 卡片式 */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-gray-500 mb-0.5">ECO 编号</label>
+            <input type="text" value={localEco?.eco_number || ''} disabled
+              className="w-full text-sm px-2 py-1 border border-gray-200 rounded bg-gray-100 text-gray-400" placeholder="新建时自动生成" />
+          </div>
+          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-gray-500 mb-0.5">标题 <span className="text-red-500">*</span></label>
+            <input type="text" value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className={`w-full text-sm px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-primary-500 ${errors.title ? 'border-red-500' : 'border-gray-200'}`}
+              placeholder="请输入 ECO 标题" />
+            {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
+          </div>
         </div>
 
-        {/* 变更原因 + 变更类别 */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">变更原因 <span className="text-red-500">*</span></label>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-gray-500 mb-0.5">变更原因 <span className="text-red-500">*</span></label>
             <select value={reason} onChange={(e) => setReason(e.target.value)}
-              className={`w-full px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.reason ? 'border-red-400' : 'border-gray-300'}`}>
+              className={`w-full text-sm px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-primary-500 ${errors.reason ? 'border-red-400' : 'border-gray-200'}`}>
               {REASON_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
             {errors.reason && <p className="text-red-500 text-xs mt-1">{errors.reason}</p>}
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">变更类别</label>
+          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-gray-500 mb-0.5">变更类别</label>
             <select value={category} onChange={(e) => setCategory(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500">
               {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          <div className="col-span-2 md:col-span-1 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-gray-500 mb-0.5">优先级</label>
+            <div className="flex gap-2 pt-0.5 flex-wrap">
+              {PRIORITY_OPTIONS.map((o) => (
+                <label key={o.value} className="inline-flex items-center gap-0.5 cursor-pointer select-none text-xs">
+                  <input type="radio" name="priority" value={o.value} checked={priority === o.value}
+                    onChange={(e) => setPriority(e.target.value)} className="w-3 h-3 text-primary-600" />
+                  <span className="text-gray-600">{o.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-gray-500 mb-0.5">审批模式</label>
+            <select value={reviewMode} onChange={(e) => setReviewMode(e.target.value)}
+              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500">
+              <option value="all">会签（全部通过）</option>
+              <option value="any">或签（任一通过）</option>
             </select>
           </div>
         </div>
 
-        {/* 优先级 — radio 单选项 */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">优先级</label>
-          <div className="flex gap-3 flex-wrap">
-            {PRIORITY_OPTIONS.map((o) => (
-              <label key={o.value} className="flex items-center gap-1.5 cursor-pointer">
-                <input type="radio" name="priority" value={o.value} checked={priority === o.value}
-                  onChange={(e) => setPriority(e.target.value)} className="text-blue-600" />
-                <span className="text-sm text-gray-700">{o.label}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {/* 描述 — 自适应高度 */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">变更描述</label>
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)}
+        <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+          <label className="block text-xs text-gray-500 mb-0.5">变更描述</label>
+          <textarea ref={descRef} value={description} onChange={(e) => setDescription(e.target.value)}
             onInput={(e) => { e.currentTarget.style.height = 'auto'; e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px'; }}
             rows={1} style={{ minHeight: '38px', resize: 'none' }}
-            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 overflow-hidden"
+            className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 overflow-hidden"
             placeholder="变更详细描述（选填）" />
-        </div>
-
-        {/* 审批模式 + 审批人 */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">审批模式</label>
-          <div className="flex gap-4">
-            {[
-              { value: 'all', label: '会签（全部通过才通过）' },
-              { value: 'any', label: '或签（任一通过即通过）' },
-            ].map((opt) => (
-              <label key={opt.value} className="flex items-center gap-1.5 cursor-pointer">
-                <input type="radio" name="reviewMode" value={opt.value}
-                  checked={reviewMode === opt.value}
-                  onChange={(e) => setReviewMode(e.target.value)}
-                  className="text-blue-600" />
-                <span className="text-sm text-gray-700">{opt.label}</span>
-              </label>
-            ))}
-          </div>
         </div>
 
         {editingEco && <div>
@@ -483,20 +487,26 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-sm font-bold text-gray-700">关联 ECR</h4>
-            <div className="flex gap-2">
-              <span className="text-xs text-gray-400">{localEco.ecr_number || '未关联'}</span>
+            <div className="flex items-center gap-2">
+              {localEco.ecr_number && (
+                <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded font-mono">{localEco.ecr_number}</span>
+              )}
               <button type="button" onClick={() => setShowEcrPicker(true)}
                 className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">
                 {localEco.ecr_id ? '更换' : '+ 关联 ECR'}
               </button>
               {localEco.ecr_id && (
-                <button type="button" onClick={async () => {
-                  try {
-                    await ecoApi.update(localEco.id, { ecr_id: null } as any);
-                    setLocalEco({ ...localEco, ecr_id: undefined, ecr_number: undefined });
-                    toast.success('已解除 ECR 关联');
-                  } catch { toast.error('操作失败'); }
-                }} className="text-xs px-2 py-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50">解除</button>
+                <>
+                  <button type="button" onClick={() => setResetKey(k => k + 1)}
+                    className="px-3 py-1 text-sm border border-gray-300 rounded text-gray-600 hover:bg-gray-50">还原</button>
+                  <button type="button" onClick={async () => {
+                    try {
+                      await ecoApi.update(localEco.id, { ecr_id: null } as any);
+                      setLocalEco({ ...localEco, ecr_id: undefined, ecr_number: undefined });
+                      toast.success('已解除 ECR 关联');
+                    } catch { toast.error('操作失败'); }
+                  }} className="px-3 py-1 text-sm border border-gray-300 rounded text-gray-500 hover:bg-gray-50">解除关联</button>
+                </>
               )}
             </div>
           </div>
@@ -507,7 +517,8 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
               setLocalEco({ ...localEco, ecr_id: newEcrId });
               toast.success('ECR 关联成功');
             } catch { toast.error('关联失败'); }
-          }} onBomChange={setBomData} executionItems={localEco.execution_items} />
+          }} onBomChange={setBomData} executionItems={localEco.execution_items}
+          resetKey={resetKey} hideResetButton />
         </div>
         )}
 
@@ -588,17 +599,17 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
             setShowReleasePicker(false);
           }}
         />
+      </div>
 
-        {/* 按钮 */}
-        <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-          <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">
-            取消
-          </button>
-          <button onClick={handleSubmit} disabled={loading}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed">
-            {loading ? '保存中...' : (localEco ? '保存' : '创建')}
-          </button>
-        </div>
+      {/* 按钮 */}
+      <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+        <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">
+          取消
+        </button>
+        <button onClick={handleSubmit} disabled={loading}
+          className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed">
+          {loading ? '保存中...' : (localEco ? '保存' : '创建')}
+        </button>
       </div>
 
       {/* 图文档选择器 — 独立弹窗 */}

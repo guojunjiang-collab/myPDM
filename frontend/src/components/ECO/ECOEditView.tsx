@@ -18,6 +18,8 @@ interface Props {
   onBomChange?: (data: { up: MutableNode[]; down: MutableNode[] }) => void;
   readOnly?: boolean;
   executionItems?: any[];
+  resetKey?: number;
+  hideResetButton?: boolean;
 }
 
 const ROW_BG: Record<string, string> = {
@@ -214,7 +216,7 @@ function AffectedTable({ rows }: { rows: MutableNode[] }) {
   );
 }
 
-export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executionItems }: Props) {
+export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executionItems, resetKey, hideResetButton }: Props) {
   const [ecrData, setEcrData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
@@ -300,6 +302,10 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
 
   useEffect(() => { onBomChange?.({ up: localUp, down: localDown }); }, [localUp, localDown, onBomChange]);
 
+  useEffect(() => {
+    if (resetKey && resetKey > 0) resetToEcr();
+  }, [resetKey]);
+
   const resetToEcr = useCallback(() => {
     if (!ecrData) return;
     const { up, down } = cloneNodes(ecrData);
@@ -326,7 +332,7 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
       {ecrId && loading && <p className="text-xs text-gray-400 text-center py-4">加载中...</p>}
       {ecrId && !loading && ecrData && (<>
         <div className="flex items-center justify-end mb-2">
-          {!readOnly && <button onClick={resetToEcr} className="text-xs px-3 py-1 border border-gray-300 rounded text-gray-600 hover:bg-gray-50">还原</button>}
+          {!readOnly && !hideResetButton && <button onClick={resetToEcr} className="text-xs px-3 py-1 border border-gray-300 rounded text-gray-600 hover:bg-gray-50">还原</button>}
         </div>
 
         {/* Per-group analysis cards */}
