@@ -1,12 +1,23 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Modal } from '../Modal';
 import { toast } from '../Toast';
-import { ecrApi, usersApi } from '../../services/api';
+import { ecrApi, usersApi, documentsApi, customFieldsApi } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
+import { useDataStore } from '../../stores/data';
 import type { ECRRequest, ECRCreateData, ECRReviewer, ECRDocumentLink, BomImpactNode } from '../../types';
 import { ECRAffectedItemPicker } from './ECRAffectedItemPicker';
 import { ECRBomImpactView } from './ECRBomImpactView';
 import { ECRDocumentPicker } from './ECRDocumentPicker';
+import VersionSelectModal from '../VersionSelectModal';
+
+const statusTag = (s: string) => {
+  const labels: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' };
+  const colors: Record<string, string> = {
+    draft: 'bg-blue-100 text-blue-800', frozen: 'bg-orange-100 text-orange-800',
+    released: 'bg-green-100 text-green-800', obsolete: 'bg-red-100 text-red-800',
+  };
+  return { label: labels[s] || s, cls: colors[s] || 'bg-gray-100 text-gray-800' };
+};
 
 const REASON_OPTIONS = [
   { value: 'quality_defect', label: '质量缺陷' },
@@ -107,6 +118,12 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
   const [documentLinks, setDocumentLinks] = useState<ECRDocumentLink[]>([]);
   const [showAffectedPicker, setShowAffectedPicker] = useState(false);
   const [showDocPicker, setShowDocPicker] = useState(false);
+  const [docData, setDocData] = useState<Record<string, any>>({});
+  const [docAttachments, setDocAttachments] = useState<Record<string, any[]>>({});
+  const [docCustomValues, setDocCustomValues] = useState<Record<string, Record<string, any>>>({});
+  const [versionSelectState, setVersionSelectState] = useState<{ docId: string; oldDocId: string } | null>(null);
+  const docFieldDefs = useDataStore((s) => s.customFieldDefs).filter((d) => d.applies_to?.includes('document'));
+  const descRef = useRef<HTMLTextAreaElement>(null);
 
   // Load users for reviewer dropdown
   const loadUsers = useCallback(async () => {
@@ -122,6 +139,30 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
       setUsersLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    const ids = documentLinks.map(d => d.document_id).filter(Boolean);
+    ids.forEach(id => {
+      if (!docData[id]) {
+        documentsApi.get(id).then(r => setDocData(prev => ({...prev, [id]: r.data}))).catch(() => {});
+        documentsApi.listAttachments(id).then(r => setDocAttachments(prev => ({...prev, [id]: r.data||[]}))).catch(() => {});
+        customFieldsApi.getValues('document', id).then(r => {
+          const vals: Record<string, any> = {};
+          (r.data || []).forEach((v: any) => { vals[v.field_id] = v.value; });
+          setDocCustomValues(prev => ({...prev, [id]: vals}));
+        }).catch(() => {});
+      }
+    });
+  }, [documentLinks]);
+
+  useEffect(() => {
+    if (!open) return;
+    const timer = setTimeout(() => {
+      const el = descRef.current;
+      if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [open, description]);
 
   // Initialize form on open or when editingEcr changes
   useEffect(() => {
@@ -402,26 +443,62 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
     <>
     <Modal open={open} title={isEditing ? '编辑 ECR' : '新建 ECR'} onClose={handleClose} width="full">
       <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-        {/* Title */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            ECR 标题 <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => {
-              setTitle(e.target.value);
-              if (errors.title) setErrors({ ...errors, title: '' });
-            }}
-            placeholder="请输入 ECR 标题"
-            className={`w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-              errors.title ? 'border-red-400' : 'border-gray-300'
-            }`}
-          />
-          {errors.title && (
-            <p className="text-red-500 text-xs mt-1">{errors.title}</p>
-          )}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-gray-500 mb-0.5">ECR 编号</label>
+            <input type="text" value={editingEcr?.ecr_number || ''} disabled
+              className="w-full text-sm px-2 py-1 border border-gray-200 rounded bg-gray-100 text-gray-400" placeholder="新建时自动生成" />
+          </div>
+          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-gray-500 mb-0.5">ECR 标题 <span className="text-red-500">*</span></label>
+            <input type="text" value={title} onChange={(e) => { setTitle(e.target.value); if (errors.title) setErrors({ ...errors, title: '' }); }}
+              placeholder="请输入 ECR 标题"
+              className={`w-full text-sm px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-primary-500 ${errors.title ? 'border-red-400' : 'border-gray-200'}`} />
+            {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-gray-500 mb-0.5">变更原因</label>
+            <select value={reason} onChange={(e) => setReason(e.target.value)}
+              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500">
+              {REASON_OPTIONS.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
+            </select>
+          </div>
+          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-gray-500 mb-0.5">变更类别</label>
+            <select value={category} onChange={(e) => setCategory(e.target.value)}
+              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500">
+              {CATEGORY_OPTIONS.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
+            </select>
+          </div>
+          <div className="col-span-2 md:col-span-1 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-gray-500 mb-0.5">优先级</label>
+            <div className="flex gap-2 pt-0.5 flex-wrap">
+              {PRIORITY_OPTIONS.map((opt) => (
+                <label key={opt.value} className="inline-flex items-center gap-0.5 cursor-pointer select-none text-xs">
+                  <input type="radio" name="priority" value={opt.value} checked={priority === opt.value}
+                    onChange={() => setPriority(opt.value)} className="w-3 h-3 text-primary-600" />
+                  <span className="text-gray-600">{opt.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-gray-500 mb-0.5">审批模式</label>
+            <select value={reviewMode} onChange={(e) => setReviewMode(e.target.value)}
+              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500">
+              <option value="all">会签</option>
+              <option value="any">或签</option>
+            </select>
+          </div>
+        </div>
+        <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+          <label className="block text-xs text-gray-500 mb-0.5">变更描述</label>
+          <textarea ref={descRef} value={description} onChange={(e) => setDescription(e.target.value)}
+            onInput={(e) => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }}
+            rows={1} placeholder="请描述变更内容和原因"
+            className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" />
         </div>
 
         {/* Reason + Category row */}
@@ -683,50 +760,46 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
         </div>
 
         {/* 关联图文档 */}
-        <div>
+        <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium text-gray-700">
-              📄 关联图文档
-            </label>
-            <button
-              type="button"
-              onClick={() => setShowDocPicker(true)}
-              className="text-xs px-3 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-            >
-              + 关联文档
-            </button>
+            <h4 className="text-sm font-bold text-gray-700">关联图文档</h4>
+            <button type="button" onClick={() => setShowDocPicker(true)}
+              className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 关联图文档</button>
           </div>
-
-          {documentLinks.length === 0 && (
-            <div className="text-center text-gray-400 py-3 text-sm border border-dashed border-gray-300 rounded-lg">
-              暂未关联文档，请点击上方按钮选择
-            </div>
-          )}
-
-          <div className="space-y-2">
-            {documentLinks.map((doc) => (
-              <div
-                key={doc.document_id}
-                className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200"
-              >
-                <span className="text-lg">📄</span>
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-900">
-                    {doc.document_code}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {doc.document_name} v{doc.document_version}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeDocumentLink(doc.document_id)}
-                  className="text-xs px-2 py-1 rounded text-red-500 hover:bg-red-50 transition-colors"
-                >
-                  取消关联
-                </button>
-              </div>
-            ))}
+          <div className="border rounded-lg overflow-hidden">
+            {documentLinks.length === 0 ? (
+              <div className="px-4 py-6 text-center text-sm text-gray-400">暂无关联图文档</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b"><tr>
+                  <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档编号</th>
+                  <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档名称</th>
+                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
+                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
+                  {docFieldDefs.map((def) => (<th key={def.id} className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap">{def.name}</th>))}
+                  <th className="px-3 py-2 text-left text-gray-500 font-medium">附件</th>
+                  <th className="px-3 py-2 text-center text-gray-500 font-medium whitespace-nowrap w-28">操作</th>
+                </tr></thead>
+                <tbody className="divide-y">{documentLinks.map((link) => {
+                  const doc = docData[link.document_id]; const atts = docAttachments[link.document_id] || [];
+                  return (<tr key={link.document_id} className="hover:bg-gray-50">
+                    <td className="px-3 py-2 text-sm font-medium">{doc?.code || link.document_code}</td>
+                    <td className="px-3 py-2 text-sm">{doc?.name || link.document_name}</td>
+                    <td className="px-3 py-2 text-sm text-gray-500">{doc?.version || link.document_version || '-'}</td>
+                    <td className="px-3 py-2">{doc ? <span className={`px-1.5 py-0.5 rounded text-xs ${statusTag(doc.status).cls}`}>{statusTag(doc.status).label}</span> : '-'}</td>
+                    {docFieldDefs.map((def) => { const vals = docCustomValues[link.document_id] || {}; const val = vals[def.id];
+                      return (<td key={def.id} className="px-3 py-2 text-sm text-gray-500">{val !== undefined && val !== null && val !== '' ? String(val) : '-'}</td>); })}
+                    <td className="px-3 py-2 text-sm text-gray-500">{doc?.file_name || atts.map((a: any) => a.file_name).join(', ') || '-'}</td>
+                    <td className="px-3 py-2 text-center"><div className="flex items-center justify-center gap-1">
+                      <button type="button" onClick={() => setVersionSelectState({ docId: link.document_id, oldDocId: link.document_id })}
+                        className="px-2 py-0.5 text-xs text-blue-600 hover:text-blue-800">选择</button>
+                      <button type="button" onClick={() => removeDocumentLink(link.document_id)}
+                        className="px-2 py-0.5 text-xs text-red-400 hover:text-red-600">移除</button>
+                    </div></td>
+                  </tr>);
+                })}</tbody>
+              </table>
+            )}
           </div>
         </div>
       </div>
@@ -761,6 +834,24 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
         onClose={() => setShowDocPicker(false)}
         onSelect={(docs) => addDocumentLinks(docs)}
         alreadyLinked={documentLinks.map((d) => d.document_id)}
+      />
+      <VersionSelectModal
+        open={!!versionSelectState}
+        entityType="document"
+        entityId={versionSelectState?.docId || ''}
+        entityName={docData[versionSelectState?.docId || '']?.code || ''}
+        currentVersionId={versionSelectState?.oldDocId || ''}
+        onSelect={(newVerId) => {
+          if (versionSelectState) {
+            setDocumentLinks(prev => prev.map(d =>
+              d.document_id === versionSelectState.oldDocId
+                ? { document_id: newVerId, document_code: '', document_name: '', document_version: '' }
+                : d
+            ));
+          }
+          setVersionSelectState(null);
+        }}
+        onClose={() => setVersionSelectState(null)}
       />
     </>
   );
