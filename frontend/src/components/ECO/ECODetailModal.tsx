@@ -15,6 +15,7 @@ import PartDetailContent from '../PartDetailContent';
 import AssemblyDetailContent from '../AssemblyDetailContent';
 import DocumentDetailContent from '../DocumentDetailContent';
 import VersionHistory from '../VersionHistory';
+import EntityEditModal from '../EntityEditModal';
 
 const statusTag = (s: string) => {
   const labels: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' };
@@ -59,6 +60,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
   const [releaseItems, setReleaseItems] = useState<any[]>([]);
   const [versionSelectState, setVersionSelectState] = useState<{ docId: string; oldDocId: string } | null>(null);
   const [detailTab, setDetailTab] = useState<'detail' | 'versions'>('detail');
+  const [editEntity, setEditEntity] = useState<{ type: string; id: string } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -111,9 +113,8 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
 
   const viewItem = async (entityType: string, entityId: string, mode?: 'view' | 'edit') => {
     if (mode === 'edit') {
-      // 新窗口打开零件/部件管理页面的编辑界面
-      const path = entityType === 'assembly' ? '/components' : '/parts';
-      window.open(`${path}?edit=${entityId}`, '_blank');
+      // 打开编辑弹窗
+      setEditEntity({ type: entityType, id: entityId });
       return;
     }
     setNestedDetail({ type: entityType, id: entityId });
@@ -376,6 +377,17 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
     <Modal open={!!viewingDoc} title="图文档详情" onClose={() => setViewingDoc(null)} width="full">
       {viewingDoc && <div className="max-h-[70vh] overflow-y-auto pr-1"><DocumentDetailContent doc={viewingDoc} customFieldDefs={docFieldDefs} customFieldValues={docCustomValues[viewingDoc.id] || {}} /></div>}
     </Modal>
+
+    {/* 编辑弹窗 */}
+    {editEntity && (
+      <EntityEditModal
+        open={!!editEntity}
+        entityType={editEntity.type as 'part' | 'assembly'}
+        entityId={editEntity.id}
+        onClose={() => setEditEntity(null)}
+        onSaved={() => { setEditEntity(null); load(); toast.success('保存成功'); }}
+      />
+    )}
 
     {/* 图文档选择器 */}
     <ECRDocumentPicker open={showDocPicker} onClose={() => setShowDocPicker(false)}
