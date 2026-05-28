@@ -66,18 +66,29 @@ def _build_eco_detail(db: Session, eco: ECO) -> dict:
     execution_items = db.query(ECOExecutionItem).filter(
         ECOExecutionItem.eco_id == eco.id
     ).order_by(ECOExecutionItem.sort_order).all()
-    execution_item_list = [
-        {"id": str(ei.id), "source": ei.source, "entity_type": ei.entity_type,
-         "entity_id": str(ei.entity_id) if ei.entity_id else None,
-         "entity_code": ei.entity_code or "", "entity_name": ei.entity_name,
-         "action": ei.action, "status": ei.status, "detail": ei.detail or {},
-         "new_entity_id": str(ei.new_entity_id) if ei.new_entity_id else None,
-         "new_version": ei.new_version, "parent_entity_id": str(ei.parent_entity_id) if ei.parent_entity_id else None,
-         "parent_new_entity_id": str(ei.parent_new_entity_id) if ei.parent_new_entity_id else None,
-         "error_message": ei.error_message, "sort_order": ei.sort_order,
-         "executed_at": ei.executed_at}
-        for ei in execution_items
-    ]
+    execution_item_list = []
+    for ei in execution_items:
+        # 查询新版实体的状态
+        new_entity_status = None
+        if ei.new_entity_id:
+            model_cls = Part if ei.entity_type == "part" else Assembly
+            new_ent = db.query(model_cls).filter(model_cls.id == ei.new_entity_id).first()
+            if new_ent:
+                new_entity_status = new_ent.status
+
+        execution_item_list.append({
+            "id": str(ei.id), "source": ei.source, "entity_type": ei.entity_type,
+            "entity_id": str(ei.entity_id) if ei.entity_id else None,
+            "entity_code": ei.entity_code or "", "entity_name": ei.entity_name,
+            "action": ei.action, "status": ei.status, "detail": ei.detail or {},
+            "new_entity_id": str(ei.new_entity_id) if ei.new_entity_id else None,
+            "new_version": ei.new_version,
+            "new_entity_status": new_entity_status,
+            "parent_entity_id": str(ei.parent_entity_id) if ei.parent_entity_id else None,
+            "parent_new_entity_id": str(ei.parent_new_entity_id) if ei.parent_new_entity_id else None,
+            "error_message": ei.error_message, "sort_order": ei.sort_order,
+            "executed_at": ei.executed_at}
+        )
 
     executor_name = ""
     if eco.executor_id:
@@ -435,6 +446,69 @@ async def remove_execution_item(
         raise HTTPException(status_code=400, detail="仅草稿状态可删除执行项")
     crud_eco.remove_execution_item(db, eco_id, item_id)
     return {"detail": "已删除"}
+
+
+# ─────────────────────────────────────────────────────
+# 16b. 手动升版（克隆实体创建新版本）
+# ─────────────────────────────────────────────────────
+@router.post("/{eco_id}/execution-items/{item_id}/upgrade")
+async def manual_upgrade_item(
+    eco_id: uuid.UUID, item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin", "engineer"]))
+):
+    item = crud_eco.get_execution_item(db, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="执行项不存在")
+    if item.entity_type not in ("part", "assembly"):
+        raise HTTPException(status_code=400, detail="仅零件/部件支持升版")
+    if not item.entity_id:
+        raise HTTPException(status_code=400, detail="执行项缺少 entity_id")
+
+    model = Part if item.entity_type == "part" else Assembly
+    entity = db.query(model).filter(model.id == item.entity_id).first()
+    if not entity:
+        raise HTTPException(status_code=404, detail="实体不存在")
+
+    new_id, new_version = crud_eco._clone_entity(db, entity, item.entity_type)
+    item.new_entity_id = new_id
+    item.new_version = new_version
+    item.detail = {**(item.detail or {}), "new_entity_id": str(new_id), "new_version": new_version}
+    db.commit()
+    return {"new_entity_id": str(new_id), "new_version": new_version}
+
+
+# ─────────────────────────────────────────────────────
+# 16c. 还原（删除升版创建的新版本，恢复执行项状态）
+# ─────────────────────────────────────────────────────
+@router.post("/{eco_id}/execution-items/{item_id}/revert")
+async def manual_revert_item(
+    eco_id: uuid.UUID, item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin", "engineer"]))
+):
+    item = crud_eco.get_execution_item(db, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="执行项不存在")
+    if not item.new_entity_id:
+        raise HTTPException(status_code=400, detail="尚未执行升版，无需还原")
+
+    model = Part if item.entity_type == "part" else Assembly
+    new_entity = db.query(model).filter(model.id == item.new_entity_id).first()
+    if new_entity:
+        # 删除新实体引用的 BOM 关系
+        from app.models import BOMItem
+        db.query(BOMItem).filter(
+            (BOMItem.child_id == item.new_entity_id) |
+            (BOMItem.parent_id == item.new_entity_id)
+        ).delete()
+        db.delete(new_entity)
+
+    item.new_entity_id = None
+    item.new_version = None
+    item.detail = {**(item.detail or {}), "new_entity_id": "", "new_version": ""}
+    db.commit()
+    return {"detail": "已还原"}
 
 
 # ─────────────────────────────────────────────────────

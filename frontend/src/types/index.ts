@@ -414,6 +414,7 @@ export interface ECOExecutionItem {
   detail?: Record<string, unknown>;
   new_entity_id?: string;
   new_version?: string;
+  new_entity_status?: string;
   parent_entity_id?: string;
   parent_new_entity_id?: string;
   error_message?: string;
@@ -480,6 +481,7 @@ export interface ECOExecutionItem {
   detail?: Record<string, unknown>;
   new_entity_id?: string;
   new_version?: string;
+  new_entity_status?: string;
   parent_entity_id?: string;
   parent_new_entity_id?: string;
   error_message?: string;

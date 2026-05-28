@@ -37,6 +37,7 @@ export function ECOList() {
   const [total, setTotal] = useState(0);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [execId, setExecId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editingEco, setEditingEco] = useState<ECORequest | null>(null);
   const [ccEcoId, setCcEcoId] = useState<string | null>(null);
@@ -139,7 +140,8 @@ export function ECOList() {
       case 'executing':
         return (
           <div className="flex gap-1 justify-end">
-            <span className="text-xs text-yellow-600">{eco.execution_completed_count}/{eco.execution_count}</span>
+            {(isCreator || admin) && <button onClick={(e) => { e.stopPropagation(); setExecId(eco.id); }}
+              className="px-2 py-1 rounded bg-orange-50 text-orange-700 hover:bg-orange-100">执行</button>}
             {ccBtn}
           </div>);
       case 'completed':
@@ -193,15 +195,14 @@ export function ECOList() {
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">来源</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">状态</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">优先级</th>
-              <th className="px-4 py-3 text-center text-sm font-medium text-gray-500 whitespace-nowrap">进度</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">创建人</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">创建时间</th>
               <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 whitespace-nowrap">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {loading ? (<tr><td colSpan={9} className="px-4 py-12 text-center text-gray-400">加载中...</td></tr>)
-              : ecos.length === 0 ? (<tr><td colSpan={9} className="px-4 py-12 text-center text-gray-400">暂无数据</td></tr>)
+            {loading ? (<tr><td colSpan={8} className="px-4 py-12 text-center text-gray-400">加载中...</td></tr>)
+              : ecos.length === 0 ? (<tr><td colSpan={8} className="px-4 py-12 text-center text-gray-400">暂无数据</td></tr>)
                 : ecos.map(eco => (
                   <tr key={eco.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setDetailId(eco.id)}>
                     <td className="px-4 py-3 text-sm font-medium whitespace-nowrap">{eco.eco_number}</td>
@@ -209,9 +210,6 @@ export function ECOList() {
                     <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{eco.ecr_number || '独立创建'}</td>
                     <td className="px-4 py-3 whitespace-nowrap"><ECOStatusBadge status={eco.status} /></td>
                     <td className="px-4 py-3 whitespace-nowrap"><ECOPriorityBadge priority={eco.priority} /></td>
-                    <td className="px-4 py-3 text-sm text-center">
-                      <span className="inline-flex items-center justify-center min-w-[2.5rem] h-6 rounded-full bg-gray-100 text-gray-700 text-xs font-medium px-2">{eco.execution_completed_count}/{eco.execution_count}</span>
-                    </td>
                     <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{eco.creator_name}</td>
                     <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{formatDate(eco.created_at)}</td>
                     <td className="px-4 py-3">{renderActions(eco)}</td>
@@ -237,6 +235,7 @@ export function ECOList() {
       )}
       <ECOCreateModal open={createOpen || !!editingEco} onClose={() => { setCreateOpen(false); setEditingEco(null); }} onCreated={() => { setCreateOpen(false); setEditingEco(null); load(); }} editingEco={editingEco} />
       {detailId && <ECODetailModal ecoId={detailId} onClose={() => setDetailId(null)} onRefresh={load} />}
+      {execId && <ECODetailModal ecoId={execId} onClose={() => setExecId(null)} onRefresh={load} executionMode />}
       {ccEcoId && (
         <ECRCcPicker
           open={true}

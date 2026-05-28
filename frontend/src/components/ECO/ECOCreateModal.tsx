@@ -268,7 +268,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
           entity_name: it.entity_name,
           action: it.action || 'upgrade',
           parent_entity_id: it.parent_entity_id || undefined,
-          detail: it.detail || undefined,
+          detail: { ...(it.detail || {}), _desc: it.change_description || it._desc || (it.detail || {})._desc || '' },
         }));
       }
       if (releaseItems.length > 0) {

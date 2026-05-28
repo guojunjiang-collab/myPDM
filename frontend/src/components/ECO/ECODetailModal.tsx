@@ -21,7 +21,7 @@ const statusTag = (s: string) => {
   return { label: labels[s] || s, cls: colors[s] || 'bg-gray-100 text-gray-800' };
 };
 
-interface Props { ecoId: string; onClose: () => void; onRefresh: () => void; }
+interface Props { ecoId: string; onClose: () => void; onRefresh: () => void; executionMode?: boolean; }
 
 function fmt(d?: string) { return d ? new Date(d).toLocaleString('zh-CN') : '-'; }
 
@@ -36,7 +36,7 @@ const CAT: Record<string, string> = {
   new_release: '新发布', other: '其他',
 };
 
-export function ECODetailModal({ ecoId, onClose, onRefresh }: Props) {
+export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Props) {
   const user = useAuthStore((s) => s.user);
   const [eco, setEco] = useState<ECORequest | null>(null);
   const docFieldDefs = useDataStore((s) => s.customFieldDefs).filter((d) => d.applies_to?.includes('document'));
@@ -49,6 +49,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh }: Props) {
   const [nestedDetail, setNestedDetail] = useState<{ type: string; id: string } | null>(null);
   const [nestedData, setNestedData] = useState<any>(null);
   const [nestedLoading, setNestedLoading] = useState(false);
+  const [checkedExecIds, setCheckedExecIds] = useState<string[]>([]);
 
   const load = async () => {
     setLoading(true);
@@ -116,7 +117,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh }: Props) {
 
   return (
     <>
-    <Modal open={true} title="ECO 详情" onClose={onClose} width="3xl">
+    <Modal open={true} title={executionMode ? 'ECO 执行' : 'ECO 详情'} onClose={onClose} width="3xl">
       {loading ? <div className="py-8 text-center text-gray-400 text-sm">加载中...</div>
       : !eco ? <div className="py-8 text-center text-gray-400 text-sm">未找到 ECO</div>
       : (
@@ -258,7 +259,11 @@ export function ECODetailModal({ ecoId, onClose, onRefresh }: Props) {
           {eco.ecr_id && (
             <div className="border-t pt-4">
               <h4 className="text-sm font-bold text-gray-700 mb-2">ECR 变更分析（{eco.ecr_number || 'ECR'}）</h4>
-              <ECOEditView ecrId={eco.ecr_id} onEcrLinked={() => {}} readOnly executionItems={eco.execution_items} />
+              <ECOEditView ecrId={eco.ecr_id} onEcrLinked={() => {}} readOnly executionItems={eco.execution_items}
+                ecoId={ecoId} canExecute={executionMode && (eco.status === 'approved' || eco.status === 'executing')}
+                onExecuteUpgrade={(itemId) => act(() => ecoApi.upgradeItem(ecoId, itemId), '升版完成')}
+                onExecuteRelease={(itemId) => act(() => ecoApi.revertItem(ecoId, itemId), '已还原')}
+                onCheckedChange={setCheckedExecIds} />
             </div>
           )}
 
@@ -268,48 +273,6 @@ export function ECODetailModal({ ecoId, onClose, onRefresh }: Props) {
           )}
 
           {/* Review panel is handled by ECRReviewPanel inside reviewers section */}
-
-          {/* Execute panel */}
-          {(eco.status === 'approved' || eco.status === 'executing') && (
-            <div className="border-t pt-3">
-              <h4 className="text-xs font-semibold text-gray-700 mb-1.5">执行操作</h4>
-              <div className="flex gap-2 mb-2">
-                {eco.status === 'approved' && (
-                  <button onClick={() => act(() => ecoApi.startExecution(ecoId), '已开始')} disabled={actionLoading}
-                    className="px-4 py-1.5 bg-blue-600 text-white rounded text-sm disabled:opacity-50">开始执行</button>
-                )}
-                <button onClick={() => act(() => ecoApi.executeAll(ecoId), '已执行')} disabled={actionLoading}
-                  className="px-4 py-1.5 bg-green-600 text-white rounded text-sm disabled:opacity-50">一键执行全部</button>
-              </div>
-              {eco.execution_items && eco.execution_items.length > 0 && (
-                <div className="border rounded overflow-hidden">
-                  <table className="w-full text-xs">
-                    <thead><tr className="bg-gray-50 border-b">
-                      <th className="p-1.5 text-left">#</th><th className="p-1.5 text-left">实体</th>
-                      <th className="p-1.5 text-left">操作</th><th className="p-1.5 text-left">状态</th>
-                      <th className="p-1.5 text-left">操作</th>
-                    </tr></thead>
-                    <tbody>
-                      {eco.execution_items.map((ei, i) => (
-                        <tr key={ei.id} className="border-b hover:bg-gray-50">
-                          <td className="p-1.5">{i+1}</td>
-                          <td className="p-1.5">{ei.entity_name}</td>
-                          <td className="p-1.5"><ECOActionBadge action={ei.action} /></td>
-                          <td className="p-1.5"><ECOExecStatusBadge status={ei.status} /></td>
-                          <td className="p-1.5">
-                            {(ei.status === 'pending' || ei.status === 'failed') && (
-                              <button onClick={() => act(() => ecoApi.executeItem(ecoId, ei.id), '已执行')} disabled={actionLoading}
-                                className="text-blue-500 text-xs hover:underline">执行</button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Status logs */}
           {eco.status_logs && eco.status_logs.length > 0 && (

@@ -538,7 +538,9 @@ def remove_execution_item(db: Session, eco_id: uuid.UUID, item_id: uuid.UUID):
 # ─────────────────────────────────────────────────────
 
 def _clone_entity(db: Session, entity, entity_type: str) -> uuid.UUID:
-    """克隆实体创建新版本，返回新实体 ID"""
+    """克隆实体创建新版本，返回新实体 ID。
+    零件：基础字段+自定义字段沿用，关联图文档清空。
+    部件：基础字段+自定义字段+子项列表沿用，关联图文档清空。"""
     new_version = _next_version(entity.version)
     revisions = list(entity.revisions or [])
 
@@ -548,26 +550,44 @@ def _clone_entity(db: Session, entity, entity_type: str) -> uuid.UUID:
             name=entity.name,
             spec=entity.spec,
             version=new_version,
-            status="released",
+            status="draft",
             remark=entity.remark,
             revisions=revisions,
             revision_parent_id=entity.id,
-            document_links=entity.document_links or [],
+            document_links=[],  # 清空关联图文档
         )
+        db.add(new_entity)
+        db.flush()
     else:
         new_entity = Assembly(
             code=entity.code,
             name=entity.name,
             spec=entity.spec,
             version=new_version,
-            status="released",
+            status="draft",
             remark=entity.remark,
             revisions=revisions,
             revision_parent_id=entity.id,
-            document_links=entity.document_links or [],
+            document_links=[],  # 清空关联图文档
         )
-    db.add(new_entity)
-    db.flush()
+        db.add(new_entity)
+        db.flush()
+        # 复制子项列表（BOM）
+        from app.models import BOMItem
+        old_bom = db.query(BOMItem).filter(
+            BOMItem.parent_type == "assembly",
+            BOMItem.parent_id == entity.id
+        ).all()
+        for bom in old_bom:
+            new_bom = BOMItem(
+                parent_type="assembly",
+                parent_id=new_entity.id,
+                child_type=bom.child_type,
+                child_id=bom.child_id,
+                quantity=bom.quantity,
+            )
+            db.add(new_bom)
+
     return new_entity.id, new_version
 
 

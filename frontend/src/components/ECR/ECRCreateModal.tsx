@@ -622,7 +622,6 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
             )}
           </div>
         </div>
-      </div>
 
         {/* BOM 影响分析 */}
         <div>
@@ -703,6 +702,7 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
             ))}
           </div>
         </div>
+      </div>
 
       {/* Footer */}
       <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
