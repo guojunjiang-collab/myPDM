@@ -13,7 +13,7 @@ const PAGE_SIZE = 20;
 
 const statusLabels: Record<string, string> = {
   draft: '草稿', reviewing: '审核中', approved: '已批准',
-  rejected: '已驳回', executing: '执行中', completed: '已完成', closed: '已关闭',
+  rejected: '已驳回', executing: '执行中', completed: '已完成',
 };
 
 const priorityLabels: Record<string, string> = {
@@ -72,11 +72,6 @@ export function ECOList() {
     try { await ecoApi.withdraw(id); toast.success('已撤回'); load(); } catch { toast.error('撤回失败'); }
     finally { setActionLoading(null); }
   };
-  const handleClose = async (id: string) => {
-    setActionLoading(id);
-    try { await ecoApi.close(id); toast.success('已关闭'); load(); } catch { toast.error('关闭失败'); }
-    finally { setActionLoading(null); }
-  };
   const handleExecute = async (id: string) => {
     setActionLoading(id);
     try { await ecoApi.startExecution(id); toast.success('已开始执行'); load(); } catch { toast.error('执行失败'); }
@@ -114,8 +109,6 @@ export function ECOList() {
             {(isCreator || admin) && <>
               <button onClick={(e) => { e.stopPropagation(); handleSubmit(eco.id); }} disabled={busy}
                 className="px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50">{busy ? '...' : '提交'}</button>
-              <button onClick={(e) => { e.stopPropagation(); handleClose(eco.id); }} disabled={busy}
-                className="px-2 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50">{busy ? '...' : '关闭'}</button>
               <button onClick={(e) => { e.stopPropagation(); handleEdit(eco); }}
                 className="px-2 py-1 rounded bg-gray-50 text-gray-700 hover:bg-gray-100">编辑</button>
               <button onClick={(e) => { e.stopPropagation(); handleDelete(eco.id); }} disabled={busy}
@@ -147,18 +140,9 @@ export function ECOList() {
       case 'completed':
         return (
           <div className="flex gap-1 justify-end">
-            {admin && <button onClick={(e) => { e.stopPropagation(); handleClose(eco.id); }} disabled={busy}
-              className="px-2 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50">{busy ? '...' : '关闭'}</button>}
             {ccBtn}
           </div>);
       case 'rejected':
-        return (
-          <div className="flex gap-1 justify-end">
-            {admin && <button onClick={(e) => { e.stopPropagation(); handleClose(eco.id); }} disabled={busy}
-              className="px-2 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50">{busy ? '...' : '关闭'}</button>}
-            {ccBtn}
-          </div>);
-      case 'closed':
         return (
           <div className="flex gap-1 justify-end">
             {ccBtn}

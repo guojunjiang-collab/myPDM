@@ -289,23 +289,6 @@ async def review_eco(
 
 
 # ─────────────────────────────────────────────────────
-# 9. 关闭 ECO
-# ─────────────────────────────────────────────────────
-@router.post("/{eco_id}/close")
-async def close_eco(
-    eco_id: uuid.UUID,
-    data: schemas_eco.ECOCloseAction = schemas_eco.ECOCloseAction(),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
-):
-    eco = crud_eco.get_eco(db, eco_id)
-    if eco.status not in ("approved", "rejected", "completed", "draft", "executing"):
-        raise HTTPException(status_code=400, detail="当前状态不允许关闭")
-    eco = crud_eco.change_eco_status(db, eco_id, "closed", current_user.id, data.comment or "关闭")
-    return _build_eco_detail(db, eco)
-
-
-# ─────────────────────────────────────────────────────
 # 10. 开始执行（approved → executing）
 # ─────────────────────────────────────────────────────
 @router.post("/{eco_id}/execute")
@@ -358,6 +341,22 @@ async def execute_all_items(
         crud_eco.change_eco_status(db, eco_id, "executing", current_user.id, "开始一键执行")
     results = crud_eco.execute_all(db, eco)
     return {"results": results, "eco": _build_eco_detail(db, crud_eco.get_eco(db, eco_id))}
+
+
+# ─────────────────────────────────────────────────────
+# 12b. 完成执行（executing → completed）
+# ─────────────────────────────────────────────────────
+@router.post("/{eco_id}/complete")
+async def complete_execution(
+    eco_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin", "engineer"]))
+):
+    eco = crud_eco.get_eco(db, eco_id)
+    if eco.status != "executing":
+        raise HTTPException(status_code=400, detail="仅执行中状态可完成执行")
+    eco = crud_eco.change_eco_status(db, eco_id, "completed", current_user.id, "手动完成执行")
+    return _build_eco_detail(db, eco)
 
 
 # ─────────────────────────────────────────────────────
@@ -479,7 +478,7 @@ async def manual_upgrade_item(
 
 
 # ─────────────────────────────────────────────────────
-# 16c. 还原（删除升版创建的新版本，恢复执行项状态）
+# 16c. 还原（根据新版本实体状态决定行为）
 # ─────────────────────────────────────────────────────
 @router.post("/{eco_id}/execution-items/{item_id}/revert")
 async def manual_revert_item(
@@ -495,24 +494,65 @@ async def manual_revert_item(
 
     model = Part if item.entity_type == "part" else Assembly
     new_entity = db.query(model).filter(model.id == item.new_entity_id).first()
-    if new_entity:
-        # 删除新实体引用的 BOM 关系
+
+    if not new_entity:
+        # 实体已被删除，清理记录
+        item.new_entity_id = None
+        item.new_version = None
+        item.detail = {**(item.detail or {}), "new_entity_id": "", "new_version": ""}
+        db.commit()
+        return {"detail": "已还原"}
+
+    if new_entity.status == "released":
+        # 已发布状态：不可还原
+        raise HTTPException(status_code=400, detail="已发布的零部件不可还原")
+
+    if new_entity.status == "draft":
+        # 已升版状态：删除新版本实体（完全撤销）
         from app.models import BOMItem
         db.query(BOMItem).filter(
             (BOMItem.child_id == item.new_entity_id) |
             (BOMItem.parent_id == item.new_entity_id)
         ).delete()
         db.delete(new_entity)
+        item.new_entity_id = None
+        item.new_version = None
+        item.detail = {**(item.detail or {}), "new_entity_id": "", "new_version": ""}
+    else:
+        # 已冻结状态：仅将状态改回 draft（保留实体）
+        new_entity.status = "draft"
 
-    item.new_entity_id = None
-    item.new_version = None
-    item.detail = {**(item.detail or {}), "new_entity_id": "", "new_version": ""}
     db.commit()
-    return {"detail": "已还原"}
+    return {"detail": "已还原", "new_entity_status": new_entity.status if new_entity else None}
 
 
 # ─────────────────────────────────────────────────────
-# 16d. 发布（将升版创建的新版本状态改为 released）
+# 16d. 冻结（将升版创建的新版本状态改为 frozen）
+# ─────────────────────────────────────────────────────
+@router.post("/{eco_id}/execution-items/{item_id}/freeze")
+async def manual_freeze_item(
+    eco_id: uuid.UUID, item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin", "engineer"]))
+):
+    item = crud_eco.get_execution_item(db, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="执行项不存在")
+    if not item.new_entity_id:
+        raise HTTPException(status_code=400, detail="尚未执行升版，无法冻结")
+
+    model = Part if item.entity_type == "part" else Assembly
+    new_entity = db.query(model).filter(model.id == item.new_entity_id).first()
+    if not new_entity:
+        raise HTTPException(status_code=404, detail="新版本实体不存在")
+
+    new_entity.status = "frozen"
+    db.commit()
+    return {"detail": "已冻结", "new_entity_status": "frozen"}
+
+
+# ─────────────────────────────────────────────────────
+# 16e. 发布（将升版创建的新版本状态改为 released）
 # ─────────────────────────────────────────────────────
 @router.post("/{eco_id}/execution-items/{item_id}/release")
 async def manual_release_item(

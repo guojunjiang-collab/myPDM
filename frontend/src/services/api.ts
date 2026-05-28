@@ -435,12 +435,16 @@ export const ecoApi = {
     api.post(`/ecos/${id}/close`, { comment }),
   startExecution: (id: string) =>
     api.post(`/ecos/${id}/execute`),
+  completeExecution: (id: string) =>
+    api.post(`/ecos/${id}/complete`),
   executeItem: (ecoId: string, itemId: string) =>
     api.post(`/ecos/${ecoId}/execute-item/${itemId}`),
   upgradeItem: (ecoId: string, itemId: string) =>
     api.post(`/ecos/${ecoId}/execution-items/${itemId}/upgrade`),
   releaseItem: (ecoId: string, itemId: string) =>
     api.post(`/ecos/${ecoId}/execution-items/${itemId}/release`),
+  freezeItem: (ecoId: string, itemId: string) =>
+    api.post(`/ecos/${ecoId}/execution-items/${itemId}/freeze`),
   revertItem: (ecoId: string, itemId: string) =>
     api.post(`/ecos/${ecoId}/execution-items/${itemId}/revert`),
   executeAll: (id: string) =>

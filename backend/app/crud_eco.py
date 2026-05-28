@@ -18,12 +18,12 @@ from app.schemas_eco import ECOCreate, ECOEdit, ECOListParams, ECOExecutionItemC
 # 状态流转规则
 # ─────────────────────────────────────────────────────
 _ALLOWED_TRANSITIONS = {
-    "draft":     {"reviewing", "closed"},
+    "draft":     {"reviewing"},
     "reviewing": {"approved", "rejected", "draft"},
-    "approved":  {"executing", "closed"},
-    "executing": {"completed", "closed"},
-    "completed": {"closed"},
-    "rejected":  {"closed"},
+    "approved":  {"executing"},
+    "executing": {"completed"},
+    "completed": set(),
+    "rejected":  {"draft"},
 }
 
 VERSION_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -261,18 +261,9 @@ def get_eco(db: Session, eco_id: uuid.UUID) -> ECO:
 
 
 def update_eco(db: Session, eco: ECO, data: ECOEdit):
-    """更新 ECO。draft 状态可全部编辑，executing 状态仅可编辑 release_items"""
-    if eco.status not in ("draft", "executing"):
-        raise HTTPException(status_code=400, detail="仅草稿或执行中状态的 ECO 可以编辑")
-    if eco.status == "executing":
-        # 执行中状态仅允许更新 release_items 和 document_links
-        if data.release_items is not None:
-            eco.release_items = data.release_items
-        if data.document_links is not None:
-            eco.document_links = [dl.model_dump() if hasattr(dl, "model_dump") else dl for dl in data.document_links]
-        db.commit()
-        db.refresh(eco)
-        return eco
+    """更新 ECO。仅 draft 状态可编辑"""
+    if eco.status != "draft":
+        raise HTTPException(status_code=400, detail="仅草稿状态的 ECO 可以编辑")
 
     for field, value in data.model_dump(exclude_unset=True).items():
         if field == "reviewers" and value is not None:

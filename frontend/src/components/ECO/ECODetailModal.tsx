@@ -266,9 +266,10 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
             <div className="border-t pt-4">
               <h4 className="text-sm font-bold text-gray-700 mb-2">ECR 变更分析（{eco.ecr_number || 'ECR'}）</h4>
               <ECOEditView ecrId={eco.ecr_id} onEcrLinked={() => {}} readOnly executionItems={eco.execution_items}
-                ecoId={ecoId} canExecute={executionMode && (eco.status === 'approved' || eco.status === 'executing')}
+                ecoId={ecoId} ecoStatus={eco.status} canExecute={executionMode && (eco.status === 'approved' || eco.status === 'executing')}
                 onExecuteUpgrade={(itemId) => act(() => ecoApi.upgradeItem(ecoId, itemId), '升版完成')}
                 onExecuteRelease={(itemId) => act(() => ecoApi.revertItem(ecoId, itemId), '已还原')}
+                onExecuteFreeze={(itemId) => act(() => ecoApi.freezeItem(ecoId, itemId), '冻结完成')}
                 onExecutePublish={(itemId) => act(() => ecoApi.releaseItem(ecoId, itemId), '发布完成')}
                 onViewItem={(entityType, entityId) => viewItem(entityType, entityId, 'view')}
                 onEditItem={(entityType, entityId) => viewItem(entityType, entityId, 'edit')}
@@ -310,7 +311,6 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
             <div><span className="text-gray-400">更新</span> {fmt(eco.updated_at)}</div>
             {eco.reviewed_at && <div><span className="text-gray-400">审批完成</span> {fmt(eco.reviewed_at)}</div>}
             {eco.executed_at && <div><span className="text-gray-400">执行完成</span> {fmt(eco.executed_at)}</div>}
-            {eco.closed_at && <div><span className="text-gray-400">关闭</span> {fmt(eco.closed_at)}</div>}
           </div>
         </div>
 
@@ -319,7 +319,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
           <div className="flex items-center justify-between pt-4 border-t border-gray-200">
             <div>
               {eco.status === 'executing' && (
-                <button onClick={() => act(() => ecoApi.close(ecoId), '执行已完成')} disabled={actionLoading} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">完成执行</button>
+                <button onClick={() => act(() => ecoApi.completeExecution(ecoId), '执行已完成')} disabled={actionLoading} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">完成执行</button>
               )}
             </div>
             <button onClick={async () => { try { await ecoApi.update(ecoId, { document_links: documentLinks, release_items: releaseItems }); toast.success('保存成功'); onClose(); onRefresh(); } catch { toast.error('保存失败'); } }} disabled={actionLoading} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">保存</button>
