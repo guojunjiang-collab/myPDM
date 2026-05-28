@@ -261,9 +261,16 @@ def get_eco(db: Session, eco_id: uuid.UUID) -> ECO:
 
 
 def update_eco(db: Session, eco: ECO, data: ECOEdit):
-    """更新 ECO（仅 draft 状态可编辑）"""
-    if eco.status != "draft":
-        raise HTTPException(status_code=400, detail="只有草稿状态的 ECO 可以编辑")
+    """更新 ECO。draft 状态可全部编辑，executing 状态仅可编辑 release_items"""
+    if eco.status not in ("draft", "executing"):
+        raise HTTPException(status_code=400, detail="仅草稿或执行中状态的 ECO 可以编辑")
+    if eco.status == "executing":
+        # 执行中状态仅允许更新 release_items
+        if data.release_items is not None:
+            eco.release_items = data.release_items
+            db.commit()
+            db.refresh(eco)
+        return eco
 
     for field, value in data.model_dump(exclude_unset=True).items():
         if field == "reviewers" and value is not None:
