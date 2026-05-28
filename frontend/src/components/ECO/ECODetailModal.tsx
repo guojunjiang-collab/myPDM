@@ -14,6 +14,7 @@ import VersionSelectModal from '../VersionSelectModal';
 import PartDetailContent from '../PartDetailContent';
 import AssemblyDetailContent from '../AssemblyDetailContent';
 import DocumentDetailContent from '../DocumentDetailContent';
+import VersionHistory from '../VersionHistory';
 
 const statusTag = (s: string) => {
   const labels: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' };
@@ -49,12 +50,15 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
   const [nestedDetail, setNestedDetail] = useState<{ type: string; id: string } | null>(null);
   const [nestedData, setNestedData] = useState<any>(null);
   const [nestedLoading, setNestedLoading] = useState(false);
+  const [nestedCustomDefs, setNestedCustomDefs] = useState<any[]>([]);
+  const [nestedCustomValues, setNestedCustomValues] = useState<Record<string, any>>({});
   const [checkedExecIds, setCheckedExecIds] = useState<string[]>([]);
   const [showDocPicker, setShowDocPicker] = useState(false);
   const [showReleasePicker, setShowReleasePicker] = useState(false);
   const [documentLinks, setDocumentLinks] = useState<ECRDocumentLink[]>([]);
   const [releaseItems, setReleaseItems] = useState<any[]>([]);
   const [versionSelectState, setVersionSelectState] = useState<{ docId: string; oldDocId: string } | null>(null);
+  const [detailTab, setDetailTab] = useState<'detail' | 'versions'>('detail');
 
   const load = async () => {
     setLoading(true);
@@ -114,10 +118,26 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
     }
     setNestedDetail({ type: entityType, id: entityId });
     setNestedLoading(true);
+    setNestedCustomDefs([]);
+    setNestedCustomValues({});
     try {
       const api = entityType === 'assembly' ? assembliesApi : partsApi;
       const r = await api.get(entityId);
       setNestedData(r.data);
+      // 加载自定义字段定义
+      const allDefs = useDataStore.getState().customFieldDefs;
+      const cfType = entityType === 'assembly' ? 'component' : 'part';
+      const defs = allDefs.filter((d: any) => d.applies_to?.includes(cfType));
+      setNestedCustomDefs(defs);
+      // 加载自定义字段值
+      if (defs.length > 0) {
+        try {
+          const valuesRes = await customFieldsApi.getValues(cfType, entityId);
+          const vals: Record<string, any> = {};
+          (valuesRes.data || []).forEach((v: any) => { vals[v.field_id] = v.value; });
+          setNestedCustomValues(vals);
+        } catch { /* optional */ }
+      }
     } catch { toast.error('加载详情失败'); }
     finally { setNestedLoading(false); }
   };
@@ -307,16 +327,46 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
         </>
       )}
 
-      {/* 嵌套详情弹窗 */}
+      {/* 嵌套详情弹窗 - 复用零件/部件管理的详情界面 */}
       {nestedDetail && (
-        <Modal open={true} title={nestedDetail.type === 'assembly' ? '部件详情' : '零件详情'} onClose={() => { setNestedDetail(null); setNestedData(null); }} width="full">
+        <Modal open={true} title={nestedDetail.type === 'assembly' ? '部件详情' : '零件详情'} onClose={() => { setNestedDetail(null); setNestedData(null); setDetailTab('detail'); }} width="full">
           {nestedLoading ? <div className="text-center py-8 text-sm text-gray-400">加载中...</div>
           : nestedData ? (
-            nestedDetail.type === 'assembly' ? (
-              <AssemblyDetailContent assembly={nestedData} customFieldDefs={[]} customFieldValues={{}} />
-            ) : (
-              <PartDetailContent part={nestedData} customFieldDefs={[]} customFieldValues={{}} />
-            )
+            <div>
+              {/* Tab 切换 */}
+              <div className="flex gap-1 mb-4 border-b">
+                <button onClick={() => setDetailTab('detail')} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${detailTab === 'detail' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>基本信息</button>
+                <button onClick={() => setDetailTab('versions')} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${detailTab === 'versions' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>版本历史</button>
+              </div>
+              {detailTab === 'detail' ? (
+                nestedDetail.type === 'assembly' ? (
+                  <AssemblyDetailContent assembly={nestedData} customFieldDefs={nestedCustomDefs} customFieldValues={nestedCustomValues} />
+                ) : (
+                  <PartDetailContent part={nestedData} customFieldDefs={nestedCustomDefs} customFieldValues={nestedCustomValues} />
+                )
+              ) : (
+                <VersionHistory
+                  entityType={nestedDetail.type as 'part' | 'assembly'}
+                  entityId={nestedData.id}
+                  onViewVersion={async (id) => {
+                    try {
+                      const api = nestedDetail.type === 'assembly' ? assembliesApi : partsApi;
+                      const r = await api.get(id);
+                      setNestedData(r.data);
+                      // 加载该版本的自定义字段值
+                      const cfType = nestedDetail.type === 'assembly' ? 'component' : 'part';
+                      try {
+                        const valuesRes = await customFieldsApi.getValues(cfType, id);
+                        const vals: Record<string, any> = {};
+                        (valuesRes.data || []).forEach((v: any) => { vals[v.field_id] = v.value; });
+                        setNestedCustomValues(vals);
+                      } catch { /* optional */ }
+                      setDetailTab('detail');
+                    } catch { toast.error('加载版本失败'); }
+                  }}
+                />
+              )}
+            </div>
           ) : <div className="text-center py-8 text-sm text-gray-400">未找到数据</div>}
         </Modal>
       )}
