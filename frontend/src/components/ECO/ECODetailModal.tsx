@@ -17,10 +17,7 @@ import DocumentDetailContent from '../DocumentDetailContent';
 
 const statusTag = (s: string) => {
   const labels: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' };
-  const colors: Record<string, string> = {
-    draft: 'bg-blue-100 text-blue-800', frozen: 'bg-orange-100 text-orange-800',
-    released: 'bg-green-100 text-green-800', obsolete: 'bg-red-100 text-gray-800',
-  };
+  const colors: Record<string, string> = { draft: 'bg-blue-100 text-blue-800', frozen: 'bg-orange-100 text-orange-800', released: 'bg-green-100 text-green-800', obsolete: 'bg-red-100 text-gray-800' };
   return { label: labels[s] || s, cls: colors[s] || 'bg-gray-100 text-gray-800' };
 };
 
@@ -66,20 +63,14 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
       setEco(r.data);
       setDocumentLinks(r.data.document_links || []);
       setReleaseItems(r.data.release_items || []);
-      // Load document details
       const docs = r.data.document_links || [];
       if (docs.length > 0) {
         const results = await Promise.allSettled(docs.map((d: any) => documentsApi.get(d.document_id)));
         const loaded = results.filter(r => r.status === 'fulfilled').map((r: any) => r.value.data);
         setDocuments(loaded);
-        // Load attachments and custom field values
         loaded.forEach((doc: Document) => {
           documentsApi.listAttachments(doc.id).then(r => setDocAttachments(prev => ({...prev, [doc.id]: r.data||[]}))).catch(() => {});
-          customFieldsApi.getValues('document', doc.id).then(r => {
-            const vals: Record<string, any> = {};
-            (r.data || []).forEach((v: any) => { vals[v.field_id] = v.value; });
-            setDocCustomValues(prev => ({...prev, [doc.id]: vals}));
-          }).catch(() => {});
+          customFieldsApi.getValues('document', doc.id).then(r => { const vals: Record<string, any> = {}; (r.data || []).forEach((v: any) => { vals[v.field_id] = v.value; }); setDocCustomValues(prev => ({...prev, [doc.id]: vals})); }).catch(() => {});
         });
       } else { setDocuments([]); }
     } catch { toast.error('加载失败'); }
@@ -97,18 +88,13 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
     try {
       await ecoApi.update(ecoId, { document_links: newLinks });
       setDocumentLinks(newLinks);
-      // Reload document details
       if (newLinks.length > 0) {
         const results = await Promise.allSettled(newLinks.map((d: any) => documentsApi.get(d.document_id)));
         const loaded = results.filter(r => r.status === 'fulfilled').map((r: any) => r.value.data);
         setDocuments(loaded);
         loaded.forEach((doc: Document) => {
           documentsApi.listAttachments(doc.id).then(r => setDocAttachments(prev => ({...prev, [doc.id]: r.data||[]}))).catch(() => {});
-          customFieldsApi.getValues('document', doc.id).then(r => {
-            const vals: Record<string, any> = {};
-            (r.data || []).forEach((v: any) => { vals[v.field_id] = v.value; });
-            setDocCustomValues(prev => ({...prev, [doc.id]: vals}));
-          }).catch(() => {});
+          customFieldsApi.getValues('document', doc.id).then(r => { const vals: Record<string, any> = {}; (r.data || []).forEach((v: any) => { vals[v.field_id] = v.value; }); setDocCustomValues(prev => ({...prev, [doc.id]: vals})); }).catch(() => {});
         });
       } else { setDocuments([]); }
       toast.success('图文档已更新');
@@ -116,14 +102,16 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
   };
 
   const saveReleaseItems = async (newItems: any[]) => {
-    try {
-      await ecoApi.update(ecoId, { release_items: newItems });
-      setReleaseItems(newItems);
-      toast.success('工程预变更已更新');
-    } catch { toast.error('保存失败'); }
+    try { await ecoApi.update(ecoId, { release_items: newItems }); setReleaseItems(newItems); toast.success('工程预变更已更新'); } catch { toast.error('保存失败'); }
   };
 
-  const viewItem = async (entityType: string, entityId: string) => {
+  const viewItem = async (entityType: string, entityId: string, mode?: 'view' | 'edit') => {
+    if (mode === 'edit') {
+      // 新窗口打开零件/部件管理页面的编辑界面
+      const path = entityType === 'assembly' ? '/components' : '/parts';
+      window.open(`${path}?edit=${entityId}`, '_blank');
+      return;
+    }
     setNestedDetail({ type: entityType, id: entityId });
     setNestedLoading(true);
     try {
@@ -139,10 +127,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
     if (!token) { alert('登录已过期'); return; }
     const a = document.createElement('a');
     a.href = `/api/v2/attachments/${attId}/direct-download?token=${encodeURIComponent(token)}`;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    a.download = fileName; document.body.appendChild(a); a.click(); document.body.removeChild(a);
   };
 
   const handleDocPreview = (attId: string, fileName: string) => {
@@ -175,7 +160,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
             </div>
           </div>
 
-          {/* Basic info cards */}
+          {/* Basic info */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <InfoItem label="变更原因" value={REASON[eco.reason] || eco.reason || '-'} />
             <InfoItem label="变更类别" value={CAT[eco.category||''] || eco.category || '-'} />
@@ -187,33 +172,13 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
             <InfoItem label="进度" value={`${eco.execution_completed_count}/${eco.execution_count}`} />
           </div>
 
-          {/* Description */}
           <InfoItem label="变更描述" value={eco.description || '-'} className="col-span-2 md:col-span-4" />
 
-          {/* Reviewers panel */}
+          {/* Reviewers */}
           {eco.reviewers && eco.reviewers.length > 0 && (
             <div className="border-t pt-3">
-              <h4 className="text-sm font-semibold text-gray-700 mb-3">
-                审批人
-                <span className="ml-2 text-xs font-normal text-gray-500">
-                  ({eco.approved_count || 0}/{eco.reviewers_count || eco.reviewers.length} 已审批)
-                </span>
-              </h4>
-              <ECRReviewPanel
-                reviewers={eco.reviewers}
-                reviewRecords={eco.review_records || []}
-                currentUserId={user?.id || ''}
-                onReview={async (decision, comment) => {
-                  setActionLoading(true);
-                  try {
-                    await ecoApi.review(ecoId, decision, comment);
-                    toast.success('操作成功');
-                    load();
-                  } catch { toast.error('操作失败'); }
-                  finally { setActionLoading(false); }
-                }}
-                loading={actionLoading}
-              />
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">审批人 <span className="ml-2 text-xs font-normal text-gray-500">({eco.approved_count || 0}/{eco.reviewers_count || eco.reviewers.length} 已审批)</span></h4>
+              <ECRReviewPanel reviewers={eco.reviewers} reviewRecords={eco.review_records || []} currentUserId={user?.id || ''} onReview={async (decision, comment) => { setActionLoading(true); try { await ecoApi.review(ecoId, decision, comment); toast.success('操作成功'); load(); } catch { toast.error('操作失败'); } finally { setActionLoading(false); } }} loading={actionLoading} />
             </div>
           )}
 
@@ -221,8 +186,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
           <div className="border-t pt-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-bold text-gray-700">关联图文档</h4>
-              <button type="button" onClick={() => setShowDocPicker(true)}
-                className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 关联图文档</button>
+              <button type="button" onClick={() => setShowDocPicker(true)} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 关联图文档</button>
             </div>
             <div className="border rounded-lg overflow-hidden">
               {documentLinks.length === 0 ? (
@@ -230,59 +194,32 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-gray-50 border-b">
-                      <tr>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档编号</th>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档名称</th>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
-                        {docFieldDefs.map((def) => (
-                          <th key={def.id} className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap">{def.name}</th>
-                        ))}
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium">附件</th>
-                        <th className="px-3 py-2 text-center text-gray-500 font-medium whitespace-nowrap w-36">操作</th>
-                      </tr>
-                    </thead>
+                    <thead className="bg-gray-50 border-b"><tr>
+                      <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档编号</th>
+                      <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档名称</th>
+                      <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
+                      <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
+                      {docFieldDefs.map((def) => <th key={def.id} className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap">{def.name}</th>)}
+                      <th className="px-3 py-2 text-left text-gray-500 font-medium">附件</th>
+                      <th className="px-3 py-2 text-center text-gray-500 font-medium whitespace-nowrap w-36">操作</th>
+                    </tr></thead>
                     <tbody className="divide-y divide-gray-100">
                       {documents.map((doc) => {
                         const atts = docAttachments[doc.id] || [];
                         return (
-                          <tr key={doc.id} className="hover:bg-gray-50 cursor-pointer"
-                            onClick={() => setViewingDoc(doc)}>
+                          <tr key={doc.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setViewingDoc(doc)}>
                             <td className="px-3 py-2 text-sm font-medium">{doc.code}</td>
                             <td className="px-3 py-2 text-sm">{doc.name}</td>
                             <td className="px-3 py-2 text-sm text-gray-500">{doc.version || '-'}</td>
-                            <td className="px-3 py-2 text-sm">
-                              <span className={`px-1.5 py-0.5 rounded text-xs ${statusTag(doc.status).cls}`}>{statusTag(doc.status).label}</span>
-                            </td>
-                            {docFieldDefs.map((def) => {
-                              const vals = docCustomValues[doc.id] || {};
-                              const val = vals[def.id];
-                              return (
-                                <td key={def.id} className="px-3 py-2 text-sm text-gray-500">
-                                  {val !== undefined && val !== null && val !== '' ? String(val) : '-'}
-                                </td>
-                              );
-                            })}
-                            <td className="px-3 py-2 text-sm text-gray-500">
-                              {atts.length > 0 ? atts.map((a: any) => (
-                                <div key={a.id} className="text-xs">{a.file_name} ({formatFileSize(a.file_size)})</div>
-                              )) : (doc.file_name || '-')}
-                            </td>
+                            <td className="px-3 py-2 text-sm"><span className={`px-1.5 py-0.5 rounded text-xs ${statusTag(doc.status).cls}`}>{statusTag(doc.status).label}</span></td>
+                            {docFieldDefs.map((def) => { const vals = docCustomValues[doc.id] || {}; const val = vals[def.id]; return <td key={def.id} className="px-3 py-2 text-sm text-gray-500">{val !== undefined && val !== null && val !== '' ? String(val) : '-'}</td>; })}
+                            <td className="px-3 py-2 text-sm text-gray-500">{atts.length > 0 ? atts.map((a: any) => <div key={a.id} className="text-xs">{a.file_name} ({formatFileSize(a.file_size)})</div>) : (doc.file_name || '-')}</td>
                             <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center justify-center gap-1">
-                                <button onClick={() => setVersionSelectState({ docId: doc.id, oldDocId: doc.id })}
-                                  className="px-2 py-0.5 text-xs text-purple-600 hover:text-purple-800">选择</button>
-                                {doc.file_id && (
-                                  <button onClick={() => handleDocPreview(doc.file_id!, doc.file_name || '')}
-                                    className="px-2 py-0.5 text-xs text-blue-600 hover:text-blue-800">预览</button>
-                                )}
-                                {doc.file_id && (
-                                  <button onClick={() => handleDocDownload(doc.file_id!, doc.file_name || '')}
-                                    className="px-2 py-0.5 text-xs text-green-600 hover:text-green-800">下载</button>
-                                )}
-                                <button onClick={() => saveDocumentLinks(documentLinks.filter(l => l.document_id !== doc.id))}
-                                  className="px-2 py-0.5 text-xs text-red-400 hover:text-red-600">移除</button>
+                                <button onClick={() => setVersionSelectState({ docId: doc.id, oldDocId: doc.id })} className="px-2 py-0.5 text-xs text-purple-600 hover:text-purple-800">选择</button>
+                                {doc.file_id && <button onClick={() => handleDocPreview(doc.file_id!, doc.file_name || '')} className="px-2 py-0.5 text-xs text-blue-600 hover:text-blue-800">预览</button>}
+                                {doc.file_id && <button onClick={() => handleDocDownload(doc.file_id!, doc.file_name || '')} className="px-2 py-0.5 text-xs text-green-600 hover:text-green-800">下载</button>}
+                                <button onClick={() => saveDocumentLinks(documentLinks.filter(l => l.document_id !== doc.id))} className="px-2 py-0.5 text-xs text-red-400 hover:text-red-600">移除</button>
                               </div>
                             </td>
                           </tr>
@@ -299,15 +236,11 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
           {eco.cc_users && eco.cc_users.length > 0 && (
             <div className="border-t pt-3">
               <h4 className="text-xs font-semibold text-gray-700 mb-1.5">知会用户</h4>
-              <div className="flex flex-wrap gap-2">
-                {eco.cc_users.map((c, i) => (
-                  <span key={i} className="text-xs px-2 py-1 rounded bg-purple-50 text-purple-700">{c.user_name}</span>
-                ))}
-              </div>
+              <div className="flex flex-wrap gap-2">{eco.cc_users.map((c, i) => <span key={i} className="text-xs px-2 py-1 rounded bg-purple-50 text-purple-700">{c.user_name}</span>)}</div>
             </div>
           )}
 
-          {/* BOM impact (if source ECR exists) */}
+          {/* BOM impact */}
           {eco.ecr_id && (
             <div className="border-t pt-4">
               <h4 className="text-sm font-bold text-gray-700 mb-2">ECR 变更分析（{eco.ecr_number || 'ECR'}）</h4>
@@ -315,25 +248,23 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
                 ecoId={ecoId} canExecute={executionMode && (eco.status === 'approved' || eco.status === 'executing')}
                 onExecuteUpgrade={(itemId) => act(() => ecoApi.upgradeItem(ecoId, itemId), '升版完成')}
                 onExecuteRelease={(itemId) => act(() => ecoApi.revertItem(ecoId, itemId), '已还原')}
+                onExecutePublish={(itemId) => act(() => ecoApi.releaseItem(ecoId, itemId), '发布完成')}
+                onViewItem={(entityType, entityId) => viewItem(entityType, entityId, 'view')}
+                onEditItem={(entityType, entityId) => viewItem(entityType, entityId, 'edit')}
                 onCheckedChange={setCheckedExecIds} />
             </div>
           )}
 
-          {/* 工程预变更关联零部件 */}
+          {/* 工程预变更 */}
           <div className="border-t pt-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-bold text-gray-700">工程预变更</h4>
-              <button type="button" onClick={() => setShowReleasePicker(true)}
-                className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 关联零部件</button>
+              <button type="button" onClick={() => setShowReleasePicker(true)} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 关联零部件</button>
             </div>
             {releaseItems.length === 0 ? (
               <div className="border rounded-lg px-4 py-6 text-center text-sm text-gray-400">暂无工程预变更</div>
             ) : (
-              <ReleaseItemsTable items={releaseItems} onViewItem={viewItem}
-                onRemove={(idx) => {
-                  const newItems = releaseItems.filter((_, i) => i !== idx);
-                  saveReleaseItems(newItems);
-                }} />
+              <ReleaseItemsTable items={releaseItems} onViewItem={viewItem} onRemove={(idx) => { const newItems = releaseItems.filter((_, i) => i !== idx); saveReleaseItems(newItems); }} />
             )}
           </div>
 
@@ -341,17 +272,14 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
           {eco.status_logs && eco.status_logs.length > 0 && (
             <div className="border-t pt-3">
               <h4 className="text-xs font-semibold text-gray-700 mb-1.5">状态日志</h4>
-              <div className="space-y-1">
-                {eco.status_logs.map((l, i) => (
-                  <div key={i} className="text-xs px-2 py-1 rounded bg-gray-50 flex gap-2">
-                    <span className="text-gray-400">{l.from_status || '-'} → </span>
-                    <span className="font-medium">{l.to_status}</span>
-                    <span className="text-gray-500">by {l.operator_name}</span>
-                    {l.comment && <span className="text-gray-400">: {l.comment}</span>}
-                    <span className="text-gray-400 ml-auto">{fmt(l.created_at)}</span>
-                  </div>
-                ))}
-              </div>
+              <div className="space-y-1">{eco.status_logs.map((l, i) => (
+                <div key={i} className="text-xs px-2 py-1 rounded bg-gray-50 flex gap-2">
+                  <span className="text-gray-400">{l.from_status || '-'} → </span><span className="font-medium">{l.to_status}</span>
+                  <span className="text-gray-500">by {l.operator_name}</span>
+                  {l.comment && <span className="text-gray-400">: {l.comment}</span>}
+                  <span className="text-gray-400 ml-auto">{fmt(l.created_at)}</span>
+                </div>
+              ))}</div>
             </div>
           )}
 
@@ -363,7 +291,6 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
             {eco.executed_at && <div><span className="text-gray-400">执行完成</span> {fmt(eco.executed_at)}</div>}
             {eco.closed_at && <div><span className="text-gray-400">关闭</span> {fmt(eco.closed_at)}</div>}
           </div>
-
         </div>
 
         {/* 执行模式底部按钮 */}
@@ -371,29 +298,10 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
           <div className="flex items-center justify-between pt-4 border-t border-gray-200">
             <div>
               {eco.status === 'executing' && (
-                <button
-                  onClick={() => act(() => ecoApi.close(ecoId), '执行已完成')}
-                  disabled={actionLoading}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50"
-                >
-                  完成执行
-                </button>
+                <button onClick={() => act(() => ecoApi.close(ecoId), '执行已完成')} disabled={actionLoading} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">完成执行</button>
               )}
             </div>
-            <button
-              onClick={async () => {
-                try {
-                  await ecoApi.update(ecoId, { document_links: documentLinks, release_items: releaseItems });
-                  toast.success('保存成功');
-                  onClose();
-                  onRefresh();
-                } catch { toast.error('保存失败'); }
-              }}
-              disabled={actionLoading}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50"
-            >
-              保存
-            </button>
+            <button onClick={async () => { try { await ecoApi.update(ecoId, { document_links: documentLinks, release_items: releaseItems }); toast.success('保存成功'); onClose(); onRefresh(); } catch { toast.error('保存失败'); } }} disabled={actionLoading} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">保存</button>
           </div>
         )}
         </>
@@ -401,97 +309,45 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
 
       {/* 嵌套详情弹窗 */}
       {nestedDetail && (
-        <Modal open={true} title={nestedDetail.type === 'assembly' ? '部件详情' : '零件详情'}
-          onClose={() => { setNestedDetail(null); setNestedData(null); }} width="full">
-          {nestedLoading ? (
-            <div className="text-center py-8 text-sm text-gray-400">加载中...</div>
-          ) : nestedData ? (
+        <Modal open={true} title={nestedDetail.type === 'assembly' ? '部件详情' : '零件详情'} onClose={() => { setNestedDetail(null); setNestedData(null); }} width="full">
+          {nestedLoading ? <div className="text-center py-8 text-sm text-gray-400">加载中...</div>
+          : nestedData ? (
             nestedDetail.type === 'assembly' ? (
               <AssemblyDetailContent assembly={nestedData} customFieldDefs={[]} customFieldValues={{}} />
             ) : (
               <PartDetailContent part={nestedData} customFieldDefs={[]} customFieldValues={{}} />
             )
-          ) : (
-            <div className="text-center py-8 text-sm text-gray-400">未找到数据</div>
-          )}
+          ) : <div className="text-center py-8 text-sm text-gray-400">未找到数据</div>}
         </Modal>
       )}
     </Modal>
 
     {/* 图文档详情弹窗 */}
     <Modal open={!!viewingDoc} title="图文档详情" onClose={() => setViewingDoc(null)} width="full">
-      {viewingDoc && (
-        <div className="max-h-[70vh] overflow-y-auto pr-1">
-          <DocumentDetailContent doc={viewingDoc} customFieldDefs={docFieldDefs} customFieldValues={docCustomValues[viewingDoc.id] || {}} />
-        </div>
-      )}
+      {viewingDoc && <div className="max-h-[70vh] overflow-y-auto pr-1"><DocumentDetailContent doc={viewingDoc} customFieldDefs={docFieldDefs} customFieldValues={docCustomValues[viewingDoc.id] || {}} /></div>}
     </Modal>
 
     {/* 图文档选择器 */}
-    <ECRDocumentPicker
-      open={showDocPicker}
-      onClose={() => setShowDocPicker(false)}
-      onSelect={(docs: ECRDocumentLink[]) => {
-        const existing = new Set(documentLinks.map(d => d.document_id));
-        const newDocs = docs.filter(d => !existing.has(d.document_id));
-        saveDocumentLinks([...documentLinks, ...newDocs]);
-        setShowDocPicker(false);
-      }}
-      alreadyLinked={documentLinks.map(d => d.document_id)}
-    />
+    <ECRDocumentPicker open={showDocPicker} onClose={() => setShowDocPicker(false)}
+      onSelect={(docs: ECRDocumentLink[]) => { const existing = new Set(documentLinks.map(d => d.document_id)); const newDocs = docs.filter(d => !existing.has(d.document_id)); saveDocumentLinks([...documentLinks, ...newDocs]); setShowDocPicker(false); }}
+      alreadyLinked={documentLinks.map(d => d.document_id)} />
 
     {/* 零部件选择器 */}
-    <AssemblyPartPicker
-      open={showReleasePicker}
-      onClose={() => setShowReleasePicker(false)}
+    <AssemblyPartPicker open={showReleasePicker} onClose={() => setShowReleasePicker(false)}
       onConfirm={(items) => {
         setShowReleasePicker(false);
-        // Load details for each item
-        Promise.allSettled(items.map(async (item) => {
-          const api = item.child_type === 'assembly' ? assembliesApi : partsApi;
-          const r = await api.get(item.child_id);
-          return { ...r.data, child_type: item.child_type, quantity: item.quantity };
-        })).then(results => {
+        Promise.allSettled(items.map(async (item) => { const api = item.child_type === 'assembly' ? assembliesApi : partsApi; const r = await api.get(item.child_id); return { ...r.data, child_type: item.child_type, quantity: item.quantity }; })).then(results => {
           const loaded = results.filter(r => r.status === 'fulfilled').map((r: any) => r.value);
           const existingIds = new Set(releaseItems.map((r: any) => r.entity_id));
-          const merged = [
-            ...releaseItems,
-            ...loaded.filter((r: any) => !existingIds.has(r.id)).map((r: any) => ({
-              entity_type: r.child_type === 'assembly' ? 'assembly' : 'part',
-              entity_id: r.id,
-              entity_code: r.code || '',
-              entity_name: r.name || '',
-              entity_version: r.version || '',
-              spec: r.spec || '',
-              status: r.status || '',
-              quantity: r.quantity || 1,
-            })),
-          ];
+          const merged = [...releaseItems, ...loaded.filter((r: any) => !existingIds.has(r.id)).map((r: any) => ({ entity_type: r.child_type === 'assembly' ? 'assembly' : 'part', entity_id: r.id, entity_code: r.code || '', entity_name: r.name || '', entity_version: r.version || '', spec: r.spec || '', status: r.status || '', quantity: r.quantity || 1 }))];
           saveReleaseItems(merged);
         });
-      }}
-    />
+      }} />
 
     {/* 版本选择器 */}
-    <VersionSelectModal
-      open={!!versionSelectState}
-      entityType="document"
-      entityId={versionSelectState?.docId || ''}
-      entityName={documents.find(d => d.id === versionSelectState?.docId)?.code || ''}
-      currentVersionId={versionSelectState?.oldDocId || ''}
-      onSelect={(newVerId) => {
-        if (versionSelectState) {
-          const newLinks = documentLinks.map(d =>
-            d.document_id === versionSelectState.oldDocId
-              ? { document_id: newVerId, document_code: '', document_name: '', document_version: '' }
-              : d
-          );
-          saveDocumentLinks(newLinks);
-        }
-        setVersionSelectState(null);
-      }}
-      onClose={() => setVersionSelectState(null)}
-    />
+    <VersionSelectModal open={!!versionSelectState} entityType="document" entityId={versionSelectState?.docId || ''} entityName={documents.find(d => d.id === versionSelectState?.docId)?.code || ''} currentVersionId={versionSelectState?.oldDocId || ''}
+      onSelect={(newVerId) => { if (versionSelectState) { const newLinks = documentLinks.map(d => d.document_id === versionSelectState.oldDocId ? { document_id: newVerId, document_code: '', document_name: '', document_version: '' } : d); saveDocumentLinks(newLinks); } setVersionSelectState(null); }}
+      onClose={() => setVersionSelectState(null)} />
     </>
   );
 }
@@ -506,15 +362,12 @@ function InfoItem({ label, value, icon, className }: { label: string; value: str
   return (
     <div className={`bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 ${className || ''}`}>
       <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-      <div className="text-sm text-gray-900 font-medium whitespace-pre-wrap">
-        {icon && <span className="mr-1">{icon}</span>}
-        {value}
-      </div>
+      <div className="text-sm text-gray-900 font-medium whitespace-pre-wrap">{icon && <span className="mr-1">{icon}</span>}{value}</div>
     </div>
   );
 }
 
-function ReleaseItemsTable({ items, onViewItem, onRemove }: { items: any[]; onViewItem: (type: string, id: string) => void; onRemove?: (idx: number) => void }) {
+function ReleaseItemsTable({ items, onViewItem, onRemove }: { items: any[]; onViewItem: (type: string, id: string, mode?: 'view' | 'edit') => void; onRemove?: (idx: number) => void }) {
   const [expanded, setExpanded] = useState<Record<string, any[]>>({});
   const [loadingIdx, setLoadingIdx] = useState<string | null>(null);
 
@@ -524,16 +377,7 @@ function ReleaseItemsTable({ items, onViewItem, onRemove }: { items: any[]; onVi
     setLoadingIdx(idx);
     try {
       const r = await assemblyPartsApi.list(entityId);
-      const children = (r.data || []).map((c: any) => ({
-        entity_type: c.childType === 'component' || c.childType === 'assembly' ? 'assembly' : 'part',
-        entity_id: c.child_id,
-        entity_code: c.child_detail?.code || '',
-        entity_name: c.child_detail?.name || '',
-        entity_version: c.child_detail?.version || '',
-        spec: c.child_detail?.spec || '',
-        status: c.child_detail?.status || '',
-        quantity: c.quantity || 1,
-      }));
+      const children = (r.data || []).map((c: any) => ({ entity_type: c.childType === 'component' || c.childType === 'assembly' ? 'assembly' : 'part', entity_id: c.child_id, entity_code: c.child_detail?.code || '', entity_name: c.child_detail?.name || '', entity_version: c.child_detail?.version || '', spec: c.child_detail?.spec || '', status: c.child_detail?.status || '', quantity: c.quantity || 1 }));
       setExpanded(prev => ({ ...prev, [idx]: children }));
     } catch { toast.error('加载子项失败'); }
     finally { setLoadingIdx(null); }
@@ -542,47 +386,26 @@ function ReleaseItemsTable({ items, onViewItem, onRemove }: { items: any[]; onVi
   const renderRow = (ri: any, level: number, idx: string): React.ReactNode => {
     const isAssembly = ri.entity_type === 'assembly';
     const childRows = expanded[idx];
-    const openDetail = () => {
-      onViewItem(isAssembly ? 'assembly' : 'part', ri.entity_id);
-    };
     const rowNum = parseInt(idx.split('-')[0], 10);
     return (
       <>
-        <tr key={idx} className="hover:bg-gray-50 cursor-pointer"
-          onClick={openDetail}>
+        <tr key={idx} className="hover:bg-gray-50 cursor-pointer" onClick={() => onViewItem(isAssembly ? 'assembly' : 'part', ri.entity_id, 'view')}>
           <td className="px-3 py-1.5 text-xs text-gray-400 whitespace-nowrap">
             <span>{'-'.repeat(level)}{level}</span>
-            {isAssembly && (
-              <button onClick={(e) => { e.stopPropagation(); toggleExpand(idx, ri.entity_id, ri.entity_type); }}
-                className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
-                {childRows ? '▼' : '▶'}
-              </button>
-            )}
+            {isAssembly && <button onClick={(e) => { e.stopPropagation(); toggleExpand(idx, ri.entity_id, ri.entity_type); }} className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">{childRows ? '▼' : '▶'}</button>}
           </td>
-          <td className="px-3 py-1.5 text-xs">
-            <span className={`px-1.5 py-0.5 rounded text-xs ${isAssembly ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
-              {isAssembly ? '部件' : '零件'}
-            </span>
-          </td>
+          <td className="px-3 py-1.5 text-xs"><span className={`px-1.5 py-0.5 rounded text-xs ${isAssembly ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>{isAssembly ? '部件' : '零件'}</span></td>
           <td className="px-3 py-1.5 text-xs font-mono">{ri.entity_code}</td>
           <td className="px-3 py-1.5 text-xs">{ri.entity_name}</td>
           <td className="px-3 py-1.5 text-xs text-gray-500">{ri.spec || '-'}</td>
           <td className="px-3 py-1.5 text-xs">{ri.entity_version || 'A'}</td>
           <td className="px-3 py-1.5 text-xs whitespace-nowrap">{ri.status ? <span className={`px-1.5 py-0.5 rounded text-xs ${statusTag(ri.status).cls}`}>{statusTag(ri.status).label}</span> : '-'}</td>
           <td className="px-3 py-1.5 text-xs text-center">{ri.quantity || 1}</td>
-          {onRemove && level === 0 && (
-            <td className="px-3 py-1.5 text-xs text-center" onClick={(e) => e.stopPropagation()}>
-              <button onClick={() => onRemove(rowNum)} className="px-2 py-0.5 text-xs text-red-400 hover:text-red-600">移除</button>
-            </td>
-          )}
+          {onRemove && level === 0 && <td className="px-3 py-1.5 text-xs text-center" onClick={(e) => e.stopPropagation()}><button onClick={() => onRemove(rowNum)} className="px-2 py-0.5 text-xs text-red-400 hover:text-red-600">移除</button></td>}
           {onRemove && level > 0 && <td className="px-3 py-1.5"></td>}
         </tr>
-        {childRows && childRows.map((child: any, j: number) =>
-          renderRow(child, level + 1, `${idx}-${j}`)
-        )}
-        {loadingIdx === idx && (
-          <tr><td colSpan={onRemove ? 9 : 8} className="px-3 py-1.5 text-xs text-gray-400 text-center">加载中...</td></tr>
-        )}
+        {childRows && childRows.map((child: any, j: number) => renderRow(child, level + 1, `${idx}-${j}`))}
+        {loadingIdx === idx && <tr><td colSpan={onRemove ? 9 : 8} className="px-3 py-1.5 text-xs text-gray-400 text-center">加载中...</td></tr>}
       </>
     );
   };
@@ -590,22 +413,18 @@ function ReleaseItemsTable({ items, onViewItem, onRemove }: { items: any[]; onVi
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
       <table className="w-full text-sm">
-        <thead className="bg-gray-50 border-b">
-          <tr>
-            <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-20">层级</th>
-            <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-16">类型</th>
-            <th className="px-3 py-1.5 text-left text-xs text-gray-500">件号</th>
-            <th className="px-3 py-1.5 text-left text-xs text-gray-500">中文名称</th>
-            <th className="px-3 py-1.5 text-left text-xs text-gray-500">规格型号</th>
-            <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-14">版本</th>
-            <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-20">状态</th>
-            <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-12">用量</th>
-            {onRemove && <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-16">操作</th>}
-          </tr>
-        </thead>
-        <tbody className="divide-y">
-          {items.map((ri, i) => renderRow(ri, 0, String(i)))}
-        </tbody>
+        <thead className="bg-gray-50 border-b"><tr>
+          <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-20">层级</th>
+          <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-16">类型</th>
+          <th className="px-3 py-1.5 text-left text-xs text-gray-500">件号</th>
+          <th className="px-3 py-1.5 text-left text-xs text-gray-500">中文名称</th>
+          <th className="px-3 py-1.5 text-left text-xs text-gray-500">规格型号</th>
+          <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-14">版本</th>
+          <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-20">状态</th>
+          <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-12">用量</th>
+          {onRemove && <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-16">操作</th>}
+        </tr></thead>
+        <tbody className="divide-y">{items.map((ri, i) => renderRow(ri, 0, String(i)))}</tbody>
       </table>
     </div>
   );

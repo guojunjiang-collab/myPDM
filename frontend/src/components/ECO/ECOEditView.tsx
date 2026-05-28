@@ -24,7 +24,10 @@ interface Props {
   canExecute?: boolean;
   onExecuteUpgrade?: (itemId: string) => void;
   onExecuteRelease?: (itemId: string) => void;
+  onExecutePublish?: (itemId: string) => void;
   onCheckedChange?: (ids: string[]) => void;
+  onViewItem?: (entityType: string, entityId: string) => void;
+  onEditItem?: (entityType: string, entityId: string) => void;
 }
 
 const ROW_BG: Record<string, string> = {
@@ -162,20 +165,26 @@ function EditableDownward({ rows, onUpdate, displayOnly = false, onRemove }: { r
 }
 
 // ── Read-only tables ──
-function ReadOnlyUpward({ rows, execMap, canExec, onUpgrade, onRelease, checkedIds, onToggleCheck }: { rows: MutableNode[]; execMap?: Map<string, any>; canExec?: boolean; onUpgrade?: (id: string) => void; onRelease?: (id: string) => void; checkedIds?: Set<string>; onToggleCheck?: (id: string) => void }) {
+function ReadOnlyUpward({ rows, execMap, canExec, onUpgrade, onRelease, onPublish, checkedIds, onToggleCheck, onViewItem, onEditItem }: { rows: MutableNode[]; execMap?: Map<string, any>; canExec?: boolean; onUpgrade?: (id: string) => void; onRelease?: (id: string) => void; onPublish?: (id: string) => void; checkedIds?: Set<string>; onToggleCheck?: (id: string) => void; onViewItem?: (entityType: string, entityId: string) => void; onEditItem?: (entityType: string, entityId: string) => void }) {
   const getExec = (entityId: string) => execMap?.get(entityId);
   return (
     <div className="overflow-x-auto border border-gray-200 rounded-lg">
       <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
         <thead><tr className="bg-gray-50"><th className={`${th} w-12`}>层级</th><th className={th}>编码</th><th className={th}>名称</th><th className={th}>版本</th><th className={th}>用量</th>
-        {canExec && <><th className={`${th} w-20`}>ECO状态</th><th className={`${th} w-20`}>操作</th></>}
+        {canExec && <><th className={`${th} w-20`}>变更状态</th><th className={`${th} w-20`}>操作</th></>}
         </tr></thead>
         <tbody>{rows.length === 0 ? <tr><td colSpan={canExec ? 7 : 5} className="text-xs text-gray-400 text-center py-6">无数据</td></tr>
         : rows.map((n, i) => {
           const r = resultRow(n, true);
           const exec = getExec(n.entity_id || '');
+          const entityId = exec?.new_entity_id || n.entity_id || '';
+          const entityType = n.entity_type || 'part';
+          const handleRowClick = () => {
+            if (exec?.new_entity_status === 'released') onViewItem?.(entityType, exec?.new_entity_id || entityId);
+            else if (exec?.new_entity_status) onEditItem?.(entityType, exec?.new_entity_id || entityId);
+          };
           return (
-            <tr key={i} className={ROW_BG[n.action||'']}>
+            <tr key={i} className={`${ROW_BG[n.action||'']} ${exec?.new_entity_status ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={handleRowClick}>
               <td className={td}><span className="text-gray-400">{n.level != null ? '-'.repeat(n.level)+n.level : '-'}</span></td>
               <td className={td}>{r.code}</td>
               <td className={td}><span className="truncate block">{r.name}</span></td>
@@ -190,9 +199,16 @@ function ReadOnlyUpward({ rows, execMap, canExec, onUpgrade, onRelease, checkedI
                   </td>
               <td className={td}>
                 <div className="flex items-center gap-1">
-                  {exec?.new_version ? (
+                  {exec?.new_entity_status === 'released' ? (
                     <button onClick={() => onRelease?.(exec?.id || '')}
                       className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
+                  ) : exec?.new_entity_status ? (
+                    <>
+                      <button onClick={() => onRelease?.(exec?.id || '')}
+                        className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
+                      <button onClick={() => onPublish?.(exec?.id || '')}
+                        className="px-1.5 py-0.5 text-xs bg-green-500 text-white rounded hover:bg-green-600">发布</button>
+                    </>
                   ) : (
                     <button onClick={() => onUpgrade?.(exec?.id || '')}
                       className="px-1.5 py-0.5 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">升版</button>
@@ -207,20 +223,26 @@ function ReadOnlyUpward({ rows, execMap, canExec, onUpgrade, onRelease, checkedI
   </table>
 </div>);}
 
-function ReadOnlyDownward({ rows, execMap, canExec, onUpgrade, onRelease, checkedIds, onToggleCheck }: { rows: MutableNode[]; execMap?: Map<string, any>; canExec?: boolean; onUpgrade?: (id: string) => void; onRelease?: (id: string) => void; checkedIds?: Set<string>; onToggleCheck?: (id: string) => void }) {
+function ReadOnlyDownward({ rows, execMap, canExec, onUpgrade, onRelease, onPublish, checkedIds, onToggleCheck, onViewItem, onEditItem }: { rows: MutableNode[]; execMap?: Map<string, any>; canExec?: boolean; onUpgrade?: (id: string) => void; onRelease?: (id: string) => void; onPublish?: (id: string) => void; checkedIds?: Set<string>; onToggleCheck?: (id: string) => void; onViewItem?: (entityType: string, entityId: string) => void; onEditItem?: (entityType: string, entityId: string) => void }) {
   const getExec = (entityId: string) => execMap?.get(entityId);
   return (
     <div className="overflow-x-auto border border-gray-200 rounded-lg">
       <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
         <thead><tr className="bg-gray-50"><th className={th}>编码</th><th className={th}>名称</th><th className={th}>版本</th><th className={th}>用量</th>
-        {canExec && <><th className={`${th} w-20`}>ECO状态</th><th className={`${th} w-20`}>操作</th></>}
+        {canExec && <><th className={`${th} w-20`}>变更状态</th><th className={`${th} w-20`}>操作</th></>}
         </tr></thead>
         <tbody>{rows.length === 0 ? <tr><td colSpan={canExec ? 6 : 4} className="text-xs text-gray-400 text-center py-6">无数据</td></tr>
         : rows.map((n, i) => {
           if (n.action === 'delete') return (<tr key={i} className={ROW_BG[n.action||'']}><td className={`${td} text-gray-300`}>-</td><td className={`${td} text-gray-300`}>-</td><td className={`${td} text-gray-300`}>-</td><td className={`${td} text-gray-300`}>-</td>{canExec && <><td className={td}>-</td><td className={td}>-</td></>}</tr>);
           const r = resultRow(n);
           const exec = getExec(n.entity_id || '');
-          return (<tr key={i} className={ROW_BG[n.action||'']}><td className={td}>{r.code}</td><td className={td}><span className="truncate block">{r.name}</span></td><td className={`${td} ${n.action === 'upgrade' ? 'text-blue-600 font-semibold' : ''}`}>{r.ver}</td><td className={`${td} ${n.action === 'qty_change' ? 'text-orange-600 font-semibold' : ''}`}>{r.qty}</td>
+          const entityId = exec?.new_entity_id || n.entity_id || '';
+          const entityType = n.entity_type || 'part';
+          const handleRowClick = () => {
+            if (exec?.new_entity_status === 'released') onViewItem?.(entityType, exec?.new_entity_id || entityId);
+            else if (exec?.new_entity_status) onEditItem?.(entityType, exec?.new_entity_id || entityId);
+          };
+          return (<tr key={i} className={`${ROW_BG[n.action||'']} ${exec?.new_entity_status ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={handleRowClick}><td className={td}>{r.code}</td><td className={td}><span className="truncate block">{r.name}</span></td><td className={`${td} ${n.action === 'upgrade' ? 'text-blue-600 font-semibold' : ''}`}>{r.ver}</td><td className={`${td} ${n.action === 'qty_change' ? 'text-orange-600 font-semibold' : ''}`}>{r.qty}</td>
           {canExec && (
             <>
               <td className={td}>
@@ -230,9 +252,16 @@ function ReadOnlyDownward({ rows, execMap, canExec, onUpgrade, onRelease, checke
               </td>
               <td className={td}>
                 <div className="flex items-center gap-1">
-                  {exec?.new_version ? (
+                  {exec?.new_entity_status === 'released' ? (
                     <button onClick={() => onRelease?.(exec?.id || '')}
                       className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
+                  ) : exec?.new_entity_status ? (
+                    <>
+                      <button onClick={() => onRelease?.(exec?.id || '')}
+                        className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
+                      <button onClick={() => onPublish?.(exec?.id || '')}
+                        className="px-1.5 py-0.5 text-xs bg-green-500 text-white rounded hover:bg-green-600">发布</button>
+                    </>
                   ) : (
                     <button onClick={() => onUpgrade?.(exec?.id || '')}
                       className="px-1.5 py-0.5 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">升版</button>
@@ -249,19 +278,25 @@ function ReadOnlyDownward({ rows, execMap, canExec, onUpgrade, onRelease, checke
 }
 
 // ── Affected items table ──
-function AffectedTable({ rows, execMap, canExec, onUpgrade, onRelease, checkedIds, onToggleCheck }: { rows: MutableNode[]; execMap?: Map<string, any>; canExec?: boolean; onUpgrade?: (id: string) => void; onRelease?: (id: string) => void; checkedIds?: Set<string>; onToggleCheck?: (id: string) => void }) {
+function AffectedTable({ rows, execMap, canExec, onUpgrade, onRelease, onPublish, onViewItem, onEditItem, checkedIds, onToggleCheck }: { rows: MutableNode[]; execMap?: Map<string, any>; canExec?: boolean; onUpgrade?: (id: string) => void; onRelease?: (id: string) => void; onPublish?: (id: string) => void; onViewItem?: (entityType: string, entityId: string) => void; onEditItem?: (entityType: string, entityId: string) => void; checkedIds?: Set<string>; onToggleCheck?: (id: string) => void }) {
   const getExec = (entityId: string) => execMap?.get(entityId);
   return (
     <div className="overflow-x-auto border border-gray-200 rounded-lg">
       <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
         <thead><tr className="bg-gray-50"><th className={th}>编码</th><th className={th}>名称</th><th className={th}>当前版本</th><th className={th}>变更后版本</th>
-        {canExec && <><th className={`${th} w-20`}>ECO状态</th><th className={`${th} w-20`}>操作</th></>}
+        {canExec && <><th className={`${th} w-20`}>变更状态</th><th className={`${th} w-20`}>操作</th></>}
         </tr></thead>
         <tbody>{rows.length === 0 ? <tr><td colSpan={canExec ? 6 : 4} className="text-xs text-gray-400 text-center py-6">无</td></tr>
         : rows.map((n, i) => {
           const exec = getExec(n.entity_id || '');
+          const entityId = exec?.new_entity_id || n.entity_id || '';
+          const entityType = n.entity_type || 'part';
+          const handleRowClick = () => {
+            if (exec?.new_entity_status === 'released') onViewItem?.(entityType, exec?.new_entity_id || entityId);
+            else if (exec?.new_entity_status) onEditItem?.(entityType, exec?.new_entity_id || entityId);
+          };
           return (
-          <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+          <tr key={i} className={`${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'} ${exec?.new_entity_status ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={handleRowClick}>
             <td className={td}>{n.entity_code||'-'}</td>
             <td className={td}><span className="truncate block">{n.entity_name}</span></td>
             <td className={td}>{n.entity_version || '-'}</td>
@@ -270,14 +305,21 @@ function AffectedTable({ rows, execMap, canExec, onUpgrade, onRelease, checkedId
               <>
                 <td className={td}>
                   {exec?.new_entity_status === 'released' ? <span className="px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-700">已发布</span>
-                  : (exec?.new_entity_status && exec?.new_version) ? <span className="px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-700">已升版</span>
+                  : exec?.new_entity_status ? <span className="px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-700">已升版</span>
                   : <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-500">未执行</span>}
                 </td>
                 <td className={td}>
                   <div className="flex items-center gap-1">
-                    {exec?.new_entity_status ? (
+                    {exec?.new_entity_status === 'released' ? (
                       <button onClick={() => onRelease?.(exec?.id || '')}
                         className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
+                    ) : exec?.new_entity_status ? (
+                      <>
+                        <button onClick={() => onRelease?.(exec?.id || '')}
+                          className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
+                        <button onClick={() => onPublish?.(exec?.id || '')}
+                          className="px-1.5 py-0.5 text-xs bg-green-500 text-white rounded hover:bg-green-600">发布</button>
+                      </>
                     ) : (
                       <button onClick={() => onUpgrade?.(exec?.id || '')}
                         className="px-1.5 py-0.5 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">升版</button>
@@ -293,7 +335,7 @@ function AffectedTable({ rows, execMap, canExec, onUpgrade, onRelease, checkedId
   );
 }
 
-export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executionItems, resetKey, hideResetButton, ecoId, canExecute, onExecuteUpgrade, onExecuteRelease, onCheckedChange }: Props) {
+export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executionItems, resetKey, hideResetButton, ecoId, canExecute, onExecuteUpgrade, onExecuteRelease, onExecutePublish, onCheckedChange, onViewItem, onEditItem }: Props) {
   const [ecrData, setEcrData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
@@ -435,7 +477,7 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
           return (
             <div key={ai.entity_id || ai.entity_code} className="bg-gray-50/50 rounded-lg border border-gray-200 p-3 mb-4">
               <div className="text-xs font-semibold text-gray-700 mb-2">📦 受影响物料: {ai.entity_code} - {ai.entity_name}</div>
-              <AffectedTable rows={[ai]} execMap={execMap} canExec={canExecute} onUpgrade={onExecuteUpgrade} onRelease={onExecuteRelease} checkedIds={checkedExecIds} onToggleCheck={toggleChecked} />
+              <AffectedTable rows={[ai]} execMap={execMap} canExec={canExecute} onUpgrade={onExecuteUpgrade} onRelease={onExecuteRelease} onPublish={onExecutePublish} onViewItem={onViewItem} onEditItem={onEditItem} checkedIds={checkedExecIds} onToggleCheck={toggleChecked} />
 
               {/* Upward chain */}
               {upRows.length > 0 && (<>
@@ -443,10 +485,10 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
                 <div className="grid grid-cols-2 gap-4 mb-3">
                   {readOnly ? (<>
                     <div><div className="text-xs text-gray-500 mb-1">ECR 评估</div><EditableUpward rows={upRows} onUpdate={() => {}} displayOnly /></div>
-                    <div><div className="text-xs text-gray-500 mb-1">ECO 执行后</div><ReadOnlyUpward rows={upRows} execMap={execMap} canExec={canExecute} onUpgrade={onExecuteUpgrade} onRelease={onExecuteRelease} checkedIds={checkedExecIds} onToggleCheck={toggleChecked} /></div>
+                    <div><div className="text-xs text-gray-500 mb-1">ECO 执行后</div><ReadOnlyUpward rows={upRows} execMap={execMap} canExec={canExecute} onUpgrade={onExecuteUpgrade} onRelease={onExecuteRelease} onViewItem={onViewItem} onEditItem={onEditItem} checkedIds={checkedExecIds} onToggleCheck={toggleChecked} /></div>
                   </>) : (<>
                     <div><div className="text-xs text-gray-500 mb-1">ECR 评估（可编辑）</div><EditableUpward rows={upRows} onUpdate={(i, patch) => { const origIdx = localUp.indexOf(upRows[i]); if (origIdx >= 0) updateUp(origIdx, patch); }} /></div>
-                    <div><div className="text-xs text-gray-500 mb-1">ECO 执行后</div><ReadOnlyUpward rows={upRows} execMap={execMap} canExec={canExecute} onUpgrade={onExecuteUpgrade} onRelease={onExecuteRelease} checkedIds={checkedExecIds} onToggleCheck={toggleChecked} /></div>
+                    <div><div className="text-xs text-gray-500 mb-1">ECO 执行后</div><ReadOnlyUpward rows={upRows} execMap={execMap} canExec={canExecute} onUpgrade={onExecuteUpgrade} onRelease={onExecuteRelease} onPublish={onExecutePublish} onViewItem={onViewItem} onEditItem={onEditItem} checkedIds={checkedExecIds} onToggleCheck={toggleChecked} /></div>
                   </>)}
                 </div>
               </>)}
@@ -457,10 +499,10 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
                 <div className="grid grid-cols-2 gap-4">
                   {readOnly ? (<>
                     <div><div className="text-xs text-gray-500 mb-1">ECR 评估</div><EditableDownward rows={downRows} onUpdate={() => {}} displayOnly /></div>
-                    <div><div className="text-xs text-gray-500 mb-1">ECO 执行后</div><ReadOnlyDownward rows={downRows} execMap={execMap} canExec={canExecute} onUpgrade={onExecuteUpgrade} onRelease={onExecuteRelease} checkedIds={checkedExecIds} onToggleCheck={toggleChecked} /></div>
+                    <div><div className="text-xs text-gray-500 mb-1">ECO 执行后</div><ReadOnlyDownward rows={downRows} execMap={execMap} canExec={canExecute} onUpgrade={onExecuteUpgrade} onRelease={onExecuteRelease} onPublish={onExecutePublish} onViewItem={onViewItem} onEditItem={onEditItem} checkedIds={checkedExecIds} onToggleCheck={toggleChecked} /></div>
                   </>) : (<>
                     <div><div className="text-xs text-gray-500 mb-1">ECR 评估（可编辑）</div><EditableDownward rows={downRows} onUpdate={(i, patch) => { const origIdx = localDown.indexOf(downRows[i]); if (origIdx >= 0) updateDown(origIdx, patch); }} onRemove={(i) => { const origIdx = localDown.indexOf(downRows[i]); if (origIdx >= 0) setLocalDown(prev => prev.filter((_, idx) => idx !== origIdx)); }} /></div>
-                    <div><div className="text-xs text-gray-500 mb-1">ECO 执行后</div><ReadOnlyDownward rows={downRows} execMap={execMap} canExec={canExecute} onUpgrade={onExecuteUpgrade} onRelease={onExecuteRelease} checkedIds={checkedExecIds} onToggleCheck={toggleChecked} /></div>
+                    <div><div className="text-xs text-gray-500 mb-1">ECO 执行后</div><ReadOnlyDownward rows={downRows} execMap={execMap} canExec={canExecute} onUpgrade={onExecuteUpgrade} onRelease={onExecuteRelease} onPublish={onExecutePublish} onViewItem={onViewItem} onEditItem={onEditItem} checkedIds={checkedExecIds} onToggleCheck={toggleChecked} /></div>
                   </>)}
                 </div>
                 {!readOnly && (

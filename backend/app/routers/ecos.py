@@ -512,6 +512,31 @@ async def manual_revert_item(
 
 
 # ─────────────────────────────────────────────────────
+# 16d. 发布（将升版创建的新版本状态改为 released）
+# ─────────────────────────────────────────────────────
+@router.post("/{eco_id}/execution-items/{item_id}/release")
+async def manual_release_item(
+    eco_id: uuid.UUID, item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin", "engineer"]))
+):
+    item = crud_eco.get_execution_item(db, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="执行项不存在")
+    if not item.new_entity_id:
+        raise HTTPException(status_code=400, detail="尚未执行升版，无法发布")
+
+    model = Part if item.entity_type == "part" else Assembly
+    new_entity = db.query(model).filter(model.id == item.new_entity_id).first()
+    if not new_entity:
+        raise HTTPException(status_code=404, detail="新版本实体不存在")
+
+    new_entity.status = "released"
+    db.commit()
+    return {"detail": "已发布", "new_entity_status": "released"}
+
+
+# ─────────────────────────────────────────────────────
 # 17. 状态变更日志
 # ─────────────────────────────────────────────────────
 @router.get("/{eco_id}/status-logs")

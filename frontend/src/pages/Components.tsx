@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { assembliesApi, assemblyPartsApi, customFieldsApi, bomApi, partsApi } from '../services/api';
 import type { Assembly, AssemblyPartItem, CustomFieldDefinition, CustomFieldValue } from '../types';
 import { canEdit, isAdmin, canDownload } from '../stores/auth';
@@ -66,6 +67,7 @@ const statusTag = (s: string) => {
    ================================================================ */
 
 export default function Components() {
+  const location = useLocation();
   /* ---- 列表状态 ---- */
   const [assemblies, setAssemblies] = useState<Assembly[]>([]);
   const [loading, setLoading] = useState(true);
@@ -246,6 +248,19 @@ export default function Components() {
   useEffect(() => {
     loadAssemblies();
   }, [search, status, storeAssemblies]);
+
+  // 从 URL 参数 auto-open 编辑弹窗
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const editId = params.get('edit');
+    if (editId && assemblies.length > 0 && !modalOpen) {
+      const assembly = assemblies.find(a => a.id === editId);
+      if (assembly) {
+        handleEdit(assembly);
+        window.history.replaceState({}, '', '/components');
+      }
+    }
+  }, [location.search, assemblies]);
 
   const loadAssemblies = () => {
     const localAssemblies = useDataStore.getState().assemblies;

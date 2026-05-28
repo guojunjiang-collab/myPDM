@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { partsApi, customFieldsApi, bomApi } from '../services/api';
 import type { Part, CustomFieldDefinition, CustomFieldValue } from '../types';
 import { canEdit, isAdmin, canDownload } from '../stores/auth';
@@ -35,6 +36,7 @@ const initialFormData: PartFormData = {
 };
 
 export default function Parts() {
+  const location = useLocation();
   const [parts, setParts] = useState<Part[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -148,6 +150,20 @@ export default function Parts() {
   useEffect(() => {
     loadParts();
   }, [search, status, storeParts, storeCustomDefs]); // storeParts、storeCustomDefs 变化时也重新加载
+
+  // 从 URL 参数 auto-open 编辑弹窗
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const editId = params.get('edit');
+    if (editId && parts.length > 0 && !modalOpen) {
+      const part = parts.find(p => p.id === editId);
+      if (part) {
+        handleEdit(part);
+        // 清除 URL 参数避免刷新后再次打开
+        window.history.replaceState({}, '', '/parts');
+      }
+    }
+  }, [location.search, parts]);
 
   const loadParts = () => {
     // 仅从本地 store 取数据，不自动调 API
