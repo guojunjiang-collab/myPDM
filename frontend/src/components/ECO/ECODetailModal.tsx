@@ -86,7 +86,10 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
 
   const act = async (fn: () => Promise<any>, msg: string) => {
     setActionLoading(true);
-    try { await fn(); toast.success(msg); load(); } catch { toast.error('操作失败'); }
+    try { await fn(); toast.success(msg); load(); } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      toast.error(typeof detail === 'string' ? detail : '操作失败');
+    }
     finally { setActionLoading(false); }
   };
 
@@ -268,9 +271,9 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
               <ECOEditView ecrId={eco.ecr_id} onEcrLinked={() => {}} readOnly executionItems={eco.execution_items}
                 ecoId={ecoId} ecoStatus={eco.status} canExecute={executionMode && (eco.status === 'approved' || eco.status === 'executing')}
                 onExecuteUpgrade={(itemId) => act(() => ecoApi.upgradeItem(ecoId, itemId), '升版完成')}
-                onExecuteRelease={(itemId) => act(() => ecoApi.revertItem(ecoId, itemId), '已还原')}
-                onExecuteFreeze={(itemId) => act(() => ecoApi.freezeItem(ecoId, itemId), '冻结完成')}
-                onExecutePublish={(itemId) => act(() => ecoApi.releaseItem(ecoId, itemId), '发布完成')}
+                onExecuteRelease={(itemId, newEntityId) => act(() => ecoApi.revertItem(ecoId, itemId, newEntityId), '已还原')}
+                onExecuteFreeze={(itemId, newEntityId) => act(() => ecoApi.freezeItem(ecoId, itemId, newEntityId), '冻结完成')}
+                onExecutePublish={(itemId, newEntityId) => act(() => ecoApi.releaseItem(ecoId, itemId), '发布完成')}
                 onViewItem={(entityType, entityId) => viewItem(entityType, entityId, 'view')}
                 onEditItem={(entityType, entityId) => viewItem(entityType, entityId, 'edit')}
                 onCheckedChange={setCheckedExecIds} />

@@ -205,17 +205,20 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
     finally { setNestedLoading(false); }
   };
 
-  const handleExecuteAction = async (action: string, itemId: string) => {
+  const handleExecuteAction = async (action: string, itemId: string, newEntityId?: string) => {
     if (!localEco) return;
     try {
       if (action === 'upgrade') await ecoApi.upgradeItem(localEco.id, itemId);
-      else if (action === 'revert') await ecoApi.revertItem(localEco.id, itemId);
-      else if (action === 'freeze') await ecoApi.freezeItem(localEco.id, itemId);
+      else if (action === 'revert') await ecoApi.revertItem(localEco.id, itemId, newEntityId);
+      else if (action === 'freeze') await ecoApi.freezeItem(localEco.id, itemId, newEntityId);
       toast.success('操作完成');
       // Reload ECO data
       const r = await ecoApi.detail(localEco.id);
       setLocalEco(r.data);
-    } catch { toast.error('操作失败'); }
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      toast.error(typeof detail === 'string' ? detail : '操作失败');
+    }
   };
 
   const addReviewer = () => {
@@ -555,8 +558,8 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
           ecoId={localEco.id} ecoStatus={localEco.status}
           canExecute={localEco.status === 'draft'}
           onExecuteUpgrade={(itemId) => handleExecuteAction('upgrade', itemId)}
-          onExecuteRelease={(itemId) => handleExecuteAction('revert', itemId)}
-          onExecuteFreeze={(itemId) => handleExecuteAction('freeze', itemId)}
+onExecuteRelease={(itemId, newEntityId) => handleExecuteAction('revert', itemId, newEntityId)}
+onExecuteFreeze={(itemId, newEntityId) => handleExecuteAction('freeze', itemId, newEntityId)}
           onViewItem={(entityType, entityId) => viewItem(entityType, entityId, 'view')}
           onEditItem={(entityType, entityId) => viewItem(entityType, entityId, 'edit')}
           resetKey={resetKey} hideResetButton />

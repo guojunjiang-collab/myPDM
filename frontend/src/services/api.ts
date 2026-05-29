@@ -443,10 +443,10 @@ export const ecoApi = {
     api.post(`/ecos/${ecoId}/execution-items/${itemId}/upgrade`),
   releaseItem: (ecoId: string, itemId: string) =>
     api.post(`/ecos/${ecoId}/execution-items/${itemId}/release`),
-  freezeItem: (ecoId: string, itemId: string) =>
-    api.post(`/ecos/${ecoId}/execution-items/${itemId}/freeze`),
-  revertItem: (ecoId: string, itemId: string) =>
-    api.post(`/ecos/${ecoId}/execution-items/${itemId}/revert`),
+  freezeItem: (ecoId: string, itemId: string, newEntityId?: string) =>
+    api.post(`/ecos/${ecoId}/execution-items/${itemId}/freeze`, newEntityId ? { new_entity_id: newEntityId } : undefined),
+  revertItem: (ecoId: string, itemId: string, newEntityId?: string) =>
+    api.post(`/ecos/${ecoId}/execution-items/${itemId}/revert`, newEntityId ? { new_entity_id: newEntityId } : undefined),
   executeAll: (id: string) =>
     api.post(`/ecos/${id}/execute-all`),
   getExecutionItems: (ecoId: string) =>

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { ecrApi, assemblyPartsApi, partsApi, assembliesApi } from '../../services/api';
+import { ecrApi, partsApi, assembliesApi } from '../../services/api';
 import type { BomImpactNode } from '../../types';
 import { ECOActionBadge } from './ECOStatusBadge';
 import AssemblyPartPicker from '../AssemblyPartPicker';
@@ -24,9 +24,9 @@ interface Props {
   ecoStatus?: string;  // 'draft' | 'reviewing' | 'approved' | 'executing' | 'completed'
   canExecute?: boolean;
   onExecuteUpgrade?: (itemId: string) => void;
-  onExecuteRelease?: (itemId: string) => void;
-  onExecuteFreeze?: (itemId: string) => void;
-  onExecutePublish?: (itemId: string) => void;
+  onExecuteRelease?: (itemId: string, newEntityId?: string) => void;
+  onExecuteFreeze?: (itemId: string, newEntityId?: string) => void;
+  onExecutePublish?: (itemId: string, newEntityId?: string) => void;
   onCheckedChange?: (ids: string[]) => void;
   onViewItem?: (entityType: string, entityId: string) => void;
   onEditItem?: (entityType: string, entityId: string) => void;
@@ -167,7 +167,7 @@ function EditableDownward({ rows, onUpdate, displayOnly = false, onRemove }: { r
 }
 
 // ── Read-only tables ──
-function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, onUpgrade, onRelease, onFreeze, onPublish, checkedIds, onToggleCheck, onViewItem, onEditItem }: { rows: MutableNode[]; execMap?: Map<string, any>; canExec?: boolean; ecoStatus?: string; onUpgrade?: (id: string) => void; onRelease?: (id: string) => void; onFreeze?: (id: string) => void; onPublish?: (id: string) => void; checkedIds?: Set<string>; onToggleCheck?: (id: string) => void; onViewItem?: (entityType: string, entityId: string) => void; onEditItem?: (entityType: string, entityId: string) => void }) {
+function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, onUpgrade, onRelease, onFreeze, onPublish, checkedIds, onToggleCheck, onViewItem, onEditItem }: { rows: MutableNode[]; execMap?: Map<string, any>; canExec?: boolean; ecoStatus?: string; onUpgrade?: (id: string) => void; onRelease?: (id: string, newEntityId?: string) => void; onFreeze?: (id: string, newEntityId?: string) => void; onPublish?: (id: string, newEntityId?: string) => void; checkedIds?: Set<string>; onToggleCheck?: (id: string) => void; onViewItem?: (entityType: string, entityId: string) => void; onEditItem?: (entityType: string, entityId: string) => void }) {
   const getExec = (entityId: string) => execMap?.get(entityId);
   return (
     <div className="overflow-x-auto border border-gray-200 rounded-lg">
@@ -213,14 +213,14 @@ function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, onUpgrade, onReleas
                     exec?.new_entity_status === 'draft' ? (
                       // 已升版：还原 + 冻结
                       <>
-                        <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || ''); }}
+                        <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
                           className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
-                        <button onClick={(e) => { e.stopPropagation(); onFreeze?.(exec?.id || ''); }}
+                        <button onClick={(e) => { e.stopPropagation(); onFreeze?.(exec?.id || '', exec?.new_entity_id); }}
                           className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">冻结</button>
                       </>
                     ) : exec?.new_entity_status === 'frozen' ? (
                       // 已冻结：还原
-                      <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || ''); }}
+                      <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
                         className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
                     ) : !exec?.new_entity_status ? (
                       // 未执行：升版
@@ -231,7 +231,7 @@ function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, onUpgrade, onReleas
                     // 执行阶段
                     exec?.new_entity_status === 'frozen' ? (
                       // 已冻结：发布
-                      <button onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || ''); }}
+                      <button onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || '', exec?.new_entity_id); }}
                         className="px-1.5 py-0.5 text-xs bg-green-500 text-white rounded hover:bg-green-600">发布</button>
                     ) : null
                   ) : null}
@@ -245,7 +245,7 @@ function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, onUpgrade, onReleas
   </table>
 </div>);}
 
-function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, onUpgrade, onRelease, onFreeze, onPublish, checkedIds, onToggleCheck, onViewItem, onEditItem }: { rows: MutableNode[]; execMap?: Map<string, any>; canExec?: boolean; ecoStatus?: string; onUpgrade?: (id: string) => void; onRelease?: (id: string) => void; onFreeze?: (id: string) => void; onPublish?: (id: string) => void; checkedIds?: Set<string>; onToggleCheck?: (id: string) => void; onViewItem?: (entityType: string, entityId: string) => void; onEditItem?: (entityType: string, entityId: string) => void }) {
+function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, onUpgrade, onRelease, onFreeze, onPublish, checkedIds, onToggleCheck, onViewItem, onEditItem }: { rows: MutableNode[]; execMap?: Map<string, any>; canExec?: boolean; ecoStatus?: string; onUpgrade?: (id: string) => void; onRelease?: (id: string, newEntityId?: string) => void; onFreeze?: (id: string, newEntityId?: string) => void; onPublish?: (id: string, newEntityId?: string) => void; checkedIds?: Set<string>; onToggleCheck?: (id: string) => void; onViewItem?: (entityType: string, entityId: string) => void; onEditItem?: (entityType: string, entityId: string) => void }) {
   const getExec = (entityId: string) => execMap?.get(entityId);
   return (
     <div className="overflow-x-auto border border-gray-200 rounded-lg">
@@ -282,13 +282,13 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, onUpgrade, onRele
                   {ecoStatus === 'draft' ? (
                     exec?.new_entity_status === 'draft' ? (
                       <>
-                        <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || ''); }}
+                        <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
                           className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
-                        <button onClick={(e) => { e.stopPropagation(); onFreeze?.(exec?.id || ''); }}
+                        <button onClick={(e) => { e.stopPropagation(); onFreeze?.(exec?.id || '', exec?.new_entity_id); }}
                           className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">冻结</button>
                       </>
                     ) : exec?.new_entity_status === 'frozen' ? (
-                      <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || ''); }}
+                      <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
                         className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
                     ) : !exec?.new_entity_status ? (
                       <button onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || ''); }}
@@ -296,7 +296,7 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, onUpgrade, onRele
                     ) : null
                   ) : ecoStatus === 'executing' ? (
                     exec?.new_entity_status === 'frozen' ? (
-                      <button onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || ''); }}
+                      <button onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || '', exec?.new_entity_id); }}
                         className="px-1.5 py-0.5 text-xs bg-green-500 text-white rounded hover:bg-green-600">发布</button>
                     ) : null
                   ) : null}
@@ -312,7 +312,7 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, onUpgrade, onRele
 }
 
 // ── Affected items table ──
-function AffectedTable({ rows, execMap, canExec, ecoStatus, onUpgrade, onRelease, onFreeze, onPublish, onViewItem, onEditItem, checkedIds, onToggleCheck }: { rows: MutableNode[]; execMap?: Map<string, any>; canExec?: boolean; ecoStatus?: string; onUpgrade?: (id: string) => void; onRelease?: (id: string) => void; onFreeze?: (id: string) => void; onPublish?: (id: string) => void; onViewItem?: (entityType: string, entityId: string) => void; onEditItem?: (entityType: string, entityId: string) => void; checkedIds?: Set<string>; onToggleCheck?: (id: string) => void }) {
+function AffectedTable({ rows, execMap, canExec, ecoStatus, onUpgrade, onRelease, onFreeze, onPublish, onViewItem, onEditItem, checkedIds, onToggleCheck }: { rows: MutableNode[]; execMap?: Map<string, any>; canExec?: boolean; ecoStatus?: string; onUpgrade?: (id: string) => void; onRelease?: (id: string, newEntityId?: string) => void; onFreeze?: (id: string, newEntityId?: string) => void; onPublish?: (id: string, newEntityId?: string) => void; onViewItem?: (entityType: string, entityId: string) => void; onEditItem?: (entityType: string, entityId: string) => void; checkedIds?: Set<string>; onToggleCheck?: (id: string) => void }) {
   const getExec = (entityId: string) => execMap?.get(entityId);
   return (
     <div className="overflow-x-auto border border-gray-200 rounded-lg">
@@ -352,13 +352,13 @@ function AffectedTable({ rows, execMap, canExec, ecoStatus, onUpgrade, onRelease
                     {ecoStatus === 'draft' ? (
                       exec?.new_entity_status === 'draft' ? (
                         <>
-                          <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || ''); }}
+                          <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
                             className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
-                          <button onClick={(e) => { e.stopPropagation(); onFreeze?.(exec?.id || ''); }}
+                          <button onClick={(e) => { e.stopPropagation(); onFreeze?.(exec?.id || '', exec?.new_entity_id); }}
                             className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">冻结</button>
                         </>
                       ) : exec?.new_entity_status === 'frozen' ? (
-                        <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || ''); }}
+                        <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
                           className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
                       ) : !exec?.new_entity_status ? (
                         <button onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || ''); }}
@@ -366,7 +366,7 @@ function AffectedTable({ rows, execMap, canExec, ecoStatus, onUpgrade, onRelease
                       ) : null
                     ) : ecoStatus === 'executing' ? (
                       exec?.new_entity_status === 'frozen' ? (
-                        <button onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || ''); }}
+                        <button onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || '', exec?.new_entity_id); }}
                           className="px-1.5 py-0.5 text-xs bg-green-500 text-white rounded hover:bg-green-600">发布</button>
                       ) : null
                     ) : null}
@@ -478,32 +478,25 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
   useEffect(() => { onBomChange?.({ up: localUp, down: localDown }); }, [localUp, localDown, onBomChange]);
 
   // 构建执行项映射 entity_id → execution item
-  const [liveExecMap, setLiveExecMap] = useState<Map<string, any>>(new Map());
-  const [autoLinkedItems, setAutoLinkedItems] = useState<Map<string, string>>(new Map());
+  const [liveExecData, setLiveExecData] = useState<Map<string, { status: string; newId: string }>>(new Map());
   const execMap = new Map<string, any>();
   (executionItems || []).forEach((ei: any) => {
     if (ei.entity_id) execMap.set(ei.entity_id, ei);
   });
-  // 合并自动关联的新版本
-  autoLinkedItems.forEach((newId, originalId) => {
-    const existing = execMap.get(originalId);
-    if (existing && !existing.new_entity_id) {
-      execMap.set(originalId, { ...existing, new_entity_id: newId });
-    }
-  });
-  // 合并实时状态（优先使用 liveExecMap 中的状态）
-  liveExecMap.forEach((val, key) => {
+  // 合并自动检测结果：仅当 API 未返回 new_entity_id 时，用检测结果补充
+  liveExecData.forEach((val, key) => {
     const existing = execMap.get(key);
-    if (existing) {
+    if (existing && !existing.new_entity_id) {
+      execMap.set(key, { ...existing, new_entity_id: val.newId, new_entity_status: val.status, _auto_linked: true });
+    } else if (existing && !existing.new_entity_status) {
       execMap.set(key, { ...existing, new_entity_status: val.status });
     }
   });
 
-  // 加载执行项涉及的零部件实时状态
+  // 加载执行项涉及的零部件实时状态（仅显示用途）
   useEffect(() => {
     if (!executionItems || executionItems.length === 0) return;
 
-    // 收集所有执行项的件号（去重）
     const codeMap = new Map<string, { entity_id: string; entity_type: string; entity_code: string }>();
     executionItems.forEach((ei: any) => {
       if (ei.entity_code && !codeMap.has(ei.entity_code)) {
@@ -511,42 +504,33 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
       }
     });
 
-    // 按类型分组搜索
     const partCodes = Array.from(codeMap.values()).filter(e => e.entity_type === 'part');
     const assemblyCodes = Array.from(codeMap.values()).filter(e => e.entity_type === 'assembly');
 
     const promises: Promise<any>[] = [];
 
-    // 搜索零件
     if (partCodes.length > 0) {
       promises.push(
         Promise.allSettled(
           partCodes.map(async ({ entity_id, entity_code }) => {
             const list = await partsApi.list({ search: entity_code, page_size: 100 });
             const items = list.data?.items || list.data || [];
-            // 找到同编码但不同ID的版本（即新版本）
             const newVersion = items.find((item: any) => item.code === entity_code && item.id !== entity_id);
-            if (newVersion) {
-              return { entity_id, newId: newVersion.id, status: newVersion.status };
-            }
+            if (newVersion) return { entity_id, status: newVersion.status, newId: newVersion.id };
             return null;
           })
         )
       );
     }
 
-    // 搜索部件
     if (assemblyCodes.length > 0) {
       promises.push(
         Promise.allSettled(
           assemblyCodes.map(async ({ entity_id, entity_code }) => {
             const list = await assembliesApi.list({ search: entity_code, page_size: 100 });
             const items = list.data?.items || list.data || [];
-            // 找到同编码但不同ID的版本（即新版本）
             const newVersion = items.find((item: any) => item.code === entity_code && item.id !== entity_id);
-            if (newVersion) {
-              return { entity_id, newId: newVersion.id, status: newVersion.status };
-            }
+            if (newVersion) return { entity_id, status: newVersion.status, newId: newVersion.id };
             return null;
           })
         )
@@ -554,23 +538,17 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
     }
 
     Promise.all(promises).then(results => {
-      const statusMap = new Map<string, any>();
-      const linkMap = new Map<string, string>();
-
+      const dataMap = new Map<string, { status: string; newId: string }>();
       results.forEach(result => {
         if (Array.isArray(result)) {
           result.forEach(r => {
             if (r.status === 'fulfilled' && r.value) {
-              const { entity_id, newId, status } = r.value;
-              statusMap.set(entity_id, { status });
-              linkMap.set(entity_id, newId);
+              dataMap.set(r.value.entity_id, { status: r.value.status, newId: r.value.newId });
             }
           });
         }
       });
-
-      setLiveExecMap(statusMap);
-      setAutoLinkedItems(linkMap);
+      setLiveExecData(dataMap);
     });
   }, [executionItems]);
 
