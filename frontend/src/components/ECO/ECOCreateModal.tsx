@@ -6,6 +6,9 @@ import { useAuthStore } from '../../stores/auth';
 import { useDataStore } from '../../stores/data';
 import type { ECORequest, ECRDocumentLink } from '../../types';
 import VersionSelectModal from '../VersionSelectModal';
+import PartDetailContent from '../PartDetailContent';
+import AssemblyDetailContent from '../AssemblyDetailContent';
+import EntityEditModal from '../EntityEditModal';
 
 const statusTag = (s: string) => {
   const labels: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' };
@@ -97,6 +100,10 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
   const [docAttachments, setDocAttachments] = useState<Record<string, any[]>>({});
   const [docCustomValues, setDocCustomValues] = useState<Record<string, Record<string, any>>>({});
   const [versionSelectState, setVersionSelectState] = useState<{ docId: string; oldDocId: string } | null>(null);
+  const [nestedDetail, setNestedDetail] = useState<{ type: string; id: string } | null>(null);
+  const [nestedData, setNestedData] = useState<any>(null);
+  const [nestedLoading, setNestedLoading] = useState(false);
+  const [editEntity, setEditEntity] = useState<{ type: string; id: string } | null>(null);
   const [resetKey, setResetKey] = useState(0);
   const docFieldDefs = useDataStore((s) => s.customFieldDefs).filter((d) => d.applies_to?.includes('document'));
   const onCloseRef = useRef(onClose);
@@ -180,8 +187,35 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
     const e: Record<string, string> = {};
     if (!title.trim()) e.title = '请输入标题';
     if (!reason) e.reason = '请选择变更原因';
-    setErrors(e);
     return Object.keys(e).length === 0;
+  };
+
+  const viewItem = async (entityType: string, entityId: string, mode?: 'view' | 'edit') => {
+    if (mode === 'edit') {
+      setEditEntity({ type: entityType, id: entityId });
+      return;
+    }
+    setNestedDetail({ type: entityType, id: entityId });
+    setNestedLoading(true);
+    try {
+      const api = entityType === 'assembly' ? assembliesApi : partsApi;
+      const r = await api.get(entityId);
+      setNestedData(r.data);
+    } catch { toast.error('加载详情失败'); }
+    finally { setNestedLoading(false); }
+  };
+
+  const handleExecuteAction = async (action: string, itemId: string) => {
+    if (!localEco) return;
+    try {
+      if (action === 'upgrade') await ecoApi.upgradeItem(localEco.id, itemId);
+      else if (action === 'revert') await ecoApi.revertItem(localEco.id, itemId);
+      else if (action === 'freeze') await ecoApi.freezeItem(localEco.id, itemId);
+      toast.success('操作完成');
+      // Reload ECO data
+      const r = await ecoApi.detail(localEco.id);
+      setLocalEco(r.data);
+    } catch { toast.error('操作失败'); }
   };
 
   const addReviewer = () => {
@@ -518,6 +552,13 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
               toast.success('ECR 关联成功');
             } catch { toast.error('关联失败'); }
           }} onBomChange={setBomData} executionItems={localEco.execution_items}
+          ecoId={localEco.id} ecoStatus={localEco.status}
+          canExecute={localEco.status === 'draft'}
+          onExecuteUpgrade={(itemId) => handleExecuteAction('upgrade', itemId)}
+          onExecuteRelease={(itemId) => handleExecuteAction('revert', itemId)}
+          onExecuteFreeze={(itemId) => handleExecuteAction('freeze', itemId)}
+          onViewItem={(entityType, entityId) => viewItem(entityType, entityId, 'view')}
+          onEditItem={(entityType, entityId) => viewItem(entityType, entityId, 'edit')}
           resetKey={resetKey} hideResetButton />
         </div>
         )}
@@ -586,6 +627,31 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         }}
         onClose={() => setVersionSelectState(null)}
       />
+
+      {/* 嵌套详情弹窗 */}
+      {nestedDetail && (
+        <Modal open={true} title={nestedDetail.type === 'assembly' ? '部件详情' : '零件详情'} onClose={() => { setNestedDetail(null); setNestedData(null); }} width="full">
+          {nestedLoading ? <div className="text-center py-8 text-sm text-gray-400">加载中...</div>
+          : nestedData ? (
+            nestedDetail.type === 'assembly' ? (
+              <AssemblyDetailContent assembly={nestedData} customFieldDefs={[]} customFieldValues={{}} />
+            ) : (
+              <PartDetailContent part={nestedData} customFieldDefs={[]} customFieldValues={{}} />
+            )
+          ) : <div className="text-center py-8 text-sm text-gray-400">未找到数据</div>}
+        </Modal>
+      )}
+
+      {/* 编辑弹窗 */}
+      {editEntity && (
+        <EntityEditModal
+          open={!!editEntity}
+          entityType={editEntity.type as 'part' | 'assembly'}
+          entityId={editEntity.id}
+          onClose={() => setEditEntity(null)}
+          onSaved={() => { setEditEntity(null); if (localEco) ecoApi.detail(localEco.id).then(r => setLocalEco(r.data)); toast.success('保存成功'); }}
+        />
+      )}
     </Modal>
   );
 }
