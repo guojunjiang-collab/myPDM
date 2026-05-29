@@ -252,7 +252,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
 
   const saveReleaseItems = (newItems: any[]) => {
     setReleaseItems(newItems);
-    toast.success('工程预变更已更新');
+    toast.success('工程变更结果已更新');
   };
 
   const handleReleaseVersionSelect = async (versionId: string) => {
@@ -616,14 +616,14 @@ onExecuteFreeze={(itemId, newEntityId) => handleExecuteAction('freeze', itemId, 
         </div>
         )}
 
-        {/* 工程预变更 */}
+        {/* 工程变更结果 */}
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-bold text-gray-700">工程预变更</h4>
+            <h4 className="text-sm font-bold text-gray-700">工程变更结果</h4>
             <button type="button" onClick={() => setShowReleasePicker(true)} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 关联零部件</button>
           </div>
           {releaseItems.length === 0 ? (
-            <div className="border rounded-lg px-4 py-6 text-center text-sm text-gray-400">暂无工程预变更</div>
+            <div className="border rounded-lg px-4 py-6 text-center text-sm text-gray-400">暂无工程变更结果</div>
           ) : (
             <ReleaseItemsTable items={releaseItems} onViewItem={viewItem} onRemove={(idx) => { const newItems = releaseItems.filter((_, i) => i !== idx); saveReleaseItems(newItems); }} onVersionSelect={(idx) => { const item = releaseItems[idx]; setReleaseVersionState({ itemIdx: idx, entityType: item.entity_type, entityId: item.entity_id, entityName: item.entity_name }); }} />
           )}
@@ -693,7 +693,7 @@ onExecuteFreeze={(itemId, newEntityId) => handleExecuteAction('freeze', itemId, 
         onClose={() => setVersionSelectState(null)}
       />
 
-      {/* 零部件版本选择器（工程预变更） */}
+      {/* 零部件版本选择器（工程变更结果） */}
       <VersionSelectModal
         open={!!releaseVersionState}
         entityType={releaseVersionState?.entityType as 'part' | 'assembly' || 'part'}
@@ -704,7 +704,7 @@ onExecuteFreeze={(itemId, newEntityId) => handleExecuteAction('freeze', itemId, 
         onClose={() => setReleaseVersionState(null)}
       />
 
-      {/* 零部件选择器（工程预变更） */}
+      {/* 零部件选择器（工程变更结果） */}
       <AssemblyPartPicker open={showReleasePicker} onClose={() => setShowReleasePicker(false)}
         onConfirm={(items) => {
           setShowReleasePicker(false);

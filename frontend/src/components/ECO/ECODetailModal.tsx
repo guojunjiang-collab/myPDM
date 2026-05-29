@@ -122,7 +122,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
   };
 
   const saveReleaseItems = async (newItems: any[]) => {
-    try { await ecoApi.update(ecoId, { release_items: newItems }); setReleaseItems(newItems); toast.success('工程预变更已更新'); } catch { toast.error('保存失败'); }
+    try { await ecoApi.update(ecoId, { release_items: newItems }); setReleaseItems(newItems); toast.success('工程变更结果已更新'); } catch { toast.error('保存失败'); }
   };
 
   const viewItem = async (entityType: string, entityId: string, mode?: 'view' | 'edit') => {
@@ -312,13 +312,13 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
             </div>
           )}
 
-          {/* 工程预变更 */}
+          {/* 工程变更结果 */}
           <div className="border-t pt-4">
             <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-bold text-gray-700">工程预变更</h4>
+              <h4 className="text-sm font-bold text-gray-700">工程变更结果</h4>
             </div>
             {releaseItems.length === 0 ? (
-              <div className="border rounded-lg px-4 py-6 text-center text-sm text-gray-400">暂无工程预变更</div>
+              <div className="border rounded-lg px-4 py-6 text-center text-sm text-gray-400">暂无工程变更结果</div>
             ) : (
               <ReleaseItemsTable items={releaseItems} onViewItem={viewItem} />
             )}
