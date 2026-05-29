@@ -479,9 +479,17 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
 
   // 构建执行项映射 entity_id → execution item
   const [liveExecMap, setLiveExecMap] = useState<Map<string, any>>(new Map());
+  const [autoLinkedItems, setAutoLinkedItems] = useState<Map<string, string>>(new Map());
   const execMap = new Map<string, any>();
   (executionItems || []).forEach((ei: any) => {
     if (ei.entity_id) execMap.set(ei.entity_id, ei);
+  });
+  // 合并自动关联的新版本
+  autoLinkedItems.forEach((newId, originalId) => {
+    const existing = execMap.get(originalId);
+    if (existing && !existing.new_entity_id) {
+      execMap.set(originalId, { ...existing, new_entity_id: newId });
+    }
   });
   // 合并实时状态（优先使用 liveExecMap 中的状态）
   liveExecMap.forEach((val, key) => {
@@ -497,22 +505,75 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
     const newEntityIds = executionItems
       .filter((ei: any) => ei.new_entity_id)
       .map((ei: any) => ({ id: ei.new_entity_id, type: ei.entity_type }));
-    if (newEntityIds.length === 0) return;
+    
+    // 检查 action=upgrade 但没有 new_entity_id 的执行项，自动关联已存在的新版本
+    const upgradeItems = executionItems
+      .filter((ei: any) => ei.action === 'upgrade' && !ei.new_entity_id && ei.entity_id)
+      .map((ei: any) => ({ id: ei.entity_id, type: ei.entity_type, code: ei.entity_code, version: ei.detail?._originalVersion || '' }));
 
-    Promise.allSettled(
-      newEntityIds.map(async ({ id, type }: { id: string; type: string }) => {
-        const api = type === 'assembly' ? assembliesApi : partsApi;
-        const r = await api.get(id);
-        return { id, status: r.data.status };
-      })
-    ).then(results => {
-      const map = new Map<string, any>();
-      results.forEach(r => {
-        if (r.status === 'fulfilled') {
-          map.set(r.value.id, { status: r.value.status });
-        }
-      });
-      setLiveExecMap(map);
+    const promises: Promise<any>[] = [];
+
+    // 获取已有 new_entity_id 的状态
+    if (newEntityIds.length > 0) {
+      promises.push(
+        Promise.allSettled(
+          newEntityIds.map(async ({ id, type }: { id: string; type: string }) => {
+            const api = type === 'assembly' ? assembliesApi : partsApi;
+            const r = await api.get(id);
+            return { id, status: r.data.status };
+          })
+        )
+      );
+    }
+
+    // 检查升级项是否有对应的新版本存在
+    if (upgradeItems.length > 0) {
+      promises.push(
+        Promise.allSettled(
+          upgradeItems.map(async ({ id, type, code }: { id: string; type: string; code: string; version: string }) => {
+            const api = type === 'assembly' ? assembliesApi : partsApi;
+            // 获取原实体信息
+            const original = await api.get(id);
+            // 搜索同编码的其他版本
+            const listApi = type === 'assembly' ? assembliesApi : partsApi;
+            const list = await listApi.list({ search: code, page_size: 100 });
+            const items = list.data?.items || list.data || [];
+            // 找到同编码但不同ID的最新版本（即升版后的实体）
+            const newVersion = items.find((item: any) => item.code === code && item.id !== id);
+            if (newVersion) {
+              return { originalId: id, newId: newVersion.id, status: newVersion.status };
+            }
+            return null;
+          })
+        )
+      );
+    }
+
+    Promise.all(promises).then(results => {
+      const statusMap = new Map<string, any>();
+      const linkMap = new Map<string, string>(); // originalId -> newId
+
+      // 处理已有 new_entity_id 的状态
+      if (results[0]) {
+        (results[0] as any[]).forEach(r => {
+          if (r.status === 'fulfilled' && r.value) {
+            statusMap.set(r.value.id, { status: r.value.status });
+          }
+        });
+      }
+
+      // 处理自动关联的新版本
+      if (results[1]) {
+        (results[1] as any[]).forEach(r => {
+          if (r.status === 'fulfilled' && r.value) {
+            linkMap.set(r.value.originalId, r.value.newId);
+            statusMap.set(r.value.newId, { status: r.value.status });
+          }
+        });
+      }
+
+      setLiveExecMap(statusMap);
+      setAutoLinkedItems(linkMap);
     });
   }, [executionItems]);
 
