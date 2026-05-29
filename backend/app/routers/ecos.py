@@ -576,17 +576,21 @@ async def manual_freeze_item(
 @router.post("/{eco_id}/execution-items/{item_id}/release")
 async def manual_release_item(
     eco_id: uuid.UUID, item_id: uuid.UUID,
+    body: schemas_eco.ECOExecutionItemAction = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(["admin", "engineer"]))
 ):
     item = crud_eco.get_execution_item(db, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="执行项不存在")
-    if not item.new_entity_id:
+
+    # 优先使用 DB 记录的 new_entity_id，其次使用请求中的（自动检测场景）
+    target_entity_id = item.new_entity_id or (uuid.UUID(body.new_entity_id) if body and body.new_entity_id else None)
+    if not target_entity_id:
         raise HTTPException(status_code=400, detail="尚未执行升版，无法发布")
 
     model = Part if item.entity_type == "part" else Assembly
-    new_entity = db.query(model).filter(model.id == item.new_entity_id).first()
+    new_entity = db.query(model).filter(model.id == target_entity_id).first()
     if not new_entity:
         raise HTTPException(status_code=404, detail="新版本实体不存在")
 

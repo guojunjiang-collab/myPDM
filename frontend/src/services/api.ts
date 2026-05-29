@@ -441,8 +441,8 @@ export const ecoApi = {
     api.post(`/ecos/${ecoId}/execute-item/${itemId}`),
   upgradeItem: (ecoId: string, itemId: string) =>
     api.post(`/ecos/${ecoId}/execution-items/${itemId}/upgrade`),
-  releaseItem: (ecoId: string, itemId: string) =>
-    api.post(`/ecos/${ecoId}/execution-items/${itemId}/release`),
+  releaseItem: (ecoId: string, itemId: string, newEntityId?: string) =>
+    api.post(`/ecos/${ecoId}/execution-items/${itemId}/release`, newEntityId ? { new_entity_id: newEntityId } : undefined),
   freezeItem: (ecoId: string, itemId: string, newEntityId?: string) =>
     api.post(`/ecos/${ecoId}/execution-items/${itemId}/freeze`, newEntityId ? { new_entity_id: newEntityId } : undefined),
   revertItem: (ecoId: string, itemId: string, newEntityId?: string) =>
