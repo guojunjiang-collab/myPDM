@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Modal } from '../Modal';
 import { toast } from '../Toast';
-import { ecoApi, usersApi, documentsApi, ecrApi, partsApi, assembliesApi, customFieldsApi } from '../../services/api';
+import { ecoApi, usersApi, documentsApi, ecrApi, partsApi, assembliesApi, assemblyPartsApi, customFieldsApi } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
 import { useDataStore } from '../../stores/data';
 import type { ECORequest, ECRDocumentLink } from '../../types';
@@ -94,10 +94,13 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
   const [documentLinks, setDocumentLinks] = useState<ECRDocumentLink[]>([]);
   const [showDocPicker, setShowDocPicker] = useState(false);
   const [showEcrPicker, setShowEcrPicker] = useState(false);
+  const [showReleasePicker, setShowReleasePicker] = useState(false);
+  const [releaseItems, setReleaseItems] = useState<any[]>([]);
   const [docData, setDocData] = useState<Record<string, any>>({});
   const [docAttachments, setDocAttachments] = useState<Record<string, any[]>>({});
   const [docCustomValues, setDocCustomValues] = useState<Record<string, Record<string, any>>>({});
   const [versionSelectState, setVersionSelectState] = useState<{ docId: string; oldDocId: string } | null>(null);
+  const [releaseVersionState, setReleaseVersionState] = useState<{ itemIdx: number; entityType: string; entityId: string; entityName: string } | null>(null);
   const [nestedDetail, setNestedDetail] = useState<{ type: string; id: string } | null>(null);
   const [nestedData, setNestedData] = useState<any>(null);
   const [nestedLoading, setNestedLoading] = useState(false);
@@ -157,6 +160,21 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         setReviewers((editingEco.reviewers || []).map((r: { user_id: string; seq: number }) => ({ user_id: r.user_id, seq: r.seq })));
         setReviewMode(editingEco.review_mode || 'all');
         setDocumentLinks(editingEco.document_links || []);
+        setReleaseItems(editingEco.release_items || []);
+        // 刷新 release_items 状态（避免显示过期状态）
+        (async () => {
+          const items = editingEco.release_items || [];
+          if (items.length > 0) {
+            const refreshed = await Promise.all(items.map(async (ri: any) => {
+              try {
+                const api = ri.entity_type === 'assembly' ? assembliesApi : partsApi;
+                const entity = await api.get(ri.entity_id);
+                return { ...ri, status: entity.data.status };
+              } catch { return ri; }
+            }));
+            setReleaseItems(refreshed);
+          }
+        })();
       } else {
         setTitle('');
         setReason('design_opt');
@@ -165,6 +183,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         setDescription('');
         setReviewers([]);
         setReviewMode('all');
+        setReleaseItems([]);
       }
       setErrors({});
     }
@@ -243,6 +262,30 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
       const detail = err?.response?.data?.detail;
       toast.error(typeof detail === 'string' ? detail : '操作失败');
     }
+  };
+
+  const saveReleaseItems = (newItems: any[]) => {
+    setReleaseItems(newItems);
+    toast.success('工程变更结果已更新');
+  };
+
+  const handleReleaseVersionSelect = async (versionId: string) => {
+    if (!releaseVersionState) return;
+    const api = releaseVersionState.entityType === 'assembly' ? assembliesApi : partsApi;
+    try {
+      const r = await api.get(versionId);
+      const updated = [...releaseItems];
+      updated[releaseVersionState.itemIdx] = {
+        ...updated[releaseVersionState.itemIdx],
+        entity_id: r.data.id,
+        entity_code: r.data.code,
+        entity_name: r.data.name,
+        entity_version: r.data.version,
+        status: r.data.status,
+      };
+      saveReleaseItems(updated);
+    } catch { toast.error('获取版本信息失败'); }
+    setReleaseVersionState(null);
   };
 
   const addReviewer = () => {
@@ -330,6 +373,13 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
           action: it.action || 'upgrade',
           parent_entity_id: it.parent_entity_id || undefined,
           detail: { ...(it.detail || {}), _desc: it.change_description || it._desc || (it.detail || {})._desc || '' },
+        }));
+      }
+      if (releaseItems.length > 0) {
+        data.release_items = releaseItems.map((ri: any) => ({
+          entity_type: ri.entity_type, entity_id: ri.entity_id,
+          entity_code: ri.entity_code, entity_name: ri.entity_name, entity_version: ri.entity_version,
+          spec: ri.spec || '', status: ri.status || 'draft',
         }));
       }
       if (ecrId) data.ecr_id = ecrId;
@@ -579,6 +629,21 @@ onExecuteFreeze={(itemId, newEntityId) => handleExecuteAction('freeze', itemId, 
           resetKey={resetKey} hideResetButton />
         </div>
         )}
+
+        {/* 工程变更结果（仅编辑模式） */}
+        {editingEco && (
+        <div className="border-t pt-4">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-bold text-gray-700">工程变更结果</h4>
+            <button type="button" onClick={() => setShowReleasePicker(true)} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 关联零部件</button>
+          </div>
+          {releaseItems.length === 0 ? (
+            <div className="border rounded-lg px-4 py-6 text-center text-sm text-gray-400">暂无工程变更结果</div>
+          ) : (
+            <ReleaseItemsTable items={releaseItems} onViewItem={viewItem} onRemove={(idx) => { const newItems = releaseItems.filter((_, i) => i !== idx); saveReleaseItems(newItems); }} onVersionSelect={(idx) => { const item = releaseItems[idx]; setReleaseVersionState({ itemIdx: idx, entityType: item.entity_type, entityId: item.entity_id, entityName: item.entity_name }); }} />
+          )}
+        </div>
+        )}
       </div>
 
       {/* 按钮 */}
@@ -643,6 +708,29 @@ onExecuteFreeze={(itemId, newEntityId) => handleExecuteAction('freeze', itemId, 
         }}
         onClose={() => setVersionSelectState(null)}
       />
+
+      {/* 零部件版本选择器（工程变更结果） */}
+      <VersionSelectModal
+        open={!!releaseVersionState}
+        entityType={releaseVersionState?.entityType as 'part' | 'assembly' || 'part'}
+        entityId={releaseVersionState?.entityId || ''}
+        entityName={releaseVersionState?.entityName || ''}
+        currentVersionId={releaseItems[releaseVersionState?.itemIdx ?? -1]?.entity_id}
+        onSelect={handleReleaseVersionSelect}
+        onClose={() => setReleaseVersionState(null)}
+      />
+
+      {/* 零部件选择器（工程变更结果） */}
+      <AssemblyPartPicker open={showReleasePicker} onClose={() => setShowReleasePicker(false)}
+        onConfirm={(items) => {
+          setShowReleasePicker(false);
+          Promise.allSettled(items.map(async (item) => { const api = item.child_type === 'assembly' ? assembliesApi : partsApi; const r = await api.get(item.child_id); return { ...r.data, child_type: item.child_type, quantity: item.quantity }; })).then(results => {
+            const loaded = results.filter(r => r.status === 'fulfilled').map((r: any) => r.value);
+            const existingIds = new Set(releaseItems.map((r: any) => r.entity_id));
+            const merged = [...releaseItems, ...loaded.filter((r: any) => !existingIds.has(r.id)).map((r: any) => ({ entity_type: r.child_type === 'assembly' ? 'assembly' : 'part', entity_id: r.id, entity_code: r.code || '', entity_name: r.name || '', entity_version: r.version || '', spec: r.spec || '', status: r.status || '', quantity: r.quantity || 1 }))];
+            saveReleaseItems(merged);
+          });
+        }} />
 
       {/* 嵌套详情弹窗 */}
       {nestedDetail && (
@@ -728,6 +816,74 @@ function EcrPicker({ onSelect }: { onSelect: (id: string, number: string) => voi
           </tbody>
         </table>
       )}
+    </div>
+  );
+}
+
+function ReleaseItemsTable({ items, onViewItem, onRemove, onVersionSelect }: { items: any[]; onViewItem: (type: string, id: string, mode?: 'view' | 'edit') => void; onRemove?: (idx: number) => void; onVersionSelect?: (idx: number) => void }) {
+  const [expanded, setExpanded] = useState<Record<string, any[]>>({});
+  const [loadingIdx, setLoadingIdx] = useState<string | null>(null);
+
+  const toggleExpand = async (idx: string, entityId: string, entityType: string) => {
+    if (expanded[idx]) { setExpanded(prev => { const n = {...prev}; delete n[idx]; return n; }); return; }
+    if (entityType !== 'assembly') return;
+    setLoadingIdx(idx);
+    try {
+      const r = await assemblyPartsApi.list(entityId);
+      const children = (r.data || []).map((c: any) => ({ entity_type: c.childType === 'component' || c.childType === 'assembly' ? 'assembly' : 'part', entity_id: c.child_id, entity_code: c.child_detail?.code || '', entity_name: c.child_detail?.name || '', entity_version: c.child_detail?.version || '', spec: c.child_detail?.spec || '', status: c.child_detail?.status || '', quantity: c.quantity || 1 }));
+      setExpanded(prev => ({ ...prev, [idx]: children }));
+    } catch { toast.error('加载子项失败'); }
+    finally { setLoadingIdx(null); }
+  };
+
+  const renderRow = (ri: any, level: number, idx: string): React.ReactNode => {
+    const isAssembly = ri.entity_type === 'assembly';
+    const childRows = expanded[idx];
+    const rowNum = parseInt(idx.split('-')[0], 10);
+    return (
+      <>
+        <tr key={idx} className="hover:bg-gray-50 cursor-pointer" onClick={() => onViewItem(isAssembly ? 'assembly' : 'part', ri.entity_id, 'view')}>
+          <td className="px-3 py-1.5 text-xs text-gray-400 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+            <span>{'-'.repeat(level)}{level}</span>
+            {isAssembly && <button onClick={(e) => { e.stopPropagation(); toggleExpand(idx, ri.entity_id, ri.entity_type); }} className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">{childRows ? '▼' : '▶'}</button>}
+          </td>
+          <td className="px-3 py-1.5 text-xs"><span className={`px-1.5 py-0.5 rounded text-xs ${isAssembly ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>{isAssembly ? '部件' : '零件'}</span></td>
+          <td className="px-3 py-1.5 text-xs font-mono">{ri.entity_code}</td>
+          <td className="px-3 py-1.5 text-xs">{ri.entity_name}</td>
+          <td className="px-3 py-1.5 text-xs text-gray-500">{ri.spec || '-'}</td>
+          <td className="px-3 py-1.5 text-xs">{ri.entity_version || 'A'}</td>
+          <td className="px-3 py-1.5 text-xs whitespace-nowrap">{ri.status ? <span className={`px-1.5 py-0.5 rounded text-xs ${statusTag(ri.status).cls}`}>{statusTag(ri.status).label}</span> : '-'}</td>
+          <td className="px-3 py-1.5 text-xs text-center">{ri.quantity || 1}</td>
+          {(onRemove || onVersionSelect) && level === 0 && <td className="px-3 py-1.5 text-xs text-center" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-1 justify-center">
+              {onVersionSelect && <button onClick={() => onVersionSelect(rowNum)} className="px-2 py-0.5 text-xs text-blue-500 hover:text-blue-700 rounded whitespace-nowrap">选择</button>}
+              {onRemove && <button onClick={() => onRemove(rowNum)} className="px-2 py-0.5 text-xs text-red-400 hover:text-red-600 whitespace-nowrap">移除</button>}
+            </div>
+          </td>}
+          {(onRemove || onVersionSelect) && level > 0 && <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}></td>}
+        </tr>
+        {childRows && childRows.map((child: any, j: number) => renderRow(child, level + 1, `${idx}-${j}`))}
+        {loadingIdx === idx && <tr><td colSpan={(onRemove || onVersionSelect) ? 9 : 8} className="px-3 py-1.5 text-xs text-gray-400 text-center">加载中...</td></tr>}
+      </>
+    );
+  };
+
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="bg-gray-50 border-b"><tr>
+          <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-20">层级</th>
+          <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-16">类型</th>
+          <th className="px-3 py-1.5 text-left text-xs text-gray-500">件号</th>
+          <th className="px-3 py-1.5 text-left text-xs text-gray-500">中文名称</th>
+          <th className="px-3 py-1.5 text-left text-xs text-gray-500">规格型号</th>
+          <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-14">版本</th>
+          <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-20">状态</th>
+          <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-12">用量</th>
+          {(onRemove || onVersionSelect) && <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-28">操作</th>}
+        </tr></thead>
+        <tbody className="divide-y">{items.map((ri, i) => renderRow(ri, 0, String(i)))}</tbody>
+      </table>
     </div>
   );
 }
