@@ -253,3 +253,12 @@ class BomImpactNode(BaseSchema):
     tree_path: Optional[str] = None
     tree_connector: Optional[str] = None
     has_sibling: Optional[bool] = None
+
+
+# ============================================================
+# 执行项操作 Schema
+# ============================================================
+
+class ECOExecutionItemAction(BaseSchema):
+    """执行项操作请求（可选携带 new_entity_id 用于自动检测场景）"""
+    new_entity_id: Optional[str] = None

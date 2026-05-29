@@ -275,24 +275,63 @@ def update_eco(db: Session, eco: ECO, data: ECOEdit):
         elif field == "document_links" and value is not None:
             setattr(eco, field, [dl.model_dump() if hasattr(dl, "model_dump") else dl for dl in value])
         elif field == "execution_items" and value is not None:
-            # 替换所有执行项
-            db.query(ECOExecutionItem).filter(ECOExecutionItem.eco_id == eco.id).delete()
+            # 合并更新执行项：匹配已有项保留升级状态，新增项创建
+            existing_items = db.query(ECOExecutionItem).filter(
+                ECOExecutionItem.eco_id == eco.id
+            ).all()
+            # 构建复合键 → 已有项映射（entity_id 优先，entity_code + source 兜底）
+            old_map: dict = {}
+            for old in existing_items:
+                if old.entity_id:
+                    old_map[str(old.entity_id)] = old
+                if old.entity_code:
+                    key = f"{old.entity_code}|{old.source}|{old.entity_type}"
+                    if key not in old_map:
+                        old_map[key] = old
+
+            seen_ids = set()
             for idx, item in enumerate(value):
                 ei_data = item if isinstance(item, dict) else item.model_dump() if hasattr(item, "model_dump") else {}
-                ei = ECOExecutionItem(
-                    eco_id=eco.id,
-                    source=ei_data.get("source", "manual"),
-                    entity_type=ei_data.get("entity_type", "part"),
-                    entity_name=ei_data.get("entity_name", ""),
-                    action=ei_data.get("action", "no_change"),
-                    entity_id=uuid.UUID(ei_data["entity_id"]) if ei_data.get("entity_id") else None,
-                    entity_code=ei_data.get("entity_code"),
-                    parent_entity_id=uuid.UUID(ei_data["parent_entity_id"]) if ei_data.get("parent_entity_id") else None,
-                    detail=ei_data.get("detail"),
-                    status="pending",
-                    sort_order=idx,
-                )
-                db.add(ei)
+                eid = str(ei_data.get("entity_id")) if ei_data.get("entity_id") else None
+                ecode = ei_data.get("entity_code")
+                etype = ei_data.get("entity_type", "part")
+                esource = ei_data.get("source", "ecr")
+
+                # 匹配已有项
+                matched = old_map.get(eid) if eid else old_map.get(f"{ecode}|{esource}|{etype}") if ecode else None
+
+                if matched:
+                    # 更新已有项（保留升级状态）
+                    matched.action = ei_data.get("action", matched.action)
+                    matched.entity_name = ei_data.get("entity_name", matched.entity_name)
+                    matched.entity_code = ei_data.get("entity_code") or matched.entity_code
+                    matched.entity_id = uuid.UUID(ei_data["entity_id"]) if ei_data.get("entity_id") else matched.entity_id
+                    matched.parent_entity_id = uuid.UUID(ei_data["parent_entity_id"]) if ei_data.get("parent_entity_id") else matched.parent_entity_id
+                    matched.detail = ei_data.get("detail") or matched.detail
+                    matched.sort_order = idx
+                    # 保留 new_entity_id, new_version, status（关键：不覆盖升级状态）
+                    seen_ids.add(matched.id)
+                else:
+                    # 新建执行项
+                    ei = ECOExecutionItem(
+                        eco_id=eco.id,
+                        source=esource,
+                        entity_type=etype,
+                        entity_name=ei_data.get("entity_name", ""),
+                        action=ei_data.get("action", "no_change"),
+                        entity_id=uuid.UUID(ei_data["entity_id"]) if ei_data.get("entity_id") else None,
+                        entity_code=ecode,
+                        parent_entity_id=uuid.UUID(ei_data["parent_entity_id"]) if ei_data.get("parent_entity_id") else None,
+                        detail=ei_data.get("detail"),
+                        status="pending",
+                        sort_order=idx,
+                    )
+                    db.add(ei)
+
+            # 删除不再需要的已有项
+            for old in existing_items:
+                if old.id not in seen_ids:
+                    db.delete(old)
         else:
             setattr(eco, field, value)
 

@@ -483,17 +483,21 @@ async def manual_upgrade_item(
 @router.post("/{eco_id}/execution-items/{item_id}/revert")
 async def manual_revert_item(
     eco_id: uuid.UUID, item_id: uuid.UUID,
+    body: schemas_eco.ECOExecutionItemAction = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(["admin", "engineer"]))
 ):
     item = crud_eco.get_execution_item(db, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="执行项不存在")
-    if not item.new_entity_id:
+
+    # 优先使用 DB 记录的 new_entity_id，其次使用请求中的（自动检测场景）
+    target_entity_id = item.new_entity_id or (uuid.UUID(body.new_entity_id) if body and body.new_entity_id else None)
+    if not target_entity_id:
         raise HTTPException(status_code=400, detail="尚未执行升版，无需还原")
 
     model = Part if item.entity_type == "part" else Assembly
-    new_entity = db.query(model).filter(model.id == item.new_entity_id).first()
+    new_entity = db.query(model).filter(model.id == target_entity_id).first()
 
     if not new_entity:
         # 实体已被删除，清理记录
@@ -504,15 +508,23 @@ async def manual_revert_item(
         return {"detail": "已还原"}
 
     if new_entity.status == "released":
-        # 已发布状态：不可还原
         raise HTTPException(status_code=400, detail="已发布的零部件不可还原")
 
     if new_entity.status == "draft":
         # 已升版状态：删除新版本实体（完全撤销）
         from app.models import BOMItem
+        # 检查原始实体是否有父项引用（草稿阶段 BOM 尚未更新指向新版本）
+        from app.models import BOMItem
+        parent_filters = [BOMItem.child_id == target_entity_id]
+        if item.entity_id:
+            parent_filters.append(BOMItem.child_id == item.entity_id)
+        from sqlalchemy import or_
+        parent_count = db.query(BOMItem).filter(or_(*parent_filters)).count()
+        if parent_count > 0:
+            raise HTTPException(status_code=400, detail="该零部件已被其他部件引用，无法删除")
+        # 清理该实体自身的子项 BOM 关系
         db.query(BOMItem).filter(
-            (BOMItem.child_id == item.new_entity_id) |
-            (BOMItem.parent_id == item.new_entity_id)
+            BOMItem.parent_id == target_entity_id
         ).delete()
         db.delete(new_entity)
         item.new_entity_id = None
@@ -532,21 +544,28 @@ async def manual_revert_item(
 @router.post("/{eco_id}/execution-items/{item_id}/freeze")
 async def manual_freeze_item(
     eco_id: uuid.UUID, item_id: uuid.UUID,
+    body: schemas_eco.ECOExecutionItemAction = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(["admin", "engineer"]))
 ):
     item = crud_eco.get_execution_item(db, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="执行项不存在")
-    if not item.new_entity_id:
+
+    # 优先使用 DB 记录的 new_entity_id，其次使用请求中的（自动检测场景）
+    target_entity_id = item.new_entity_id or (uuid.UUID(body.new_entity_id) if body and body.new_entity_id else None)
+    if not target_entity_id:
         raise HTTPException(status_code=400, detail="尚未执行升版，无法冻结")
 
     model = Part if item.entity_type == "part" else Assembly
-    new_entity = db.query(model).filter(model.id == item.new_entity_id).first()
+    new_entity = db.query(model).filter(model.id == target_entity_id).first()
     if not new_entity:
         raise HTTPException(status_code=404, detail="新版本实体不存在")
 
     new_entity.status = "frozen"
+    # 同步更新执行项记录
+    if not item.new_entity_id and target_entity_id:
+        item.new_entity_id = target_entity_id
     db.commit()
     return {"detail": "已冻结", "new_entity_status": "frozen"}
 
