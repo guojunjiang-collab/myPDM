@@ -176,6 +176,191 @@ async def startup_event():
             db.execute(text("CREATE INDEX idx_cwi_profile_id ON configuration_working_items(profile_id)"))
             db.commit()
             print("✓ Created table configuration_working_items")
+
+        # ── ECO/ECR 表结构（变更管理）──
+        # ECR 表
+        result = db.execute(text("SELECT table_name FROM information_schema.tables WHERE table_name = 'ecrs'"))
+        if not result.fetchone():
+            db.execute(text("""
+                CREATE TABLE ecrs (
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    ecr_number VARCHAR(32) UNIQUE NOT NULL,
+                    title VARCHAR(255) NOT NULL,
+                    description TEXT,
+                    reason VARCHAR(64) NOT NULL,
+                    priority VARCHAR(16) NOT NULL DEFAULT 'normal',
+                    category VARCHAR(32),
+                    status VARCHAR(16) NOT NULL DEFAULT 'draft',
+                    reviewers JSONB NOT NULL DEFAULT '[]',
+                    review_mode VARCHAR(8) NOT NULL DEFAULT 'all',
+                    creator_id UUID NOT NULL REFERENCES users(id),
+                    document_links JSONB NOT NULL DEFAULT '[]',
+                    cc_users JSONB NOT NULL DEFAULT '[]',
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    reviewed_at TIMESTAMP WITH TIME ZONE,
+                    closed_at TIMESTAMP WITH TIME ZONE,
+                    eco_id UUID
+                )
+            """))
+            db.commit()
+            print("✓ Created table ecrs")
+
+        result = db.execute(text("SELECT table_name FROM information_schema.tables WHERE table_name = 'ecr_affected_items'"))
+        if not result.fetchone():
+            db.execute(text("""
+                CREATE TABLE ecr_affected_items (
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    ecr_id UUID NOT NULL REFERENCES ecrs(id) ON DELETE CASCADE,
+                    entity_type VARCHAR(16) NOT NULL,
+                    entity_id UUID NOT NULL,
+                    entity_code VARCHAR(64),
+                    entity_name VARCHAR(255),
+                    entity_version VARCHAR(32),
+                    change_description TEXT,
+                    change_type VARCHAR(32),
+                    bom_impact JSONB NOT NULL DEFAULT '{}',
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            db.commit()
+            print("✓ Created table ecr_affected_items")
+
+        result = db.execute(text("SELECT table_name FROM information_schema.tables WHERE table_name = 'ecr_review_records'"))
+        if not result.fetchone():
+            db.execute(text("""
+                CREATE TABLE ecr_review_records (
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    ecr_id UUID NOT NULL REFERENCES ecrs(id) ON DELETE CASCADE,
+                    reviewer_id UUID NOT NULL REFERENCES users(id),
+                    reviewer_name VARCHAR(64),
+                    decision VARCHAR(16) NOT NULL,
+                    comment TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            db.commit()
+            print("✓ Created table ecr_review_records")
+
+        result = db.execute(text("SELECT table_name FROM information_schema.tables WHERE table_name = 'ecr_status_logs'"))
+        if not result.fetchone():
+            db.execute(text("""
+                CREATE TABLE ecr_status_logs (
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    ecr_id UUID NOT NULL REFERENCES ecrs(id) ON DELETE CASCADE,
+                    from_status VARCHAR(16),
+                    to_status VARCHAR(16) NOT NULL,
+                    operator_id UUID NOT NULL REFERENCES users(id),
+                    operator_name VARCHAR(64),
+                    comment TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            db.commit()
+            print("✓ Created table ecr_status_logs")
+
+        # ECO 表
+        result = db.execute(text("SELECT table_name FROM information_schema.tables WHERE table_name = 'ecos'"))
+        if not result.fetchone():
+            db.execute(text("""
+                CREATE TABLE ecos (
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    eco_number VARCHAR(32) UNIQUE NOT NULL,
+                    ecr_id UUID REFERENCES ecrs(id),
+                    title VARCHAR(255) NOT NULL,
+                    description TEXT,
+                    reason VARCHAR(64) NOT NULL,
+                    priority VARCHAR(16) NOT NULL DEFAULT 'normal',
+                    category VARCHAR(32),
+                    status VARCHAR(16) NOT NULL DEFAULT 'draft',
+                    reviewers JSONB NOT NULL DEFAULT '[]',
+                    review_mode VARCHAR(8) NOT NULL DEFAULT 'all',
+                    creator_id UUID NOT NULL REFERENCES users(id),
+                    executor_id UUID REFERENCES users(id),
+                    document_links JSONB NOT NULL DEFAULT '[]',
+                    cc_users JSONB NOT NULL DEFAULT '[]',
+                    release_items JSONB NOT NULL DEFAULT '[]',
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    reviewed_at TIMESTAMP WITH TIME ZONE,
+                    executed_at TIMESTAMP WITH TIME ZONE,
+                    closed_at TIMESTAMP WITH TIME ZONE
+                )
+            """))
+            db.commit()
+            print("✓ Created table ecos")
+
+        result = db.execute(text("SELECT table_name FROM information_schema.tables WHERE table_name = 'eco_execution_items'"))
+        if not result.fetchone():
+            db.execute(text("""
+                CREATE TABLE eco_execution_items (
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    eco_id UUID NOT NULL REFERENCES ecos(id) ON DELETE CASCADE,
+                    source VARCHAR(8) NOT NULL DEFAULT 'ecr',
+                    affected_item_id UUID REFERENCES ecr_affected_items(id),
+                    entity_type VARCHAR(16) NOT NULL,
+                    entity_id UUID,
+                    entity_code VARCHAR(64),
+                    entity_name VARCHAR(255) NOT NULL,
+                    action VARCHAR(16) NOT NULL,
+                    status VARCHAR(16) NOT NULL DEFAULT 'pending',
+                    detail JSONB NOT NULL DEFAULT '{}',
+                    new_entity_id UUID,
+                    new_version VARCHAR(32),
+                    parent_entity_id UUID,
+                    parent_new_entity_id UUID,
+                    error_message TEXT,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    executed_at TIMESTAMP WITH TIME ZONE
+                )
+            """))
+            db.commit()
+            print("✓ Created table eco_execution_items")
+
+        result = db.execute(text("SELECT table_name FROM information_schema.tables WHERE table_name = 'eco_review_records'"))
+        if not result.fetchone():
+            db.execute(text("""
+                CREATE TABLE eco_review_records (
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    eco_id UUID NOT NULL REFERENCES ecos(id) ON DELETE CASCADE,
+                    reviewer_id UUID NOT NULL REFERENCES users(id),
+                    reviewer_name VARCHAR(64),
+                    decision VARCHAR(16) NOT NULL,
+                    comment TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            db.commit()
+            print("✓ Created table eco_review_records")
+
+        result = db.execute(text("SELECT table_name FROM information_schema.tables WHERE table_name = 'eco_status_logs'"))
+        if not result.fetchone():
+            db.execute(text("""
+                CREATE TABLE eco_status_logs (
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    eco_id UUID NOT NULL REFERENCES ecos(id) ON DELETE CASCADE,
+                    from_status VARCHAR(16),
+                    to_status VARCHAR(16) NOT NULL,
+                    operator_id UUID NOT NULL REFERENCES users(id),
+                    operator_name VARCHAR(64),
+                    comment TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            db.commit()
+            print("✓ Created table eco_status_logs")
+
+        # ── ECO/ECR 列迁移（增量更新）──
+        for tbl, col, coltype in [
+            ("ecrs", "cc_users", "JSONB NOT NULL DEFAULT '[]'"),
+            ("ecos", "cc_users", "JSONB NOT NULL DEFAULT '[]'"),
+            ("ecos", "release_items", "JSONB NOT NULL DEFAULT '[]'"),
+        ]:
+            result = db.execute(text(f"SELECT column_name FROM information_schema.columns WHERE table_name = '{tbl}' AND column_name = '{col}'"))
+            if not result.fetchone():
+                db.execute(text(f"ALTER TABLE {tbl} ADD COLUMN {col} {coltype}"))
+                db.commit()
+                print(f"✓ Added column {col} to {tbl} table")
     except Exception as e:
         print(f"✗ Database migration error: {e}")
         db.rollback()
