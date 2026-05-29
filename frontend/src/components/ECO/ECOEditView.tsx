@@ -553,21 +553,25 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
       const statusMap = new Map<string, any>();
       const linkMap = new Map<string, string>(); // originalId -> newId
 
-      // 处理已有 new_entity_id 的状态
+      // 处理已有 new_entity_id 的状态（key = 原始entity_id）
       if (results[0]) {
-        (results[0] as any[]).forEach(r => {
+        (results[0] as any[]).forEach((r, i) => {
           if (r.status === 'fulfilled' && r.value) {
-            statusMap.set(r.value.id, { status: r.value.status });
+            // 用原始entity_id作为key
+            const originalId = newEntityIds[i]?.id;
+            if (originalId) {
+              statusMap.set(originalId, { status: r.value.status });
+            }
           }
         });
       }
 
-      // 处理自动关联的新版本
+      // 处理自动关联的新版本（key = 原始entity_id）
       if (results[1]) {
         (results[1] as any[]).forEach(r => {
           if (r.status === 'fulfilled' && r.value) {
             linkMap.set(r.value.originalId, r.value.newId);
-            statusMap.set(r.value.newId, { status: r.value.status });
+            statusMap.set(r.value.originalId, { status: r.value.status });
           }
         });
       }
