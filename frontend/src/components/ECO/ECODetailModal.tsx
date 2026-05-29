@@ -210,7 +210,6 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
           <div className="border-t pt-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-bold text-gray-700">关联图文档</h4>
-              <button type="button" onClick={() => setShowDocPicker(true)} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 关联图文档</button>
             </div>
             <div className="border rounded-lg overflow-hidden">
               {documentLinks.length === 0 ? (
@@ -225,7 +224,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
                       <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
                       {docFieldDefs.map((def) => <th key={def.id} className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap">{def.name}</th>)}
                       <th className="px-3 py-2 text-left text-gray-500 font-medium">附件</th>
-                      <th className="px-3 py-2 text-center text-gray-500 font-medium whitespace-nowrap w-36">操作</th>
+                      <th className="px-3 py-2 text-center text-gray-500 font-medium whitespace-nowrap w-24">操作</th>
                     </tr></thead>
                     <tbody className="divide-y divide-gray-100">
                       {documents.map((doc) => {
@@ -240,10 +239,8 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
                             <td className="px-3 py-2 text-sm text-gray-500">{atts.length > 0 ? atts.map((a: any) => <div key={a.id} className="text-xs">{a.file_name} ({formatFileSize(a.file_size)})</div>) : (doc.file_name || '-')}</td>
                             <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center justify-center gap-1">
-                                <button onClick={() => setVersionSelectState({ docId: doc.id, oldDocId: doc.id })} className="px-2 py-0.5 text-xs text-purple-600 hover:text-purple-800">选择</button>
-                                {doc.file_id && <button onClick={() => handleDocPreview(doc.file_id!, doc.file_name || '')} className="px-2 py-0.5 text-xs text-blue-600 hover:text-blue-800">预览</button>}
-                                {doc.file_id && <button onClick={() => handleDocDownload(doc.file_id!, doc.file_name || '')} className="px-2 py-0.5 text-xs text-green-600 hover:text-green-800">下载</button>}
-                                <button onClick={() => saveDocumentLinks(documentLinks.filter(l => l.document_id !== doc.id))} className="px-2 py-0.5 text-xs text-red-400 hover:text-red-600">移除</button>
+                                {doc.file_id && <button onClick={() => handleDocPreview(doc.file_id!, doc.file_name || '')} className="px-2 py-0.5 text-xs text-blue-600 hover:text-blue-800 whitespace-nowrap">预览</button>}
+                                {doc.file_id && <button onClick={() => handleDocDownload(doc.file_id!, doc.file_name || '')} className="px-2 py-0.5 text-xs text-green-600 hover:text-green-800 whitespace-nowrap">下载</button>}
                               </div>
                             </td>
                           </tr>
@@ -284,12 +281,11 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
           <div className="border-t pt-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-bold text-gray-700">工程预变更</h4>
-              <button type="button" onClick={() => setShowReleasePicker(true)} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 关联零部件</button>
             </div>
             {releaseItems.length === 0 ? (
               <div className="border rounded-lg px-4 py-6 text-center text-sm text-gray-400">暂无工程预变更</div>
             ) : (
-              <ReleaseItemsTable items={releaseItems} onViewItem={viewItem} onRemove={(idx) => { const newItems = releaseItems.filter((_, i) => i !== idx); saveReleaseItems(newItems); }} />
+              <ReleaseItemsTable items={releaseItems} onViewItem={viewItem} />
             )}
           </div>
 
@@ -432,7 +428,7 @@ function InfoItem({ label, value, icon, className }: { label: string; value: str
   );
 }
 
-function ReleaseItemsTable({ items, onViewItem, onRemove }: { items: any[]; onViewItem: (type: string, id: string, mode?: 'view' | 'edit') => void; onRemove?: (idx: number) => void }) {
+function ReleaseItemsTable({ items, onViewItem }: { items: any[]; onViewItem: (type: string, id: string, mode?: 'view' | 'edit') => void }) {
   const [expanded, setExpanded] = useState<Record<string, any[]>>({});
   const [loadingIdx, setLoadingIdx] = useState<string | null>(null);
 
@@ -466,11 +462,9 @@ function ReleaseItemsTable({ items, onViewItem, onRemove }: { items: any[]; onVi
           <td className="px-3 py-1.5 text-xs">{ri.entity_version || 'A'}</td>
           <td className="px-3 py-1.5 text-xs whitespace-nowrap">{ri.status ? <span className={`px-1.5 py-0.5 rounded text-xs ${statusTag(ri.status).cls}`}>{statusTag(ri.status).label}</span> : '-'}</td>
           <td className="px-3 py-1.5 text-xs text-center">{ri.quantity || 1}</td>
-          {onRemove && level === 0 && <td className="px-3 py-1.5 text-xs text-center" onClick={(e) => e.stopPropagation()}><button onClick={() => onRemove(rowNum)} className="px-2 py-0.5 text-xs text-red-400 hover:text-red-600">移除</button></td>}
-          {onRemove && level > 0 && <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}></td>}
         </tr>
         {childRows && childRows.map((child: any, j: number) => renderRow(child, level + 1, `${idx}-${j}`))}
-        {loadingIdx === idx && <tr><td colSpan={onRemove ? 9 : 8} className="px-3 py-1.5 text-xs text-gray-400 text-center">加载中...</td></tr>}
+        {loadingIdx === idx && <tr><td colSpan={8} className="px-3 py-1.5 text-xs text-gray-400 text-center">加载中...</td></tr>}
       </>
     );
   };
@@ -487,7 +481,6 @@ function ReleaseItemsTable({ items, onViewItem, onRemove }: { items: any[]; onVi
           <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-14">版本</th>
           <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-20">状态</th>
           <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-12">用量</th>
-          {onRemove && <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-16">操作</th>}
         </tr></thead>
         <tbody className="divide-y">{items.map((ri, i) => renderRow(ri, 0, String(i)))}</tbody>
       </table>

@@ -841,8 +841,8 @@ function ReleaseItemsTable({ items, onViewItem, onRemove, onVersionSelect }: { i
           <td className="px-3 py-1.5 text-xs">{ri.entity_version || 'A'}</td>
           <td className="px-3 py-1.5 text-xs whitespace-nowrap">{ri.status ? <span className={`px-1.5 py-0.5 rounded text-xs ${statusTag(ri.status).cls}`}>{statusTag(ri.status).label}</span> : '-'}</td>
           <td className="px-3 py-1.5 text-xs text-center">{ri.quantity || 1}</td>
-          {(onRemove || onVersionSelect) && level === 0 && <td className="px-3 py-1.5 text-xs text-right" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-1 justify-end">
+          {(onRemove || onVersionSelect) && level === 0 && <td className="px-3 py-1.5 text-xs text-center" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-1 justify-center">
               {onVersionSelect && <button onClick={() => onVersionSelect(rowNum)} className="px-2 py-0.5 text-xs text-blue-500 hover:text-blue-700 rounded whitespace-nowrap">选择</button>}
               {onRemove && <button onClick={() => onRemove(rowNum)} className="px-2 py-0.5 text-xs text-red-400 hover:text-red-600 whitespace-nowrap">移除</button>}
             </div>
@@ -867,7 +867,7 @@ function ReleaseItemsTable({ items, onViewItem, onRemove, onVersionSelect }: { i
           <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-14">版本</th>
           <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-20">状态</th>
           <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-12">用量</th>
-          {(onRemove || onVersionSelect) && <th className="px-3 py-1.5 text-right text-xs text-gray-500 w-28">操作</th>}
+          {(onRemove || onVersionSelect) && <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-28">操作</th>}
         </tr></thead>
         <tbody className="divide-y">{items.map((ri, i) => renderRow(ri, 0, String(i)))}</tbody>
       </table>
