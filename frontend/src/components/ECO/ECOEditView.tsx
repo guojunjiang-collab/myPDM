@@ -478,10 +478,43 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
   useEffect(() => { onBomChange?.({ up: localUp, down: localDown }); }, [localUp, localDown, onBomChange]);
 
   // 构建执行项映射 entity_id → execution item
+  const [liveExecMap, setLiveExecMap] = useState<Map<string, any>>(new Map());
   const execMap = new Map<string, any>();
   (executionItems || []).forEach((ei: any) => {
     if (ei.entity_id) execMap.set(ei.entity_id, ei);
   });
+  // 合并实时状态（优先使用 liveExecMap 中的状态）
+  liveExecMap.forEach((val, key) => {
+    const existing = execMap.get(key);
+    if (existing) {
+      execMap.set(key, { ...existing, new_entity_status: val.status });
+    }
+  });
+
+  // 加载执行项涉及的零部件实时状态
+  useEffect(() => {
+    if (!executionItems || executionItems.length === 0) return;
+    const newEntityIds = executionItems
+      .filter((ei: any) => ei.new_entity_id)
+      .map((ei: any) => ({ id: ei.new_entity_id, type: ei.entity_type }));
+    if (newEntityIds.length === 0) return;
+
+    Promise.allSettled(
+      newEntityIds.map(async ({ id, type }: { id: string; type: string }) => {
+        const api = type === 'assembly' ? assembliesApi : partsApi;
+        const r = await api.get(id);
+        return { id, status: r.data.status };
+      })
+    ).then(results => {
+      const map = new Map<string, any>();
+      results.forEach(r => {
+        if (r.status === 'fulfilled') {
+          map.set(r.value.id, { status: r.value.status });
+        }
+      });
+      setLiveExecMap(map);
+    });
+  }, [executionItems]);
 
   useEffect(() => {
     if (resetKey && resetKey > 0) resetToEcr();
