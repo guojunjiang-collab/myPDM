@@ -36,75 +36,69 @@ const statusBadge = (status: string) => {
 
 /* ──── Tree helpers for optimistic local updates ──── */
 
-/** Recursively deep-clone a config tree node, recalculating is_selected for each node */
-function cloneAndRecalc(node: ConfigTreeNode): ConfigTreeNode {
-  const parts = node.parts.map(p => ({ ...p }));
-  const children = node.children.map(cloneAndRecalc);
-  const is_selected = node.is_required ||
-    parts.some(p => p.is_selected) ||
-    children.some(c => c.is_selected);
-  return { ...node, parts, children, is_selected };
-}
-
-/** Deep clone tree, find part by ID and toggle it, recalculate ancestors */
+/** Deep clone tree, find part by ID and toggle it (independent, no parent recalc) */
 function togglePartInTree(root: ConfigTreeNode | null, partId: string, selected: boolean): ConfigTreeNode | null {
   if (!root) return null;
-  function walk(node: ConfigTreeNode): { node: ConfigTreeNode; found: boolean } {
+  function walk(node: ConfigTreeNode): ConfigTreeNode {
     // Check parts at this level
     const partIdx = node.parts.findIndex(p => p.id === partId);
     let newParts = node.parts;
-    let found = false;
     if (partIdx !== -1) {
       newParts = [...node.parts];
       newParts[partIdx] = { ...newParts[partIdx], is_selected: selected };
-      found = true;
     }
     // Walk children
-    let newChildren = node.children;
-    if (!found) {
-      newChildren = node.children.map(c => {
-        const r = walk(c);
-        if (r.found) found = true;
-        return r.node;
-      });
-    }
-    // Recalculate — empty optional nodes preserve their existing is_selected
-    let is_selected: boolean;
-    if (!node.is_required && newParts.length === 0 && newChildren.length === 0) {
-      is_selected = node.is_selected;
-    } else {
-      is_selected = node.is_required ||
-        newParts.some(p => p.is_selected) ||
-        newChildren.some(c => c.is_selected);
-    }
-    return { node: { ...node, parts: newParts, children: newChildren, is_selected }, found };
+    const newChildren = node.children.map(walk);
+    return { ...node, parts: newParts, children: newChildren };
   }
-  return walk(root).node;
+  return walk(root);
 }
 
-/** Deep clone tree, find node by ID and toggle all parts in entire subtree, recalculate */
+/** Deep clone tree, find node by ID and toggle only that node (independent, no children cascade) */
 function toggleNodeInTree(root: ConfigTreeNode | null, nodeId: string, selected: boolean): ConfigTreeNode | null {
   if (!root) return null;
-  function walk(node: ConfigTreeNode, inTargetSubtree: boolean): ConfigTreeNode {
+  function walk(node: ConfigTreeNode): ConfigTreeNode {
     const isTarget = node.id === nodeId;
-    const shouldToggle = inTargetSubtree || isTarget;
-    const children = node.children.map(c => walk(c, shouldToggle));
-    let parts = node.parts;
-    if (shouldToggle) {
-      parts = node.parts.map(p => ({ ...p, is_selected: selected }));
+    let newNode = { ...node };
+    if (isTarget) {
+      // Only toggle this node's is_selected, don't touch children or parts
+      newNode.is_selected = selected;
     }
-    // 空可选节点（无零件无子节点）：直接覆写 is_selected，无零件可翻转
-    let is_selected: boolean;
-    if (isTarget && !node.is_required && parts.length === 0 && children.length === 0) {
-      is_selected = selected;
-    } else {
-      is_selected = node.is_required ||
-        parts.some(p => p.is_selected) ||
-        children.some(c => c.is_selected);
-    }
-    return { ...node, parts, children, is_selected };
+    newNode.children = node.children.map(walk);
+    return newNode;
   }
-  return walk(root, false);
+  return walk(root);
+}
+
+/**
+ * Check if a node's parent is selected (for enabled/disabled state).
+ * Returns true if the node can be interacted with.
+ */
+function isParentSelected(nodeId: string, root: ConfigTreeNode): boolean {
+  // Build parent map
+  const parentMap = new Map<string, string>();
+  const buildParentMap = (node: ConfigTreeNode, parentId?: string) => {
+    if (parentId) parentMap.set(node.id, parentId);
+    node.children.forEach(c => buildParentMap(c, node.id));
+  };
+  buildParentMap(root);
+
+  // Find direct parent
+  const parentId = parentMap.get(nodeId);
+  if (!parentId) return true; // Root node has no parent constraint
+
+  // Find parent node and check its state
+  const findNode = (n: ConfigTreeNode): ConfigTreeNode | null => {
+    if (n.id === parentId) return n;
+    for (const c of n.children) {
+      const r = findNode(c);
+      if (r) return r;
+    }
+    return null;
+  };
+  const parentNode = findNode(root);
+  // Parent must be selected (or required) for child to be enabled
+  return !parentNode || parentNode.is_selected || parentNode.is_required;
 }
 
 /* ──── Component ──── */
@@ -526,7 +520,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
             <input
               type="checkbox"
               checked={node.is_selected}
-              disabled={node.is_required || !canEdit}
+              disabled={node.is_required || !canEdit || (level > 0 && !isParentSelected(node.id, configTree!))}
               onChange={() => { if (!node.is_required && canEdit) handleToggleConfigNode(node.id); }}
               className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500 disabled:opacity-50"
             />
@@ -563,8 +557,8 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
               <input
                 type="checkbox"
                 checked={part.is_selected}
-                disabled={part.is_required || !canEdit}
-                onChange={() => { if (canEdit) handleTogglePart(part.id, part.is_selected); }}
+                disabled={part.is_required || !canEdit || !node.is_selected}
+                onChange={() => { if (canEdit && node.is_selected) handleTogglePart(part.id, part.is_selected); }}
                 className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500 disabled:opacity-50"
               />
               <span className={`text-xs px-1.5 py-0.5 rounded ${part.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
