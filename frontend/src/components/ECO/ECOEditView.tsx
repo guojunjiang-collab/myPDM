@@ -173,7 +173,7 @@ function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, onUpgrade, onReleas
     <div className="overflow-x-auto border border-gray-200 rounded-lg">
       <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
         <thead><tr className="bg-gray-50"><th className={`${th} w-12`}>层级</th><th className={th}>编码</th><th className={th}>名称</th><th className={th}>版本</th><th className={th}>用量</th>
-        {canExec && <><th className={`${th} w-20`}>变更状态</th><th className={`${th} w-20`}>操作</th></>}
+        {canExec && <><th className={`${th} w-20`}>变更状态</th><th className={`${th} w-28`}>操作</th></>}
         </tr></thead>
         <tbody>{rows.length === 0 ? <tr><td colSpan={canExec ? 7 : 5} className="text-xs text-gray-400 text-center py-6">无数据</td></tr>
         : rows.map((n, i) => {
@@ -251,7 +251,7 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, onUpgrade, onRele
     <div className="overflow-x-auto border border-gray-200 rounded-lg">
       <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
         <thead><tr className="bg-gray-50"><th className={th}>编码</th><th className={th}>名称</th><th className={th}>版本</th><th className={th}>用量</th>
-        {canExec && <><th className={`${th} w-20`}>变更状态</th><th className={`${th} w-20`}>操作</th></>}
+        {canExec && <><th className={`${th} w-20`}>变更状态</th><th className={`${th} w-28`}>操作</th></>}
         </tr></thead>
         <tbody>{rows.length === 0 ? <tr><td colSpan={canExec ? 6 : 4} className="text-xs text-gray-400 text-center py-6">无数据</td></tr>
         : rows.map((n, i) => {
@@ -318,7 +318,7 @@ function AffectedTable({ rows, execMap, canExec, ecoStatus, onUpgrade, onRelease
     <div className="overflow-x-auto border border-gray-200 rounded-lg">
       <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
         <thead><tr className="bg-gray-50"><th className={th}>编码</th><th className={th}>名称</th><th className={th}>当前版本</th><th className={th}>变更后版本</th>
-        {canExec && <><th className={`${th} w-20`}>变更状态</th><th className={`${th} w-20`}>操作</th></>}
+        {canExec && <><th className={`${th} w-20`}>变更状态</th><th className={`${th} w-28`}>操作</th></>}
         </tr></thead>
         <tbody>{rows.length === 0 ? <tr><td colSpan={canExec ? 6 : 4} className="text-xs text-gray-400 text-center py-6">无</td></tr>
         : rows.map((n, i) => {
