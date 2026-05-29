@@ -403,70 +403,66 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
     });
   };
 
+  // ECR 数据加载（仅 ecrId 变化时触发）
   useEffect(() => {
     if (!ecrId) { setEcrData(null); setLocalUp([]); setLocalDown([]); setLocalAffected([]); return; }
     setLoading(true);
     ecrApi.get(ecrId).then(r => {
       setEcrData(r.data);
-      const { up, down } = cloneNodes(r.data);
-      // Merge saved execution items (composite key: entity_id|_affectedCode)
-      if (executionItems && executionItems.length > 0) {
-        const savedMap = new Map<string, any>();
-        executionItems.forEach((ei: any) => {
-          const affCode = ei.detail?._affectedCode || '';
-          const key = ei.entity_id || ei.entity_code;
-          if (!key) return;
-          savedMap.set(key + '|' + affCode, ei);      // composite key for per-group match
-          if (!affCode) savedMap.set(key, ei);         // backward compat: fallback without _affectedCode
-        });
-        const lookup = (n: any) => {
-          const compKey = (n.entity_id || n.entity_code || '') + '|' + (n._affectedCode || '');
-          return savedMap.get(compKey) || savedMap.get(n.entity_id) || savedMap.get(n.entity_code);
-        };
-        down.forEach((n: any) => {
-          const saved = lookup(n);
-          if (!saved) return;
-          if (saved.action && saved.action !== 'add_existing' && saved.action !== 'add_new') {
-            n.action = saved.action;
-          }
-          if (saved?.detail?._targetQty != null) n._targetQty = saved.detail._targetQty;
-          if (saved?.detail?._desc) n._desc = saved.detail._desc;
-        });
-        up.forEach((n: any) => {
-          const saved = lookup(n);
-          if (!saved) return;
-          if (saved?.detail?._targetQty != null) n._targetQty = saved.detail._targetQty;
-          if (saved.action) n.action = saved.action;
-        });
-        // Restore manually added items that were saved but may not be in the ECR analysis
-        const allKeys = new Set<string>();
-        up.forEach((n: any) => {
-          if (n.entity_id) allKeys.add(n.entity_id + '|' + (n._affectedCode || ''));
-          if (n.entity_code) allKeys.add(n.entity_code + '|' + (n._affectedCode || ''));
-        });
-        down.forEach((n: any) => {
-          if (n.entity_id) allKeys.add(n.entity_id + '|' + (n._affectedCode || ''));
-          if (n.entity_code) allKeys.add(n.entity_code + '|' + (n._affectedCode || ''));
-        });
-        executionItems.forEach((ei: any) => {
-          const affCode = ei.detail?._affectedCode || '';
-          const key = ei.entity_id || ei.entity_code;
-          if (!key) return;
-          const compKey = key + '|' + affCode;
-          if (!allKeys.has(compKey) && (ei.action === 'add_existing' || ei.action === 'add_new')) {
-            const parentAff = r.data.affected_items?.find((a: any) => a.entity_id === ei.parent_entity_id);
-            down.push({ entity_type: ei.entity_type || 'part', entity_id: ei.entity_id || '', entity_code: ei.entity_code || '', entity_name: ei.entity_name || '', entity_version: ei.entity_version || 'A', quantity: 0, _targetQty: ei.detail?._targetQty || 1, action: 'add_existing', _desc: ei.detail?._desc || '', parent_entity_id: ei.parent_entity_id || undefined, level: 1, _affectedCode: parentAff?.entity_code || ei.detail?._affectedCode, _affectedName: parentAff?.entity_name || ei._affectedName } as any);
-          }
-        });
-      }
-      setLocalUp(up); setLocalDown(down);
       const affected: MutableNode[] = (r.data.affected_items || []).map((ai: any) => ({
         entity_type: ai.entity_type, entity_id: ai.entity_id, entity_code: ai.entity_code || '', entity_name: ai.entity_name || '', entity_version: ai.entity_version || '',
         action: ai.change_type || 'no_change', change_description: ai.change_description || '', quantity: 1, _targetQty: 1, _desc: ai.change_description || '',
       }));
       setLocalAffected(affected);
     }).catch(() => {}).finally(() => setLoading(false));
-  }, [ecrId, executionItems]);
+  }, [ecrId]);
+
+  // 执行项合并到 ECR 分析数据（executionItems 变化时增量更新，不重新加载 ECR）
+  useEffect(() => {
+    if (!ecrData) return;
+    const { up, down } = cloneNodes(ecrData);
+    if (executionItems && executionItems.length > 0) {
+      const savedMap = new Map<string, any>();
+      executionItems.forEach((ei: any) => {
+        const affCode = ei.detail?._affectedCode || '';
+        const key = ei.entity_id || ei.entity_code;
+        if (!key) return;
+        savedMap.set(key + '|' + affCode, ei);
+        if (!affCode) savedMap.set(key, ei);
+      });
+      const lookup = (n: any) => {
+        const compKey = (n.entity_id || n.entity_code || '') + '|' + (n._affectedCode || '');
+        return savedMap.get(compKey) || savedMap.get(n.entity_id) || savedMap.get(n.entity_code);
+      };
+      down.forEach((n: any) => {
+        const saved = lookup(n);
+        if (!saved) return;
+        if (saved.action && saved.action !== 'add_existing' && saved.action !== 'add_new') n.action = saved.action;
+        if (saved?.detail?._targetQty != null) n._targetQty = saved.detail._targetQty;
+        if (saved?.detail?._desc) n._desc = saved.detail._desc;
+      });
+      up.forEach((n: any) => {
+        const saved = lookup(n);
+        if (!saved) return;
+        if (saved?.detail?._targetQty != null) n._targetQty = saved.detail._targetQty;
+        if (saved.action) n.action = saved.action;
+      });
+      const allKeys = new Set<string>();
+      up.forEach((n: any) => { if (n.entity_id) allKeys.add(n.entity_id + '|' + (n._affectedCode || '')); if (n.entity_code) allKeys.add(n.entity_code + '|' + (n._affectedCode || '')); });
+      down.forEach((n: any) => { if (n.entity_id) allKeys.add(n.entity_id + '|' + (n._affectedCode || '')); if (n.entity_code) allKeys.add(n.entity_code + '|' + (n._affectedCode || '')); });
+      executionItems.forEach((ei: any) => {
+        const affCode = ei.detail?._affectedCode || '';
+        const key = ei.entity_id || ei.entity_code;
+        if (!key) return;
+        const compKey = key + '|' + affCode;
+        if (!allKeys.has(compKey) && (ei.action === 'add_existing' || ei.action === 'add_new')) {
+          const parentAff = ecrData.affected_items?.find((a: any) => a.entity_id === ei.parent_entity_id);
+          down.push({ entity_type: ei.entity_type || 'part', entity_id: ei.entity_id || '', entity_code: ei.entity_code || '', entity_name: ei.entity_name || '', entity_version: ei.entity_version || 'A', quantity: 0, _targetQty: ei.detail?._targetQty || 1, action: 'add_existing', _desc: ei.detail?._desc || '', parent_entity_id: ei.parent_entity_id || undefined, level: 1, _affectedCode: parentAff?.entity_code || ei.detail?._affectedCode, _affectedName: parentAff?.entity_name || ei._affectedName } as any);
+        }
+      });
+    }
+    setLocalUp(up); setLocalDown(down);
+  }, [ecrData]);
 
   const updateUp = useCallback((i: number, patch: Partial<MutableNode>) => {
     setLocalUp(prev => prev.map((n, idx) => idx === i ? { ...n, ...patch } : n));
