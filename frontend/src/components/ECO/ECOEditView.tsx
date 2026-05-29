@@ -62,6 +62,27 @@ function nextVer(v: string): string {
   return 'A' + c.join('');
 }
 
+// ── 辅助：判断是否需要显示"不变更"状态 ──
+function isUnchanged(n: MutableNode, isUpward: boolean): boolean {
+  // 向上溯源链：仅 action=no_change 时不变更
+  if (isUpward) return n.action === 'no_change';
+  // 向下子项：action=no_change 或 qty_change 时不变更
+  return n.action === 'no_change' || n.action === 'qty_change';
+}
+
+// ── 辅助：判断是否自动视为"已升版"（向下子项中的"新增"操作）──
+function isAutoUpgraded(n: MutableNode): boolean {
+  return n.action === 'add_existing';
+}
+
+// ── 渲染变更状态 Badge ──
+function StatusBadge({ status }: { status: string | undefined }) {
+  if (status === 'released') return <span className="px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-700">已发布</span>;
+  if (status === 'frozen') return <span className="px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-700">已冻结</span>;
+  if (status === 'draft') return <span className="px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-700">已升版</span>;
+  return <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-500">未执行</span>;
+}
+
 function resultRow(n: MutableNode, isUpward = false) {
   if (isUpward) {
     if (n.action === 'delete') return { code: n.entity_code || '-', name: n.entity_name || '', ver: nextVer(n.entity_version || 'A'), qty: 0 };
@@ -181,8 +202,9 @@ function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, onUpgrade, onReleas
           const exec = getExec(n.entity_id || '');
           const entityId = exec?.new_entity_id || n.entity_id || '';
           const entityType = n.entity_type || 'part';
+          const unchanged = isUnchanged(n, true);
           const handleRowClick = () => {
-            if (!canExec || !exec?.new_entity_status) return;
+            if (!canExec || unchanged || !exec?.new_entity_status) return;
             // 已发布或已冻结：弹出详情
             if (exec.new_entity_status === 'released' || exec.new_entity_status === 'frozen') {
               onViewItem?.(entityType, exec.new_entity_id || entityId);
@@ -192,7 +214,7 @@ function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, onUpgrade, onReleas
             }
           };
           return (
-            <tr key={i} className={`${ROW_BG[n.action||'']} ${exec?.new_entity_status ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={handleRowClick}>
+            <tr key={i} className={`${ROW_BG[n.action||'']} ${!unchanged && exec?.new_entity_status ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={handleRowClick}>
               <td className={td}><span className="text-gray-400">{n.level != null ? '-'.repeat(n.level)+n.level : '-'}</span></td>
               <td className={td}>{r.code}</td>
               <td className={td}><span className="truncate block">{r.name}</span></td>
@@ -201,41 +223,41 @@ function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, onUpgrade, onReleas
               {canExec && (
                 <>
                   <td className={td}>
-                    {exec?.new_entity_status === 'released' ? <span className="px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-700">已发布</span>
-                    : exec?.new_entity_status === 'frozen' ? <span className="px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-700">已冻结</span>
-                    : exec?.new_entity_status === 'draft' ? <span className="px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-700">已升版</span>
-                    : <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-500">未执行</span>}
+                    {unchanged ? <span className="px-1.5 py-0.5 rounded text-xs bg-gray-200 text-gray-500">不变更</span>
+                    : <StatusBadge status={exec?.new_entity_status} />}
                   </td>
               <td className={td}>
-                <div className="flex items-center gap-1">
-                  {ecoStatus === 'draft' ? (
-                    // 草稿阶段
-                    exec?.new_entity_status === 'draft' ? (
-                      // 已升版：还原 + 冻结
-                      <>
+                {!unchanged && (
+                  <div className="flex items-center gap-1">
+                    {ecoStatus === 'draft' ? (
+                      // 草稿阶段
+                      exec?.new_entity_status === 'draft' ? (
+                        // 已升版：还原 + 冻结
+                        <>
+                          <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
+                            className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
+                          <button onClick={(e) => { e.stopPropagation(); onFreeze?.(exec?.id || '', exec?.new_entity_id); }}
+                            className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">冻结</button>
+                        </>
+                      ) : exec?.new_entity_status === 'frozen' ? (
+                        // 已冻结：还原
                         <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
                           className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
-                        <button onClick={(e) => { e.stopPropagation(); onFreeze?.(exec?.id || '', exec?.new_entity_id); }}
-                          className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">冻结</button>
-                      </>
-                    ) : exec?.new_entity_status === 'frozen' ? (
-                      // 已冻结：还原
-                      <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
-                        className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
-                    ) : !exec?.new_entity_status ? (
-                      // 未执行：升版
-                      <button onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || ''); }}
-                        className="px-1.5 py-0.5 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">升版</button>
-                    ) : null
-                  ) : ecoStatus === 'executing' ? (
-                    // 执行阶段
-                    exec?.new_entity_status === 'frozen' ? (
-                      // 已冻结：发布
-                      <button onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || '', exec?.new_entity_id); }}
-                        className="px-1.5 py-0.5 text-xs bg-green-500 text-white rounded hover:bg-green-600">发布</button>
-                    ) : null
-                  ) : null}
-                </div>
+                      ) : !exec?.new_entity_status ? (
+                        // 未执行：升版
+                        <button onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || ''); }}
+                          className="px-1.5 py-0.5 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">升版</button>
+                      ) : null
+                    ) : ecoStatus === 'executing' ? (
+                      // 执行阶段
+                      exec?.new_entity_status === 'frozen' ? (
+                        // 已冻结：发布
+                        <button onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || '', exec?.new_entity_id); }}
+                          className="px-1.5 py-0.5 text-xs bg-green-500 text-white rounded hover:bg-green-600">发布</button>
+                      ) : null
+                    ) : null}
+                  </div>
+                )}
               </td>
             </>
           )}
@@ -258,49 +280,52 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, onUpgrade, onRele
           if (n.action === 'delete') return (<tr key={i} className={ROW_BG[n.action||'']}><td className={`${td} text-gray-300`}>-</td><td className={`${td} text-gray-300`}>-</td><td className={`${td} text-gray-300`}>-</td><td className={`${td} text-gray-300`}>-</td>{canExec && <><td className={td}>-</td><td className={td}>-</td></>}</tr>);
           const r = resultRow(n);
           const exec = getExec(n.entity_id || '');
+          const unchanged = isUnchanged(n, false);
+          const autoUpgraded = isAutoUpgraded(n) && !exec?.new_entity_status;
+          const effStatus = autoUpgraded ? 'draft' : exec?.new_entity_status;
           const entityId = exec?.new_entity_id || n.entity_id || '';
           const entityType = n.entity_type || 'part';
           const handleRowClick = () => {
-            if (!canExec || !exec?.new_entity_status) return;
-            if (exec.new_entity_status === 'released' || exec.new_entity_status === 'frozen') {
-              onViewItem?.(entityType, exec.new_entity_id || entityId);
-            } else if (exec.new_entity_status === 'draft') {
-              onEditItem?.(entityType, exec.new_entity_id || entityId);
+            if (!canExec || unchanged || !effStatus) return;
+            if (effStatus === 'released' || effStatus === 'frozen') {
+              onViewItem?.(entityType, exec?.new_entity_id || entityId);
+            } else if (effStatus === 'draft') {
+              onEditItem?.(entityType, exec?.new_entity_id || entityId);
             }
           };
-          return (<tr key={i} className={`${ROW_BG[n.action||'']} ${exec?.new_entity_status ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={handleRowClick}><td className={td}>{r.code}</td><td className={td}><span className="truncate block">{r.name}</span></td><td className={`${td} ${n.action === 'upgrade' ? 'text-blue-600 font-semibold' : ''}`}>{r.ver}</td><td className={`${td} ${n.action === 'qty_change' ? 'text-orange-600 font-semibold' : ''}`}>{r.qty}</td>
+          return (<tr key={i} className={`${ROW_BG[n.action||'']} ${!unchanged && effStatus ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={handleRowClick}><td className={td}>{r.code}</td><td className={td}><span className="truncate block">{r.name}</span></td><td className={`${td} ${n.action === 'upgrade' ? 'text-blue-600 font-semibold' : ''}`}>{r.ver}</td><td className={`${td} ${n.action === 'qty_change' ? 'text-orange-600 font-semibold' : ''}`}>{r.qty}</td>
           {canExec && (
             <>
               <td className={td}>
-                {exec?.new_entity_status === 'released' ? <span className="px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-700">已发布</span>
-                : exec?.new_entity_status === 'frozen' ? <span className="px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-700">已冻结</span>
-                : exec?.new_entity_status === 'draft' ? <span className="px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-700">已升版</span>
-                : <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-500">未执行</span>}
+                {unchanged ? <span className="px-1.5 py-0.5 rounded text-xs bg-gray-200 text-gray-500">不变更</span>
+                : <StatusBadge status={effStatus} />}
               </td>
               <td className={td}>
-                <div className="flex items-center gap-1">
-                  {ecoStatus === 'draft' ? (
-                    exec?.new_entity_status === 'draft' ? (
-                      <>
+                {!unchanged && (
+                  <div className="flex items-center gap-1">
+                    {ecoStatus === 'draft' ? (
+                      effStatus === 'draft' ? (
+                        <>
+                          <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
+                            className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
+                          <button onClick={(e) => { e.stopPropagation(); onFreeze?.(exec?.id || '', exec?.new_entity_id); }}
+                            className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">冻结</button>
+                        </>
+                      ) : effStatus === 'frozen' ? (
                         <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
                           className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
-                        <button onClick={(e) => { e.stopPropagation(); onFreeze?.(exec?.id || '', exec?.new_entity_id); }}
-                          className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">冻结</button>
-                      </>
-                    ) : exec?.new_entity_status === 'frozen' ? (
-                      <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
-                        className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
-                    ) : !exec?.new_entity_status ? (
-                      <button onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || ''); }}
-                        className="px-1.5 py-0.5 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">升版</button>
-                    ) : null
-                  ) : ecoStatus === 'executing' ? (
-                    exec?.new_entity_status === 'frozen' ? (
-                      <button onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || '', exec?.new_entity_id); }}
-                        className="px-1.5 py-0.5 text-xs bg-green-500 text-white rounded hover:bg-green-600">发布</button>
-                    ) : null
-                  ) : null}
-                </div>
+                      ) : !effStatus ? (
+                        <button onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || ''); }}
+                          className="px-1.5 py-0.5 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">升版</button>
+                      ) : null
+                    ) : ecoStatus === 'executing' ? (
+                      effStatus === 'frozen' ? (
+                        <button onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || '', exec?.new_entity_id); }}
+                          className="px-1.5 py-0.5 text-xs bg-green-500 text-white rounded hover:bg-green-600">发布</button>
+                      ) : null
+                    ) : null}
+                  </div>
+                )}
               </td>
             </>
           )}
@@ -323,18 +348,20 @@ function AffectedTable({ rows, execMap, canExec, ecoStatus, onUpgrade, onRelease
         <tbody>{rows.length === 0 ? <tr><td colSpan={canExec ? 6 : 4} className="text-xs text-gray-400 text-center py-6">无</td></tr>
         : rows.map((n, i) => {
           const exec = getExec(n.entity_id || '');
+          const unchanged = isUnchanged(n, true);
+          const effStatus = exec?.new_entity_status;
           const entityId = exec?.new_entity_id || n.entity_id || '';
           const entityType = n.entity_type || 'part';
           const handleRowClick = () => {
-            if (!canExec || !exec?.new_entity_status) return;
-            if (exec.new_entity_status === 'released' || exec.new_entity_status === 'frozen') {
+            if (!canExec || unchanged || !effStatus) return;
+            if (effStatus === 'released' || effStatus === 'frozen') {
               onViewItem?.(entityType, exec.new_entity_id || entityId);
-            } else if (exec.new_entity_status === 'draft') {
+            } else if (effStatus === 'draft') {
               onEditItem?.(entityType, exec.new_entity_id || entityId);
             }
           };
           return (
-          <tr key={i} className={`${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'} ${exec?.new_entity_status ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={handleRowClick}>
+          <tr key={i} className={`${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'} ${!unchanged && effStatus ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={handleRowClick}>
             <td className={td}>{n.entity_code||'-'}</td>
             <td className={td}><span className="truncate block">{n.entity_name}</span></td>
             <td className={td}>{n.entity_version || '-'}</td>
@@ -342,35 +369,35 @@ function AffectedTable({ rows, execMap, canExec, ecoStatus, onUpgrade, onRelease
             {canExec && (
               <>
                 <td className={td}>
-                  {exec?.new_entity_status === 'released' ? <span className="px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-700">已发布</span>
-                  : exec?.new_entity_status === 'frozen' ? <span className="px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-700">已冻结</span>
-                  : exec?.new_entity_status === 'draft' ? <span className="px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-700">已升版</span>
-                  : <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-500">未执行</span>}
+                  {unchanged ? <span className="px-1.5 py-0.5 rounded text-xs bg-gray-200 text-gray-500">不变更</span>
+                  : <StatusBadge status={effStatus} />}
                 </td>
                 <td className={td}>
-                  <div className="flex items-center gap-1">
-                    {ecoStatus === 'draft' ? (
-                      exec?.new_entity_status === 'draft' ? (
-                        <>
+                  {!unchanged && (
+                    <div className="flex items-center gap-1">
+                      {ecoStatus === 'draft' ? (
+                        effStatus === 'draft' ? (
+                          <>
+                            <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
+                              className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
+                            <button onClick={(e) => { e.stopPropagation(); onFreeze?.(exec?.id || '', exec?.new_entity_id); }}
+                              className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">冻结</button>
+                          </>
+                        ) : effStatus === 'frozen' ? (
                           <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
                             className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
-                          <button onClick={(e) => { e.stopPropagation(); onFreeze?.(exec?.id || '', exec?.new_entity_id); }}
-                            className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">冻结</button>
-                        </>
-                      ) : exec?.new_entity_status === 'frozen' ? (
-                        <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
-                          className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
-                      ) : !exec?.new_entity_status ? (
-                        <button onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || ''); }}
-                          className="px-1.5 py-0.5 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">升版</button>
-                      ) : null
-                    ) : ecoStatus === 'executing' ? (
-                      exec?.new_entity_status === 'frozen' ? (
-                        <button onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || '', exec?.new_entity_id); }}
-                          className="px-1.5 py-0.5 text-xs bg-green-500 text-white rounded hover:bg-green-600">发布</button>
-                      ) : null
-                    ) : null}
-                  </div>
+                        ) : !effStatus ? (
+                          <button onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || ''); }}
+                            className="px-1.5 py-0.5 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">升版</button>
+                        ) : null
+                      ) : ecoStatus === 'executing' ? (
+                        effStatus === 'frozen' ? (
+                          <button onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || '', exec?.new_entity_id); }}
+                            className="px-1.5 py-0.5 text-xs bg-green-500 text-white rounded hover:bg-green-600">发布</button>
+                        ) : null
+                      ) : null}
+                    </div>
+                  )}
                 </td>
               </>
             )}
