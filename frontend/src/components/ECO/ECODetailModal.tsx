@@ -69,6 +69,18 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
       setEco(r.data);
       setDocumentLinks(r.data.document_links || []);
       setReleaseItems(r.data.release_items || []);
+      // 刷新 release_items 状态（避免显示过期状态）
+      const items = r.data.release_items || [];
+      if (items.length > 0) {
+        const refreshed = await Promise.all(items.map(async (ri: any) => {
+          try {
+            const api = ri.entity_type === 'assembly' ? assembliesApi : partsApi;
+            const entity = await api.get(ri.entity_id);
+            return { ...ri, status: entity.data.status };
+          } catch { return ri; }
+        }));
+        setReleaseItems(refreshed);
+      }
       const docs = r.data.document_links || [];
       if (docs.length > 0) {
         const results = await Promise.allSettled(docs.map((d: any) => documentsApi.get(d.document_id)));
