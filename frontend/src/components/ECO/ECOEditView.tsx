@@ -132,9 +132,9 @@ function EditableUpward({ rows, onUpdate, displayOnly = false }: { rows: Mutable
               {displayOnly ? <ECOActionBadge action={n.action||'no_change'} /> : <ActionSelect variant="upward" value={n.action||'no_change'} onChange={v => onUpdate(i, { action: v as any })} />}
             </td>
             <td className={`${td} text-center`}>
-              <input type="number" min="0" value={n._targetQty ?? (n.quantity_change?.to ?? n.quantity)} readOnly={displayOnly}
-                onChange={e => onUpdate(i, { _targetQty: Number(e.target.value) })}
-                className="w-full text-xs border border-gray-300 rounded px-1 py-1" />
+              {n.action === 'delete' ? <span className="text-red-500 text-xs">—</span>
+              : n.action === 'qty_change' && !displayOnly ? <input type="number" value={n._targetQty ?? (n.quantity_change?.to ?? n.quantity)} min={1} onChange={e => onUpdate(i, { _targetQty: parseInt(e.target.value)||1 })} className="w-16 border border-gray-300 rounded px-1 py-0.5 text-xs text-center" />
+              : <span className="text-xs">{n._targetQty ?? (n.quantity_change?.to ?? n.quantity)}</span>}
             </td>
             <td className={td}>
               <input value={n._desc || ''} readOnly={displayOnly}
