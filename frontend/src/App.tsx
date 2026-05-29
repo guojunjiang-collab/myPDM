@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import { useAuthStore } from './stores/auth';
 import Layout from './components/Layout';
+import { ToastContainer } from './components/Toast';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Board from './pages/Board';
@@ -29,6 +30,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <BrowserRouter>
+      <ToastContainer />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route
