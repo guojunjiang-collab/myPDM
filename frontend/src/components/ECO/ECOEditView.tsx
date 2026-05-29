@@ -105,8 +105,8 @@ function cloneNodes(ecrData: any): { up: MutableNode[]; down: MutableNode[] } {
   if (!ecrData) return { up, down };
   (ecrData.affected_items || []).forEach((ai: any) => {
     const bi = ai.bom_impact || {};
-    (bi.upward_chain || []).forEach((n: BomImpactNode) => up.push({ ...n, _targetQty: n.quantity_change?.to ?? n.quantity, _affectedCode: ai.entity_code, _affectedName: ai.entity_name }));
-    (bi.downward_items || []).forEach((n: BomImpactNode) => down.push({ ...n, _targetQty: n.quantity_change?.to ?? n.quantity, _affectedCode: ai.entity_code, _affectedName: ai.entity_name }));
+    (bi.upward_chain || []).forEach((n: BomImpactNode) => up.push({ ...n, _targetQty: n.quantity_change?.to ?? n.quantity, _desc: n.change_description || '', _affectedCode: ai.entity_code, _affectedName: ai.entity_name }));
+    (bi.downward_items || []).forEach((n: BomImpactNode) => down.push({ ...n, _targetQty: n.quantity_change?.to ?? n.quantity, _desc: n.change_description || '', _affectedCode: ai.entity_code, _affectedName: ai.entity_name }));
   });
   return { up, down };
 }
@@ -137,9 +137,8 @@ function EditableUpward({ rows, onUpdate, displayOnly = false }: { rows: Mutable
               : <span className="text-xs">{n._targetQty ?? (n.quantity_change?.to ?? n.quantity)}</span>}
             </td>
             <td className={td}>
-              <input value={n._desc || ''} readOnly={displayOnly}
-                onChange={e => onUpdate(i, { _desc: e.target.value })}
-                className="w-full text-xs border border-gray-300 rounded px-1 py-1" placeholder="变更说明" />
+              {displayOnly ? <span className="text-gray-600">{(n._desc ?? n.change_description) || '-'}</span>
+              : <input type="text" value={(n._desc ?? n.change_description) || ''} placeholder="说明" onChange={e => onUpdate(i, { _desc: e.target.value })} className="w-full border border-gray-300 rounded px-1 py-0.5 text-xs" />}
             </td>
           </tr>
         ))}</tbody>
@@ -484,6 +483,7 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
         const saved = lookup(n);
         if (!saved) return;
         if (saved?.detail?._targetQty != null) n._targetQty = saved.detail._targetQty;
+        if (saved?.detail?._desc) n._desc = saved.detail._desc;
         if (saved.action) n.action = saved.action;
       });
       const allKeys = new Set<string>();
