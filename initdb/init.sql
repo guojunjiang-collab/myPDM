@@ -221,6 +221,7 @@ CREATE TABLE ecrs (
     review_mode VARCHAR(8) NOT NULL DEFAULT 'all',
     creator_id UUID NOT NULL REFERENCES users(id),
     document_links JSONB NOT NULL DEFAULT '[]',
+    cc_users JSONB NOT NULL DEFAULT '[]',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     reviewed_at TIMESTAMP WITH TIME ZONE,
@@ -272,6 +273,81 @@ CREATE INDEX idx_ecr_affected_items_entity ON ecr_affected_items(entity_type, en
 CREATE INDEX idx_ecr_review_records_ecr ON ecr_review_records(ecr_id);
 CREATE INDEX idx_ecr_review_records_reviewer ON ecr_review_records(reviewer_id);
 CREATE INDEX idx_ecr_status_logs_ecr ON ecr_status_logs(ecr_id);
+
+-- ===== 变更管理 - ECO =====
+
+CREATE TABLE ecos (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    eco_number VARCHAR(32) UNIQUE NOT NULL,
+    ecr_id UUID REFERENCES ecrs(id),
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    reason VARCHAR(64) NOT NULL,
+    priority VARCHAR(16) NOT NULL DEFAULT 'normal',
+    category VARCHAR(32),
+    status VARCHAR(16) NOT NULL DEFAULT 'draft',
+    reviewers JSONB NOT NULL DEFAULT '[]',
+    review_mode VARCHAR(8) NOT NULL DEFAULT 'all',
+    creator_id UUID NOT NULL REFERENCES users(id),
+    executor_id UUID REFERENCES users(id),
+    document_links JSONB NOT NULL DEFAULT '[]',
+    cc_users JSONB NOT NULL DEFAULT '[]',
+    release_items JSONB NOT NULL DEFAULT '[]',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    reviewed_at TIMESTAMP WITH TIME ZONE,
+    executed_at TIMESTAMP WITH TIME ZONE,
+    closed_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE TABLE eco_execution_items (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    eco_id UUID NOT NULL REFERENCES ecos(id) ON DELETE CASCADE,
+    source VARCHAR(8) NOT NULL DEFAULT 'ecr',
+    affected_item_id UUID REFERENCES ecr_affected_items(id),
+    entity_type VARCHAR(16) NOT NULL,
+    entity_id UUID,
+    entity_code VARCHAR(64),
+    entity_name VARCHAR(255) NOT NULL,
+    action VARCHAR(16) NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'pending',
+    detail JSONB NOT NULL DEFAULT '{}',
+    new_entity_id UUID,
+    new_version VARCHAR(32),
+    parent_entity_id UUID,
+    parent_new_entity_id UUID,
+    error_message TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    executed_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE TABLE eco_review_records (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    eco_id UUID NOT NULL REFERENCES ecos(id) ON DELETE CASCADE,
+    reviewer_id UUID NOT NULL REFERENCES users(id),
+    reviewer_name VARCHAR(64),
+    decision VARCHAR(16) NOT NULL,
+    comment TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE eco_status_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    eco_id UUID NOT NULL REFERENCES ecos(id) ON DELETE CASCADE,
+    from_status VARCHAR(16),
+    to_status VARCHAR(16) NOT NULL,
+    operator_id UUID NOT NULL REFERENCES users(id),
+    operator_name VARCHAR(64),
+    comment TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_ecos_status ON ecos(status);
+CREATE INDEX idx_ecos_creator ON ecos(creator_id);
+CREATE INDEX idx_ecos_number ON ecos(eco_number);
+CREATE INDEX idx_eco_exec_items_eco ON eco_execution_items(eco_id);
+CREATE INDEX idx_eco_review_records_eco ON eco_review_records(eco_id);
+CREATE INDEX idx_eco_status_logs_eco ON eco_status_logs(eco_id);
 
 -- ============================================================
 -- 构型配置模块
