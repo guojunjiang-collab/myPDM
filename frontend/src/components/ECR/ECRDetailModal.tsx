@@ -288,7 +288,6 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
     >
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold">ECR 详情</h3>
-        <button onClick={() => window.print()} className="text-sm px-3 py-1.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 print:hidden">🖨️ 打印</button>
       </div>
       {loading && !detail ? (
         <div className="flex items-center justify-center py-12">
