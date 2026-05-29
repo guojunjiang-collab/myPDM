@@ -40,13 +40,15 @@ const ROW_BG: Record<string, string> = {
 const th = 'px-2 py-2 text-left text-xs font-semibold text-gray-500 border-b border-gray-200 whitespace-nowrap';
 const td = 'px-2 py-1.5 text-xs text-gray-700 border-b border-gray-100';
 
-const ACTIONS = ['no_change', 'upgrade', 'qty_change', 'delete', 'add_existing'] as const;
+const UPWARD_ACTIONS = ['no_change', 'upgrade', 'qty_change', 'delete'] as const;
+const DOWNWARD_ACTIONS = ['no_change', 'upgrade', 'qty_change', 'delete', 'add_existing'] as const;
 
-function ActionSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function ActionSelect({ value, onChange, variant = 'downward' }: { value: string; onChange: (v: string) => void; variant?: 'upward' | 'downward' }) {
+  const actions = variant === 'upward' ? UPWARD_ACTIONS : DOWNWARD_ACTIONS;
   return (
     <select value={value} onChange={e => onChange(e.target.value)}
       className="w-full text-xs border border-gray-300 rounded px-1 py-1 bg-white focus:ring-1 focus:ring-primary-500">
-      {ACTIONS.map(a => <option key={a} value={a}>{a==='no_change'?'不变':a==='upgrade'?'升版':a==='qty_change'?'数量':a==='delete'?'删除':a==='add_existing'?'新增':a}</option>)}
+      {actions.map(a => <option key={a} value={a}>{a==='no_change'?'不变':a==='upgrade'?'升版':a==='qty_change'?'数量':a==='delete'?'删除':a==='add_existing'?'新增':a}</option>)}
     </select>
   );
 }
@@ -127,17 +129,17 @@ function EditableUpward({ rows, onUpdate, displayOnly = false }: { rows: Mutable
             <td className={td}>{n.entity_version || '-'}</td>
             <td className={td}>{n.quantity}</td>
             <td className={`${td} text-center`}>
-              {displayOnly ? <ECOActionBadge action={n.action||'no_change'} /> : <ActionSelect value={n.action||'no_change'} onChange={v => onUpdate(i, { action: v as any })} />}
+              {displayOnly ? <ECOActionBadge action={n.action||'no_change'} /> : <ActionSelect variant="upward" value={n.action||'no_change'} onChange={v => onUpdate(i, { action: v as any })} />}
             </td>
             <td className={td}>
-              {n.action === 'delete' ? <span className="text-red-500 text-xs">—</span>
-              : n.action !== 'qty_change' ? <span className="text-xs">{n._targetQty ?? n.quantity}</span>
-              : displayOnly ? <span className="text-xs">{n._targetQty ?? n.quantity}</span>
-              : <input type="number" value={n._targetQty ?? n.quantity} min={1} onChange={e => onUpdate(i, { _targetQty: parseInt(e.target.value)||1 })} className="w-16 border border-gray-300 rounded px-1 py-0.5 text-xs text-center" />}
+              <input type="number" min="0" value={n._targetQty ?? (n.quantity_change?.to ?? n.quantity)} readOnly={displayOnly}
+                onChange={e => onUpdate(i, { _targetQty: Number(e.target.value) })}
+                className="w-full text-xs border border-gray-300 rounded px-1 py-1" />
             </td>
             <td className={td}>
-              {displayOnly ? <span className="text-gray-600">{(n._desc ?? n.change_description) || '-'}</span>
-              : <input type="text" value={(n._desc ?? n.change_description) || ''} placeholder="说明" onChange={e => onUpdate(i, { _desc: e.target.value })} className="w-full border border-gray-300 rounded px-1 py-0.5 text-xs" />}
+              <input value={n._desc || ''} readOnly={displayOnly}
+                onChange={e => onUpdate(i, { _desc: e.target.value })}
+                className="w-full text-xs border border-gray-300 rounded px-1 py-1" placeholder="变更说明" />
             </td>
           </tr>
         ))}</tbody>
