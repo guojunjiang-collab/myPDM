@@ -455,7 +455,7 @@ function ReleaseItemsTable({ items, onViewItem, onRemove }: { items: any[]; onVi
     return (
       <>
         <tr key={idx} className="hover:bg-gray-50 cursor-pointer" onClick={() => onViewItem(isAssembly ? 'assembly' : 'part', ri.entity_id, 'view')}>
-          <td className="px-3 py-1.5 text-xs text-gray-400 whitespace-nowrap">
+          <td className="px-3 py-1.5 text-xs text-gray-400 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
             <span>{'-'.repeat(level)}{level}</span>
             {isAssembly && <button onClick={(e) => { e.stopPropagation(); toggleExpand(idx, ri.entity_id, ri.entity_type); }} className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">{childRows ? '▼' : '▶'}</button>}
           </td>
@@ -467,7 +467,7 @@ function ReleaseItemsTable({ items, onViewItem, onRemove }: { items: any[]; onVi
           <td className="px-3 py-1.5 text-xs whitespace-nowrap">{ri.status ? <span className={`px-1.5 py-0.5 rounded text-xs ${statusTag(ri.status).cls}`}>{statusTag(ri.status).label}</span> : '-'}</td>
           <td className="px-3 py-1.5 text-xs text-center">{ri.quantity || 1}</td>
           {onRemove && level === 0 && <td className="px-3 py-1.5 text-xs text-center" onClick={(e) => e.stopPropagation()}><button onClick={() => onRemove(rowNum)} className="px-2 py-0.5 text-xs text-red-400 hover:text-red-600">移除</button></td>}
-          {onRemove && level > 0 && <td className="px-3 py-1.5"></td>}
+          {onRemove && level > 0 && <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}></td>}
         </tr>
         {childRows && childRows.map((child: any, j: number) => renderRow(child, level + 1, `${idx}-${j}`))}
         {loadingIdx === idx && <tr><td colSpan={onRemove ? 9 : 8} className="px-3 py-1.5 text-xs text-gray-400 text-center">加载中...</td></tr>}
