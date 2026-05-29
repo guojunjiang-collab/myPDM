@@ -117,8 +117,8 @@ function EditableUpward({ rows, onUpdate, displayOnly = false }: { rows: Mutable
     <div className="overflow-x-auto border border-gray-200 rounded-lg">
       <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
         <thead><tr className="bg-gray-50">
-          <th className={`${th} w-12`}>层级</th><th className={th}>编码</th><th className={th}>名称</th><th className={th}>版本</th><th className={th}>用量</th>
-          <th className={`${th} w-20 text-center`}>操作</th><th className={`${th} w-16`}>目标用量</th><th className={th}>说明</th>
+          <th className={`${th} w-12`}>层级</th><th className={th}>编码</th><th className={th}>名称</th><th className={`${th} text-center`}>版本</th><th className={`${th} text-center`}>用量</th>
+          <th className={`${th} w-20 text-center`}>操作</th><th className={`${th} w-16 text-center`}>目标用量</th><th className={th}>说明</th>
         </tr></thead>
         <tbody>{rows.length === 0 ? <tr><td colSpan={8} className="text-xs text-gray-400 text-center py-6">无数据</td></tr>
         : rows.map((n, i) => (
@@ -126,12 +126,12 @@ function EditableUpward({ rows, onUpdate, displayOnly = false }: { rows: Mutable
             <td className={td}><span className="text-gray-400">{n.level != null ? '-'.repeat(n.level)+n.level : '-'}</span></td>
             <td className={td}>{n.entity_code||'-'}</td>
             <td className={td}><span className="truncate block">{n.entity_name}</span></td>
-            <td className={td}>{n.entity_version || '-'}</td>
-            <td className={td}>{n.quantity}</td>
+            <td className={`${td} text-center`}>{n.entity_version || '-'}</td>
+            <td className={`${td} text-center`}>{n.quantity}</td>
             <td className={`${td} text-center`}>
               {displayOnly ? <ECOActionBadge action={n.action||'no_change'} /> : <ActionSelect variant="upward" value={n.action||'no_change'} onChange={v => onUpdate(i, { action: v as any })} />}
             </td>
-            <td className={td}>
+            <td className={`${td} text-center`}>
               <input type="number" min="0" value={n._targetQty ?? (n.quantity_change?.to ?? n.quantity)} readOnly={displayOnly}
                 onChange={e => onUpdate(i, { _targetQty: Number(e.target.value) })}
                 className="w-full text-xs border border-gray-300 rounded px-1 py-1" />
@@ -154,8 +154,8 @@ function EditableDownward({ rows, onUpdate, displayOnly = false, onRemove }: { r
     <div className="overflow-x-auto border border-gray-200 rounded-lg">
       <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
         <thead><tr className="bg-gray-50">
-          <th className={th}>编码</th><th className={th}>名称</th><th className={th}>版本</th><th className={th}>用量</th>
-          <th className={`${th} w-20 text-center`}>操作</th><th className={`${th} w-16`}>目标用量</th><th className={th}>说明</th>
+          <th className={th}>编码</th><th className={th}>名称</th><th className={`${th} text-center`}>版本</th><th className={`${th} text-center`}>用量</th>
+          <th className={`${th} w-20 text-center`}>操作</th><th className={`${th} w-16 text-center`}>目标用量</th><th className={th}>说明</th>
           {onRemove && <th className={`${th} w-10`}></th>}
         </tr></thead>
         <tbody>{rows.length === 0 ? <tr><td colSpan={onRemove ? 8 : 7} className="text-xs text-gray-400 text-center py-6">无数据</td></tr>
@@ -163,12 +163,12 @@ function EditableDownward({ rows, onUpdate, displayOnly = false, onRemove }: { r
           <tr key={i} className={ROW_BG[n.action||''] || (i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50')}>
             <td className={td}>{n.entity_code||'-'}</td>
             <td className={td}><span className="truncate block">{n.entity_name}</span></td>
-            <td className={td}>{n.entity_version || '-'}</td>
-            <td className={td}>{n.quantity}</td>
+            <td className={`${td} text-center`}>{n.entity_version || '-'}</td>
+            <td className={`${td} text-center`}>{n.quantity}</td>
             <td className={`${td} text-center`}>
               {displayOnly ? <ECOActionBadge action={n.action||'no_change'} /> : <ActionSelect value={n.action||'no_change'} onChange={v => onUpdate(i, { action: v as any })} />}
             </td>
-            <td className={td}>
+            <td className={`${td} text-center`}>
               {n.action === 'delete' ? <span className="text-red-500 text-xs">—</span>
               : (n.action !== 'qty_change' && n.action !== 'add_existing' && n.action !== 'add_new') ? <span className="text-xs">{n._targetQty ?? n.quantity}</span>
               : displayOnly ? <span className="text-xs">{n._targetQty ?? n.quantity}</span>
@@ -195,8 +195,8 @@ function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, onUpgrade, onReleas
   return (
     <div className="overflow-x-auto border border-gray-200 rounded-lg">
       <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
-        <thead><tr className="bg-gray-50"><th className={`${th} w-12`}>层级</th><th className={th}>编码</th><th className={th}>名称</th><th className={th}>版本</th><th className={th}>用量</th>
-        {canExec && <><th className={`${th} w-20`}>变更状态</th><th className={`${th} w-28`}>操作</th></>}
+        <thead><tr className="bg-gray-50"><th className={`${th} w-12`}>层级</th><th className={th}>编码</th><th className={th}>名称</th><th className={`${th} text-center`}>版本</th><th className={`${th} text-center`}>用量</th>
+        {canExec && <><th className={`${th} w-20`}>变更状态</th><th className={`${th} w-28 text-center`}>操作</th></>}
         </tr></thead>
         <tbody>{rows.length === 0 ? <tr><td colSpan={canExec ? 7 : 5} className="text-xs text-gray-400 text-center py-6">无数据</td></tr>
         : rows.map((n, i) => {
@@ -220,15 +220,15 @@ function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, onUpgrade, onReleas
               <td className={td}><span className="text-gray-400">{n.level != null ? '-'.repeat(n.level)+n.level : '-'}</span></td>
               <td className={td}>{r.code}</td>
               <td className={td}><span className="truncate block">{r.name}</span></td>
-              <td className={`${td} ${n.action === 'upgrade' ? 'text-blue-600 font-semibold' : ''}`}>{r.ver}</td>
-              <td className={`${td} ${n.action === 'qty_change' ? 'text-orange-600 font-semibold' : ''}`}>{r.qty}</td>
+              <td className={`${td} text-center ${n.action === 'upgrade' ? 'text-blue-600 font-semibold' : ''}`}>{r.ver}</td>
+              <td className={`${td} text-center ${n.action === 'qty_change' ? 'text-orange-600 font-semibold' : ''}`}>{r.qty}</td>
               {canExec && (
                 <>
                   <td className={td}>
                     {unchanged ? <span className="px-1.5 py-0.5 rounded text-xs bg-gray-200 text-gray-500">不变更</span>
                     : <StatusBadge status={exec?.new_entity_status} />}
                   </td>
-              <td className={td}>
+                  <td className={`${td} text-center`}>
                 {!unchanged && (
                   <div className="flex items-center gap-1">
                     {ecoStatus === 'draft' ? (
@@ -274,8 +274,8 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, onUpgrade, onRele
   return (
     <div className="overflow-x-auto border border-gray-200 rounded-lg">
       <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
-        <thead><tr className="bg-gray-50"><th className={th}>编码</th><th className={th}>名称</th><th className={th}>版本</th><th className={th}>用量</th>
-        {canExec && <><th className={`${th} w-20`}>变更状态</th><th className={`${th} w-28`}>操作</th></>}
+        <thead><tr className="bg-gray-50"><th className={th}>编码</th><th className={th}>名称</th><th className={`${th} text-center`}>版本</th><th className={`${th} text-center`}>用量</th>
+        {canExec && <><th className={`${th} w-20`}>变更状态</th><th className={`${th} w-28 text-center`}>操作</th></>}
         </tr></thead>
         <tbody>{rows.length === 0 ? <tr><td colSpan={canExec ? 6 : 4} className="text-xs text-gray-400 text-center py-6">无数据</td></tr>
         : rows.map((n, i) => {
@@ -295,14 +295,14 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, onUpgrade, onRele
               onEditItem?.(entityType, exec?.new_entity_id || entityId);
             }
           };
-          return (<tr key={i} className={`${ROW_BG[n.action||'']} ${!unchanged && effStatus ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={handleRowClick}><td className={td}>{r.code}</td><td className={td}><span className="truncate block">{r.name}</span></td><td className={`${td} ${n.action === 'upgrade' ? 'text-blue-600 font-semibold' : ''}`}>{r.ver}</td><td className={`${td} ${n.action === 'qty_change' ? 'text-orange-600 font-semibold' : ''}`}>{r.qty}</td>
+          return (<tr key={i} className={`${ROW_BG[n.action||'']} ${!unchanged && effStatus ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={handleRowClick}><td className={td}>{r.code}</td><td className={td}><span className="truncate block">{r.name}</span></td><td className={`${td} text-center ${n.action === 'upgrade' ? 'text-blue-600 font-semibold' : ''}`}>{r.ver}</td><td className={`${td} text-center ${n.action === 'qty_change' ? 'text-orange-600 font-semibold' : ''}`}>{r.qty}</td>
           {canExec && (
             <>
               <td className={td}>
                 {unchanged ? <span className="px-1.5 py-0.5 rounded text-xs bg-gray-200 text-gray-500">不变更</span>
                 : <StatusBadge status={effStatus} />}
               </td>
-              <td className={td}>
+              <td className={`${td} text-center`}>
                 {!unchanged && (
                   <div className="flex items-center gap-1">
                     {ecoStatus === 'draft' ? (
