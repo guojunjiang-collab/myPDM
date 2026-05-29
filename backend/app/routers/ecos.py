@@ -513,13 +513,11 @@ async def manual_revert_item(
     if new_entity.status == "draft":
         # 已升版状态：删除新版本实体（完全撤销）
         from app.models import BOMItem
-        # 检查原始实体是否有父项引用（草稿阶段 BOM 尚未更新指向新版本）
-        from app.models import BOMItem
-        parent_filters = [BOMItem.child_id == target_entity_id]
-        if item.entity_id:
-            parent_filters.append(BOMItem.child_id == item.entity_id)
-        from sqlalchemy import or_
-        parent_count = db.query(BOMItem).filter(or_(*parent_filters)).count()
+        # 仅检查克隆体（target_entity_id）是否有父项引用
+        # 不检查原实体，因为 manual_upgrade 不会更新 BOM，原实体必然有引用
+        parent_count = db.query(BOMItem).filter(
+            BOMItem.child_id == target_entity_id
+        ).count()
         if parent_count > 0:
             raise HTTPException(status_code=400, detail="该零部件已被其他部件引用，无法删除")
         # 清理该实体自身的子项 BOM 关系
