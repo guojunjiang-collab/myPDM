@@ -572,15 +572,12 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         </div>
         </div>}
 
-        {/* 关联 ECR（仅编辑模式） */}
+        {/* ECR 变更分析（仅编辑模式） */}
         {!!localEco && (
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-bold text-gray-700">关联 ECR</h4>
+            <h4 className="text-sm font-bold text-gray-700">ECR 变更分析{localEco.ecr_number ? `（${localEco.ecr_number}）` : ''}</h4>
             <div className="flex items-center gap-2">
-              {localEco.ecr_number && (
-                <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded font-mono">{localEco.ecr_number}</span>
-              )}
               <button type="button" onClick={() => setShowEcrPicker(true)}
                 className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">
                 {localEco.ecr_id ? '更换' : '+ 关联 ECR'}

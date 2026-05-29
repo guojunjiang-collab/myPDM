@@ -93,6 +93,17 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
     finally { setActionLoading(false); }
   };
 
+  // 增量更新执行项状态（不重新加载整个 ECO，避免闪屏）
+  const updateExecutionItem = (itemId: string, patch: Record<string, any>) => {
+    if (!eco) return;
+    const items = [...(eco.execution_items || [])];
+    const idx = items.findIndex((ei: any) => ei.id === itemId);
+    if (idx >= 0) {
+      items[idx] = { ...items[idx], ...patch };
+      setEco({ ...eco, execution_items: items });
+    }
+  };
+
   const saveDocumentLinks = async (newLinks: ECRDocumentLink[]) => {
     try {
       await ecoApi.update(ecoId, { document_links: newLinks });
@@ -267,10 +278,34 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
               <h4 className="text-sm font-bold text-gray-700 mb-2">ECR 变更分析（{eco.ecr_number || 'ECR'}）</h4>
               <ECOEditView ecrId={eco.ecr_id} onEcrLinked={() => {}} readOnly executionItems={eco.execution_items}
                 ecoId={ecoId} ecoStatus={eco.status} canExecute={executionMode && (eco.status === 'approved' || eco.status === 'executing')}
-                onExecuteUpgrade={(itemId) => act(() => ecoApi.upgradeItem(ecoId, itemId), '升版完成')}
-                onExecuteRelease={(itemId, newEntityId) => act(() => ecoApi.revertItem(ecoId, itemId, newEntityId), '已还原')}
-                onExecuteFreeze={(itemId, newEntityId) => act(() => ecoApi.freezeItem(ecoId, itemId, newEntityId), '冻结完成')}
-                onExecutePublish={(itemId, newEntityId) => act(() => ecoApi.releaseItem(ecoId, itemId), '发布完成')}
+                onExecuteUpgrade={async (itemId) => {
+                  try {
+                    const r = await ecoApi.upgradeItem(ecoId, itemId);
+                    updateExecutionItem(itemId, { new_entity_id: r.data?.new_entity_id, new_version: r.data?.new_version, new_entity_status: 'draft' });
+                    toast.success('升版完成');
+                  } catch (err: any) { toast.error(err?.response?.data?.detail || '操作失败'); }
+                }}
+                onExecuteRelease={async (itemId, newEntityId) => {
+                  try {
+                    await ecoApi.revertItem(ecoId, itemId, newEntityId);
+                    updateExecutionItem(itemId, { new_entity_id: undefined, new_version: undefined, new_entity_status: undefined });
+                    toast.success('已还原');
+                  } catch (err: any) { toast.error(err?.response?.data?.detail || '操作失败'); }
+                }}
+                onExecuteFreeze={async (itemId, newEntityId) => {
+                  try {
+                    await ecoApi.freezeItem(ecoId, itemId, newEntityId);
+                    updateExecutionItem(itemId, { new_entity_status: 'frozen' });
+                    toast.success('冻结完成');
+                  } catch (err: any) { toast.error(err?.response?.data?.detail || '操作失败'); }
+                }}
+                onExecutePublish={async (itemId, newEntityId) => {
+                  try {
+                    await ecoApi.releaseItem(ecoId, itemId, newEntityId);
+                    updateExecutionItem(itemId, { new_entity_status: 'released' });
+                    toast.success('发布完成');
+                  } catch (err: any) { toast.error(err?.response?.data?.detail || '操作失败'); }
+                }}
                 onViewItem={(entityType, entityId) => viewItem(entityType, entityId, 'view')}
                 onEditItem={(entityType, entityId) => viewItem(entityType, entityId, 'edit')}
                 onCheckedChange={setCheckedExecIds} />
@@ -321,7 +356,6 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
                 <button onClick={() => act(() => ecoApi.completeExecution(ecoId), '执行已完成')} disabled={actionLoading} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">完成执行</button>
               )}
             </div>
-            <button onClick={async () => { try { await ecoApi.update(ecoId, { document_links: documentLinks, release_items: releaseItems }); toast.success('保存成功'); onClose(); onRefresh(); } catch { toast.error('保存失败'); } }} disabled={actionLoading} className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">保存</button>
           </div>
         )}
         </>
