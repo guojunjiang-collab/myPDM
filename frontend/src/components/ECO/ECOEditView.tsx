@@ -502,46 +502,50 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
   // 加载执行项涉及的零部件实时状态
   useEffect(() => {
     if (!executionItems || executionItems.length === 0) return;
-    const newEntityIds = executionItems
-      .filter((ei: any) => ei.new_entity_id)
-      .map((ei: any) => ({ id: ei.new_entity_id, type: ei.entity_type }));
-    
-    // 检查所有没有 new_entity_id 的执行项，自动关联已存在的新版本
-    const upgradeItems = executionItems
-      .filter((ei: any) => !ei.new_entity_id && ei.entity_id && ei.entity_type)
-      .map((ei: any) => ({ id: ei.entity_id, type: ei.entity_type, code: ei.entity_code }));
+
+    // 收集所有执行项的件号（去重）
+    const codeMap = new Map<string, { entity_id: string; entity_type: string; entity_code: string }>();
+    executionItems.forEach((ei: any) => {
+      if (ei.entity_code && !codeMap.has(ei.entity_code)) {
+        codeMap.set(ei.entity_code, { entity_id: ei.entity_id, entity_type: ei.entity_type, entity_code: ei.entity_code });
+      }
+    });
+
+    // 按类型分组搜索
+    const partCodes = Array.from(codeMap.values()).filter(e => e.entity_type === 'part');
+    const assemblyCodes = Array.from(codeMap.values()).filter(e => e.entity_type === 'assembly');
 
     const promises: Promise<any>[] = [];
 
-    // 获取已有 new_entity_id 的状态
-    if (newEntityIds.length > 0) {
+    // 搜索零件
+    if (partCodes.length > 0) {
       promises.push(
         Promise.allSettled(
-          newEntityIds.map(async ({ id, type }: { id: string; type: string }) => {
-            const api = type === 'assembly' ? assembliesApi : partsApi;
-            const r = await api.get(id);
-            return { id, status: r.data.status };
+          partCodes.map(async ({ entity_id, entity_code }) => {
+            const list = await partsApi.list({ search: entity_code, page_size: 100 });
+            const items = list.data?.items || list.data || [];
+            // 找到同编码但不同ID的版本（即新版本）
+            const newVersion = items.find((item: any) => item.code === entity_code && item.id !== entity_id);
+            if (newVersion) {
+              return { entity_id, newId: newVersion.id, status: newVersion.status };
+            }
+            return null;
           })
         )
       );
     }
 
-    // 检查升级项是否有对应的新版本存在
-    if (upgradeItems.length > 0) {
+    // 搜索部件
+    if (assemblyCodes.length > 0) {
       promises.push(
         Promise.allSettled(
-          upgradeItems.map(async ({ id, type, code }: { id: string; type: string; code: string }) => {
-            const api = type === 'assembly' ? assembliesApi : partsApi;
-            // 获取原实体信息
-            const original = await api.get(id);
-            // 搜索同编码的其他版本
-            const listApi = type === 'assembly' ? assembliesApi : partsApi;
-            const list = await listApi.list({ search: code, page_size: 100 });
+          assemblyCodes.map(async ({ entity_id, entity_code }) => {
+            const list = await assembliesApi.list({ search: entity_code, page_size: 100 });
             const items = list.data?.items || list.data || [];
-            // 找到同编码但不同ID的最新版本（即升版后的实体）
-            const newVersion = items.find((item: any) => item.code === code && item.id !== id);
+            // 找到同编码但不同ID的版本（即新版本）
+            const newVersion = items.find((item: any) => item.code === entity_code && item.id !== entity_id);
             if (newVersion) {
-              return { originalId: id, newId: newVersion.id, status: newVersion.status };
+              return { entity_id, newId: newVersion.id, status: newVersion.status };
             }
             return null;
           })
@@ -551,30 +555,19 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
 
     Promise.all(promises).then(results => {
       const statusMap = new Map<string, any>();
-      const linkMap = new Map<string, string>(); // originalId -> newId
+      const linkMap = new Map<string, string>();
 
-      // 处理已有 new_entity_id 的状态（key = 原始entity_id）
-      if (results[0]) {
-        (results[0] as any[]).forEach((r, i) => {
-          if (r.status === 'fulfilled' && r.value) {
-            // 用原始entity_id作为key
-            const originalId = newEntityIds[i]?.id;
-            if (originalId) {
-              statusMap.set(originalId, { status: r.value.status });
+      results.forEach(result => {
+        if (Array.isArray(result)) {
+          result.forEach(r => {
+            if (r.status === 'fulfilled' && r.value) {
+              const { entity_id, newId, status } = r.value;
+              statusMap.set(entity_id, { status });
+              linkMap.set(entity_id, newId);
             }
-          }
-        });
-      }
-
-      // 处理自动关联的新版本（key = 原始entity_id）
-      if (results[1]) {
-        (results[1] as any[]).forEach(r => {
-          if (r.status === 'fulfilled' && r.value) {
-            linkMap.set(r.value.originalId, r.value.newId);
-            statusMap.set(r.value.originalId, { status: r.value.status });
-          }
-        });
-      }
+          });
+        }
+      });
 
       setLiveExecMap(statusMap);
       setAutoLinkedItems(linkMap);
