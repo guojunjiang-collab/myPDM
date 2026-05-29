@@ -506,10 +506,10 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
       .filter((ei: any) => ei.new_entity_id)
       .map((ei: any) => ({ id: ei.new_entity_id, type: ei.entity_type }));
     
-    // 检查 action=upgrade 但没有 new_entity_id 的执行项，自动关联已存在的新版本
+    // 检查所有没有 new_entity_id 的执行项，自动关联已存在的新版本
     const upgradeItems = executionItems
-      .filter((ei: any) => ei.action === 'upgrade' && !ei.new_entity_id && ei.entity_id)
-      .map((ei: any) => ({ id: ei.entity_id, type: ei.entity_type, code: ei.entity_code, version: ei.detail?._originalVersion || '' }));
+      .filter((ei: any) => !ei.new_entity_id && ei.entity_id && ei.entity_type)
+      .map((ei: any) => ({ id: ei.entity_id, type: ei.entity_type, code: ei.entity_code }));
 
     const promises: Promise<any>[] = [];
 
@@ -530,7 +530,7 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
     if (upgradeItems.length > 0) {
       promises.push(
         Promise.allSettled(
-          upgradeItems.map(async ({ id, type, code }: { id: string; type: string; code: string; version: string }) => {
+          upgradeItems.map(async ({ id, type, code }: { id: string; type: string; code: string }) => {
             const api = type === 'assembly' ? assembliesApi : partsApi;
             // 获取原实体信息
             const original = await api.get(id);
