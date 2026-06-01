@@ -48,6 +48,7 @@ class ConfigurationItemChild(Base):
     parent_id = Column(UUID(as_uuid=True), ForeignKey("configuration_items.id", ondelete="CASCADE"), nullable=False)
     child_id = Column(UUID(as_uuid=True), ForeignKey("configuration_items.id", ondelete="CASCADE"), nullable=False)
     is_required = Column(Boolean, nullable=False, default=True)
+    quantity = Column(Integer, nullable=False, default=1)
     sort_order = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

@@ -104,6 +104,7 @@ async def get_config_item(
         children_data.append({
             "id": str(c.id), "child_id": str(c.child_id),
             "is_required": c.is_required, "sort_order": c.sort_order,
+            "quantity": c.quantity,
             "has_children": has_children,
             "child_detail": {
                 "id": str(child.id), "code": child.code, "name": child.name,

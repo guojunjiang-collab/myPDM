@@ -79,11 +79,13 @@ class ConfigPartBulkCreate(BaseSchema):
 class ConfigChildCreate(BaseSchema):
     child_id: uuid.UUID
     is_required: bool = True
+    quantity: int = 1
     sort_order: int = 0
 
 
 class ConfigChildUpdate(BaseSchema):
     is_required: Optional[bool] = None
+    quantity: Optional[int] = None
     sort_order: Optional[int] = None
 
 
@@ -92,6 +94,7 @@ class ConfigChildResponse(BaseSchema):
     parent_id: uuid.UUID
     child_id: uuid.UUID
     is_required: bool
+    quantity: int
     sort_order: int
     created_at: datetime
     child_detail: Optional[dict] = None

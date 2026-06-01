@@ -568,6 +568,7 @@ export interface ConfigChildItem {
   parent_id: string;
   child_id: string;
   is_required: boolean;
+  quantity?: number;
   sort_order: number;
   has_children?: boolean;
   child_detail?: { id: string; code: string; name: string; spec?: string; status?: string };

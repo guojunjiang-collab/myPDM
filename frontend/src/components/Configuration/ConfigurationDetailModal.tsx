@@ -34,12 +34,18 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
   // 子构型项嵌套详情
   const [nestedConfigId, setNestedConfigId] = useState<string | null>(null);
 
+  // 按构型号排序
+  const sortByCode = (items: any[]) =>
+    [...items].sort((a, b) => ((a.child_detail?.code || a.child_code || '').localeCompare(b.child_detail?.code || b.child_code || '', 'zh-CN', { numeric: true })));
+
   useEffect(() => {
     if (!itemId) return;
     setLoading(true);
     configurationApi.getItem(itemId)
       .then((res) => {
-        setData(res.data);
+        const d = res.data;
+        if (d.children) d.children = sortByCode(d.children);
+        setData(d);
         setExpandedParts({}); setExpandedChild({}); setNoChildren(new Set());
       })
       .catch(() => setData(null))
@@ -77,10 +83,12 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
         child_code: c.child_detail?.code || '',
         child_name: c.child_detail?.name || '',
         remark: c.child_detail?.remark || '',
+        quantity: c.quantity ?? 1,
+        is_required: c.is_required,
         has_children: c.has_children,
       }));
       if (children.length > 0) {
-        setExpandedChild(p => ({ ...p, [idx]: children }));
+        setExpandedChild(p => ({ ...p, [idx]: sortByCode(children) }));
       } else {
         setNoChildren(prev => new Set(prev).add(idx));
       }
@@ -184,7 +192,7 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
       <>
         <tr key={idx} className={`hover:bg-gray-50 ${rowCls}`}>
           <td className="px-3 py-2 text-sm text-gray-400 whitespace-nowrap">
-            <span>{'-'.repeat(level)}{level}</span>
+            <span>{'-'.repeat(level + 1)}{level + 1}</span>
             {hasChildren && !isEmpty && (
               <button onClick={(e) => { e.stopPropagation(); toggleChild(idx, childId); }}
                 className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
@@ -195,6 +203,7 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
           <td className={`px-3 py-2 text-sm font-medium ${rowCls}`} onClick={onClickRow}>{c.child_detail?.code || c.child_code || c.child_id}</td>
           <td className={`px-3 py-2 text-sm ${rowCls}`} onClick={onClickRow}>{c.child_detail?.name || c.child_name || '-'}</td>
           <td className={`px-3 py-2 text-sm text-gray-500 ${rowCls}`} onClick={onClickRow}>{c.child_detail?.remark || c.remark || '-'}</td>
+          <td className={`px-3 py-2 text-center text-sm ${rowCls}`} onClick={onClickRow}>{c.quantity ?? 1}</td>
           <td className={`px-3 py-2 text-center text-sm ${rowCls}`} onClick={onClickRow}>
             <span className={`px-2 py-0.5 text-sm rounded ${c.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
               {c.is_required ? '必选' : '可选'}
@@ -202,7 +211,7 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
           </td>
         </tr>
         {childRows && childRows.map((cc: any, j: number) => renderChildRow(cc, level + 1, `${idx}-${j}`))}
-        {loadingChild === idx && <tr><td colSpan={5} className="px-3 py-2 text-sm text-gray-400 text-center">加载中...</td></tr>}
+        {loadingChild === idx && <tr><td colSpan={6} className="px-3 py-2 text-sm text-gray-400 text-center">加载中...</td></tr>}
       </>
     );
   };
@@ -257,6 +266,7 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
                   <th className="px-3 py-2 text-left text-gray-500 font-medium">构型号</th>
                   <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
                   <th className="px-3 py-2 text-left text-gray-500 font-medium w-48">备注</th>
+                  <th className="px-3 py-2 text-center text-gray-500 font-medium w-16">数量</th>
                   <th className="px-3 py-2 text-center text-gray-500 font-medium w-24">必选/可选</th>
                 </tr></thead>
                 <tbody className="divide-y divide-gray-100">
