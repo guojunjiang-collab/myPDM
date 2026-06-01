@@ -657,6 +657,7 @@ def _build_config_tree(db: Session, config_item_id: str, profile_items: list, en
         child_tree = _build_config_tree(db, str(child.child_id), profile_items, entity_map)
         if child_tree:
             child_tree["is_required"] = child.is_required
+            child_tree["quantity"] = child.quantity
             # 子构型项的选中态：必选项始终选中；可选节点由子零件决定
             child_tree["is_selected"] = child.is_required or _is_config_node_selected(db, str(child.child_id), profile_items)
             child_nodes.append(child_tree)

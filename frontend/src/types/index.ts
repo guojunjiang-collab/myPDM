@@ -627,6 +627,7 @@ export interface ConfigTreeNode {
   name: string;
   is_required: boolean;
   is_selected: boolean;
+  quantity?: number;
   parts: ConfigTreePart[];
   children: ConfigTreeNode[];
 }
