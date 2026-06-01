@@ -126,6 +126,18 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
   }, [form.remark]);
   const [profile, setProfile] = useState<ConfigurationProfileDetail | null>(null);
   const [configTree, setConfigTree] = useState<ConfigTreeNode | null>(null);
+
+  // 递归按构型号排序
+  const sortTreeByCode = (node: ConfigTreeNode | null): ConfigTreeNode | null => {
+    if (!node) return null;
+    return {
+      ...node,
+      children: node.children
+        .map(sortTreeByCode)
+        .filter((c): c is ConfigTreeNode => c !== null)
+        .sort((a, b) => a.code.localeCompare(b.code, 'zh-CN', { numeric: true })),
+    };
+  };
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [cfgPickOpen, setCfgPickOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -159,7 +171,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
       const r = await configurationProfileApi.get(profileId);
       const data: ConfigurationProfileDetail = r.data;
       setProfile(data);
-      setConfigTree(data.config_tree || null);
+      setConfigTree(sortTreeByCode(data.config_tree || null));
       // Default expand all nodes for edit checklist
       if (data.config_tree) {
         const expanded = new Set<string>();
