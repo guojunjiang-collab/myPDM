@@ -69,6 +69,8 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [quickForm, setQuickForm] = useState({ code: '', name: '', remark: '' });
   const [quickCreating, setQuickCreating] = useState(false);
+  // 嵌套编辑（子项行点击）
+  const [nestedEditItem, setNestedEditItem] = useState<ConfigurationItem | null>(null);
 
   // 按构型号排序（定义在 useEffect 之前）
   const sortByCode = (items: any[]) =>
@@ -90,6 +92,8 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
       // Load existing parts and children for edit mode
       if (item?.id) {
         configurationApi.getItem(item.id).then(r => {
+          const d = r.data;
+          setForm({ code: d.code, name: d.name, spec: d.spec || '', remark: d.remark || '' });
           setParts((r.data.parts || []).map((p: any) => ({
             id: p.id, part_type: p.part_type, part_id: p.part_id,
             part_code: p.part_detail?.code || '', part_name: p.part_detail?.name || '',
@@ -291,9 +295,9 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
               </button>
             )}
           </td>
-          <td className="px-3 py-2 text-sm font-medium">{c.child_code}</td>
-          <td className="px-3 py-2 text-sm">{c.child_name}</td>
-          <td className="px-3 py-2 text-sm text-gray-500">{c.child_remark || '-'}</td>
+          <td className="px-3 py-2 text-sm font-medium cursor-pointer hover:text-primary-600" onClick={() => setNestedEditItem({ id: c.child_id, code: c.child_code, name: c.child_name } as ConfigurationItem)}>{c.child_code}</td>
+          <td className="px-3 py-2 text-sm cursor-pointer hover:text-primary-600" onClick={() => setNestedEditItem({ id: c.child_id, code: c.child_code, name: c.child_name } as ConfigurationItem)}>{c.child_name}</td>
+          <td className="px-3 py-2 text-sm text-gray-500 cursor-pointer hover:text-primary-600" onClick={() => setNestedEditItem({ id: c.child_id, code: c.child_code, name: c.child_name } as ConfigurationItem)}>{c.child_remark || '-'}</td>
           <td className="px-3 py-2 text-center text-sm">
             {isRoot ? (
               <input type="number" min={1} value={c.quantity ?? 1}
@@ -352,6 +356,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
   };
 
   return (
+    <>
     <Modal open={open} onClose={onClose} title={isEdit ? '编辑构型项' : '新建构型项'} width="3xl">
       <div className="flex flex-col max-h-[75vh]">
         <div className="flex-1 overflow-y-auto pr-1 space-y-4">
@@ -688,5 +693,51 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
         />
       )}
     </Modal>
+
+    {/* 子项行点击 → 嵌套编辑弹窗 */}
+    {nestedEditItem && (
+      <ConfigurationCreateModal
+        open={!!nestedEditItem}
+        item={nestedEditItem}
+        onClose={() => setNestedEditItem(null)}
+        onSaved={() => {
+          setNestedEditItem(null);
+          // 刷新父级及所有已展开子项列表
+          if (item?.id) {
+            configurationApi.getItem(item.id).then(r => {
+              setChildren(sortByCode((r.data.children || []).map((c: any) => ({
+                id: c.id, child_id: c.child_id,
+                child_code: c.child_detail?.code || '', child_name: c.child_detail?.name || '',
+                child_remark: c.child_detail?.remark || '',
+                quantity: c.quantity ?? 1,
+                is_required: c.is_required,
+                has_children: c.has_children,
+                parent_id: item.id,
+              }))));
+            }).catch(() => {});
+            // 刷新所有展开的深层子项
+            for (const [key, rows] of Object.entries(expandedChild)) {
+              if (rows.length > 0 && rows[0].parent_id) {
+                configurationApi.getItem(rows[0].parent_id).then(r2 => {
+                  setExpandedChild(prev => ({
+                    ...prev,
+                    [key]: sortByCode((r2.data.children || []).map((c: any) => ({
+                      id: c.id, child_id: c.child_id,
+                      child_code: c.child_detail?.code || '', child_name: c.child_detail?.name || '',
+                      child_remark: c.child_detail?.remark || '',
+                      quantity: c.quantity ?? 1,
+                      is_required: c.is_required,
+                      has_children: c.has_children,
+                      parent_id: rows[0].parent_id,
+                    }))),
+                  }));
+                }).catch(() => {});
+              }
+            }
+          }
+        }}
+      />
+    )}
+    </>
   );
 }
