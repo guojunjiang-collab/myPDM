@@ -38,6 +38,11 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
   const [loadingEditParts, setLoadingEditParts] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [versionSelectState, setVersionSelectState] = useState<{ itemId: string; childType: string } | null>(null);
+  // 子项树形展开
+  const [expandedParts, setExpandedParts] = useState<Record<string, any[]>>({});
+  const [loadingPart, setLoadingPart] = useState<string | null>(null);
+  // 选择器目标（null=当前部件, string=子部件ID）
+  const [pickerTargetId, setPickerTargetId] = useState<string | null>(null);
 
   const api = entityType === 'assembly' ? assembliesApi : partsApi;
   const cfType = entityType === 'assembly' ? 'component' : 'part';
@@ -95,9 +100,15 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
 
   const handleAddParts = async (items: { child_type: string; child_id: string; quantity: number }[]) => {
     try {
-      await Promise.all(items.map((it) => assemblyPartsApi.add(entityId, it)));
-      await loadEditParts(entityId);
+      const targetId = pickerTargetId || entityId;
+      await Promise.all(items.map((it) => assemblyPartsApi.add(targetId, it)));
+      if (pickerTargetId) {
+        refreshParentParts(pickerTargetId);
+      } else {
+        await loadEditParts(entityId);
+      }
       setPickerOpen(false);
+      setPickerTargetId(null);
     } catch {
       alert('添加子项失败');
     }
@@ -139,6 +150,46 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
     }
   };
 
+  // 展开/折叠子部件的子项
+  const toggleExpand = async (idx: string, childId: string) => {
+    if (expandedParts[idx]) { setExpandedParts(p => { const n = { ...p }; delete n[idx]; return n; }); return; }
+    setLoadingPart(idx);
+    try {
+      const res = await assemblyPartsApi.list(childId);
+      const children = (res.data || []).map((c: any) => ({
+        ...c,
+        childType: c.childType === 'component' ? 'assembly' : c.childType,
+      }));
+      setExpandedParts(p => ({ ...p, [idx]: children }));
+    } catch { } finally { setLoadingPart(null); }
+  };
+
+  // 刷新指定父级的展开子项（嵌套操作后使用）
+  const refreshParentParts = (parentId: string) => {
+    for (const [key, rows] of Object.entries(expandedParts)) {
+      if (rows.length > 0 && rows[0]?.parent_id === parentId) {
+        assemblyPartsApi.list(parentId).then(res => {
+          const fresh = (res.data || []).map((c: any) => ({
+            ...c, childType: c.childType === 'component' ? 'assembly' : c.childType,
+          }));
+          setExpandedParts(p => ({ ...p, [key]: fresh }));
+        }).catch(() => {});
+        return;
+      }
+    }
+  };
+
+  // 嵌套行：移除
+  const handleNestedRemove = async (parentId: string, itemId: string) => {
+    await assemblyPartsApi.remove(parentId, itemId);
+    refreshParentParts(parentId);
+  };
+
+  // 嵌套行：更新用量
+  const handleNestedQuantity = async (parentId: string, itemId: string, qty: number) => {
+    await assemblyPartsApi.update(parentId, itemId, { quantity: qty });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -170,6 +221,70 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
     }
   };
 
+  const renderPartRow = (part: any, level: number, idx: string): React.ReactNode => {
+    const isAssembly = part.childType === 'assembly';
+    const childRows = expandedParts[idx];
+    const hasChildren = isAssembly;
+
+    return (
+      <>
+        <tr key={idx} className="hover:bg-gray-50">
+          <td className="px-3 py-2 text-sm text-gray-400 whitespace-nowrap">
+            <span>{'-'.repeat(level)}{level}</span>
+            {hasChildren && (
+              <button onClick={(e) => { e.stopPropagation(); toggleExpand(idx, part.child_id); }}
+                className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
+                {childRows ? '\u25bc' : '\u25b6'}
+              </button>
+            )}
+          </td>
+          <td className="px-3 py-2">
+            <span className={`px-1.5 py-0.5 text-xs rounded ${isAssembly ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
+              {isAssembly ? '部件' : '零件'}
+            </span>
+          </td>
+          <td className="px-3 py-2 font-medium">{part.child_detail?.code || '-'}</td>
+          <td className="px-3 py-2">{part.child_detail?.name || '-'}</td>
+          <td className="px-3 py-2 text-gray-500">{part.child_detail?.spec || '-'}</td>
+          <td className="px-3 py-2 text-gray-500">{part.child_detail?.version || '-'}</td>
+          <td className="px-3 py-2">
+            <span className={`px-1.5 py-0.5 text-xs rounded ${
+              part.child_detail?.status === 'released' ? 'bg-green-100 text-green-800' :
+              part.child_detail?.status === 'draft' ? 'bg-blue-100 text-blue-800' :
+              part.child_detail?.status === 'frozen' ? 'bg-orange-100 text-orange-800' :
+              'bg-red-100 text-red-800'
+            }`}>
+              {part.child_detail?.status === 'released' ? '发布' : part.child_detail?.status === 'draft' ? '草稿' : part.child_detail?.status === 'frozen' ? '冻结' : '作废'}
+            </span>
+          </td>
+          <td className="px-3 py-2">
+            {level === 0 ? (
+              <input type="number" min={1} defaultValue={part.quantity} onBlur={e => { const v = parseInt(e.target.value); if (v > 0 && v !== part.quantity) handleUpdateQuantity(part.id, v); }} className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-1 focus:ring-primary-500" />
+            ) : (
+              <input type="number" min={1} defaultValue={part.quantity} onBlur={e => { const v = parseInt(e.target.value); if (v > 0 && v !== part.quantity) handleNestedQuantity(part.parent_id || part.id, part.id, v); }} className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-1 focus:ring-primary-500" />
+            )}
+          </td>
+          <td className="px-3 py-2 text-right whitespace-nowrap">
+            <span className="inline-flex items-center gap-1">
+              <button type="button" onClick={() => setVersionSelectState({ itemId: part.id, childType: part.childType === 'assembly' ? 'assembly' : part.childType })} className="text-primary-600 hover:text-primary-800 text-xs" title="选择版本">选择</button>
+              {isAssembly && (
+                <button type="button" onClick={() => {
+                  setPickerTargetId(part.child_id); setPickerOpen(true);
+                }} className="text-primary-600 hover:text-primary-800 text-xs" title="添加子项">+子项</button>
+              )}
+              <button type="button" onClick={() => {
+                if (level === 0) { handleRemovePart(part.id); }
+                else { handleNestedRemove(part.parent_id || entityId, part.id); }
+              }} className="text-red-500 hover:text-red-700 text-xs" title="移除子项">移除</button>
+            </span>
+          </td>
+        </tr>
+        {childRows && childRows.map((c: any, j: number) => renderPartRow(c, level + 1, `${idx}-${j}`))}
+        {loadingPart === idx && <tr><td colSpan={9} className="px-3 py-2 text-sm text-gray-400 text-center">加载中...</td></tr>}
+      </>
+    );
+  };
+
   const renderCustomFieldInput = (def: CustomFieldDefinition) => {
     const value = customFieldValues[def.id] ?? '';
     const onChange = (val: any) => setCustomFieldValues(prev => ({ ...prev, [def.id]: val }));
@@ -190,7 +305,6 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
   };
 
   const title = entityType === 'assembly' ? '编辑部件' : '编辑零件';
-  const existingChildIds = new Set(editParts.map((p) => p.child_id));
 
   return (
     <>
@@ -258,7 +372,7 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
             <div className="border-t pt-4">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-sm font-bold text-gray-700">子项清单</h4>
-                <button type="button" onClick={() => setPickerOpen(true)} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 添加子项</button>
+                <button type="button" onClick={() => { setPickerTargetId(null); setExpandedParts({}); setPickerOpen(true); }} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 添加子项</button>
               </div>
               <div className="border rounded-lg overflow-hidden">
                 {loadingEditParts ? (
@@ -266,10 +380,11 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
                 ) : editParts.length === 0 ? (
                   <div className="px-4 py-8 text-center text-sm text-gray-400">暂无子项</div>
                 ) : (
-                  <div className="max-h-[240px] overflow-auto">
+                  <div className="max-h-[400px] overflow-auto">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-50 border-b">
+                      <thead className="bg-gray-50 border-b sticky top-0">
                         <tr>
+                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">层级</th>
                           <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">类型</th>
                           <th className="px-3 py-2 text-left text-gray-500 font-medium">件号</th>
                           <th className="px-3 py-2 text-left text-gray-500 font-medium">中文名称</th>
@@ -277,42 +392,11 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
                           <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
                           <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
                           <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">用量</th>
-                          <th className="px-3 py-2 text-right text-gray-500 font-medium w-24">操作</th>
+                          <th className="px-3 py-2 text-right text-gray-500 font-medium w-32">操作</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {editParts.map((part) => (
-                          <tr key={part.id} className="hover:bg-gray-50">
-                            <td className="px-3 py-2">
-                              <span className={`px-1.5 py-0.5 text-xs rounded ${part.childType === 'part' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>
-                                {part.childType === 'part' ? '零件' : '部件'}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2 font-medium">{part.child_detail?.code || '-'}</td>
-                            <td className="px-3 py-2">{part.child_detail?.name || '-'}</td>
-                            <td className="px-3 py-2 text-gray-500">{part.child_detail?.spec || '-'}</td>
-                            <td className="px-3 py-2 text-gray-500">{part.child_detail?.version || '-'}</td>
-                            <td className="px-3 py-2">
-                              <span className={`px-1.5 py-0.5 text-xs rounded ${
-                                part.child_detail?.status === 'released' ? 'bg-green-100 text-green-800' :
-                                part.child_detail?.status === 'draft' ? 'bg-blue-100 text-blue-800' :
-                                part.child_detail?.status === 'frozen' ? 'bg-orange-100 text-orange-800' :
-                                'bg-red-100 text-red-800'
-                              }`}>
-                                {part.child_detail?.status === 'released' ? '发布' : part.child_detail?.status === 'draft' ? '草稿' : part.child_detail?.status === 'frozen' ? '冻结' : '作废'}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2">
-                              <input type="number" min={1} defaultValue={part.quantity} onBlur={e => { const v = parseInt(e.target.value); if (v > 0 && v !== part.quantity) handleUpdateQuantity(part.id, v); }} className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-1 focus:ring-primary-500" />
-                            </td>
-                            <td className="px-3 py-2 text-right whitespace-nowrap">
-                              <span className="inline-flex items-center gap-1">
-                                <button type="button" onClick={() => setVersionSelectState({ itemId: part.id, childType: part.childType === 'component' ? 'assembly' : part.childType })} className="text-primary-600 hover:text-primary-800 text-xs" title="选择版本">选择</button>
-                                <button type="button" onClick={() => handleRemovePart(part.id)} className="text-red-500 hover:text-red-700 text-xs" title="移除子项">移除</button>
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
+                        {editParts.map((part, i) => renderPartRow(part, 0, String(i)))}
                       </tbody>
                     </table>
                   </div>
@@ -339,10 +423,10 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
     {entityType === 'assembly' && (
       <AssemblyPartPicker
         open={pickerOpen}
-        onClose={() => setPickerOpen(false)}
+        onClose={() => { setPickerOpen(false); setPickerTargetId(null); }}
         onConfirm={handleAddParts}
-        currentAssemblyId={entityId}
-        existingChildIds={existingChildIds}
+        currentAssemblyId={pickerTargetId || entityId}
+        existingChildIds={new Set(editParts.map(p => p.child_id))}
       />
     )}
 

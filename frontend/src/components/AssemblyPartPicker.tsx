@@ -84,10 +84,17 @@ export default function AssemblyPartPicker({
   const [fetchedAssemblies, setFetchedAssemblies] = useState<Assembly[]>([]);
   const [ancestorIds, setAncestorIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'part' | 'component'>('part');
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickForm, setQuickForm] = useState({ code: '', name: '', spec: '', remark: '' });
+  const [quickCreating, setQuickCreating] = useState(false);
 
   /* 加载数据：store 为空时从 API 拉取；同时计算祖先链 */
   useEffect(() => {
     if (!open) return;
+    setQuickForm({ code: '', name: '', spec: '', remark: '' });
+    setQuickOpen(false);
+    setQuickCreating(false);
     const needParts = storeParts.length === 0;
     const needAssemblies = storeAssemblies.length === 0;
     if (!needParts && !needAssemblies && !currentAssemblyId) {
@@ -351,6 +358,56 @@ export default function AssemblyPartPicker({
             <option value="released">发布</option>
             <option value="obsolete">作废</option>
           </select>
+        </div>
+
+        {/* ---- 快速新建 ---- */}
+        <div className="border rounded-lg overflow-hidden">
+          <button onClick={() => setQuickOpen(!quickOpen)} className="w-full px-4 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 flex items-center gap-1">
+            <span className="text-xs">{quickOpen ? '▼' : '▶'}</span>
+            快速新建零部件
+          </button>
+          {quickOpen && (
+            <div className="px-4 py-3 border-t space-y-2 bg-gray-50">
+              {/* Tab 切换 */}
+              <div className="flex gap-0 border rounded-lg overflow-hidden w-fit">
+                <button
+                  onClick={() => setActiveTab('part')}
+                  className={`px-3 py-1 text-xs font-medium ${activeTab === 'part' ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+                >零件</button>
+                <button
+                  onClick={() => setActiveTab('component')}
+                  className={`px-3 py-1 text-xs font-medium ${activeTab === 'component' ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+                >部件</button>
+              </div>
+              <div className="flex gap-2">
+                <input value={quickForm.code} onChange={e => setQuickForm({ ...quickForm, code: e.target.value })} placeholder="件号 *" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                <input value={quickForm.name} onChange={e => setQuickForm({ ...quickForm, name: e.target.value })} placeholder="名称 *" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
+              </div>
+              <div className="flex gap-2">
+                <input value={quickForm.spec} onChange={e => setQuickForm({ ...quickForm, spec: e.target.value })} placeholder="规格型号" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                <button onClick={async () => {
+                  if (!quickForm.code.trim() || !quickForm.name.trim()) return;
+                  setQuickCreating(true);
+                  try {
+                    const api = activeTab === 'part' ? partsApi : assembliesApi;
+                    const r = await api.create({ code: quickForm.code.trim(), name: quickForm.name.trim(), spec: quickForm.spec || undefined, remark: quickForm.remark || undefined });
+                    const newItem: SelectedItem = { id: r.data.id, code: r.data.code, name: r.data.name, version: r.data.version || '-', status: r.data.status || 'draft', type: activeTab, quantity: 1 };
+                    setSelected(prev => new Map(prev).set(newItem.id, newItem));
+                    // 同步添加到候选列表，无需重新搜索
+                    const candidate: CandidateItem = { id: newItem.id, code: newItem.code, name: newItem.name, version: newItem.version, status: newItem.status, type: activeTab };
+                    if (activeTab === 'part') {
+                      setFetchedParts(prev => [...prev, candidate as any]);
+                    } else {
+                      setFetchedAssemblies(prev => [...prev, candidate as any]);
+                    }
+                    setQuickForm({ code: '', name: '', spec: '', remark: '' });
+                  } catch { } finally { setQuickCreating(false); }
+                }} disabled={quickCreating} className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 whitespace-nowrap">
+                  {quickCreating ? '创建中...' : '新建并添加'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ---- 3. 可选子项列表 ---- */}
