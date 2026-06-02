@@ -455,13 +455,13 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         </td>
         <td className="px-3 py-2 text-sm font-medium text-gray-700">{node.code}</td>
         <td className="px-3 py-2 text-sm text-gray-600">{node.name}</td>
-        <td className="px-3 py-2 text-center text-sm">{node.quantity ?? 1}</td>
         <td className="px-3 py-2 text-xs whitespace-nowrap">
           <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">构型项</span>
         </td>
         <td className="px-3 py-2 text-xs text-gray-400">-</td>
         <td className="px-3 py-2 text-xs text-gray-400">-</td>
         <td className="px-3 py-2 text-xs text-gray-400">-</td>
+        <td className="px-3 py-2 text-center text-sm">{node.quantity ?? 1}</td>
       </tr>
     );
 
@@ -522,13 +522,13 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         </td>
         <td className="px-3 py-2 text-sm font-medium text-gray-700">{node.code}</td>
         <td className="px-3 py-2 text-sm text-gray-600">{node.name}</td>
-        <td className="px-3 py-2 text-center text-sm">{node.quantity ?? 1}</td>
         <td className="px-3 py-2 text-xs whitespace-nowrap">
           <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">构型项</span>
         </td>
         <td className="px-3 py-2 text-xs text-gray-400">-</td>
         <td className="px-3 py-2 text-xs text-gray-400">-</td>
         <td className="px-3 py-2 text-xs text-gray-400">-</td>
+        <td className="px-3 py-2 text-center text-sm">{node.quantity ?? 1}</td>
         <td className="px-3 py-2 text-center whitespace-nowrap">
           <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
             <input
@@ -566,6 +566,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
           <td className="px-3 py-2 text-sm font-mono text-gray-600">{part.item_code}</td>
           <td className="px-3 py-2 text-xs text-gray-500">{part.item_version || '-'}</td>
           <td className="px-3 py-2 text-xs text-gray-500">{partStatusBadge(part.item_status)}</td>
+          <td className="px-3 py-2 text-center text-xs text-gray-400">-</td>
           <td className="px-3 py-2 text-center whitespace-nowrap">
             <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
               <input
@@ -770,11 +771,11 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                           <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-20">层级</th>
                           <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-32">构型号</th>
                           <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-28">名称</th>
-                          <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 w-12">数量</th>
                           <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-16 whitespace-nowrap">类型</th>
                           <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-36">零部件件号</th>
                           <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-16">版本</th>
                           <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-16">状态</th>
+                          <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 w-12">数量</th>
                           <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 w-24">可选</th>
                         </tr>
                       </thead>
@@ -804,11 +805,11 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                         <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-20">层级</th>
                         <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-32">构型号</th>
                         <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-28">名称</th>
-                        <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 w-12">数量</th>
                         <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-16 whitespace-nowrap">类型</th>
                         <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-36">零部件件号</th>
                         <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-16">版本</th>
                         <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-16">状态</th>
+                        <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 w-12">数量</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
