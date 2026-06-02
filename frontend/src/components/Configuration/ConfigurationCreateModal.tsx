@@ -316,8 +316,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
           </td>
           <td className="px-3 py-2 text-center text-sm">
             <div className="flex items-center justify-center gap-1 whitespace-nowrap">
-              {!isRoot && (
-                <button onClick={() => {
+              <button onClick={() => {
                 setPickerParentId(c.child_id); setPickerParentIdx(idx); setCfgSearch(''); setPickerSelected([]);
                 setQuickCreateOpen(false); setQuickForm({ code: '', name: '', remark: '' });
                 setCfgSearching(true);
@@ -329,7 +328,6 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                 setCfgPickerOpen(true);
               }}
                 className="text-sm text-primary-600 hover:text-primary-800">＋子项</button>
-              )}
               <button onClick={() => {
                 if (isRoot) { setChildren(prev => prev.filter((_, j) => j !== arrIndex)); }
                 else { removeNestedChild(c); }
