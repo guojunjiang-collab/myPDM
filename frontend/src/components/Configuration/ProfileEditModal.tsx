@@ -475,15 +475,15 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
             onClick={() => handleFormalRowClick(part.item_type, part.item_id)}>
             <td className="px-3 py-2 text-xs text-gray-400 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>{'-'.repeat(level)}</td>
             <td className="px-3 py-2 text-xs text-gray-400">-</td>
-            <td className="px-3 py-2 text-xs text-gray-600">{part.item_name || '-'}</td>
-            <td className="px-3 py-2 text-xs whitespace-nowrap">
+            <td className="px-3 py-2 text-sm text-gray-600">{part.item_name || '-'}</td>
+            <td className="px-3 py-2 text-sm whitespace-nowrap">
               <span className={`px-1.5 py-0.5 rounded text-xs ${part.item_type === 'assembly' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
                 {part.item_type === 'assembly' ? '部件' : '零件'}
               </span>
             </td>
             <td className="px-3 py-2 text-sm font-mono text-gray-600">{part.item_code}</td>
-            <td className="px-3 py-2 text-xs text-gray-500">{part.item_version || '-'}</td>
-            <td className="px-3 py-2 text-xs text-gray-500">{partStatusBadge(part.item_status)}</td>
+            <td className="px-3 py-2 text-sm text-gray-500">{part.item_version || '-'}</td>
+            <td className="px-3 py-2 text-sm text-gray-500">{partStatusBadge(part.item_status)}</td>
           </tr>
         );
       }
@@ -507,7 +507,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
 
     // ── Config Item Row ──
     rows.push(
-      <tr key={node.id} className="bg-gray-50/70 hover:bg-gray-100/50 transition-colors">
+      <tr key={node.id} className="bg-gray-50/70 hover:bg-purple-50 transition-colors">
         <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
           {levelPrefix}{level}
           {hasChildren ? (
@@ -556,17 +556,17 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
             <span className="inline-block w-4 mr-1" />
             {'-'.repeat(level)}
           </td>
-          <td className="px-3 py-2 text-xs text-gray-400">-</td>
-          <td className="px-3 py-2 text-xs text-gray-600">{part.item_name || '-'}</td>
-          <td className="px-3 py-2 text-xs whitespace-nowrap">
+          <td className="px-3 py-2 text-sm text-gray-400">-</td>
+          <td className="px-3 py-2 text-sm text-gray-600">{part.item_name || '-'}</td>
+          <td className="px-3 py-2 text-sm whitespace-nowrap">
             <span className={`px-1.5 py-0.5 rounded text-xs ${part.item_type === 'assembly' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
               {part.item_type === 'assembly' ? '部件' : '零件'}
             </span>
           </td>
           <td className="px-3 py-2 text-sm font-mono text-gray-600">{part.item_code}</td>
-          <td className="px-3 py-2 text-xs text-gray-500">{part.item_version || '-'}</td>
-          <td className="px-3 py-2 text-xs text-gray-500">{partStatusBadge(part.item_status)}</td>
-          <td className="px-3 py-2 text-center text-xs text-gray-400">-</td>
+          <td className="px-3 py-2 text-sm text-gray-500">{part.item_version || '-'}</td>
+          <td className="px-3 py-2 text-sm text-gray-500">{partStatusBadge(part.item_status)}</td>
+          <td className="px-3 py-2 text-center text-sm text-gray-400">-</td>
           <td className="px-3 py-2 text-center whitespace-nowrap">
             <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
               <input
@@ -768,15 +768,15 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                     <table className="w-full text-sm">
                       <thead className="bg-gray-100 sticky top-0 z-10">
                         <tr>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-20">层级</th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-32">构型号</th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-28">名称</th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-16 whitespace-nowrap">类型</th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-36">零部件件号</th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-16">版本</th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-16">状态</th>
-                          <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 w-12">数量</th>
-                          <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 w-24">可选</th>
+                          <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-20">层级</th>
+                          <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-32">构型号</th>
+                          <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-28">名称</th>
+                          <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-16 whitespace-nowrap">类型</th>
+                          <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-36">零部件件号</th>
+                          <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-16">版本</th>
+                          <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-16">状态</th>
+                          <th className="text-center px-3 py-2 text-sm font-medium text-gray-500 w-12">数量</th>
+                          <th className="text-center px-3 py-2 text-sm font-medium text-gray-500 w-24">可选</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
@@ -802,14 +802,14 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                   <table className="w-full text-sm">
                     <thead className="bg-gray-100 sticky top-0 z-10">
                       <tr>
-                        <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-20">层级</th>
-                        <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-32">构型号</th>
-                        <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-28">名称</th>
-                        <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-16 whitespace-nowrap">类型</th>
-                        <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-36">零部件件号</th>
-                        <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-16">版本</th>
-                        <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-16">状态</th>
-                        <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 w-12">数量</th>
+                        <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-20">层级</th>
+                        <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-32">构型号</th>
+                        <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-28">名称</th>
+                        <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-16 whitespace-nowrap">类型</th>
+                        <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-36">零部件件号</th>
+                        <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-16">版本</th>
+                        <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-16">状态</th>
+                        <th className="text-center px-3 py-2 text-sm font-medium text-gray-500 w-12">数量</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
