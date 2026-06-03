@@ -175,7 +175,22 @@ async def delete_config_item(
     config_id: str, db: Session = Depends(get_db),
     current_user=Depends(require_role(["admin"])),
 ):
-    """删除构型项"""
+    """删除构型项（检查父项引用）"""
+    # 检查是否被其他构型项引用为子项
+    parent_refs = db.query(models.ConfigurationItemChild).filter(
+        models.ConfigurationItemChild.child_id == config_id
+    ).all()
+    if parent_refs:
+        parent_ids = [str(r.parent_id) for r in parent_refs]
+        parents = db.query(models.ConfigurationItem).filter(
+            models.ConfigurationItem.id.in_(parent_ids)
+        ).all()
+        parent_codes = [p.code for p in parents]
+        raise HTTPException(
+            status_code=400,
+            detail=f"该构型项被 {len(parents)} 个父构型项引用: {', '.join(parent_codes)}，无法删除"
+        )
+
     if not crud.delete_config_item(db, config_id):
         raise HTTPException(status_code=404, detail="构型项不存在")
     return {"detail": "ok"}

@@ -21,6 +21,7 @@ export default function ConfigurationList() {
   const [editItem, setEditItem] = useState<ConfigurationItem | null>(null);
   const [detailItem, setDetailItem] = useState<ConfigurationItem | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const storeCustomDefs = useDataStore((s) => s.customFieldDefs);
   const configCustomDefs = storeCustomDefs.filter((d) => d.applies_to?.includes('configuration_item'));
@@ -62,7 +63,19 @@ export default function ConfigurationList() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
-    try { await configurationApi.deleteItem(deleteId); setDeleteId(null); load(); } catch { }
+    setDeleteError(null);
+    try {
+      await configurationApi.deleteItem(deleteId);
+      setDeleteId(null);
+      load();
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      if (detail) {
+        setDeleteError(typeof detail === 'string' ? detail : '删除失败');
+      } else {
+        setDeleteError('删除失败，请重试');
+      }
+    }
   };
 
   return (
@@ -166,12 +179,12 @@ export default function ConfigurationList() {
       {/* 删除确认 */}
       <ConfirmModal
         open={!!deleteId}
-        title="删除构型项"
-        content="确认删除该构型项？此操作不可恢复。"
-        confirmText="删除"
+        title={deleteError ? "无法删除" : "删除构型项"}
+        content={deleteError || "确认删除该构型项？此操作不可恢复。"}
+        confirmText={deleteError ? "知道了" : "删除"}
         type="danger"
-        onConfirm={handleDelete}
-        onCancel={() => setDeleteId(null)}
+        onConfirm={deleteError ? () => { setDeleteId(null); setDeleteError(null); } : handleDelete}
+        onCancel={() => { setDeleteId(null); setDeleteError(null); }}
       />
     </div>
   );

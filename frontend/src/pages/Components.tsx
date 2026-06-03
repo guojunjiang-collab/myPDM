@@ -1094,12 +1094,12 @@ export default function Components() {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th onClick={() => handleSort('code' as keyof Assembly)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">件号 {getSortIcon('code' as keyof Assembly)}</th>
-              <th onClick={() => handleSort('name' as keyof Assembly)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">中文名称 {getSortIcon('name' as keyof Assembly)}</th>
+              <th onClick={() => handleSort('code' as keyof Assembly)} className="w-56 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">件号 {getSortIcon('code' as keyof Assembly)}</th>
+              <th onClick={() => handleSort('name' as keyof Assembly)} className="w-80 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">中文名称 {getSortIcon('name' as keyof Assembly)}</th>
               <th onClick={() => handleSort('spec' as keyof Assembly)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">规格型号 {getSortIcon('spec' as keyof Assembly)}</th>
-              <th onClick={() => handleSort('version' as keyof Assembly)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">版本 {getSortIcon('version' as keyof Assembly)}</th>
-              <th onClick={() => handleSort('status' as keyof Assembly)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">状态 {getSortIcon('status' as keyof Assembly)}</th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">操作</th>
+              <th onClick={() => handleSort('version' as keyof Assembly)} className="w-14 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">版本 {getSortIcon('version' as keyof Assembly)}</th>
+              <th onClick={() => handleSort('status' as keyof Assembly)} className="w-14 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">状态 {getSortIcon('status' as keyof Assembly)}</th>
+              <th className="w-40 px-4 py-3 text-right text-sm font-medium text-gray-500">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -1130,9 +1130,9 @@ export default function Components() {
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-sm">{assembly.name}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{assembly.spec || '-'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{assembly.version || '-'}</td>
+<td className="px-4 py-3 text-sm truncate">{assembly.name}</td>
+<td className="px-4 py-3 text-sm text-gray-500 break-words whitespace-normal">{assembly.spec || '-'}</td>
+<td className="px-4 py-3 text-sm text-gray-500">{assembly.version || '-'}</td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-1 text-xs rounded-full ${statusTag(assembly.status).cls}`}>
                       {statusTag(assembly.status).label}

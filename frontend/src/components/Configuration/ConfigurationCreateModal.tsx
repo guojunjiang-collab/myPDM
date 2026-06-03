@@ -43,13 +43,18 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const remarkRef = useRef<HTMLTextAreaElement>(null);
+  // 弹窗打开或备注内容变化时，自适应 textarea 高度
   useEffect(() => {
-    const el = remarkRef.current;
-    if (el) {
-      el.style.height = 'auto';
-      el.style.height = el.scrollHeight + 'px';
-    }
-  }, [form.remark]);
+    if (!open) return;
+    const timer = setTimeout(() => {
+      const el = remarkRef.current;
+      if (el) {
+        el.style.height = 'auto';
+        el.style.height = el.scrollHeight + 'px';
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [open, form.remark]);
 
   // 关联零部件
   const [parts, setParts] = useState<PartEntry[]>([]);
@@ -367,17 +372,17 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
           <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
             <label className="block text-xs text-gray-500 mb-0.5">构型号 *</label>
             <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} disabled={isEdit}
-              className="w-full text-sm bg-transparent border-0 p-0 focus:outline-none disabled:text-gray-400 placeholder:text-gray-300" placeholder="如 CFG-001" />
+              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300 disabled:bg-gray-100 disabled:text-gray-400" placeholder="如 CFG-001" />
           </div>
           <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
             <label className="block text-xs text-gray-500 mb-0.5">中文名称 *</label>
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full text-sm bg-transparent border-0 p-0 focus:outline-none placeholder:text-gray-300" placeholder="如 A型机翼构型" />
+              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300" placeholder="如 A型机翼构型" />
           </div>
-          <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 col-span-2">
             <label className="block text-xs text-gray-500 mb-0.5">备注</label>
             <textarea ref={remarkRef} value={form.remark} onChange={(e) => setForm({ ...form, remark: e.target.value })} rows={1}
-              className="w-full text-sm bg-transparent border-0 p-0 focus:outline-none resize-none"
+              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
               onInput={(e) => {
                 const el = e.currentTarget;
                 el.style.height = 'auto';
