@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 import uuid
@@ -23,11 +24,16 @@ def _part_response(part):
         "revisions": part.revisions or [],
         "created_at": part.created_at,
         "updated_at": part.updated_at,
+        "deleted_at": part.deleted_at,
     }
 
-@router.get("/", response_model=list[schemas.PartResponse])
-async def list_parts(skip: int = 0, limit: int = 100, search: str = None, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
-    parts = crud.get_parts(db, skip=skip, limit=limit, search=search)
+@router.get("/")
+async def list_parts(skip: int = 0, limit: int = 100, search: str = None, updated_since: float = None, brief: bool = False, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+    include_deleted = bool(updated_since)  # 增量模式可能包含已删除记录
+    parts = crud.get_parts(db, skip=skip, limit=limit, search=search, updated_since=updated_since, include_deleted=include_deleted)
+    if brief:
+        from ..crud import _part_brief
+        return JSONResponse(content=[_part_brief(p) for p in parts])
     return [_part_response(p) for p in parts]
 
 @router.post("/", response_model=schemas.PartResponse)
@@ -65,10 +71,11 @@ async def check_part_can_delete(part_id: uuid.UUID, db: Session = Depends(get_db
     if not db_part:
         raise HTTPException(status_code=404, detail="零件不存在")
     
-    # 检查是否被部件引用为子项
+    # 检查是否被部件引用为子项（排除已软删除的）
     ref_count = db.query(BOMItem).filter(
         BOMItem.child_type == 'part',
-        BOMItem.child_id == part_id
+        BOMItem.child_id == part_id,
+        BOMItem.deleted_at.is_(None),
     ).count()
     
     references = []
@@ -100,18 +107,21 @@ async def delete_part(part_id: uuid.UUID, request: Request, db: Session = Depend
     if not db_part:
         raise HTTPException(status_code=404, detail="零件不存在")
     
-    # 检查是否被部件引用为子项
+    # 检查是否被部件引用为子项（排除已软删除的 BOM 关系和部件）
     ref_count = db.query(BOMItem).filter(
         BOMItem.child_type == 'part',
-        BOMItem.child_id == part_id
+        BOMItem.child_id == part_id,
+        BOMItem.deleted_at.is_(None),
     ).count()
     if ref_count > 0:
-        # 获取引用该零件的部件信息
+        # 获取引用该零件的部件信息（仅未删除的）
         refs = db.query(BOMItem, Assembly).join(
             Assembly, BOMItem.parent_id == Assembly.id
         ).filter(
             BOMItem.child_type == 'part',
-            BOMItem.child_id == part_id
+            BOMItem.child_id == part_id,
+            BOMItem.deleted_at.is_(None),
+            Assembly.deleted_at.is_(None),
         ).all()
         ref_codes = [f"{r[1].code}({r[1].version})" for r in refs[:5]]
         msg = f"该零件被 {ref_count} 个部件引用: {', '.join(ref_codes)}"

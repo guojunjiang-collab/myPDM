@@ -36,6 +36,7 @@ class ECO(Base):
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
     executed_at = Column(DateTime(timezone=True), nullable=True)
     closed_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
 
 
 class ECOExecutionItem(Base):

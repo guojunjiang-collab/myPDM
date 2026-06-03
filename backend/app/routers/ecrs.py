@@ -133,6 +133,8 @@ async def list_ecrs(
     search: str = Query(None),
     status: str = Query(None),
     priority: str = Query(None),
+    updated_since: float = Query(None, description="仅返回指定 UNIX 时间戳之后更新的记录（含已删除）"),
+    brief: bool = Query(False, description="仅返回简要字段：ecr_number, title, status, priority, creator_name, updated_at, deleted_at"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
 ):
@@ -141,12 +143,31 @@ async def list_ecrs(
       page=page, page_size=page_size,
       search=search, status=status, priority=priority
   )
-  items, total = crud_ecr.get_ecrs(db, params, current_user)
+  include_deleted = bool(updated_since)
+  items, total = crud_ecr.get_ecrs(db, params, current_user, include_deleted=include_deleted, updated_since=updated_since)
+
+  if brief:
+      brief_items = [
+          {
+              "id": str(item["id"]),
+              "ecr_number": item["ecr_number"],
+              "title": item["title"],
+              "status": item["status"],
+              "priority": item["priority"],
+              "creator_name": item["creator_name"],
+              "updated_at": item["updated_at"],
+              "deleted_at": item.get("deleted_at"),
+          }
+          for item in items
+      ]
+      return {"items": brief_items, "total": total, "page": page, "page_size": page_size}
+
   # 将 UUID 转为字符串
   items_serialized = []
   for item in items:
       serialized = {**item}
       serialized["id"] = str(serialized["id"])
+      serialized["creator_id"] = str(serialized["creator_id"]) if serialized.get("creator_id") else None
       items_serialized.append(serialized)
   return {
       "items": items_serialized,

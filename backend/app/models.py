@@ -20,7 +20,8 @@ class User(Base):
 
 class Part(Base):
     __tablename__ = "parts"
-    __table_args__ = (UniqueConstraint('code', 'version', name='uix_part_code_version'),)
+    # Unique constraint managed by DB partial index: uix_part_code_version WHERE deleted_at IS NULL
+    __table_args__ = ()
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     code = Column(String(64), nullable=False)
     name = Column(String(255), nullable=False)
@@ -33,10 +34,12 @@ class Part(Base):
     document_links = Column(JSONB, default=[])  # [{id, document_id, category, sort_order}]
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
 
 class Assembly(Base):
     __tablename__ = "assemblies"
-    __table_args__ = (UniqueConstraint('code', 'version', name='uix_assembly_code_version'),)
+    # Unique constraint managed by DB partial index: uix_assembly_code_version WHERE deleted_at IS NULL
+    __table_args__ = ()
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     code = Column(String(64), nullable=False)
     name = Column(String(255), nullable=False)
@@ -49,6 +52,7 @@ class Assembly(Base):
     document_links = Column(JSONB, default=[])  # [{id, document_id, category, sort_order}]
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
 
 class BOMItem(Base):
     __tablename__ = "bom_items"
@@ -59,6 +63,8 @@ class BOMItem(Base):
     child_id = Column(UUID(as_uuid=True), nullable=False)
     quantity = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
 
 class OperationLog(Base):
     __tablename__ = "operation_logs"
@@ -75,7 +81,8 @@ class OperationLog(Base):
 class Document(Base):
     """图文档主表"""
     __tablename__ = "documents"
-    __table_args__ = (UniqueConstraint('code', 'version', name='uix_doc_code_version'),)
+    # Unique constraint managed by DB partial index: uix_doc_code_version WHERE deleted_at IS NULL
+    __table_args__ = ()
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     code = Column(String(64), nullable=False)
     name = Column(String(255), nullable=False)
@@ -88,6 +95,7 @@ class Document(Base):
     revision_parent_id = Column(UUID(as_uuid=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
 
 class DocumentAttachment(Base):
     """图文档独立附件表（文件存储在文件系统）"""

@@ -111,7 +111,7 @@ export default function AssemblyPartPicker({
     // 计算祖先链：向上查找所有包含当前部件的父部件
     if (currentAssemblyId) {
       promises.push(
-        bomApi.getAllItems()
+        bomApi.getAll()
           .then((r) => r.data as { parent_type: string; parent_id: string; child_type: string; child_id: string }[])
           .then((allItems) => {
             const childToParents = new Map<string, string[]>();

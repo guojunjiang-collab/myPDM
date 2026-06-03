@@ -24,6 +24,7 @@ class ConfigurationItem(Base):
     document_links = Column(JSONB, default=[])  # [{id, document_id, category, sort_order}]
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
 
 
 class ConfigurationItemPart(Base):

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { customFieldsApi, authApi } from '../services/api';
 import api from '../services/api';
 import { useAuthStore } from '../stores/auth';
@@ -507,6 +508,20 @@ export default function Settings() {
       {/* 数据管理 */}
       {activeTab === 'dataManagement' && (
         <>
+        {/* 软删除数据管理入口 */}
+        <div className="mb-6 bg-blue-50 border border-blue-100 rounded-lg p-4 flex items-center justify-between">
+          <div>
+            <h3 className="font-medium text-blue-800">软删除数据管理</h3>
+            <p className="text-sm text-blue-600 mt-1">查看和管理系统中被软删除的零件、部件、图文档等记录</p>
+          </div>
+          <a
+            href="/data-management"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 whitespace-nowrap"
+          >
+            进入管理
+          </a>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* 导出全部数据 */}
           <div className="bg-white rounded-lg border border-gray-200 p-6">

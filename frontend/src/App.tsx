@@ -17,6 +17,7 @@ import EC from './pages/EC';
 import Configuration from './pages/Configuration';
 import Inventory from './pages/Inventory';
 import Business from './pages/Business';
+import DataManagement from './pages/DataManagement';
 const STPViewer = lazy(() => import('./pages/STPViewer'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -65,6 +66,8 @@ export default function App() {
           <Route path="users" element={<Users />} />
           <Route path="logs" element={<Logs />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="data-management" element={<DataManagement />} />
+          <Route path="datamanagement" element={<DataManagement />} />
         </Route>
       </Routes>
     </BrowserRouter>

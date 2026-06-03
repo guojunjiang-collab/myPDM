@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuthStore } from '../stores/auth';
 import { useDataStore } from '../stores/data';
+import { syncService } from '../services/syncService';
 import { APP_VERSION } from '../constants';
 import { ConfirmModal } from './Modal';
 
@@ -38,11 +39,36 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
-  const { syncAll, isSyncing, clearCache } = useDataStore();
+  const { syncAll, isSyncing, clearCache, lastSyncTime, autoSyncEnabled, setAutoSyncEnabled, syncError } = useDataStore();
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [confirmSyncOpen, setConfirmSyncOpen] = useState(false);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
+  const [lastSyncText, setLastSyncText] = useState<string>('--');
   const userRole = user?.role || 'guest';
+
+  // Auto-start sync on mount
+  useEffect(() => {
+    if (autoSyncEnabled) {
+      syncService.start();
+    }
+    return () => {
+      syncService.stop();
+    };
+  }, [autoSyncEnabled]);
+
+  // Update sync time display
+  useEffect(() => {
+    if (!lastSyncTime) { setLastSyncText('--'); return; }
+    const update = () => {
+      const seconds = Math.floor((Date.now() / 1000) - lastSyncTime);
+      if (seconds < 60) setLastSyncText(`${seconds}秒前`);
+      else if (seconds < 3600) setLastSyncText(`${Math.floor(seconds/60)}分钟前`);
+      else setLastSyncText(new Date(lastSyncTime * 1000).toLocaleTimeString());
+    };
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, [lastSyncTime]);
 
   const isSeparator = (item: NavItem | NavSeparator): item is NavSeparator =>
     'type' in item && item.type === 'separator';
@@ -127,25 +153,34 @@ export default function Layout() {
             </span>
           </div>
           <div className="right flex items-center gap-3">
+            {/* 同步状态指示器 */}
+            <div className="flex items-center gap-1 text-xs" title={`上次同步: ${lastSyncText}${syncError ? ' | 错误: ' + syncError : ''}`}>
+              <span className={`inline-block w-2 h-2 rounded-full ${
+                syncError ? 'bg-red-500' : isSyncing ? 'bg-yellow-400 animate-pulse' : 'bg-green-500'
+              }`}></span>
+              <span className="text-gray-400">
+                {syncError ? '同步失败' : isSyncing ? '同步中' : `已同步 (${lastSyncText})`}
+              </span>
+              {syncError && (
+                <button onClick={() => {
+                  syncService.stop();
+                  syncService.start();
+                }} className="text-blue-400 hover:text-blue-300 ml-1" title="重试">↻</button>
+              )}
+            </div>
             <span className="text-sm text-gray-700">{user?.real_name}</span>
             <span className={`px-2 py-0.5 text-xs rounded-full ${user?.role === 'admin' ? 'bg-red-100 text-red-700' : user?.role === 'engineer' ? 'bg-blue-100 text-blue-700' : user?.role === 'production' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
               {{ admin: '管理员', engineer: '工程师', production: '生产人员', guest: '访客' }[user?.role || 'guest'] || user?.role}
             </span>
             <span className="text-gray-300">|</span>
+            {/* 自动同步已启用，手动检出改为小图标 */}
             <button
               onClick={() => setConfirmSyncOpen(true)}
               disabled={isSyncing}
-              className="px-3 py-1 text-sm text-blue-600 border border-blue-200 rounded hover:bg-blue-50 disabled:opacity-50"
-              title="从服务器检出最新数据到本地"
+              className="text-gray-300 hover:text-blue-500 disabled:opacity-30 text-sm"
+              title="手动强制同步"
             >
-              {isSyncing ? '同步中...' : '检出数据'}
-            </button>
-            <button
-              onClick={() => setConfirmClearOpen(true)}
-              className="px-3 py-1 text-sm text-red-600 border border-red-200 rounded hover:bg-red-50"
-              title="清除本地缓存数据"
-            >
-              清除缓存
+              {isSyncing ? '⟳' : '↻'}
             </button>
             <button
               onClick={handleLogout}

@@ -132,14 +132,35 @@ def _build_eco_detail(db: Session, eco: ECO) -> dict:
 async def list_ecos(
     page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
     search: str = Query(None), status: str = Query(None), priority: str = Query(None),
+    updated_since: float = Query(None, description="仅返回指定 UNIX 时间戳之后更新的记录（含已删除）"),
+    brief: bool = Query(False, description="仅返回简要字段：eco_number, title, status, priority, creator_name, updated_at, deleted_at"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
 ):
     params = schemas_eco.ECOListParams(page=page, page_size=page_size, search=search, status=status, priority=priority)
-    items, total = crud_eco.get_ecos(db, params, current_user)
+    include_deleted = bool(updated_since)
+    items, total = crud_eco.get_ecos(db, params, current_user, include_deleted=include_deleted, updated_since=updated_since)
+
+    if brief:
+        brief_items = [
+            {
+                "id": str(item["id"]),
+                "eco_number": item["eco_number"],
+                "title": item["title"],
+                "status": item["status"],
+                "priority": item["priority"],
+                "creator_name": item["creator_name"],
+                "updated_at": item["updated_at"],
+                "deleted_at": item.get("deleted_at"),
+            }
+            for item in items
+        ]
+        return {"items": brief_items, "total": total, "page": page, "page_size": page_size}
+
     items_serialized = []
     for item in items:
         s = {**item, "id": str(item["id"])}
+        s["ecr_id"] = str(s["ecr_id"]) if s.get("ecr_id") else None
         items_serialized.append(s)
     return {"items": items_serialized, "total": total, "page": page, "page_size": page_size}
 
@@ -196,7 +217,7 @@ async def delete_eco(
     eco = crud_eco.get_eco(db, eco_id)
     if eco.status != "draft":
         raise HTTPException(status_code=400, detail="仅草稿状态的 ECO 可以删除")
-    crud_eco.delete_eco(db, eco)
+    crud_eco.delete_eco(db, eco_id)
     return {"detail": "已删除"}
 
 

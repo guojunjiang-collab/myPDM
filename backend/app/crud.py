@@ -1,7 +1,41 @@
 import uuid
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
+from sqlalchemy import func as sqlfunc
 from . import models, schemas
 import bcrypt
+
+def _part_brief(part):
+    """Return only list fields (lightweight for sync)"""
+    return {
+        "id": str(part.id), "code": part.code, "name": part.name,
+        "spec": part.spec, "version": part.version, "status": part.status,
+        "remark": part.remark,
+        "created_at": part.created_at.isoformat() if part.created_at else None,
+        "updated_at": part.updated_at.isoformat() if part.updated_at else None,
+        "deleted_at": part.deleted_at.isoformat() if part.deleted_at else None,
+    }
+
+def _assembly_brief(asm):
+    return {
+        "id": str(asm.id), "code": asm.code, "name": asm.name,
+        "spec": asm.spec, "version": asm.version, "status": asm.status,
+        "remark": asm.remark,
+        "created_at": asm.created_at.isoformat() if asm.created_at else None,
+        "updated_at": asm.updated_at.isoformat() if asm.updated_at else None,
+        "deleted_at": asm.deleted_at.isoformat() if asm.deleted_at else None,
+    }
+
+def _doc_brief(doc):
+    return {
+        "id": str(doc.id), "code": doc.code, "name": doc.name,
+        "version": doc.version, "status": doc.status,
+        "file_name": doc.file_name, "file_id": str(doc.file_id) if doc.file_id else None,
+        "remark": doc.remark,
+        "created_at": doc.created_at.isoformat() if doc.created_at else None,
+        "updated_at": doc.updated_at.isoformat() if doc.updated_at else None,
+        "deleted_at": doc.deleted_at.isoformat() if doc.deleted_at else None,
+    }
 
 def verify_password(plain_password, hashed_password):
     try:
@@ -73,13 +107,22 @@ def get_part_by_code(db, code, version=None):
         return db.query(models.Part).filter(models.Part.code == code, models.Part.version == version).first()
     return db.query(models.Part).filter(models.Part.code == code).first()
 
-def get_parts(db, skip=0, limit=100, search=None):
+def get_parts(db, skip=0, limit=100, search=None, include_deleted=False, updated_since=None):
     q = db.query(models.Part)
+    if not include_deleted:
+        q = q.filter(models.Part.deleted_at.is_(None))
     if search:
         pattern = f"%{search}%"
         q = q.filter(
             (models.Part.code.ilike(pattern)) |
             (models.Part.name.ilike(pattern))
+        )
+    if updated_since:
+        from datetime import datetime, timezone
+        since_dt = datetime.fromtimestamp(updated_since, tz=timezone.utc)
+        q = q.filter(
+            (models.Part.updated_at >= since_dt) | 
+            (models.Part.deleted_at >= since_dt)
         )
     return q.offset(skip).limit(limit).all()
 
@@ -103,25 +146,36 @@ def update_part(db, part_id, part_update):
     return db_part
 
 def delete_part(db, part_id):
-    # 删除所有引用该零件的 BOM items（该零件作为子项被引用）
+    # Soft-delete related BOM items where this part is a child
     db.query(models.BOMItem).filter(
         models.BOMItem.child_type == 'part',
-        models.BOMItem.child_id == part_id
-    ).delete(synchronize_session=False)
+        models.BOMItem.child_id == part_id,
+        models.BOMItem.deleted_at.is_(None)
+    ).update({"deleted_at": sqlfunc.now()}, synchronize_session=False)
     db.commit()
-    # 删除零件主体
+    # Soft-delete the part
     db_part = get_part(db, part_id)
     if db_part:
-        db.delete(db_part)
+        db_part.deleted_at = sqlfunc.now()
         db.commit()
     return db_part
 
 def get_assembly(db, assembly_id):
     return db.query(models.Assembly).filter(models.Assembly.id == assembly_id).first()
 
-def get_all_bom_items(db):
+def get_all_bom_items(db, include_deleted=False, updated_since=None):
     """获取所有 BOM 关系，用于前端反查"""
-    return db.query(models.BOMItem).all()
+    q = db.query(models.BOMItem)
+    if not include_deleted:
+        q = q.filter(models.BOMItem.deleted_at.is_(None))
+    if updated_since:
+        from datetime import datetime, timezone
+        since_dt = datetime.fromtimestamp(updated_since, tz=timezone.utc)
+        q = q.filter(
+            (models.BOMItem.updated_at >= since_dt) |
+            (models.BOMItem.deleted_at >= since_dt)
+        )
+    return q.all()
 
 def get_assembly_by_code(db, code):
     return db.query(models.Assembly).filter(models.Assembly.code == code).first()
@@ -133,13 +187,22 @@ def get_assembly_by_code_version(db, code, version):
         models.Assembly.version == version
     ).first()
 
-def get_assemblies(db, skip=0, limit=100, search=None):
+def get_assemblies(db, skip=0, limit=100, search=None, include_deleted=False, updated_since=None):
     q = db.query(models.Assembly)
+    if not include_deleted:
+        q = q.filter(models.Assembly.deleted_at.is_(None))
     if search:
         pattern = f"%{search}%"
         q = q.filter(
             (models.Assembly.code.ilike(pattern)) |
             (models.Assembly.name.ilike(pattern))
+        )
+    if updated_since:
+        from datetime import datetime, timezone
+        since_dt = datetime.fromtimestamp(updated_since, tz=timezone.utc)
+        q = q.filter(
+            (models.Assembly.updated_at >= since_dt) |
+            (models.Assembly.deleted_at >= since_dt)
         )
     return q.offset(skip).limit(limit).all()
 
@@ -163,21 +226,23 @@ def update_assembly(db, assembly_id, assembly_update):
     return db_assembly
 
 def delete_assembly(db, assembly_id):
-    # 删除该部件"拥有"的 BOM items（它的子项）
+    # Soft-delete BOM items where this assembly is parent
     db.query(models.BOMItem).filter(
         models.BOMItem.parent_type == 'assembly',
-        models.BOMItem.parent_id == assembly_id
-    ).delete(synchronize_session=False)
-    # 删除所有引用该部件的 BOM items（该部件作为子项被其他部件引用）
+        models.BOMItem.parent_id == assembly_id,
+        models.BOMItem.deleted_at.is_(None)
+    ).update({"deleted_at": sqlfunc.now()}, synchronize_session=False)
+    # Soft-delete BOM items where this assembly is a child
     db.query(models.BOMItem).filter(
         models.BOMItem.child_type == 'component',
-        models.BOMItem.child_id == assembly_id
-    ).delete(synchronize_session=False)
+        models.BOMItem.child_id == assembly_id,
+        models.BOMItem.deleted_at.is_(None)
+    ).update({"deleted_at": sqlfunc.now()}, synchronize_session=False)
     db.commit()
-    # 删除部件主体
+    # Soft-delete the assembly
     db_assembly = get_assembly(db, assembly_id)
     if db_assembly:
-        db.delete(db_assembly)
+        db_assembly.deleted_at = sqlfunc.now()
         db.commit()
     return db_assembly
 
@@ -185,7 +250,8 @@ def get_assembly_parts(db, assembly_id):
     """获取部件的子项列表，包含零件和部件的详细信息（返回本地格式）"""
     items = db.query(models.BOMItem).filter(
         models.BOMItem.parent_type == "assembly",
-        models.BOMItem.parent_id == assembly_id
+        models.BOMItem.parent_id == assembly_id,
+        models.BOMItem.deleted_at.is_(None),  # 排除已软删除的 BOM 项
     ).all()
     
     result = []
@@ -236,11 +302,14 @@ def get_assembly_parts(db, assembly_id):
         result.append(item_dict)
     return result
 
-def get_bom_items(db, parent_type, parent_id):
-    return db.query(models.BOMItem).filter(
+def get_bom_items(db, parent_type, parent_id, include_deleted=False):
+    q = db.query(models.BOMItem).filter(
         models.BOMItem.parent_type == parent_type,
-        models.BOMItem.parent_id == parent_id
-    ).all()
+        models.BOMItem.parent_id == parent_id,
+    )
+    if not include_deleted:
+        q = q.filter(models.BOMItem.deleted_at.is_(None))
+    return q.all()
 
 def create_bom_item(db, item):
     db_item = models.BOMItem(**item.model_dump())
@@ -252,7 +321,7 @@ def create_bom_item(db, item):
 def delete_bom_item(db, item_id):
     db_item = db.query(models.BOMItem).filter(models.BOMItem.id == item_id).first()
     if db_item:
-        db.delete(db_item)
+        db_item.deleted_at = sqlfunc.now()
         db.commit()
     return db_item
 
@@ -425,6 +494,40 @@ def get_custom_field_values(db, entity_type, entity_id):
     ).all()
     return results
 
+def get_custom_field_values_batch(db, entity_type, entity_ids):
+    """批量获取多个实体的自定义字段值，返回 {entity_id: {field_key: value}}"""
+    from collections import defaultdict
+    CFV = models.CustomFieldValue
+    CFD = models.CustomFieldDefinition
+    
+    # 一次查询所有字段定义
+    all_defs = db.query(CFD).filter(
+        CFD.applies_to.contains(entity_type)
+    ).all()
+    
+    # 批量查询所有实体的字段值
+    results = db.query(CFV, CFD).join(CFD, CFV.field_id == CFD.id).filter(
+        CFV.entity_type == entity_type,
+        CFV.entity_id.in_(entity_ids)
+    ).all()
+    
+    # 构建结果: {entity_id: {field_key: value, ...}}
+    output = defaultdict(dict)
+    for val, field_def in results:
+        entity_id_str = str(val.entity_id)
+        value = None
+        if field_def.field_type in ('text', 'select'):
+            value = val.value_text
+        elif field_def.field_type == 'number':
+            value = float(val.value_number) if val.value_number is not None else None
+        elif field_def.field_type == 'multiselect':
+            value = val.value_json
+        else:
+            value = val.value_text or (float(val.value_number) if val.value_number is not None else None) or val.value_json
+        output[entity_id_str][field_def.field_key] = value
+    
+    return dict(output)
+
 def set_custom_field_values(db, entity_type, entity_id, values):
     """批量设置实体的自定义字段值"""
     for item in values:
@@ -590,7 +693,8 @@ def upgrade_assembly(db, assembly_id, user: str = None):
     # 深拷贝 BOM 结构
     source_bom_items = db.query(models.BOMItem).filter(
         models.BOMItem.parent_type == 'assembly',
-        models.BOMItem.parent_id == source.id
+        models.BOMItem.parent_id == source.id,
+        models.BOMItem.deleted_at.is_(None),
     ).all()
     for item in source_bom_items:
         new_bom_item = models.BOMItem(

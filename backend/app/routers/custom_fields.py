@@ -124,6 +124,29 @@ async def reorder_definitions(
 
 # ===== 字段值 CRUD =====
 
+@router.get("/values/batch")
+async def get_values_batch(
+    type: str,
+    ids: str,  # comma-separated UUIDs
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
+):
+    """批量获取多个实体的自定义字段值，替代 N+1 查询。
+    
+    示例: GET /api/custom-fields/values/batch?type=part&ids=id1,id2,id3
+    返回: { "id1": {"field_key": "value", ...}, "id2": {...} }
+    """
+    if type not in ('part', 'component', 'document'):
+        raise HTTPException(status_code=400, detail="type 必须为 part、component 或 document")
+    
+    entity_ids = [id.strip() for id in ids.split(',') if id.strip()]
+    if not entity_ids:
+        return {}
+    
+    result = crud.get_custom_field_values_batch(db, type, entity_ids)
+    return result
+
+
 @router.get("/values/{entity_type}/{entity_id}", response_model=list[schemas.CustomFieldValueResponse])
 async def get_values(
     entity_type: str,

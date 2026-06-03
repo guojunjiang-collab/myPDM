@@ -32,6 +32,8 @@ async def list_config_items(
     page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
     search: str = Query(None),
     exclude_ancestors_of: str = Query(None),
+    updated_since: float = Query(None),
+    brief: bool = Query(False),
     db: Session = Depends(get_db),
     current_user=Depends(require_role(["admin", "engineer", "production", "guest"])),
 ):
@@ -57,8 +59,30 @@ async def list_config_items(
                 if pid not in exclude_ids:
                     exclude_ids.add(pid)
                     queue.append(pid)
-    items, total = crud.get_config_items(db, search=search, skip=skip, limit=page_size,
-                                          exclude_ids=exclude_ids)
+    crud_kwargs = dict(search=search, skip=skip, limit=page_size, exclude_ids=exclude_ids)
+    if updated_since is not None:
+        crud_kwargs["include_deleted"] = True
+        crud_kwargs["updated_since"] = updated_since
+    items, total = crud.get_config_items(db, **crud_kwargs)
+    if brief:
+        return {
+            "items": [{
+                "id": str(i.id), "code": i.code, "name": i.name,
+                "spec": i.spec or "",
+                "updated_at": i.updated_at.isoformat() if i.updated_at else None,
+                "deleted_at": i.deleted_at.isoformat() if i.deleted_at else None,
+            } for i in items],
+            "total": total, "page": page, "page_size": page_size,
+        }
+    return {
+        "items": [{
+            "id": str(i.id), "code": i.code, "name": i.name,
+            "spec": i.spec or "", "remark": i.remark or "",
+            "created_at": i.created_at.isoformat() if i.created_at else None,
+            "updated_at": i.updated_at.isoformat() if i.updated_at else None,
+        } for i in items],
+        "total": total, "page": page, "page_size": page_size,
+    }
     return {
         "items": [{
             "id": str(i.id), "code": i.code, "name": i.name,

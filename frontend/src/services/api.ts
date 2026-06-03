@@ -64,7 +64,7 @@ export const authApi = {
 
 // 零件 API
 export const partsApi = {
-  list: (params?: { page?: number; page_size?: number; search?: string; status?: string }) =>
+  list: (params?: { page?: number; page_size?: number; search?: string; status?: string; brief?: boolean; updated_since?: number }) =>
     api.get('/parts/', { params }),
   get: (id: string) => api.get(`/parts/${id}`),
   create: (data: unknown) => api.post('/parts/', data),
@@ -78,7 +78,7 @@ export const partsApi = {
 
 // 部件 API
 export const assembliesApi = {
-  list: (params?: { page?: number; page_size?: number; search?: string; status?: string }) =>
+  list: (params?: { page?: number; page_size?: number; search?: string; status?: string; brief?: boolean; updated_since?: number }) =>
     api.get('/assemblies/', { params }),
   get: (id: string) => api.get(`/assemblies/${id}`),
   create: (data: unknown) => api.post('/assemblies/', data),
@@ -92,7 +92,7 @@ export const assembliesApi = {
 
 // 图文档 API
 export const documentsApi = {
-  list: (params?: { page?: number; page_size?: number; search?: string; status?: string }) =>
+  list: (params?: { page?: number; page_size?: number; keyword?: string; status?: string; brief?: boolean; updated_since?: number }) =>
     api.get('/documents/', { params }),
   get: (id: string) => api.get(`/documents/${id}`),
   create: (data: unknown) => api.post('/documents/', data),
@@ -114,7 +114,8 @@ export const documentsApi = {
 export const bomApi = {
   getTree: (type: 'part' | 'assembly', id: string) =>
     api.get(`/bom/tree/${type}/${id}`),
-  getAllItems: () => api.get('/bom/items/all'),
+  getAll: (params?: { updated_since?: number }) =>
+    api.get('/bom/items/all', { params }),
   checkReferences: (entityType: string, entityId: string) =>
     api.get(`/bom/references/${entityType}/${entityId}`),
   createItem: (data: { parent_type: string; parent_id: string; child_type: string; child_id: string; qty: number }) =>
@@ -370,6 +371,8 @@ export const customFieldsApi = {
     api.put('/custom-fields/definitions/reorder', { items }),
   getValues: (entityType: string, entityId: string) =>
     api.get(`/custom-fields/values/${entityType}/${entityId}`),
+  getValuesBatch: (params: { type: string; ids: string }) =>
+    api.get('/custom-fields/values/batch', { params }),
   setValues: (entityType: string, entityId: string, values: unknown[]) =>
     api.put(`/custom-fields/values/${entityType}/${entityId}`, { values }),
   resetData: (password: string) => api.post('/custom-fields/reset-data', { password }),

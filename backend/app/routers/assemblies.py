@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 import uuid
@@ -23,11 +24,17 @@ def _assembly_response(asm):
         "revisions": asm.revisions or [],
         "created_at": asm.created_at,
         "updated_at": asm.updated_at,
+        "deleted_at": asm.deleted_at,
     }
 
-@router.get("/", response_model=list[schemas.AssemblyResponse])
-async def list_assemblies(skip: int = 0, limit: int = 100, search: str = None, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
-    return [_assembly_response(a) for a in crud.get_assemblies(db, skip=skip, limit=limit, search=search)]
+@router.get("/")
+async def list_assemblies(skip: int = 0, limit: int = 100, search: str = None, updated_since: float = None, brief: bool = False, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+    include_deleted = bool(updated_since)  # 增量模式可能包含已删除记录
+    asms = crud.get_assemblies(db, skip=skip, limit=limit, search=search, updated_since=updated_since, include_deleted=include_deleted)
+    if brief:
+        from ..crud import _assembly_brief
+        return JSONResponse(content=[_assembly_brief(a) for a in asms])
+    return [_assembly_response(a) for a in asms]
 
 @router.post("/", response_model=schemas.AssemblyResponse)
 async def create_assembly(assembly: schemas.AssemblyCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
@@ -63,10 +70,11 @@ async def check_assembly_can_delete(assembly_id: uuid.UUID, db: Session = Depend
     if not db_assembly:
         raise HTTPException(status_code=404, detail="部件不存在")
     
-    # 检查是否被其他部件引用为子项
+    # 检查是否被其他部件引用为子项（排除已软删除的）
     ref_count = db.query(BOMItem).filter(
         BOMItem.child_type == 'component',
-        BOMItem.child_id == assembly_id
+        BOMItem.child_id == assembly_id,
+        BOMItem.deleted_at.is_(None),
     ).count()
     
     references = []
@@ -98,18 +106,21 @@ async def delete_assembly(assembly_id: uuid.UUID, request: Request, db: Session 
     if not db_assembly:
         raise HTTPException(status_code=404, detail="部件不存在")
     
-    # 检查是否被其他部件引用为子项 (只检查 component，数据库存储为 component)
+    # 检查是否被其他部件引用为子项（排除已软删除的 BOM 关系和部件）
     ref_count = db.query(BOMItem).filter(
         BOMItem.child_type == 'component',
-        BOMItem.child_id == assembly_id
+        BOMItem.child_id == assembly_id,
+        BOMItem.deleted_at.is_(None),
     ).count()
     if ref_count > 0:
-        # 获取引用该部件的其他部件信息
+        # 获取引用该部件的其他部件信息（仅未删除的）
         refs = db.query(BOMItem, Assembly).join(
             Assembly, BOMItem.parent_id == Assembly.id
         ).filter(
             BOMItem.child_type == 'component',
-            BOMItem.child_id == assembly_id
+            BOMItem.child_id == assembly_id,
+            BOMItem.deleted_at.is_(None),
+            Assembly.deleted_at.is_(None),
         ).all()
         ref_codes = [f"{r[1].code}({r[1].version})" for r in refs[:5]]
         msg = f"该部件被 {ref_count} 个部件引用: {', '.join(ref_codes)}"

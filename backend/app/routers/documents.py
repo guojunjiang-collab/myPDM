@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import cast, String
+from sqlalchemy import cast, String, func
+from datetime import datetime, timezone
 import uuid
 import base64
 
@@ -13,8 +15,10 @@ from ..stp_converter import is_stp_file, delete_glb_cache
 router = APIRouter(prefix="/documents", tags=["图文档管理"])
 
 @router.get("/")
-async def list_documents(skip: int = 0, limit: int = 100, keyword: str = None, status: str = None, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def list_documents(skip: int = 0, limit: int = 100, keyword: str = None, status: str = None, updated_since: float = None, brief: bool = False, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
     query = db.query(Document)
+    if not updated_since:  # 非增量模式排除已删除
+        query = query.filter(Document.deleted_at.is_(None))
     if keyword:
         kw = f"%{keyword.strip().lower()}%"
         query = query.filter(
@@ -22,13 +26,31 @@ async def list_documents(skip: int = 0, limit: int = 100, keyword: str = None, s
         )
     if status:
         query = query.filter(Document.status == status)
+    if updated_since:
+        from datetime import datetime, timezone
+        since_dt = datetime.fromtimestamp(updated_since, tz=timezone.utc)
+        query = query.filter(
+            (Document.updated_at >= since_dt) |
+            (Document.deleted_at >= since_dt)
+        )
     docs = query.offset(skip).limit(limit).all()
+    if brief:
+        return JSONResponse(content=[{
+            "id": str(d.id), "code": d.code, "name": d.name,
+            "version": d.version, "status": d.status, "file_name": d.file_name,
+            "file_id": str(d.file_id) if d.file_id else None,
+            "remark": d.remark,
+            "created_at": d.created_at.isoformat() if d.created_at else None,
+            "updated_at": d.updated_at.isoformat() if d.updated_at else None,
+            "deleted_at": d.deleted_at.isoformat() if d.deleted_at else None,
+        } for d in docs])
     return [{
         "id": d.id, "code": d.code, "name": d.name,
         "version": d.version, "status": d.status,
         "remark": d.remark,
         "file_name": d.file_name, "file_id": d.file_id,
         "created_at": d.created_at, "updated_at": d.updated_at,
+        "deleted_at": d.deleted_at,
     } for d in docs]
 
 @router.get("/{doc_id}/references")
@@ -244,11 +266,12 @@ async def delete_document(doc_id: uuid.UUID, request: Request, db: Session = Dep
     
     # 删除数据库中的附件记录
     db.query(DocumentAttachment).filter(DocumentAttachment.document_id == doc_id).delete()
-    db.delete(d)
+    # 软删除图文档元数据（保留记录用于同步感知删除）
+    d.deleted_at = func.now()
     db.commit()
     ip = request.client.host if request.client else None
-    crud.create_log(db, current_user.id, current_user.username, "删除图文档", "document", str(doc_id), f"编号:{d.code}", ip)
-    return {"message": "图文档已删除"}
+    crud.create_log(db, current_user.id, current_user.username, "软删除图文档", "document", str(doc_id), f"编号:{d.code}", ip)
+    return {"message": "图文档已软删除"}
 
 @router.post("/{doc_id}/attachments")
 async def upload_document_attachment(doc_id: uuid.UUID, body: schemas.DocumentAttachmentCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):

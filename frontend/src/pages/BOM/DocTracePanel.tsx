@@ -27,7 +27,7 @@ export default function DocTracePanel({ onViewEntity }: DocTracePanelProps) {
     docTraceDebounceRef.current = setTimeout(async () => {
       setDocTraceSearchLoading(true);
       try {
-        const response = await documentsApi.list({ search: query.trim() });
+        const response = await documentsApi.list({ keyword: query.trim() });
         const items = Array.isArray(response.data)
           ? response.data
           : (response.data.items || []);

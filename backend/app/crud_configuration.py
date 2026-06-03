@@ -4,7 +4,7 @@
 """
 
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, func as sqlfunc
 from typing import Optional, List, Tuple
 
 from . import models_configuration as models
@@ -19,9 +19,13 @@ def get_config_items(
     db: Session, search: Optional[str] = None,
     skip: int = 0, limit: int = 50,
     exclude_ids: set | None = None,
+    include_deleted: bool = False,
+    updated_since: Optional[float] = None,
 ) -> Tuple[List[models.ConfigurationItem], int]:
     """构型项列表"""
     q = db.query(models.ConfigurationItem)
+    if not include_deleted:
+        q = q.filter(models.ConfigurationItem.deleted_at.is_(None))
     if exclude_ids:
         q = q.filter(models.ConfigurationItem.id.notin_(exclude_ids))
     if search:
@@ -31,13 +35,23 @@ def get_config_items(
             models.ConfigurationItem.name.ilike(like),
             models.ConfigurationItem.spec.ilike(like),
         ))
+    if updated_since:
+        from datetime import datetime, timezone as tz
+        since_dt = datetime.fromtimestamp(updated_since, tz=tz.utc)
+        q = q.filter(
+            (models.ConfigurationItem.updated_at >= since_dt) |
+            (models.ConfigurationItem.deleted_at >= since_dt)
+        )
     total = q.count()
     items = q.order_by(models.ConfigurationItem.code).offset(skip).limit(limit).all()
     return items, total
 
 
 def get_config_item(db: Session, config_id: str) -> Optional[models.ConfigurationItem]:
-    return db.query(models.ConfigurationItem).filter(models.ConfigurationItem.id == config_id).first()
+    return db.query(models.ConfigurationItem).filter(
+        models.ConfigurationItem.id == config_id,
+        models.ConfigurationItem.deleted_at.is_(None)
+    ).first()
 
 
 def get_config_item_by_code(db: Session, code: str) -> Optional[models.ConfigurationItem]:
@@ -65,10 +79,15 @@ def update_config_item(db: Session, config_id: str, data: schemas.ConfigurationI
 
 
 def delete_config_item(db: Session, config_id: str) -> bool:
-    item = get_config_item(db, config_id)
+    """Soft delete configuration item"""
+    from sqlalchemy.sql import func
+    item = db.query(models.ConfigurationItem).filter(
+        models.ConfigurationItem.id == config_id,
+        models.ConfigurationItem.deleted_at.is_(None)
+    ).first()
     if not item:
         return False
-    db.delete(item)
+    item.deleted_at = func.now()
     db.commit()
     return True
 

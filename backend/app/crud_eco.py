@@ -177,10 +177,13 @@ def create_eco(db: Session, data: ECOCreate, creator_id: uuid.UUID) -> ECO:
     return db_eco
 
 
-def get_ecos(db: Session, params: ECOListParams, current_user=None):
+def get_ecos(db: Session, params: ECOListParams, current_user=None,
+              include_deleted: bool = False, updated_since: float | None = None):
     """查询 ECO 列表（分页 + 筛选）。非管理员只看与自己相关的 ECO"""
     from sqlalchemy import or_, cast, String
     q = db.query(ECO)
+    if not include_deleted:
+        q = q.filter(ECO.deleted_at.is_(None))
 
     if current_user and current_user.role != "admin":
         uid = str(current_user.id)
@@ -201,6 +204,13 @@ def get_ecos(db: Session, params: ECOListParams, current_user=None):
         pattern = f"%{params.search}%"
         q = q.filter(
             (ECO.title.ilike(pattern)) | (ECO.eco_number.ilike(pattern))
+        )
+
+    if updated_since:
+        since_dt = datetime.fromtimestamp(updated_since, tz=timezone.utc)
+        q = q.filter(
+            (ECO.updated_at >= since_dt) |
+            (ECO.deleted_at >= since_dt)
         )
 
     total = q.count()
@@ -247,6 +257,7 @@ def get_ecos(db: Session, params: ECOListParams, current_user=None):
             "ecr_number": ecr_number,
             "created_at": eco.created_at,
             "updated_at": eco.updated_at,
+            "deleted_at": eco.deleted_at,
         })
 
     return items, total
@@ -254,7 +265,7 @@ def get_ecos(db: Session, params: ECOListParams, current_user=None):
 
 def get_eco(db: Session, eco_id: uuid.UUID) -> ECO:
     """获取单个 ECO"""
-    eco = db.query(ECO).filter(ECO.id == eco_id).first()
+    eco = db.query(ECO).filter(ECO.id == eco_id, ECO.deleted_at.is_(None)).first()
     if not eco:
         raise HTTPException(status_code=404, detail="ECO 不存在")
     return eco
@@ -340,12 +351,14 @@ def update_eco(db: Session, eco: ECO, data: ECOEdit):
     return eco
 
 
-def delete_eco(db: Session, eco: ECO):
-    """删除 ECO（仅 draft 状态）"""
-    if eco.status != "draft":
-        raise HTTPException(status_code=400, detail="只有草稿状态的 ECO 可以删除")
-    db.delete(eco)
+def delete_eco(db: Session, eco_id: uuid.UUID) -> bool:
+    """软删除 ECO"""
+    eco = db.query(ECO).filter(ECO.id == eco_id, ECO.deleted_at.is_(None)).first()
+    if not eco:
+        return False
+    eco.deleted_at = sqlfunc.now()
     db.commit()
+    return True
 
 
 def change_eco_status(

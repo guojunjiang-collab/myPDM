@@ -95,7 +95,10 @@ def create_ecr(db: Session, data: ECRCreate, creator_id: uuid.UUID) -> ECR:
     return db_ecr
 
 
-def get_ecrs(db: Session, params: ECRListParams, current_user=None):
+def get_ecrs(
+    db: Session, params: ECRListParams, current_user=None,
+    include_deleted: bool = False, updated_since: float | None = None,
+):
     """查询 ECR 列表（分页 + 筛选）。非管理员只看与自己相关的 ECR"""
     from sqlalchemy import or_, cast, String
     q = db.query(ECR)
@@ -122,6 +125,17 @@ def get_ecrs(db: Session, params: ECRListParams, current_user=None):
         pattern = f"%{params.search}%"
         q = q.filter(
             (ECR.title.ilike(pattern)) | (ECR.ecr_number.ilike(pattern))
+        )
+
+    # 软删除过滤
+    if not include_deleted:
+        q = q.filter(ECR.deleted_at.is_(None))
+    if updated_since:
+        from datetime import datetime, timezone
+        since_dt = datetime.fromtimestamp(updated_since, tz=timezone.utc)
+        q = q.filter(
+            (ECR.updated_at >= since_dt) |
+            (ECR.deleted_at >= since_dt)
         )
 
     total = q.count()
@@ -162,14 +176,15 @@ def get_ecrs(db: Session, params: ECRListParams, current_user=None):
             "affected_count": affected_count,
             "created_at": ecr.created_at,
             "updated_at": ecr.updated_at,
+            "deleted_at": ecr.deleted_at,
         })
 
     return items, total
 
 
 def get_ecr(db: Session, ecr_id: uuid.UUID) -> ECR:
-    """通过 ID 获取 ECR，不存在抛出 404"""
-    ecr = db.query(ECR).filter(ECR.id == ecr_id).first()
+    """通过 ID 获取 ECR，不存在抛出 404（已删除的记录也视作不存在）"""
+    ecr = db.query(ECR).filter(ECR.id == ecr_id, ECR.deleted_at.is_(None)).first()
     if not ecr:
         raise HTTPException(status_code=404, detail="ECR 不存在")
     return ecr
@@ -202,11 +217,14 @@ def update_ecr(db: Session, ecr_id: uuid.UUID, data: ECREdit) -> ECR:
     return ecr
 
 
-def delete_ecr(db: Session, ecr_id: uuid.UUID):
-    """删除 ECR（级联删除关联数据）"""
-    ecr = get_ecr(db, ecr_id)
-    db.delete(ecr)
+def delete_ecr(db: Session, ecr_id: uuid.UUID) -> bool:
+    """Soft delete ECR"""
+    ecr = db.query(ECR).filter(ECR.id == ecr_id, ECR.deleted_at.is_(None)).first()
+    if not ecr:
+        return False
+    ecr.deleted_at = sqlfunc.now()
     db.commit()
+    return True
 
 
 def change_ecr_status(

@@ -32,6 +32,7 @@ class ECR(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
     closed_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
     eco_id = Column(UUID(as_uuid=True), nullable=True)
 
 

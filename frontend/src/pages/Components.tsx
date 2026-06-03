@@ -108,7 +108,7 @@ export default function Components() {
   const [editParts, setEditParts] = useState<AssemblyPartItem[]>([]);
   const [loadingEditParts, setLoadingEditParts] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [editSortField, setEditSortField] = useState<string | null>(null);
+  const [editSortField, setEditSortField] = useState<string | null>('code');
   const [editSortDir, setEditSortDir] = useState<'asc' | 'desc'>('asc');
   // 子项树形展开
   const [expandedParts, setExpandedParts] = useState<Record<string, any[]>>({});
@@ -955,7 +955,7 @@ export default function Components() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {editParts.map((part: any, i: number) => renderPartRow(part, 0, String(i)))}
+              {sortedEditParts.map((part: any, i: number) => renderPartRow(part, 0, String(i)))}
             </tbody>
           </table>
         </div>

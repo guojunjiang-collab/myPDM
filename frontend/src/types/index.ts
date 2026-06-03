@@ -23,6 +23,7 @@ export interface Part {
   revision_parent_id?: string;
   created_at?: string;
   updated_at?: string;
+  deleted_at?: string | null;
 }
 
 export interface Assembly {
@@ -36,6 +37,7 @@ export interface Assembly {
   revision_parent_id?: string;
   created_at?: string;
   updated_at?: string;
+  deleted_at?: string | null;
 }
 
 export interface Document {
@@ -50,6 +52,7 @@ export interface Document {
   revision_parent_id?: string;
   created_at?: string;
   updated_at?: string;
+  deleted_at?: string | null;
 }
 
 export interface DocumentAttachment {
@@ -68,6 +71,8 @@ export interface BOMItem {
   child_id: string;
   qty: number;
   created: string;
+  updated_at?: string;
+  deleted_at?: string | null;
 }
 
 export interface OperationLog {
@@ -635,5 +640,157 @@ export interface ConfigTreeNode {
 export interface ConfigurationProfileDetail extends ConfigurationProfile {
   items: ConfigurationProfileItem[];
   config_tree?: ConfigTreeNode | null;
+}
+
+// ===== Brief types (lightweight for sync/list) =====
+
+export interface PartBrief {
+  id: string;
+  code: string;
+  name: string;
+  spec?: string;
+  version?: string;
+  status: 'draft' | 'frozen' | 'released' | 'obsolete';
+  remark?: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface AssemblyBrief {
+  id: string;
+  code: string;
+  name: string;
+  spec?: string;
+  version?: string;
+  status: 'draft' | 'frozen' | 'released' | 'obsolete';
+  remark?: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface DocumentBrief {
+  id: string;
+  code: string;
+  name: string;
+  version?: string;
+  status: 'draft' | 'frozen' | 'released' | 'obsolete';
+  remark?: string;
+  file_name?: string;
+  file_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface AssemblyBrief {
+  id: string;
+  code: string;
+  name: string;
+  spec?: string;
+  version?: string;
+  status: 'draft' | 'frozen' | 'released' | 'obsolete';
+  remark?: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface DocumentBrief {
+  id: string;
+  code: string;
+  name: string;
+  version?: string;
+  status: 'draft' | 'frozen' | 'released' | 'obsolete';
+  remark?: string;
+  file_name?: string;
+  file_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface AssemblyBrief {
+  id: string;
+  code: string;
+  name: string;
+  spec?: string;
+  version?: string;
+  status: 'draft' | 'frozen' | 'released' | 'obsolete';
+  remark?: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface DocumentBrief {
+  id: string;
+  code: string;
+  name: string;
+  version?: string;
+  status: 'draft' | 'frozen' | 'released' | 'obsolete';
+  remark?: string;
+  file_name?: string;
+  file_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface BOMItemBrief {
+  id: string;
+  parent_type: 'part' | 'assembly';
+  parent_id: string;
+  child_type: 'part' | 'assembly';
+  child_id: string;
+  quantity: number;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+// ===== ECR / ECO / ConfigItem =====
+
+export interface ECRBrief {
+  id: string;
+  ecr_number: string;
+  title: string;
+  status: string;
+  priority: string;
+  creator_name?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface ECOBrief {
+  id: string;
+  eco_number: string;
+  title: string;
+  status: string;
+  priority: string;
+  creator_name?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface ConfigItemBrief {
+  id: string;
+  code: string;
+  name: string;
+  spec?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+// ===== Sync status =====
+export interface SyncStatus {
+  parts: number;
+  assemblies: number;
+  documents: number;
+  bom_items: number;
+  ecrs: number;
+  ecos: number;
+  config_items: number;
 }
 

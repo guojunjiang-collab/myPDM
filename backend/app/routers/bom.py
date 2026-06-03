@@ -32,18 +32,18 @@ async def check_references(
         bom_items = db.query(models.BOMItem).filter(
             models.BOMItem.child_type.in_(child_types),
             models.BOMItem.child_id == entity_id,
+            models.BOMItem.deleted_at.is_(None),  # 排除已软删除的 BOM 关系
         ).all()
         for item in bom_items:
-            label = item.parent_type
-            if label == "part":
+            # 检查父实体是否未被软删除
+            if item.parent_type == "part":
                 p = crud.get_part(db, item.parent_id)
-                if p:
-                    label = f"零件 {p.code}"
-            elif label == "assembly":
+                if p and p.deleted_at is None:
+                    references.append({"type": "bom_child", "parent_id": str(item.parent_id), "label": f"零件 {p.code}"})
+            elif item.parent_type == "assembly":
                 a = crud.get_assembly(db, item.parent_id)
-                if a:
-                    label = f"部件 {a.code}"
-            references.append({"type": "bom_child", "parent_id": str(item.parent_id), "label": label})
+                if a and a.deleted_at is None:
+                    references.append({"type": "bom_child", "parent_id": str(item.parent_id), "label": f"部件 {a.code}"})
 
     # 2. 检查 document_links 引用（图文档被关联到零件/部件）
     if entity_type == "document":
@@ -66,20 +66,25 @@ async def check_references(
     return references
 
 @router.get("/items/all")
-async def get_all_bom_items_route(db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production"]))):
+async def get_all_bom_items_route(updated_since: float = None, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production"]))):
     """获取所有 BOM 关系，用于前端反查"""
-    items = crud.get_all_bom_items(db)
-    return [
-        {
+    include_deleted = bool(updated_since)
+    items = crud.get_all_bom_items(db, include_deleted=include_deleted, updated_since=updated_since)
+    # BOM items use `quantity` column, backend serializes it as `qty`
+    result = []
+    for item in items:
+        result.append({
             "id": str(item.id),
             "parent_type": item.parent_type,
-            "parent_id": str(item.parent_id),
+            "parent_id": str(item.parent_id) if item.parent_id else None,
             "child_type": item.child_type,
-            "child_id": str(item.child_id),
-            "quantity": int(item.quantity) if item.quantity else 1,
-        }
-        for item in items
-    ]
+            "child_id": str(item.child_id) if item.child_id else None,
+            "quantity": item.quantity,
+            "created_at": item.created_at.isoformat() if item.created_at else None,
+            "updated_at": item.updated_at.isoformat() if hasattr(item, 'updated_at') and item.updated_at else None,
+            "deleted_at": item.deleted_at.isoformat() if hasattr(item, 'deleted_at') and item.deleted_at else None,
+        })
+    return result
 
 
 @router.get("/tree/{item_type}/{item_id}")

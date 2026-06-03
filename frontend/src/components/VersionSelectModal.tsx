@@ -59,22 +59,22 @@ export default function VersionSelectModal({
   const title = entityName ? `选择版本 - ${entityName}` : '选择版本';
 
   return (
-    <Modal open={open} title={title} onClose={onClose} width="xl" zIndex={70}>
+    <Modal open={open} title={title} onClose={onClose} width="full" zIndex={70}>
       {loading ? (
         <div className="text-sm text-gray-500 py-8 text-center">加载中...</div>
       ) : versions.length === 0 ? (
         <div className="text-sm text-gray-400 py-8 text-center">暂无可选版本</div>
       ) : (
         <div className="border rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-fixed">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">版本</th>
-                <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
-                <th className="px-3 py-2 text-left text-gray-500 font-medium w-40">创建时间</th>
-                <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">创建人</th>
+                <th className="px-3 py-2 text-left text-gray-500 font-medium w-20 whitespace-nowrap">版本</th>
+                <th className="px-3 py-2 text-left text-gray-500 font-medium w-14 whitespace-nowrap">状态</th>
+                <th className="px-3 py-2 text-left text-gray-500 font-medium w-44 whitespace-nowrap">创建时间</th>
+                <th className="px-3 py-2 text-left text-gray-500 font-medium w-20 whitespace-nowrap">创建人</th>
                 <th className="px-3 py-2 text-left text-gray-500 font-medium">备注</th>
-                <th className="px-3 py-2 text-center text-gray-500 font-medium w-16">操作</th>
+                <th className="px-3 py-2 text-center text-gray-500 font-medium w-16 whitespace-nowrap">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -96,7 +96,7 @@ export default function VersionSelectModal({
                     </td>
                     <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{formatDateTime(v.created_at)}</td>
                     <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{creator || '-'}</td>
-                    <td className="px-3 py-2 text-gray-500 max-w-60 truncate">{v.remark || '-'}</td>
+                    <td className="px-3 py-2 text-gray-500 break-words whitespace-normal">{v.remark || '-'}</td>
                     <td className="px-3 py-2 text-center">
                       {!isCurrent ? (
                         <button

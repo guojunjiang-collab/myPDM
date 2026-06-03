@@ -4,6 +4,8 @@ from sqlalchemy import text
 
 from .routers import auth_router, users_router, parts_router, assemblies_router, bom_router, logs_router, custom_fields_router, documents_router, dashboard_router, ecr_router, eco_router, config_router
 from .routers.attachments_v2 import router as attachments_v2_router
+from .routers.sync import router as sync_router
+from .routers.admin import router as admin_router
 from .database import SessionLocal
 
 app = FastAPI(
@@ -35,6 +37,8 @@ app.include_router(dashboard_router, prefix="/api")
 app.include_router(ecr_router, prefix="/api")
 app.include_router(eco_router, prefix="/api")
 app.include_router(config_router, prefix="/api")
+app.include_router(sync_router, prefix="/api")
+app.include_router(admin_router, prefix="/api")
 
 @app.on_event("startup")
 async def startup_event():
@@ -359,8 +363,29 @@ async def startup_event():
             result = db.execute(text(f"SELECT column_name FROM information_schema.columns WHERE table_name = '{tbl}' AND column_name = '{col}'"))
             if not result.fetchone():
                 db.execute(text(f"ALTER TABLE {tbl} ADD COLUMN {col} {coltype}"))
+            db.commit()
+            print(f"✓ Added column {col} to {tbl} table")
+
+        # ── 软删除列迁移 ──
+        for tbl in ["parts", "assemblies", "documents", "bom_items", "ecrs", "ecos", "configuration_items"]:
+            result = db.execute(text(f"""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = '{tbl}' AND column_name = 'deleted_at'
+            """))
+            if not result.fetchone():
+                db.execute(text(f"ALTER TABLE {tbl} ADD COLUMN deleted_at TIMESTAMPTZ DEFAULT NULL"))
                 db.commit()
-                print(f"✓ Added column {col} to {tbl} table")
+                print(f"✓ Added column deleted_at to {tbl} table")
+
+        # BOM items 的 updated_at 列
+        result = db.execute(text("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'bom_items' AND column_name = 'updated_at'
+        """))
+        if not result.fetchone():
+            db.execute(text("ALTER TABLE bom_items ADD COLUMN updated_at TIMESTAMPTZ DEFAULT now()"))
+            db.commit()
+            print("✓ Added column updated_at to bom_items table")
     except Exception as e:
         print(f"✗ Database migration error: {e}")
         db.rollback()
