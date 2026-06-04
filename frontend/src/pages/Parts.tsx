@@ -568,6 +568,7 @@ export default function Parts() {
         width="full"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-4 max-h-[75vh] overflow-y-auto px-1">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">件号 <span className="text-red-500">*</span></label>
@@ -676,7 +677,7 @@ export default function Parts() {
 
           {editingPart && (
             <EntityDocumentSection entityType="part" entityId={editingPart.id} editable />
-          )}
+          )}          </div>
 
            <div className="flex justify-between items-center gap-2 pt-4 border-t">
             <div>
@@ -721,7 +722,7 @@ export default function Parts() {
         width="full"
       >
         {viewingPart && (
-          <div>
+          <div className="max-h-[75vh] overflow-y-auto">
             {/* Tab 切换 */}
             <div className="flex gap-1 mb-4 border-b">
               <button

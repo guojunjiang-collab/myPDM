@@ -939,7 +939,7 @@ export default function Components() {
       ) : editParts.length === 0 ? (
         <div className="px-4 py-8 text-center text-sm text-gray-400">暂无子项</div>
       ) : (
-        <div className="max-h-[400px] overflow-auto">
+        <div className="max-h-[65vh] overflow-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b sticky top-0">
               <tr>
@@ -1179,6 +1179,7 @@ export default function Components() {
         width="full"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-4 max-h-[80vh] overflow-y-auto px-1">
           {/* 基本属性 - 卡片式 */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
@@ -1301,6 +1302,7 @@ export default function Components() {
             </div>
           )}
 
+          </div>
           {/* 底部操作 */}
            <div className="flex justify-between items-center gap-2 pt-4 border-t">
             <div>

@@ -210,7 +210,7 @@ export default function BOMTreeTable({ assemblyId, maxHeight = 'max-h-[calc(100v
         ) : (
           <div className={`overflow-auto ${maxHeight}`}>
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
+              <thead className="bg-gray-50 border-b sticky top-0 z-10">
                 <tr>
                   <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">层级</th>
                   <th onClick={() => handleViewSort('type')} className="px-3 py-2 text-left text-gray-500 font-medium w-24 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">类型 {getViewSortIcon('type')}</th>
