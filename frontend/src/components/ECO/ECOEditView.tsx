@@ -306,16 +306,8 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade,
                   <div className="flex items-center gap-1">
                     {ecoStatus === 'draft' ? (
                       effStatus === 'draft' ? (
-                        <>
-                          <button onClick={async (e) => {
-                            e.stopPropagation();
-                            let itemId = exec?.id || '';
-                            if (!itemId && ecoId) {
-                              const created = await ecoApi.addExecutionItem(ecoId, { entity_type: n.entity_type || 'part', entity_id: n.entity_id, entity_code: n.entity_code, entity_name: n.entity_name, action: 'add_existing', source: 'manual' });
-                              itemId = created.data?.id;
-                            }
-                            onRelease?.(itemId, n.entity_id);
-                          }} className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
+                        // 新增的零部件：隐藏"还原"按钮，避免误删
+                        n.action === 'add_existing' ? (
                           <button onClick={async (e) => {
                             e.stopPropagation();
                             let itemId = exec?.id || '';
@@ -325,7 +317,28 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade,
                             }
                             onFreeze?.(itemId, n.entity_id);
                           }} className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">冻结</button>
-                        </>
+                        ) : (
+                          <>
+                            <button onClick={async (e) => {
+                              e.stopPropagation();
+                              let itemId = exec?.id || '';
+                              if (!itemId && ecoId) {
+                                const created = await ecoApi.addExecutionItem(ecoId, { entity_type: n.entity_type || 'part', entity_id: n.entity_id, entity_code: n.entity_code, entity_name: n.entity_name, action: 'add_existing', source: 'manual' });
+                                itemId = created.data?.id;
+                              }
+                              onRelease?.(itemId, n.entity_id);
+                            }} className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
+                            <button onClick={async (e) => {
+                              e.stopPropagation();
+                              let itemId = exec?.id || '';
+                              if (!itemId && ecoId) {
+                                const created = await ecoApi.addExecutionItem(ecoId, { entity_type: n.entity_type || 'part', entity_id: n.entity_id, entity_code: n.entity_code, entity_name: n.entity_name, action: 'add_existing', source: 'manual' });
+                                itemId = created.data?.id;
+                              }
+                              onFreeze?.(itemId, n.entity_id);
+                            }} className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">冻结</button>
+                          </>
+                        )
                       ) : effStatus === 'frozen' ? (
                         <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
                           className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
