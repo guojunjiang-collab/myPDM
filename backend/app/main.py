@@ -42,10 +42,27 @@ app.include_router(admin_router, prefix="/api")
 
 @app.on_event("startup")
 async def startup_event():
-    """应用启动时执行数据库表结构检查和自动迁移"""
-    db = SessionLocal()
+    """应用启动时执行数据库表结构检查和自动迁移（带 PostgreSQL 连接重试）"""
+    import time as _time
+
+    # 第一步：等待 PostgreSQL 就绪（容器启动时序问题）
+    max_retries = 10
+    db = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            db = SessionLocal()
+            db.execute(text("SELECT 1"))
+            break  # 连接成功
+        except Exception as e:
+            if db: db.close()
+            if attempt == max_retries:
+                print(f"✗ PostgreSQL not ready after {max_retries} attempts: {e}")
+                return
+            print(f"⏳ Waiting for PostgreSQL (attempt {attempt}/{max_retries})...")
+            _time.sleep(2 ** attempt)
+
+    # 第二步：执行数据库迁移
     try:
-        # 检查 document_attachments 表是否有 file_path 列
         result = db.execute(text("""
             SELECT column_name 
             FROM information_schema.columns 
@@ -386,6 +403,7 @@ async def startup_event():
             db.execute(text("ALTER TABLE bom_items ADD COLUMN updated_at TIMESTAMPTZ DEFAULT now()"))
             db.commit()
             print("✓ Added column updated_at to bom_items table")
+        print("✓ Database migration completed successfully")
     except Exception as e:
         print(f"✗ Database migration error: {e}")
         db.rollback()
