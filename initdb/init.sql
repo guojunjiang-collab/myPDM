@@ -156,12 +156,9 @@ CREATE INDEX idx_doc_code ON documents(code);
 CREATE INDEX idx_doc_status ON documents(status);
 CREATE INDEX idx_doc_att_doc ON document_attachments(document_id);
 
--- 插入默认用户（密码均为 admin123）
+-- 插入默认管理员用户（密码: admin123）
 INSERT INTO users (username, password_hash, real_name, role, department, status) VALUES
-('admin', '$2b$12$MwgiArsPySEydYloZq.FYu7lixhRufdvZfqC17I2bW4Eo5kRt0Kp2', '系统管理员', 'admin', '信息部', 'active'),
-('engineer', '$2b$12$MwgiArsPySEydYloZq.FYu7lixhRufdvZfqC17I2bW4Eo5kRt0Kp2', '张工程师', 'engineer', '研发部', 'active'),
-('production', '$2b$12$MwgiArsPySEydYloZq.FYu7lixhRufdvZfqC17I2bW4Eo5kRt0Kp2', '李生产', 'production', '生产部', 'active'),
-('guest', '$2b$12$MwgiArsPySEydYloZq.FYu7lixhRufdvZfqC17I2bW4Eo5kRt0Kp2', '访客账户', 'guest', '采购部', 'active');
+('admin', '$2b$12$MwgiArsPySEydYloZq.FYu7lixhRufdvZfqC17I2bW4Eo5kRt0Kp2', '系统管理员', 'admin', '信息部', 'active');
 
 -- ===== 用户看板 =====
 
