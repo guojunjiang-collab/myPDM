@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
-import { useAuthStore } from '../stores/auth';
+import api from '../services/api';
 import { isAdmin } from '../stores/auth';
 import { ConfirmModal } from '../components/Modal';
 
@@ -38,7 +37,7 @@ export default function DataManagement() {
     setLoading(true);
     setError(null);
     try {
-      const res = await axios.get('/api/admin/soft-deleted-stats');
+      const res = await api.get('/admin/soft-deleted-stats');
       setStats(res.data);
       // 默认选中所有有数据的表
       const tables = new Set<string>();
@@ -73,11 +72,27 @@ export default function DataManagement() {
     });
   };
 
+  const setPresetDate = (days: number | null) => {
+    if (days === null) {
+      setBeforeDate(''); // 全部清理
+    } else {
+      const d = new Date();
+      d.setDate(d.getDate() - days);
+      setBeforeDate(d.toISOString().split('T')[0]);
+    }
+  };
+
+  const getPresetDateStr = (days: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return d.toISOString().split('T')[0];
+  };
+
   const handlePurge = async () => {
     setPurging(true);
     setPurgeResult(null);
     try {
-      const res = await axios.post('/api/admin/purge-soft-deleted', {
+      const res = await api.post('/admin/purge-soft-deleted', {
         tables: Array.from(selectedTables),
         before_date: beforeDate || undefined,
         confirm: true,
@@ -182,6 +197,20 @@ export default function DataManagement() {
             {/* 日期选择 */}
             <div className="mb-4">
               <div className="text-sm text-gray-600 mb-2">清理此日期之前的数据（可选）:</div>
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <button onClick={() => setPresetDate(null)} className={`px-3 py-1 rounded text-xs border transition-colors ${!beforeDate ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                  全部清理
+                </button>
+                <button onClick={() => setPresetDate(30)} className={`px-3 py-1 rounded text-xs border transition-colors ${beforeDate === getPresetDateStr(30) ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                  清理30天前
+                </button>
+                <button onClick={() => setPresetDate(90)} className={`px-3 py-1 rounded text-xs border transition-colors ${beforeDate === getPresetDateStr(90) ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                  清理90天前
+                </button>
+                <button onClick={() => setPresetDate(180)} className={`px-3 py-1 rounded text-xs border transition-colors ${beforeDate === getPresetDateStr(180) ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                  清理180天前
+                </button>
+              </div>
               <input
                 type="date"
                 value={beforeDate}
