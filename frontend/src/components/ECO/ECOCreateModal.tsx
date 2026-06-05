@@ -347,21 +347,6 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
             detail: { _targetQty: n._targetQty ?? n.quantity, _desc: n._desc || '', _affectedCode: n._affectedCode || '' },
           });
         });
-        // Preserve old manual items not found in bomData (e.g. directly added items)
-        oldMap.forEach((it: any, ck: string) => {
-          if (!seen.has(ck) && it.source === 'manual' && it.entity_name) {
-            items.push({
-              source: it.source,
-              entity_type: it.entity_type,
-              entity_id: it.entity_id || undefined,
-              entity_code: it.entity_code || undefined,
-              entity_name: it.entity_name,
-              action: it.action || 'no_change',
-              parent_entity_id: it.parent_entity_id || undefined,
-              detail: it.detail || {},
-            });
-          }
-        });
         data.execution_items = items;
       } else {
         data.execution_items = (localEco?.execution_items || ecrItems || []).map((it: any) => ({
