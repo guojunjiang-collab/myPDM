@@ -232,7 +232,7 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
           <td className="px-3 py-2 text-sm text-gray-400 whitespace-nowrap">
             <span>{'-'.repeat(level)}{level}</span>
             {hasChildren && (
-              <button onClick={(e) => { e.stopPropagation(); toggleExpand(idx, part.child_id); }}
+              <button type="button" onClick={(e) => { e.stopPropagation(); toggleExpand(idx, part.child_id); }}
                 className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
                 {childRows ? '\u25bc' : '\u25b6'}
               </button>
