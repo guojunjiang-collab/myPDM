@@ -117,7 +117,7 @@ function EditableUpward({ rows, onUpdate, displayOnly = false }: { rows: Mutable
     <div className="overflow-x-auto border border-gray-200 rounded-lg">
       <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
         <thead><tr className="bg-gray-50">
-          <th className={`${th} w-12`}>层级</th><th className={th}>编码</th><th className={th}>名称</th><th className={`${th} text-center`}>版本</th><th className={`${th} text-center`}>用量</th>
+          <th className={`${th} w-12`}>层级</th><th className={th}>件号</th><th className={th}>名称</th><th className={`${th} text-center`}>版本</th><th className={`${th} text-center`}>用量</th>
           <th className={`${th} w-20 text-center`}>操作</th><th className={`${th} w-16 text-center`}>目标用量</th><th className={th}>说明</th>
         </tr></thead>
         <tbody>{rows.length === 0 ? <tr><td colSpan={8} className="text-xs text-gray-400 text-center py-6">无数据</td></tr>
@@ -153,7 +153,7 @@ function EditableDownward({ rows, onUpdate, displayOnly = false, onRemove }: { r
     <div className="overflow-x-auto border border-gray-200 rounded-lg">
       <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
         <thead><tr className="bg-gray-50">
-          <th className={th}>编码</th><th className={th}>名称</th><th className={`${th} text-center`}>版本</th><th className={`${th} text-center`}>用量</th>
+          <th className={th}>件号</th><th className={th}>名称</th><th className={`${th} text-center`}>版本</th><th className={`${th} text-center`}>用量</th>
           <th className={`${th} w-20 text-center`}>操作</th><th className={`${th} w-16 text-center`}>目标用量</th><th className={th}>说明</th>
           {onRemove && <th className={`${th} w-10`}></th>}
         </tr></thead>
@@ -194,7 +194,7 @@ function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, onUpgrade, onReleas
   return (
     <div className="overflow-x-auto border border-gray-200 rounded-lg">
       <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
-        <thead><tr className="bg-gray-50"><th className={`${th} w-12`}>层级</th><th className={th}>编码</th><th className={th}>名称</th><th className={`${th} text-center`}>版本</th><th className={`${th} text-center`}>用量</th>
+        <thead><tr className="bg-gray-50"><th className={`${th} w-12`}>层级</th><th className={th}>件号</th><th className={th}>名称</th><th className={`${th} text-center`}>版本</th><th className={`${th} text-center`}>用量</th>
         {canExec && <><th className={`${th} w-20`}>变更状态</th><th className={`${th} w-28 text-center`}>操作</th></>}
         </tr></thead>
         <tbody>{rows.length === 0 ? <tr><td colSpan={canExec ? 7 : 5} className="text-xs text-gray-400 text-center py-6">无数据</td></tr>
@@ -273,7 +273,7 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade,
   return (
     <div className="overflow-x-auto border border-gray-200 rounded-lg">
       <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
-        <thead><tr className="bg-gray-50"><th className={th}>编码</th><th className={th}>名称</th><th className={`${th} text-center`}>版本</th><th className={`${th} text-center`}>用量</th>
+        <thead><tr className="bg-gray-50"><th className={th}>件号</th><th className={th}>名称</th><th className={`${th} text-center`}>版本</th><th className={`${th} text-center`}>用量</th>
         {canExec && <><th className={`${th} w-20`}>变更状态</th><th className={`${th} w-28 text-center`}>操作</th></>}
         </tr></thead>
         <tbody>{rows.length === 0 ? <tr><td colSpan={canExec ? 6 : 4} className="text-xs text-gray-400 text-center py-6">无数据</td></tr>
@@ -370,7 +370,7 @@ function AffectedTable({ rows, execMap, canExec, ecoStatus, onUpgrade, onRelease
   return (
     <div className="overflow-x-auto border border-gray-200 rounded-lg">
       <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
-        <thead><tr className="bg-gray-50"><th className={th}>编码</th><th className={th}>名称</th><th className={th}>当前版本</th><th className={th}>变更后版本</th>
+        <thead><tr className="bg-gray-50"><th className={th}>件号</th><th className={th}>名称</th><th className={th}>当前版本</th><th className={th}>变更后版本</th>
         {canExec && <><th className={`${th} w-20`}>变更状态</th><th className={`${th} w-28`}>操作</th></>}
         </tr></thead>
         <tbody>{rows.length === 0 ? <tr><td colSpan={canExec ? 6 : 4} className="text-xs text-gray-400 text-center py-6">无</td></tr>
