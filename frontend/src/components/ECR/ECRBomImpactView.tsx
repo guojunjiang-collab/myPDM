@@ -96,6 +96,18 @@ export function ECRBomImpactView({
     [upwardTree, expandedKeys, flattenUpwardTreeExpanded],
   );
 
+  // Sort: upward chain by entity_code ascending (siblings within tree)
+  const sortedFlatUpward = useMemo(
+    () => [...flatUpward].sort((a, b) => (a.node.entity_code || '').localeCompare(b.node.entity_code || '')),
+    [flatUpward],
+  );
+
+  // Sort: downward items by entity_code ascending
+  const sortedDownwardItems = useMemo(
+    () => [...downwardItems].sort((a, b) => (a.entity_code || '').localeCompare(b.entity_code || '')),
+    [downwardItems],
+  );
+
   const toggleUpwardNode = (treeNode: UpwardTreeNode) => {
     setExpandedKeys((prev) => {
       const next = new Set(prev);
@@ -221,7 +233,7 @@ export function ECRBomImpactView({
             <thead>
               <tr className="bg-gray-50">
                 <th className={`${thClass} w-20`}>层级</th>
-                <th className={thClass}>编码</th>
+                <th className={thClass}>件号</th>
                 <th className={thClass}>名称</th>
                 <th className={thClass}>版本</th>
                 <th className={thClass}>子项用量</th>
@@ -238,7 +250,7 @@ export function ECRBomImpactView({
                   </td>
                 </tr>
               ) : (
-                flatUpward.map((treeNode) => {
+                sortedFlatUpward.map((treeNode) => {
                   const node = treeNode.node;
                   const idx = upwardChain.indexOf(node);
                   const hasChildren = treeNode.children.length > 0;
@@ -320,7 +332,7 @@ export function ECRBomImpactView({
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-gray-50">
-                  <th className={thClass}>编码</th>
+                  <th className={thClass}>件号</th>
                   <th className={thClass}>名称</th>
                   <th className={thClass}>版本</th>
                   <th className={thClass}>当前数量</th>
@@ -337,7 +349,9 @@ export function ECRBomImpactView({
                     </td>
                   </tr>
                 ) : (
-                downwardItems.map((node, idx) => (
+                sortedDownwardItems.map((node) => {
+                  const idx = downwardItems.indexOf(node);
+                  return (
                   <tr key={`down-${idx}`} className={node.action && node.action !== 'no_change' ? ACTION_ROW_CLASS[node.action] || '' : 'hover:bg-gray-50'}>
                     <td className={`${tdClass} font-mono`}>{node.entity_code}</td>
                     <td className={tdClass}>{node.entity_name}</td>
@@ -381,7 +395,8 @@ export function ECRBomImpactView({
                       )}
                     </td>
                   </tr>
-                ))
+                  );
+                })
                 )}
               </tbody>
             </table>
