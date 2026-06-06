@@ -222,7 +222,7 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
   };
 
   const renderPartRow = (part: any, level: number, idx: string): React.ReactNode => {
-    const isAssembly = part.childType === 'assembly';
+    const isAssembly = part.childType === 'assembly' || part.childType === 'component';
     const childRows = expandedParts[idx];
     const hasChildren = isAssembly;
 
