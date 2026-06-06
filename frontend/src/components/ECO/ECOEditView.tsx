@@ -635,8 +635,9 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
 
         {/* Per-group analysis cards */}
         {localAffected.map(ai => {
-          const upRows = localUp.filter(n => (n as any)._affectedCode === ai.entity_code && (n.level ?? 0) > 0);
-          const downRows = localDown.filter(n => (n as any)._affectedCode === ai.entity_code);
+          const byCode = (a: any, b: any) => (a.entity_code || '').localeCompare(b.entity_code || '', 'zh-CN');
+          const upRows = localUp.filter(n => (n as any)._affectedCode === ai.entity_code && (n.level ?? 0) > 0).sort(byCode);
+          const downRows = localDown.filter(n => (n as any)._affectedCode === ai.entity_code).sort(byCode);
           return (
             <div key={ai.entity_id || ai.entity_code} className="bg-gray-50/50 rounded-lg border border-gray-200 p-3 mb-4">
               <div className="text-xs font-semibold text-gray-700 mb-2">📦 受影响物料: {ai.entity_code} - {ai.entity_name}</div>
@@ -681,8 +682,9 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
 
         {/* Orphan group */}
         {(() => {
-          const orphanUp = localUp.filter(n => !(n as any)._affectedCode && (n.level ?? 0) > 0);
-          const orphanDown = localDown.filter(n => !(n as any)._affectedCode);
+          const byCode = (a: any, b: any) => (a.entity_code || '').localeCompare(b.entity_code || '', 'zh-CN');
+          const orphanUp = localUp.filter(n => !(n as any)._affectedCode && (n.level ?? 0) > 0).sort(byCode);
+          const orphanDown = localDown.filter(n => !(n as any)._affectedCode).sort(byCode);
           if (orphanUp.length === 0 && orphanDown.length === 0) return null;
           return (
             <div className="bg-gray-50/50 rounded-lg border border-gray-200 p-3 mb-4">
