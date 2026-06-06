@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 from app.database import SessionLocal
 from app.models_ecr import ECR, ECRAffectedItem, ECRReviewRecord, ECRStatusLog
-from app.models import User, Part, Assembly
+from app.models import User, Part, Assembly, BOMItem
 from app.schemas_ecr import ECRCreate, ECREdit, ECRListParams, AffectedItemCreate
 
 # ─────────────────────────────────────────────────────
@@ -403,3 +403,216 @@ def delete_affected_item(db: Session, item_id: uuid.UUID):
         raise HTTPException(status_code=404, detail="受影响对象不存在")
     db.delete(item)
     db.commit()
+
+
+# ─────────────────────────────────────────────────────
+# BOM 溯源辅助函数（供 ECO 和 ECR 共享）
+# ─────────────────────────────────────────────────────
+
+def _get_upward_trace(db: Session, entity_type: str, entity_id: uuid.UUID) -> list:
+    """向上追溯：查找引用该实体的所有父级（最多10层），构建树结构"""
+    from sqlalchemy import text
+    sql = text("""
+    WITH RECURSIVE trace AS (
+      SELECT bi.id, bi.parent_type, bi.parent_id, bi.child_type, bi.child_id,
+             bi.quantity, 1 AS level
+      FROM bom_items bi
+      WHERE bi.child_id = :entity_id
+        AND bi.deleted_at IS NULL
+        AND (bi.child_type = :entity_type
+             OR (bi.child_type = 'component' AND :entity_type = 'assembly'))
+      UNION ALL
+      SELECT bi.id, bi.parent_type, bi.parent_id, bi.child_type, bi.child_id,
+             bi.quantity, t.level + 1
+      FROM bom_items bi
+      JOIN trace t ON bi.child_id = t.parent_id
+      WHERE t.level < 10
+        AND bi.deleted_at IS NULL
+    )
+    SELECT * FROM trace ORDER BY level
+    """)
+    rows = db.execute(sql, {"entity_id": entity_id, "entity_type": entity_type}).fetchall()
+
+    # 构建节点查找表
+    nodes_by_id = {}
+    for row in rows:
+        pk = str(row.parent_id)
+        if pk not in nodes_by_id:
+            if row.parent_type == "assembly":
+                p = db.query(Assembly).filter(Assembly.id == row.parent_id).first()
+            else:
+                p = db.query(Part).filter(Part.id == row.parent_id).first()
+            if p:
+                nodes_by_id[pk] = {
+                    "entity_type": row.parent_type,
+                    "entity_code": p.code,
+                    "entity_name": p.name,
+                    "entity_version": p.version,
+                }
+
+    # 构建 child→parents 映射
+    child_to_parents = {}
+    parent_meta = {}
+    for row in rows:
+        ck = str(row.child_id)
+        pk = str(row.parent_id)
+        if ck not in child_to_parents:
+            child_to_parents[ck] = []
+        if pk not in child_to_parents[ck]:
+            child_to_parents[ck].append(pk)
+        if pk not in parent_meta or row.level < parent_meta[pk].get("_cte_level", 999):
+            parent_meta[pk] = {"child_id": ck, "quantity": float(row.quantity), "_cte_level": row.level}
+
+    # 获取变更对象详情
+    if entity_type == "part":
+        obj = db.query(Part).filter(Part.id == entity_id).first()
+    else:
+        obj = db.query(Assembly).filter(Assembly.id == entity_id).first()
+    if not obj:
+        return []
+
+    target_id = str(entity_id)
+    target_qty = 0
+    if target_id in child_to_parents:
+        first_parent = child_to_parents[target_id][0]
+        target_qty = parent_meta.get(first_parent, {}).get("quantity", 1)
+
+    upward_chain = []
+
+    # 变更对象自身（level 0）
+    upward_chain.append({
+        "level": 0,
+        "entity_type": entity_type,
+        "entity_id": target_id,
+        "entity_code": obj.code,
+        "entity_name": obj.name,
+        "entity_version": obj.version,
+        "quantity": target_qty,
+        "parent_entity_id": None,
+        "parent_entity_code": None,
+        "parent_target_version": None,
+        "is_change_target": True,
+        "action": "no_change",
+        "target_version": None,
+        "quantity_change": None,
+        "change_description": "",
+        "tree_path": "",
+        "tree_connector": "",
+        "has_sibling": False,
+        "is_last_child": True,
+    })
+
+    # 递归向上构建树
+    def build_upward_tree(node_id, depth, tree_prefix, is_last_of_parent):
+        parents = child_to_parents.get(node_id, [])
+        for i, parent_id in enumerate(parents):
+            node_info = nodes_by_id.get(parent_id, {})
+            qty = parent_meta.get(parent_id, {}).get("quantity", 1)
+            is_last = (i == len(parents) - 1)
+
+            connector = "└── " if is_last else "├── "
+            child_prefix = "    " if is_last else "│   "
+
+            upward_chain.append({
+                "level": depth,
+                "entity_type": node_info.get("entity_type", "assembly"),
+                "entity_id": parent_id,
+                "entity_code": node_info.get("entity_code", ""),
+                "entity_name": node_info.get("entity_name", ""),
+                "entity_version": node_info.get("entity_version", ""),
+                "quantity": qty,
+                "parent_entity_id": node_id,
+                "parent_entity_code": obj.code if node_id == target_id else nodes_by_id.get(node_id, {}).get("entity_code"),
+                "parent_target_version": None,
+                "is_change_target": False,
+                "action": "no_change",
+                "target_version": None,
+                "quantity_change": None,
+                "change_description": "",
+                "tree_path": tree_prefix,
+                "tree_connector": connector,
+                "has_sibling": len(parents) > 1,
+                "is_last_child": is_last,
+            })
+
+            build_upward_tree(parent_id, depth + 1, tree_prefix + child_prefix, is_last)
+
+    # 从变更目标开始向上
+    if target_id in child_to_parents:
+        parents = child_to_parents[target_id]
+        for i, parent_id in enumerate(parents):
+            node_info = nodes_by_id.get(parent_id, {})
+            qty = parent_meta.get(parent_id, {}).get("quantity", 1)
+            is_last = (i == len(parents) - 1)
+
+            connector = "└── " if is_last else "├── "
+            child_prefix = "    " if is_last else "│   "
+
+            upward_chain.append({
+                "level": 1,
+                "entity_type": node_info.get("entity_type", "assembly"),
+                "entity_id": parent_id,
+                "entity_code": node_info.get("entity_code", ""),
+                "entity_name": node_info.get("entity_name", ""),
+                "entity_version": node_info.get("entity_version", ""),
+                "quantity": qty,
+                "parent_entity_id": target_id,
+                "parent_entity_code": obj.code,
+                "parent_target_version": None,
+                "is_change_target": False,
+                "action": "no_change",
+                "target_version": None,
+                "quantity_change": None,
+                "change_description": "",
+                "tree_path": "",
+                "tree_connector": connector,
+                "has_sibling": len(parents) > 1,
+                "is_last_child": is_last,
+            })
+
+            build_upward_tree(parent_id, 2, child_prefix, is_last)
+
+    return upward_chain
+
+
+def _get_downward_trace(db: Session, entity_type: str, entity_id: uuid.UUID) -> list:
+    """向下展开：仅当实体为部件时，取一级 BOM 子项"""
+    downward_items = []
+    if entity_type == "assembly":
+        child_rows = db.query(BOMItem).filter(
+            BOMItem.parent_type == "assembly",
+            BOMItem.parent_id == entity_id,
+            BOMItem.deleted_at.is_(None)
+        ).all()
+        for child in child_rows:
+            child_code = None
+            child_name = None
+            child_version = None
+            # 兼容旧数据：child_type 为 'component' 时等同 'assembly'
+            child_type_db = child.child_type
+            if child_type_db == "component":
+                child_type_db = "assembly"
+            if child_type_db == "part":
+                c = db.query(Part).filter(Part.id == child.child_id).first()
+            else:
+                c = db.query(Assembly).filter(Assembly.id == child.child_id).first()
+            if c:
+                child_code = c.code
+                child_name = c.name
+                child_version = c.version
+            downward_items.append({
+                "entity_type": child_type_db,
+                "entity_id": str(child.child_id),
+                "entity_code": child_code,
+                "entity_name": child_name or "",
+                "entity_version": child_version,
+                "quantity": float(child.quantity),
+                "selected": False,
+                "action": "no_change",
+                "target_version": None,
+                "quantity_change": None,
+                "change_description": "",
+                "parent_entity_id": str(entity_id),
+                "parent_target_version": None,
+            })
+    return downward_items
