@@ -123,13 +123,14 @@ async def get_bom_trace(
     if entity_type not in ("part", "assembly"):
         raise HTTPException(status_code=400, detail="无效的类型，仅支持 part 或 assembly")
 
-    # 递归 CTE：向上追溯父级
+    # 递归 CTE：向上追溯父级（忽略软删除的 BOM 关系）
     sql = text("""
     WITH RECURSIVE trace AS (
       SELECT bi.id, bi.parent_type, bi.parent_id, bi.child_type, bi.child_id,
              bi.quantity, 1 AS level
       FROM bom_items bi
       WHERE bi.child_id = :entity_id
+        AND bi.deleted_at IS NULL
         AND (bi.child_type = :entity_type
              OR (bi.child_type = 'component' AND :entity_type = 'assembly'))
       UNION ALL
@@ -138,6 +139,7 @@ async def get_bom_trace(
       FROM bom_items bi
       JOIN trace t ON bi.child_id = t.parent_id
       WHERE t.level < 10
+        AND bi.deleted_at IS NULL
     )
     SELECT * FROM trace ORDER BY level
     """)

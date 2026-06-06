@@ -507,6 +507,7 @@ async def get_bom_trace(
              bi.quantity, 1 AS level
       FROM bom_items bi
       WHERE bi.child_id = :entity_id
+        AND bi.deleted_at IS NULL
         AND (bi.child_type = :entity_type
              OR (bi.child_type = 'component' AND :entity_type = 'assembly'))
       UNION ALL
@@ -515,6 +516,7 @@ async def get_bom_trace(
       FROM bom_items bi
       JOIN trace t ON bi.child_id = t.parent_id
       WHERE t.level < 10
+        AND bi.deleted_at IS NULL
     )
     SELECT * FROM trace ORDER BY level
     """)
