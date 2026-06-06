@@ -396,7 +396,7 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {editParts.map((part, i) => renderPartRow(part, 0, String(i)))}
+                        {editParts.slice().sort((a, b) => (a.child_detail?.code || '').localeCompare(b.child_detail?.code || '', 'zh-CN')).map((part, i) => renderPartRow(part, 0, String(i)))}
                       </tbody>
                     </table>
                   </div>
