@@ -23,7 +23,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function EntityEditModal({ open, entityType, entityId, onClose, onSaved }: EntityEditModalProps) {
-  const [formData, setFormData] = useState({ code: '', name: '', spec: '', remark: '', status: 'draft' });
+  const [formData, setFormData] = useState({ code: '', name: '', spec: '', remark: '', version: '-', status: 'draft' });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -65,7 +65,7 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
     setSaveError(null);
     api.get(entityId).then(r => {
       const d = r.data;
-      setFormData({ code: d.code || '', name: d.name || '', spec: d.spec || '', remark: d.remark || '', status: d.status || 'draft' });
+      setFormData({ code: d.code || '', name: d.name || '', spec: d.spec || '', remark: d.remark || '', version: d.version || '-', status: d.status || 'draft' });
     }).catch(() => { setSaveError('加载失败'); }).finally(() => setLoading(false));
 
     // 加载自定义字段定义
@@ -324,7 +324,7 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
             </div>
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">版本</label>
-              <input type="text" value="-" disabled className="w-full text-sm px-2 py-1 border border-gray-200 rounded bg-gray-100 text-gray-500" />
+              <input type="text" value={formData.version} disabled className="w-full text-sm px-2 py-1 border border-gray-200 rounded bg-gray-100 text-gray-500" />
             </div>
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">状态</label>
