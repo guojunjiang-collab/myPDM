@@ -403,6 +403,34 @@ async def startup_event():
             db.execute(text("ALTER TABLE bom_items ADD COLUMN updated_at TIMESTAMPTZ DEFAULT now()"))
             db.commit()
             print("✓ Added column updated_at to bom_items table")
+
+        # ── 软删除 → 唯一约束改为 partial index ──
+        for tbl in ["parts", "assemblies", "documents"]:
+            idx_name = {"parts": "uix_part_code_version", "assemblies": "uix_assembly_code_version", "documents": "uix_doc_code_version"}[tbl]
+            # 检查是否已经是 partial index
+            result = db.execute(text(f"""
+                SELECT 1 FROM pg_indexes
+                WHERE indexname = '{idx_name}' AND indexdef ILIKE '%WHERE deleted_at IS NULL%'
+            """))
+            if result.fetchone():
+                continue  # 已是 partial index，跳过
+            # 删除旧约束/索引，创建 partial unique index
+            try:
+                db.execute(text(f"ALTER TABLE {tbl} DROP CONSTRAINT IF EXISTS {idx_name}"))
+                db.commit()
+            except Exception:
+                db.rollback()
+            try:
+                db.execute(text(f"DROP INDEX IF EXISTS {idx_name}"))
+                db.commit()
+            except Exception:
+                db.rollback()
+            db.execute(text(f"""
+                CREATE UNIQUE INDEX {idx_name} ON {tbl} (code, version) WHERE deleted_at IS NULL
+            """))
+            db.commit()
+            print(f"✓ Converted {idx_name} to partial unique index on {tbl}")
+
         print("✓ Database migration completed successfully")
     except Exception as e:
         print(f"✗ Database migration error: {e}")
