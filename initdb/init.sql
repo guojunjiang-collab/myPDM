@@ -97,9 +97,11 @@ CREATE TABLE documents (
     revision_parent_id UUID,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
-    CONSTRAINT uix_doc_code_version UNIQUE (code, version)
+    deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL
 );
+
+-- 软删除记录不参与 code+version 唯一约束
+CREATE UNIQUE INDEX uix_doc_code_version ON documents (code, version) WHERE deleted_at IS NULL;
 
 -- 图文档独立附件表
 CREATE TABLE document_attachments (
