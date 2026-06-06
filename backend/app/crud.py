@@ -599,8 +599,8 @@ def _to_version_string(index: int) -> str:
 
 
 def _get_next_version(db, model_class, code: str) -> str:
-    """根据同编码已有版本数，生成下一版本号"""
-    count = db.query(model_class).filter(model_class.code == code).count()
+    """根据同编码已有（未软删除）版本数，生成下一版本号"""
+    count = db.query(model_class).filter(model_class.code == code, model_class.deleted_at.is_(None)).count()
     return _to_version_string(count)
 
 

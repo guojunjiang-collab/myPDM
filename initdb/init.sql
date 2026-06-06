@@ -31,9 +31,11 @@ CREATE TABLE parts (
     document_links JSONB DEFAULT '[]',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
-    CONSTRAINT uix_part_code_version UNIQUE (code, version)
+    deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL
 );
+
+-- 软删除记录不参与 code+version 唯一约束（允许软删后重建相同版本）
+CREATE UNIQUE INDEX uix_part_code_version ON parts (code, version) WHERE deleted_at IS NULL;
 
 -- 部件表
 CREATE TABLE assemblies (
@@ -49,9 +51,11 @@ CREATE TABLE assemblies (
     document_links JSONB DEFAULT '[]',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
-    CONSTRAINT uix_assembly_code_version UNIQUE (code, version)
+    deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL
 );
+
+-- 软删除记录不参与 code+version 唯一约束
+CREATE UNIQUE INDEX uix_assembly_code_version ON assemblies (code, version) WHERE deleted_at IS NULL;
 
 -- BOM表
 CREATE TABLE bom_items (
