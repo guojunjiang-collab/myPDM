@@ -1098,7 +1098,7 @@ export default function Components() {
               <th onClick={() => handleSort('name' as keyof Assembly)} className="w-80 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">中文名称 {getSortIcon('name' as keyof Assembly)}</th>
               <th onClick={() => handleSort('spec' as keyof Assembly)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">规格型号 {getSortIcon('spec' as keyof Assembly)}</th>
               <th onClick={() => handleSort('version' as keyof Assembly)} className="w-14 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">版本 {getSortIcon('version' as keyof Assembly)}</th>
-              <th onClick={() => handleSort('status' as keyof Assembly)} className="w-14 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">状态 {getSortIcon('status' as keyof Assembly)}</th>
+              <th onClick={() => handleSort('status' as keyof Assembly)} className="w-20 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">状态 {getSortIcon('status' as keyof Assembly)}</th>
               <th className="w-40 px-4 py-3 text-right text-sm font-medium text-gray-500">操作</th>
             </tr>
           </thead>
