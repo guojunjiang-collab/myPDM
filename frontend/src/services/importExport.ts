@@ -39,6 +39,7 @@ import api, {
   usersApi,
   configurationApi,
   configurationProfileApi,
+  ecrApi,
 } from './api';
 import { useDataStore } from '../stores/data';
 import type {
@@ -3322,5 +3323,374 @@ export async function executeConfigurationProfilesImport(preview: ImportPreview)
     }
   }
 
+  await useDataStore.getState().syncAll();
+}
+
+// ================================================================
+// ECR EXPORT / IMPORT
+// ================================================================
+
+/**
+ * 导出 ECR 为 Excel 文件
+ * Sheet1: ECR清单, Sheet2: 审批流, Sheet3: 受影响对象, Sheet4: 关联图文档
+ */
+export async function exportECRs(): Promise<void> {
+  const res = await ecrApi.list({ page: 1, page_size: 10000 });
+  const ecrs: any[] = res.data.items || res.data || [];
+  if (ecrs.length === 0) throw new Error('没有可导出的 ECR 数据');
+
+  // 并发获取每条 ECR 详情
+  const details = await Promise.all(ecrs.map((e: any) => ecrApi.get(e.id)));
+  const detailData: any[] = details.map((r: any) => r.data);
+
+  // Sheet1: ECR 清单
+  const sheet1Rows = detailData.map((d: any) => ({
+    编号: d.number || '',
+    标题: d.title || '',
+    类型: d.category || '',
+    优先级: d.priority || '',
+    状态: d.status || '',
+    描述: d.description || '',
+    变更原因: d.reason || '',
+    备注: d.remark || '',
+    创建时间: d.created_at || '',
+  }));
+
+  // Sheet2: 审批流
+  const sheet2Rows: Record<string, unknown>[] = [];
+  for (const d of detailData) {
+    for (const r of d.reviewers || []) {
+      sheet2Rows.push({
+        ECR编号: d.number,
+        审批人工号: r.user?.employee_no || r.user?.username || r.user_id || '',
+        顺序: r.seq ?? 0,
+      });
+    }
+  }
+
+  // Sheet3: 受影响对象
+  const sheet3Rows: Record<string, unknown>[] = [];
+  for (const d of detailData) {
+    for (const item of d.affected_items || []) {
+      sheet3Rows.push({
+        ECR编号: d.number,
+        实体类型: item.entity_type || '',
+        实体件号: item.entity?.code || item.entity_code || '',
+        实体版本: item.entity?.version || item.entity_version || '',
+        变更描述: item.change_description || '',
+        变更类型: item.change_type || '',
+      });
+    }
+  }
+
+  // Sheet4: 关联图文档
+  const sheet4Rows: Record<string, unknown>[] = [];
+  for (const d of detailData) {
+    for (const doc of d.document_links || []) {
+      sheet4Rows.push({
+        ECR编号: d.number,
+        图文档编号: doc.document?.code || doc.document_code || '',
+        图文档版本: doc.document?.version || doc.document_version || '',
+        类别: doc.category || '',
+        排序: doc.sort_order ?? 0,
+      });
+    }
+  }
+
+  const wb = XLSX.utils.book_new();
+
+  const s1 = XLSX.utils.json_to_sheet(sheet1Rows);
+  s1['!cols'] = [
+    { wch: 16 }, { wch: 30 }, { wch: 12 }, { wch: 10 }, { wch: 12 },
+    { wch: 30 }, { wch: 30 }, { wch: 20 }, { wch: 20 },
+  ];
+  XLSX.utils.book_append_sheet(wb, s1, 'ECR清单');
+
+  if (sheet2Rows.length > 0) {
+    const s2 = XLSX.utils.json_to_sheet(sheet2Rows);
+    s2['!cols'] = [{ wch: 16 }, { wch: 20 }, { wch: 8 }];
+    XLSX.utils.book_append_sheet(wb, s2, '审批流');
+  }
+
+  if (sheet3Rows.length > 0) {
+    const s3 = XLSX.utils.json_to_sheet(sheet3Rows);
+    s3['!cols'] = [{ wch: 16 }, { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 30 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(wb, s3, '受影响对象');
+  }
+
+  if (sheet4Rows.length > 0) {
+    const s4 = XLSX.utils.json_to_sheet(sheet4Rows);
+    s4['!cols'] = [{ wch: 16 }, { wch: 20 }, { wch: 12 }, { wch: 16 }, { wch: 8 }];
+    XLSX.utils.book_append_sheet(wb, s4, '关联图文档');
+  }
+
+  const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  downloadBlob(blob, `ECR数据_${todayStr()}.xlsx`);
+}
+
+/**
+ * 预览 ECR 导入
+ */
+export async function previewECRsImport(file: File): Promise<ImportPreview> {
+  const buffer = await file.arrayBuffer();
+  const wb = XLSX.read(buffer, { type: 'array' });
+
+  const ws1 = wb.Sheets['ECR清单'];
+  if (!ws1) throw new Error('Excel 中未找到 "ECR清单" Sheet');
+
+  const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws1);
+  if (rawRows.length === 0) throw new Error('Excel 中无数据');
+
+  // 获取现有 ECR 列表，建立 number→ecr map
+  const existingRes = await ecrApi.list({ page: 1, page_size: 10000 });
+  const existingEcrs: any[] = existingRes.data.items || existingRes.data || [];
+  const existingMap = new Map<string, any>();
+  for (const e of existingEcrs) {
+    if (e.number) existingMap.set(e.number, e);
+  }
+
+  // 解析关联 Sheet
+  const reviewerRows = wb.Sheets['审批流']
+    ? XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets['审批流'])
+    : [];
+  const affectedRows = wb.Sheets['受影响对象']
+    ? XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets['受影响对象'])
+    : [];
+  const docLinkRows = wb.Sheets['关联图文档']
+    ? XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets['关联图文档'])
+    : [];
+
+  const store = useDataStore.getState();
+  let reviewerWarnings = 0;
+  let affectedWarnings = 0;
+  let docLinkWarnings = 0;
+
+  // 获取用户列表（用于审批人查找）
+  const usersRes = await usersApi.list({ page_size: 10000 });
+  const usersAll: any[] = Array.isArray(usersRes.data)
+    ? usersRes.data
+    : ((usersRes.data as { items?: any[] })?.items || []);
+
+  // 按 ECR 编号分组审批流
+  const reviewersByNumber = new Map<string, any[]>();
+  for (const r of reviewerRows) {
+    const num = String(r['ECR编号'] || '').trim();
+    if (!reviewersByNumber.has(num)) reviewersByNumber.set(num, []);
+    const empNo = String(r['审批人工号'] || '').trim();
+    const user = usersAll.find(
+      (u: any) => u.employee_no === empNo || u.username === empNo
+    );
+    if (!user) reviewerWarnings++;
+    reviewersByNumber.get(num)!.push({ ...r, _user: user || null });
+  }
+
+  // 按 ECR 编号分组受影响对象
+  const affectedByNumber = new Map<string, any[]>();
+  for (const r of affectedRows) {
+    const num = String(r['ECR编号'] || '').trim();
+    if (!affectedByNumber.has(num)) affectedByNumber.set(num, []);
+    const entityCode = String(r['实体件号'] || '').trim();
+    const entityVersion = String(r['实体版本'] || '').trim();
+    const entityType = String(r['实体类型'] || '').trim();
+    let found: any = null;
+    if (entityType === 'part') {
+      found = store.parts.find(
+        (p: Part) => p.code === entityCode && (p.version || '') === entityVersion
+      );
+    } else if (entityType === 'assembly') {
+      found = store.assemblies.find(
+        (a: Assembly) => a.code === entityCode && (a.version || '') === entityVersion
+      );
+    } else if (entityType === 'document') {
+      found = store.documents.find(
+        (d: Document) => d.code === entityCode && (d.version || '') === entityVersion
+      );
+    } else {
+      found = store.parts.find((p: Part) => p.code === entityCode && (p.version || '') === entityVersion)
+           || store.assemblies.find((a: Assembly) => a.code === entityCode && (a.version || '') === entityVersion)
+           || store.documents.find((d: Document) => d.code === entityCode && (d.version || '') === entityVersion);
+    }
+    if (!found) affectedWarnings++;
+    affectedByNumber.get(num)!.push({ ...r, _entity: found || null });
+  }
+
+  // 按 ECR 编号分组关联图文档
+  const docLinksByNumber = new Map<string, any[]>();
+  for (const r of docLinkRows) {
+    const num = String(r['ECR编号'] || '').trim();
+    if (!docLinksByNumber.has(num)) docLinksByNumber.set(num, []);
+    const docCode = String(r['图文档编号'] || '').trim();
+    const docVersion = String(r['图文档版本'] || '').trim();
+    const found = store.documents.find(
+      (d: Document) => d.code === docCode && (d.version || '') === docVersion
+    );
+    if (!found) docLinkWarnings++;
+    docLinksByNumber.get(num)!.push({ ...r, _document: found || null });
+  }
+
+  const rows: ImportRow[] = rawRows.map((raw) => {
+    const title = String(raw['标题'] || '').trim();
+    const number = String(raw['编号'] || '').trim();
+
+    if (!title) {
+      return {
+        status: '错误' as const,
+        code: number || '—',
+        name: title || '—',
+        version: '',
+        error: '缺少必填字段：标题',
+      };
+    }
+
+    const existing = number ? existingMap.get(number) : undefined;
+    const rowStatus: '新增' | '更新' = existing ? '更新' : '新增';
+
+    const reviewers = reviewersByNumber.get(number) || [];
+    const affectedItems = affectedByNumber.get(number) || [];
+    const docLinks = docLinksByNumber.get(number) || [];
+
+    return {
+      status: rowStatus,
+      code: number,
+      name: title,
+      version: '',
+      remark: String(raw['备注'] || ''),
+      _reviewerCount: reviewers.length,
+      _affectedCount: affectedItems.length,
+      _docCount: docLinks.length,
+      _data: {
+        title,
+        description: String(raw['描述'] || ''),
+        reason: String(raw['变更原因'] || ''),
+        priority: String(raw['优先级'] || 'normal'),
+        category: String(raw['类型'] || ''),
+        review_mode: 'all',
+        reviewers: reviewers
+          .filter((r: any) => r._user)
+          .map((r: any, idx: number) => ({
+            user_id: r._user.id,
+            seq: Number(r['顺序'] ?? idx + 1),
+          })),
+        document_links: docLinks
+          .filter((r: any) => r._document)
+          .map((r: any) => ({
+            document_id: r._document.id,
+            category: String(r['类别'] || ''),
+            sort_order: Number(r['排序'] ?? 0),
+          })),
+        _affectedItems: affectedItems.map((r: any) => ({
+          entity_type: String(r['实体类型'] || ''),
+          entity_id: r._entity ? r._entity.id : null,
+          change_description: String(r['变更描述'] || ''),
+          change_type: String(r['变更类型'] || ''),
+        })),
+      },
+    };
+  });
+
+  return {
+    type: 'ecr',
+    rows,
+    reviewerWarnings,
+    affectedWarnings,
+    docWarnings: docLinkWarnings,
+    affectedCount: affectedRows.length,
+    reviewerCount: reviewerRows.length,
+    docRelationCount: docLinkRows.length,
+  };
+}
+
+/**
+ * 执行 ECR 导入
+ */
+export async function executeECRsImport(preview: ImportPreview): Promise<void> {
+  const validRows = preview.rows.filter((r) => r.status !== '错误');
+
+  // 重新获取现有 ECR（number→ecr）
+  const existingRes = await ecrApi.list({ page: 1, page_size: 10000 });
+  const existingEcrs: any[] = existingRes.data.items || existingRes.data || [];
+  const existingMap = new Map<string, any>();
+  for (const e of existingEcrs) {
+    if (e.number) existingMap.set(e.number, e);
+  }
+
+  // 第一步：创建/更新 ECR 主记录，建立 number→id map
+  const numberToId = new Map<string, string>();
+  const numberToExistingAffected = new Map<string, any[]>();
+
+  for (const row of validRows) {
+    const data = row._data!;
+    const affectedItems: any[] = (data._affectedItems as any[]) || [];
+    void affectedItems; // used in step 2
+
+    // 构造 API payload（不含内部字段 _affectedItems）
+    const payload: any = {
+      title: data.title,
+      description: data.description,
+      reason: data.reason,
+      priority: data.priority,
+      category: data.category,
+      review_mode: data.review_mode,
+      reviewers: data.reviewers,
+      document_links: data.document_links,
+    };
+
+    try {
+      if (row.status === '更新') {
+        const existing = existingMap.get(row.code);
+        if (existing) {
+          await ecrApi.update(existing.id, payload);
+          numberToId.set(row.code, existing.id);
+          // 获取现有受影响对象（用于先删后增）
+          const detail = await ecrApi.get(existing.id);
+          numberToExistingAffected.set(row.code, detail.data.affected_items || []);
+        }
+      } else {
+        const res = await ecrApi.create(payload);
+        const created = res.data;
+        const key = row.code || created.number;
+        numberToId.set(key, created.id);
+        row._newId = created.id;
+      }
+    } catch (err) {
+      console.error(`导入 ECR 失败: ${row.code || row.name}`, err);
+    }
+  }
+
+  // 第二步：处理受影响对象
+  for (const row of validRows) {
+    const data = row._data!;
+    const affectedItems: any[] = (data._affectedItems as any[]) || [];
+    const ecrId = numberToId.get(row.code) || row._newId;
+    if (!ecrId) continue;
+
+    try {
+      // 更新时先删除所有旧的受影响对象
+      if (row.status === '更新') {
+        const oldItems = numberToExistingAffected.get(row.code) || [];
+        for (const oldItem of oldItems) {
+          await ecrApi.removeAffectedItem(ecrId, oldItem.id);
+        }
+      }
+
+      // 添加新的受影响对象（跳过找不到实体的）
+      for (const item of affectedItems) {
+        if (!item.entity_id) continue;
+        await ecrApi.addAffectedItem(ecrId, {
+          entity_type: item.entity_type,
+          entity_id: item.entity_id,
+          change_description: item.change_description,
+          change_type: item.change_type,
+        });
+      }
+    } catch (err) {
+      console.error(`处理 ECR 受影响对象失败: ${row.code || row.name}`, err);
+    }
+  }
+
+  // 第三步：同步 store
   await useDataStore.getState().syncAll();
 }
