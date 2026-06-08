@@ -3096,6 +3096,22 @@ export async function previewConfigurationItemsImport(file: File): Promise<Impor
         name,
         spec: String(raw['规格型号'] || ''),
         remark: String(raw['备注'] || ''),
+        _parts: (partsByCode.get(code) || []).map((r: any) => ({
+          part_type: String(r['零部件类型'] || 'part').trim(),
+          part_code: String(r['零部件件号'] || '').trim(),
+          part_version: String(r['零部件版本'] || '').trim(),
+          is_required: String(r['是否必选'] || '').trim().toUpperCase() === 'TRUE',
+        })),
+        _children: (childrenByCode.get(code) || []).map((r: any) => ({
+          child_code: String(r['子构型号'] || '').trim(),
+          is_required: String(r['是否必选'] || '').trim().toUpperCase() === 'TRUE',
+        })),
+        _docLinks: (docsByCode.get(code) || []).map((r: any) => ({
+          doc_code: String(r['图文档编号'] || '').trim(),
+          doc_version: String(r['图文档版本'] || '').trim(),
+          category: String(r['类别'] || '').trim(),
+          sort_order: Number(r['排序']) || 0,
+        })),
       },
     };
   });
@@ -3117,11 +3133,6 @@ export async function previewConfigurationItemsImport(file: File): Promise<Impor
 export async function executeConfigurationItemsImport(preview: ImportPreview): Promise<void> {
   const validRows = preview.rows.filter(r => r.status !== '错误');
 
-  // 需要重新解析关联 Sheet——从 _data 中取不到，需要传入原始文件
-  // 注意：预览时已解析，执行时需要用户重新提供文件——这里通过全局缓存的方式处理
-  // 实际实现：UI 层应将解析结果缓存在 preview 的扩展字段中
-  // 这里为简化，执行时直接通过 API 逐条处理
-
   // 获取现有构型项列表（重新查询确保最新）
   const existingRes = await configurationApi.listItems({ page: 1, page_size: 10000 });
   const existingItems: any[] = existingRes.data.items || [];
@@ -3132,15 +3143,17 @@ export async function executeConfigurationItemsImport(preview: ImportPreview): P
   const codeToId = new Map<string, string>();
   for (const row of validRows) {
     const data = row._data!;
+    // 构造主记录 payload，去掉内部关联字段
+    const mainPayload = { code: data.code, name: data.name, spec: data.spec, remark: data.remark };
     try {
       if (row.status === '更新') {
         const existing = existingMap.get(row.code);
         if (existing) {
-          await configurationApi.updateItem(existing.id, data);
+          await configurationApi.updateItem(existing.id, mainPayload as any);
           codeToId.set(row.code, existing.id);
         }
       } else {
-        const res = await configurationApi.createItem(data as any);
+        const res = await configurationApi.createItem(mainPayload as any);
         const created = res.data;
         codeToId.set(row.code, created.id);
         row._newId = created.id;
@@ -3150,7 +3163,152 @@ export async function executeConfigurationItemsImport(preview: ImportPreview): P
     }
   }
 
-  // 刷新 store 以更新 documents 等缓存
+  // 重建 codeToId 以包含本次新增之前已存在的项
+  for (const item of existingItems) {
+    if (!codeToId.has(item.code)) codeToId.set(item.code, item.id);
+  }
+
+  const store = useDataStore.getState();
+
+  // 第二轮：处理关联零部件
+  for (const row of validRows) {
+    const data = row._data!;
+    const ciId = codeToId.get(row.code);
+    if (!ciId) continue;
+    const parts: any[] = (data._parts as any[]) || [];
+    if (parts.length === 0) continue;
+
+    try {
+      // 更新模式：先清空旧关联
+      if (row.status === '更新') {
+        try {
+          const detailRes = await configurationApi.getItem(ciId);
+          const oldParts: any[] = detailRes.data.parts || [];
+          for (const op of oldParts) {
+            await configurationApi.removePart(ciId, op.id);
+          }
+        } catch (err) {
+          console.warn(`清除构型项旧零部件关联失败: ${row.code}`, err);
+        }
+      }
+
+      // 解析零部件件号+版本→entity_id，构造 addParts 参数
+      const partsToAdd: { part_type: string; part_id: string; is_required: boolean }[] = [];
+      for (const p of parts) {
+        const pc = p.part_code as string;
+        const pv = p.part_version as string;
+        const entity = store.parts.find((e: Part) => e.code === pc && (e.version || '') === pv)
+                    || store.assemblies.find((e: Assembly) => e.code === pc && (e.version || '') === pv);
+        if (!entity) {
+          console.warn(`构型项 ${row.code} 关联零部件未找到，跳过: ${pc}@${pv}`);
+          continue;
+        }
+        partsToAdd.push({
+          part_type: p.part_type as string || 'part',
+          part_id: entity.id,
+          is_required: p.is_required as boolean,
+        });
+      }
+
+      if (partsToAdd.length > 0) {
+        await configurationApi.addParts(ciId, partsToAdd);
+      }
+    } catch (err) {
+      console.warn(`处理构型项零部件关联失败: ${row.code}`, err);
+    }
+  }
+
+  // 第三轮：处理子构型项
+  for (const row of validRows) {
+    const data = row._data!;
+    const ciId = codeToId.get(row.code);
+    if (!ciId) continue;
+    const children: any[] = (data._children as any[]) || [];
+    if (children.length === 0) continue;
+
+    try {
+      // 更新模式：先清空旧子项
+      if (row.status === '更新') {
+        try {
+          const detailRes = await configurationApi.getItem(ciId);
+          const oldChildren: any[] = detailRes.data.children || [];
+          for (const oc of oldChildren) {
+            await configurationApi.removeChild(ciId, oc.id);
+          }
+        } catch (err) {
+          console.warn(`清除构型项旧子项关联失败: ${row.code}`, err);
+        }
+      }
+
+      // 解析子构型号→子构型项 id
+      const childrenToAdd: { child_id: string; is_required: boolean }[] = [];
+      for (const c of children) {
+        const childCode = c.child_code as string;
+        const childId = codeToId.get(childCode);
+        if (!childId) {
+          console.warn(`构型项 ${row.code} 子构型项未找到，跳过: ${childCode}`);
+          continue;
+        }
+        childrenToAdd.push({ child_id: childId, is_required: c.is_required as boolean });
+      }
+
+      if (childrenToAdd.length > 0) {
+        await configurationApi.addChildren(ciId, childrenToAdd);
+      }
+    } catch (err) {
+      console.warn(`处理构型项子项关联失败: ${row.code}`, err);
+    }
+  }
+
+  // 第四轮：处理关联图文档
+  for (const row of validRows) {
+    const data = row._data!;
+    const ciId = codeToId.get(row.code);
+    if (!ciId) continue;
+    const docLinks: any[] = (data._docLinks as any[]) || [];
+    if (docLinks.length === 0) continue;
+
+    try {
+      // 更新模式：先清空旧文档关联
+      if (row.status === '更新') {
+        try {
+          const oldDocsRes = await entityDocumentsApi.list('configuration', ciId);
+          const oldDocs: any[] = oldDocsRes.data || [];
+          for (const od of oldDocs) {
+            await entityDocumentsApi.remove('configuration', ciId, od.id);
+          }
+        } catch (err) {
+          console.warn(`清除构型项旧图文档关联失败: ${row.code}`, err);
+        }
+      }
+
+      // 添加新图文档关联
+      for (const dl of docLinks) {
+        const dc = dl.doc_code as string;
+        const dv = dl.doc_version as string;
+        const doc = store.documents.find(
+          (d: Document) => d.code === dc && (d.version || '') === dv
+        );
+        if (!doc) {
+          console.warn(`构型项 ${row.code} 关联图文档未找到，跳过: ${dc}@${dv}`);
+          continue;
+        }
+        try {
+          await entityDocumentsApi.add('configuration', ciId, {
+            document_id: doc.id,
+            category: dl.category as string || undefined,
+            sort_order: dl.sort_order as number || undefined,
+          });
+        } catch (err) {
+          console.warn(`添加构型项图文档关联失败: ${row.code} → ${dc}`, err);
+        }
+      }
+    } catch (err) {
+      console.warn(`处理构型项图文档关联失败: ${row.code}`, err);
+    }
+  }
+
+  // 刷新 store
   await useDataStore.getState().syncAll();
 }
 
@@ -3635,6 +3793,7 @@ export async function executeECRsImport(preview: ImportPreview): Promise<void> {
       priority: data.priority,
       category: data.category,
       review_mode: data.review_mode,
+      status: 'draft',
       reviewers: data.reviewers,
       document_links: data.document_links,
     };
@@ -3677,15 +3836,19 @@ export async function executeECRsImport(preview: ImportPreview): Promise<void> {
         }
       }
 
-      // 添加新的受影响对象（跳过找不到实体的）
+      // 添加新的受影响对象（跳过找不到实体的，逐条 try/catch 避免一条失败阻断全组）
       for (const item of affectedItems) {
         if (!item.entity_id) continue;
-        await ecrApi.addAffectedItem(ecrId, {
-          entity_type: item.entity_type,
-          entity_id: item.entity_id,
-          change_description: item.change_description,
-          change_type: item.change_type,
-        });
+        try {
+          await ecrApi.addAffectedItem(ecrId, {
+            entity_type: item.entity_type,
+            entity_id: item.entity_id,
+            change_description: item.change_description,
+            change_type: item.change_type,
+          });
+        } catch (addErr) {
+          console.warn(`添加 ECR 受影响对象失败（跳过）: ${row.code || row.name} entity=${item.entity_id}`, addErr);
+        }
       }
     } catch (err) {
       console.error(`处理 ECR 受影响对象失败: ${row.code || row.name}`, err);
@@ -3918,15 +4081,23 @@ export async function previewECOsImport(file: File): Promise<ImportPreview> {
     if (!execItemsByNumber.has(num)) execItemsByNumber.set(num, []);
     const entityCode = String(r['对象编号'] || '').trim();
     const entityType = String(r['对象类型'] || '').trim();
+    // 优先按 code+version 匹配（若 Excel 含"对象版本"列）；无版本列时退化为 code-only
+    const entityVersion = r['对象版本'] !== undefined ? String(r['对象版本']).trim() : null;
+    const matchesByCodeVersion = (code: string, version: string | null, entityVersion: string | null) => {
+      if (entityVersion !== null) {
+        return code === entityCode && (version || '') === entityVersion;
+      }
+      return code === entityCode;
+    };
     let found: any = null;
     if (entityCode) {
       if (entityType === 'part') {
-        found = store.parts.find((p: Part) => p.code === entityCode);
+        found = store.parts.find((p: Part) => matchesByCodeVersion(p.code, p.version || null, entityVersion));
       } else if (entityType === 'assembly') {
-        found = store.assemblies.find((a: Assembly) => a.code === entityCode);
+        found = store.assemblies.find((a: Assembly) => matchesByCodeVersion(a.code, a.version || null, entityVersion));
       } else {
-        found = store.parts.find((p: Part) => p.code === entityCode)
-             || store.assemblies.find((a: Assembly) => a.code === entityCode);
+        found = store.parts.find((p: Part) => matchesByCodeVersion(p.code, p.version || null, entityVersion))
+             || store.assemblies.find((a: Assembly) => matchesByCodeVersion(a.code, a.version || null, entityVersion));
       }
       if (!found) execItemWarnings++;
     }
