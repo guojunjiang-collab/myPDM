@@ -212,6 +212,24 @@ function todayStr(): string {
   return `${y}${m}${day}`;
 }
 
+/** 分页拉取全部列表数据（后端 page_size 上限 100） */
+async function fetchAllPages<T>(
+  fetchPage: (page: number, pageSize: number) => Promise<{ items: T[]; total: number }>,
+  pageSize = 100,
+): Promise<T[]> {
+  const all: T[] = [];
+  let page = 1;
+  for (;;) {
+    const res = await fetchPage(page, pageSize);
+    const items: T[] = res.items || [];
+    all.push(...items);
+    const total = res.total ?? all.length;
+    if (all.length >= total || items.length === 0) break;
+    page += 1;
+  }
+  return all;
+}
+
 /** 将文件 handle 读取为 ArrayBuffer */
 async function readFileAsBuffer(
   dirHandle: FileSystemDirectoryHandle,
@@ -2905,8 +2923,9 @@ export async function importAllData(
  * Sheet1: 构型项清单, Sheet2: 关联零部件, Sheet3: 子构型项, Sheet4: 关联图文档
  */
 export async function exportConfigurationItems(): Promise<void> {
-  const res = await configurationApi.listItems({ page: 1, page_size: 10000 });
-  const items: any[] = res.data.items || [];
+  const items: any[] = await fetchAllPages((page, pageSize) =>
+    configurationApi.listItems({ page, page_size: pageSize }).then((r) => r.data),
+  );
   if (items.length === 0) throw new Error('没有可导出的构型项数据');
 
   // 并发获取每个构型项的详情（含关联数据）
@@ -3014,8 +3033,9 @@ export async function previewConfigurationItemsImport(file: File): Promise<Impor
   if (rawRows.length === 0) throw new Error('Excel 中无数据');
 
   // 获取现有构型项列表
-  const existingRes = await configurationApi.listItems({ page: 1, page_size: 10000 });
-  const existingItems: any[] = existingRes.data.items || [];
+  const existingItems: any[] = await fetchAllPages((page, pageSize) =>
+    configurationApi.listItems({ page, page_size: pageSize }).then((r) => r.data),
+  );
   const existingMap = new Map<string, any>();
   for (const item of existingItems) {
     existingMap.set(item.code, item);
@@ -3134,8 +3154,9 @@ export async function executeConfigurationItemsImport(preview: ImportPreview): P
   const validRows = preview.rows.filter(r => r.status !== '错误');
 
   // 获取现有构型项列表（重新查询确保最新）
-  const existingRes = await configurationApi.listItems({ page: 1, page_size: 10000 });
-  const existingItems: any[] = existingRes.data.items || [];
+  const existingItems: any[] = await fetchAllPages((page, pageSize) =>
+    configurationApi.listItems({ page, page_size: pageSize }).then((r) => r.data),
+  );
   const existingMap = new Map<string, any>();
   for (const item of existingItems) existingMap.set(item.code, item);
 
@@ -3320,8 +3341,9 @@ export async function executeConfigurationItemsImport(preview: ImportPreview): P
  * 导出构型配置
  */
 export async function exportConfigurationProfiles(): Promise<void> {
-  const res = await configurationProfileApi.list({ page: 1, page_size: 10000 });
-  const profiles: any[] = res.data.items || [];
+  const profiles: any[] = await fetchAllPages((page, pageSize) =>
+    configurationProfileApi.list({ page, page_size: pageSize }).then((r) => r.data),
+  );
   if (profiles.length === 0) throw new Error('没有可导出的构型配置数据');
 
   // 并发获取每个 Profile 的详情（含关联构型项信息）
@@ -3364,14 +3386,16 @@ export async function previewConfigurationProfilesImport(file: File): Promise<Im
   const rawRows: Record<string, string>[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
   // 获取现有构型项列表，建立 code→item map
-  const ciRes = await configurationApi.listItems({ page: 1, page_size: 10000 });
-  const ciItems: any[] = ciRes.data.items || [];
+  const ciItems: any[] = await fetchAllPages((page, pageSize) =>
+    configurationApi.listItems({ page, page_size: pageSize }).then((r) => r.data),
+  );
   const ciMap = new Map<string, any>();
   for (const ci of ciItems) ciMap.set(ci.code, ci);
 
   // 获取现有 Profile 列表，建立 name→profile map
-  const profileRes = await configurationProfileApi.list({ page: 1, page_size: 10000 });
-  const existingProfiles: any[] = profileRes.data.items || [];
+  const existingProfiles: any[] = await fetchAllPages((page, pageSize) =>
+    configurationProfileApi.list({ page, page_size: pageSize }).then((r) => r.data),
+  );
   const profileNameMap = new Map<string, any>();
   for (const p of existingProfiles) profileNameMap.set(p.name, p);
 
@@ -3440,14 +3464,16 @@ export async function executeConfigurationProfilesImport(preview: ImportPreview)
   const validRows = preview.rows.filter((r) => r.status !== '错误');
 
   // 重新获取最新构型项列表（code→id）
-  const ciRes = await configurationApi.listItems({ page: 1, page_size: 10000 });
-  const ciItems: any[] = ciRes.data.items || [];
+  const ciItems: any[] = await fetchAllPages((page, pageSize) =>
+    configurationApi.listItems({ page, page_size: pageSize }).then((r) => r.data),
+  );
   const ciMap = new Map<string, any>();
   for (const ci of ciItems) ciMap.set(ci.code, ci);
 
   // 重新获取现有 Profile 列表（name→profile）
-  const profileRes = await configurationProfileApi.list({ page: 1, page_size: 10000 });
-  const existingProfiles: any[] = profileRes.data.items || [];
+  const existingProfiles: any[] = await fetchAllPages((page, pageSize) =>
+    configurationProfileApi.list({ page, page_size: pageSize }).then((r) => r.data),
+  );
   const profileNameMap = new Map<string, any>();
   for (const p of existingProfiles) profileNameMap.set(p.name, p);
 
@@ -3494,8 +3520,9 @@ export async function executeConfigurationProfilesImport(preview: ImportPreview)
  * Sheet1: ECR清单, Sheet2: 审批流, Sheet3: 受影响对象, Sheet4: 关联图文档
  */
 export async function exportECRs(): Promise<void> {
-  const res = await ecrApi.list({ page: 1, page_size: 10000 });
-  const ecrs: any[] = res.data.items || res.data || [];
+  const ecrs: any[] = await fetchAllPages((page, pageSize) =>
+    ecrApi.list({ page, page_size: pageSize }).then((r) => ({ items: r.data.items || r.data || [], total: r.data.total ?? 0 })),
+  );
   if (ecrs.length === 0) throw new Error('没有可导出的 ECR 数据');
 
   // 并发获取每条 ECR 详情
@@ -3604,8 +3631,9 @@ export async function previewECRsImport(file: File): Promise<ImportPreview> {
   if (rawRows.length === 0) throw new Error('Excel 中无数据');
 
   // 获取现有 ECR 列表，建立 number→ecr map
-  const existingRes = await ecrApi.list({ page: 1, page_size: 10000 });
-  const existingEcrs: any[] = existingRes.data.items || existingRes.data || [];
+  const existingEcrs: any[] = await fetchAllPages((page, pageSize) =>
+    ecrApi.list({ page, page_size: pageSize }).then((r) => ({ items: r.data.items || r.data || [], total: r.data.total ?? 0 })),
+  );
   const existingMap = new Map<string, any>();
   for (const e of existingEcrs) {
     if (e.number) existingMap.set(e.number, e);
@@ -3769,8 +3797,9 @@ export async function executeECRsImport(preview: ImportPreview): Promise<void> {
   const validRows = preview.rows.filter((r) => r.status !== '错误');
 
   // 重新获取现有 ECR（number→ecr）
-  const existingRes = await ecrApi.list({ page: 1, page_size: 10000 });
-  const existingEcrs: any[] = existingRes.data.items || existingRes.data || [];
+  const existingEcrs: any[] = await fetchAllPages((page, pageSize) =>
+    ecrApi.list({ page, page_size: pageSize }).then((r) => ({ items: r.data.items || r.data || [], total: r.data.total ?? 0 })),
+  );
   const existingMap = new Map<string, any>();
   for (const e of existingEcrs) {
     if (e.number) existingMap.set(e.number, e);
@@ -3867,8 +3896,9 @@ export async function executeECRsImport(preview: ImportPreview): Promise<void> {
  * 导出所有 ECO 数据为多 Sheet Excel
  */
 export async function exportECOs(): Promise<void> {
-  const res = await ecoApi.list({ page: 1, page_size: 10000 });
-  const ecos: any[] = res.data.items || res.data || [];
+  const ecos: any[] = await fetchAllPages((page, pageSize) =>
+    ecoApi.list({ page, page_size: pageSize }).then((r) => ({ items: r.data.items || r.data || [], total: r.data.total ?? 0 })),
+  );
   if (ecos.length === 0) throw new Error('没有可导出的 ECO 数据');
 
   // 并发获取每条 ECO 详情
@@ -4008,16 +4038,18 @@ export async function previewECOsImport(file: File): Promise<ImportPreview> {
   if (rawRows.length === 0) throw new Error('Excel 中无数据');
 
   // 获取现有 ECO 列表，建立 eco_number→eco map
-  const existingRes = await ecoApi.list({ page: 1, page_size: 10000 });
-  const existingEcos: any[] = existingRes.data.items || existingRes.data || [];
+  const existingEcos: any[] = await fetchAllPages((page, pageSize) =>
+    ecoApi.list({ page, page_size: pageSize }).then((r) => ({ items: r.data.items || r.data || [], total: r.data.total ?? 0 })),
+  );
   const existingMap = new Map<string, any>();
   for (const e of existingEcos) {
     if (e.eco_number) existingMap.set(e.eco_number, e);
   }
 
   // 获取现有 ECR 列表，建立 number→ecr map（用于来源 ECR 查找）
-  const ecrRes = await ecrApi.list({ page: 1, page_size: 10000 });
-  const existingEcrs: any[] = ecrRes.data.items || ecrRes.data || [];
+  const existingEcrs: any[] = await fetchAllPages((page, pageSize) =>
+    ecrApi.list({ page, page_size: pageSize }).then((r) => ({ items: r.data.items || r.data || [], total: r.data.total ?? 0 })),
+  );
   const ecrMap = new Map<string, any>();
   for (const e of existingEcrs) {
     if (e.number) ecrMap.set(e.number, e);
@@ -4224,16 +4256,18 @@ export async function executeECOsImport(preview: ImportPreview): Promise<void> {
   const validRows = preview.rows.filter((r) => r.status !== '错误');
 
   // 重新获取现有 ECO（eco_number→eco）
-  const existingRes = await ecoApi.list({ page: 1, page_size: 10000 });
-  const existingEcos: any[] = existingRes.data.items || existingRes.data || [];
+  const existingEcos: any[] = await fetchAllPages((page, pageSize) =>
+    ecoApi.list({ page, page_size: pageSize }).then((r) => r.data),
+  );
   const existingMap = new Map<string, any>();
   for (const e of existingEcos) {
     if (e.eco_number) existingMap.set(e.eco_number, e);
   }
 
   // 重新获取 ECR 列表（用于 ecr_id 解析）
-  const ecrRes = await ecrApi.list({ page: 1, page_size: 10000 });
-  const existingEcrs: any[] = ecrRes.data.items || ecrRes.data || [];
+  const existingEcrs: any[] = await fetchAllPages((page, pageSize) =>
+    ecrApi.list({ page, page_size: pageSize }).then((r) => r.data),
+  );
   const ecrMap = new Map<string, any>();
   for (const e of existingEcrs) {
     if (e.number) ecrMap.set(e.number, e);
