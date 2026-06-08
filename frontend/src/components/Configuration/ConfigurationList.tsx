@@ -1,11 +1,18 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { configurationApi } from '../../services/api';
 import type { ConfigurationItem } from '../../types';
-import { canEdit, isAdmin } from '../../stores/auth';
+import { canEdit, isAdmin, canDownload } from '../../stores/auth';
 import { Modal, ConfirmModal } from '../Modal';
 import ConfigurationCreateModal from './ConfigurationCreateModal';
 import ConfigurationDetailModal from './ConfigurationDetailModal';
 import { useDataStore } from '../../stores/data';
+import {
+  exportConfigurationItems,
+  previewConfigurationItemsImport,
+  executeConfigurationItemsImport,
+} from '../../services/importExport';
+import type { ImportPreview } from '../../services/importExport';
+import ImportPreviewModal from '../ImportPreviewModal';
 
 const PAGE_SIZE = 20;
 
@@ -25,6 +32,13 @@ export default function ConfigurationList() {
 
   const storeCustomDefs = useDataStore((s) => s.customFieldDefs);
   const configCustomDefs = storeCustomDefs.filter((d) => d.applies_to?.includes('configuration_item'));
+
+  // 导入导出
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
+  const [importPreviewOpen, setImportPreviewOpen] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
     setLoading(true);
@@ -78,6 +92,50 @@ export default function ConfigurationList() {
     }
   };
 
+  const handleExport = async () => {
+    try {
+      await exportConfigurationItems();
+    } catch (err: any) {
+      alert(err.message || '导出失败');
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportLoading(true);
+    try {
+      const preview = await previewConfigurationItemsImport(file);
+      setImportPreview(preview);
+      setImportPreviewOpen(true);
+    } catch (err: any) {
+      alert(err.message || '导入解析失败');
+    } finally {
+      setImportLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleImportConfirm = async () => {
+    if (!importPreview) return;
+    setImporting(true);
+    try {
+      await executeConfigurationItemsImport(importPreview);
+      setImportPreviewOpen(false);
+      setImportPreview(null);
+      load();
+      alert('导入成功');
+    } catch (err: any) {
+      alert(err.message || '导入执行失败');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <div>
       {/* 搜索 + 新建 */}
@@ -102,6 +160,16 @@ export default function ConfigurationList() {
           placeholder={searchField === 'all' ? '搜索全部字段...' : searchField.startsWith('cf_') ? `搜索${configCustomDefs.find(d => d.id === searchField.replace('cf_', ''))?.name || '自定义字段'}...` : `搜索${searchField === 'code' ? '构型号' : searchField === 'name' ? '名称' : searchField === 'spec' ? '规格型号' : '备注'}...`}
           className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 flex-1"
         />
+        <div className="flex-1" />
+        {canDownload() && (
+          <button onClick={handleExport} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">导出全部</button>
+        )}
+        {canEdit() && (
+          <>
+            <button onClick={handleImportClick} disabled={importLoading} className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm disabled:opacity-50">{importLoading ? '解析中...' : '导入'}</button>
+            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange} />
+          </>
+        )}
         {canEdit() && (
           <button onClick={() => setCreateOpen(true)} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建构型</button>
         )}
@@ -185,6 +253,15 @@ export default function ConfigurationList() {
         type="danger"
         onConfirm={deleteError ? () => { setDeleteId(null); setDeleteError(null); } : handleDelete}
         onCancel={() => { setDeleteId(null); setDeleteError(null); }}
+      />
+
+      {/* 导入预览弹窗 */}
+      <ImportPreviewModal
+        open={importPreviewOpen}
+        preview={importPreview}
+        loading={importing}
+        onClose={() => { setImportPreviewOpen(false); setImportPreview(null); }}
+        onConfirm={handleImportConfirm}
       />
     </div>
   );

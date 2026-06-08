@@ -1,9 +1,16 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { configurationProfileApi } from '../../services/api';
 import type { ConfigurationProfile } from '../../types';
-import { canEdit, isAdmin } from '../../stores/auth';
+import { canEdit, isAdmin, canDownload } from '../../stores/auth';
 import { ConfirmModal } from '../Modal';
 import ProfileEditModal from './ProfileEditModal';
+import {
+  exportConfigurationProfiles,
+  previewConfigurationProfilesImport,
+  executeConfigurationProfilesImport,
+} from '../../services/importExport';
+import type { ImportPreview } from '../../services/importExport';
+import ImportPreviewModal from '../ImportPreviewModal';
 
 const statusBadge = (status: string) => {
   const map: Record<string, string> = {
@@ -29,6 +36,13 @@ export default function ProfileList() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // 导入导出
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
+  const [importPreviewOpen, setImportPreviewOpen] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
     setLoading(true);
@@ -70,6 +84,50 @@ export default function ProfileList() {
     try { await configurationProfileApi.delete(deleteId); setDeleteId(null); load(); } catch {}
   };
 
+  const handleExport = async () => {
+    try {
+      await exportConfigurationProfiles();
+    } catch (err: any) {
+      alert(err.message || '导出失败');
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportLoading(true);
+    try {
+      const preview = await previewConfigurationProfilesImport(file);
+      setImportPreview(preview);
+      setImportPreviewOpen(true);
+    } catch (err: any) {
+      alert(err.message || '导入解析失败');
+    } finally {
+      setImportLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleImportConfirm = async () => {
+    if (!importPreview) return;
+    setImporting(true);
+    try {
+      await executeConfigurationProfilesImport(importPreview);
+      setImportPreviewOpen(false);
+      setImportPreview(null);
+      load();
+      alert('导入成功');
+    } catch (err: any) {
+      alert(err.message || '导入执行失败');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const formatDate = (d: string) => {
     if (!d) return '-';
     return new Date(d).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -97,6 +155,15 @@ export default function ProfileList() {
           className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
         <div className="flex-1" />
+        {canDownload() && (
+          <button onClick={handleExport} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">导出全部</button>
+        )}
+        {canEdit() && (
+          <>
+            <button onClick={handleImportClick} disabled={importLoading} className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm disabled:opacity-50">{importLoading ? '解析中...' : '导入'}</button>
+            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange} />
+          </>
+        )}
         {canEdit() && (
           <button onClick={() => setCreateOpen(true)} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建配置</button>
         )}
@@ -186,6 +253,15 @@ export default function ProfileList() {
         content="确定要删除该构型配置吗？配置清单将一并删除。"
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}
+      />
+
+      {/* 导入预览弹窗 */}
+      <ImportPreviewModal
+        open={importPreviewOpen}
+        preview={importPreview}
+        loading={importing}
+        onClose={() => { setImportPreviewOpen(false); setImportPreview(null); }}
+        onConfirm={handleImportConfirm}
       />
     </div>
   );
