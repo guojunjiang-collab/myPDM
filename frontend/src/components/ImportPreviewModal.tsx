@@ -34,6 +34,18 @@ export default function ImportPreviewModal({
         return '部件';
       case 'document':
         return '图文档';
+      case 'configuration_item':
+        return '构型项';
+      case 'configuration_profile':
+        return '构型配置';
+      case 'ecr':
+        return 'ECR';
+      case 'eco':
+        return 'ECO';
+      case 'user':
+        return '用户';
+      case 'dashboard':
+        return '仪表盘';
     }
   };
 
@@ -97,6 +109,89 @@ export default function ImportPreviewModal({
               关联图文档 {preview.docRelationCount} 条
             </span>
           )}
+          {/* 构型项统计 */}
+          {preview.type === 'configuration_item' && (
+            <>
+              {preview.partRelationCount !== undefined && preview.partRelationCount > 0 && (
+                <span className="text-sm text-gray-600">
+                  关联零部件 {preview.partRelationCount} 个
+                  {preview.partWarnings !== undefined && preview.partWarnings > 0 && (
+                    <span className="text-orange-600">（未找到 {preview.partWarnings} 个）</span>
+                  )}
+                </span>
+              )}
+              {preview.childRelationCount !== undefined && preview.childRelationCount > 0 && (
+                <span className="text-sm text-gray-600">
+                  子构型项 {preview.childRelationCount} 个
+                  {preview.childWarnings !== undefined && preview.childWarnings > 0 && (
+                    <span className="text-orange-600">（未找到 {preview.childWarnings} 个）</span>
+                  )}
+                </span>
+              )}
+            </>
+          )}
+          {/* 构型配置统计 */}
+          {preview.type === 'configuration_profile' && (
+            <>
+              {preview.profileItemCount !== undefined && preview.profileItemCount > 0 && (
+                <span className="text-sm text-gray-600">清单项 {preview.profileItemCount} 个</span>
+              )}
+              {preview.ciWarnings !== undefined && preview.ciWarnings > 0 && (
+                <span className="text-sm text-orange-600">⚠️ {preview.ciWarnings} 个关联构型项未找到</span>
+              )}
+            </>
+          )}
+          {/* ECR 统计 */}
+          {preview.type === 'ecr' && (
+            <>
+              {preview.affectedCount !== undefined && preview.affectedCount > 0 && (
+                <span className="text-sm text-gray-600">
+                  受影响对象 {preview.affectedCount} 个
+                  {preview.affectedWarnings !== undefined && preview.affectedWarnings > 0 && (
+                    <span className="text-orange-600">（未找到 {preview.affectedWarnings} 个）</span>
+                  )}
+                </span>
+              )}
+              {preview.reviewerCount !== undefined && preview.reviewerCount > 0 && (
+                <span className="text-sm text-gray-600">
+                  审批人 {preview.reviewerCount} 个
+                  {preview.reviewerWarnings !== undefined && preview.reviewerWarnings > 0 && (
+                    <span className="text-orange-600">（未找到 {preview.reviewerWarnings} 个）</span>
+                  )}
+                </span>
+              )}
+              {preview.ccWarnings !== undefined && preview.ccWarnings > 0 && (
+                <span className="text-sm text-orange-600">⚠️ {preview.ccWarnings} 个知会人未找到</span>
+              )}
+            </>
+          )}
+          {/* ECO 统计 */}
+          {preview.type === 'eco' && (
+            <>
+              {preview.execItemCount !== undefined && preview.execItemCount > 0 && (
+                <span className="text-sm text-gray-600">
+                  执行明细 {preview.execItemCount} 个
+                  {preview.execItemWarnings !== undefined && preview.execItemWarnings > 0 && (
+                    <span className="text-orange-600">（未找到 {preview.execItemWarnings} 个）</span>
+                  )}
+                </span>
+              )}
+              {preview.reviewerCount !== undefined && preview.reviewerCount > 0 && (
+                <span className="text-sm text-gray-600">
+                  审批人 {preview.reviewerCount} 个
+                  {preview.reviewerWarnings !== undefined && preview.reviewerWarnings > 0 && (
+                    <span className="text-orange-600">（未找到 {preview.reviewerWarnings} 个）</span>
+                  )}
+                </span>
+              )}
+              {preview.ecrWarnings !== undefined && preview.ecrWarnings > 0 && (
+                <span className="text-sm text-orange-600">⚠️ {preview.ecrWarnings} 个来源ECR未找到</span>
+              )}
+              {preview.ccWarnings !== undefined && preview.ccWarnings > 0 && (
+                <span className="text-sm text-orange-600">⚠️ {preview.ccWarnings} 个知会人未找到</span>
+              )}
+            </>
+          )}
         </div>
 
         {/* 表格 */}
@@ -109,6 +204,9 @@ export default function ImportPreviewModal({
                 <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
                 <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
                 <th className="px-3 py-2 text-left text-gray-500 font-medium">备注/说明</th>
+                {(['configuration_item', 'configuration_profile', 'ecr', 'eco'] as ImportPreview['type'][]).includes(preview.type) && (
+                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-24">关联</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -138,6 +236,27 @@ export default function ImportPreviewModal({
                       '-'
                     )}
                   </td>
+                  {(['configuration_item', 'configuration_profile', 'ecr', 'eco'] as ImportPreview['type'][]).includes(preview.type) && (
+                    <td className="px-3 py-2 text-gray-500 text-xs">
+                      {preview.type === 'configuration_item' && (
+                        <span className="space-x-1">
+                          {row._partCount !== undefined && <span>零部件×{row._partCount}</span>}
+                          {row._childCount !== undefined && <span>子项×{row._childCount}</span>}
+                          {row._docCount !== undefined && <span>文档×{row._docCount}</span>}
+                        </span>
+                      )}
+                      {preview.type === 'configuration_profile' && (
+                        <span>{row._ciCode ? `CI: ${row._ciCode}` : '-'}</span>
+                      )}
+                      {(preview.type === 'ecr' || preview.type === 'eco') && (
+                        <span className="space-x-1">
+                          {row._affectedCount !== undefined && <span>影响×{row._affectedCount}</span>}
+                          {row._reviewerCount !== undefined && <span>审批×{row._reviewerCount}</span>}
+                          {row._execCount !== undefined && <span>执行×{row._execCount}</span>}
+                        </span>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
