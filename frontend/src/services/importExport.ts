@@ -38,6 +38,7 @@ import api, {
   customFieldsApi,
   usersApi,
   configurationApi,
+  configurationProfileApi,
 } from './api';
 import { useDataStore } from '../stores/data';
 import type {
@@ -3148,5 +3149,178 @@ export async function executeConfigurationItemsImport(preview: ImportPreview): P
   }
 
   // 刷新 store 以更新 documents 等缓存
+  await useDataStore.getState().syncAll();
+}
+
+// ================================================================
+// CONFIGURATION PROFILE EXPORT / IMPORT
+// ================================================================
+
+/**
+ * 导出构型配置
+ */
+export async function exportConfigurationProfiles(): Promise<void> {
+  const res = await configurationProfileApi.list({ page: 1, page_size: 10000 });
+  const profiles: any[] = res.data.items || [];
+  if (profiles.length === 0) throw new Error('没有可导出的构型配置数据');
+
+  // 并发获取每个 Profile 的详情（含关联构型项信息）
+  const details = await Promise.all(profiles.map((p: any) => configurationProfileApi.get(p.id)));
+  const detailData: any[] = details.map((r: any) => r.data);
+
+  const sheetRows = detailData.map((d: any) => ({
+    配置编号: d.code || '',
+    配置名称: d.name || '',
+    关联构型号: d.configuration_item?.code || d.configuration_item_code || '',
+    状态: d.status || '',
+    备注: d.remark || '',
+    创建时间: d.created_at || '',
+  }));
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(sheetRows);
+  ws['!cols'] = [
+    { wch: 20 }, { wch: 24 }, { wch: 20 }, { wch: 12 }, { wch: 30 }, { wch: 20 },
+  ];
+  XLSX.utils.book_append_sheet(wb, ws, '构型配置');
+
+  const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  downloadBlob(blob, `构型配置数据_${todayStr()}.xlsx`);
+}
+
+/**
+ * 预览构型配置导入
+ */
+export async function previewConfigurationProfilesImport(file: File): Promise<ImportPreview> {
+  const arrayBuffer = await file.arrayBuffer();
+  const wb = XLSX.read(arrayBuffer, { type: 'array' });
+
+  // 找"构型配置" Sheet 或用第一个
+  const sheetName = wb.SheetNames.find((n) => n.includes('构型配置')) ?? wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  const rawRows: Record<string, string>[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+  // 获取现有构型项列表，建立 code→item map
+  const ciRes = await configurationApi.listItems({ page: 1, page_size: 10000 });
+  const ciItems: any[] = ciRes.data.items || [];
+  const ciMap = new Map<string, any>();
+  for (const ci of ciItems) ciMap.set(ci.code, ci);
+
+  // 获取现有 Profile 列表，建立 name→profile map
+  const profileRes = await configurationProfileApi.list({ page: 1, page_size: 10000 });
+  const existingProfiles: any[] = profileRes.data.items || [];
+  const profileNameMap = new Map<string, any>();
+  for (const p of existingProfiles) profileNameMap.set(p.name, p);
+
+  let ciWarnings = 0;
+  const rows: ImportRow[] = rawRows.map((raw) => {
+    const name = String(raw['配置名称'] || '').trim();
+    const code = String(raw['配置编号'] || '').trim();
+    const ciCode = String(raw['关联构型号'] || '').trim();
+    const remark = String(raw['备注'] || '').trim();
+
+    if (!name) {
+      return {
+        status: '错误' as const,
+        code: code || '—',
+        name: name || '—',
+        version: '',
+        error: '缺少必填字段：配置名称',
+      };
+    }
+    if (!ciCode) {
+      return {
+        status: '错误' as const,
+        code: code || name,
+        name,
+        version: '',
+        error: '缺少必填字段：关联构型号',
+      };
+    }
+
+    const ci = ciMap.get(ciCode);
+    if (!ci) {
+      ciWarnings++;
+    }
+
+    const existing = profileNameMap.get(name);
+    const rowStatus: '新增' | '更新' = existing ? '更新' : '新增';
+
+    return {
+      status: rowStatus,
+      code: code || name,
+      name,
+      version: '',
+      remark,
+      _ciCode: ciCode,
+      _data: {
+        code,
+        name,
+        remark,
+        configuration_item_id: ci ? ci.id : undefined,
+        status: 'draft',
+      },
+    };
+  });
+
+  return {
+    type: 'configuration_profile',
+    rows,
+    ciWarnings,
+  };
+}
+
+/**
+ * 执行构型配置导入
+ */
+export async function executeConfigurationProfilesImport(preview: ImportPreview): Promise<void> {
+  const validRows = preview.rows.filter((r) => r.status !== '错误');
+
+  // 重新获取最新构型项列表（code→id）
+  const ciRes = await configurationApi.listItems({ page: 1, page_size: 10000 });
+  const ciItems: any[] = ciRes.data.items || [];
+  const ciMap = new Map<string, any>();
+  for (const ci of ciItems) ciMap.set(ci.code, ci);
+
+  // 重新获取现有 Profile 列表（name→profile）
+  const profileRes = await configurationProfileApi.list({ page: 1, page_size: 10000 });
+  const existingProfiles: any[] = profileRes.data.items || [];
+  const profileNameMap = new Map<string, any>();
+  for (const p of existingProfiles) profileNameMap.set(p.name, p);
+
+  for (const row of validRows) {
+    const data = row._data!;
+    const ciCode = row._ciCode;
+
+    // 解析最新的 configuration_item_id
+    const ciId = ciCode ? ciMap.get(ciCode)?.id : undefined;
+    const payload = {
+      ...data,
+      configuration_item_id: ciId ?? data.configuration_item_id,
+    };
+
+    try {
+      if (row.status === '更新') {
+        const existing = profileNameMap.get(row.name);
+        if (existing) {
+          await configurationProfileApi.update(existing.id, payload as any);
+        }
+      } else {
+        // 新增：status 设为 draft
+        const createPayload = { ...payload, status: 'draft' };
+        const res = await configurationProfileApi.create(createPayload as any);
+        const created = res.data;
+        row._newId = created.id;
+        // 创建后调用 regenerate 填充 profile_items
+        await configurationProfileApi.regenerate(created.id);
+      }
+    } catch (err) {
+      console.error(`导入构型配置失败: ${row.name}`, err);
+    }
+  }
+
   await useDataStore.getState().syncAll();
 }
