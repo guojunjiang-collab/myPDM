@@ -40,6 +40,7 @@ import api, {
   configurationApi,
   configurationProfileApi,
   ecrApi,
+  ecoApi,
 } from './api';
 import { useDataStore } from '../stores/data';
 import type {
@@ -3692,5 +3693,452 @@ export async function executeECRsImport(preview: ImportPreview): Promise<void> {
   }
 
   // 第三步：同步 store
+  await useDataStore.getState().syncAll();
+}
+
+// ================================================================
+// ECO 导出 / 导入
+// ================================================================
+
+/**
+ * 导出所有 ECO 数据为多 Sheet Excel
+ */
+export async function exportECOs(): Promise<void> {
+  const res = await ecoApi.list({ page: 1, page_size: 10000 });
+  const ecos: any[] = res.data.items || res.data || [];
+  if (ecos.length === 0) throw new Error('没有可导出的 ECO 数据');
+
+  // 并发获取每条 ECO 详情
+  const details = await Promise.all(ecos.map((e: any) => ecoApi.detail(e.id)));
+  const detailData: any[] = details.map((r: any) => r.data);
+
+  // Sheet1: ECO 清单
+  const sheet1Rows = detailData.map((d: any) => ({
+    编号: d.eco_number || '',
+    标题: d.title || '',
+    来源ECR编号: d.ecr_number || '',
+    变更类型: d.category || '',
+    优先级: d.priority || '',
+    状态: d.status || '',
+    审批模式: d.review_mode || 'all',
+    描述: d.description || '',
+    变更原因: d.reason || '',
+    执行人工号: d.executor_name || '',
+    创建人: d.creator_name || '',
+    创建时间: d.created_at || '',
+  }));
+
+  // Sheet2: 执行明细
+  const sheet2Rows: Record<string, unknown>[] = [];
+  for (const d of detailData) {
+    for (const item of d.execution_items || []) {
+      const detail = item.detail || {};
+      sheet2Rows.push({
+        ECO编号: d.eco_number,
+        对象类型: item.entity_type || '',
+        对象编号: item.entity_code || '',
+        对象名称: item.entity_name || '',
+        动作: item.action || '',
+        来源: item.source || 'manual',
+        目标数量: detail._targetQty ?? '',
+        变更描述: detail._desc || '',
+        受影响编号: detail._affectedCode || '',
+        父对象ID: item.parent_entity_id || '',
+        排序: item.sort_order ?? 0,
+      });
+    }
+  }
+
+  // Sheet3: 审批人
+  const sheet3Rows: Record<string, unknown>[] = [];
+  for (const d of detailData) {
+    for (const r of d.reviewers || []) {
+      sheet3Rows.push({
+        ECO编号: d.eco_number,
+        审批人工号: r.user?.employee_no || r.user?.username || r.user_name || r.user_id || '',
+        顺序: r.seq ?? 0,
+      });
+    }
+  }
+
+  // Sheet4: 知会人
+  const sheet4Rows: Record<string, unknown>[] = [];
+  for (const d of detailData) {
+    for (const cc of d.cc_users || []) {
+      sheet4Rows.push({
+        ECO编号: d.eco_number,
+        知会人工号: cc.user_name || cc.user_id || '',
+      });
+    }
+  }
+
+  // Sheet5: 关联图文档
+  const sheet5Rows: Record<string, unknown>[] = [];
+  for (const d of detailData) {
+    for (const doc of d.document_links || []) {
+      sheet5Rows.push({
+        ECO编号: d.eco_number,
+        图文档编号: doc.document?.code || doc.document_code || '',
+        图文档版本: doc.document?.version || doc.document_version || '',
+        类别: doc.category || '',
+        排序: doc.sort_order ?? 0,
+      });
+    }
+  }
+
+  const wb = XLSX.utils.book_new();
+
+  const s1 = XLSX.utils.json_to_sheet(sheet1Rows);
+  s1['!cols'] = [
+    { wch: 16 }, { wch: 30 }, { wch: 16 }, { wch: 12 }, { wch: 10 },
+    { wch: 12 }, { wch: 10 }, { wch: 30 }, { wch: 30 }, { wch: 16 },
+    { wch: 16 }, { wch: 20 },
+  ];
+  XLSX.utils.book_append_sheet(wb, s1, 'ECO清单');
+
+  if (sheet2Rows.length > 0) {
+    const s2 = XLSX.utils.json_to_sheet(sheet2Rows);
+    s2['!cols'] = [
+      { wch: 16 }, { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 12 },
+      { wch: 10 }, { wch: 10 }, { wch: 30 }, { wch: 20 }, { wch: 20 }, { wch: 8 },
+    ];
+    XLSX.utils.book_append_sheet(wb, s2, '执行明细');
+  }
+
+  if (sheet3Rows.length > 0) {
+    const s3 = XLSX.utils.json_to_sheet(sheet3Rows);
+    s3['!cols'] = [{ wch: 16 }, { wch: 20 }, { wch: 8 }];
+    XLSX.utils.book_append_sheet(wb, s3, '审批人');
+  }
+
+  if (sheet4Rows.length > 0) {
+    const s4 = XLSX.utils.json_to_sheet(sheet4Rows);
+    s4['!cols'] = [{ wch: 16 }, { wch: 20 }];
+    XLSX.utils.book_append_sheet(wb, s4, '知会人');
+  }
+
+  if (sheet5Rows.length > 0) {
+    const s5 = XLSX.utils.json_to_sheet(sheet5Rows);
+    s5['!cols'] = [{ wch: 16 }, { wch: 20 }, { wch: 12 }, { wch: 16 }, { wch: 8 }];
+    XLSX.utils.book_append_sheet(wb, s5, '关联图文档');
+  }
+
+  const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  downloadBlob(blob, `ECO数据_${todayStr()}.xlsx`);
+}
+
+/**
+ * 预览 ECO 导入
+ */
+export async function previewECOsImport(file: File): Promise<ImportPreview> {
+  const buffer = await file.arrayBuffer();
+  const wb = XLSX.read(buffer, { type: 'array' });
+
+  const ws1 = wb.Sheets['ECO清单'];
+  if (!ws1) throw new Error('Excel 中未找到 "ECO清单" Sheet');
+
+  const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws1);
+  if (rawRows.length === 0) throw new Error('Excel 中无数据');
+
+  // 获取现有 ECO 列表，建立 eco_number→eco map
+  const existingRes = await ecoApi.list({ page: 1, page_size: 10000 });
+  const existingEcos: any[] = existingRes.data.items || existingRes.data || [];
+  const existingMap = new Map<string, any>();
+  for (const e of existingEcos) {
+    if (e.eco_number) existingMap.set(e.eco_number, e);
+  }
+
+  // 获取现有 ECR 列表，建立 number→ecr map（用于来源 ECR 查找）
+  const ecrRes = await ecrApi.list({ page: 1, page_size: 10000 });
+  const existingEcrs: any[] = ecrRes.data.items || ecrRes.data || [];
+  const ecrMap = new Map<string, any>();
+  for (const e of existingEcrs) {
+    if (e.number) ecrMap.set(e.number, e);
+  }
+
+  // 解析关联 Sheet
+  const execItemRows = wb.Sheets['执行明细']
+    ? XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets['执行明细'])
+    : [];
+  const reviewerRows = wb.Sheets['审批人']
+    ? XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets['审批人'])
+    : [];
+  const ccRows = wb.Sheets['知会人']
+    ? XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets['知会人'])
+    : [];
+  const docLinkRows = wb.Sheets['关联图文档']
+    ? XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets['关联图文档'])
+    : [];
+
+  const store = useDataStore.getState();
+  let reviewerWarnings = 0;
+  let ccWarnings = 0;
+  let execItemWarnings = 0;
+  let ecrWarnings = 0;
+
+  // 获取用户列表（审批人 / 知会人查找）
+  const usersRes = await usersApi.list({ page_size: 10000 });
+  const usersAll: any[] = Array.isArray(usersRes.data)
+    ? usersRes.data
+    : ((usersRes.data as { items?: any[] })?.items || []);
+
+  // 按 ECO 编号分组审批人
+  const reviewersByNumber = new Map<string, any[]>();
+  for (const r of reviewerRows) {
+    const num = String(r['ECO编号'] || '').trim();
+    if (!reviewersByNumber.has(num)) reviewersByNumber.set(num, []);
+    const empNo = String(r['审批人工号'] || '').trim();
+    const user = usersAll.find(
+      (u: any) => u.employee_no === empNo || u.username === empNo
+    );
+    if (!user) reviewerWarnings++;
+    reviewersByNumber.get(num)!.push({ ...r, _user: user || null });
+  }
+
+  // 按 ECO 编号分组知会人
+  const ccByNumber = new Map<string, any[]>();
+  for (const r of ccRows) {
+    const num = String(r['ECO编号'] || '').trim();
+    if (!ccByNumber.has(num)) ccByNumber.set(num, []);
+    const empNo = String(r['知会人工号'] || '').trim();
+    const user = usersAll.find(
+      (u: any) => u.employee_no === empNo || u.username === empNo
+    );
+    if (!user) ccWarnings++;
+    ccByNumber.get(num)!.push({ ...r, _user: user || null });
+  }
+
+  // 按 ECO 编号分组执行明细
+  const execItemsByNumber = new Map<string, any[]>();
+  for (const r of execItemRows) {
+    const num = String(r['ECO编号'] || '').trim();
+    if (!execItemsByNumber.has(num)) execItemsByNumber.set(num, []);
+    const entityCode = String(r['对象编号'] || '').trim();
+    const entityType = String(r['对象类型'] || '').trim();
+    let found: any = null;
+    if (entityCode) {
+      if (entityType === 'part') {
+        found = store.parts.find((p: Part) => p.code === entityCode);
+      } else if (entityType === 'assembly') {
+        found = store.assemblies.find((a: Assembly) => a.code === entityCode);
+      } else {
+        found = store.parts.find((p: Part) => p.code === entityCode)
+             || store.assemblies.find((a: Assembly) => a.code === entityCode);
+      }
+      if (!found) execItemWarnings++;
+    }
+    execItemsByNumber.get(num)!.push({ ...r, _entity: found || null });
+  }
+
+  // 按 ECO 编号分组关联图文档
+  const docLinksByNumber = new Map<string, any[]>();
+  for (const r of docLinkRows) {
+    const num = String(r['ECO编号'] || '').trim();
+    if (!docLinksByNumber.has(num)) docLinksByNumber.set(num, []);
+    const docCode = String(r['图文档编号'] || '').trim();
+    const docVersion = String(r['图文档版本'] || '').trim();
+    const found = store.documents.find(
+      (d: Document) => d.code === docCode && (d.version || '') === docVersion
+    );
+    docLinksByNumber.get(num)!.push({ ...r, _document: found || null });
+  }
+
+  const rows: ImportRow[] = rawRows.map((raw) => {
+    const title = String(raw['标题'] || '').trim();
+    const ecoNumber = String(raw['编号'] || '').trim();
+
+    if (!title) {
+      return {
+        status: '错误' as const,
+        code: ecoNumber || '—',
+        name: title || '—',
+        version: '',
+        error: '缺少必填字段：标题',
+      };
+    }
+
+    // 查找来源 ECR
+    const sourceEcrNumber = String(raw['来源ECR编号'] || '').trim();
+    let ecrId: string | undefined;
+    if (sourceEcrNumber) {
+      const ecrObj = ecrMap.get(sourceEcrNumber);
+      if (ecrObj) {
+        ecrId = ecrObj.id;
+      } else {
+        ecrWarnings++;
+      }
+    }
+
+    const existing = ecoNumber ? existingMap.get(ecoNumber) : undefined;
+    const rowStatus: '新增' | '更新' = existing ? '更新' : '新增';
+
+    const reviewers = reviewersByNumber.get(ecoNumber) || [];
+    const ccUsers = ccByNumber.get(ecoNumber) || [];
+    const execItems = execItemsByNumber.get(ecoNumber) || [];
+    const docLinks = docLinksByNumber.get(ecoNumber) || [];
+
+    return {
+      status: rowStatus,
+      code: ecoNumber,
+      name: title,
+      version: '',
+      _reviewerCount: reviewers.length,
+      _execCount: execItems.length,
+      _ecrNumber: sourceEcrNumber || undefined,
+      _data: {
+        title,
+        description: String(raw['描述'] || ''),
+        reason: String(raw['变更原因'] || ''),
+        priority: String(raw['优先级'] || 'normal'),
+        category: String(raw['变更类型'] || ''),
+        review_mode: String(raw['审批模式'] || 'all'),
+        status: 'draft',
+        ecr_id: ecrId,
+        reviewers: reviewers
+          .filter((r: any) => r._user)
+          .map((r: any, idx: number) => ({
+            user_id: r._user.id,
+            seq: Number(r['顺序'] ?? idx + 1),
+          })),
+        document_links: docLinks
+          .filter((r: any) => r._document)
+          .map((r: any) => ({
+            document_id: r._document.id,
+            category: String(r['类别'] || ''),
+            sort_order: Number(r['排序'] ?? 0),
+          })),
+        execution_items: execItems.map((r: any) => ({
+          source: String(r['来源'] || 'manual') as 'manual' | 'ecr',
+          entity_type: String(r['对象类型'] || 'part'),
+          entity_name: String(r['对象名称'] || ''),
+          action: String(r['动作'] || 'no_change'),
+          entity_id: r._entity ? r._entity.id : undefined,
+          entity_code: String(r['对象编号'] || '') || undefined,
+          parent_entity_id: String(r['父对象ID'] || '') || undefined,
+          status: 'pending',
+          detail: {
+            _targetQty: r['目标数量'] !== '' && r['目标数量'] != null ? Number(r['目标数量']) : undefined,
+            _desc: String(r['变更描述'] || ''),
+            _affectedCode: String(r['受影响编号'] || ''),
+          },
+        })),
+        _ccUsers: ccUsers
+          .filter((r: any) => r._user)
+          .map((r: any) => r._user.id),
+      },
+    };
+  });
+
+  return {
+    type: 'eco',
+    rows,
+    reviewerWarnings,
+    ccWarnings,
+    execItemWarnings,
+    ecrWarnings,
+    execItemCount: execItemRows.length,
+    reviewerCount: reviewerRows.length,
+    affectedCount: 0,
+  };
+}
+
+/**
+ * 执行 ECO 导入
+ */
+export async function executeECOsImport(preview: ImportPreview): Promise<void> {
+  const validRows = preview.rows.filter((r) => r.status !== '错误');
+
+  // 重新获取现有 ECO（eco_number→eco）
+  const existingRes = await ecoApi.list({ page: 1, page_size: 10000 });
+  const existingEcos: any[] = existingRes.data.items || existingRes.data || [];
+  const existingMap = new Map<string, any>();
+  for (const e of existingEcos) {
+    if (e.eco_number) existingMap.set(e.eco_number, e);
+  }
+
+  // 重新获取 ECR 列表（用于 ecr_id 解析）
+  const ecrRes = await ecrApi.list({ page: 1, page_size: 10000 });
+  const existingEcrs: any[] = ecrRes.data.items || ecrRes.data || [];
+  const ecrMap = new Map<string, any>();
+  for (const e of existingEcrs) {
+    if (e.number) ecrMap.set(e.number, e);
+  }
+
+  for (const row of validRows) {
+    const data = row._data!;
+
+    // 解析 ecr_id（若 _data 中未存则按 _ecrNumber 再查一次）
+    let ecrId = data.ecr_id as string | undefined;
+    if (!ecrId && row._ecrNumber) {
+      const ecrObj = ecrMap.get(row._ecrNumber);
+      if (ecrObj) ecrId = ecrObj.id;
+    }
+
+    const ccUserIds: string[] = (data._ccUsers as string[]) || [];
+
+    // 构造主体 payload（execution_items 嵌入在 create/update 请求里）
+    const payload: any = {
+      title: data.title,
+      description: data.description,
+      reason: data.reason,
+      priority: data.priority,
+      category: data.category,
+      review_mode: data.review_mode,
+      status: 'draft',
+      reviewers: data.reviewers,
+      document_links: data.document_links,
+      execution_items: (data.execution_items as any[]).map((it: any) => ({
+        source: it.source,
+        entity_type: it.entity_type,
+        entity_name: it.entity_name,
+        action: it.action,
+        entity_id: it.entity_id || undefined,
+        entity_code: it.entity_code || undefined,
+        parent_entity_id: it.parent_entity_id || undefined,
+        detail: it.detail,
+      })),
+      ...(ecrId ? { ecr_id: ecrId } : {}),
+    };
+
+    try {
+      let ecoId: string | undefined;
+
+      if (row.status === '更新') {
+        const existing = existingMap.get(row.code);
+        if (existing) {
+          await ecoApi.update(existing.id, payload);
+          ecoId = existing.id;
+        }
+      } else {
+        const res = await ecoApi.create(payload);
+        const created = res.data;
+        ecoId = created.id;
+        row._newId = ecoId;
+      }
+
+      // 处理知会人（cc）：更新时先取消旧的，再添加新的
+      if (ecoId && ccUserIds.length > 0) {
+        if (row.status === '更新') {
+          try {
+            const detailRes = await ecoApi.detail(ecoId);
+            const oldCcUsers: any[] = detailRes.data.cc_users || [];
+            for (const oldCc of oldCcUsers) {
+              await ecoApi.uncc(ecoId, oldCc.user_id);
+            }
+          } catch (err) {
+            console.warn(`清除 ECO 知会人失败: ${row.code}`, err);
+          }
+        }
+        await ecoApi.cc(ecoId, ccUserIds);
+      }
+    } catch (err) {
+      console.error(`导入 ECO 失败: ${row.code || row.name}`, err);
+    }
+  }
+
+  // 同步 store
   await useDataStore.getState().syncAll();
 }
