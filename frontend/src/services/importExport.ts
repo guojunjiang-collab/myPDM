@@ -3900,6 +3900,7 @@ export async function exportECOs(): Promise<void> {
         ECO编号: d.eco_number,
         对象类型: item.entity_type || '',
         对象编号: item.entity_code || '',
+        对象版本: item.entity_version || '',
         对象名称: item.entity_name || '',
         动作: item.action || '',
         来源: item.source || 'manual',
@@ -3962,7 +3963,7 @@ export async function exportECOs(): Promise<void> {
   if (sheet2Rows.length > 0) {
     const s2 = XLSX.utils.json_to_sheet(sheet2Rows);
     s2['!cols'] = [
-      { wch: 16 }, { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 12 },
+      { wch: 16 }, { wch: 10 }, { wch: 20 }, { wch: 12 }, { wch: 20 }, { wch: 12 },
       { wch: 10 }, { wch: 10 }, { wch: 30 }, { wch: 20 }, { wch: 20 }, { wch: 8 },
     ];
     XLSX.utils.book_append_sheet(wb, s2, '执行明细');
