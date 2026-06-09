@@ -155,11 +155,13 @@ const ENTITY_TYPE_TO_ZH: Record<string, string> = {
   part: '零件',
   assembly: '部件',
   document: '图文档',
+  configuration: '构型项',
 };
 const ENTITY_TYPE_FROM_ZH: Record<string, string> = {
   '零件': 'part',
   '部件': 'assembly',
   '图文档': 'document',
+  '构型项': 'configuration',
 };
 
 /** 存储导入时的目录句柄（在 preview 阶段打开，execute 阶段复用） */
@@ -2731,7 +2733,7 @@ export type ExportProgressCallback = (message: string) => void;
 
 /**
  * 统一导出全部数据到同一个文件夹
- * 顺序：自定义字段 → 用户 → 看板 → 图文档 → 零件 → 部件
+ * 顺序：自定义字段 → 用户 → 看板 → 图文档 → 零件 → 部件 → 构型项 → 构型配置
  * 通过 onProgress 回调报告进度
  */
 export async function exportAllData(
@@ -2801,6 +2803,16 @@ export async function exportAllData(
     onProgress?.('部件: 无数据，跳过');
   }
 
+  // 4. 导出构型项
+  onProgress?.('正在导出构型项...');
+  const ciExported = await exportConfigItemsToDir(dirHandle);
+  onProgress?.(ciExported ? '构型项导出完成' : '构型项: 无数据，跳过');
+
+  // 5. 导出构型配置
+  onProgress?.('正在导出构型配置...');
+  const cpExported = await exportConfigProfilesToDir(dirHandle);
+  onProgress?.(cpExported ? '构型配置导出完成' : '构型配置: 无数据，跳过');
+
   onProgress?.('全部数据导出完成');
 }
 
@@ -2840,7 +2852,7 @@ async function _readXlsxAsFile(
 
 /**
  * 统一导入全部数据
- * 顺序：自定义字段 → 用户 → 图文档 → 零件 → 部件 → 用户看板
+ * 顺序：自定义字段 → 用户 → 图文档 → 零件 → 部件 → 构型项 → 构型配置 → 用户看板
  */
 export async function importAllData(
   onProgress?: ExportProgressCallback,
@@ -2910,7 +2922,29 @@ export async function importAllData(
     onProgress?.('部件: 无数据，跳过');
   }
 
-  // ===== 5. 导入用户看板（最后导入，因为关联了图文档和零部件） =====
+  // ===== 5. 导入构型项（依赖零件/部件/图文档，故在其后） =====
+  const ciFile = await _readXlsxAsFile(dirHandle, '构型项.xlsx');
+  if (ciFile) {
+    onProgress?.('正在导入构型项...');
+    const ciPreview = await previewConfigurationItemsImport(ciFile);
+    const ciResult = await executeConfigurationItemsImport(ciPreview);
+    onProgress?.(`构型项: 新增 ${ciResult.created} 个, 更新 ${ciResult.updated} 个`);
+  } else {
+    onProgress?.('构型项: 无文件，跳过');
+  }
+
+  // ===== 6. 导入构型配置（依赖构型项，故在构型项后） =====
+  const cpFile = await _readXlsxAsFile(dirHandle, '构型配置.xlsx');
+  if (cpFile) {
+    onProgress?.('正在导入构型配置...');
+    const cpPreview = await previewConfigurationProfilesImport(cpFile);
+    const cpResult = await executeConfigurationProfilesImport(cpPreview);
+    onProgress?.(`构型配置: 新增 ${cpResult.created} 个, 更新 ${cpResult.updated} 个`);
+  } else {
+    onProgress?.('构型配置: 无文件，跳过');
+  }
+
+  // ===== 7. 导入用户看板（最后导入，因为关联了图文档、零部件和构型项） =====
   const dashFile = await _readXlsxAsFile(dirHandle, '用户看板.xlsx');
   if (dashFile) {
     onProgress?.('正在导入用户看板...');
@@ -2932,11 +2966,16 @@ export async function importAllData(
  * 导出构型项为 Excel 文件
  * Sheet1: 构型项清单, Sheet2: 关联零部件, Sheet3: 子构型项, Sheet4: 关联图文档
  */
-export async function exportConfigurationItems(): Promise<void> {
+/**
+ * 构建构型项导出工作簿（共享逻辑）
+ * Sheet1: 构型项清单, Sheet2: 关联零部件, Sheet3: 子构型项, Sheet4: 关联图文档
+ * 无数据返回 null
+ */
+async function _buildConfigItemsWorkbook(): Promise<XLSX.WorkBook | null> {
   const items: any[] = await fetchAllPages((page, pageSize) =>
     configurationApi.listItems({ page, page_size: pageSize }).then((r) => r.data),
   );
-  if (items.length === 0) throw new Error('没有可导出的构型项数据');
+  if (items.length === 0) return null;
 
   // 并发获取每个构型项的详情（含关联数据）
   const details = await Promise.all(items.map((i: any) => configurationApi.getItem(i.id)));
@@ -3013,6 +3052,27 @@ export async function exportConfigurationItems(): Promise<void> {
     XLSX.utils.book_append_sheet(wb, s4, '关联图文档');
   }
 
+  return wb;
+}
+
+/** 导出构型项到指定目录（固定文件名 构型项.xlsx），无数据则跳过 */
+async function exportConfigItemsToDir(dirHandle: FileSystemDirectoryHandle): Promise<boolean> {
+  const wb = await _buildConfigItemsWorkbook();
+  if (!wb) return false;
+  const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  await writeBlobToDirectory(
+    dirHandle,
+    '构型项.xlsx',
+    new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    }),
+  );
+  return true;
+}
+
+export async function exportConfigurationItems(): Promise<void> {
+  const wb = await _buildConfigItemsWorkbook();
+  if (!wb) throw new Error('没有可导出的构型项数据');
   const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
   const blob = new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -3351,11 +3411,16 @@ export async function executeConfigurationItemsImport(preview: ImportPreview): P
 /**
  * 导出构型配置
  */
-export async function exportConfigurationProfiles(): Promise<void> {
+/**
+ * 构建构型配置导出工作簿（共享逻辑）
+ * Sheet1: 配置清单, Sheet2: 配置清单项
+ * 无数据返回 null
+ */
+async function _buildConfigProfilesWorkbook(): Promise<XLSX.WorkBook | null> {
   const profiles: any[] = await fetchAllPages((page, pageSize) =>
     configurationProfileApi.list({ page, page_size: pageSize }).then((r) => r.data),
   );
-  if (profiles.length === 0) throw new Error('没有可导出的构型配置数据');
+  if (profiles.length === 0) return null;
 
   // 构型项 id→code 映射，用于还原清单项的来源构型号
   const ciItems: any[] = await fetchAllPages((page, pageSize) =>
@@ -3419,6 +3484,27 @@ export async function exportConfigurationProfiles(): Promise<void> {
     XLSX.utils.book_append_sheet(wb, s2, '配置清单项');
   }
 
+  return wb;
+}
+
+/** 导出构型配置到指定目录（固定文件名 构型配置.xlsx），无数据则跳过 */
+async function exportConfigProfilesToDir(dirHandle: FileSystemDirectoryHandle): Promise<boolean> {
+  const wb = await _buildConfigProfilesWorkbook();
+  if (!wb) return false;
+  const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  await writeBlobToDirectory(
+    dirHandle,
+    '构型配置.xlsx',
+    new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    }),
+  );
+  return true;
+}
+
+export async function exportConfigurationProfiles(): Promise<void> {
+  const wb = await _buildConfigProfilesWorkbook();
+  if (!wb) throw new Error('没有可导出的构型配置数据');
   const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
   const blob = new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

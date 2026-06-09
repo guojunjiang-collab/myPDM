@@ -527,7 +527,7 @@ export default function Settings() {
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <h3 className="text-lg font-medium mb-2">导出全部数据</h3>
             <p className="text-sm text-gray-500 mb-4">
-              将系统中的所有零件、部件、图文档、用户看板数据导出为文件备份。请选择目标文件夹。
+              将系统中的所有零件、部件、图文档、构型项、构型配置、用户看板数据导出为文件备份。请选择目标文件夹。
             </p>
             <button
               onClick={handleExportAll}
@@ -547,7 +547,7 @@ export default function Settings() {
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <h3 className="text-lg font-medium mb-2">导入全部数据</h3>
             <p className="text-sm text-gray-500 mb-4">
-              从导出的文件夹中选择"自定义字段定义.xlsx + 图文档清单.xlsx + 零件清单.xlsx + 部件清单.xlsx"等文件所在的文件夹，批量导入全部数据。
+              从导出的文件夹中选择"自定义字段定义.xlsx + 图文档清单.xlsx + 零件清单.xlsx + 部件清单.xlsx + 构型项.xlsx + 构型配置.xlsx + 用户看板.xlsx"等文件所在的文件夹，批量导入全部数据。
             </p>
             <button
               onClick={handleImportAll}
