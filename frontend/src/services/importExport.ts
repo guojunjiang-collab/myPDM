@@ -3517,7 +3517,8 @@ export async function executeConfigurationProfilesImport(preview: ImportPreview)
 
 /**
  * 导出 ECR 为 Excel 文件
- * Sheet1: ECR清单, Sheet2: 审批流, Sheet3: 受影响对象, Sheet4: 关联图文档
+ * Sheet1: ECR清单, Sheet2: 审批流, Sheet3: 受影响对象,
+ * Sheet4: 受影响影响分析（BOM 向上/向下链）, Sheet5: 关联图文档
  */
 export async function exportECRs(): Promise<void> {
   const ecrs: any[] = await fetchAllPages((page, pageSize) =>
@@ -3529,9 +3530,21 @@ export async function exportECRs(): Promise<void> {
   const details = await Promise.all(ecrs.map((e: any) => ecrApi.get(e.id)));
   const detailData: any[] = details.map((r: any) => r.data);
 
+  // 获取用户列表，用于把 reviewers 里的 user_id 解析成工号（便于导入回填）
+  const usersRes = await usersApi.list({ page_size: 10000 });
+  const usersAll: any[] = Array.isArray(usersRes.data)
+    ? usersRes.data
+    : ((usersRes.data as { items?: any[] })?.items || []);
+  const userById = new Map<string, any>();
+  for (const u of usersAll) userById.set(String(u.id), u);
+  const reviewerCode = (r: any): string => {
+    const u = userById.get(String(r.user_id));
+    return (u?.employee_no || u?.username || r.user_name || r.user_id || '') as string;
+  };
+
   // Sheet1: ECR 清单
   const sheet1Rows = detailData.map((d: any) => ({
-    编号: d.number || '',
+    编号: d.ecr_number || '',
     标题: d.title || '',
     类型: d.category || '',
     优先级: d.priority || '',
@@ -3547,8 +3560,9 @@ export async function exportECRs(): Promise<void> {
   for (const d of detailData) {
     for (const r of d.reviewers || []) {
       sheet2Rows.push({
-        ECR编号: d.number,
-        审批人工号: r.user?.employee_no || r.user?.username || r.user_id || '',
+        ECR编号: d.ecr_number,
+        审批人工号: reviewerCode(r),
+        审批人姓名: r.user_name || '',
         顺序: r.seq ?? 0,
       });
     }
@@ -3559,22 +3573,53 @@ export async function exportECRs(): Promise<void> {
   for (const d of detailData) {
     for (const item of d.affected_items || []) {
       sheet3Rows.push({
-        ECR编号: d.number,
+        ECR编号: d.ecr_number,
         实体类型: item.entity_type || '',
-        实体件号: item.entity?.code || item.entity_code || '',
-        实体版本: item.entity?.version || item.entity_version || '',
+        实体件号: item.entity_code || item.entity?.code || '',
+        实体版本: item.entity_version || item.entity?.version || '',
         变更描述: item.change_description || '',
         变更类型: item.change_type || '',
       });
     }
   }
 
-  // Sheet4: 关联图文档
+  // Sheet4: 受影响影响分析（BOM 向上溯源链 + 向下子项列表，完整记录变更内容）
   const sheet4Rows: Record<string, unknown>[] = [];
   for (const d of detailData) {
+    for (const item of d.affected_items || []) {
+      const impact = item.bom_impact || {};
+      const pushNode = (node: any, direction: string) => {
+        sheet4Rows.push({
+          ECR编号: d.ecr_number,
+          受影响件号: item.entity_code || item.entity?.code || '',
+          受影响版本: item.entity_version || item.entity?.version || '',
+          链方向: direction,
+          层级: node.level ?? '',
+          节点类型: node.entity_type || '',
+          节点件号: node.entity_code || '',
+          节点名称: node.entity_name || '',
+          节点版本: node.entity_version || '',
+          动作: node.action || 'no_change',
+          目标版本: node.target_version || '',
+          数量: node.quantity ?? '',
+          数量变更: node.quantity_change
+            ? JSON.stringify(node.quantity_change)
+            : '',
+          变更描述: node.change_description || '',
+          是否选中: node.selected === false ? 'FALSE' : 'TRUE',
+        });
+      };
+      for (const node of impact.upward_chain || []) pushNode(node, '向上溯源');
+      for (const node of impact.downward_items || []) pushNode(node, '向下子项');
+    }
+  }
+
+  // Sheet5: 关联图文档
+  const sheet5Rows: Record<string, unknown>[] = [];
+  for (const d of detailData) {
     for (const doc of d.document_links || []) {
-      sheet4Rows.push({
-        ECR编号: d.number,
+      sheet5Rows.push({
+        ECR编号: d.ecr_number,
         图文档编号: doc.document?.code || doc.document_code || '',
         图文档版本: doc.document?.version || doc.document_version || '',
         类别: doc.category || '',
@@ -3594,7 +3639,7 @@ export async function exportECRs(): Promise<void> {
 
   if (sheet2Rows.length > 0) {
     const s2 = XLSX.utils.json_to_sheet(sheet2Rows);
-    s2['!cols'] = [{ wch: 16 }, { wch: 20 }, { wch: 8 }];
+    s2['!cols'] = [{ wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 8 }];
     XLSX.utils.book_append_sheet(wb, s2, '审批流');
   }
 
@@ -3606,8 +3651,18 @@ export async function exportECRs(): Promise<void> {
 
   if (sheet4Rows.length > 0) {
     const s4 = XLSX.utils.json_to_sheet(sheet4Rows);
-    s4['!cols'] = [{ wch: 16 }, { wch: 20 }, { wch: 12 }, { wch: 16 }, { wch: 8 }];
-    XLSX.utils.book_append_sheet(wb, s4, '关联图文档');
+    s4['!cols'] = [
+      { wch: 16 }, { wch: 18 }, { wch: 10 }, { wch: 10 }, { wch: 6 },
+      { wch: 10 }, { wch: 18 }, { wch: 20 }, { wch: 10 }, { wch: 10 },
+      { wch: 10 }, { wch: 8 }, { wch: 20 }, { wch: 30 }, { wch: 8 },
+    ];
+    XLSX.utils.book_append_sheet(wb, s4, '受影响影响分析');
+  }
+
+  if (sheet5Rows.length > 0) {
+    const s5 = XLSX.utils.json_to_sheet(sheet5Rows);
+    s5['!cols'] = [{ wch: 16 }, { wch: 20 }, { wch: 12 }, { wch: 16 }, { wch: 8 }];
+    XLSX.utils.book_append_sheet(wb, s5, '关联图文档');
   }
 
   const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
@@ -3636,7 +3691,7 @@ export async function previewECRsImport(file: File): Promise<ImportPreview> {
   );
   const existingMap = new Map<string, any>();
   for (const e of existingEcrs) {
-    if (e.number) existingMap.set(e.number, e);
+    if (e.ecr_number) existingMap.set(e.ecr_number, e);
   }
 
   // 解析关联 Sheet
@@ -3802,7 +3857,7 @@ export async function executeECRsImport(preview: ImportPreview): Promise<void> {
   );
   const existingMap = new Map<string, any>();
   for (const e of existingEcrs) {
-    if (e.number) existingMap.set(e.number, e);
+    if (e.ecr_number) existingMap.set(e.ecr_number, e);
   }
 
   // 第一步：创建/更新 ECR 主记录，建立 number→id map
@@ -3840,7 +3895,7 @@ export async function executeECRsImport(preview: ImportPreview): Promise<void> {
       } else {
         const res = await ecrApi.create(payload);
         const created = res.data;
-        const key = row.code || created.number;
+        const key = row.code || created.ecr_number;
         numberToId.set(key, created.id);
         row._newId = created.id;
       }
@@ -4052,7 +4107,7 @@ export async function previewECOsImport(file: File): Promise<ImportPreview> {
   );
   const ecrMap = new Map<string, any>();
   for (const e of existingEcrs) {
-    if (e.number) ecrMap.set(e.number, e);
+    if (e.ecr_number) ecrMap.set(e.ecr_number, e);
   }
 
   // 解析关联 Sheet
@@ -4270,7 +4325,7 @@ export async function executeECOsImport(preview: ImportPreview): Promise<void> {
   );
   const ecrMap = new Map<string, any>();
   for (const e of existingEcrs) {
-    if (e.number) ecrMap.set(e.number, e);
+    if (e.ecr_number) ecrMap.set(e.ecr_number, e);
   }
 
   for (const row of validRows) {
