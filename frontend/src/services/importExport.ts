@@ -4003,8 +4003,6 @@ export async function exportECOs(): Promise<void> {
       }
     }
   }
-  const parentVer = (pid: any): string => (pid ? versionById.get(String(pid)) || '' : '');
-
   // Sheet1: ECO 清单
   const sheet1Rows = detailData.map((d: any) => ({
     编号: d.eco_number || '',
@@ -4097,8 +4095,7 @@ export async function exportECOs(): Promise<void> {
           动作: aiSaved?.action || ai.change_type || 'no_change',
           目标数量: aiSaved?.detail?._targetQty ?? '',
           变更描述: aiSaved?.detail?._desc || ai.change_description || '',
-          受影响编号: ai.entity_code || '',
-          父对象ID: '',
+          受影响对象件号: ai.entity_code || '',
           来源: aiSaved?.source || 'ecr',
         });
 
@@ -4118,8 +4115,8 @@ export async function exportECOs(): Promise<void> {
             动作: saved?.action || n.action || 'no_change',
             目标数量: dt._targetQty ?? (n.quantity_change?.to ?? n.quantity ?? ''),
             变更描述: dt._desc || n.change_description || '',
-            受影响编号: ai.entity_code || '',
-            父对象版本: parentVer(n.parent_entity_id || saved?.parent_entity_id),
+            受影响对象件号: ai.entity_code || '',
+            受影响对象版本: ai.entity_version || '',
             来源: saved?.source || 'ecr',
           };
         };
@@ -4146,7 +4143,7 @@ export async function exportECOs(): Promise<void> {
         动作: ei.action || 'no_change',
         目标数量: dt._targetQty ?? '',
         变更描述: dt._desc || '',
-        受影响编号: dt._affectedCode || '',
+        受影响对象件号: dt._affectedCode || '',
       };
       if (isSpecial || ei.parent_entity_id) {
         traceRows.push({
@@ -4154,14 +4151,13 @@ export async function exportECOs(): Promise<void> {
           链分类: isSpecial ? '向下子项' : '向上溯源',
           层级: '',
           ...base,
-          父对象版本: parentVer(ei.parent_entity_id),
+          受影响对象版本: '',
           来源: ei.source || 'manual',
         });
       } else {
         affectedRows.push({
           ECO编号: d.eco_number,
           ...base,
-          父对象ID: '',
           来源: ei.source || 'manual',
         });
       }
@@ -4195,15 +4191,15 @@ export async function exportECOs(): Promise<void> {
   }
 
   const wb = XLSX.utils.book_new();
-  // 受影响物料: ECO编号/对象类型/对象编号/对象名称/对象版本/动作/目标数量/变更描述/受影响编号/父对象ID/来源
+  // 受影响物料: ECO编号/对象类型/对象编号/对象名称/对象版本/动作/目标数量/变更描述/受影响对象件号/来源
   const affectedCols = [
-    { wch: 16 }, { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 10 }, { wch: 10 },
-    { wch: 10 }, { wch: 30 }, { wch: 18 }, { wch: 22 }, { wch: 8 },
+    { wch: 16 }, { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 10 },
+    { wch: 10 }, { wch: 10 }, { wch: 30 }, { wch: 18 }, { wch: 8 },
   ];
-  // 溯源链: ECO编号/链分类/对象类型/对象编号/对象名称/对象版本/层级/动作/目标数量/变更描述/受影响编号/父对象版本/来源
+  // 溯源链: ECO编号/链分类/对象类型/对象编号/对象名称/对象版本/层级/动作/目标数量/变更描述/受影响对象件号/受影响对象版本/来源
   const traceCols = [
     { wch: 16 }, { wch: 10 }, { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 10 }, { wch: 6 },
-    { wch: 10 }, { wch: 10 }, { wch: 30 }, { wch: 18 }, { wch: 22 }, { wch: 8 },
+    { wch: 10 }, { wch: 10 }, { wch: 30 }, { wch: 18 }, { wch: 14 }, { wch: 8 },
   ];
 
   const s1 = XLSX.utils.json_to_sheet(sheet1Rows);
@@ -4463,7 +4459,7 @@ export async function previewECOsImport(file: File): Promise<ImportPreview> {
           detail: {
             _targetQty: r['目标数量'] !== '' && r['目标数量'] != null ? Number(r['目标数量']) : undefined,
             _desc: String(r['变更描述'] || ''),
-            _affectedCode: String(r['受影响编号'] || ''),
+            _affectedCode: String(r['受影响对象件号'] || r['受影响编号'] || ''),
           },
         })),
         _ccUsers: ccUsers
