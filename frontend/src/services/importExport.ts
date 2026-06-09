@@ -4378,7 +4378,22 @@ export async function previewECOsImport(file: File): Promise<ImportPreview> {
       }
       if (!found) execItemWarnings++;
     }
-    execItemsByNumber.get(num)!.push({ ...r, _entity: found || null });
+    // 向下子项：父对象 = 受影响对象（按 受影响对象件号 + 受影响对象版本 解析回 ID，
+    // 因导出不含父对象UUID；用于恢复 parent_entity_id，使详情归类与执行正确）
+    let parentId: string | undefined;
+    if (String(r['链分类'] || '').trim() === '向下子项') {
+      const pCode = String(r['受影响对象件号'] || r['受影响编号'] || '').trim();
+      const pVer = r['受影响对象版本'] !== undefined ? String(r['受影响对象版本']).trim() : null;
+      const matchPV = (code: string, version: string | null) =>
+        code === pCode && (pVer === null || (version || '') === pVer);
+      if (pCode) {
+        const pEnt =
+          store.assemblies.find((a: Assembly) => matchPV(a.code, a.version || null)) ||
+          store.parts.find((p: Part) => matchPV(p.code, p.version || null));
+        parentId = pEnt?.id;
+      }
+    }
+    execItemsByNumber.get(num)!.push({ ...r, _entity: found || null, _parentId: parentId });
   }
 
   // 按 ECO 编号分组关联图文档
@@ -4466,7 +4481,7 @@ export async function previewECOsImport(file: File): Promise<ImportPreview> {
           action: String(r['动作'] || 'no_change'),
           entity_id: r._entity ? r._entity.id : undefined,
           entity_code: String(r['对象编号'] || '') || undefined,
-          parent_entity_id: String(r['父对象ID'] || '') || undefined,
+          parent_entity_id: r._parentId || String(r['父对象ID'] || '') || undefined,
           status: 'pending',
           detail: {
             _targetQty: r['目标数量'] !== '' && r['目标数量'] != null ? Number(r['目标数量']) : undefined,

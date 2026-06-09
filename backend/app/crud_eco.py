@@ -160,6 +160,7 @@ def create_eco(db: Session, data: ECOCreate, creator_id: uuid.UUID) -> ECO:
                 entity_id=uuid.UUID(item.entity_id) if item.entity_id else None,
                 entity_code=item.entity_code,
                 parent_entity_id=uuid.UUID(item.parent_entity_id) if item.parent_entity_id else None,
+                detail=item.detail if getattr(item, "detail", None) else {},
                 sort_order=idx,
             )
             db.add(ei)
