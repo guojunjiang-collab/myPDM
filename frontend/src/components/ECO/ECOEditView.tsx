@@ -680,39 +680,6 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
           );
         })}
 
-        {/* Orphan group */}
-        {(() => {
-          const byCode = (a: any, b: any) => (a.entity_code || '').localeCompare(b.entity_code || '', 'zh-CN');
-          const orphanUp = localUp.filter(n => !(n as any)._affectedCode && (n.level ?? 0) > 0).sort(byCode);
-          const orphanDown = localDown.filter(n => !(n as any)._affectedCode).sort(byCode);
-          if (orphanUp.length === 0 && orphanDown.length === 0) return null;
-          return (
-            <div className="bg-gray-50/50 rounded-lg border border-gray-200 p-3 mb-4">
-              <div className="text-xs font-semibold text-gray-700 mb-2">📦 其他/手动新增</div>
-              {orphanUp.length > 0 && (<>
-                <div className="text-xs font-semibold text-gray-600 mt-3 mb-1">📊 向上溯源链</div>
-                <div className="grid grid-cols-2 gap-4">
-                  {readOnly ? (<>
-                    <div><div className="text-xs text-gray-500 mb-1">ECR 评估</div><EditableUpward rows={orphanUp} onUpdate={() => {}} displayOnly /></div>
-                    <div><div className="text-xs text-gray-500 mb-1">ECO 执行后</div><ReadOnlyUpward rows={orphanUp} /></div>
-                  </>) : null}
-                </div>
-              </>)}
-              {orphanDown.length > 0 && (<>
-                <div className="text-xs font-semibold text-gray-600 mt-3 mb-1">📋 向下子项</div>
-                <div className="grid grid-cols-2 gap-4">
-                  {readOnly ? (<>
-                    <div><div className="text-xs text-gray-500 mb-1">ECR 评估</div><EditableDownward rows={orphanDown} onUpdate={() => {}} displayOnly /></div>
-                    <div><div className="text-xs text-gray-500 mb-1">ECO 执行后</div><ReadOnlyDownward rows={orphanDown} /></div>
-                  </>) : (<>
-                    <div><div className="text-xs text-gray-500 mb-1">ECR 评估（可编辑）</div><EditableDownward rows={orphanDown} onUpdate={(i, patch) => { const origIdx = localDown.indexOf(orphanDown[i]); if (origIdx >= 0) updateDown(origIdx, patch); }} onRemove={(i) => { const origIdx = localDown.indexOf(orphanDown[i]); if (origIdx >= 0) setLocalDown(prev => prev.filter((_, idx) => idx !== origIdx)); }} /></div>
-                    <div><div className="text-xs text-gray-500 mb-1">ECO 执行后</div><ReadOnlyDownward rows={orphanDown} /></div>
-                  </>)}
-                </div>
-              </>)}
-            </div>
-          );
-        })()}
       </>)}
       {ecrId && !loading && !ecrData && <p className="text-xs text-gray-400 text-center py-4">未找到 ECR</p>}
 
