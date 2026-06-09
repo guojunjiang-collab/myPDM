@@ -375,6 +375,7 @@ async def startup_event():
             ("ecrs", "cc_users", "JSONB NOT NULL DEFAULT '[]'"),
             ("ecos", "cc_users", "JSONB NOT NULL DEFAULT '[]'"),
             ("ecos", "release_items", "JSONB NOT NULL DEFAULT '[]'"),
+            ("configuration_item_children", "quantity", "INTEGER NOT NULL DEFAULT 1"),
         ]:
             result = db.execute(text(f"SELECT column_name FROM information_schema.columns WHERE table_name = '{tbl}' AND column_name = '{col}'"))
             if not result.fetchone():
