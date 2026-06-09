@@ -245,14 +245,47 @@ export function exportEcrMarkdown(detail: any, statusLogs: any[] = []): void {
 
 // ─── ECO 导出 ──────────────────────────────────────────────────
 const DOWNWARD_ACTIONS = ['qty_change', 'delete', 'add_existing', 'add_new'];
+const CHANGING_ACTIONS = ['upgrade', 'qty_change', 'delete'];
+const EXEC_STATUS_LABELS: Record<string, string> = {
+  released: '已发布', frozen: '已冻结', draft: '已升版',
+};
 
-/** 把 ECR bom_impact 节点叠加 ECO 执行项编辑值（与 ECOEditView 一致） */
+/** 计算下一个版本号（A→B→…→Z→AA），与 ECOEditView.nextVer 一致 */
+function nextVer(v: string): string {
+  if (!v) return 'A';
+  const c = [...v.toUpperCase()];
+  let i = c.length - 1;
+  while (i >= 0) {
+    if (c[i] === 'Z') { c[i] = 'A'; i--; }
+    else { c[i] = String.fromCharCode(c[i].charCodeAt(0) + 1); return c.join(''); }
+  }
+  return 'A' + c.join('');
+}
+
+/** ECO 执行后版本：已执行用 new_version，否则变更类动作预览 nextVer */
+function resultVersion(action: string, version: string, newVersion?: string): string {
+  if (newVersion) return newVersion;
+  if (CHANGING_ACTIONS.includes(action)) return nextVer(version || 'A');
+  return version || '-';
+}
+
+/** ECO 执行后状态标签（对应详情 StatusBadge） */
+function execStatusLabel(action: string, newStatus?: string): string {
+  if (action === 'no_change') return '不变更';
+  return EXEC_STATUS_LABELS[newStatus || ''] || '未执行';
+}
+
+const byCode = (a: any, b: any) => String(a.entity_code || '').localeCompare(String(b.entity_code || ''), 'zh-CN');
+
+/** 把 ECR bom_impact 节点叠加 ECO 执行项编辑值 + 执行结果（与 ECOEditView 一致） */
 function ecoOverlayNode(n: any, saved: any): any {
   return {
     ...n,
     action: saved?.action || n.action || 'no_change',
     _targetQty: saved?.detail?._targetQty ?? (n.quantity_change?.to ?? n.quantity ?? ''),
     _desc: saved?.detail?._desc || n.change_description || '',
+    _newVersion: saved?.new_version || '',
+    _newStatus: saved?.new_entity_status || '',
   };
 }
 
@@ -360,32 +393,39 @@ export async function exportEcoMarkdown(eco: any): Promise<void> {
           entity_type: ei.entity_type, entity_code: ei.entity_code, entity_name: ei.entity_name,
           entity_version: '', action: ei.action,
           _targetQty: ei.detail?._targetQty ?? '', _desc: ei.detail?._desc || '',
+          _newVersion: ei.new_version || '', _newStatus: ei.new_entity_status || '',
         });
       }
+
+      // 按件号排序（与 ECO 详情一致）
+      up.sort(byCode);
+      down.sort(byCode);
 
       const typeLabel = ai.entity_type === 'part' ? '零件' : '部件';
       out.push(`### 📦 ${ai.entity_code} ${ai.entity_name || ''} v${ai.entity_version || ''}（${typeLabel}）`);
       out.push('');
       if (up.length > 0) {
-        out.push('**📊 向上溯源链**\n');
+        out.push('**📊 向上溯源链**（ECR 评估 → ECO 执行后）\n');
         out.push(mdTable(
-          ['层级', '类型', '件号', '名称', '版本', '动作', '数量', '目标数量', '变更描述'],
+          ['层级', '类型', '件号', '名称', '原版本', '动作', '原数量', '目标数量', '变更描述', '执行后版本', '变更状态'],
           up.map((n: any) => [
             n.level ?? '-', n.entity_type === 'part' ? '零件' : '部件',
             n.entity_code, n.entity_name, n.entity_version,
             actionCell(n.action), n.quantity ?? '-', n._targetQty ?? '-', n._desc || '',
+            resultVersion(n.action, n.entity_version, n._newVersion), execStatusLabel(n.action, n._newStatus),
           ]),
         ));
         out.push('');
       }
       if (down.length > 0) {
-        out.push('**📋 向下子项**\n');
+        out.push('**📋 向下子项**（ECR 评估 → ECO 执行后）\n');
         out.push(mdTable(
-          ['类型', '件号', '名称', '版本', '动作', '数量', '目标数量', '变更描述'],
+          ['类型', '件号', '名称', '原版本', '动作', '原数量', '目标数量', '变更描述', '执行后版本', '变更状态'],
           down.map((n: any) => [
             n.entity_type === 'part' ? '零件' : '部件',
             n.entity_code, n.entity_name, n.entity_version || '-',
             actionCell(n.action), n.quantity ?? '-', n._targetQty ?? '-', n._desc || '',
+            resultVersion(n.action, n.entity_version, n._newVersion), execStatusLabel(n.action, n._newStatus),
           ]),
         ));
         out.push('');
