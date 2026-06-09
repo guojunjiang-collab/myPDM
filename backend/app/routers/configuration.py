@@ -611,6 +611,67 @@ async def archive_profile(
     return {"detail": "ok", "status": "archived"}
 
 
+class ChecklistRestoreItem(BaseModel):
+    item_type: str
+    item_code: str
+    source_ci_code: str = ""
+    is_selected: bool
+
+
+class ChecklistRestoreRequest(BaseModel):
+    items: list[ChecklistRestoreItem]
+
+
+@router.put("/profiles/{profile_id}/restore-checklist", response_model=dict)
+async def restore_profile_checklist(
+    profile_id: str,
+    data: ChecklistRestoreRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_role(["admin", "engineer"])),
+):
+    """按导入数据强制还原工作清单勾选（含必选件，用于导入恢复），再同步正式清单。仅 draft。
+
+    逐项 updateItem 无法还原"被取消的可选子构型项下的必选件"（接口拦截必选件），
+    故此处直接强制设置工作表项的 is_selected，完整还原整棵树（含子构型项节点的取消级联）。
+    """
+    profile = crud.get_profile(db, profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="配置不存在")
+    if profile.status != "draft":
+        raise HTTPException(status_code=400, detail="仅草稿状态可还原清单")
+
+    working = crud.get_working_items(db, profile_id)
+
+    # 工作表项的来源构型项 id→code
+    ci_ids = {str(wi.source_config_item_id) for wi in working if wi.source_config_item_id}
+    code_by_id: dict[str, str] = {}
+    if ci_ids:
+        for ci in db.query(models.ConfigurationItem).filter(
+            models.ConfigurationItem.id.in_(ci_ids)
+        ).all():
+            code_by_id[str(ci.id)] = ci.code
+
+    def _key(item_type: str, item_code: str, source_code: str) -> str:
+        return f"{item_type}|{item_code}|{source_code}"
+
+    target = {_key(it.item_type, it.item_code, it.source_ci_code): it.is_selected for it in data.items}
+    matched: set[str] = set()
+
+    for wi in working:
+        src_code = code_by_id.get(str(wi.source_config_item_id), "") if wi.source_config_item_id else ""
+        k = _key(wi.item_type, wi.item_code or "", src_code)
+        if k in target:
+            wi.is_selected = target[k]  # 强制设置，含必选件
+            matched.add(k)
+
+    db.flush()
+    crud.sync_working_to_formal(db, profile_id)
+    db.commit()
+
+    unmatched = [k for k in target if k not in matched]
+    return {"detail": "ok", "matched": len(matched), "unmatched": len(unmatched)}
+
+
 @router.put("/profiles/{profile_id}/items/{item_id}", response_model=dict)
 async def update_profile_item(
     profile_id: str,

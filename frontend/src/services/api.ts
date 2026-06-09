@@ -536,6 +536,12 @@ export const configurationProfileApi = {
   updateItem: (profileId: string, itemId: string, data: { is_selected: boolean }) =>
     api.put(`/configurations/profiles/${profileId}/items/${itemId}`, data),
 
+  restoreChecklist: (
+    profileId: string,
+    items: { item_type: string; item_code: string; source_ci_code: string; is_selected: boolean }[],
+  ) =>
+    api.put(`/configurations/profiles/${profileId}/restore-checklist`, { items }),
+
   toggleConfigNode: (profileId: string, configItemId: string) =>
     api.put(`/configurations/profiles/${profileId}/config-items/${configItemId}/toggle`),
 

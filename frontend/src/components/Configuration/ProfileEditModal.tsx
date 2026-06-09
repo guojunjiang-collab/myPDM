@@ -820,34 +820,35 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
               </div>
             )}
 
-            {/* Footer Buttons */}
-            <div className="flex justify-end gap-2 pt-2 border-t">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 border border-gray-200 rounded-lg text-sm"
-              >
-                关闭
-              </button>
-              {isCreate && (
-                <button
-                  onClick={handleSubmit}
-                  disabled={saving}
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm disabled:opacity-50"
-                >
-                  {saving ? '保存中...' : '保存'}
-                </button>
-              )}
-              {canEdit && (
-                <button
-                  onClick={handleUpdate}
-                  disabled={saving}
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm disabled:opacity-50"
-                >
-                  {saving ? '保存中...' : '保存'}
-                </button>
-              )}
-            </div>
           </>
+        )}
+      </div>
+
+      {/* Footer Buttons — 置于滚动容器外侧，始终可见 */}
+      <div className="flex justify-end gap-2 pt-3 mt-3 border-t border-gray-200">
+        <button
+          onClick={onClose}
+          className="px-4 py-2 border border-gray-200 rounded-lg text-sm"
+        >
+          关闭
+        </button>
+        {isCreate && (
+          <button
+            onClick={handleSubmit}
+            disabled={saving}
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm disabled:opacity-50"
+          >
+            {saving ? '保存中...' : '保存'}
+          </button>
+        )}
+        {canEdit && (
+          <button
+            onClick={handleUpdate}
+            disabled={saving}
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm disabled:opacity-50"
+          >
+            {saving ? '保存中...' : '保存'}
+          </button>
         )}
       </div>
     </Modal>

@@ -3364,7 +3364,7 @@ export async function exportConfigurationProfiles(): Promise<void> {
   const ciIdToCode = new Map<string, string>();
   for (const ci of ciItems) ciIdToCode.set(String(ci.id), ci.code);
 
-  // 并发获取每个 Profile 的详情（含正式清单 formal_items）
+  // 并发获取每个 Profile 的详情（含完整配置清单 items，每项带真实 is_selected）
   const details = await Promise.all(profiles.map((p: any) => configurationProfileApi.get(p.id)));
   const detailData: any[] = details.map((r: any) => r.data);
 
@@ -3381,10 +3381,10 @@ export async function exportConfigurationProfiles(): Promise<void> {
     更新时间: d.updated_at || '',
   }));
 
-  // Sheet2: 正式配置清单项
+  // Sheet2: 配置清单项（导出完整工作清单 items，含未选中项，是否选用按真实 is_selected）
   const sheet2Rows: Record<string, unknown>[] = [];
   for (const d of detailData) {
-    for (const it of d.formal_items || []) {
+    for (const it of d.items || []) {
       sheet2Rows.push({
         配置编号: d.code,
         来源构型号: it.source_config_item_id
@@ -3416,7 +3416,7 @@ export async function exportConfigurationProfiles(): Promise<void> {
       { wch: 20 }, { wch: 20 }, { wch: 12 }, { wch: 20 },
       { wch: 24 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 8 },
     ];
-    XLSX.utils.book_append_sheet(wb, s2, '正式配置清单项');
+    XLSX.utils.book_append_sheet(wb, s2, '配置清单项');
   }
 
   const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
@@ -3515,6 +3515,7 @@ export async function previewConfigurationProfilesImport(file: File): Promise<Im
         code,
         name,
         remark,
+        status: String(raw['状态'] || '').trim(),
         effectivity_start: String(raw['起始架次号'] || '').trim(),
         effectivity_end: String(raw['结束架次号'] || '').trim(),
         _items: items,
@@ -3600,43 +3601,64 @@ export async function executeConfigurationProfilesImport(preview: ImportPreview)
       continue;
     }
 
+    if (!profileId) continue;
+
     // 还原正式清单的勾选状态（仅在关联构型项存在时有清单可还原）
     const items = (data._items as any[]) || [];
-    if (!profileId || !ciId) continue;
-
-    try {
-      // 创建/更新后工作表已按当前构型项生成；按导入的 is_selected 逐项校正
-      const detail = await configurationProfileApi.get(profileId);
-      const working: any[] = detail.data.items || [];
-
-      // 导入文件中应选中的清单项键集合
-      const selectedKeys = new Set<string>();
-      for (const it of items) {
-        if (it.is_selected || it.is_required) {
-          selectedKeys.add(itemKey(it.item_type, it.item_code, it.source_ci_code));
+    if (ciId) {
+      try {
+        // 反向检查：导出"选中/必选"项是否在当前构型项有对应工作表项，否则视为未能恢复
+        const detail = await configurationProfileApi.get(profileId);
+        const working: any[] = detail.data.items || [];
+        const workingKeys = new Set<string>();
+        for (const wi of working) {
+          const wiSourceCode = wi.source_config_item_id
+            ? ciIdToCode.get(String(wi.source_config_item_id)) || ''
+            : '';
+          workingKeys.add(itemKey(wi.item_type, wi.item_code, wiSourceCode));
         }
-      }
-
-      let changed = false;
-      for (const wi of working) {
-        if (wi.is_required) continue; // 必选项恒选中，跳过
-        const wiSourceCode = wi.source_config_item_id
-          ? ciIdToCode.get(String(wi.source_config_item_id)) || ''
-          : '';
-        const shouldSelect = selectedKeys.has(itemKey(wi.item_type, wi.item_code, wiSourceCode));
-        if (Boolean(wi.is_selected) !== shouldSelect) {
-          await configurationProfileApi.updateItem(profileId, wi.id, { is_selected: shouldSelect });
-          changed = true;
+        const missing: string[] = [];
+        for (const it of items) {
+          if (it.is_selected || it.is_required) {
+            const k = itemKey(it.item_type, it.item_code, it.source_ci_code);
+            if (!workingKeys.has(k)) missing.push(it.item_code || k);
+          }
         }
-      }
+        if (missing.length > 0) {
+          warnings.push(
+            `配置 ${row.code}: ${missing.length} 个清单项在当前构型项中无对应、未能恢复（${missing.slice(0, 5).join(', ')}${missing.length > 5 ? '…' : ''}）`,
+          );
+        }
 
-      // 触发工作表→正式清单同步（update 结尾始终执行 sync_working_to_formal）
-      if (changed) {
-        await configurationProfileApi.update(profileId, payload as any);
+        // 强制按导入的 is_selected 还原整棵清单（含必选件、子构型项节点取消的级联），后端同步正式清单
+        await configurationProfileApi.restoreChecklist(
+          profileId,
+          items.map((it) => ({
+            item_type: it.item_type,
+            item_code: it.item_code,
+            source_ci_code: it.source_ci_code || '',
+            is_selected: !!it.is_selected,
+          })),
+        );
+      } catch (err: any) {
+        warnings.push(`配置 ${row.code}: 清单项勾选还原失败 ${err?.message || ''}`);
+        console.warn(`还原构型配置清单项失败: ${row.code}`, err);
       }
-    } catch (err: any) {
-      warnings.push(`配置 ${row.code}: 清单项勾选还原失败 ${err?.message || ''}`);
-      console.warn(`还原构型配置清单项失败: ${row.code}`, err);
+    }
+
+    // 恢复状态（导出为 active/archived 时；勾选还原须在草稿态完成，故放最后）
+    const targetStatus = (data.status as string) || '';
+    if (targetStatus && targetStatus !== 'draft') {
+      try {
+        if (targetStatus === 'active') {
+          await configurationProfileApi.activate(profileId);
+        } else if (targetStatus === 'archived') {
+          await configurationProfileApi.updateStatus(profileId, 'archived');
+        }
+      } catch (err: any) {
+        warnings.push(`配置 ${row.code}: 状态恢复为 ${targetStatus} 失败（可能权限不足或不允许的状态转换）${err?.message || ''}`);
+        console.warn(`恢复构型配置状态失败: ${row.code}`, err);
+      }
     }
   }
 
