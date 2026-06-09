@@ -419,10 +419,13 @@ def reorder_custom_field_definitions(db, items):
     return True
 
 def reset_business_data(db):
-    """清除所有业务数据：零件、部件、BOM、图文档、附件文件、自定义字段、看板、日志、非管理员用户；重置 admin 密码为 admin123"""
+    """清除所有业务数据：零件、部件、BOM、图文档、附件文件、自定义字段、看板、构型管理（构型项/构型配置）、变更管理（ECR/ECO）、日志、非管理员用户；重置 admin 密码为 admin123"""
     import os
     import shutil
     from .file_storage import UPLOAD_DIR
+    from . import models_configuration as mc
+    from . import models_ecr as mecr
+    from . import models_eco as meco
 
     # 先收集所有要删除的附件文件路径
     attachments = db.query(models.DocumentAttachment).all()
@@ -438,6 +441,25 @@ def reset_business_data(db):
     db.query(models.DashboardFolderShare).delete()
     db.query(models.DashboardFolder).delete()
     db.query(models.UserDashboard).delete()
+
+    # 变更管理（ECO/ECR）：子表 → 主表（均引用 users / 互相引用，须在删除用户前）
+    db.query(meco.ECOExecutionItem).delete()
+    db.query(meco.ECOReviewRecord).delete()
+    db.query(meco.ECOStatusLog).delete()
+    db.query(meco.ECO).delete()
+    db.query(mecr.ECRAffectedItem).delete()
+    db.query(mecr.ECRReviewRecord).delete()
+    db.query(mecr.ECRStatusLog).delete()
+    db.query(mecr.ECR).delete()
+
+    # 构型管理（构型项/构型配置）：子表 → 主表
+    db.query(mc.ConfigurationProfileItem).delete()
+    db.query(mc.ConfigurationWorkingItem).delete()
+    db.query(mc.ConfigurationProfile).delete()
+    db.query(mc.ConfigurationItemPart).delete()
+    db.query(mc.ConfigurationItemChild).delete()
+    db.query(mc.ConfigurationItem).delete()
+
     db.query(models.DocumentAttachment).delete()
     db.query(models.Document).delete()
     db.query(models.Part).delete()

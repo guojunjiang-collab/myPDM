@@ -623,7 +623,7 @@ export default function Settings() {
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <h3 className="text-lg font-medium mb-2">重置系统数据</h3>
             <p className="text-sm text-gray-500 mb-4">
-              清空所有零件、部件、图文档、自定义字段、附件文件及看板数据。需验证管理员密码。此操作不可逆，请谨慎操作。
+              清空所有零件、部件、图文档、自定义字段、附件文件、看板、构型管理（构型项/构型配置）及变更管理（ECR/ECO）数据。需验证管理员密码。此操作不可逆，请谨慎操作。
             </p>
             <button
               onClick={() => { setShowResetConfirm(true); setResetPassword(''); }}
@@ -638,7 +638,7 @@ export default function Settings() {
         {/* ---- Reset Confirm Modal ---- */}
         <Modal open={showResetConfirm} title="确认重置" onClose={() => setShowResetConfirm(false)} width="sm">
           <div className="space-y-4">
-              <p className="text-sm text-gray-600">此操作将清空所有业务数据（零件、部件、图文档、附件、自定义字段、看板、glTF缓存），删除所有非管理员用户，并将 admin 密码重置为 admin123。此操作不可逆，请输入管理员密码确认：</p>
+              <p className="text-sm text-gray-600">此操作将清空所有业务数据（零件、部件、图文档、附件、自定义字段、看板、构型管理、变更管理、glTF缓存），删除所有非管理员用户，并将 admin 密码重置为 admin123。此操作不可逆，请输入管理员密码确认：</p>
             <input
               type="password"
               value={resetPassword}
