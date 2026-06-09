@@ -3518,7 +3518,7 @@ export async function executeConfigurationProfilesImport(preview: ImportPreview)
 /**
  * 导出 ECR 为 Excel 文件
  * Sheet1: ECR清单, Sheet2: 审批流, Sheet3: 受影响对象,
- * Sheet4: 受影响影响分析（BOM 向上/向下链）, Sheet5: 关联图文档
+ * Sheet4: 影响分析（BOM 向上/向下链）, Sheet5: 关联图文档
  */
 export async function exportECRs(): Promise<void> {
   const ecrs: any[] = await fetchAllPages((page, pageSize) =>
@@ -3600,13 +3600,11 @@ export async function exportECRs(): Promise<void> {
           节点名称: node.entity_name || '',
           节点版本: node.entity_version || '',
           动作: node.action || 'no_change',
-          目标版本: node.target_version || '',
           数量: node.quantity ?? '',
           数量变更: node.quantity_change
             ? JSON.stringify(node.quantity_change)
             : '',
           变更描述: node.change_description || '',
-          是否选中: node.selected === false ? 'FALSE' : 'TRUE',
         });
       };
       for (const node of impact.upward_chain || []) pushNode(node, '向上溯源');
@@ -3654,9 +3652,9 @@ export async function exportECRs(): Promise<void> {
     s4['!cols'] = [
       { wch: 16 }, { wch: 18 }, { wch: 10 }, { wch: 10 }, { wch: 6 },
       { wch: 10 }, { wch: 18 }, { wch: 20 }, { wch: 10 }, { wch: 10 },
-      { wch: 10 }, { wch: 8 }, { wch: 20 }, { wch: 30 }, { wch: 8 },
+      { wch: 8 }, { wch: 20 }, { wch: 30 },
     ];
-    XLSX.utils.book_append_sheet(wb, s4, '受影响影响分析');
+    XLSX.utils.book_append_sheet(wb, s4, '影响分析');
   }
 
   if (sheet5Rows.length > 0) {
