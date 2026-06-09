@@ -4,7 +4,8 @@ import type { ECORequest, Document, ECRDocumentLink } from '../../types';
 import { ECOStatusBadge, ECOPriorityBadge } from './ECOStatusBadge';
 import { Modal } from '../Modal';
 import { toast } from '../Toast';
-import { useAuthStore } from '../../stores/auth';
+import { useAuthStore, canDownload } from '../../stores/auth';
+import { exportEcoMarkdown } from '../../services/ecMarkdownExport';
 import { useDataStore } from '../../stores/data';
 import { ECOEditView } from './ECOEditView';
 import { ECRReviewPanel } from '../ECR/ECRReviewPanel';
@@ -202,6 +203,15 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
               <div className="text-sm text-gray-500 mt-0.5">{eco.title}</div>
             </div>
             <div className="flex items-center gap-2">
+              {canDownload() && (
+                <button
+                  onClick={async () => { try { await exportEcoMarkdown(eco); } catch { toast.error('导出失败'); } }}
+                  className="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+                  title="导出为 Markdown 文档（展开所有信息）"
+                >
+                  📄 导出MD
+                </button>
+              )}
               <ECOStatusBadge status={eco.status} />
               <ECOPriorityBadge priority={eco.priority} />
             </div>

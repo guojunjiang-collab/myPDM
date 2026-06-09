@@ -2,8 +2,10 @@
  * ECR / ECO 详情导出为 Markdown 文档
  * ------------------------------------------------------------------
  * 纯前端：直接把详情接口已加载的数据按详情界面的分区渲染成 .md 文本并下载。
- * 不依赖后端，不做导入（这类单据是过程记录，导出留档即可）。
+ * 不做导入（这类单据是过程记录，导出留档即可）。
+ * ECO 的「ECR 变更分析」与详情界面一致：拉源 ECR 的 BOM 拓扑 + 叠加执行项编辑值。
  */
+import { ecrApi } from './api';
 
 // ─── 标签字典（与详情界面一致）──────────────────────────────────
 const REASON_LABELS: Record<string, string> = {
@@ -30,6 +32,10 @@ const ECR_STATUS_LABELS: Record<string, string> = {
 };
 const DECISION_LABELS: Record<string, string> = {
   approved: '通过', rejected: '驳回', returned: '退回',
+};
+const ECO_STATUS_LABELS: Record<string, string> = {
+  draft: '草稿', reviewing: '评审中', approved: '已批准', rejected: '已驳回',
+  executing: '执行中', completed: '已完成', closed: '已关闭', returned: '退回修改',
 };
 const ACTION_LABELS: Record<string, string> = {
   upgrade: '升版', qty_change: '数量修改', delete: '删除', no_change: '不变',
@@ -235,4 +241,209 @@ export function exportEcrMarkdown(detail: any, statusLogs: any[] = []): void {
   out.push(`_导出时间：${new Date().toLocaleString('zh-CN')}_`);
 
   downloadMarkdown(`${d.ecr_number || 'ECR'}_${d.title || ''}.md`, out.join('\n'));
+}
+
+// ─── ECO 导出 ──────────────────────────────────────────────────
+const DOWNWARD_ACTIONS = ['qty_change', 'delete', 'add_existing', 'add_new'];
+
+/** 把 ECR bom_impact 节点叠加 ECO 执行项编辑值（与 ECOEditView 一致） */
+function ecoOverlayNode(n: any, saved: any): any {
+  return {
+    ...n,
+    action: saved?.action || n.action || 'no_change',
+    _targetQty: saved?.detail?._targetQty ?? (n.quantity_change?.to ?? n.quantity ?? ''),
+    _desc: saved?.detail?._desc || n.change_description || '',
+  };
+}
+
+/**
+ * 导出 ECO 详情为 Markdown。
+ * BOM 变更分析与详情界面一致：拉源 ECR 的 bom_impact 拓扑（含版本/层级），
+ * 再叠加 ECO 自身 execution_items 的编辑内容（动作/目标数量/变更描述）。
+ */
+export async function exportEcoMarkdown(eco: any): Promise<void> {
+  const e = eco || {};
+  const out: string[] = [];
+
+  out.push(`# ${e.eco_number || 'ECO'} ${e.title || ''}`.trim());
+  out.push('');
+  out.push(`> 状态：${lbl(ECO_STATUS_LABELS, e.status)} ｜ 优先级：${lbl(PRIORITY_LABELS, e.priority)}`);
+  out.push('');
+
+  // 基本信息
+  out.push('## 基本信息\n');
+  out.push(mdTable(['项', '值'], [
+    ['变更原因', lbl(REASON_LABELS, e.reason)],
+    ['变更类别', lbl(CATEGORY_LABELS, e.category)],
+    ['优先级', lbl(PRIORITY_LABELS, e.priority)],
+    ['审批模式', e.review_mode === 'all' ? '会签' : (e.review_mode === 'any' ? '或签' : '-')],
+    ['创建人', e.creator_name || '-'],
+    ['来源 ECR', e.ecr_number || '独立创建'],
+    ['执行进度', `${e.execution_completed_count ?? 0}/${e.execution_count ?? (e.execution_items?.length ?? 0)}`],
+    ['创建时间', dt(e.created_at)],
+    ['更新时间', dt(e.updated_at)],
+  ]));
+  out.push('');
+
+  // 变更描述
+  if (e.description) {
+    out.push('## 变更描述\n');
+    out.push(e.description);
+    out.push('');
+  }
+
+  // 审批进度
+  const reviewers: any[] = e.reviewers || [];
+  if (reviewers.length > 0) {
+    const recByUser = new Map<string, any>();
+    for (const r of e.review_records || []) recByUser.set(String(r.reviewer_id), r);
+    out.push(`## 审批进度（${e.approved_count || 0}/${e.reviewers_count || reviewers.length} 已审批）\n`);
+    out.push(mdTable(
+      ['顺序', '审批人', '结果', '意见', '时间'],
+      reviewers
+        .slice()
+        .sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0))
+        .map((r) => {
+          const rec = recByUser.get(String(r.user_id));
+          return [
+            r.seq ?? '-',
+            r.user_name || '-',
+            rec ? lbl(DECISION_LABELS, rec.decision) : '待审批',
+            rec?.comment || '',
+            rec ? dt(rec.created_at) : '-',
+          ];
+        }),
+    ));
+    out.push('');
+  }
+
+  // ECR 变更分析（拉源 ECR + 叠加执行项）
+  const execItems: any[] = e.execution_items || [];
+  let ecrData: any = null;
+  if (e.ecr_id) {
+    try { ecrData = (await ecrApi.get(e.ecr_id)).data; } catch { ecrData = null; }
+  }
+
+  if (ecrData && (ecrData.affected_items || []).length > 0) {
+    // 执行项编辑值索引
+    const savedMap = new Map<string, any>();
+    for (const ei of execItems) {
+      const aff = ei.detail?._affectedCode || '';
+      const key = ei.entity_id || ei.entity_code;
+      if (!key) continue;
+      savedMap.set(key + '|' + aff, ei);
+      if (!aff) savedMap.set(String(key), ei);
+    }
+    const lookup = (n: any, affCode: string) =>
+      savedMap.get((n.entity_id || n.entity_code || '') + '|' + (affCode || '')) ||
+      savedMap.get(n.entity_id) ||
+      savedMap.get(n.entity_code);
+    const usedKeys = new Set<string>();
+
+    out.push(`## ECR 变更分析（${e.ecr_number || ecrData.ecr_number || 'ECR'}）\n`);
+    for (const ai of ecrData.affected_items || []) {
+      const bi = ai.bom_impact || {};
+      const up = (bi.upward_chain || [])
+        .filter((n: any) => (n.level ?? 0) > 0)
+        .map((n: any) => { const s = lookup(n, ai.entity_code); if (s) usedKeys.add((s.entity_id || s.entity_code) + '|' + (s.detail?._affectedCode || '')); return ecoOverlayNode(n, s); });
+      const down = (bi.downward_items || [])
+        .map((n: any) => { const s = lookup(n, ai.entity_code); if (s) usedKeys.add((s.entity_id || s.entity_code) + '|' + (s.detail?._affectedCode || '')); return ecoOverlayNode(n, s); });
+
+      // 手动新增子项（不在 ECR 链中）补到对应受影响对象下
+      for (const ei of execItems) {
+        if (!DOWNWARD_ACTIONS.includes(ei.action)) continue;
+        if ((ei.detail?._affectedCode || '') !== ai.entity_code) continue;
+        const k = (ei.entity_id || ei.entity_code) + '|' + (ei.detail?._affectedCode || '');
+        if (usedKeys.has(k)) continue;
+        usedKeys.add(k);
+        down.push({
+          entity_type: ei.entity_type, entity_code: ei.entity_code, entity_name: ei.entity_name,
+          entity_version: '', action: ei.action,
+          _targetQty: ei.detail?._targetQty ?? '', _desc: ei.detail?._desc || '',
+        });
+      }
+
+      const typeLabel = ai.entity_type === 'part' ? '零件' : '部件';
+      out.push(`### 📦 ${ai.entity_code} ${ai.entity_name || ''} v${ai.entity_version || ''}（${typeLabel}）`);
+      out.push('');
+      if (up.length > 0) {
+        out.push('**📊 向上溯源链**\n');
+        out.push(mdTable(
+          ['层级', '类型', '件号', '名称', '版本', '动作', '数量', '目标数量', '变更描述'],
+          up.map((n: any) => [
+            n.level ?? '-', n.entity_type === 'part' ? '零件' : '部件',
+            n.entity_code, n.entity_name, n.entity_version,
+            actionCell(n.action), n.quantity ?? '-', n._targetQty ?? '-', n._desc || '',
+          ]),
+        ));
+        out.push('');
+      }
+      if (down.length > 0) {
+        out.push('**📋 向下子项**\n');
+        out.push(mdTable(
+          ['类型', '件号', '名称', '版本', '动作', '数量', '目标数量', '变更描述'],
+          down.map((n: any) => [
+            n.entity_type === 'part' ? '零件' : '部件',
+            n.entity_code, n.entity_name, n.entity_version || '-',
+            actionCell(n.action), n.quantity ?? '-', n._targetQty ?? '-', n._desc || '',
+          ]),
+        ));
+        out.push('');
+      }
+      if (up.length === 0 && down.length === 0) out.push('_（无影响链节点）_\n');
+    }
+  } else if (execItems.length > 0) {
+    // 无源 ECR：按执行项扁平列出（兜底）
+    out.push('## 变更明细\n');
+    out.push(mdTable(
+      ['对象类型', '件号', '名称', '动作', '目标数量', '变更描述', '受影响对象'],
+      execItems.map((ei) => [
+        ei.entity_type === 'part' ? '零件' : '部件',
+        ei.entity_code, ei.entity_name, actionCell(ei.action),
+        ei.detail?._targetQty ?? '-', ei.detail?._desc || '', ei.detail?._affectedCode || '',
+      ]),
+    ));
+    out.push('');
+  }
+
+  // 关联图文档
+  const docs: any[] = e.document_links || [];
+  if (docs.length > 0) {
+    out.push('## 关联图文档\n');
+    out.push(mdTable(
+      ['图文档编号', '名称', '版本'],
+      docs.map((l) => [
+        l.document_code || l.document?.code || '-',
+        l.document_name || l.document?.name || '-',
+        l.document_version || l.document?.version || '-',
+      ]),
+    ));
+    out.push('');
+  }
+
+  // 知会人
+  const cc: any[] = e.cc_users || [];
+  if (cc.length > 0) {
+    out.push('## 知会人\n');
+    out.push(cc.map((c) => c.user_name).filter(Boolean).join('、') || '-');
+    out.push('');
+  }
+
+  // 状态记录
+  const logs: any[] = e.status_logs || [];
+  if (logs.length > 0) {
+    out.push('## 状态记录\n');
+    for (const log of logs) {
+      const to = lbl(ECO_STATUS_LABELS, log.to_status);
+      const op = log.operator_name || '';
+      const comment = log.comment ? ` —— ${log.comment}` : '';
+      out.push(`- ${dt(log.created_at)}  **${to}**（${op}）${comment}`);
+    }
+    out.push('');
+  }
+
+  out.push('');
+  out.push(`_导出时间：${new Date().toLocaleString('zh-CN')}_`);
+
+  downloadMarkdown(`${e.eco_number || 'ECO'}_${e.title || ''}.md`, out.join('\n'));
 }
