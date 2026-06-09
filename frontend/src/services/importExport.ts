@@ -4099,7 +4099,6 @@ export async function exportECOs(): Promise<void> {
           对象编号: ai.entity_code || '',
           对象名称: ai.entity_name || '',
           对象版本: ai.entity_version || '',
-          动作: aiSaved?.action || ai.change_type || 'no_change',
           目标数量: aiSaved?.detail?._targetQty ?? '',
           变更描述: aiSaved?.detail?._desc || ai.change_description || '',
           来源: aiSaved?.source || 'ecr',
@@ -4146,7 +4145,6 @@ export async function exportECOs(): Promise<void> {
         对象编号: ei.entity_code || '',
         对象名称: ei.entity_name || '',
         对象版本: ei.entity_id ? versionById.get(String(ei.entity_id)) || '' : '',
-        动作: ei.action || 'no_change',
         目标数量: dt._targetQty ?? '',
         变更描述: dt._desc || '',
       };
@@ -4154,8 +4152,14 @@ export async function exportECOs(): Promise<void> {
         traceRows.push({
           ECO编号: d.eco_number,
           链分类: isSpecial ? '向下子项' : '向上溯源',
+          对象类型: base.对象类型,
+          对象编号: base.对象编号,
+          对象名称: base.对象名称,
+          对象版本: base.对象版本,
           层级: '',
-          ...base,
+          动作: ei.action || 'no_change',
+          目标数量: base.目标数量,
+          变更描述: base.变更描述,
           受影响对象件号: dt._affectedCode || '',
           受影响对象版本:
             affectedVerByCode.get(dt._affectedCode || '') ||
@@ -4200,10 +4204,10 @@ export async function exportECOs(): Promise<void> {
   }
 
   const wb = XLSX.utils.book_new();
-  // 受影响物料: ECO编号/对象类型/对象编号/对象名称/对象版本/动作/目标数量/变更描述/来源
+  // 受影响物料: ECO编号/对象类型/对象编号/对象名称/对象版本/目标数量/变更描述/来源
   const affectedCols = [
     { wch: 16 }, { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 10 },
-    { wch: 10 }, { wch: 10 }, { wch: 30 }, { wch: 8 },
+    { wch: 10 }, { wch: 30 }, { wch: 8 },
   ];
   // 溯源链: ECO编号/链分类/对象类型/对象编号/对象名称/对象版本/层级/动作/目标数量/变更描述/受影响对象件号/受影响对象版本/来源
   const traceCols = [
@@ -4297,7 +4301,8 @@ export async function previewECOsImport(file: File): Promise<ImportPreview> {
   const readSheet = (name: string): Record<string, unknown>[] =>
     wb.Sheets[name] ? XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[name]) : [];
   const execItemRows = [
-    ...readSheet('受影响物料'),
+    // 受影响物料默认动作为 upgrade（该物料必定升版变更，导出表已省略动作列）
+    ...readSheet('受影响物料').map((r) => ({ 动作: 'upgrade', ...r }) as Record<string, unknown>),
     ...readSheet('溯源链'),
     ...readSheet('执行明细'),
   ];
