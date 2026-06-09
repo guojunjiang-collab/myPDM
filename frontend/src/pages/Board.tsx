@@ -113,10 +113,6 @@ export default function Board() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   /* ---- Data ---- */
-  const storeParts = useDataStore((s) => s.parts);
-  const storeAssemblies = useDataStore((s) => s.assemblies);
-  const storeDocuments = useDataStore((s) => s.documents);
-  const storeConfigItems = useDataStore((s) => s.configItems);
   const [usersList, setUsersList] = useState<{ id: string; username: string; real_name: string }[]>([]);
   const [shares, setShares] = useState<ShareRecord[]>([]);
   const [workingShares, setWorkingShares] = useState<ShareRecord[]>([]);
@@ -556,7 +552,7 @@ export default function Board() {
       </Modal>
 
       {/* ---- Item Picker ---- */}
-      <ItemPicker open={pickerOpen} onClose={() => setPickerOpen(false)} onConfirm={handleAddItems} existingIds={existingIds} storeParts={storeParts} storeAssemblies={storeAssemblies} storeDocuments={storeDocuments} storeConfigItems={storeConfigItems} />
+      <ItemPicker open={pickerOpen} onClose={() => setPickerOpen(false)} onConfirm={handleAddItems} existingIds={existingIds} />
 
       {/* ---- Detail Modal ---- */}
       <Modal open={!!detailItem} title={detailItem ? `${ENTITY_LABEL[detailItem.entity_type]}详情` : ''} onClose={() => setDetailItem(null)} width="full">
@@ -715,26 +711,66 @@ interface ItemPickerProps {
   onClose: () => void;
   onConfirm: (items: { entity_type: string; entity_id: string }[]) => void;
   existingIds: Set<string>;
-  storeParts: any[];
-  storeAssemblies: any[];
-  storeDocuments: any[];
-  storeConfigItems: any[];
 }
 
-function ItemPicker({ open, onClose, onConfirm, existingIds, storeParts, storeAssemblies, storeDocuments, storeConfigItems }: ItemPickerProps) {
+function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) {
   const [tab, setTab] = useState<FilterTab>('all');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Map<string, any>>(new Map());
 
+  /* 服务器数据（弹窗打开时实时拉取，失败时回退到本地缓存） */
+  const [srcParts, setSrcParts] = useState<any[]>([]);
+  const [srcAssemblies, setSrcAssemblies] = useState<any[]>([]);
+  const [srcDocuments, setSrcDocuments] = useState<any[]>([]);
+  const [srcConfigItems, setSrcConfigItems] = useState<any[]>([]);
+  const [dataLoading, setDataLoading] = useState(false);
+  const [dataWarning, setDataWarning] = useState<string | null>(null);
+
+  const extract = (res: any): any[] => {
+    const d = res?.data;
+    return Array.isArray(d) ? d : (d?.items || []);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setDataLoading(true);
+    setDataWarning(null);
+    (async () => {
+      const [p, a, d, c] = await Promise.allSettled([
+        partsApi.list({ page_size: 10000, brief: true }),
+        assembliesApi.list({ page_size: 10000, brief: true }),
+        documentsApi.list({ page_size: 10000, brief: true }),
+        configurationApi.listItems({ page_size: 10000, brief: true }),
+      ]);
+      if (cancelled) return;
+      // 每类独立处理：成功用服务器数据，失败回退到本地缓存，互不影响
+      const cache = useDataStore.getState();
+      const pick = (r: PromiseSettledResult<any>, fallback: any[], label: string): any[] => {
+        if (r.status === 'fulfilled') return extract(r.value);
+        console.error(`[ItemPicker] 加载${label}失败：`, r.reason);
+        return fallback;
+      };
+      setSrcParts(pick(p, cache.parts, '零件'));
+      setSrcAssemblies(pick(a, cache.assemblies, '部件'));
+      setSrcDocuments(pick(d, cache.documents, '图文档'));
+      setSrcConfigItems(pick(c, cache.configItems, '构型项'));
+      const failed = [p, a, d, c].some((r) => r.status === 'rejected');
+      setDataWarning(failed ? '部分数据从服务器加载失败，已使用本地缓存' : null);
+      setDataLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [open]);
+
   const candidates = useMemo(() => {
     const kw = search.trim().toLowerCase();
     const all: any[] = [];
-    if (tab === 'all' || tab === 'part') storeParts.forEach((p: any) => { if (!existingIds.has(p.id)) all.push({ t: 'part', id: p.id, code: p.code, name: p.name, version: p.version || '', status: p.status || '' }); });
-    if (tab === 'all' || tab === 'assembly') storeAssemblies.forEach((a: any) => { if (!existingIds.has(a.id)) all.push({ t: 'assembly', id: a.id, code: a.code, name: a.name, version: a.version || '', status: a.status || '' }); });
-    if (tab === 'all' || tab === 'document') storeDocuments.forEach((d: any) => { if (!existingIds.has(d.id)) all.push({ t: 'document', id: d.id, code: d.code, name: d.name, version: d.version || '', status: d.status || '' }); });
-    if (tab === 'all' || tab === 'configuration') storeConfigItems.forEach((c: any) => { if (!existingIds.has(c.id)) all.push({ t: 'configuration', id: c.id, code: c.code, name: c.name, version: '-', status: 'active' }); });
+    if (tab === 'all' || tab === 'part') srcParts.forEach((p: any) => { if (!existingIds.has(p.id)) all.push({ t: 'part', id: p.id, code: p.code, name: p.name, version: p.version || '', status: p.status || '' }); });
+    if (tab === 'all' || tab === 'assembly') srcAssemblies.forEach((a: any) => { if (!existingIds.has(a.id)) all.push({ t: 'assembly', id: a.id, code: a.code, name: a.name, version: a.version || '', status: a.status || '' }); });
+    if (tab === 'all' || tab === 'document') srcDocuments.forEach((d: any) => { if (!existingIds.has(d.id)) all.push({ t: 'document', id: d.id, code: d.code, name: d.name, version: d.version || '', status: d.status || '' }); });
+    if (tab === 'all' || tab === 'configuration') srcConfigItems.forEach((c: any) => { if (!existingIds.has(c.id)) all.push({ t: 'configuration', id: c.id, code: c.code, name: c.name, version: '-', status: 'active' }); });
     return kw ? all.filter((i) => i.code.toLowerCase().includes(kw) || i.name.toLowerCase().includes(kw)) : all;
-  }, [tab, search, storeParts, storeAssemblies, storeDocuments, storeConfigItems, existingIds]);
+  }, [tab, search, srcParts, srcAssemblies, srcDocuments, srcConfigItems, existingIds]);
 
   const handleConfirm = () => {
     onConfirm(Array.from(selected.values()).map((v) => ({ entity_type: v.t, entity_id: v.id })));
@@ -769,8 +805,11 @@ function ItemPicker({ open, onClose, onConfirm, existingIds, storeParts, storeAs
           ))}</div>
         </div>
         {/* Candidates */}
+        {dataWarning && <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-3 py-1.5">{dataWarning}</p>}
         <div className="border rounded-lg overflow-hidden flex-1 min-h-0"><div className="max-h-64 overflow-y-auto">
-          {candidates.length === 0 ? (
+          {dataLoading ? (
+            <p className="p-4 text-center text-sm text-gray-400">加载中...</p>
+          ) : candidates.length === 0 ? (
             <p className="p-4 text-center text-sm text-gray-400">无匹配结果</p>
           ) : (
             <table className="w-full text-sm"><thead className="bg-gray-50 border-b sticky top-0"><tr>
@@ -779,7 +818,7 @@ function ItemPicker({ open, onClose, onConfirm, existingIds, storeParts, storeAs
               <th className="px-3 py-2 text-left text-gray-500 font-medium">版本</th>
               <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
               <th className="px-3 py-2 text-left text-gray-500 font-medium">状态</th>
-               <th className="px-3 py-2 text-center text-gray-500 font-medium w-16">操作</th>
+               <th className="px-3 py-2 text-center text-gray-500 font-medium w-24">操作</th>
             </tr></thead><tbody className="divide-y divide-gray-100">
               {candidates.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50">
@@ -788,7 +827,7 @@ function ItemPicker({ open, onClose, onConfirm, existingIds, storeParts, storeAs
                   <td className="px-3 py-2 text-gray-500">{item.version || '-'}</td>
                   <td className="px-3 py-2">{item.name}</td>
                   <td className="px-3 py-2"><StatusTag status={item.status} /></td>
-                  <td className="px-3 py-2 text-center">{selected.has(item.id) ? <span className="text-xs text-green-600">已选</span> : <button type="button" onClick={() => setSelected(new Map(selected).set(item.id, item))} className="px-2.5 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">添加</button>}</td>
+                  <td className="px-3 py-2 text-center whitespace-nowrap">{selected.has(item.id) ? <span className="text-xs text-green-600">已选</span> : <button type="button" onClick={() => setSelected(new Map(selected).set(item.id, item))} className="px-2.5 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700 whitespace-nowrap">添加</button>}</td>
                 </tr>
               ))}
             </tbody></table>

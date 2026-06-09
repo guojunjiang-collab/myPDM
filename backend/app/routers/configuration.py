@@ -29,7 +29,7 @@ router = APIRouter(prefix="/configurations", tags=["构型配置"])
 
 @router.get("/items", response_model=dict)
 async def list_config_items(
-    page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
+    page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=10000),
     search: str = Query(None),
     exclude_ancestors_of: str = Query(None),
     updated_since: float = Query(None),
