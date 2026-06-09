@@ -168,7 +168,7 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
               {(p.part_detail?.status || p.status) === 'draft' ? '草稿' : (p.part_detail?.status || p.status) === 'released' ? '发布' : (p.part_detail?.status || p.status) === 'frozen' ? '冻结' : (p.part_detail?.status || p.status) === 'obsolete' ? '作废' : '-'}
             </span>
           </td>
-          <td className={`px-3 py-2 text-center text-sm ${rowCls}`} onClick={onClickRow}>{level === 0 ? 1 : (p.quantity || 1)}</td>
+          <td className={`px-3 py-2 text-center text-sm ${rowCls}`} onClick={onClickRow}>{p.quantity ?? 1}</td>
           <td className={`px-3 py-2 text-center text-sm ${rowCls}`} onClick={onClickRow}>
             <span className={`px-2 py-0.5 text-sm rounded ${p.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
               {p.is_required != null ? (p.is_required ? '必选' : '可选') : '-'}

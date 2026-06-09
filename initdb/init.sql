@@ -384,6 +384,7 @@ CREATE TABLE configuration_item_parts (
     part_type VARCHAR(16) NOT NULL,
     part_id UUID NOT NULL,
     is_required BOOLEAN NOT NULL DEFAULT TRUE,
+    quantity INTEGER NOT NULL DEFAULT 1,
     sort_order INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -433,6 +434,7 @@ CREATE TABLE configuration_profile_items (
     item_name VARCHAR(255),
     is_required BOOLEAN NOT NULL DEFAULT TRUE,
     is_selected BOOLEAN NOT NULL DEFAULT FALSE,
+    quantity INTEGER NOT NULL DEFAULT 1,
     source_type VARCHAR(16) NOT NULL,
     sort_order INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -451,6 +453,7 @@ CREATE TABLE configuration_working_items (
     item_name VARCHAR(255),
     is_required BOOLEAN NOT NULL DEFAULT TRUE,
     is_selected BOOLEAN NOT NULL DEFAULT FALSE,
+    quantity INTEGER NOT NULL DEFAULT 1,
     source_type VARCHAR(16) NOT NULL,
     sort_order INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

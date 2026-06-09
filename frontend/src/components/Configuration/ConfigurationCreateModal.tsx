@@ -23,6 +23,7 @@ interface PartEntry {
   part_spec: string;
   part_status: string;
   is_required: boolean;
+  quantity: number;
 }
 
 interface ChildEntry {
@@ -104,6 +105,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
             part_code: p.part_detail?.code || '', part_name: p.part_detail?.name || '',
             part_version: p.part_detail?.version || '', part_spec: p.part_detail?.spec || '',
             part_status: p.part_detail?.status || '', is_required: p.is_required,
+            quantity: p.quantity ?? 1,
           })));
           setChildren(sortByCode((r.data.children || []).map((c: any) => ({
             id: c.id, child_id: c.child_id,
@@ -150,7 +152,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
       }
       if (parts.length > 0) {
         await configurationApi.addParts(configId, parts.map(p => ({
-          part_type: p.part_type, part_id: p.part_id, is_required: p.is_required,
+          part_type: p.part_type, part_id: p.part_id, is_required: p.is_required, quantity: p.quantity ?? 1,
         })));
       }
       if (children.length > 0) {
@@ -166,6 +168,9 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
 
   const togglePartRequired = (idx: number) => {
     setParts(prev => prev.map((p, i) => i === idx ? { ...p, is_required: !p.is_required } : p));
+  };
+  const updatePartQuantity = (idx: number, quantity: number) => {
+    setParts(prev => prev.map((p, i) => i === idx ? { ...p, quantity } : p));
   };
   const toggleChildRequired = (idx: number) => {
     setChildren(prev => prev.map((c, i) => i === idx ? { ...c, is_required: !c.is_required } : c));
@@ -412,6 +417,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                     <th className="px-3 py-1.5 text-left text-xs text-gray-500">规格型号</th>
                     <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-14">版本</th>
                     <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-16">状态</th>
+                    <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-16">用量</th>
                     <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-20">必选/可选</th>
                     <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-24">操作</th>
                   </tr>
@@ -432,6 +438,11 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                         <span className={`px-1.5 py-0.5 rounded text-xs ${p.part_status === 'draft' ? 'bg-blue-100 text-blue-800' : p.part_status === 'frozen' ? 'bg-orange-100 text-orange-800' : p.part_status === 'released' ? 'bg-green-100 text-green-800' : p.part_status === 'obsolete' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>
                           {p.part_status === 'draft' ? '草稿' : p.part_status === 'frozen' ? '冻结' : p.part_status === 'released' ? '发布' : p.part_status === 'obsolete' ? '作废' : '-'}
                         </span>
+                      </td>
+                      <td className="px-3 py-1.5 text-center">
+                        <input type="number" min={1} value={p.quantity ?? 1}
+                          onChange={(e) => updatePartQuantity(i, parseInt(e.target.value) || 1)}
+                          className="w-14 text-center text-xs border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary-500" />
                       </td>
                       <td className="px-3 py-1.5 text-center">
                         <button onClick={() => togglePartRequired(i)}
@@ -669,7 +680,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
               code = r.data.code; name = r.data.name; ver = r.data.version || '';
               spec = r.data.spec || ''; status = r.data.status || '';
             } catch {}
-            setParts(prev => [...prev, { part_type: it.child_type === 'assembly' ? 'assembly' : 'part', part_id: it.child_id, part_code: code, part_name: name, part_version: ver, part_spec: spec, part_status: status, is_required: true }]);
+            setParts(prev => [...prev, { part_type: it.child_type === 'assembly' ? 'assembly' : 'part', part_id: it.child_id, part_code: code, part_name: name, part_version: ver, part_spec: spec, part_status: status, is_required: true, quantity: 1 }]);
           }
           setPickerOpen(false);
         }}

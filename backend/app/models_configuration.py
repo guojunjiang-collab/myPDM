@@ -36,6 +36,7 @@ class ConfigurationItemPart(Base):
     part_type = Column(String(16), nullable=False)  # 'part' | 'assembly'
     part_id = Column(UUID(as_uuid=True), nullable=False)
     is_required = Column(Boolean, nullable=False, default=True)
+    quantity = Column(Integer, nullable=False, default=1)
     sort_order = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -84,6 +85,7 @@ class ConfigurationProfileItem(Base):
     item_name = Column(String(255))
     is_required = Column(Boolean, nullable=False, default=True)
     is_selected = Column(Boolean, nullable=False, default=False)
+    quantity = Column(Integer, nullable=False, default=1)
     source_type = Column(String(16), nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -102,6 +104,7 @@ class ConfigurationWorkingItem(Base):
     item_name = Column(String(255))
     is_required = Column(Boolean, nullable=False, default=True)
     is_selected = Column(Boolean, nullable=False, default=False)
+    quantity = Column(Integer, nullable=False, default=1)
     source_type = Column(String(16), nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

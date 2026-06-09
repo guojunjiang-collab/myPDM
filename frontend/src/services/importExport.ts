@@ -2999,6 +2999,7 @@ async function _buildConfigItemsWorkbook(): Promise<XLSX.WorkBook | null> {
         零部件类型: p.part_type || 'part',
         零部件件号: p.part_detail?.code || '',
         零部件版本: p.part_detail?.version || '',
+        用量: p.quantity ?? 1,
         是否必选: p.is_required ? 'TRUE' : 'FALSE',
       });
     }
@@ -3036,7 +3037,7 @@ async function _buildConfigItemsWorkbook(): Promise<XLSX.WorkBook | null> {
 
   if (sheet2Rows.length > 0) {
     const s2 = XLSX.utils.json_to_sheet(sheet2Rows);
-    s2['!cols'] = [{ wch: 20 }, { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 10 }];
+    s2['!cols'] = [{ wch: 20 }, { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 8 }, { wch: 10 }];
     XLSX.utils.book_append_sheet(wb, s2, '关联零部件');
   }
 
@@ -3185,6 +3186,7 @@ export async function previewConfigurationItemsImport(file: File): Promise<Impor
           part_type: String(r['零部件类型'] || 'part').trim(),
           part_code: String(r['零部件件号'] || '').trim(),
           part_version: String(r['零部件版本'] || '').trim(),
+          quantity: parseInt(String(r['用量'] ?? '')) || 1,
           is_required: String(r['是否必选'] || '').trim().toUpperCase() === 'TRUE',
         })),
         _children: (childrenByCode.get(code) || []).map((r: any) => ({
@@ -3283,7 +3285,7 @@ export async function executeConfigurationItemsImport(preview: ImportPreview): P
       }
 
       // 解析零部件件号+版本→entity_id，构造 addParts 参数
-      const partsToAdd: { part_type: string; part_id: string; is_required: boolean }[] = [];
+      const partsToAdd: { part_type: string; part_id: string; is_required: boolean; quantity: number }[] = [];
       for (const p of parts) {
         const pc = p.part_code as string;
         const pv = p.part_version as string;
@@ -3298,6 +3300,7 @@ export async function executeConfigurationItemsImport(preview: ImportPreview): P
           part_type: p.part_type as string || 'part',
           part_id: entity.id,
           is_required: p.is_required as boolean,
+          quantity: (p.quantity as number) || 1,
         });
       }
 

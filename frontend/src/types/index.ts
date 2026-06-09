@@ -559,6 +559,7 @@ export interface ConfigPartItem {
   part_type: 'part' | 'assembly';
   part_id: string;
   is_required: boolean;
+  quantity?: number;
   sort_order: number;
   part_detail?: { id: string; code: string; name: string; version?: string; spec?: string; status?: string };
 }
@@ -618,6 +619,7 @@ export interface ConfigTreePart {
   item_status?: string;
   is_required: boolean;
   is_selected: boolean;
+  quantity?: number;
   source_type: string;
 }
 

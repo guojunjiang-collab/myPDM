@@ -237,6 +237,7 @@ def _generate_checklist(db: Session, profile_id: str, config_item_id: str, sourc
             item_name=item_name,
             is_required=p.is_required,
             is_selected=p.is_required,
+            quantity=getattr(p, "quantity", 1) or 1,
             source_type=source_type,
             sort_order=p.sort_order,
         )
@@ -393,6 +394,7 @@ def sync_working_to_formal(db: Session, profile_id: str):
                 item_name=wi.item_name,
                 is_required=wi.is_required,
                 is_selected=wi.is_selected,
+                quantity=wi.quantity,
                 source_type=wi.source_type,
                 sort_order=wi.sort_order,
             )

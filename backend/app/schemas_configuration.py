@@ -49,11 +49,13 @@ class ConfigPartCreate(BaseSchema):
     part_type: str  # 'part' | 'assembly'
     part_id: uuid.UUID
     is_required: bool = True
+    quantity: int = 1
     sort_order: int = 0
 
 
 class ConfigPartUpdate(BaseSchema):
     is_required: Optional[bool] = None
+    quantity: Optional[int] = None
     sort_order: Optional[int] = None
 
 
@@ -63,6 +65,7 @@ class ConfigPartResponse(BaseSchema):
     part_type: str
     part_id: uuid.UUID
     is_required: bool
+    quantity: int
     sort_order: int
     created_at: datetime
     part_detail: Optional[dict] = None

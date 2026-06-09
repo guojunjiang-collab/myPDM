@@ -111,7 +111,7 @@ async def get_config_item(
             else db.query(Assembly).filter(Assembly.id == p.part_id).first()
         parts_data.append({
             "id": str(p.id), "part_type": p.part_type, "part_id": str(p.part_id),
-            "is_required": p.is_required, "sort_order": p.sort_order,
+            "is_required": p.is_required, "quantity": p.quantity, "sort_order": p.sort_order,
             "part_detail": {
                 "id": str(entity.id), "code": entity.code, "name": entity.name,
                 "version": entity.version, "spec": entity.spec or "", "status": entity.status,
@@ -227,7 +227,7 @@ async def update_part(
     part = crud.update_config_part(db, part_id, data)
     if not part:
         raise HTTPException(status_code=404, detail="关联关系不存在")
-    return {"id": str(part.id), "is_required": part.is_required}
+    return {"id": str(part.id), "is_required": part.is_required, "quantity": part.quantity}
 
 
 @router.delete("/items/{config_id}/parts/{part_id}")
@@ -715,6 +715,7 @@ def _format_profile_item(item, entity_map: dict = None) -> dict:
         "item_status": entity.status if entity and hasattr(entity, 'status') else "",
         "is_required": item.is_required,
         "is_selected": item.is_selected,
+        "quantity": getattr(item, "quantity", 1) or 1,
         "source_type": item.source_type,
         "sort_order": item.sort_order,
         "created_at": item.created_at.isoformat() if item.created_at else None,

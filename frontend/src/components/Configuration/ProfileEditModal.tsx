@@ -485,6 +485,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
             <td className="px-3 py-2 text-sm font-mono text-gray-600">{part.item_code}</td>
             <td className="px-3 py-2 text-sm text-gray-500">{part.item_version || '-'}</td>
             <td className="px-3 py-2 text-sm text-gray-500">{partStatusBadge(part.item_status)}</td>
+            <td className="px-3 py-2 text-center text-sm">{part.quantity ?? 1}</td>
           </tr>
         );
       }
@@ -567,7 +568,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
           <td className="px-3 py-2 text-sm font-mono text-gray-600">{part.item_code}</td>
           <td className="px-3 py-2 text-sm text-gray-500">{part.item_version || '-'}</td>
           <td className="px-3 py-2 text-sm text-gray-500">{partStatusBadge(part.item_status)}</td>
-          <td className="px-3 py-2 text-center text-sm text-gray-400">-</td>
+          <td className="px-3 py-2 text-center text-sm">{part.quantity ?? 1}</td>
           <td className="px-3 py-2 text-center whitespace-nowrap">
             <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
               <input

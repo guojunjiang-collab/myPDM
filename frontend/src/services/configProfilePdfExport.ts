@@ -69,7 +69,7 @@ function collectFormalRows(node: ConfigTreeNode, level: number, out: FormalRow[]
       partCode: part.item_code || '',
       version: part.item_version || '',
       status: STATUS_ENTITY_ZH[part.item_status || ''] || part.item_status || '',
-      quantity: '',
+      quantity: String(part.quantity ?? 1),
     });
   }
 
