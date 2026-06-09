@@ -4099,7 +4099,6 @@ export async function exportECOs(): Promise<void> {
           对象名称: ai.entity_name || '',
           对象版本: ai.entity_version || '',
           目标数量: aiSaved?.detail?._targetQty ?? '',
-          变更描述: aiSaved?.detail?._desc || ai.change_description || '',
           来源: aiSaved?.source || 'ecr',
         });
 
@@ -4145,7 +4144,6 @@ export async function exportECOs(): Promise<void> {
         对象名称: ei.entity_name || '',
         对象版本: ei.entity_id ? versionById.get(String(ei.entity_id)) || '' : '',
         目标数量: dt._targetQty ?? '',
-        变更描述: dt._desc || '',
       };
       if (isSpecial || ei.parent_entity_id) {
         traceRows.push({
@@ -4158,7 +4156,7 @@ export async function exportECOs(): Promise<void> {
           层级: '',
           动作: ei.action || 'no_change',
           目标数量: base.目标数量,
-          变更描述: base.变更描述,
+          变更描述: dt._desc || '',
           受影响对象件号: dt._affectedCode || '',
           受影响对象版本:
             affectedVerByCode.get(dt._affectedCode || '') ||
@@ -4196,17 +4194,16 @@ export async function exportECOs(): Promise<void> {
         ECO编号: d.eco_number,
         图文档编号: doc.document?.code || doc.document_code || '',
         图文档版本: doc.document?.version || doc.document_version || '',
-        类别: doc.category || '',
         排序: doc.sort_order ?? 0,
       });
     }
   }
 
   const wb = XLSX.utils.book_new();
-  // 受影响物料: ECO编号/对象类型/对象编号/对象名称/对象版本/目标数量/变更描述/来源
+  // 受影响物料: ECO编号/对象类型/对象编号/对象名称/对象版本/目标数量/来源
   const affectedCols = [
     { wch: 16 }, { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 10 },
-    { wch: 10 }, { wch: 30 }, { wch: 8 },
+    { wch: 10 }, { wch: 8 },
   ];
   // 溯源链: ECO编号/链分类/对象类型/对象编号/对象名称/对象版本/层级/动作/目标数量/变更描述/受影响对象件号/受影响对象版本/来源
   const traceCols = [
@@ -4254,7 +4251,7 @@ export async function exportECOs(): Promise<void> {
 
   if (docLinkRows.length > 0) {
     const s = XLSX.utils.json_to_sheet(docLinkRows);
-    s['!cols'] = [{ wch: 16 }, { wch: 20 }, { wch: 12 }, { wch: 16 }, { wch: 8 }];
+    s['!cols'] = [{ wch: 16 }, { wch: 20 }, { wch: 12 }, { wch: 8 }];
     XLSX.utils.book_append_sheet(wb, s, '关联图文档');
   }
 
