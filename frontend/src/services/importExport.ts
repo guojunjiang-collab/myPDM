@@ -3706,6 +3706,9 @@ export async function previewECRsImport(file: File): Promise<ImportPreview> {
   const docLinkRows = wb.Sheets['关联图文档']
     ? XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets['关联图文档'])
     : [];
+  const impactRows = wb.Sheets['影响分析']
+    ? XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets['影响分析'])
+    : [];
 
   const store = useDataStore.getState();
   let reviewerWarnings = 0;
@@ -3759,6 +3762,27 @@ export async function previewECRsImport(file: File): Promise<ImportPreview> {
     }
     if (!found) affectedWarnings++;
     affectedByNumber.get(num)!.push({ ...r, _entity: found || null });
+  }
+
+  // 按 ECR编号 → 受影响件号 → 节点件号(|版本) 索引「影响分析」评估编辑（动作/目标数量/变更描述）
+  // 用于导入时叠加到按当前 BOM 重算出的影响链节点上（两者结合）
+  const impactByNumber = new Map<string, Map<string, Map<string, any>>>();
+  for (const r of impactRows) {
+    const num = String(r['ECR编号'] || '').trim();
+    const affCode = String(r['受影响件号'] || '').trim();
+    const nodeCode = String(r['节点件号'] || '').trim();
+    const nodeVer = String(r['节点版本'] || '').trim();
+    if (!num || !affCode || !nodeCode) continue;
+    if (!impactByNumber.has(num)) impactByNumber.set(num, new Map());
+    const byAff = impactByNumber.get(num)!;
+    if (!byAff.has(affCode)) byAff.set(affCode, new Map());
+    const ov = {
+      action: String(r['动作'] || '').trim(),
+      targetQty: r['目标数量'],
+      desc: String(r['变更描述'] || ''),
+    };
+    byAff.get(affCode)!.set(nodeCode + '|' + nodeVer, ov);
+    if (!byAff.get(affCode)!.has(nodeCode)) byAff.get(affCode)!.set(nodeCode, ov); // 无版本回退键
   }
 
   // 按 ECR 编号分组关联图文档
@@ -3831,6 +3855,8 @@ export async function previewECRsImport(file: File): Promise<ImportPreview> {
           entity_id: r._entity ? r._entity.id : null,
           change_description: String(r['变更描述'] || ''),
           change_type: String(r['变更类型'] || ''),
+          // 该受影响对象的影响分析评估编辑（节点件号|版本 → {action,targetQty,desc}）
+          _impactOverlay: impactByNumber.get(number)?.get(String(r['实体件号'] || '').trim()) || null,
         })),
       },
     };
@@ -3927,12 +3953,45 @@ export async function executeECRsImport(preview: ImportPreview): Promise<void> {
       for (const item of affectedItems) {
         if (!item.entity_id) continue;
         try {
-          await ecrApi.addAffectedItem(ecrId, {
+          const addRes = await ecrApi.addAffectedItem(ecrId, {
             entity_type: item.entity_type,
             entity_id: item.entity_id,
             change_description: item.change_description,
             change_type: item.change_type,
           });
+          // BOM 影响分析（两者结合）：按当前 BOM 重算上/下链，再叠加导出表中的评估编辑
+          const affectedItemId = (addRes as any)?.data?.id;
+          if (affectedItemId) {
+            try {
+              const traceRes: any = await ecrApi.bomTrace(ecrId, item.entity_type, item.entity_id);
+              let up: any[] = traceRes?.data?.upward_chain || [];
+              let down: any[] = traceRes?.data?.downward_items || [];
+              const ov: Map<string, any> | null = item._impactOverlay || null;
+              if (ov && ov.size > 0) {
+                const apply = (n: any) => {
+                  const o = ov.get((n.entity_code || '') + '|' + (n.entity_version || '')) || ov.get(n.entity_code || '');
+                  if (!o) return n;
+                  const next = { ...n };
+                  if (o.action) next.action = o.action;
+                  if (o.desc) next.change_description = o.desc;
+                  if (o.targetQty != null && o.targetQty !== '') {
+                    const to = Number(o.targetQty);
+                    if (!Number.isNaN(to) && to !== n.quantity) {
+                      next.quantity_change = { from: n.quantity, to };
+                    }
+                  }
+                  return next;
+                };
+                up = up.map(apply);
+                down = down.map(apply);
+              }
+              await ecrApi.updateAffectedItem(ecrId, affectedItemId, {
+                bom_impact: { upward_chain: up, downward_items: down },
+              });
+            } catch (traceErr) {
+              console.warn(`重算/回填 ECR 影响分析失败（跳过）: ${row.code || row.name} entity=${item.entity_id}`, traceErr);
+            }
+          }
         } catch (addErr) {
           console.warn(`添加 ECR 受影响对象失败（跳过）: ${row.code || row.name} entity=${item.entity_id}`, addErr);
         }
