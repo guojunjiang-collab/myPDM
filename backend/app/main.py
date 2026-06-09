@@ -426,6 +426,59 @@ async def startup_event():
                 # 约束/索引可能已不存在，忽略错误
                 pass
 
+        # ── 通用列对账：模型已声明但表中缺失的列，自动 ADD COLUMN（幂等）──
+        # 防止"模型加了列但忘了写迁移"导致旧库 SELECT 时 UndefinedColumn 500。
+        try:
+            from sqlalchemy import inspect as _sqla_inspect
+            from app.database import Base, engine
+            # 导入所有模型模块以填充 Base.metadata
+            import app.models  # noqa: F401
+            import app.models_ecr  # noqa: F401
+            import app.models_eco  # noqa: F401
+            import app.models_configuration  # noqa: F401
+
+            def _col_default_sql(col):
+                sd = getattr(col, "server_default", None)
+                if sd is not None and getattr(sd, "arg", None) is not None:
+                    txt = getattr(sd.arg, "text", None)
+                    if txt is not None:
+                        return f" DEFAULT {txt}"
+                d = getattr(col, "default", None)
+                if d is not None and getattr(d, "is_scalar", False):
+                    v = d.arg
+                    if isinstance(v, bool):
+                        return f" DEFAULT {'true' if v else 'false'}"
+                    if isinstance(v, (int, float)):
+                        return f" DEFAULT {v}"
+                    if isinstance(v, str):
+                        return " DEFAULT '" + v.replace("'", "''") + "'"
+                return ""
+
+            _insp = _sqla_inspect(engine)
+            for _table in Base.metadata.tables.values():
+                if not _insp.has_table(_table.name):
+                    continue  # 不存在的表交由上面的 CREATE 流程处理
+                _existing = {c["name"] for c in _insp.get_columns(_table.name)}
+                for _col in _table.columns:
+                    if _col.name in _existing:
+                        continue
+                    try:
+                        _ctype = _col.type.compile(engine.dialect)
+                        _default_sql = _col_default_sql(_col)
+                        # 仅在有默认值时加 NOT NULL，避免已有数据表加非空列失败；否则加为可空
+                        _nn = " NOT NULL" if (not _col.nullable and _default_sql) else ""
+                        db.execute(text(
+                            f'ALTER TABLE {_table.name} ADD COLUMN IF NOT EXISTS "{_col.name}" {_ctype}{_default_sql}{_nn}'
+                        ))
+                        db.commit()
+                        print(f"✓ Auto-added missing column {_table.name}.{_col.name}")
+                    except Exception as _ce:
+                        db.rollback()
+                        print(f"⚠ Skip auto-add {_table.name}.{_col.name}: {_ce}")
+        except Exception as _e:
+            db.rollback()
+            print(f"⚠ Auto column reconcile skipped: {_e}")
+
         print("✓ Database migration completed successfully")
     except Exception as e:
         print(f"✗ Database migration error: {e}")
