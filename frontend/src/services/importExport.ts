@@ -3555,15 +3555,24 @@ export async function exportECRs(): Promise<void> {
     创建时间: d.created_at || '',
   }));
 
-  // Sheet2: 审批流
+  // Sheet2: 审批流（含审批结果/意见/时间）
   const sheet2Rows: Record<string, unknown>[] = [];
   for (const d of detailData) {
+    // 审批记录按 reviewer_id 索引（取最新一条）
+    const recByUser = new Map<string, any>();
+    for (const rec of d.review_records || []) recByUser.set(String(rec.reviewer_id), rec);
     for (const r of d.reviewers || []) {
+      const rec = recByUser.get(String(r.user_id));
       sheet2Rows.push({
         ECR编号: d.ecr_number,
         审批人工号: reviewerCode(r),
         审批人姓名: r.user_name || '',
         顺序: r.seq ?? 0,
+        审批结果: rec
+          ? ({ approved: '通过', rejected: '驳回', returned: '退回' } as Record<string, string>)[rec.decision] || rec.decision
+          : '待审批',
+        审批意见: rec?.comment || '',
+        审批时间: rec?.created_at || '',
       });
     }
   }
@@ -3637,7 +3646,7 @@ export async function exportECRs(): Promise<void> {
 
   if (sheet2Rows.length > 0) {
     const s2 = XLSX.utils.json_to_sheet(sheet2Rows);
-    s2['!cols'] = [{ wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 8 }];
+    s2['!cols'] = [{ wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 8 }, { wch: 10 }, { wch: 30 }, { wch: 20 }];
     XLSX.utils.book_append_sheet(wb, s2, '审批流');
   }
 
