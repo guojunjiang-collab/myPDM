@@ -3989,6 +3989,22 @@ export async function exportECOs(): Promise<void> {
     if (ecrDetailResults[i]) ecrById.set(id, ecrDetailResults[i]);
   });
 
+  // 实体 ID → 版本 映射（用于把父对象 ID 解析为父对象版本）。来源：store + ECR 节点。
+  const ecoStore = useDataStore.getState();
+  const versionById = new Map<string, string>();
+  for (const p of ecoStore.parts || []) if (p.id) versionById.set(String(p.id), p.version || '');
+  for (const a of ecoStore.assemblies || []) if (a.id) versionById.set(String(a.id), a.version || '');
+  for (const ecr of ecrById.values()) {
+    for (const ai of ecr.affected_items || []) {
+      if (ai.entity_id) versionById.set(String(ai.entity_id), ai.entity_version || versionById.get(String(ai.entity_id)) || '');
+      const bi = ai.bom_impact || {};
+      for (const n of [...(bi.upward_chain || []), ...(bi.downward_items || [])]) {
+        if (n.entity_id && n.entity_version) versionById.set(String(n.entity_id), n.entity_version);
+      }
+    }
+  }
+  const parentVer = (pid: any): string => (pid ? versionById.get(String(pid)) || '' : '');
+
   // Sheet1: ECO 清单
   const sheet1Rows = detailData.map((d: any) => ({
     编号: d.eco_number || '',
@@ -4103,7 +4119,7 @@ export async function exportECOs(): Promise<void> {
             目标数量: dt._targetQty ?? (n.quantity_change?.to ?? n.quantity ?? ''),
             变更描述: dt._desc || n.change_description || '',
             受影响编号: ai.entity_code || '',
-            父对象ID: n.parent_entity_id || saved?.parent_entity_id || '',
+            父对象版本: parentVer(n.parent_entity_id || saved?.parent_entity_id),
             来源: saved?.source || 'ecr',
           };
         };
@@ -4126,18 +4142,28 @@ export async function exportECOs(): Promise<void> {
         对象类型: ei.entity_type || '',
         对象编号: ei.entity_code || '',
         对象名称: ei.entity_name || '',
-        对象版本: '',
+        对象版本: ei.entity_id ? versionById.get(String(ei.entity_id)) || '' : '',
         动作: ei.action || 'no_change',
         目标数量: dt._targetQty ?? '',
         变更描述: dt._desc || '',
         受影响编号: dt._affectedCode || '',
-        父对象ID: ei.parent_entity_id || '',
-        来源: ei.source || 'manual',
       };
       if (isSpecial || ei.parent_entity_id) {
-        traceRows.push({ ECO编号: d.eco_number, 链分类: isSpecial ? '向下子项' : '向上溯源', 层级: '', ...base });
+        traceRows.push({
+          ECO编号: d.eco_number,
+          链分类: isSpecial ? '向下子项' : '向上溯源',
+          层级: '',
+          ...base,
+          父对象版本: parentVer(ei.parent_entity_id),
+          来源: ei.source || 'manual',
+        });
       } else {
-        affectedRows.push({ ECO编号: d.eco_number, ...base });
+        affectedRows.push({
+          ECO编号: d.eco_number,
+          ...base,
+          父对象ID: '',
+          来源: ei.source || 'manual',
+        });
       }
     }
   }
@@ -4174,7 +4200,7 @@ export async function exportECOs(): Promise<void> {
     { wch: 16 }, { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 10 }, { wch: 10 },
     { wch: 10 }, { wch: 30 }, { wch: 18 }, { wch: 22 }, { wch: 8 },
   ];
-  // 溯源链: ECO编号/链分类/对象类型/对象编号/对象名称/对象版本/层级/动作/目标数量/变更描述/受影响编号/父对象ID/来源
+  // 溯源链: ECO编号/链分类/对象类型/对象编号/对象名称/对象版本/层级/动作/目标数量/变更描述/受影响编号/父对象版本/来源
   const traceCols = [
     { wch: 16 }, { wch: 10 }, { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 10 }, { wch: 6 },
     { wch: 10 }, { wch: 10 }, { wch: 30 }, { wch: 18 }, { wch: 22 }, { wch: 8 },
