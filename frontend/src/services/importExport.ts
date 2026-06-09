@@ -3951,8 +3951,9 @@ export async function executeECRsImport(preview: ImportPreview): Promise<void> {
  * 导出所有 ECO 数据为多 Sheet Excel
  * Sheet: ECO清单 / 审批人(含审批结果) / 工程变更结果(关联零部件) /
  *        受影响物料 / 溯源链(链分类:向上溯源/向下子项) / 知会人 / 关联图文档
- * 受影响物料/溯源链 取自 ECO 自身 execution_items 的编辑后内容（仅 ECR 评估列，
- * 不含 ECO 执行后自动生成的结果），不回拉 ECR。
+ * 受影响物料/溯源链：分区(向上溯源/向下子项)与物料版本取自来源 ECR 的 bom_impact 拓扑
+ * （与 ECO 详情界面一致），变更内容(动作/数量/描述)叠加 ECO execution_items 的编辑值；
+ * 仅导出 ECR 评估列，不含 ECO 执行后自动生成的结果。
  */
 export async function exportECOs(): Promise<void> {
   const ecos: any[] = await fetchAllPages((page, pageSize) =>
@@ -3975,6 +3976,18 @@ export async function exportECOs(): Promise<void> {
     const u = userById.get(String(uid));
     return (u?.employee_no || u?.username || fallbackName || uid || '') as string;
   };
+
+  // 拉取来源 ECR（仅用于 BOM 拓扑：上/下分区 + 物料版本；变更内容仍取 ECO 执行项）
+  const ecrIds = Array.from(
+    new Set(detailData.map((d: any) => d.ecr_id).filter(Boolean)),
+  ) as string[];
+  const ecrDetailResults = await Promise.all(
+    ecrIds.map((id) => ecrApi.get(id).then((r: any) => r.data).catch(() => null)),
+  );
+  const ecrById = new Map<string, any>();
+  ecrIds.forEach((id, i) => {
+    if (ecrDetailResults[i]) ecrById.set(id, ecrDetailResults[i]);
+  });
 
   // Sheet1: ECO 清单
   const sheet1Rows = detailData.map((d: any) => ({
@@ -4028,38 +4041,103 @@ export async function exportECOs(): Promise<void> {
     }
   }
 
-  // 受影响物料 / 溯源链——直接取自 ECO 自身执行项的编辑后内容（ECR评估列）
-  // （detail._targetQty/_desc/_affectedCode），不回拉 ECR，确保反映 ECO 中的修改。
-  // 仅导出 ECR 评估内容，不导出 ECO 执行后自动生成的结果。
-  // 分类：无父对象且非子项类动作 → 受影响物料；其余为溯源链节点，
-  //       子项类动作(改数量/删除/增选/新增子项) → 向下子项，否则 → 向上溯源。
+  // 受影响物料 / 溯源链——复制 ECO 详情界面逻辑：
+  //  - 分区由来源 ECR 的 bom_impact 决定：upward_chain(level>0)→向上溯源，downward_items→向下子项，
+  //    upward_chain(level 0)/affected_items→受影响物料
+  //  - 物料版本(对象版本)取自 bom_impact 节点 entity_version（便于后续按编号+版本匹配）
+  //  - 变更内容(动作/目标数量/变更描述)叠加 ECO 自身 execution_items 的编辑值（反映 ECO 修改）
+  //  - 仅导出 ECR 评估列，不含 ECO 执行后自动生成的结果
   const DOWNWARD_ACTIONS = ['qty_change', 'delete', 'add_existing', 'add_new'];
   const affectedRows: Record<string, unknown>[] = [];
   const traceRows: Record<string, unknown>[] = [];
   for (const d of detailData) {
-    for (const item of d.execution_items || []) {
-      const detail = item.detail || {};
-      const isSpecial = DOWNWARD_ACTIONS.includes(item.action);
-      const base = {
-        对象类型: item.entity_type || '',
-        对象编号: item.entity_code || '',
-        对象名称: item.entity_name || '',
-        动作: item.action || '',
-        目标数量: detail._targetQty ?? '',
-        变更描述: detail._desc || '',
-        受影响编号: detail._affectedCode || '',
-        父对象ID: item.parent_entity_id || '',
-        来源: item.source || 'manual',
-      };
-      const isAffected = !item.parent_entity_id && !isSpecial;
-      if (isAffected) {
-        affectedRows.push({ ECO编号: d.eco_number, ...base });
-      } else {
-        traceRows.push({
+    const ecr = d.ecr_id ? ecrById.get(d.ecr_id) : null;
+    // ECO 执行项编辑值索引（复合键 entity_id|_affectedCode，回退到 entity_id / entity_code）
+    const savedMap = new Map<string, any>();
+    for (const ei of d.execution_items || []) {
+      const aff = ei.detail?._affectedCode || '';
+      const key = ei.entity_id || ei.entity_code;
+      if (!key) continue;
+      savedMap.set(key + '|' + aff, ei);
+      if (!aff) savedMap.set(String(key), ei);
+    }
+    const lookup = (n: any, affCode: string) =>
+      savedMap.get((n.entity_id || n.entity_code || '') + '|' + (affCode || '')) ||
+      savedMap.get(n.entity_id) ||
+      savedMap.get(n.entity_code);
+    const usedExec = new Set<string>();
+
+    if (ecr) {
+      for (const ai of ecr.affected_items || []) {
+        // 受影响物料行
+        const aiSaved = lookup({ entity_id: ai.entity_id, entity_code: ai.entity_code }, ai.entity_code);
+        if (aiSaved) usedExec.add(aiSaved.id);
+        affectedRows.push({
           ECO编号: d.eco_number,
-          链分类: isSpecial ? '向下子项' : '向上溯源',
-          ...base,
+          对象类型: ai.entity_type || '',
+          对象编号: ai.entity_code || '',
+          对象名称: ai.entity_name || '',
+          对象版本: ai.entity_version || '',
+          动作: aiSaved?.action || ai.change_type || 'no_change',
+          目标数量: aiSaved?.detail?._targetQty ?? '',
+          变更描述: aiSaved?.detail?._desc || ai.change_description || '',
+          受影响编号: ai.entity_code || '',
+          父对象ID: '',
+          来源: aiSaved?.source || 'ecr',
         });
+
+        const bi = ai.bom_impact || {};
+        const buildTrace = (n: any, chainType: string) => {
+          const saved = lookup(n, ai.entity_code);
+          if (saved) usedExec.add(saved.id);
+          const dt = saved?.detail || {};
+          return {
+            ECO编号: d.eco_number,
+            链分类: chainType,
+            对象类型: n.entity_type || '',
+            对象编号: n.entity_code || '',
+            对象名称: n.entity_name || '',
+            对象版本: n.entity_version || '',
+            层级: n.level ?? '',
+            动作: saved?.action || n.action || 'no_change',
+            目标数量: dt._targetQty ?? (n.quantity_change?.to ?? n.quantity ?? ''),
+            变更描述: dt._desc || n.change_description || '',
+            受影响编号: ai.entity_code || '',
+            父对象ID: n.parent_entity_id || saved?.parent_entity_id || '',
+            来源: saved?.source || 'ecr',
+          };
+        };
+        for (const n of bi.upward_chain || []) {
+          if ((n.level ?? 0) === 0) continue; // level 0 为变更目标本身，归入受影响物料
+          traceRows.push(buildTrace(n, '向上溯源'));
+        }
+        for (const n of bi.downward_items || []) {
+          traceRows.push(buildTrace(n, '向下子项'));
+        }
+      }
+    }
+
+    // 未匹配到 ECR 链的执行项（手动新增子项、或无来源 ECR 的 ECO）兜底
+    for (const ei of d.execution_items || []) {
+      if (ei.id && usedExec.has(ei.id)) continue;
+      const dt = ei.detail || {};
+      const isSpecial = DOWNWARD_ACTIONS.includes(ei.action);
+      const base = {
+        对象类型: ei.entity_type || '',
+        对象编号: ei.entity_code || '',
+        对象名称: ei.entity_name || '',
+        对象版本: '',
+        动作: ei.action || 'no_change',
+        目标数量: dt._targetQty ?? '',
+        变更描述: dt._desc || '',
+        受影响编号: dt._affectedCode || '',
+        父对象ID: ei.parent_entity_id || '',
+        来源: ei.source || 'manual',
+      };
+      if (isSpecial || ei.parent_entity_id) {
+        traceRows.push({ ECO编号: d.eco_number, 链分类: isSpecial ? '向下子项' : '向上溯源', 层级: '', ...base });
+      } else {
+        affectedRows.push({ ECO编号: d.eco_number, ...base });
       }
     }
   }
@@ -4091,11 +4169,16 @@ export async function exportECOs(): Promise<void> {
   }
 
   const wb = XLSX.utils.book_new();
+  // 受影响物料: ECO编号/对象类型/对象编号/对象名称/对象版本/动作/目标数量/变更描述/受影响编号/父对象ID/来源
   const affectedCols = [
-    { wch: 16 }, { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 10 },
+    { wch: 16 }, { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 10 }, { wch: 10 },
     { wch: 10 }, { wch: 30 }, { wch: 18 }, { wch: 22 }, { wch: 8 },
   ];
-  const traceCols = [{ wch: 16 }, { wch: 10 }, ...affectedCols.slice(1)];
+  // 溯源链: ECO编号/链分类/对象类型/对象编号/对象名称/对象版本/层级/动作/目标数量/变更描述/受影响编号/父对象ID/来源
+  const traceCols = [
+    { wch: 16 }, { wch: 10 }, { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 10 }, { wch: 6 },
+    { wch: 10 }, { wch: 10 }, { wch: 30 }, { wch: 18 }, { wch: 22 }, { wch: 8 },
+  ];
 
   const s1 = XLSX.utils.json_to_sheet(sheet1Rows);
   s1['!cols'] = [
