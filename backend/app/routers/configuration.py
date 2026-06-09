@@ -152,8 +152,13 @@ async def create_config_item(
     current_user=Depends(require_role(["admin", "engineer"])),
 ):
     """创建构型项"""
-    if crud.get_config_item_by_code(db, data.code):
-        raise HTTPException(status_code=400, detail=f"构型号 {data.code} 已存在")
+    existing = crud.get_config_item_by_code(db, data.code)
+    if existing:
+        if existing.deleted_at is None:
+            raise HTTPException(status_code=400, detail=f"构型号 {data.code} 已存在")
+        # code 被同名的软删除项占用：复活该项（等价全新创建），支持导入恢复已删除构型项
+        item = crud.revive_config_item(db, existing, data)
+        return {"id": str(item.id), "code": item.code, "name": item.name}
     item = crud.create_config_item(db, data)
     return {"id": str(item.id), "code": item.code, "name": item.name}
 

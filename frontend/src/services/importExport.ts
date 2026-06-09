@@ -90,6 +90,16 @@ export interface ImportRow {
   _ecrNumber?: string;
   /** 构型配置关联构型项编号（警告用） */
   _ciCode?: string;
+  /** 构型配置：正式清单项数 */
+  _itemCount?: number;
+}
+
+/** 导入执行结果汇总 */
+export interface ImportResult {
+  created: number;
+  updated: number;
+  /** 关联引用未找到等告警信息 */
+  warnings: string[];
 }
 
 /** 导入预览结果 */
@@ -2936,50 +2946,45 @@ export async function exportConfigurationItems(): Promise<void> {
   const sheet1Rows = detailData.map((d: any) => ({
     构型号: d.code || '',
     名称: d.name || '',
-    规格型号: d.spec || '',
     备注: d.remark || '',
     创建时间: d.created_at || '',
     更新时间: d.updated_at || '',
   }));
 
-  // Sheet2: 关联零部件
+  // Sheet2: 关联零部件（件号/版本取自 part_detail）
   const sheet2Rows: Record<string, unknown>[] = [];
   for (const d of detailData) {
     for (const p of d.parts || []) {
       sheet2Rows.push({
         构型号: d.code,
         零部件类型: p.part_type || 'part',
-        零部件件号: p.part_code || p.code || '',
-        零部件版本: p.part_version || p.version || '',
+        零部件件号: p.part_detail?.code || '',
+        零部件版本: p.part_detail?.version || '',
         是否必选: p.is_required ? 'TRUE' : 'FALSE',
-        排序: p.sort_order ?? 0,
       });
     }
   }
 
-  // Sheet3: 子构型项
+  // Sheet3: 子构型项（子构型号取自 child_detail）
   const sheet3Rows: Record<string, unknown>[] = [];
   for (const d of detailData) {
     for (const c of d.children || []) {
       sheet3Rows.push({
         父构型号: d.code,
-        子构型号: c.child_code || c.code || '',
+        子构型号: c.child_detail?.code || '',
         是否必选: c.is_required ? 'TRUE' : 'FALSE',
-        排序: c.sort_order ?? 0,
       });
     }
   }
 
-  // Sheet4: 关联图文档
+  // Sheet4: 关联图文档（后端字段为 documents，编号/版本取自 document）
   const sheet4Rows: Record<string, unknown>[] = [];
   for (const d of detailData) {
-    for (const doc of d.document_links || []) {
+    for (const doc of d.documents || []) {
       sheet4Rows.push({
         构型号: d.code,
-        图文档编号: doc.document?.code || doc.doc_code || '',
-        图文档版本: doc.document?.version || doc.doc_version || '',
-        类别: doc.category || '',
-        排序: doc.sort_order ?? 0,
+        图文档编号: doc.document?.code || '',
+        图文档版本: doc.document?.version || '',
       });
     }
   }
@@ -2987,24 +2992,24 @@ export async function exportConfigurationItems(): Promise<void> {
   const wb = XLSX.utils.book_new();
 
   const s1 = XLSX.utils.json_to_sheet(sheet1Rows);
-  s1['!cols'] = [{ wch: 20 }, { wch: 24 }, { wch: 20 }, { wch: 30 }, { wch: 20 }, { wch: 20 }];
+  s1['!cols'] = [{ wch: 20 }, { wch: 24 }, { wch: 30 }, { wch: 20 }, { wch: 20 }];
   XLSX.utils.book_append_sheet(wb, s1, '构型项清单');
 
   if (sheet2Rows.length > 0) {
     const s2 = XLSX.utils.json_to_sheet(sheet2Rows);
-    s2['!cols'] = [{ wch: 20 }, { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 10 }, { wch: 8 }];
+    s2['!cols'] = [{ wch: 20 }, { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 10 }];
     XLSX.utils.book_append_sheet(wb, s2, '关联零部件');
   }
 
   if (sheet3Rows.length > 0) {
     const s3 = XLSX.utils.json_to_sheet(sheet3Rows);
-    s3['!cols'] = [{ wch: 20 }, { wch: 20 }, { wch: 10 }, { wch: 8 }];
+    s3['!cols'] = [{ wch: 20 }, { wch: 20 }, { wch: 10 }];
     XLSX.utils.book_append_sheet(wb, s3, '子构型项');
   }
 
   if (sheet4Rows.length > 0) {
     const s4 = XLSX.utils.json_to_sheet(sheet4Rows);
-    s4['!cols'] = [{ wch: 20 }, { wch: 20 }, { wch: 12 }, { wch: 16 }, { wch: 8 }];
+    s4['!cols'] = [{ wch: 20 }, { wch: 20 }, { wch: 12 }];
     XLSX.utils.book_append_sheet(wb, s4, '关联图文档');
   }
 
@@ -3129,8 +3134,6 @@ export async function previewConfigurationItemsImport(file: File): Promise<Impor
         _docLinks: (docsByCode.get(code) || []).map((r: any) => ({
           doc_code: String(r['图文档编号'] || '').trim(),
           doc_version: String(r['图文档版本'] || '').trim(),
-          category: String(r['类别'] || '').trim(),
-          sort_order: Number(r['排序']) || 0,
         })),
       },
     };
@@ -3150,8 +3153,11 @@ export async function previewConfigurationItemsImport(file: File): Promise<Impor
 /**
  * 执行构型项导入
  */
-export async function executeConfigurationItemsImport(preview: ImportPreview): Promise<void> {
+export async function executeConfigurationItemsImport(preview: ImportPreview): Promise<ImportResult> {
   const validRows = preview.rows.filter(r => r.status !== '错误');
+  const warnings: string[] = [];
+  let createdCount = 0;
+  let updatedCount = 0;
 
   // 获取现有构型项列表（重新查询确保最新）
   const existingItems: any[] = await fetchAllPages((page, pageSize) =>
@@ -3172,14 +3178,17 @@ export async function executeConfigurationItemsImport(preview: ImportPreview): P
         if (existing) {
           await configurationApi.updateItem(existing.id, mainPayload as any);
           codeToId.set(row.code, existing.id);
+          updatedCount++;
         }
       } else {
         const res = await configurationApi.createItem(mainPayload as any);
         const created = res.data;
         codeToId.set(row.code, created.id);
         row._newId = created.id;
+        createdCount++;
       }
-    } catch (err) {
+    } catch (err: any) {
+      warnings.push(`构型项 ${row.code}: 主记录写入失败 ${err?.message || ''}`);
       console.error(`导入构型项失败: ${row.code}`, err);
     }
   }
@@ -3221,6 +3230,7 @@ export async function executeConfigurationItemsImport(preview: ImportPreview): P
         const entity = store.parts.find((e: Part) => e.code === pc && (e.version || '') === pv)
                     || store.assemblies.find((e: Assembly) => e.code === pc && (e.version || '') === pv);
         if (!entity) {
+          warnings.push(`构型项 ${row.code}: 关联零部件未找到 ${pc}@${pv}`);
           console.warn(`构型项 ${row.code} 关联零部件未找到，跳过: ${pc}@${pv}`);
           continue;
         }
@@ -3267,6 +3277,7 @@ export async function executeConfigurationItemsImport(preview: ImportPreview): P
         const childCode = c.child_code as string;
         const childId = codeToId.get(childCode);
         if (!childId) {
+          warnings.push(`构型项 ${row.code}: 子构型项未找到 ${childCode}`);
           console.warn(`构型项 ${row.code} 子构型项未找到，跳过: ${childCode}`);
           continue;
         }
@@ -3311,14 +3322,13 @@ export async function executeConfigurationItemsImport(preview: ImportPreview): P
           (d: Document) => d.code === dc && (d.version || '') === dv
         );
         if (!doc) {
+          warnings.push(`构型项 ${row.code}: 关联图文档未找到 ${dc}@${dv}`);
           console.warn(`构型项 ${row.code} 关联图文档未找到，跳过: ${dc}@${dv}`);
           continue;
         }
         try {
           await entityDocumentsApi.add('configuration', ciId, {
             document_id: doc.id,
-            category: dl.category as string || undefined,
-            sort_order: dl.sort_order as number || undefined,
           });
         } catch (err) {
           console.warn(`添加构型项图文档关联失败: ${row.code} → ${dc}`, err);
@@ -3331,6 +3341,7 @@ export async function executeConfigurationItemsImport(preview: ImportPreview): P
 
   // 刷新 store
   await useDataStore.getState().syncAll();
+  return { created: createdCount, updated: updatedCount, warnings };
 }
 
 // ================================================================
@@ -3346,25 +3357,67 @@ export async function exportConfigurationProfiles(): Promise<void> {
   );
   if (profiles.length === 0) throw new Error('没有可导出的构型配置数据');
 
-  // 并发获取每个 Profile 的详情（含关联构型项信息）
+  // 构型项 id→code 映射，用于还原清单项的来源构型号
+  const ciItems: any[] = await fetchAllPages((page, pageSize) =>
+    configurationApi.listItems({ page, page_size: pageSize }).then((r) => r.data),
+  );
+  const ciIdToCode = new Map<string, string>();
+  for (const ci of ciItems) ciIdToCode.set(String(ci.id), ci.code);
+
+  // 并发获取每个 Profile 的详情（含正式清单 formal_items）
   const details = await Promise.all(profiles.map((p: any) => configurationProfileApi.get(p.id)));
   const detailData: any[] = details.map((r: any) => r.data);
 
-  const sheetRows = detailData.map((d: any) => ({
+  // Sheet1: 配置清单
+  const sheet1Rows = detailData.map((d: any) => ({
     配置编号: d.code || '',
     配置名称: d.name || '',
     关联构型号: d.configuration_item?.code || d.configuration_item_code || '',
     状态: d.status || '',
+    起始架次号: d.effectivity_start || '',
+    结束架次号: d.effectivity_end || '',
     备注: d.remark || '',
     创建时间: d.created_at || '',
+    更新时间: d.updated_at || '',
   }));
 
+  // Sheet2: 正式配置清单项
+  const sheet2Rows: Record<string, unknown>[] = [];
+  for (const d of detailData) {
+    for (const it of d.formal_items || []) {
+      sheet2Rows.push({
+        配置编号: d.code,
+        来源构型号: it.source_config_item_id
+          ? ciIdToCode.get(String(it.source_config_item_id)) || ''
+          : '',
+        项类型: it.item_type || '',
+        项编号: it.item_code || '',
+        项名称: it.item_name || '',
+        是否必选: it.is_required ? 'TRUE' : 'FALSE',
+        是否选用: it.is_selected ? 'TRUE' : 'FALSE',
+        来源类型: it.source_type || '',
+        排序: it.sort_order ?? 0,
+      });
+    }
+  }
+
   const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.json_to_sheet(sheetRows);
-  ws['!cols'] = [
-    { wch: 20 }, { wch: 24 }, { wch: 20 }, { wch: 12 }, { wch: 30 }, { wch: 20 },
+
+  const s1 = XLSX.utils.json_to_sheet(sheet1Rows);
+  s1['!cols'] = [
+    { wch: 20 }, { wch: 24 }, { wch: 20 }, { wch: 10 },
+    { wch: 14 }, { wch: 14 }, { wch: 30 }, { wch: 20 }, { wch: 20 },
   ];
-  XLSX.utils.book_append_sheet(wb, ws, '构型配置');
+  XLSX.utils.book_append_sheet(wb, s1, '配置清单');
+
+  if (sheet2Rows.length > 0) {
+    const s2 = XLSX.utils.json_to_sheet(sheet2Rows);
+    s2['!cols'] = [
+      { wch: 20 }, { wch: 20 }, { wch: 12 }, { wch: 20 },
+      { wch: 24 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 8 },
+    ];
+    XLSX.utils.book_append_sheet(wb, s2, '正式配置清单项');
+  }
 
   const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
   const blob = new Blob([buffer], {
@@ -3380,10 +3433,34 @@ export async function previewConfigurationProfilesImport(file: File): Promise<Im
   const arrayBuffer = await file.arrayBuffer();
   const wb = XLSX.read(arrayBuffer, { type: 'array' });
 
-  // 找"构型配置" Sheet 或用第一个
-  const sheetName = wb.SheetNames.find((n) => n.includes('构型配置')) ?? wb.SheetNames[0];
-  const ws = wb.Sheets[sheetName];
+  // 配置清单 Sheet（兼容旧文件名"构型配置"）
+  const mainSheetName =
+    wb.SheetNames.find((n) => n.includes('配置清单') || n.includes('构型配置')) ?? wb.SheetNames[0];
+  const ws = wb.Sheets[mainSheetName];
   const rawRows: Record<string, string>[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
+  if (rawRows.length === 0) throw new Error('Excel 中无数据');
+
+  // 正式配置清单项 Sheet，按配置编号分组
+  const itemSheetName = wb.SheetNames.find((n) => n.includes('清单项'));
+  const itemRows: Record<string, string>[] = itemSheetName
+    ? XLSX.utils.sheet_to_json(wb.Sheets[itemSheetName], { defval: '' })
+    : [];
+  const itemsByCode = new Map<string, any[]>();
+  for (const r of itemRows) {
+    const code = String(r['配置编号'] || '').trim();
+    if (!code) continue;
+    if (!itemsByCode.has(code)) itemsByCode.set(code, []);
+    itemsByCode.get(code)!.push({
+      source_ci_code: String(r['来源构型号'] || '').trim(),
+      item_type: String(r['项类型'] || '').trim(),
+      item_code: String(r['项编号'] || '').trim(),
+      item_name: String(r['项名称'] || '').trim(),
+      is_required: String(r['是否必选'] || '').trim().toUpperCase() === 'TRUE',
+      is_selected: String(r['是否选用'] || '').trim().toUpperCase() === 'TRUE',
+      source_type: String(r['来源类型'] || '').trim(),
+      sort_order: Number(r['排序']) || 0,
+    });
+  }
 
   // 获取现有构型项列表，建立 code→item map
   const ciItems: any[] = await fetchAllPages((page, pageSize) =>
@@ -3392,60 +3469,55 @@ export async function previewConfigurationProfilesImport(file: File): Promise<Im
   const ciMap = new Map<string, any>();
   for (const ci of ciItems) ciMap.set(ci.code, ci);
 
-  // 获取现有 Profile 列表，建立 name→profile map
+  // 获取现有 Profile 列表，建立 code→profile map（匹配键为配置编号）
   const existingProfiles: any[] = await fetchAllPages((page, pageSize) =>
     configurationProfileApi.list({ page, page_size: pageSize }).then((r) => r.data),
   );
-  const profileNameMap = new Map<string, any>();
-  for (const p of existingProfiles) profileNameMap.set(p.name, p);
+  const profileCodeMap = new Map<string, any>();
+  for (const p of existingProfiles) profileCodeMap.set(p.code, p);
 
   let ciWarnings = 0;
+  let profileItemCount = 0;
   const rows: ImportRow[] = rawRows.map((raw) => {
     const name = String(raw['配置名称'] || '').trim();
     const code = String(raw['配置编号'] || '').trim();
     const ciCode = String(raw['关联构型号'] || '').trim();
     const remark = String(raw['备注'] || '').trim();
 
-    if (!name) {
+    if (!code || !name) {
       return {
         status: '错误' as const,
         code: code || '—',
         name: name || '—',
         version: '',
-        error: '缺少必填字段：配置名称',
-      };
-    }
-    if (!ciCode) {
-      return {
-        status: '错误' as const,
-        code: code || name,
-        name,
-        version: '',
-        error: '缺少必填字段：关联构型号',
+        error: '缺少必填字段（配置编号或配置名称）',
       };
     }
 
-    const ci = ciMap.get(ciCode);
-    if (!ci) {
-      ciWarnings++;
-    }
+    // 关联构型号可空；填了但找不到则告警
+    if (ciCode && !ciMap.has(ciCode)) ciWarnings++;
 
-    const existing = profileNameMap.get(name);
+    const items = itemsByCode.get(code) || [];
+    profileItemCount += items.length;
+
+    const existing = profileCodeMap.get(code);
     const rowStatus: '新增' | '更新' = existing ? '更新' : '新增';
 
     return {
       status: rowStatus,
-      code: code || name,
+      code,
       name,
       version: '',
       remark,
-      _ciCode: ciCode,
+      _ciCode: ciCode || undefined,
+      _itemCount: items.length,
       _data: {
         code,
         name,
         remark,
-        configuration_item_id: ci ? ci.id : undefined,
-        status: 'draft',
+        effectivity_start: String(raw['起始架次号'] || '').trim(),
+        effectivity_end: String(raw['结束架次号'] || '').trim(),
+        _items: items,
       },
     };
   });
@@ -3454,61 +3526,122 @@ export async function previewConfigurationProfilesImport(file: File): Promise<Im
     type: 'configuration_profile',
     rows,
     ciWarnings,
+    profileItemCount,
   };
 }
 
 /**
  * 执行构型配置导入
  */
-export async function executeConfigurationProfilesImport(preview: ImportPreview): Promise<void> {
+export async function executeConfigurationProfilesImport(preview: ImportPreview): Promise<ImportResult> {
   const validRows = preview.rows.filter((r) => r.status !== '错误');
+  const warnings: string[] = [];
+  let created = 0;
+  let updated = 0;
 
-  // 重新获取最新构型项列表（code→id）
+  // 最新构型项列表：code→id 与 id→code（清单项匹配用）
   const ciItems: any[] = await fetchAllPages((page, pageSize) =>
     configurationApi.listItems({ page, page_size: pageSize }).then((r) => r.data),
   );
   const ciMap = new Map<string, any>();
-  for (const ci of ciItems) ciMap.set(ci.code, ci);
+  const ciIdToCode = new Map<string, string>();
+  for (const ci of ciItems) {
+    ciMap.set(ci.code, ci);
+    ciIdToCode.set(String(ci.id), ci.code);
+  }
 
-  // 重新获取现有 Profile 列表（name→profile）
+  // 现有 Profile 列表：code→profile（匹配键为配置编号）
   const existingProfiles: any[] = await fetchAllPages((page, pageSize) =>
     configurationProfileApi.list({ page, page_size: pageSize }).then((r) => r.data),
   );
-  const profileNameMap = new Map<string, any>();
-  for (const p of existingProfiles) profileNameMap.set(p.name, p);
+  const profileCodeMap = new Map<string, any>();
+  for (const p of existingProfiles) profileCodeMap.set(p.code, p);
+
+  // 清单项匹配键：项类型 + 项编号 + 来源构型号
+  const itemKey = (itemType: string, itemCode: string, sourceCiCode: string) =>
+    `${itemType}|${itemCode}|${sourceCiCode}`;
 
   for (const row of validRows) {
     const data = row._data!;
     const ciCode = row._ciCode;
-
-    // 解析最新的 configuration_item_id
     const ciId = ciCode ? ciMap.get(ciCode)?.id : undefined;
-    const payload = {
-      ...data,
-      configuration_item_id: ciId ?? data.configuration_item_id,
+    if (ciCode && !ciId) warnings.push(`配置 ${row.code}: 关联构型项未找到 ${ciCode}`);
+
+    const payload: Record<string, unknown> = {
+      code: data.code,
+      name: data.name,
+      configuration_item_id: ciId ?? null,
+      effectivity_start: (data.effectivity_start as string) || undefined,
+      effectivity_end: (data.effectivity_end as string) || undefined,
+      remark: (data.remark as string) || undefined,
     };
 
+    let profileId: string | undefined;
     try {
       if (row.status === '更新') {
-        const existing = profileNameMap.get(row.name);
-        if (existing) {
-          await configurationProfileApi.update(existing.id, payload as any);
+        const existing = profileCodeMap.get(row.code);
+        if (!existing) continue;
+        profileId = existing.id;
+        if (existing.status !== 'draft') {
+          warnings.push(`配置 ${row.code}: 非草稿状态（${existing.status}）跳过更新`);
+          continue;
         }
+        await configurationProfileApi.update(profileId!, payload as any);
+        updated++;
       } else {
-        // 新增：status 设为 draft
-        const createPayload = { ...payload, status: 'draft' };
-        const res = await configurationProfileApi.create(createPayload as any);
-        const created = res.data;
-        row._newId = created.id;
-        // 创建后调用 regenerate 填充 profile_items
-        await configurationProfileApi.regenerate(created.id);
+        const res = await configurationProfileApi.create(payload as any);
+        profileId = res.data.id;
+        row._newId = profileId;
+        created++;
       }
-    } catch (err) {
-      console.error(`导入构型配置失败: ${row.name}`, err);
+    } catch (err: any) {
+      warnings.push(`配置 ${row.code}: 主记录写入失败 ${err?.message || ''}`);
+      console.error(`导入构型配置失败: ${row.code}`, err);
+      continue;
+    }
+
+    // 还原正式清单的勾选状态（仅在关联构型项存在时有清单可还原）
+    const items = (data._items as any[]) || [];
+    if (!profileId || !ciId) continue;
+
+    try {
+      // 创建/更新后工作表已按当前构型项生成；按导入的 is_selected 逐项校正
+      const detail = await configurationProfileApi.get(profileId);
+      const working: any[] = detail.data.items || [];
+
+      // 导入文件中应选中的清单项键集合
+      const selectedKeys = new Set<string>();
+      for (const it of items) {
+        if (it.is_selected || it.is_required) {
+          selectedKeys.add(itemKey(it.item_type, it.item_code, it.source_ci_code));
+        }
+      }
+
+      let changed = false;
+      for (const wi of working) {
+        if (wi.is_required) continue; // 必选项恒选中，跳过
+        const wiSourceCode = wi.source_config_item_id
+          ? ciIdToCode.get(String(wi.source_config_item_id)) || ''
+          : '';
+        const shouldSelect = selectedKeys.has(itemKey(wi.item_type, wi.item_code, wiSourceCode));
+        if (Boolean(wi.is_selected) !== shouldSelect) {
+          await configurationProfileApi.updateItem(profileId, wi.id, { is_selected: shouldSelect });
+          changed = true;
+        }
+      }
+
+      // 触发工作表→正式清单同步（update 结尾始终执行 sync_working_to_formal）
+      if (changed) {
+        await configurationProfileApi.update(profileId, payload as any);
+      }
+    } catch (err: any) {
+      warnings.push(`配置 ${row.code}: 清单项勾选还原失败 ${err?.message || ''}`);
+      console.warn(`还原构型配置清单项失败: ${row.code}`, err);
     }
   }
 
   await useDataStore.getState().syncAll();
+  return { created, updated, warnings };
 }
 
 // ================================================================

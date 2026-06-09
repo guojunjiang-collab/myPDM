@@ -246,7 +246,10 @@ export default function ImportPreviewModal({
                         </span>
                       )}
                       {preview.type === 'configuration_profile' && (
-                        <span>{row._ciCode ? `CI: ${row._ciCode}` : '-'}</span>
+                        <span className="space-x-1">
+                          <span>{row._ciCode ? `CI: ${row._ciCode}` : '无关联构型项'}</span>
+                          {row._itemCount !== undefined && <span>清单项×{row._itemCount}</span>}
+                        </span>
                       )}
                       {(preview.type === 'ecr' || preview.type === 'eco') && (
                         <span className="space-x-1">

@@ -116,11 +116,16 @@ export default function ProfileList() {
     if (!importPreview) return;
     setImporting(true);
     try {
-      await executeConfigurationProfilesImport(importPreview);
+      const result = await executeConfigurationProfilesImport(importPreview);
       setImportPreviewOpen(false);
       setImportPreview(null);
       load();
-      alert('导入成功');
+      let msg = `导入成功（新增 ${result.created}，更新 ${result.updated}）`;
+      if (result.warnings.length > 0) {
+        msg += `\n\n⚠️ ${result.warnings.length} 条告警：\n` + result.warnings.slice(0, 20).join('\n');
+        if (result.warnings.length > 20) msg += `\n… 其余 ${result.warnings.length - 20} 条见控制台`;
+      }
+      alert(msg);
     } catch (err: any) {
       alert(err.message || '导入执行失败');
     } finally {

@@ -66,6 +66,31 @@ def create_config_item(db: Session, data: schemas.ConfigurationItemCreate) -> mo
     return item
 
 
+def revive_config_item(
+    db: Session, item: models.ConfigurationItem, data: schemas.ConfigurationItemCreate,
+) -> models.ConfigurationItem:
+    """复活已软删除的构型项：撤销删除、以新数据覆盖基本字段，并清空其自身旧关联（等价全新创建）。
+
+    code 列有唯一约束，软删除行仍占用该 code，故再次创建同 code 时复用此行而非插入新行。
+    """
+    item.deleted_at = None
+    item.name = data.name
+    item.spec = data.spec
+    item.remark = data.remark
+    item.document_links = []
+    # 清空该构型项自身的关联零部件
+    db.query(models.ConfigurationItemPart).filter(
+        models.ConfigurationItemPart.configuration_item_id == item.id
+    ).delete()
+    # 清空该构型项作为父项的子构型关联（不动其它父项对它的引用）
+    db.query(models.ConfigurationItemChild).filter(
+        models.ConfigurationItemChild.parent_id == item.id
+    ).delete()
+    db.commit()
+    db.refresh(item)
+    return item
+
+
 def update_config_item(db: Session, config_id: str, data: schemas.ConfigurationItemUpdate) -> Optional[models.ConfigurationItem]:
     item = get_config_item(db, config_id)
     if not item:
