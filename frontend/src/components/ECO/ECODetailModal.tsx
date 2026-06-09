@@ -195,6 +195,17 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
       : !eco ? <div className="py-8 text-center text-gray-400 text-sm">未找到 ECO</div>
       : (
         <>
+        {canDownload() && (
+          <div className="flex items-center justify-end mb-3">
+            <button
+              onClick={async () => { try { await exportEcoMarkdown(eco); } catch { toast.error('导出失败'); } }}
+              className="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+              title="导出为 Markdown 文档（展开所有信息）"
+            >
+              📄 导出MD
+            </button>
+          </div>
+        )}
         <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
           {/* Header */}
           <div className="flex items-center justify-between pb-4 border-b border-gray-200">
@@ -203,15 +214,6 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
               <div className="text-sm text-gray-500 mt-0.5">{eco.title}</div>
             </div>
             <div className="flex items-center gap-2">
-              {canDownload() && (
-                <button
-                  onClick={async () => { try { await exportEcoMarkdown(eco); } catch { toast.error('导出失败'); } }}
-                  className="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
-                  title="导出为 Markdown 文档（展开所有信息）"
-                >
-                  📄 导出MD
-                </button>
-              )}
               <ECOStatusBadge status={eco.status} />
               <ECOPriorityBadge priority={eco.priority} />
             </div>
