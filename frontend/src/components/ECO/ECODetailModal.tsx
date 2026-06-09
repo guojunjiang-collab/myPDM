@@ -214,7 +214,6 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
             <InfoItem label="优先级" value={eco.priority} />
             <InfoItem label="审批模式" value={eco.review_mode === 'all' ? '会签' : '或签'} />
             <InfoItem label="创建人" value={eco.creator_name} icon="👤" />
-            <InfoItem label="执行人" value={eco.executor_name || '未指定'} />
             <InfoItem label="来源" value={eco.ecr_number || '独立创建'} />
             <InfoItem label="进度" value={`${eco.execution_completed_count}/${eco.execution_count}`} />
           </div>

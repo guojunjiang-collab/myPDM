@@ -27,7 +27,6 @@ class ECO(Base):
     reviewers = Column(JSONB, nullable=False, default=[])
     review_mode = Column(String(8), nullable=False, default="all")
     creator_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    executor_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     document_links = Column(JSONB, nullable=False, default=[])
     cc_users = Column(JSONB, nullable=False, default=[])
     release_items = Column(JSONB, nullable=False, default=[])  # 工程预变更关联的零部件列表

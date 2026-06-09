@@ -133,7 +133,6 @@ class ECOCreate(BaseSchema):
     review_mode: Literal["all", "any"] = "all"
     document_links: List[ECODocumentLinkItem] = []
     ecr_id: Optional[str] = None
-    executor_id: Optional[str] = None
     release_items: Optional[List[Dict[str, Any]]] = None  # 工程预变更关联零部件
     execution_items: List[ECOExecutionItemCreate] = []
 
@@ -148,7 +147,6 @@ class ECOEdit(BaseSchema):
     reviewers: Optional[List[ECOReviewerItem]] = None
     review_mode: Optional[Literal["all", "any"]] = None
     document_links: Optional[List[ECODocumentLinkItem]] = None
-    executor_id: Optional[str] = None
     ecr_id: Optional[str] = None
     release_items: Optional[List[Dict[str, Any]]] = None
     execution_items: Optional[List[ECOExecutionItemCreate]] = None
@@ -203,7 +201,6 @@ class ECODetail(ECOListItem):
     reviewed_at: Optional[datetime] = None
     executed_at: Optional[datetime] = None
     closed_at: Optional[datetime] = None
-    executor_name: Optional[str] = None
 
 
 # ============================================================

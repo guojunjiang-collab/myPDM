@@ -377,8 +377,6 @@ export interface ECORequest {
   review_mode: 'all' | 'any';
   creator_id: string;
   creator_name: string;
-  executor_id?: string;
-  executor_name?: string;
   reviewers: ECOReviewer[];
   reviewers_count: number;
   approved_count: number;
@@ -446,7 +444,6 @@ export interface ECOCreateData {
   review_mode: string;
   document_links: ECRDocumentLink[];
   ecr_id?: string;
-  executor_id?: string;
   execution_items?: {
     source?: string;
     entity_type: string;
@@ -525,8 +522,6 @@ export interface ECORequest {
   review_mode: 'all' | 'any';
   creator_id: string;
   creator_name: string;
-  executor_id?: string;
-  executor_name?: string;
   reviewers: ECOReviewer[];
   reviewers_count: number;
   approved_count: number;

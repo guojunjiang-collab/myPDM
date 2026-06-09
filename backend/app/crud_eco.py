@@ -143,7 +143,6 @@ def create_eco(db: Session, data: ECOCreate, creator_id: uuid.UUID) -> ECO:
         creator_id=creator_id,
         document_links=document_links_json,
         ecr_id=ecr_id_val,
-        executor_id=uuid.UUID(data.executor_id) if data.executor_id else None,
     )
     db.add(db_eco)
     db.commit()
@@ -190,7 +189,6 @@ def get_ecos(db: Session, params: ECOListParams, current_user=None,
         q = q.filter(
             or_(
                 ECO.creator_id == current_user.id,
-                ECO.executor_id == current_user.id,
                 ECO.reviewers.cast(String).contains(f'"user_id": "{uid}"'),
                 ECO.cc_users.cast(String).contains(f'"user_id": "{uid}"')
             )
@@ -280,8 +278,6 @@ def update_eco(db: Session, eco: ECO, data: ECOEdit):
         if field == "reviewers" and value is not None:
             setattr(eco, field, _build_reviewers_json(db, value))
         elif field == "ecr_id" and value is not None:
-            setattr(eco, field, uuid.UUID(value) if value else None)
-        elif field == "executor_id" and value is not None:
             setattr(eco, field, uuid.UUID(value) if value else None)
         elif field == "document_links" and value is not None:
             setattr(eco, field, [dl.model_dump() if hasattr(dl, "model_dump") else dl for dl in value])

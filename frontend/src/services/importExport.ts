@@ -4014,7 +4014,6 @@ export async function exportECOs(): Promise<void> {
     审批模式: d.review_mode || 'all',
     描述: d.description || '',
     变更原因: d.reason || '',
-    执行人工号: d.executor_name || '',
     创建人: d.creator_name || '',
     创建时间: d.created_at || '',
   }));
@@ -4219,7 +4218,7 @@ export async function exportECOs(): Promise<void> {
   s1['!cols'] = [
     { wch: 16 }, { wch: 30 }, { wch: 16 }, { wch: 12 }, { wch: 10 },
     { wch: 12 }, { wch: 10 }, { wch: 30 }, { wch: 30 }, { wch: 16 },
-    { wch: 16 }, { wch: 20 },
+    { wch: 20 },
   ];
   XLSX.utils.book_append_sheet(wb, s1, 'ECO清单');
 

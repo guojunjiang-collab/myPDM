@@ -90,11 +90,6 @@ def _build_eco_detail(db: Session, eco: ECO) -> dict:
             "executed_at": ei.executed_at}
         )
 
-    executor_name = ""
-    if eco.executor_id:
-        executor = db.query(User).filter(User.id == eco.executor_id).first()
-        executor_name = executor.real_name if executor else ""
-
     ecr_number = None
     if eco.ecr_id:
         from app.models_ecr import ECR as ECRModel
@@ -118,8 +113,6 @@ def _build_eco_detail(db: Session, eco: ECO) -> dict:
         "status_logs": status_log_items,
         "cc_users": eco.cc_users or [],
         "release_items": eco.release_items or [],
-        "executor_name": executor_name,
-        "executor_id": str(eco.executor_id) if eco.executor_id else None,
         "reviewed_at": eco.reviewed_at, "executed_at": eco.executed_at,
         "closed_at": eco.closed_at,
     }

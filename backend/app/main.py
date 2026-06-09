@@ -297,7 +297,6 @@ async def startup_event():
                     reviewers JSONB NOT NULL DEFAULT '[]',
                     review_mode VARCHAR(8) NOT NULL DEFAULT 'all',
                     creator_id UUID NOT NULL REFERENCES users(id),
-                    executor_id UUID REFERENCES users(id),
                     document_links JSONB NOT NULL DEFAULT '[]',
                     cc_users JSONB NOT NULL DEFAULT '[]',
                     release_items JSONB NOT NULL DEFAULT '[]',
