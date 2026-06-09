@@ -4066,6 +4066,13 @@ export async function exportECOs(): Promise<void> {
   const traceRows: Record<string, unknown>[] = [];
   for (const d of detailData) {
     const ecr = d.ecr_id ? ecrById.get(d.ecr_id) : null;
+    // 受影响对象件号 → 版本（用于兜底分支解析手动新增子项所属受影响对象的版本）
+    const affectedVerByCode = new Map<string, string>();
+    if (ecr) {
+      for (const ai of ecr.affected_items || []) {
+        if (ai.entity_code) affectedVerByCode.set(ai.entity_code, ai.entity_version || '');
+      }
+    }
     // ECO 执行项编辑值索引（复合键 entity_id|_affectedCode，回退到 entity_id / entity_code）
     const savedMap = new Map<string, any>();
     for (const ei of d.execution_items || []) {
@@ -4150,7 +4157,10 @@ export async function exportECOs(): Promise<void> {
           层级: '',
           ...base,
           受影响对象件号: dt._affectedCode || '',
-          受影响对象版本: '',
+          受影响对象版本:
+            affectedVerByCode.get(dt._affectedCode || '') ||
+            (ei.parent_entity_id ? versionById.get(String(ei.parent_entity_id)) || '' : '') ||
+            '',
           来源: ei.source || 'manual',
         });
       } else {
