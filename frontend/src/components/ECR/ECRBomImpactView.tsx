@@ -67,11 +67,14 @@ function buildUpwardTree(items: BomImpactNode[]): UpwardTreeNode[] {
 
 // ─── Component ───────────────────────────────────────────────────
 export function ECRBomImpactView({
-  upwardChain,
-  downwardItems,
+  upwardChain: upwardChainProp,
+  downwardItems: downwardItemsProp,
   onChange,
   editable,
 }: ECRBomImpactViewProps) {
+  // 防空：导入或未计算 BOM 影响时，bom_impact 可能为 {}，上/下链为 undefined
+  const upwardChain = upwardChainProp || [];
+  const downwardItems = downwardItemsProp || [];
   // ── Upward tree state ──────────────────────────────────────────
   const upwardTree = useMemo(() => buildUpwardTree(upwardChain), [upwardChain]);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set());
