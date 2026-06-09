@@ -37,6 +37,10 @@ const ECO_STATUS_LABELS: Record<string, string> = {
   draft: '草稿', reviewing: '评审中', approved: '已批准', rejected: '已驳回',
   executing: '执行中', completed: '已完成', closed: '已关闭', returned: '退回修改',
 };
+// 零部件状态（工程变更结果列表）
+const ENTITY_STATUS_LABELS: Record<string, string> = {
+  draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废',
+};
 const ACTION_LABELS: Record<string, string> = {
   upgrade: '升版', qty_change: '数量修改', delete: '删除', no_change: '不变',
   create: '新建', add_existing: '增选已有', add_new: '新增子项',
@@ -441,6 +445,23 @@ export async function exportEcoMarkdown(eco: any): Promise<void> {
         ei.entity_type === 'part' ? '零件' : '部件',
         ei.entity_code, ei.entity_name, actionCell(ei.action),
         ei.detail?._targetQty ?? '-', ei.detail?._desc || '', ei.detail?._affectedCode || '',
+      ]),
+    ));
+    out.push('');
+  }
+
+  // 工程变更结果（关联零部件 release_items）
+  const releaseItems: any[] = e.release_items || [];
+  if (releaseItems.length > 0) {
+    out.push('## 工程变更结果\n');
+    out.push(mdTable(
+      ['类型', '件号', '名称', '规格型号', '版本', '状态', '用量'],
+      releaseItems.map((ri) => [
+        ri.entity_type === 'assembly' ? '部件' : '零件',
+        ri.entity_code, ri.entity_name, ri.spec || '-',
+        ri.entity_version || 'A',
+        lbl(ENTITY_STATUS_LABELS, ri.status),
+        ri.quantity ?? 1,
       ]),
     ));
     out.push('');
