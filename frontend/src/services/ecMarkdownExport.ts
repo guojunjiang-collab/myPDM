@@ -75,40 +75,14 @@ function downloadMarkdown(filename: string, content: string): void {
   URL.revokeObjectURL(url);
 }
 
-// ─── BOM 影响链表格（HTML 表格，按动作着色，与 ECR 详情一致）─────
-// 行底色对应详情中 ECRBomImpactView 的 ACTION_ROW_CLASS：
-//   升版 bg-blue-50(#eff6ff)、数量修改 bg-orange-50(#fff7ed)、删除 bg-red-50(#fef2f2)、不变 无
-const ACTION_ROW_BG: Record<string, string> = {
-  upgrade: '#eff6ff',
-  qty_change: '#fff7ed',
-  delete: '#fef2f2',
+// ─── BOM 影响链表格 ────────────────────────────────────────────
+// 用彩色圆点区分动作（纯文本，MarkText/GitHub/各查看器都能显示）：
+//   🔵升版  🟠数量修改  🔴删除  ⚪不变  🟢新建/新增子项
+const ACTION_DOT: Record<string, string> = {
+  upgrade: '🔵', qty_change: '🟠', delete: '🔴', no_change: '⚪',
+  create: '🟢', add_existing: '🟢', add_new: '🟢',
 };
-
-const htmlEscape = (v: unknown): string =>
-  String(v ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\r?\n/g, '<br>');
-
-/** 生成带行底色的 HTML 表格；rows 每项含 cells 与 action */
-function htmlImpactTable(headers: string[], rows: { cells: unknown[]; action: string }[]): string {
-  const thead =
-    '<thead><tr>' +
-    headers.map((h) => `<th align="left">${htmlEscape(h)}</th>`).join('') +
-    '</tr></thead>';
-  const tbody =
-    '<tbody>' +
-    rows
-      .map((r) => {
-        const bg = ACTION_ROW_BG[r.action] || '';
-        const style = bg ? ` style="background-color:${bg}"` : '';
-        return `<tr${style}>` + r.cells.map((c) => `<td>${htmlEscape(c)}</td>`).join('') + '</tr>';
-      })
-      .join('') +
-    '</tbody>';
-  return `<table>\n${thead}\n${tbody}\n</table>`;
-}
+const actionCell = (a: string): string => `${ACTION_DOT[a] || ''} ${lbl(ACTION_LABELS, a)}`.trim();
 
 function bomImpactSection(item: any): string {
   const out: string[] = [];
@@ -118,34 +92,28 @@ function bomImpactSection(item: any): string {
 
   if (up.length > 0) {
     out.push('**📊 向上溯源链**\n');
-    out.push(htmlImpactTable(
+    out.push(mdTable(
       ['层级', '类型', '件号', '名称', '版本', '动作', '数量', '目标数量', '变更描述'],
-      up.map((n) => ({
-        action: n.action,
-        cells: [
-          n.level ?? '-',
-          n.entity_type === 'part' ? '零件' : '部件',
-          n.entity_code, n.entity_name, n.entity_version,
-          lbl(ACTION_LABELS, n.action), n.quantity ?? '-', targetQty(n),
-          n.change_description || '',
-        ],
-      })),
+      up.map((n) => [
+        n.level ?? '-',
+        n.entity_type === 'part' ? '零件' : '部件',
+        n.entity_code, n.entity_name, n.entity_version,
+        actionCell(n.action), n.quantity ?? '-', targetQty(n),
+        n.change_description || '',
+      ]),
     ));
     out.push('');
   }
   if (down.length > 0) {
     out.push('**📋 向下子项**\n');
-    out.push(htmlImpactTable(
+    out.push(mdTable(
       ['类型', '件号', '名称', '版本', '动作', '数量', '目标数量', '变更描述'],
-      down.map((n) => ({
-        action: n.action,
-        cells: [
-          n.entity_type === 'part' ? '零件' : '部件',
-          n.entity_code, n.entity_name, n.entity_version,
-          lbl(ACTION_LABELS, n.action), n.quantity ?? '-', targetQty(n),
-          n.change_description || '',
-        ],
-      })),
+      down.map((n) => [
+        n.entity_type === 'part' ? '零件' : '部件',
+        n.entity_code, n.entity_name, n.entity_version,
+        actionCell(n.action), n.quantity ?? '-', targetQty(n),
+        n.change_description || '',
+      ]),
     ));
     out.push('');
   }
