@@ -3949,9 +3949,10 @@ export async function executeECRsImport(preview: ImportPreview): Promise<void> {
 
 /**
  * 导出所有 ECO 数据为多 Sheet Excel
- * Sheet: ECO清单 / 审批人(含审批结果) / 执行明细 / 工程变更结果 /
- *        向上溯源链 / 向下子项 / 知会人 / 关联图文档
- * 变更内容（向上/向下）取自 ECO 自身 execution_items 的编辑后值，不回拉 ECR。
+ * Sheet: ECO清单 / 审批人(含审批结果) / 工程变更结果(关联零部件) /
+ *        受影响物料 / 溯源链(链分类:向上溯源/向下子项) / 知会人 / 关联图文档
+ * 受影响物料/溯源链 取自 ECO 自身 execution_items 的编辑后内容（仅 ECR 评估列，
+ * 不含 ECO 执行后自动生成的结果），不回拉 ECR。
  */
 export async function exportECOs(): Promise<void> {
   const ecos: any[] = await fetchAllPages((page, pageSize) =>
@@ -3974,9 +3975,6 @@ export async function exportECOs(): Promise<void> {
     const u = userById.get(String(uid));
     return (u?.employee_no || u?.username || fallbackName || uid || '') as string;
   };
-
-  const execStatusLabel = (s: string): string =>
-    ({ pending: '待执行', in_progress: '执行中', completed: '已完成', failed: '失败', skipped: '已跳过' } as Record<string, string>)[s] || s || '';
 
   // Sheet1: ECO 清单
   const sheet1Rows = detailData.map((d: any) => ({
@@ -4016,79 +4014,53 @@ export async function exportECOs(): Promise<void> {
     }
   }
 
-  // Sheet3: 执行明细（编辑态字段，保留用于导入往返）
-  const execItemRows: Record<string, unknown>[] = [];
+  // Sheet: 工程变更结果（挂关联零部件 release_items）
+  const releaseRows: Record<string, unknown>[] = [];
+  for (const d of detailData) {
+    for (const ri of d.release_items || []) {
+      releaseRows.push({
+        ECO编号: d.eco_number,
+        对象类型: ri.entity_type || '',
+        对象编号: ri.entity_code || '',
+        对象名称: ri.entity_name || '',
+        版本: ri.entity_version || '',
+      });
+    }
+  }
+
+  // 受影响物料 / 溯源链——直接取自 ECO 自身执行项的编辑后内容（ECR评估列）
+  // （detail._targetQty/_desc/_affectedCode），不回拉 ECR，确保反映 ECO 中的修改。
+  // 仅导出 ECR 评估内容，不导出 ECO 执行后自动生成的结果。
+  // 分类：无父对象且非子项类动作 → 受影响物料；其余为溯源链节点，
+  //       子项类动作(改数量/删除/增选/新增子项) → 向下子项，否则 → 向上溯源。
+  const DOWNWARD_ACTIONS = ['qty_change', 'delete', 'add_existing', 'add_new'];
+  const affectedRows: Record<string, unknown>[] = [];
+  const traceRows: Record<string, unknown>[] = [];
   for (const d of detailData) {
     for (const item of d.execution_items || []) {
       const detail = item.detail || {};
-      execItemRows.push({
-        ECO编号: d.eco_number,
+      const isSpecial = DOWNWARD_ACTIONS.includes(item.action);
+      const base = {
         对象类型: item.entity_type || '',
         对象编号: item.entity_code || '',
-        对象版本: item.entity_version || '',
         对象名称: item.entity_name || '',
         动作: item.action || '',
-        来源: item.source || 'manual',
         目标数量: detail._targetQty ?? '',
         变更描述: detail._desc || '',
         受影响编号: detail._affectedCode || '',
         父对象ID: item.parent_entity_id || '',
-        排序: item.sort_order ?? 0,
-      });
-    }
-  }
-
-  // Sheet4: 工程变更结果（ECO 执行后实际产生的新版本/状态）
-  const changeResultRows: Record<string, unknown>[] = [];
-  for (const d of detailData) {
-    for (const item of d.execution_items || []) {
-      changeResultRows.push({
-        ECO编号: d.eco_number,
-        对象类型: item.entity_type || '',
-        对象编号: item.entity_code || '',
-        对象名称: item.entity_name || '',
-        动作: item.action || '',
-        执行状态: execStatusLabel(item.status),
-        新版本: item.new_version || '',
-        新实体状态: item.new_entity_status || '',
-        新实体ID: item.new_entity_id || '',
-        父项新版本ID: item.parent_new_entity_id || '',
-        错误信息: item.error_message || '',
-        执行时间: item.executed_at || '',
-      });
-    }
-  }
-
-  // Sheet5/6: 变更内容分析（向上溯源链 / 向下子项）——直接取自 ECO 自身执行项的
-  // 编辑后内容（detail._targetQty/_desc/_affectedCode），不回拉 ECR，确保反映 ECO 中的修改。
-  // ECO 保存时把上行链与下行子项节点都写入了 execution_items，按 parent/动作区分方向。
-  const actionLabel = (a: string): string =>
-    ({ create: '新建', upgrade: '升版', qty_change: '改数量', delete: '删除', no_change: '无变更', add_existing: '增选已有', add_new: '新增子项' } as Record<string, string>)[a] || a || '';
-  const isDownward = (item: any): boolean =>
-    !!item.parent_entity_id || ['qty_change', 'delete', 'add_existing', 'add_new'].includes(item.action);
-  const upwardRows: Record<string, unknown>[] = [];
-  const downwardRows: Record<string, unknown>[] = [];
-  for (const d of detailData) {
-    for (const item of d.execution_items || []) {
-      const detail = item.detail || {};
-      const row = {
-        ECO编号: d.eco_number,
-        来源ECR编号: d.ecr_number || '',
-        所属受影响对象: detail._affectedCode || '',
-        对象类型: item.entity_type || '',
-        对象编号: item.entity_code || '',
-        对象名称: item.entity_name || '',
-        父对象ID: item.parent_entity_id || '',
-        变更动作: actionLabel(item.action),
-        目标数量: detail._targetQty ?? '',
-        变更描述: detail._desc || '',
         来源: item.source || 'manual',
-        执行结果: execStatusLabel(item.status),
-        执行后新版本: item.new_version || '',
-        执行后状态: item.new_entity_status || '',
       };
-      if (isDownward(item)) downwardRows.push(row);
-      else upwardRows.push(row);
+      const isAffected = !item.parent_entity_id && !isSpecial;
+      if (isAffected) {
+        affectedRows.push({ ECO编号: d.eco_number, ...base });
+      } else {
+        traceRows.push({
+          ECO编号: d.eco_number,
+          链分类: isSpecial ? '向下子项' : '向上溯源',
+          ...base,
+        });
+      }
     }
   }
 
@@ -4119,11 +4091,11 @@ export async function exportECOs(): Promise<void> {
   }
 
   const wb = XLSX.utils.book_new();
-  const chainCols = [
-    { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 10 }, { wch: 18 }, { wch: 20 },
-    { wch: 22 }, { wch: 10 }, { wch: 10 }, { wch: 30 }, { wch: 8 }, { wch: 10 },
-    { wch: 12 }, { wch: 12 },
+  const affectedCols = [
+    { wch: 16 }, { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 10 },
+    { wch: 10 }, { wch: 30 }, { wch: 18 }, { wch: 22 }, { wch: 8 },
   ];
+  const traceCols = [{ wch: 16 }, { wch: 10 }, ...affectedCols.slice(1)];
 
   const s1 = XLSX.utils.json_to_sheet(sheet1Rows);
   s1['!cols'] = [
@@ -4139,34 +4111,22 @@ export async function exportECOs(): Promise<void> {
     XLSX.utils.book_append_sheet(wb, s, '审批人');
   }
 
-  if (execItemRows.length > 0) {
-    const s = XLSX.utils.json_to_sheet(execItemRows);
-    s['!cols'] = [
-      { wch: 16 }, { wch: 10 }, { wch: 20 }, { wch: 12 }, { wch: 20 }, { wch: 12 },
-      { wch: 10 }, { wch: 10 }, { wch: 30 }, { wch: 20 }, { wch: 20 }, { wch: 8 },
-    ];
-    XLSX.utils.book_append_sheet(wb, s, '执行明细');
-  }
-
-  if (changeResultRows.length > 0) {
-    const s = XLSX.utils.json_to_sheet(changeResultRows);
-    s['!cols'] = [
-      { wch: 16 }, { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 10 }, { wch: 10 },
-      { wch: 10 }, { wch: 12 }, { wch: 22 }, { wch: 22 }, { wch: 30 }, { wch: 20 },
-    ];
+  if (releaseRows.length > 0) {
+    const s = XLSX.utils.json_to_sheet(releaseRows);
+    s['!cols'] = [{ wch: 16 }, { wch: 10 }, { wch: 20 }, { wch: 24 }, { wch: 10 }];
     XLSX.utils.book_append_sheet(wb, s, '工程变更结果');
   }
 
-  if (upwardRows.length > 0) {
-    const s = XLSX.utils.json_to_sheet(upwardRows);
-    s['!cols'] = chainCols;
-    XLSX.utils.book_append_sheet(wb, s, '向上溯源链');
+  if (affectedRows.length > 0) {
+    const s = XLSX.utils.json_to_sheet(affectedRows);
+    s['!cols'] = affectedCols;
+    XLSX.utils.book_append_sheet(wb, s, '受影响物料');
   }
 
-  if (downwardRows.length > 0) {
-    const s = XLSX.utils.json_to_sheet(downwardRows);
-    s['!cols'] = chainCols;
-    XLSX.utils.book_append_sheet(wb, s, '向下子项');
+  if (traceRows.length > 0) {
+    const s = XLSX.utils.json_to_sheet(traceRows);
+    s['!cols'] = traceCols;
+    XLSX.utils.book_append_sheet(wb, s, '溯源链');
   }
 
   if (ccRows.length > 0) {
@@ -4219,10 +4179,14 @@ export async function previewECOsImport(file: File): Promise<ImportPreview> {
     if (e.ecr_number) ecrMap.set(e.ecr_number, e);
   }
 
-  // 解析关联 Sheet
-  const execItemRows = wb.Sheets['执行明细']
-    ? XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets['执行明细'])
-    : [];
+  // 解析关联 Sheet：执行项来自「受影响物料」+「溯源链」（旧版「执行明细」做兼容回退）
+  const readSheet = (name: string): Record<string, unknown>[] =>
+    wb.Sheets[name] ? XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[name]) : [];
+  const execItemRows = [
+    ...readSheet('受影响物料'),
+    ...readSheet('溯源链'),
+    ...readSheet('执行明细'),
+  ];
   const reviewerRows = wb.Sheets['审批人']
     ? XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets['审批人'])
     : [];
