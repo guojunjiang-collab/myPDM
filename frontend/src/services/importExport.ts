@@ -3586,8 +3586,6 @@ export async function exportECRs(): Promise<void> {
         实体类型: item.entity_type || '',
         实体件号: item.entity_code || item.entity?.code || '',
         实体版本: item.entity_version || item.entity?.version || '',
-        变更描述: item.change_description || '',
-        变更类型: item.change_type || '',
       });
     }
   }
@@ -3610,9 +3608,7 @@ export async function exportECRs(): Promise<void> {
           节点版本: node.entity_version || '',
           动作: node.action || 'no_change',
           数量: node.quantity ?? '',
-          数量变更: node.quantity_change
-            ? JSON.stringify(node.quantity_change)
-            : '',
+          目标数量: node.quantity_change?.to ?? node.quantity ?? '',
           变更描述: node.change_description || '',
         });
       };
@@ -3652,7 +3648,7 @@ export async function exportECRs(): Promise<void> {
 
   if (sheet3Rows.length > 0) {
     const s3 = XLSX.utils.json_to_sheet(sheet3Rows);
-    s3['!cols'] = [{ wch: 16 }, { wch: 12 }, { wch: 20 }, { wch: 12 }, { wch: 30 }, { wch: 12 }];
+    s3['!cols'] = [{ wch: 16 }, { wch: 12 }, { wch: 20 }, { wch: 12 }];
     XLSX.utils.book_append_sheet(wb, s3, '受影响对象');
   }
 
