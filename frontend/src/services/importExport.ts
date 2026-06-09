@@ -3551,7 +3551,6 @@ export async function exportECRs(): Promise<void> {
     状态: d.status || '',
     描述: d.description || '',
     变更原因: d.reason || '',
-    备注: d.remark || '',
     创建时间: d.created_at || '',
   }));
 
@@ -3636,7 +3635,7 @@ export async function exportECRs(): Promise<void> {
   const s1 = XLSX.utils.json_to_sheet(sheet1Rows);
   s1['!cols'] = [
     { wch: 16 }, { wch: 30 }, { wch: 12 }, { wch: 10 }, { wch: 12 },
-    { wch: 30 }, { wch: 30 }, { wch: 20 }, { wch: 20 },
+    { wch: 30 }, { wch: 30 }, { wch: 20 },
   ];
   XLSX.utils.book_append_sheet(wb, s1, 'ECR清单');
 
