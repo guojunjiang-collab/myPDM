@@ -3820,8 +3820,9 @@ export async function previewECRsImport(file: File): Promise<ImportPreview> {
           .filter((r: any) => r._document)
           .map((r: any) => ({
             document_id: r._document.id,
-            category: String(r['类别'] || ''),
-            sort_order: Number(r['排序'] ?? 0),
+            document_code: r._document.code || '',
+            document_name: r._document.name || '',
+            document_version: r._document.version || '',
           })),
         _affectedItems: affectedItems.map((r: any) => ({
           entity_type: String(r['实体类型'] || ''),
@@ -4454,8 +4455,9 @@ export async function previewECOsImport(file: File): Promise<ImportPreview> {
           .filter((r: any) => r._document)
           .map((r: any) => ({
             document_id: r._document.id,
-            category: String(r['类别'] || ''),
-            sort_order: Number(r['排序'] ?? 0),
+            document_code: r._document.code || '',
+            document_name: r._document.name || '',
+            document_version: r._document.version || '',
           })),
         execution_items: execItems.map((r: any) => ({
           source: String(r['来源'] || 'manual') as 'manual' | 'ecr',
