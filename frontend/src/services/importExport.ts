@@ -3950,8 +3950,8 @@ export async function executeECRsImport(preview: ImportPreview): Promise<void> {
 /**
  * 导出所有 ECO 数据为多 Sheet Excel
  * Sheet: ECO清单 / 审批人(含审批结果) / 执行明细 / 工程变更结果 /
- *        ECR受影响物料 / 向上溯源链(评估+执行后) / 向下子项(评估+执行后) /
- *        知会人 / 关联图文档
+ *        向上溯源链 / 向下子项 / 知会人 / 关联图文档
+ * 变更内容（向上/向下）取自 ECO 自身 execution_items 的编辑后值，不回拉 ECR。
  */
 export async function exportECOs(): Promise<void> {
   const ecos: any[] = await fetchAllPages((page, pageSize) =>
@@ -3974,18 +3974,6 @@ export async function exportECOs(): Promise<void> {
     const u = userById.get(String(uid));
     return (u?.employee_no || u?.username || fallbackName || uid || '') as string;
   };
-
-  // 拉取每条 ECO 的来源 ECR 详情（含受影响物料 + BOM 影响分析）
-  const ecrIds = Array.from(
-    new Set(detailData.map((d: any) => d.ecr_id).filter(Boolean)),
-  ) as string[];
-  const ecrDetailResults = await Promise.all(
-    ecrIds.map((id) => ecrApi.get(id).then((r: any) => r.data).catch(() => null)),
-  );
-  const ecrById = new Map<string, any>();
-  ecrIds.forEach((id, i) => {
-    if (ecrDetailResults[i]) ecrById.set(id, ecrDetailResults[i]);
-  });
 
   const execStatusLabel = (s: string): string =>
     ({ pending: '待执行', in_progress: '执行中', completed: '已完成', failed: '失败', skipped: '已跳过' } as Record<string, string>)[s] || s || '';
@@ -4071,61 +4059,36 @@ export async function exportECOs(): Promise<void> {
     }
   }
 
-  // Sheet5: ECR 受影响物料（来源 ECR 的变更分析对象）
-  const ecrAffectedRows: Record<string, unknown>[] = [];
-  for (const d of detailData) {
-    const ecr = d.ecr_id ? ecrById.get(d.ecr_id) : null;
-    if (!ecr) continue;
-    for (const ai of ecr.affected_items || []) {
-      ecrAffectedRows.push({
-        ECO编号: d.eco_number,
-        来源ECR编号: d.ecr_number || ecr.ecr_number || '',
-        实体类型: ai.entity_type || '',
-        件号: ai.entity_code || ai.entity?.code || '',
-        版本: ai.entity_version || ai.entity?.version || '',
-        变更描述: ai.change_description || '',
-        变更类型: ai.change_type || '',
-      });
-    }
-  }
-
-  // Sheet6/7: 向上溯源链 / 向下子项（每个节点一行，ECR评估 与 ECO执行后 并排）
+  // Sheet5/6: 变更内容分析（向上溯源链 / 向下子项）——直接取自 ECO 自身执行项的
+  // 编辑后内容（detail._targetQty/_desc/_affectedCode），不回拉 ECR，确保反映 ECO 中的修改。
+  // ECO 保存时把上行链与下行子项节点都写入了 execution_items，按 parent/动作区分方向。
+  const actionLabel = (a: string): string =>
+    ({ create: '新建', upgrade: '升版', qty_change: '改数量', delete: '删除', no_change: '无变更', add_existing: '增选已有', add_new: '新增子项' } as Record<string, string>)[a] || a || '';
+  const isDownward = (item: any): boolean =>
+    !!item.parent_entity_id || ['qty_change', 'delete', 'add_existing', 'add_new'].includes(item.action);
   const upwardRows: Record<string, unknown>[] = [];
   const downwardRows: Record<string, unknown>[] = [];
   for (const d of detailData) {
-    const ecr = d.ecr_id ? ecrById.get(d.ecr_id) : null;
-    if (!ecr) continue;
-    // 执行结果按原实体 ID 索引（节点 entity_id → 执行项）
-    const execByEntityId = new Map<string, any>();
     for (const item of d.execution_items || []) {
-      if (item.entity_id) execByEntityId.set(String(item.entity_id), item);
-    }
-    const buildRow = (ai: any, node: any) => {
-      const ex = execByEntityId.get(String(node.entity_id));
-      return {
+      const detail = item.detail || {};
+      const row = {
         ECO编号: d.eco_number,
-        来源ECR编号: d.ecr_number || ecr.ecr_number || '',
-        受影响件号: ai.entity_code || ai.entity?.code || '',
-        受影响版本: ai.entity_version || ai.entity?.version || '',
-        层级: node.level ?? '',
-        节点类型: node.entity_type || '',
-        节点件号: node.entity_code || '',
-        节点名称: node.entity_name || '',
-        节点版本: node.entity_version || '',
-        评估动作: node.action || 'no_change',
-        评估目标版本: node.target_version || '',
-        数量: node.quantity ?? '',
-        数量变更: node.quantity_change ? JSON.stringify(node.quantity_change) : '',
-        执行结果: ex ? execStatusLabel(ex.status) : '—（未纳入执行）',
-        执行后新版本: ex?.new_version || '',
-        执行后状态: ex?.new_entity_status || '',
-        变更描述: node.change_description || '',
+        来源ECR编号: d.ecr_number || '',
+        所属受影响对象: detail._affectedCode || '',
+        对象类型: item.entity_type || '',
+        对象编号: item.entity_code || '',
+        对象名称: item.entity_name || '',
+        父对象ID: item.parent_entity_id || '',
+        变更动作: actionLabel(item.action),
+        目标数量: detail._targetQty ?? '',
+        变更描述: detail._desc || '',
+        来源: item.source || 'manual',
+        执行结果: execStatusLabel(item.status),
+        执行后新版本: item.new_version || '',
+        执行后状态: item.new_entity_status || '',
       };
-    };
-    for (const ai of ecr.affected_items || []) {
-      const impact = ai.bom_impact || {};
-      for (const node of impact.upward_chain || []) upwardRows.push(buildRow(ai, node));
-      for (const node of impact.downward_items || []) downwardRows.push(buildRow(ai, node));
+      if (isDownward(item)) downwardRows.push(row);
+      else upwardRows.push(row);
     }
   }
 
@@ -4157,9 +4120,9 @@ export async function exportECOs(): Promise<void> {
 
   const wb = XLSX.utils.book_new();
   const chainCols = [
-    { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 10 }, { wch: 6 }, { wch: 10 },
-    { wch: 18 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 8 },
-    { wch: 18 }, { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 30 },
+    { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 10 }, { wch: 18 }, { wch: 20 },
+    { wch: 22 }, { wch: 10 }, { wch: 10 }, { wch: 30 }, { wch: 8 }, { wch: 10 },
+    { wch: 12 }, { wch: 12 },
   ];
 
   const s1 = XLSX.utils.json_to_sheet(sheet1Rows);
@@ -4192,12 +4155,6 @@ export async function exportECOs(): Promise<void> {
       { wch: 10 }, { wch: 12 }, { wch: 22 }, { wch: 22 }, { wch: 30 }, { wch: 20 },
     ];
     XLSX.utils.book_append_sheet(wb, s, '工程变更结果');
-  }
-
-  if (ecrAffectedRows.length > 0) {
-    const s = XLSX.utils.json_to_sheet(ecrAffectedRows);
-    s['!cols'] = [{ wch: 16 }, { wch: 16 }, { wch: 10 }, { wch: 18 }, { wch: 10 }, { wch: 30 }, { wch: 12 }];
-    XLSX.utils.book_append_sheet(wb, s, 'ECR受影响物料');
   }
 
   if (upwardRows.length > 0) {
