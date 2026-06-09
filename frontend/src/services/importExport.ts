@@ -3949,6 +3949,9 @@ export async function executeECRsImport(preview: ImportPreview): Promise<void> {
 
 /**
  * 导出所有 ECO 数据为多 Sheet Excel
+ * Sheet: ECO清单 / 审批人(含审批结果) / 执行明细 / 工程变更结果 /
+ *        ECR受影响物料 / 向上溯源链(评估+执行后) / 向下子项(评估+执行后) /
+ *        知会人 / 关联图文档
  */
 export async function exportECOs(): Promise<void> {
   const ecos: any[] = await fetchAllPages((page, pageSize) =>
@@ -3959,6 +3962,33 @@ export async function exportECOs(): Promise<void> {
   // 并发获取每条 ECO 详情
   const details = await Promise.all(ecos.map((e: any) => ecoApi.detail(e.id)));
   const detailData: any[] = details.map((r: any) => r.data);
+
+  // 用户列表：把 reviewers/cc 的 user_id 解析成工号（便于导入回填）
+  const usersRes = await usersApi.list({ page_size: 10000 });
+  const usersAll: any[] = Array.isArray(usersRes.data)
+    ? usersRes.data
+    : ((usersRes.data as { items?: any[] })?.items || []);
+  const userById = new Map<string, any>();
+  for (const u of usersAll) userById.set(String(u.id), u);
+  const reviewerCode = (uid: string, fallbackName?: string): string => {
+    const u = userById.get(String(uid));
+    return (u?.employee_no || u?.username || fallbackName || uid || '') as string;
+  };
+
+  // 拉取每条 ECO 的来源 ECR 详情（含受影响物料 + BOM 影响分析）
+  const ecrIds = Array.from(
+    new Set(detailData.map((d: any) => d.ecr_id).filter(Boolean)),
+  ) as string[];
+  const ecrDetailResults = await Promise.all(
+    ecrIds.map((id) => ecrApi.get(id).then((r: any) => r.data).catch(() => null)),
+  );
+  const ecrById = new Map<string, any>();
+  ecrIds.forEach((id, i) => {
+    if (ecrDetailResults[i]) ecrById.set(id, ecrDetailResults[i]);
+  });
+
+  const execStatusLabel = (s: string): string =>
+    ({ pending: '待执行', in_progress: '执行中', completed: '已完成', failed: '失败', skipped: '已跳过' } as Record<string, string>)[s] || s || '';
 
   // Sheet1: ECO 清单
   const sheet1Rows = detailData.map((d: any) => ({
@@ -3976,12 +4006,34 @@ export async function exportECOs(): Promise<void> {
     创建时间: d.created_at || '',
   }));
 
-  // Sheet2: 执行明细
-  const sheet2Rows: Record<string, unknown>[] = [];
+  // Sheet2: 审批人（含审批结果）
+  const reviewerRows2: Record<string, unknown>[] = [];
+  for (const d of detailData) {
+    // 审批记录按 reviewer_id 索引（取最新一条）
+    const recByUser = new Map<string, any>();
+    for (const rec of d.review_records || []) recByUser.set(String(rec.reviewer_id), rec);
+    for (const r of d.reviewers || []) {
+      const rec = recByUser.get(String(r.user_id));
+      reviewerRows2.push({
+        ECO编号: d.eco_number,
+        审批人工号: reviewerCode(r.user_id, r.user_name),
+        审批人姓名: r.user_name || '',
+        顺序: r.seq ?? 0,
+        审批结果: rec
+          ? ({ approved: '通过', rejected: '驳回', returned: '退回' } as Record<string, string>)[rec.decision] || rec.decision
+          : '待审批',
+        审批意见: rec?.comment || '',
+        审批时间: rec?.created_at || '',
+      });
+    }
+  }
+
+  // Sheet3: 执行明细（编辑态字段，保留用于导入往返）
+  const execItemRows: Record<string, unknown>[] = [];
   for (const d of detailData) {
     for (const item of d.execution_items || []) {
       const detail = item.detail || {};
-      sheet2Rows.push({
+      execItemRows.push({
         ECO编号: d.eco_number,
         对象类型: item.entity_type || '',
         对象编号: item.entity_code || '',
@@ -3998,34 +4050,102 @@ export async function exportECOs(): Promise<void> {
     }
   }
 
-  // Sheet3: 审批人
-  const sheet3Rows: Record<string, unknown>[] = [];
+  // Sheet4: 工程变更结果（ECO 执行后实际产生的新版本/状态）
+  const changeResultRows: Record<string, unknown>[] = [];
   for (const d of detailData) {
-    for (const r of d.reviewers || []) {
-      sheet3Rows.push({
+    for (const item of d.execution_items || []) {
+      changeResultRows.push({
         ECO编号: d.eco_number,
-        审批人工号: r.user?.employee_no || r.user?.username || r.user_name || r.user_id || '',
-        顺序: r.seq ?? 0,
+        对象类型: item.entity_type || '',
+        对象编号: item.entity_code || '',
+        对象名称: item.entity_name || '',
+        动作: item.action || '',
+        执行状态: execStatusLabel(item.status),
+        新版本: item.new_version || '',
+        新实体状态: item.new_entity_status || '',
+        新实体ID: item.new_entity_id || '',
+        父项新版本ID: item.parent_new_entity_id || '',
+        错误信息: item.error_message || '',
+        执行时间: item.executed_at || '',
       });
     }
   }
 
-  // Sheet4: 知会人
-  const sheet4Rows: Record<string, unknown>[] = [];
+  // Sheet5: ECR 受影响物料（来源 ECR 的变更分析对象）
+  const ecrAffectedRows: Record<string, unknown>[] = [];
+  for (const d of detailData) {
+    const ecr = d.ecr_id ? ecrById.get(d.ecr_id) : null;
+    if (!ecr) continue;
+    for (const ai of ecr.affected_items || []) {
+      ecrAffectedRows.push({
+        ECO编号: d.eco_number,
+        来源ECR编号: d.ecr_number || ecr.ecr_number || '',
+        实体类型: ai.entity_type || '',
+        件号: ai.entity_code || ai.entity?.code || '',
+        版本: ai.entity_version || ai.entity?.version || '',
+        变更描述: ai.change_description || '',
+        变更类型: ai.change_type || '',
+      });
+    }
+  }
+
+  // Sheet6/7: 向上溯源链 / 向下子项（每个节点一行，ECR评估 与 ECO执行后 并排）
+  const upwardRows: Record<string, unknown>[] = [];
+  const downwardRows: Record<string, unknown>[] = [];
+  for (const d of detailData) {
+    const ecr = d.ecr_id ? ecrById.get(d.ecr_id) : null;
+    if (!ecr) continue;
+    // 执行结果按原实体 ID 索引（节点 entity_id → 执行项）
+    const execByEntityId = new Map<string, any>();
+    for (const item of d.execution_items || []) {
+      if (item.entity_id) execByEntityId.set(String(item.entity_id), item);
+    }
+    const buildRow = (ai: any, node: any) => {
+      const ex = execByEntityId.get(String(node.entity_id));
+      return {
+        ECO编号: d.eco_number,
+        来源ECR编号: d.ecr_number || ecr.ecr_number || '',
+        受影响件号: ai.entity_code || ai.entity?.code || '',
+        受影响版本: ai.entity_version || ai.entity?.version || '',
+        层级: node.level ?? '',
+        节点类型: node.entity_type || '',
+        节点件号: node.entity_code || '',
+        节点名称: node.entity_name || '',
+        节点版本: node.entity_version || '',
+        评估动作: node.action || 'no_change',
+        评估目标版本: node.target_version || '',
+        数量: node.quantity ?? '',
+        数量变更: node.quantity_change ? JSON.stringify(node.quantity_change) : '',
+        执行结果: ex ? execStatusLabel(ex.status) : '—（未纳入执行）',
+        执行后新版本: ex?.new_version || '',
+        执行后状态: ex?.new_entity_status || '',
+        变更描述: node.change_description || '',
+      };
+    };
+    for (const ai of ecr.affected_items || []) {
+      const impact = ai.bom_impact || {};
+      for (const node of impact.upward_chain || []) upwardRows.push(buildRow(ai, node));
+      for (const node of impact.downward_items || []) downwardRows.push(buildRow(ai, node));
+    }
+  }
+
+  // Sheet8: 知会人
+  const ccRows: Record<string, unknown>[] = [];
   for (const d of detailData) {
     for (const cc of d.cc_users || []) {
-      sheet4Rows.push({
+      ccRows.push({
         ECO编号: d.eco_number,
-        知会人工号: cc.user_name || cc.user_id || '',
+        知会人工号: reviewerCode(cc.user_id, cc.user_name),
+        知会人姓名: cc.user_name || '',
       });
     }
   }
 
-  // Sheet5: 关联图文档
-  const sheet5Rows: Record<string, unknown>[] = [];
+  // Sheet9: 关联图文档
+  const docLinkRows: Record<string, unknown>[] = [];
   for (const d of detailData) {
     for (const doc of d.document_links || []) {
-      sheet5Rows.push({
+      docLinkRows.push({
         ECO编号: d.eco_number,
         图文档编号: doc.document?.code || doc.document_code || '',
         图文档版本: doc.document?.version || doc.document_version || '',
@@ -4036,6 +4156,11 @@ export async function exportECOs(): Promise<void> {
   }
 
   const wb = XLSX.utils.book_new();
+  const chainCols = [
+    { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 10 }, { wch: 6 }, { wch: 10 },
+    { wch: 18 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 8 },
+    { wch: 18 }, { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 30 },
+  ];
 
   const s1 = XLSX.utils.json_to_sheet(sheet1Rows);
   s1['!cols'] = [
@@ -4045,31 +4170,58 @@ export async function exportECOs(): Promise<void> {
   ];
   XLSX.utils.book_append_sheet(wb, s1, 'ECO清单');
 
-  if (sheet2Rows.length > 0) {
-    const s2 = XLSX.utils.json_to_sheet(sheet2Rows);
-    s2['!cols'] = [
+  if (reviewerRows2.length > 0) {
+    const s = XLSX.utils.json_to_sheet(reviewerRows2);
+    s['!cols'] = [{ wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 8 }, { wch: 10 }, { wch: 30 }, { wch: 20 }];
+    XLSX.utils.book_append_sheet(wb, s, '审批人');
+  }
+
+  if (execItemRows.length > 0) {
+    const s = XLSX.utils.json_to_sheet(execItemRows);
+    s['!cols'] = [
       { wch: 16 }, { wch: 10 }, { wch: 20 }, { wch: 12 }, { wch: 20 }, { wch: 12 },
       { wch: 10 }, { wch: 10 }, { wch: 30 }, { wch: 20 }, { wch: 20 }, { wch: 8 },
     ];
-    XLSX.utils.book_append_sheet(wb, s2, '执行明细');
+    XLSX.utils.book_append_sheet(wb, s, '执行明细');
   }
 
-  if (sheet3Rows.length > 0) {
-    const s3 = XLSX.utils.json_to_sheet(sheet3Rows);
-    s3['!cols'] = [{ wch: 16 }, { wch: 20 }, { wch: 8 }];
-    XLSX.utils.book_append_sheet(wb, s3, '审批人');
+  if (changeResultRows.length > 0) {
+    const s = XLSX.utils.json_to_sheet(changeResultRows);
+    s['!cols'] = [
+      { wch: 16 }, { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 10 }, { wch: 10 },
+      { wch: 10 }, { wch: 12 }, { wch: 22 }, { wch: 22 }, { wch: 30 }, { wch: 20 },
+    ];
+    XLSX.utils.book_append_sheet(wb, s, '工程变更结果');
   }
 
-  if (sheet4Rows.length > 0) {
-    const s4 = XLSX.utils.json_to_sheet(sheet4Rows);
-    s4['!cols'] = [{ wch: 16 }, { wch: 20 }];
-    XLSX.utils.book_append_sheet(wb, s4, '知会人');
+  if (ecrAffectedRows.length > 0) {
+    const s = XLSX.utils.json_to_sheet(ecrAffectedRows);
+    s['!cols'] = [{ wch: 16 }, { wch: 16 }, { wch: 10 }, { wch: 18 }, { wch: 10 }, { wch: 30 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(wb, s, 'ECR受影响物料');
   }
 
-  if (sheet5Rows.length > 0) {
-    const s5 = XLSX.utils.json_to_sheet(sheet5Rows);
-    s5['!cols'] = [{ wch: 16 }, { wch: 20 }, { wch: 12 }, { wch: 16 }, { wch: 8 }];
-    XLSX.utils.book_append_sheet(wb, s5, '关联图文档');
+  if (upwardRows.length > 0) {
+    const s = XLSX.utils.json_to_sheet(upwardRows);
+    s['!cols'] = chainCols;
+    XLSX.utils.book_append_sheet(wb, s, '向上溯源链');
+  }
+
+  if (downwardRows.length > 0) {
+    const s = XLSX.utils.json_to_sheet(downwardRows);
+    s['!cols'] = chainCols;
+    XLSX.utils.book_append_sheet(wb, s, '向下子项');
+  }
+
+  if (ccRows.length > 0) {
+    const s = XLSX.utils.json_to_sheet(ccRows);
+    s['!cols'] = [{ wch: 16 }, { wch: 16 }, { wch: 14 }];
+    XLSX.utils.book_append_sheet(wb, s, '知会人');
+  }
+
+  if (docLinkRows.length > 0) {
+    const s = XLSX.utils.json_to_sheet(docLinkRows);
+    s['!cols'] = [{ wch: 16 }, { wch: 20 }, { wch: 12 }, { wch: 16 }, { wch: 8 }];
+    XLSX.utils.book_append_sheet(wb, s, '关联图文档');
   }
 
   const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
