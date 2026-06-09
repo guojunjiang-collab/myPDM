@@ -626,7 +626,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
     <>
       <Modal open={open} onClose={onClose} title={title} width="3xl">
       <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
-        {profile && configTree && (
+        {isView && profile && configTree && (
           <div className="flex justify-end">
             <button
               type="button"
