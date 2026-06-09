@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Part, PartBrief, Assembly, AssemblyBrief, Document, DocumentBrief, CustomFieldDefinition, BOMItemBrief, ECRBrief, ECOBrief, ConfigItemBrief } from '../types';
-import { partsApi, assembliesApi, documentsApi, customFieldsApi } from '../services/api';
+import { partsApi, assembliesApi, documentsApi, customFieldsApi, configurationApi } from '../services/api';
 
 function extractData<T>(response: any): T[] {
   return Array.isArray(response) ? response : (response?.items || []);
@@ -113,11 +113,12 @@ export const useDataStore = create<DataState>()(
       syncAll: async () => {
         set({ isSyncing: true, syncError: null });
         try {
-          const [partsRes, assembliesRes, documentsRes, fieldsRes] = await Promise.allSettled([
+          const [partsRes, assembliesRes, documentsRes, fieldsRes, configRes] = await Promise.allSettled([
             partsApi.list({ page_size: 10000, brief: true }),
             assembliesApi.list({ page_size: 10000, brief: true }),
             documentsApi.list({ page_size: 10000, brief: true }),
             customFieldsApi.listDefinitions(),
+            configurationApi.listItems({ page_size: 10000 }),
           ]);
 
           set({
@@ -125,6 +126,7 @@ export const useDataStore = create<DataState>()(
             assemblies: assembliesRes.status === 'fulfilled' ? extractData<AssemblyBrief>(assembliesRes.value.data) : [],
             documents: documentsRes.status === 'fulfilled' ? extractData<DocumentBrief>(documentsRes.value.data) : [],
             customFieldDefs: fieldsRes.status === 'fulfilled' ? extractData<CustomFieldDefinition>(fieldsRes.value.data) : [],
+            configItems: configRes.status === 'fulfilled' ? extractData<ConfigItemBrief>(configRes.value.data) : [],
             lastSyncTime: Math.floor(Date.now() / 1000),
             isSyncing: false,
           });

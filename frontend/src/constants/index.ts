@@ -28,6 +28,7 @@ export const ENTITY_TYPES = {
   PART: 'part',
   ASSEMBLY: 'assembly',
   DOCUMENT: 'document',
+  CONFIGURATION: 'configuration',
 } as const;
 
 // 分页默认值

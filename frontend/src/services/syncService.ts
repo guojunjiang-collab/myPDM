@@ -1,7 +1,7 @@
 import { useDataStore } from '../stores/data';
 import { syncApi } from './syncApi';
-import { partsApi, assembliesApi, documentsApi, bomApi } from './api';
-import type { SyncStatus, Part, Assembly, Document, BOMItem } from '../types';
+import { partsApi, assembliesApi, documentsApi, bomApi, configurationApi } from './api';
+import type { SyncStatus, Part, Assembly, Document, BOMItem, ConfigItemBrief } from '../types';
 
 interface SyncEntity {
   name: string;
@@ -95,6 +95,25 @@ function buildEntities(): SyncEntity[] {
         void items;
       },
     },
+    {
+      name: 'config_items',
+      key: 'config_items',
+      fetch: async (since: number) => {
+        const res = await configurationApi.listItems({
+          updated_since: since,
+          page_size: 10000,
+        });
+        return Array.isArray(res.data)
+          ? res.data
+          : res.data?.items || [];
+      },
+      merge: (items: ConfigItemBrief[]) => {
+        const store = useDataStore.getState();
+        const current = [...store.configItems];
+        mergeItems(current, items as any[]);
+        store.setConfigItems(current);
+      },
+    },
   ];
 }
 
@@ -136,12 +155,13 @@ class SyncService {
   async start() {
     const store = useDataStore.getState();
 
-    // If store is empty, do an initial full pull
-    if (
-      store.parts.length === 0 &&
-      store.assemblies.length === 0 &&
-      store.documents.length === 0
-    ) {
+    // Trigger initial full pull if store is empty or configItems not yet synced (migration)
+    const needsInitialSync =
+      (store.parts.length === 0 &&
+       store.assemblies.length === 0 &&
+       store.documents.length === 0) ||
+      store.configItems.length === 0;
+    if (needsInitialSync) {
       store.setSyncing(true);
       try {
         await store.syncAll();

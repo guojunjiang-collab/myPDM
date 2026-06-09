@@ -321,7 +321,7 @@ class DashboardFolderTreeResponse(BaseSchema):
 class DashboardItemCreate(BaseSchema):
     """创建文件夹关联项"""
     folder_id: uuid.UUID
-    entity_type: str = Field(..., pattern=r'^(part|assembly|document)$')
+    entity_type: str = Field(..., pattern=r'^(part|assembly|document|configuration)$')
     entity_id: uuid.UUID
 
 class DashboardItemBatchCreate(BaseSchema):

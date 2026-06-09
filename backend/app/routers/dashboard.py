@@ -7,6 +7,7 @@ from ..models import (
     User, Part, Assembly, Document, UserDashboard, DashboardFolder,
     DashboardItem, DashboardFolderShare
 )
+from ..models_configuration import ConfigurationItem
 from .auth import require_role
 
 router = APIRouter(prefix="/dashboard", tags=["用户看板"])
@@ -70,6 +71,21 @@ def _folder_to_dict(folder, db: Session, include_items=False, include_children=F
                         "name": entity.name,
                         "version": entity.version,
                         "status": entity.status,
+                    })
+            elif item.entity_type == "configuration":
+                entity = db.query(ConfigurationItem).filter(
+                    ConfigurationItem.id == item.entity_id,
+                    ConfigurationItem.deleted_at.is_(None)
+                ).first()
+                if entity:
+                    item_list.append({
+                        "id": item.id,
+                        "entity_type": "configuration",
+                        "entity_id": str(entity.id),
+                        "code": entity.code,
+                        "name": entity.name,
+                        "version": "-",
+                        "status": "active",
                     })
         # 按名称排序
         item_list.sort(key=lambda x: x["name"])
@@ -398,7 +414,7 @@ async def add_items(data: dict, request: Request, db: Session = Depends(get_db),
     for item_data in items:
         entity_type = item_data.get("entity_type")
         entity_id = item_data.get("entity_id")
-        if entity_type not in ("part", "assembly", "document"):
+        if entity_type not in ("part", "assembly", "document", "configuration"):
             continue
 
         # 验证实体存在
@@ -409,6 +425,11 @@ async def add_items(data: dict, request: Request, db: Session = Depends(get_db),
             entity = db.query(Assembly).filter(Assembly.id == entity_id).first()
         elif entity_type == "document":
             entity = db.query(Document).filter(Document.id == entity_id).first()
+        elif entity_type == "configuration":
+            entity = db.query(ConfigurationItem).filter(
+                ConfigurationItem.id == entity_id,
+                ConfigurationItem.deleted_at.is_(None)
+            ).first()
         if not entity:
             continue
 
@@ -745,6 +766,7 @@ async def export_all_dashboards(
         part_ids = []
         asm_ids = []
         doc_ids = []
+        config_ids = []
         for i in items:
             if i.entity_type == "part":
                 part_ids.append(i.entity_id)
@@ -752,6 +774,8 @@ async def export_all_dashboards(
                 asm_ids.append(i.entity_id)
             elif i.entity_type == "document":
                 doc_ids.append(i.entity_id)
+            elif i.entity_type == "configuration":
+                config_ids.append(i.entity_id)
 
         part_map = {}
         if part_ids:
@@ -765,6 +789,10 @@ async def export_all_dashboards(
         if doc_ids:
             docs = db.query(Document).filter(Document.id.in_(doc_ids)).all()
             doc_map = {str(d.id): d for d in docs}
+        config_map = {}
+        if config_ids:
+            configs = db.query(ConfigurationItem).filter(ConfigurationItem.id.in_(config_ids)).all()
+            config_map = {str(c.id): c for c in configs}
 
         def _get_entity_info(entity_type, entity_id):
             """获取实体的 code、name 和 version"""
@@ -775,6 +803,10 @@ async def export_all_dashboards(
                 e = asm_map.get(eid)
             elif entity_type == "document":
                 e = doc_map.get(eid)
+            elif entity_type == "configuration":
+                e = config_map.get(eid)
+                if e:
+                    return e.code or "", e.name or "", "-"
             else:
                 return "", "", ""
             if e:
@@ -961,6 +993,11 @@ async def import_all_dashboards(
                     exists = db.query(Assembly).filter(Assembly.id == entity_id).first() is not None
                 elif entity_type == "document":
                     exists = db.query(Document).filter(Document.id == entity_id).first() is not None
+                elif entity_type == "configuration":
+                    exists = db.query(ConfigurationItem).filter(
+                        ConfigurationItem.id == entity_id,
+                        ConfigurationItem.deleted_at.is_(None)
+                    ).first() is not None
                 if exists:
                     resolved_entity_id = entity_id
 
@@ -972,6 +1009,11 @@ async def import_all_dashboards(
                     e = db.query(Assembly).filter(Assembly.code == entity_code).first()
                 elif entity_type == "document":
                     e = db.query(Document).filter(Document.code == entity_code).first()
+                elif entity_type == "configuration":
+                    e = db.query(ConfigurationItem).filter(
+                        ConfigurationItem.code == entity_code,
+                        ConfigurationItem.deleted_at.is_(None)
+                    ).first()
                 else:
                     e = None
                 if e:

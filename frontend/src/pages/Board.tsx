@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { boardApi, usersApi, partsApi, assembliesApi, documentsApi, customFieldsApi } from '../services/api';
+import { boardApi, usersApi, partsApi, assembliesApi, documentsApi, customFieldsApi, configurationApi } from '../services/api';
 import { useDataStore } from '../stores/data';
 import { Modal, ConfirmModal } from '../components/Modal';
 import PartDetailContent from '../components/PartDetailContent';
@@ -15,7 +15,7 @@ import type { CustomFieldDefinition, CustomFieldValue } from '../types';
 
 interface DashboardItem {
   id: string;
-  entity_type: 'part' | 'assembly' | 'document';
+  entity_type: 'part' | 'assembly' | 'document' | 'configuration';
   entity_id: string;
   code: string;
   name: string;
@@ -41,13 +41,14 @@ interface ShareRecord {
   created_at: string;
 }
 
-type FilterTab = 'all' | 'part' | 'assembly' | 'document';
+type FilterTab = 'all' | 'part' | 'assembly' | 'document' | 'configuration';
 
-const ENTITY_LABEL: Record<string, string> = { part: '零件', assembly: '部件', document: '图文档' };
-const ENTITY_ICON: Record<string, string> = { part: '🔧', assembly: '📦', document: '📄' };
+const ENTITY_LABEL: Record<string, string> = { part: '零件', assembly: '部件', document: '图文档', configuration: '构型项' };
+const ENTITY_ICON: Record<string, string> = { part: '🔧', assembly: '📦', document: '📄', configuration: '⚙️' };
 
 const STATUS_TAG: Record<string, { label: string; cls: string }> = {
   draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
+  active: { label: '有效', cls: 'bg-green-100 text-green-800' },
   frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
   released: { label: '发布', cls: 'bg-green-100 text-green-800' },
   obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
@@ -115,6 +116,7 @@ export default function Board() {
   const storeParts = useDataStore((s) => s.parts);
   const storeAssemblies = useDataStore((s) => s.assemblies);
   const storeDocuments = useDataStore((s) => s.documents);
+  const storeConfigItems = useDataStore((s) => s.configItems);
   const [usersList, setUsersList] = useState<{ id: string; username: string; real_name: string }[]>([]);
   const [shares, setShares] = useState<ShareRecord[]>([]);
   const [workingShares, setWorkingShares] = useState<ShareRecord[]>([]);
@@ -284,14 +286,15 @@ export default function Board() {
       let res;
       if (item.entity_type === 'part') res = await partsApi.get(item.entity_id);
       else if (item.entity_type === 'assembly') res = await assembliesApi.get(item.entity_id);
-      else res = await documentsApi.get(item.entity_id);
+      else if (item.entity_type === 'document') res = await documentsApi.get(item.entity_id);
+      else res = await configurationApi.getItem(item.entity_id);
       
       const data = res.data;
       setDetailData(data);
       
       // Load custom field defs and values
       const allDefs = useDataStore.getState().customFieldDefs;
-      const entityType = item.entity_type === 'part' ? 'part' : item.entity_type === 'assembly' ? 'component' : 'document';
+      const entityType = item.entity_type === 'part' ? 'part' : item.entity_type === 'assembly' ? 'component' : item.entity_type === 'document' ? 'document' : 'configuration';
       const defs = allDefs.filter((d: CustomFieldDefinition) => d.applies_to?.includes(entityType));
       setDetailCustomDefs(defs);
       
@@ -315,6 +318,7 @@ export default function Board() {
     part: selectedItems.filter((i) => i.entity_type === 'part').length,
     assembly: selectedItems.filter((i) => i.entity_type === 'assembly').length,
     document: selectedItems.filter((i) => i.entity_type === 'document').length,
+    configuration: selectedItems.filter((i) => i.entity_type === 'configuration').length,
   }), [selectedItems]);
 
   /* ================================================================
@@ -379,7 +383,7 @@ export default function Board() {
 
             {/* Tabs */}
             <div className="px-6 flex gap-0 border-b border-gray-200">
-              {(['all', 'part', 'assembly', 'document'] as FilterTab[]).map((tab) => (
+              {(['all', 'part', 'assembly', 'document', 'configuration'] as FilterTab[]).map((tab) => (
                 <button
                   type="button"
                   key={tab}
@@ -552,7 +556,7 @@ export default function Board() {
       </Modal>
 
       {/* ---- Item Picker ---- */}
-      <ItemPicker open={pickerOpen} onClose={() => setPickerOpen(false)} onConfirm={handleAddItems} existingIds={existingIds} storeParts={storeParts} storeAssemblies={storeAssemblies} storeDocuments={storeDocuments} />
+      <ItemPicker open={pickerOpen} onClose={() => setPickerOpen(false)} onConfirm={handleAddItems} existingIds={existingIds} storeParts={storeParts} storeAssemblies={storeAssemblies} storeDocuments={storeDocuments} storeConfigItems={storeConfigItems} />
 
       {/* ---- Detail Modal ---- */}
       <Modal open={!!detailItem} title={detailItem ? `${ENTITY_LABEL[detailItem.entity_type]}详情` : ''} onClose={() => setDetailItem(null)} width="full">
@@ -581,14 +585,37 @@ export default function Board() {
               status: item.child_detail?.status || 'draft',
             })}
           />
-        ) : (
+        ) : detailItem?.entity_type === 'document' ? (
           <DocumentDetailContent
             doc={detailData}
             customFieldDefs={detailCustomDefs}
             customFieldValues={detailCustomValues}
             onArchivePreview={(attId, fileName) => setArchivePreview({ attId, fileName })}
           />
-        )}
+        ) : detailItem?.entity_type === 'configuration' ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">构型编号</label>
+                <p className="text-sm font-medium text-gray-900">{detailData.code || '-'}</p>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">构型名称</label>
+                <p className="text-sm text-gray-900">{detailData.name || '-'}</p>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">规格</label>
+                <p className="text-sm text-gray-900">{detailData.spec || '-'}</p>
+              </div>
+            </div>
+            {detailData.remark && (
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">备注</label>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{detailData.remark}</p>
+              </div>
+            )}
+          </div>
+        ) : null}
       </Modal>
 
       {/* ---- Delete Confirm ---- */}
@@ -691,9 +718,10 @@ interface ItemPickerProps {
   storeParts: any[];
   storeAssemblies: any[];
   storeDocuments: any[];
+  storeConfigItems: any[];
 }
 
-function ItemPicker({ open, onClose, onConfirm, existingIds, storeParts, storeAssemblies, storeDocuments }: ItemPickerProps) {
+function ItemPicker({ open, onClose, onConfirm, existingIds, storeParts, storeAssemblies, storeDocuments, storeConfigItems }: ItemPickerProps) {
   const [tab, setTab] = useState<FilterTab>('all');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Map<string, any>>(new Map());
@@ -704,8 +732,9 @@ function ItemPicker({ open, onClose, onConfirm, existingIds, storeParts, storeAs
     if (tab === 'all' || tab === 'part') storeParts.forEach((p: any) => { if (!existingIds.has(p.id)) all.push({ t: 'part', id: p.id, code: p.code, name: p.name, version: p.version || '', status: p.status || '' }); });
     if (tab === 'all' || tab === 'assembly') storeAssemblies.forEach((a: any) => { if (!existingIds.has(a.id)) all.push({ t: 'assembly', id: a.id, code: a.code, name: a.name, version: a.version || '', status: a.status || '' }); });
     if (tab === 'all' || tab === 'document') storeDocuments.forEach((d: any) => { if (!existingIds.has(d.id)) all.push({ t: 'document', id: d.id, code: d.code, name: d.name, version: d.version || '', status: d.status || '' }); });
+    if (tab === 'all' || tab === 'configuration') storeConfigItems.forEach((c: any) => { if (!existingIds.has(c.id)) all.push({ t: 'configuration', id: c.id, code: c.code, name: c.name, version: '-', status: 'active' }); });
     return kw ? all.filter((i) => i.code.toLowerCase().includes(kw) || i.name.toLowerCase().includes(kw)) : all;
-  }, [tab, search, storeParts, storeAssemblies, storeDocuments, existingIds]);
+  }, [tab, search, storeParts, storeAssemblies, storeDocuments, storeConfigItems, existingIds]);
 
   const handleConfirm = () => {
     onConfirm(Array.from(selected.values()).map((v) => ({ entity_type: v.t, entity_id: v.id })));
@@ -735,7 +764,7 @@ function ItemPicker({ open, onClose, onConfirm, existingIds, storeParts, storeAs
         {/* Search + filter */}
         <div className="flex gap-2">
           <input type="text" placeholder="搜索编号/名称..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm" />
-          <div className="flex gap-1">{(['all', 'part', 'assembly', 'document'] as FilterTab[]).map((t) => (
+          <div className="flex gap-1">{(['all', 'part', 'assembly', 'document', 'configuration'] as FilterTab[]).map((t) => (
             <button type="button" key={t} onClick={() => setTab(t)} className={`px-3 py-2 text-sm rounded-lg ${tab === t ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{t === 'all' ? '全部' : ENTITY_LABEL[t]}</button>
           ))}</div>
         </div>
