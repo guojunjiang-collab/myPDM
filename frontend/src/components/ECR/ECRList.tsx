@@ -1,20 +1,13 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { ecrApi } from '../../services/api';
 import type { ECRRequest } from '../../types';
-import { canEdit, canDownload, isAdmin, useAuthStore } from '../../stores/auth';
+import { canEdit, isAdmin, useAuthStore } from '../../stores/auth';
 import { toast } from '../Toast';
 import { ECRStatusBadge, ECRPriorityBadge } from './ECRStatusBadge';
 import { ConfirmModal } from '../Modal';
 import { ECRCreateModal } from './ECRCreateModal';
 import { ECRDetailModal } from './ECRDetailModal';
 import { ECRCcPicker } from './ECRCcPicker';
-import {
-  exportECRs,
-  previewECRsImport,
-  executeECRsImport,
-} from '../../services/importExport';
-import type { ImportPreview } from '../../services/importExport';
-import ImportPreviewModal from '../ImportPreviewModal';
 
 const PAGE_SIZE = 20;
 
@@ -56,13 +49,6 @@ export function ECRList() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editEcr, setEditEcr] = useState<ECRRequest | null>(null);
   const [ccEcrId, setCcEcrId] = useState<string | null>(null);
-
-  // 导入导出
-  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
-  const [importPreviewOpen, setImportPreviewOpen] = useState(false);
-  const [importLoading, setImportLoading] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -110,50 +96,6 @@ export function ECRList() {
       setEditEcr(detail);
     } catch {
       toast.error('获取 ECR 详情失败');
-    }
-  };
-
-  const handleExport = async () => {
-    try {
-      await exportECRs();
-    } catch (err: any) {
-      alert(err.message || '导出失败');
-    }
-  };
-
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImportLoading(true);
-    try {
-      const preview = await previewECRsImport(file);
-      setImportPreview(preview);
-      setImportPreviewOpen(true);
-    } catch (err: any) {
-      alert(err.message || '导入解析失败');
-    } finally {
-      setImportLoading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  const handleImportConfirm = async () => {
-    if (!importPreview) return;
-    setImporting(true);
-    try {
-      await executeECRsImport(importPreview);
-      setImportPreviewOpen(false);
-      setImportPreview(null);
-      loadEcrs();
-      alert('导入成功');
-    } catch (err: any) {
-      alert(err.message || '导入执行失败');
-    } finally {
-      setImporting(false);
     }
   };
 
@@ -390,15 +332,6 @@ export function ECRList() {
           ))}
         </select>
         <div className="flex-1" />
-        {canDownload() && (
-          <button onClick={handleExport} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">导出全部</button>
-        )}
-        {canEdit() && (
-          <>
-            <button onClick={handleImportClick} disabled={importLoading} className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm disabled:opacity-50">{importLoading ? '解析中...' : '导入'}</button>
-            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange} />
-          </>
-        )}
         {canEdit() && (
           <button
             onClick={() => setCreateOpen(true)}
@@ -578,15 +511,6 @@ export function ECRList() {
         open={!!ccEcrId}
         ecrId={ccEcrId || ''}
         onClose={() => setCcEcrId(null)}
-      />
-
-      {/* 导入预览弹窗 */}
-      <ImportPreviewModal
-        open={importPreviewOpen}
-        preview={importPreview}
-        loading={importing}
-        onClose={() => { setImportPreviewOpen(false); setImportPreview(null); }}
-        onConfirm={handleImportConfirm}
       />
     </div>
   );
