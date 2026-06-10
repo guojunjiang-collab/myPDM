@@ -121,11 +121,11 @@ export function buildProfileMarkdown(
   if (rows.length === 0) {
     lines.push('（暂无配置清单）');
   } else {
-    lines.push('| 层级 | 构型号 | 名称 | 类型 | 零部件件号 | 版本 | 状态 | 数量 |');
-    lines.push('| --- | --- | --- | --- | --- | --- | --- | --- |');
+    lines.push('| 层级 | 构型号/零部件 件号 | 名称 | 类型 | 版本 | 状态 | 数量 |');
+    lines.push('| --- | --- | --- | --- | --- | --- | --- |');
     for (const r of rows) {
       lines.push(
-        `| ${cell(r.level)} | ${cell(r.code)} | ${cell(r.name)} | ${cell(r.type)} | ${cell(r.partCode)} | ${cell(r.version)} | ${cell(r.status)} | ${cell(r.quantity)} |`,
+        `| ${cell(r.level)} | ${cell(r.code || r.partCode)} | ${cell(r.name)} | ${cell(r.type)} | ${cell(r.version)} | ${cell(r.status)} | ${cell(r.quantity)} |`,
       );
     }
   }
