@@ -109,3 +109,10 @@ def test_system_message_role_for_engineer(db, engineer_user, make_fake_llm):
     agent.run_agent([{"role": "user", "content": "hi"}], db, engineer_user, emit, llm=llm)
     sys_msg = llm.calls[0]["messages"][0]["content"]
     assert "engineer" in sys_msg
+
+
+def test_system_prompt_directs_download_buttons_not_urls():
+    from app.assistant import agent as agent_mod
+    # 应指引用工具生成下载按钮，且不再指示"把下载链接如实告知用户"
+    assert "download_document" in agent_mod.SYSTEM_PROMPT
+    assert "如实告知" not in agent_mod.SYSTEM_PROMPT

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from .. import crud
 from ..bom import compare
-from ..models import User
+from ..models import User, DocumentAttachment
 from . import document_builder
 from . import api_gateway
 from . import knowledge
@@ -163,9 +163,16 @@ def export_bom(db: Session, user: User, type: str, id: str):
 def download_document(db: Session, user: User, attachment_id: str):
     if user.role not in DOWNLOAD_ROLES:
         return {"error": "当前账号无下载权限"}
+    try:
+        att = db.query(DocumentAttachment).filter(
+            DocumentAttachment.id == uuid.UUID(attachment_id)).first()
+    except (ValueError, TypeError):
+        att = None
+    file_name = att.file_name if att and att.file_name else None
+    label = f"下载 {file_name}" if file_name else "下载文档"
     url = f"/api/v2/attachments/{attachment_id}/direct-download"
-    card = {"card_type": "download", "payload": {"label": "下载文档", "url": url}}
-    return {"url": url, "_card": card}
+    card = {"card_type": "download", "payload": {"label": label, "url": url}}
+    return {"url": url, "file_name": file_name, "_card": card}
 
 
 def create_document(db: Session, user: User, title: str, content: str, format: str = "md"):

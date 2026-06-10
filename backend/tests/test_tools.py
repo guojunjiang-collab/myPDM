@@ -129,3 +129,18 @@ def test_list_api_endpoints_filtered_by_role(db, guest_user, engineer_user):
     # bom/tree 不含 guest，故仅 engineer 可见
     assert "/api/bom/tree/{item_type}/{item_id}" in e
     assert "/api/bom/tree/{item_type}/{item_id}" not in g
+
+
+def test_download_document_label_includes_filename(db, engineer_user):
+    att = models.DocumentAttachment(id=uuid.uuid4(), document_id=uuid.uuid4(),
+                                    file_name="图纸A.pdf")
+    db.add(att); db.commit()
+    out = tools.REGISTRY["download_document"]["execute"](
+        db, engineer_user, attachment_id=str(att.id))
+    assert "图纸A.pdf" in out["_card"]["payload"]["label"]
+
+
+def test_download_document_label_fallback_when_missing(db, engineer_user):
+    out = tools.REGISTRY["download_document"]["execute"](
+        db, engineer_user, attachment_id=str(uuid.uuid4()))
+    assert out["_card"]["payload"]["label"] == "下载文档"
