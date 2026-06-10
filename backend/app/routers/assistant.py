@@ -3,7 +3,7 @@ import json
 import queue
 import threading
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -12,6 +12,7 @@ from ..database import get_db, SessionLocal
 from ..models import User
 from .auth import require_role, get_current_active_user
 from ..assistant import agent as agent_mod
+from ..assistant import document_builder
 
 router = APIRouter(prefix="/assistant", tags=["AI助手"])
 
@@ -58,3 +59,16 @@ async def chat(
             yield _sse(ev)
 
     return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+@router.get("/artifacts/{doc_id}/download")
+async def download_artifact(
+    doc_id: str,
+    current_user: User = Depends(require_role(ASSISTANT_ROLES)),
+):
+    content = document_builder.read_document(doc_id)
+    if content is None:
+        raise HTTPException(status_code=404, detail="产物不存在")
+    return StreamingResponse(
+        iter([content]), media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{doc_id}.md"'})

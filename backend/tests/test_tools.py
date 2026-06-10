@@ -95,3 +95,11 @@ def test_export_bom_denied_for_guest(db, guest_user):
     out = tools.REGISTRY["export_bom"]["execute"](
         db, guest_user, type="assembly", id=str(a.id))
     assert "error" in out and "_card" not in out
+
+
+def test_create_document_returns_markdown_doc_card(db, engineer_user, tmp_path, monkeypatch):
+    monkeypatch.setenv("UPLOAD_DIR", str(tmp_path))
+    out = tools.REGISTRY["create_document"]["execute"](
+        db, engineer_user, title="对比报告", content="# 报告\n内容")
+    assert out["_card"]["card_type"] == "markdown_doc"
+    assert out["_card"]["payload"]["download_url"].endswith("/download")

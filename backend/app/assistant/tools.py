@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from .. import crud
 from ..bom import compare
 from ..models import User
+from . import document_builder
 
 DOWNLOAD_ROLES = {"admin", "engineer", "production"}
 
@@ -165,6 +166,15 @@ def download_document(db: Session, user: User, attachment_id: str):
     return {"url": url, "_card": card}
 
 
+def create_document(db: Session, user: User, title: str, content: str, format: str = "md"):
+    meta = document_builder.build_document(title=title, content=content, fmt=format)
+    card = {"card_type": "markdown_doc", "payload": {
+        "title": meta["title"], "preview": meta["preview"],
+        "download_url": meta["download_url"]}}
+    # 不把全文回灌模型（节省 token），只回执行结果
+    return {"doc_id": meta["doc_id"], "title": meta["title"], "_card": card}
+
+
 REGISTRY = {
     "search_entity": {
         "execute": search_entity,
@@ -252,6 +262,19 @@ REGISTRY = {
             "parameters": {"type": "object", "properties": {
                 "attachment_id": {"type": "string"},
             }, "required": ["attachment_id"]},
+        }},
+    },
+    "create_document": {
+        "execute": create_document,
+        "schema": {"type": "function", "function": {
+            "name": "create_document",
+            "description": ("把你撰写好的文档内容交给后端生成成品（Markdown），"
+                            "返回可预览/下载的产物。content 为完整 Markdown 正文。"),
+            "parameters": {"type": "object", "properties": {
+                "title": {"type": "string"},
+                "content": {"type": "string", "description": "完整 Markdown 正文"},
+                "format": {"type": "string", "enum": ["md"], "default": "md"},
+            }, "required": ["title", "content"]},
         }},
     },
 }
