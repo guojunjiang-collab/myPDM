@@ -14,13 +14,16 @@
   "dependencies": {
     "@react-three/drei": "^9.122.0",
     "@react-three/fiber": "^8.18.0",
+    "@tailwindcss/typography": "^0.5.20",
     "@types/three": "^0.184.1",
     "axios": "^1.7.7",
     "dayjs": "^1.11.13",
     "marked": "^18.0.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^6.26.0",
+    "remark-gfm": "^4.0.1",
     "three": "^0.184.0",
     "xlsx": "^0.18.5",
     "zustand": "^4.5.4"
