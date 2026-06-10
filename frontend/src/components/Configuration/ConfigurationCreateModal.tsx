@@ -68,6 +68,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
   const [cfgSearch, setCfgSearch] = useState('');
   const [cfgResults, setCfgResults] = useState<any[]>([]);
   const [cfgSearching, setCfgSearching] = useState(false);
+  const cfgReqId = useRef(0);
   const [pickerSelected, setPickerSelected] = useState<any[]>([]);
   const [pickerParentId, setPickerParentId] = useState<string | null>(null); // null=根级, string=指定父级子项
   const [pickerParentIdx, setPickerParentIdx] = useState<string | null>(null); // 父行的 idx，用于标记 has_children
@@ -333,12 +334,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
               <button onClick={() => {
                 setPickerParentId(c.child_id); setPickerParentIdx(idx); setCfgSearch(''); setPickerSelected([]);
                 setQuickCreateOpen(false); setQuickForm({ code: '', name: '', remark: '' });
-                setCfgSearching(true);
-                const params: any = { page: 1, page_size: 100 };
-                if (item?.id) params.exclude_ancestors_of = c.child_id;
-                configurationApi.listItems(params)
-                  .then(r => setCfgResults(r.data.items || []))
-                  .finally(() => setCfgSearching(false));
+                setCfgResults([]);
                 setCfgPickerOpen(true);
               }}
                 className="text-sm text-primary-600 hover:text-primary-800">＋子项</button>
@@ -356,14 +352,29 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
     );
   };
 
-  const searchConfigItems = () => {
-    if (!cfgSearch.trim()) return;
+  // 加载/搜索可选子构型项（exclude 规则与打开弹窗时一致；带请求竞态守卫）
+  const loadCfgItems = (search: string) => {
+    const reqId = ++cfgReqId.current;
     setCfgSearching(true);
-    configurationApi.listItems({ page_size: 50, search: cfgSearch })
-      .then(r => setCfgResults(r.data.items || []))
-      .catch(() => setCfgResults([]))
-      .finally(() => setCfgSearching(false));
+    const params: any = { page: 1, page_size: 100 };
+    const excludeId = pickerParentId ?? item?.id;
+    if (item?.id && excludeId) params.exclude_ancestors_of = excludeId;
+    const kw = search.trim();
+    if (kw) params.search = kw;
+    configurationApi.listItems(params)
+      .then(r => { if (reqId === cfgReqId.current) setCfgResults(r.data.items || []); })
+      .catch(() => { if (reqId === cfgReqId.current) setCfgResults([]); })
+      .finally(() => { if (reqId === cfgReqId.current) setCfgSearching(false); });
   };
+
+  // 选择子构型项弹窗：随输入实时刷新列表（防抖 250ms）；打开弹窗时也会触发首次加载
+  useEffect(() => {
+    if (!cfgPickerOpen) return;
+    setCfgSearching(true);
+    const t = setTimeout(() => loadCfgItems(cfgSearch), 250);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cfgPickerOpen, cfgSearch, pickerParentId]);
 
   return (
     <>
@@ -471,14 +482,9 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-sm font-bold text-gray-700">子构型项 ({children.length})</h4>
             <button type="button" onClick={() => {
-              setPickerParentId(null); setCfgPickerOpen(true); setCfgSearch(''); setPickerSelected([]);
+              setPickerParentId(null); setCfgSearch(''); setPickerSelected([]);
               setQuickCreateOpen(false); setQuickForm({ code: '', name: '', remark: '' });
-              setCfgSearching(true);
-              const params: any = { page: 1, page_size: 100 };
-              if (item?.id) params.exclude_ancestors_of = item.id;
-              configurationApi.listItems(params)
-                .then(r => setCfgResults(r.data.items || []))
-                .finally(() => setCfgSearching(false));
+              setCfgResults([]); setCfgPickerOpen(true);
             }}
               className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">添加子构型项</button>
           </div>
@@ -559,18 +565,13 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
 
                 {/* 搜索 + 候选列表 */}
                 <div className="p-4 flex-1 overflow-auto">
-                  <div className="flex gap-2 mb-3">
-                    <input value={cfgSearch} onChange={e => setCfgSearch(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && searchConfigItems()}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm" placeholder="搜索构型号/名称..." />
-                    <button onClick={searchConfigItems} className="px-4 py-2 bg-primary-600 text-white rounded text-sm hover:bg-primary-700">
-                      {cfgSearching ? '搜索中...' : '搜索'}
-                    </button>
+                  <div className="flex gap-2 mb-3 items-center">
+                    <input value={cfgSearch} onChange={e => setCfgSearch(e.target.value)} autoFocus
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm" placeholder="搜索构型号/名称（实时）..." />
+                    {cfgSearching && <span className="text-xs text-gray-400 whitespace-nowrap">搜索中...</span>}
                   </div>
-                  {cfgSearching ? (
-                    <div className="text-center py-8 text-sm text-gray-400">加载中...</div>
-                  ) : cfgResults.length === 0 ? (
-                    <div className="text-center py-8 text-sm text-gray-400">无可用构型项</div>
+                  {cfgResults.length === 0 ? (
+                    <div className="text-center py-8 text-sm text-gray-400">{cfgSearching ? '加载中...' : '无可用构型项'}</div>
                   ) : (
                     <table className="w-full text-sm border border-gray-200 rounded">
                       <thead className="bg-gray-50 border-b">
