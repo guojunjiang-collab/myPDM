@@ -1,4 +1,5 @@
 import { useAuthStore } from '../stores/auth';
+import { toast } from '../components/Toast';
 import type { SSEEvent, ChatMessage } from '../types/assistant';
 
 export async function streamChat(
@@ -37,16 +38,47 @@ export async function streamChat(
   }
 }
 
-// 给下载链接附带 token（后端下载端点需鉴权）
-export function authedDownload(url: string): void {
+function filenameFromDisposition(cd: string): string {
+  // 优先 RFC 5987 的 filename*=UTF-8''xxx，其次普通 filename="xxx"
+  const star = cd.match(/filename\*=UTF-8''([^;]+)/i);
+  if (star) {
+    try { return decodeURIComponent(star[1]); } catch { /* fallthrough */ }
+  }
+  const plain = cd.match(/filename="?([^";]+)"?/i);
+  return plain ? plain[1] : '';
+}
+
+/**
+ * 鉴权下载。两类下载端点鉴权方式不同，故同时附带：
+ * - 附件端点（/api/v2/attachments/.../direct-download）用 ?token= 查询参数鉴权
+ * - BOM 导出 / 助手产物端点用 Authorization 头鉴权（require_role）
+ * 并校验 response.ok，避免把 401/404 的错误 JSON 当成文件下载下来。
+ */
+export async function authedDownload(url: string): Promise<void> {
   const token = useAuthStore.getState().token;
-  fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
-    .then((r) => r.blob())
-    .then((blob) => {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = '';
-      a.click();
-      URL.revokeObjectURL(a.href);
+  let finalUrl = url;
+  if (token) {
+    const sep = url.includes('?') ? '&' : '?';
+    finalUrl = `${url}${sep}token=${encodeURIComponent(token)}`;
+  }
+  try {
+    const resp = await fetch(finalUrl, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
+    if (!resp.ok) {
+      let detail = '';
+      try { detail = (await resp.json())?.detail || ''; } catch { /* 非 JSON */ }
+      toast.error(`下载失败（${resp.status}）${detail ? '：' + detail : ''}`);
+      return;
+    }
+    const blob = await resp.blob();
+    const filename = filenameFromDisposition(resp.headers.get('Content-Disposition') || '');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch (e) {
+    toast.error(`下载失败：${e instanceof Error ? e.message : String(e)}`);
+  }
 }
