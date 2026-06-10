@@ -3012,6 +3012,7 @@ async function _buildConfigItemsWorkbook(): Promise<XLSX.WorkBook | null> {
       sheet3Rows.push({
         父构型号: d.code,
         子构型号: c.child_detail?.code || '',
+        用量: c.quantity ?? 1,
         是否必选: c.is_required ? 'TRUE' : 'FALSE',
       });
     }
@@ -3043,7 +3044,7 @@ async function _buildConfigItemsWorkbook(): Promise<XLSX.WorkBook | null> {
 
   if (sheet3Rows.length > 0) {
     const s3 = XLSX.utils.json_to_sheet(sheet3Rows);
-    s3['!cols'] = [{ wch: 20 }, { wch: 20 }, { wch: 10 }];
+    s3['!cols'] = [{ wch: 20 }, { wch: 20 }, { wch: 8 }, { wch: 10 }];
     XLSX.utils.book_append_sheet(wb, s3, '子构型项');
   }
 
@@ -3191,6 +3192,7 @@ export async function previewConfigurationItemsImport(file: File): Promise<Impor
         })),
         _children: (childrenByCode.get(code) || []).map((r: any) => ({
           child_code: String(r['子构型号'] || '').trim(),
+          quantity: parseInt(String(r['用量'] ?? '')) || 1,
           is_required: String(r['是否必选'] || '').trim().toUpperCase() === 'TRUE',
         })),
         _docLinks: (docsByCode.get(code) || []).map((r: any) => ({
@@ -3335,7 +3337,7 @@ export async function executeConfigurationItemsImport(preview: ImportPreview): P
       }
 
       // 解析子构型号→子构型项 id
-      const childrenToAdd: { child_id: string; is_required: boolean }[] = [];
+      const childrenToAdd: { child_id: string; is_required: boolean; quantity: number }[] = [];
       for (const c of children) {
         const childCode = c.child_code as string;
         const childId = codeToId.get(childCode);
@@ -3344,7 +3346,7 @@ export async function executeConfigurationItemsImport(preview: ImportPreview): P
           console.warn(`构型项 ${row.code} 子构型项未找到，跳过: ${childCode}`);
           continue;
         }
-        childrenToAdd.push({ child_id: childId, is_required: c.is_required as boolean });
+        childrenToAdd.push({ child_id: childId, is_required: c.is_required as boolean, quantity: (c.quantity as number) ?? 1 });
       }
 
       if (childrenToAdd.length > 0) {
