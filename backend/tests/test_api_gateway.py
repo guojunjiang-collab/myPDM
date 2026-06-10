@@ -39,3 +39,43 @@ def test_build_catalog_filters_to_allowed_get():
     detail = next(e for e in cat if e["path"] == "/api/parts/{part_id}")
     assert detail["method"] == "GET"
     assert detail["path_params"] == ["part_id"]
+
+
+def test_call_read_api_rejects_unauthorized_path_without_forwarding():
+    called = []
+    def fake_forward(path, query, token):
+        called.append(path); return 200, "{}"
+    out = gw.call_read_api(None, None, path="/api/users/", _forward=fake_forward)
+    assert "error" in out
+    assert called == []  # 未授权路径不应转发
+
+
+def test_call_read_api_forwards_with_token_and_parses_json():
+    seen = {}
+    def fake_forward(path, query, token):
+        seen.update(path=path, query=query, token=token)
+        return 200, '{"items": [1, 2, 3]}'
+    out = gw.call_read_api(None, None, path="/api/parts/", query={"limit": 5},
+                           _token="tok-abc", _forward=fake_forward)
+    assert seen["token"] == "tok-abc"
+    assert seen["query"] == {"limit": 5}
+    assert out["status"] == 200
+    assert out["data"] == {"items": [1, 2, 3]}
+
+
+def test_call_read_api_truncates_oversized(monkeypatch):
+    monkeypatch.setenv("ASSISTANT_API_MAX_CHARS", "20")
+    def fake_forward(path, query, token):
+        return 200, "x" * 100
+    out = gw.call_read_api(None, None, path="/api/parts/", _forward=fake_forward)
+    assert out["_truncated"] is True
+    assert "hint" in out
+    assert len(out["data_preview"]) == 20
+
+
+def test_call_read_api_returns_error_on_4xx():
+    def fake_forward(path, query, token):
+        return 403, '{"detail": "权限不足"}'
+    out = gw.call_read_api(None, None, path="/api/ecrs/", _forward=fake_forward)
+    assert out["status"] == 403
+    assert "error" in out
