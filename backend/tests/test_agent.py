@@ -84,3 +84,9 @@ def test_agent_injects_token_into_needs_token_tool(db, engineer_user, make_fake_
         assert captured["token"] == "tok-xyz"
     finally:
         tools_mod.REGISTRY.pop("__probe__", None)
+
+
+def test_system_prompt_includes_pdm_overview():
+    from app.assistant import agent as agent_mod
+    assert "构型" in agent_mod.SYSTEM_PROMPT
+    assert "list_api_endpoints" in agent_mod.SYSTEM_PROMPT

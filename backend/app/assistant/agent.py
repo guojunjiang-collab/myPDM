@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..models import User
 from . import tools as tools_mod
+from . import knowledge
 from .sanitizer import sanitize_for_llm
 
 SYSTEM_PROMPT = (
@@ -14,6 +15,8 @@ SYSTEM_PROMPT = (
     "然后用中文为用户做分析、对比、撰写文档。无法用工具获取的信息不要编造。"
     "涉及下载时，把工具返回的下载链接如实告知用户。"
 )
+
+SYSTEM_PROMPT = SYSTEM_PROMPT + "\n\n" + knowledge.build_overview()
 
 
 def run_agent(messages: list, db: Session, user: User, emit: Callable[[dict], None],

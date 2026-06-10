@@ -3,13 +3,14 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.database import get_db
-from app.routers.auth import get_current_active_user
+from app.routers.auth import get_current_active_user, oauth2_scheme
 from app.assistant import agent as agent_mod
 
 
 def test_chat_streams_events(db, engineer_user, monkeypatch):
     app.dependency_overrides[get_db] = lambda: db
     app.dependency_overrides[get_current_active_user] = lambda: engineer_user
+    app.dependency_overrides[oauth2_scheme] = lambda: "test-token"
 
     def fake_run_agent(messages, db_, user, emit, **kw):
         emit({"type": "token", "delta": "hi"})
