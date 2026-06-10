@@ -779,7 +779,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                       <thead className="bg-gray-100 sticky top-0 z-10">
                         <tr>
                           <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-20">层级</th>
-                          <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-44 whitespace-nowrap">构型号/零部件 件号</th>
+                          <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-44 whitespace-nowrap">构型号/零部件件号</th>
                           <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-28">名称</th>
                           <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-16 whitespace-nowrap">类型</th>
                           <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-16">版本</th>
@@ -812,7 +812,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                     <thead className="bg-gray-100 sticky top-0 z-10">
                       <tr>
                         <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-20">层级</th>
-                        <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-44 whitespace-nowrap">构型号/零部件 件号</th>
+                        <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-44 whitespace-nowrap">构型号/零部件件号</th>
                         <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-28">名称</th>
                         <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-16 whitespace-nowrap">类型</th>
                         <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-16">版本</th>
