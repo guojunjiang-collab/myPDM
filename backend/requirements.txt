@@ -13,4 +13,5 @@ rarfile==4.2
 py7zr==0.21.0
 gltf-draco-transcoder
 openai==1.55.0
+httpx==0.27.2  # 固定 <0.28，openai 1.55 仍向 httpx 传 proxies= 参数，0.28 已移除会报错
 pytest==8.3.4
