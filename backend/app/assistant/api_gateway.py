@@ -46,9 +46,11 @@ def build_catalog(openapi: dict) -> list:
 
 
 def list_api_endpoints(db, user):
-    """工具：返回白名单只读接口目录。"""
+    """工具：返回当前用户角色可访问的白名单只读接口目录。"""
     from ..main import app  # 延迟导入避免循环
-    return {"endpoints": build_catalog(app.openapi())}
+    catalog = build_catalog(app.openapi())
+    role = getattr(user, "role", None) or "guest"
+    return {"endpoints": filter_catalog_by_role(catalog, role, endpoint_roles_map())}
 
 
 async def _forward_async(app, path, query, token):

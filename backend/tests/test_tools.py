@@ -118,3 +118,14 @@ def test_get_data_dictionary_tool_registered(db, engineer_user):
     out = tools.REGISTRY["get_data_dictionary"]["execute"](db, engineer_user, entity="part")
     assert out["entity"] == "part"
     assert any(f["name"] == "code" for f in out["fields"])
+
+
+def test_list_api_endpoints_filtered_by_role(db, guest_user, engineer_user):
+    g = {e["path"] for e in
+         tools.REGISTRY["list_api_endpoints"]["execute"](db, guest_user)["endpoints"]}
+    e = {e["path"] for e in
+         tools.REGISTRY["list_api_endpoints"]["execute"](db, engineer_user)["endpoints"]}
+    assert g <= e  # guest 目录是 engineer 的子集
+    # bom/tree 不含 guest，故仅 engineer 可见
+    assert "/api/bom/tree/{item_type}/{item_id}" in e
+    assert "/api/bom/tree/{item_type}/{item_id}" not in g
