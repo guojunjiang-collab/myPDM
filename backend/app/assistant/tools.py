@@ -5,11 +5,13 @@ execute 必须把当前 user 作为权限边界；返回值是给大模型回灌
 若工具产出富卡片，在返回 dict 中放 "_card": {"card_type":..., "payload":...}，
 由 agent 层取出并 emit，不回灌给模型（避免重复占 token）。
 """
+import os
 import uuid
 from typing import Optional
 from sqlalchemy.orm import Session
 
 from .. import crud
+from ..bom import compare
 from ..models import User
 
 DOWNLOAD_ROLES = {"admin", "engineer", "production"}
@@ -71,6 +73,53 @@ def get_bom_tree(db: Session, user: User, type: str, id: str):
     return {"items": rows, "_card": card}
 
 
+def _flatten_tree(db, etype, eid):
+    if etype != "assembly":
+        return []
+    return compare.get_bom_tree_recursive(db, eid)
+
+
+def diff_bom(db: Session, user: User, left_id: str, right_id: str,
+             left_type: str = "assembly", right_type: str = "assembly"):
+    threshold = int(os.getenv("ASSISTANT_BOM_RAW_THRESHOLD", "200"))
+    left_nodes = _flatten_tree(db, left_type, uuid.UUID(left_id))
+    right_nodes = _flatten_tree(db, right_type, uuid.UUID(right_id))
+
+    def brief(nodes):
+        return [{"code": n.get("child_code"), "name": n.get("child_name"),
+                 "qty": int(n.get("quantity") or 0), "level": n.get("level")}
+                for n in nodes]
+
+    if len(left_nodes) + len(right_nodes) <= threshold:
+        # 小 BOM：原始数据交给模型自由分析
+        return {"mode": "raw", "left": brief(left_nodes), "right": brief(right_nodes)}
+
+    # 大 BOM：服务端预处理，只回变化行
+    def key(n):
+        return n.get("child_code")
+    lmap = {key(n): n for n in left_nodes}
+    rmap = {key(n): n for n in right_nodes}
+    added = [brief([rmap[k]])[0] for k in rmap.keys() - lmap.keys()]
+    removed = [brief([lmap[k]])[0] for k in lmap.keys() - rmap.keys()]
+    changed = []
+    for k in lmap.keys() & rmap.keys():
+        lq = int(lmap[k].get("quantity") or 0)
+        rq = int(rmap[k].get("quantity") or 0)
+        if lq != rq:
+            changed.append({"code": k, "name": lmap[k].get("child_name"),
+                            "left_qty": lq, "right_qty": rq})
+    diff = {"added": added, "removed": removed, "changed": changed}
+    card = {"card_type": "table", "payload": {
+        "title": "BOM 对比（已对超大 BOM 预处理）",
+        "columns": ["变化", "code", "name", "数量"],
+        "rows": ([{"变化": "新增", **a} for a in added] +
+                 [{"变化": "删除", **r} for r in removed] +
+                 [{"变化": "改量", "code": c["code"], "name": c["name"],
+                   "数量": f'{c["left_qty"]}→{c["right_qty"]}'} for c in changed])}}
+    return {"mode": "preprocessed", "diff": diff, "_card": card,
+            "note": "BOM 较大，已服务端预处理为差异。"}
+
+
 REGISTRY = {
     "search_entity": {
         "execute": search_entity,
@@ -112,6 +161,20 @@ REGISTRY = {
                 "type": {"type": "string", "enum": ["part", "assembly"]},
                 "id": {"type": "string"},
             }, "required": ["type", "id"]},
+        }},
+    },
+    "diff_bom": {
+        "execute": diff_bom,
+        "schema": {"type": "function", "function": {
+            "name": "diff_bom",
+            "description": ("对比两个部件的 BOM。小 BOM 返回两棵原始树供你自行分析差异；"
+                            "大 BOM 自动返回服务端预处理的增/删/改量。"),
+            "parameters": {"type": "object", "properties": {
+                "left_id": {"type": "string"},
+                "right_id": {"type": "string"},
+                "left_type": {"type": "string", "enum": ["assembly"], "default": "assembly"},
+                "right_type": {"type": "string", "enum": ["assembly"], "default": "assembly"},
+            }, "required": ["left_id", "right_id"]},
         }},
     },
 }
