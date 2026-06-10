@@ -265,7 +265,7 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
           <td className={`px-3 py-2 text-center text-sm ${rowCls}`} onClick={onClickRow}>{c.quantity ?? 1}</td>
           <td className={`px-3 py-2 text-center text-sm ${rowCls}`} onClick={onClickRow}>
             <span className={`px-2 py-0.5 text-sm rounded ${c.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-              {c.is_required ? '必选' : '可选'}
+              {c.is_required != null ? (c.is_required ? '必选' : '可选') : '-'}
             </span>
           </td>
         </tr>
