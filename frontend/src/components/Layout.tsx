@@ -5,6 +5,7 @@ import { useDataStore } from '../stores/data';
 import { syncService } from '../services/syncService';
 import { APP_VERSION } from '../constants';
 import { ConfirmModal } from './Modal';
+import FloatingAssistant from './assistant/FloatingAssistant';
 
 type NavItem = {
   path: string;
@@ -217,6 +218,7 @@ export default function Layout() {
         onConfirm={handleClearCache}
         onCancel={() => setConfirmClearOpen(false)}
       />
+      <FloatingAssistant />
     </div>
   );
 }
