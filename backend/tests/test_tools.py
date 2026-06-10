@@ -103,3 +103,12 @@ def test_create_document_returns_markdown_doc_card(db, engineer_user, tmp_path, 
         db, engineer_user, title="对比报告", content="# 报告\n内容")
     assert out["_card"]["card_type"] == "markdown_doc"
     assert out["_card"]["payload"]["download_url"].endswith("/download")
+
+
+def test_list_api_endpoints_registered_and_returns_endpoints(db, engineer_user):
+    out = tools.REGISTRY["list_api_endpoints"]["execute"](db, engineer_user)
+    assert "endpoints" in out
+    paths = {e["path"] for e in out["endpoints"]}
+    # 至少包含零件列表，且不含用户接口
+    assert any(p.startswith("/api/parts") for p in paths)
+    assert not any(p.startswith("/api/users") for p in paths)

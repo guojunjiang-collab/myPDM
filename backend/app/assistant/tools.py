@@ -14,6 +14,7 @@ from .. import crud
 from ..bom import compare
 from ..models import User
 from . import document_builder
+from . import api_gateway
 
 DOWNLOAD_ROLES = {"admin", "engineer", "production"}
 
@@ -275,6 +276,14 @@ REGISTRY = {
                 "content": {"type": "string", "description": "完整 Markdown 正文"},
                 "format": {"type": "string", "enum": ["md"], "default": "md"},
             }, "required": ["title", "content"]},
+        }},
+    },
+    "list_api_endpoints": {
+        "execute": api_gateway.list_api_endpoints,
+        "schema": {"type": "function", "function": {
+            "name": "list_api_endpoints",
+            "description": "列出 AI 可读的全部只读接口目录（路径/说明/参数）。需要某类数据时先调它发现接口。",
+            "parameters": {"type": "object", "properties": {}},
         }},
     },
 }
