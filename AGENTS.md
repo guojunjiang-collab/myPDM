@@ -457,6 +457,11 @@ docker-compose up -d
 - `POST /api/dashboard/items` - 关联项目
 - `POST /api/dashboard/folders/{id}/share` - 共享文件夹
 
+### AI 助手
+
+- `POST /api/assistant/chat` - 自然语言对话（SSE 流式，工具编排）
+- `GET /api/assistant/artifacts/{doc_id}/download` - 下载 AI 生成的文档产物
+
 ---
 
 ## 🛠️ 关键设计决策
