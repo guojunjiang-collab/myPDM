@@ -148,6 +148,23 @@ def trace_bom(db: Session, user: User, entity_type: str, entity_id: str, max_lev
     return {"parents": parents}
 
 
+def export_bom(db: Session, user: User, type: str, id: str):
+    if user.role not in DOWNLOAD_ROLES:
+        return {"error": "当前账号无下载/导出权限"}
+    # 复用现有 BOM 导出端点（前端用带 token 链接调用）
+    url = f"/api/bom/export/{type}/{id}"
+    card = {"card_type": "download", "payload": {"label": "下载 BOM 导出", "url": url}}
+    return {"url": url, "_card": card}
+
+
+def download_document(db: Session, user: User, attachment_id: str):
+    if user.role not in DOWNLOAD_ROLES:
+        return {"error": "当前账号无下载权限"}
+    url = f"/api/v2/attachments/{attachment_id}/direct-download"
+    card = {"card_type": "download", "payload": {"label": "下载文档", "url": url}}
+    return {"url": url, "_card": card}
+
+
 REGISTRY = {
     "search_entity": {
         "execute": search_entity,
@@ -214,6 +231,27 @@ REGISTRY = {
                 "entity_type": {"type": "string", "enum": ["part", "assembly"]},
                 "entity_id": {"type": "string"},
             }, "required": ["entity_type", "entity_id"]},
+        }},
+    },
+    "export_bom": {
+        "execute": export_bom,
+        "schema": {"type": "function", "function": {
+            "name": "export_bom",
+            "description": "导出零件/部件的 BOM，返回下载链接。需下载权限。",
+            "parameters": {"type": "object", "properties": {
+                "type": {"type": "string", "enum": ["part", "assembly"]},
+                "id": {"type": "string"},
+            }, "required": ["type", "id"]},
+        }},
+    },
+    "download_document": {
+        "execute": download_document,
+        "schema": {"type": "function", "function": {
+            "name": "download_document",
+            "description": "返回某附件的下载链接。需下载权限。",
+            "parameters": {"type": "object", "properties": {
+                "attachment_id": {"type": "string"},
+            }, "required": ["attachment_id"]},
         }},
     },
 }

@@ -1,4 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
+import csv
+import io
 from sqlalchemy.orm import Session
 from typing import List
 import uuid
@@ -245,3 +248,26 @@ async def compare_bom_components(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"子部件对比失败: {str(e)}")
+
+
+@router.get("/export/{item_type}/{item_id}")
+async def export_bom_csv(
+    item_type: str,
+    item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin", "engineer", "production"])),
+):
+    """导出零件/部件 BOM 为 CSV（供 AI 助手与前端下载）。"""
+    if item_type not in ("part", "assembly"):
+        raise HTTPException(status_code=400, detail="无效的类型")
+    nodes = compare.get_bom_tree_recursive(db, item_id) if item_type == "assembly" else []
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["层级", "类型", "编码", "名称", "规格", "数量"])
+    for n in nodes:
+        writer.writerow([n.get("level"), n.get("child_type"), n.get("child_code"),
+                         n.get("child_name"), n.get("child_spec"), n.get("quantity")])
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]), media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="bom_{item_id}.csv"'})

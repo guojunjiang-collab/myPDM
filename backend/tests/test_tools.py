@@ -80,3 +80,18 @@ def test_trace_bom_returns_parents(db, engineer_user):
     out = tools.REGISTRY["trace_bom"]["execute"](
         db, engineer_user, entity_type="part", entity_id=str(child.id))
     assert isinstance(out["parents"], list)
+
+
+def test_export_bom_returns_link_for_engineer(db, engineer_user):
+    a = _make_assembly(db, "A-X", "导出")
+    out = tools.REGISTRY["export_bom"]["execute"](
+        db, engineer_user, type="assembly", id=str(a.id))
+    assert out["_card"]["card_type"] == "download"
+    assert "/api/" in out["_card"]["payload"]["url"]
+
+
+def test_export_bom_denied_for_guest(db, guest_user):
+    a = _make_assembly(db, "A-Y", "禁止")
+    out = tools.REGISTRY["export_bom"]["execute"](
+        db, guest_user, type="assembly", id=str(a.id))
+    assert "error" in out and "_card" not in out
