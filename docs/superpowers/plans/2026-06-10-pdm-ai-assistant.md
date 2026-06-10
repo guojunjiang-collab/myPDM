@@ -124,6 +124,8 @@ git commit -m "chore(assistant): 引入 openai 与 pytest 依赖及配置"
 
 - [ ] **Step 1: 写 conftest.py**
 
+> **已实测前提（务必保留）**：模型用 PostgreSQL 的 `JSONB`/`UUID` 列。内存 SQLite 下，`UUID` 在 SQLAlchemy 2.0 原生可用，但 `JSONB` 必须经 `@compiles` 映射为 `JSON`，否则 `create_all` 失败。下面的 conftest 已包含该 shim，**不要删除**。已验证 `create_all`、UUID 主键、`child_id.in_([uuid])` 过滤均可正常工作。
+
 `backend/tests/conftest.py`：
 ```python
 """pytest 公共 fixtures：内存数据库、测试用户、假 LLM 客户端。"""
@@ -131,9 +133,17 @@ import uuid
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.compiler import compiles
 
 from app.database import Base
 from app import models
+
+
+# SQLite 下把 PG 的 JSONB 渲染成 JSON，使 create_all 可用（已实测必需）
+@compiles(JSONB, "sqlite")
+def _compile_jsonb_sqlite(element, compiler, **kw):
+    return "JSON"
 
 
 @pytest.fixture
@@ -1141,7 +1151,44 @@ REGISTRY 追加：
     },
 ```
 
-> 注：`/api/bom/export/{type}/{id}` 若现有后端尚无该端点，需在 `routers/bom.py` 增加一个导出端点（返回 Excel/CSV）。**实现本步前先确认**：`grep -n "export" backend/app/routers/bom.py`。若无，则把 `export_bom` 的 url 暂指向前端已有的导出交互，或在本任务内补一个最简 CSV 导出端点（复用 `compare.get_bom_tree_recursive`）。前端下载链接统一由前端附加 `Authorization` 头（见 Task 6.x assistantApi）。
+> **已确认**：`backend/app/routers/bom.py` 目前**没有** `/export` 端点。因此本任务必须新增一个最简 CSV 导出端点（见下一步）。前端下载链接统一由前端附加 `Authorization` 头（见 Task 6.2 `authedDownload`）。
+
+- [ ] **Step 3.5: 在 routers/bom.py 新增 CSV 导出端点**
+
+在 `backend/app/routers/bom.py` 末尾追加（复用已存在的 `compare.get_bom_tree_recursive`；文件顶部已 `from ..bom import compare`、`from fastapi.responses` 需新增 import）：
+
+文件顶部 import 区追加：
+```python
+from fastapi.responses import StreamingResponse
+import csv
+import io
+```
+追加端点：
+```python
+@router.get("/export/{item_type}/{item_id}")
+async def export_bom_csv(
+    item_type: str,
+    item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin", "engineer", "production"])),
+):
+    """导出零件/部件 BOM 为 CSV（供 AI 助手与前端下载）。"""
+    if item_type not in ("part", "assembly"):
+        raise HTTPException(status_code=400, detail="无效的类型")
+    nodes = compare.get_bom_tree_recursive(db, item_id) if item_type == "assembly" else []
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["层级", "类型", "编码", "名称", "规格", "数量"])
+    for n in nodes:
+        writer.writerow([n.get("level"), n.get("child_type"), n.get("child_code"),
+                         n.get("child_name"), n.get("child_spec"), n.get("quantity")])
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]), media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="bom_{item_id}.csv"'})
+```
+
+> 本端点的下载验证依赖真实 PostgreSQL（递归 CTE），不纳入 SQLite 单测；通过 Task 6.4 浏览器手动验证覆盖。`export_bom` 工具单测只校验它返回了正确形状的 download 卡片与 url（不真正取数）。
 
 - [ ] **Step 4: 运行确认通过**
 
@@ -1151,8 +1198,8 @@ Expected: PASS。
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/app/assistant/tools.py backend/tests/test_tools.py
-git commit -m "feat(assistant): 下载/导出工具与下载权限守卫"
+git add backend/app/assistant/tools.py backend/app/routers/bom.py backend/tests/test_tools.py
+git commit -m "feat(assistant): 下载/导出工具、CSV导出端点与下载权限守卫"
 ```
 
 ---
