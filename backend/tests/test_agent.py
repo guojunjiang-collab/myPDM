@@ -57,3 +57,30 @@ def test_agent_stops_at_max_iters(db, engineer_user, make_fake_llm):
     agent.run_agent([{"role": "user", "content": "loop"}], db, engineer_user, emit,
                     llm=llm, max_iters=3)
     assert events[-1]["type"] == "error"
+
+
+def test_agent_injects_token_into_needs_token_tool(db, engineer_user, make_fake_llm, monkeypatch):
+    captured = {}
+    def fake_exec(db_, user, _token=None, **kw):
+        captured["token"] = _token
+        captured["kw"] = kw
+        return {"ok": True}
+    # 临时往 REGISTRY 注入一个 needs_token 工具
+    from app.assistant import tools as tools_mod
+    tools_mod.REGISTRY["__probe__"] = {"execute": fake_exec, "needs_token": True,
+        "schema": {"type": "function", "function": {"name": "__probe__",
+            "parameters": {"type": "object", "properties": {}}}}}
+    try:
+        tc = {"id": "c1", "type": "function",
+              "function": {"name": "__probe__", "arguments": "{}"}}
+        llm = make_fake_llm([
+            [{"type": "final", "finish_reason": "tool_calls", "tool_calls": [tc]}],
+            [{"type": "text", "delta": "ok"},
+             {"type": "final", "finish_reason": "stop", "tool_calls": []}],
+        ])
+        events, emit = _emit_collector()
+        agent.run_agent([{"role": "user", "content": "x"}], db, engineer_user, emit,
+                        token="tok-xyz", llm=llm, max_iters=5)
+        assert captured["token"] == "tok-xyz"
+    finally:
+        tools_mod.REGISTRY.pop("__probe__", None)

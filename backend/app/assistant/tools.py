@@ -286,4 +286,18 @@ REGISTRY = {
             "parameters": {"type": "object", "properties": {}},
         }},
     },
+    "call_read_api": {
+        "execute": api_gateway.call_read_api,
+        "needs_token": True,
+        "schema": {"type": "function", "function": {
+            "name": "call_read_api",
+            "description": ("调用 list_api_endpoints 目录里的某个只读接口取数。"
+                            "path 用实际路径（路径参数已填入，如 /api/parts/<id>）；"
+                            "query 为查询参数对象（如 {\"search\":\"电机\",\"limit\":20}）。"),
+            "parameters": {"type": "object", "properties": {
+                "path": {"type": "string", "description": "接口路径，含已填好的路径参数"},
+                "query": {"type": "object", "description": "查询参数（可选）"},
+            }, "required": ["path"]},
+        }},
+    },
 }

@@ -17,7 +17,7 @@ SYSTEM_PROMPT = (
 
 
 def run_agent(messages: list, db: Session, user: User, emit: Callable[[dict], None],
-              llm=None, max_iters: Optional[int] = None) -> None:
+              token: Optional[str] = None, llm=None, max_iters: Optional[int] = None) -> None:
     if llm is None:
         from .llm_client import LLMClient
         llm = LLMClient()
@@ -58,8 +58,11 @@ def run_agent(messages: list, db: Session, user: User, emit: Callable[[dict], No
             if not spec:
                 result = {"error": f"未知工具 {name}"}
             else:
+                kwargs = dict(args)
+                if spec.get("needs_token"):
+                    kwargs["_token"] = token
                 try:
-                    result = spec["execute"](db, user, **args)
+                    result = spec["execute"](db, user, **kwargs)
                 except Exception as exc:  # 工具错误回灌模型，不中断
                     result = {"error": str(exc)}
             card = result.pop("_card", None) if isinstance(result, dict) else None

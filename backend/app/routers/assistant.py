@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db, SessionLocal
 from ..models import User
-from .auth import require_role, get_current_active_user
+from .auth import require_role, get_current_active_user, oauth2_scheme
 from ..assistant import agent as agent_mod
 from ..assistant import document_builder
 
@@ -31,6 +31,7 @@ def _sse(data: dict) -> str:
 async def chat(
     req: ChatRequest,
     current_user: User = Depends(require_role(ASSISTANT_ROLES)),
+    token: str = Depends(oauth2_scheme),
 ):
     """SSE 流式：在独立线程跑 Agent，通过队列把事件推给响应生成器。
 
@@ -42,7 +43,7 @@ async def chat(
     def worker():
         db = SessionLocal()
         try:
-            agent_mod.run_agent(req.messages, db, current_user, q.put)
+            agent_mod.run_agent(req.messages, db, current_user, q.put, token=token)
         except Exception as exc:  # 兜底
             q.put({"type": "error", "message": str(exc)})
         finally:
