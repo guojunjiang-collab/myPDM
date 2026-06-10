@@ -173,15 +173,9 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
       const data: ConfigurationProfileDetail = r.data;
       setProfile(data);
       setConfigTree(sortTreeByCode(data.config_tree || null));
-      // Default expand all nodes for edit checklist
+      // Default expand only level 1 (root node) for edit checklist, to avoid showing too much
       if (data.config_tree) {
-        const expanded = new Set<string>();
-        const walk = (node: ConfigTreeNode) => {
-          expanded.add(node.id);
-          node.children.forEach(walk);
-        };
-        walk(data.config_tree);
-        setExpandedNodes(expanded);
+        setExpandedNodes(new Set([data.config_tree.id]));
       }
       // Default expand root node for formal checklist (show level 1 children)
       if (data.config_tree) {
@@ -335,15 +329,8 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
     try {
       const r = await configurationProfileApi.regenerate(profileId);
       setConfigTree(r.data.config_tree || null);
-      const expanded = new Set<string>();
-      if (r.data.config_tree) {
-        const walk = (node: ConfigTreeNode) => {
-          expanded.add(node.id);
-          node.children.forEach(walk);
-        };
-        walk(r.data.config_tree);
-      }
-      setExpandedNodes(expanded);
+      // Expand only level 1 (root node) after regenerate, consistent with default
+      setExpandedNodes(r.data.config_tree ? new Set([r.data.config_tree.id]) : new Set());
       setError('');
     } catch (e: any) {
       setError(e?.response?.data?.detail || '重建清单失败');
