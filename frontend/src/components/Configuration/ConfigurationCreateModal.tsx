@@ -680,7 +680,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
               code = r.data.code; name = r.data.name; ver = r.data.version || '';
               spec = r.data.spec || ''; status = r.data.status || '';
             } catch {}
-            setParts(prev => [...prev, { part_type: it.child_type === 'assembly' ? 'assembly' : 'part', part_id: it.child_id, part_code: code, part_name: name, part_version: ver, part_spec: spec, part_status: status, is_required: true, quantity: 1 }]);
+            setParts(prev => [...prev, { part_type: it.child_type === 'assembly' ? 'assembly' : 'part', part_id: it.child_id, part_code: code, part_name: name, part_version: ver, part_spec: spec, part_status: status, is_required: true, quantity: it.quantity ?? 1 }]);
           }
           setPickerOpen(false);
         }}
