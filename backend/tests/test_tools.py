@@ -112,3 +112,9 @@ def test_list_api_endpoints_registered_and_returns_endpoints(db, engineer_user):
     # 至少包含零件列表，且不含用户接口
     assert any(p.startswith("/api/parts") for p in paths)
     assert not any(p.startswith("/api/users") for p in paths)
+
+
+def test_get_data_dictionary_tool_registered(db, engineer_user):
+    out = tools.REGISTRY["get_data_dictionary"]["execute"](db, engineer_user, entity="part")
+    assert out["entity"] == "part"
+    assert any(f["name"] == "code" for f in out["fields"])

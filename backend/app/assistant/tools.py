@@ -15,6 +15,7 @@ from ..bom import compare
 from ..models import User
 from . import document_builder
 from . import api_gateway
+from . import knowledge
 
 DOWNLOAD_ROLES = {"admin", "engineer", "production"}
 
@@ -298,6 +299,18 @@ REGISTRY = {
                 "path": {"type": "string", "description": "接口路径，含已填好的路径参数"},
                 "query": {"type": "object", "description": "查询参数（可选）"},
             }, "required": ["path"]},
+        }},
+    },
+    "get_data_dictionary": {
+        "execute": knowledge.get_data_dictionary,
+        "schema": {"type": "function", "function": {
+            "name": "get_data_dictionary",
+            "description": ("查询 PDM 数据字典：不带参返回所有实体清单与词汇表；"
+                            "带 entity（如 part/assembly/bom_item/document/ecr/eco/configuration_item）"
+                            "返回该实体的字段含义。"),
+            "parameters": {"type": "object", "properties": {
+                "entity": {"type": "string", "description": "实体名（可选）"},
+            }},
         }},
     },
 }
