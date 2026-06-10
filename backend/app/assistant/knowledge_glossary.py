@@ -16,6 +16,13 @@ GLOSSARY = {
     "custom_field_value": "自定义字段值：entity_type/entity_id 关联到具体实体，value/value_json。",
 }
 
+ROLE_CAPABILITIES = {
+    "admin": "全部数据与操作",
+    "engineer": "查看、编辑（无删除），可下载/导出",
+    "production": "查看、下载、导出，不可编辑删除",
+    "guest": "仅查看，不可下载/导出",
+}
+
 OVERVIEW = (
     "你管理的 PDM 系统含以下业务数据（字段含义用 get_data_dictionary 查，接口用 list_api_endpoints 查）：\n"
     "- 零件 part、部件 assembly、BOM（bom_item，父子结构带 quantity）\n"

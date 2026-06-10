@@ -90,3 +90,22 @@ def test_system_prompt_includes_pdm_overview():
     from app.assistant import agent as agent_mod
     assert "构型" in agent_mod.SYSTEM_PROMPT
     assert "list_api_endpoints" in agent_mod.SYSTEM_PROMPT
+
+
+def test_system_message_includes_role_and_capability(db, guest_user, make_fake_llm):
+    llm = make_fake_llm([[{"type": "text", "delta": "hi"},
+                          {"type": "final", "finish_reason": "stop", "tool_calls": []}]])
+    events, emit = _emit_collector()
+    agent.run_agent([{"role": "user", "content": "hi"}], db, guest_user, emit, llm=llm)
+    sys_msg = llm.calls[0]["messages"][0]["content"]
+    assert "guest" in sys_msg
+    assert "不可下载" in sys_msg
+
+
+def test_system_message_role_for_engineer(db, engineer_user, make_fake_llm):
+    llm = make_fake_llm([[{"type": "text", "delta": "hi"},
+                          {"type": "final", "finish_reason": "stop", "tool_calls": []}]])
+    events, emit = _emit_collector()
+    agent.run_agent([{"role": "user", "content": "hi"}], db, engineer_user, emit, llm=llm)
+    sys_msg = llm.calls[0]["messages"][0]["content"]
+    assert "engineer" in sys_msg

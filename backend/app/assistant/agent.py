@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ..models import User
 from . import tools as tools_mod
 from . import knowledge
+from .knowledge_glossary import ROLE_CAPABILITIES
 from .sanitizer import sanitize_for_llm
 
 SYSTEM_PROMPT = (
@@ -28,7 +29,11 @@ def run_agent(messages: list, db: Session, user: User, emit: Callable[[dict], No
         max_iters = int(os.getenv("ASSISTANT_MAX_ITERS", "8"))
 
     tool_specs = [t["schema"] for t in tools_mod.REGISTRY.values()]
-    convo = [{"role": "system", "content": SYSTEM_PROMPT}] + list(messages)
+    role = getattr(user, "role", None) or "guest"
+    cap = ROLE_CAPABILITIES.get(role, "按你的权限提供只读操作")
+    role_line = (f"\n\n当前用户角色：{role}（{cap}）。"
+                 "只提供该角色权限范围内的读取操作；遇到无权限的操作，礼貌说明而非尝试。")
+    convo = [{"role": "system", "content": SYSTEM_PROMPT + role_line}] + list(messages)
 
     for _ in range(max_iters):
         text_buf = ""
