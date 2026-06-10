@@ -69,3 +69,14 @@ def test_diff_bom_large_returns_preprocessed_diff(db, engineer_user, monkeypatch
     assert "ONLY_LEFT" in codes_removed
     assert "COMMON" in codes_changed
     assert out["_card"]["card_type"] == "table"
+
+
+def test_trace_bom_returns_parents(db, engineer_user):
+    parent = _make_assembly(db, "A-P", "父")
+    child = _make_part(db, "P-C", "子")
+    bi = models.BOMItem(id=uuid.uuid4(), parent_type="assembly", parent_id=parent.id,
+                        child_type="part", child_id=child.id, quantity=2)
+    db.add(bi); db.commit()
+    out = tools.REGISTRY["trace_bom"]["execute"](
+        db, engineer_user, entity_type="part", entity_id=str(child.id))
+    assert isinstance(out["parents"], list)

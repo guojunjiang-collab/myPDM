@@ -120,6 +120,34 @@ def diff_bom(db: Session, user: User, left_id: str, right_id: str,
             "note": "BOM 较大，已服务端预处理为差异。"}
 
 
+def trace_bom(db: Session, user: User, entity_type: str, entity_id: str, max_level: int = 10):
+    from ..models import BOMItem
+    if entity_type not in ("part", "assembly"):
+        return {"error": "无效类型"}
+    parents = []
+    frontier = [uuid.UUID(entity_id)]
+    seen = set()
+    level = 0
+    while frontier and level < max_level:
+        level += 1
+        next_frontier = []
+        rows = db.query(BOMItem).filter(
+            BOMItem.child_id.in_(frontier),
+            BOMItem.deleted_at.is_(None),
+        ).all()
+        for r in rows:
+            if r.parent_id in seen:
+                continue
+            seen.add(r.parent_id)
+            pa = crud.get_assembly(db, r.parent_id) if r.parent_type == "assembly" else crud.get_part(db, r.parent_id)
+            if pa:
+                parents.append({"level": level, "parent_type": r.parent_type,
+                                "code": pa.code, "name": pa.name})
+                next_frontier.append(r.parent_id)
+        frontier = next_frontier
+    return {"parents": parents}
+
+
 REGISTRY = {
     "search_entity": {
         "execute": search_entity,
@@ -175,6 +203,17 @@ REGISTRY = {
                 "left_type": {"type": "string", "enum": ["assembly"], "default": "assembly"},
                 "right_type": {"type": "string", "enum": ["assembly"], "default": "assembly"},
             }, "required": ["left_id", "right_id"]},
+        }},
+    },
+    "trace_bom": {
+        "execute": trace_bom,
+        "schema": {"type": "function", "function": {
+            "name": "trace_bom",
+            "description": "BOM 反查：查找使用了某零件/部件的所有上层部件。",
+            "parameters": {"type": "object", "properties": {
+                "entity_type": {"type": "string", "enum": ["part", "assembly"]},
+                "entity_id": {"type": "string"},
+            }, "required": ["entity_type", "entity_id"]},
         }},
     },
 }
