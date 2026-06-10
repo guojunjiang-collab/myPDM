@@ -125,11 +125,15 @@ async def get_config_item(
         has_children = db.query(models.ConfigurationItemChild).filter(
             models.ConfigurationItemChild.parent_id == c.child_id
         ).limit(1).count() > 0 if child else False
+        has_parts = db.query(models.ConfigurationItemPart).filter(
+            models.ConfigurationItemPart.configuration_item_id == c.child_id
+        ).limit(1).count() > 0 if child else False
         children_data.append({
             "id": str(c.id), "child_id": str(c.child_id),
             "is_required": c.is_required, "sort_order": c.sort_order,
             "quantity": c.quantity,
             "has_children": has_children,
+            "has_parts": has_parts,
             "child_detail": {
                 "id": str(child.id), "code": child.code, "name": child.name,
                 "spec": child.spec or "", "remark": child.remark or "",
