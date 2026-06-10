@@ -93,3 +93,48 @@ def call_read_api(db, user, path, query=None, _token=None, _forward=None):
     except json.JSONDecodeError:
         data = text
     return {"status": status, "data": data}
+
+
+def _walk_dependant(dep):
+    yield dep
+    for d in dep.dependencies:
+        yield from _walk_dependant(d)
+
+
+def roles_for_route(route):
+    """从路由的 require_role 依赖闭包提取允许角色集；无角色门返回 None。"""
+    for d in _walk_dependant(route.dependant):
+        call = getattr(d, "call", None)
+        if call and getattr(call, "__qualname__", "").endswith("require_role.<locals>.checker"):
+            for cell in (call.__closure__ or []):
+                v = cell.cell_contents
+                if isinstance(v, (list, tuple, set)) and v and all(isinstance(x, str) for x in v):
+                    return set(v)
+    return None
+
+
+_ROLES_MAP_CACHE = None
+
+
+def endpoint_roles_map():
+    """构建 {GET path: 允许角色集 or None}，模块级缓存（重启刷新）。"""
+    global _ROLES_MAP_CACHE
+    if _ROLES_MAP_CACHE is None:
+        from ..main import app  # 延迟导入避免循环
+        from fastapi.routing import APIRoute
+        m = {}
+        for r in app.routes:
+            if isinstance(r, APIRoute) and "GET" in r.methods:
+                m[r.path] = roles_for_route(r)
+        _ROLES_MAP_CACHE = m
+    return _ROLES_MAP_CACHE
+
+
+def filter_catalog_by_role(catalog, role, roles_map):
+    """保留：路径无角色门(None) 或 role 在允许集内 的条目。"""
+    out = []
+    for e in catalog:
+        roles = roles_map.get(e["path"])
+        if roles is None or role in roles:
+            out.append(e)
+    return out

@@ -79,3 +79,28 @@ def test_call_read_api_returns_error_on_4xx():
     out = gw.call_read_api(None, None, path="/api/ecrs/", _forward=fake_forward)
     assert out["status"] == 403
     assert "error" in out
+
+
+def test_roles_for_route_reads_per_endpoint_roles():
+    from app.main import app
+    from fastapi.routing import APIRoute
+    by_path = {r.path: gw.roles_for_route(r) for r in app.routes
+               if isinstance(r, APIRoute) and "GET" in r.methods}
+    assert "guest" in by_path["/api/parts/"]
+    assert "guest" not in by_path["/api/bom/tree/{item_type}/{item_id}"]
+
+
+def test_filter_catalog_by_role():
+    catalog = [{"path": "/api/parts/"}, {"path": "/api/bom/tree/x"}, {"path": "/api/foo"}]
+    roles_map = {"/api/parts/": {"admin", "engineer", "production", "guest"},
+                 "/api/bom/tree/x": {"admin", "engineer", "production"}}
+    guest = gw.filter_catalog_by_role(catalog, "guest", roles_map)
+    paths = {e["path"] for e in guest}
+    assert "/api/parts/" in paths
+    assert "/api/bom/tree/x" not in paths   # guest 不在允许集
+    assert "/api/foo" in paths               # 无角色门(None)→保留
+
+
+def test_endpoint_roles_map_has_business_paths():
+    m = gw.endpoint_roles_map()
+    assert "guest" in m["/api/parts/"]
