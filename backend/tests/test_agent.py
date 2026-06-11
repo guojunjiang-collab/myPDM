@@ -156,3 +156,11 @@ def test_system_prompt_loaded_from_md_file():
     # 内置 system_prompt.md 应被加载，仍含接地约束关键词
     from app.assistant import agent as agent_mod
     assert "仅基于" in agent_mod.SYSTEM_PROMPT
+
+
+def test_system_prompt_requires_comprehensive_search():
+    from app.assistant import agent as agent_mod
+    p = agent_mod.SYSTEM_PROMPT
+    assert "全面检索" in p
+    # 报告类请求需读附件正文、取完整字段
+    assert "read_attachment_content" in p
