@@ -28,7 +28,7 @@ export default function MessageList() {
             {m.role === 'assistant'
               ? <><TextCard text={m.text} streaming={m.streaming} />
                   {m.cards.map(renderCard)}</>
-              : <span className="text-sm">{m.text}</span>}
+              : <span className="block text-left text-sm whitespace-pre-wrap break-words">{m.text}</span>}
           </div>
         </div>
       ))}
