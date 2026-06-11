@@ -129,3 +129,30 @@ def test_system_prompt_enforces_data_grounding():
     assert "仅基于" in p
     assert "不得联网" in p or "不得联网检索" in p
     assert "系统中未找到相关数据" in p
+
+
+def test_strip_comments_removes_html_comments():
+    from app.assistant import agent as agent_mod
+    out = agent_mod._strip_comments("前<!-- 编辑说明\n多行 -->后")
+    assert "编辑说明" not in out
+    assert "前" in out and "后" in out
+
+
+def test_load_base_prompt_falls_back_when_missing(tmp_path):
+    from app.assistant import agent as agent_mod
+    missing = str(tmp_path / "nope.md")
+    assert agent_mod.load_base_prompt(missing) == agent_mod.DEFAULT_SYSTEM_PROMPT
+
+
+def test_load_base_prompt_reads_file(tmp_path):
+    from app.assistant import agent as agent_mod
+    f = tmp_path / "p.md"
+    f.write_text("<!-- 说明 -->\n自定义提示词内容", encoding="utf-8")
+    out = agent_mod.load_base_prompt(str(f))
+    assert out == "自定义提示词内容"
+
+
+def test_system_prompt_loaded_from_md_file():
+    # 内置 system_prompt.md 应被加载，仍含接地约束关键词
+    from app.assistant import agent as agent_mod
+    assert "仅基于" in agent_mod.SYSTEM_PROMPT

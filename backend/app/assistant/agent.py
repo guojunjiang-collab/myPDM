@@ -11,7 +11,8 @@ from . import knowledge
 from .knowledge_glossary import ROLE_CAPABILITIES
 from .sanitizer import sanitize_for_llm
 
-SYSTEM_PROMPT = (
+# 内置默认提示词——仅当外置 system_prompt.md 缺失/为空时兜底，保证不崩
+DEFAULT_SYSTEM_PROMPT = (
     "你是 PDM/BOM 系统的智能助手。可调用工具获取零件、部件、BOM 数据，"
     "然后用中文为用户做分析、对比、撰写文档。"
     "【信息接地约束】你的所有回答与分析必须仅基于通过工具检索到的本系统数据（含附件正文）；"
@@ -26,7 +27,27 @@ SYSTEM_PROMPT = (
     "再调用 read_attachment_content 读取正文后总结分析。"
 )
 
-SYSTEM_PROMPT = SYSTEM_PROMPT + "\n\n" + knowledge.build_overview()
+# 外置可编辑提示词文件（与本模块同目录），编辑后重启后端生效
+_PROMPT_FILE = os.path.join(os.path.dirname(__file__), "system_prompt.md")
+
+
+def _strip_comments(text: str) -> str:
+    """移除 <!-- ... --> HTML 注释块（供编辑者写说明，不发给模型）。"""
+    import re
+    return re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
+
+
+def load_base_prompt(path: str = _PROMPT_FILE) -> str:
+    """加载外置提示词；缺失/为空则回退内置默认。"""
+    try:
+        with open(path, encoding="utf-8") as f:
+            content = _strip_comments(f.read()).strip()
+        return content or DEFAULT_SYSTEM_PROMPT
+    except (FileNotFoundError, OSError):
+        return DEFAULT_SYSTEM_PROMPT
+
+
+SYSTEM_PROMPT = load_base_prompt() + "\n\n" + knowledge.build_overview()
 
 
 def run_agent(messages: list, db: Session, user: User, emit: Callable[[dict], None],
