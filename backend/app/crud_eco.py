@@ -13,6 +13,7 @@ from app.database import SessionLocal
 from app.models_eco import ECO, ECOExecutionItem, ECOReviewRecord, ECOStatusLog
 from app.models import User, Part, Assembly, BOMItem
 from app.schemas_eco import ECOCreate, ECOEdit, ECOListParams, ECOExecutionItemCreate, ECOExecutionItemEdit
+from app.crud import _get_next_version
 
 # ─────────────────────────────────────────────────────
 # 状态流转规则
@@ -590,7 +591,7 @@ def _clone_entity(db: Session, entity, entity_type: str) -> uuid.UUID:
     """克隆实体创建新版本，返回新实体 ID。
     零件：基础字段+自定义字段沿用，关联图文档清空。
     部件：基础字段+自定义字段+子项列表沿用，关联图文档清空。"""
-    new_version = _next_version(entity.version)
+    new_version = _get_next_version(db, Part if entity_type == "part" else Assembly, entity.code)
     revisions = list(entity.revisions or [])
 
     if entity_type == "part":

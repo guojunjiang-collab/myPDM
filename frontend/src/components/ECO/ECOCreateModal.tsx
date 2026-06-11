@@ -231,17 +231,23 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
     finally { setNestedLoading(false); }
   };
 
-  const handleExecuteAction = async (action: string, itemId: string, newEntityId?: string) => {
+  const handleExecuteAction = async (action: string, itemId: string, newEntityId?: string, entityInfo?: { entity_type: string; entity_id: string; entity_code: string; entity_name: string; action: string }) => {
     if (!localEco) return;
+    let actualItemId = itemId;
     try {
+      // 尚未创建执行项的，先创建再加入本地状态，确保后续 update 能找到
+      let items = [...(localEco.execution_items || [])];
+      if (!actualItemId && entityInfo) {
+        const created = await ecoApi.addExecutionItem(localEco.id, { ...entityInfo, source: 'manual' });
+        actualItemId = created.data?.id;
+        if (actualItemId) items.push({ id: actualItemId, ...entityInfo, source: 'manual' as const, status: 'pending' as const, sort_order: 0 } as any);
+      }
       let result: any;
-      if (action === 'upgrade') result = await ecoApi.upgradeItem(localEco.id, itemId);
-      else if (action === 'revert') result = await ecoApi.revertItem(localEco.id, itemId, newEntityId);
-      else if (action === 'freeze') result = await ecoApi.freezeItem(localEco.id, itemId, newEntityId);
+      if (action === 'upgrade') result = await ecoApi.upgradeItem(localEco.id, actualItemId);
+      else if (action === 'revert') result = await ecoApi.revertItem(localEco.id, actualItemId, newEntityId);
+      else if (action === 'freeze') result = await ecoApi.freezeItem(localEco.id, actualItemId, newEntityId);
       toast.success('操作完成');
-      // 仅更新受影响的执行项，不重新加载整个 ECO（避免滚动位置重置）
-      const items = [...(localEco.execution_items || [])];
-      const idx = items.findIndex((ei: any) => ei.id === itemId);
+      const idx = items.findIndex((ei: any) => ei.id === actualItemId);
       if (idx >= 0) {
         const updated = { ...items[idx] };
         if (action === 'upgrade') {
@@ -606,7 +612,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
           }} onBomChange={setBomData} executionItems={localEco.execution_items}
           ecoId={localEco.id} ecoStatus={localEco.status}
           canExecute={localEco.status === 'draft'}
-          onExecuteUpgrade={(itemId) => handleExecuteAction('upgrade', itemId)}
+          onExecuteUpgrade={(itemId, entityInfo) => handleExecuteAction('upgrade', itemId, undefined, entityInfo)}
 onExecuteRelease={(itemId, newEntityId) => handleExecuteAction('revert', itemId, newEntityId)}
 onExecuteFreeze={(itemId, newEntityId) => handleExecuteAction('freeze', itemId, newEntityId)}
           onViewItem={(entityType, entityId) => viewItem(entityType, entityId, 'view')}

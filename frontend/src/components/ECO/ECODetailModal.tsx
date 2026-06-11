@@ -301,10 +301,18 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
               <h4 className="text-sm font-bold text-gray-700 mb-2">ECR 变更分析（{eco.ecr_number || 'ECR'}）</h4>
               <ECOEditView ecrId={eco.ecr_id} onEcrLinked={() => {}} readOnly executionItems={eco.execution_items}
                 ecoId={ecoId} ecoStatus={eco.status} canExecute={executionMode && (eco.status === 'approved' || eco.status === 'executing')}
-                onExecuteUpgrade={async (itemId) => {
+                onExecuteUpgrade={async (itemId, entityInfo) => {
                   try {
-                    const r = await ecoApi.upgradeItem(ecoId, itemId);
-                    updateExecutionItem(itemId, { new_entity_id: r.data?.new_entity_id, new_version: r.data?.new_version, new_entity_status: 'draft' });
+                    let actualItemId = itemId;
+                    if (!actualItemId && entityInfo) {
+                      const created = await ecoApi.addExecutionItem(ecoId, { ...entityInfo, source: 'manual' });
+                      actualItemId = created.data?.id;
+                      if (actualItemId && eco) {
+                        setEco({ ...eco, execution_items: [...(eco.execution_items || []), { id: actualItemId, ...entityInfo, source: 'manual', status: 'pending', sort_order: 0 } as any] });
+                      }
+                    }
+                    const r = await ecoApi.upgradeItem(ecoId, actualItemId);
+                    updateExecutionItem(actualItemId, { new_entity_id: r.data?.new_entity_id, new_version: r.data?.new_version, new_entity_status: 'draft' });
                     toast.success('升版完成');
                   } catch (err: any) { toast.error(err?.response?.data?.detail || '操作失败'); }
                 }}
