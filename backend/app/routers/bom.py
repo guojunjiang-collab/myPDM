@@ -69,7 +69,7 @@ async def check_references(
     return references
 
 @router.get("/items/all")
-async def get_all_bom_items_route(updated_since: float = None, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production"]))):
+async def get_all_bom_items_route(updated_since: float = None, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
     """获取所有 BOM 关系，用于前端反查"""
     include_deleted = bool(updated_since)
     items = crud.get_all_bom_items(db, include_deleted=include_deleted, updated_since=updated_since)
