@@ -116,3 +116,8 @@ def test_system_prompt_directs_download_buttons_not_urls():
     # 应指引用工具生成下载按钮，且不再指示"把下载链接如实告知用户"
     assert "download_document" in agent_mod.SYSTEM_PROMPT
     assert "如实告知" not in agent_mod.SYSTEM_PROMPT
+
+
+def test_system_prompt_mentions_attachment_content_reading():
+    from app.assistant import agent as agent_mod
+    assert "read_attachment_content" in agent_mod.SYSTEM_PROMPT

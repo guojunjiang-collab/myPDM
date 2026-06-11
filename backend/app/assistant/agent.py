@@ -17,6 +17,8 @@ SYSTEM_PROMPT = (
     "涉及附件/文档下载时，必须调用 download_document 工具为每个附件生成下载按钮，"
     "不要在回复正文里手写下载链接或 URL（手写链接缺少鉴权、无法下载）；"
     "正文可按文件名列出清单，下载入口由按钮提供。"
+    "需要分析附件内容（pdf/word/excel/文本）时，先经文档接口取得 attachment_id，"
+    "再调用 read_attachment_content 读取正文后总结分析。"
 )
 
 SYSTEM_PROMPT = SYSTEM_PROMPT + "\n\n" + knowledge.build_overview()
