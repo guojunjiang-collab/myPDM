@@ -144,3 +144,44 @@ def test_download_document_label_fallback_when_missing(db, engineer_user):
     out = tools.REGISTRY["download_document"]["execute"](
         db, engineer_user, attachment_id=str(uuid.uuid4()))
     assert out["_card"]["payload"]["label"] == "下载文档"
+
+
+def _make_attachment(db, file_name, file_path="doc/x/file.md"):
+    att = models.DocumentAttachment(id=uuid.uuid4(), document_id=uuid.uuid4(),
+                                    file_name=file_name, file_path=file_path)
+    db.add(att); db.commit(); db.refresh(att)
+    return att
+
+
+def test_read_attachment_content_for_engineer(db, engineer_user, monkeypatch):
+    att = _make_attachment(db, "说明.md")
+    monkeypatch.setattr(tools.file_storage, "read_file",
+                        lambda p: "# 标题\n附件正文".encode("utf-8"))
+    out = tools.REGISTRY["read_attachment_content"]["execute"](
+        db, engineer_user, attachment_id=str(att.id))
+    assert "附件正文" in out["text"]
+
+
+def test_read_attachment_content_denied_for_guest(db, guest_user, monkeypatch):
+    att = _make_attachment(db, "说明.md")
+    monkeypatch.setattr(tools.file_storage, "read_file",
+                        lambda p: b"secret")
+    out = tools.REGISTRY["read_attachment_content"]["execute"](
+        db, guest_user, attachment_id=str(att.id))
+    assert "error" in out and "text" not in out
+
+
+def test_read_attachment_content_missing_attachment(db, engineer_user):
+    out = tools.REGISTRY["read_attachment_content"]["execute"](
+        db, engineer_user, attachment_id=str(uuid.uuid4()))
+    assert "error" in out
+
+
+def test_read_attachment_content_missing_file(db, engineer_user, monkeypatch):
+    att = _make_attachment(db, "说明.md")
+    def boom(p):
+        raise FileNotFoundError("文件不存在")
+    monkeypatch.setattr(tools.file_storage, "read_file", boom)
+    out = tools.REGISTRY["read_attachment_content"]["execute"](
+        db, engineer_user, attachment_id=str(att.id))
+    assert "error" in out

@@ -13,11 +13,14 @@ from sqlalchemy.orm import Session
 from .. import crud
 from ..bom import compare
 from ..models import User, DocumentAttachment
+from ..file_storage import file_storage
 from . import document_builder
 from . import api_gateway
 from . import knowledge
+from . import attachment_reader
 
 DOWNLOAD_ROLES = {"admin", "engineer", "production"}
+CONTENT_READ_ROLES = {"admin", "engineer"}
 
 
 def _entity_brief(obj, etype):
@@ -175,6 +178,26 @@ def download_document(db: Session, user: User, attachment_id: str):
     return {"url": url, "file_name": file_name, "_card": card}
 
 
+def read_attachment_content(db: Session, user: User, attachment_id: str):
+    if user.role not in CONTENT_READ_ROLES:
+        return {"error": "当前账号无附件内容读取权限（仅管理员/工程师）"}
+    try:
+        att = db.query(DocumentAttachment).filter(
+            DocumentAttachment.id == uuid.UUID(attachment_id)).first()
+    except (ValueError, TypeError):
+        att = None
+    if not att:
+        return {"error": "附件不存在"}
+    if not att.file_path:
+        return {"error": "附件文件不存在"}
+    try:
+        data = file_storage.read_file(att.file_path)
+    except FileNotFoundError:
+        return {"error": "附件文件不存在"}
+    max_chars = int(os.getenv("ASSISTANT_ATTACHMENT_MAX_CHARS", "20000"))
+    return attachment_reader.extract_text(data, att.file_name or "", max_chars)
+
+
 def create_document(db: Session, user: User, title: str, content: str, format: str = "md"):
     meta = document_builder.build_document(title=title, content=content, fmt=format)
     card = {"card_type": "markdown_doc", "payload": {
@@ -268,6 +291,17 @@ REGISTRY = {
         "schema": {"type": "function", "function": {
             "name": "download_document",
             "description": "返回某附件的下载链接。需下载权限。",
+            "parameters": {"type": "object", "properties": {
+                "attachment_id": {"type": "string"},
+            }, "required": ["attachment_id"]},
+        }},
+    },
+    "read_attachment_content": {
+        "execute": read_attachment_content,
+        "schema": {"type": "function", "function": {
+            "name": "read_attachment_content",
+            "description": ("读取附件正文供你总结分析，支持 pdf/docx/xlsx/md/txt/csv/json。"
+                            "先通过文档接口拿到 attachment_id 再调用。超长正文会被截断。"),
             "parameters": {"type": "object", "properties": {
                 "attachment_id": {"type": "string"},
             }, "required": ["attachment_id"]},
