@@ -121,3 +121,11 @@ def test_system_prompt_directs_download_buttons_not_urls():
 def test_system_prompt_mentions_attachment_content_reading():
     from app.assistant import agent as agent_mod
     assert "read_attachment_content" in agent_mod.SYSTEM_PROMPT
+
+
+def test_system_prompt_enforces_data_grounding():
+    from app.assistant import agent as agent_mod
+    p = agent_mod.SYSTEM_PROMPT
+    assert "仅基于" in p
+    assert "不得联网" in p or "不得联网检索" in p
+    assert "系统中未找到相关数据" in p
