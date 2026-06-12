@@ -103,13 +103,15 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   selectNode: (id) => set({ selectedNodeId: id }),
 
   selectByMesh: (meshUuid) => {
-    const owner = get().meshOwner.get(meshUuid);
+    const { meshOwner, nodeMap } = get();
+    const owner = meshOwner.get(meshUuid);
     if (!owner) return;
     const expanded = new Set(get().expandedIds);
+    // 沿 parentId 上溯展开所有祖先；expanded 自带去重，兼作环路防护
     let p = owner.parentId;
-    while (p) {
+    while (p && !expanded.has(p)) {
       expanded.add(p);
-      p = get().nodeMap.get(p)?.parentId ?? null;
+      p = nodeMap.get(p)?.parentId ?? null;
     }
     set({ selectedNodeId: owner.id, expandedIds: expanded });
   },
@@ -123,6 +125,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   },
 
   toggleNodeVisibility: (node) => {
+    if (node.meshUuids.length === 0) return; // 无关联 mesh，避免无谓的 set 触发重渲染
     const hidden = new Set(get().hiddenParts);
     const allHidden = node.meshUuids.every((u) => hidden.has(u));
     if (allHidden) {

@@ -65,4 +65,23 @@ describe('viewerStore tree extensions', () => {
     expect(s.hiddenParts.has('u1')).toBe(false);
     expect(s.hiddenParts.has('u2')).toBe(false);
   });
+
+  it('selectByMesh 对未知 mesh 不改变状态', () => {
+    const st = useViewerStore.getState();
+    st.setTreeData(tree);
+    st.selectByMesh('不存在的uuid');
+    const s = useViewerStore.getState();
+    expect(s.selectedNodeId).toBeNull();
+    expect(s.expandedIds.size).toBe(0);
+  });
+
+  it('toggleNodeVisibility 部分隐藏时切为全隐', () => {
+    const st = useViewerStore.getState();
+    st.setTreeData(tree);
+    st.toggleNodeVisibility(tree.children[0].children[0]); // 先单独隐藏 P1(u1)
+    st.toggleNodeVisibility(tree.children[0]); // G 部分隐藏(u1已隐,u2未隐)→ 应全隐
+    const s = useViewerStore.getState();
+    expect(s.hiddenParts.has('u1')).toBe(true);
+    expect(s.hiddenParts.has('u2')).toBe(true);
+  });
 });
