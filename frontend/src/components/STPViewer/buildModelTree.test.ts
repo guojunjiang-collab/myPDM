@@ -66,4 +66,32 @@ describe('buildModelTree', () => {
   it('空场景返回 null', () => {
     expect(buildModelTree(new THREE.Scene())).toBeNull();
   });
+
+  it('单一顶层零件(mesh)→ part 根', () => {
+    const scene = new THREE.Scene();
+    const m = mesh('单件');
+    scene.add(m);
+
+    const tree = buildModelTree(scene)!;
+    expect(tree.type).toBe('part');
+    expect(tree.name).toBe('单件');
+    expect(tree.parentId).toBeNull();
+    expect(tree.meshUuids).toEqual([m.uuid]);
+    expect(tree.children).toHaveLength(0);
+  });
+
+  it('part 节点带子 mesh 时仍归为 part 且聚合整子树 meshUuids', () => {
+    const scene = new THREE.Scene();
+    const root = new THREE.Group(); root.name = 'A';
+    const parent = mesh('父零件');
+    const childMesh = mesh('子零件');
+    parent.add(childMesh); // mesh 带子 mesh
+    root.add(parent); scene.add(root);
+
+    const tree = buildModelTree(scene)!;
+    const node = tree.children[0];
+    expect(node.type).toBe('part');
+    expect([...node.meshUuids].sort()).toEqual([parent.uuid, childMesh.uuid].sort());
+    expect(node.children.map((c) => c.name)).toEqual(['子零件']);
+  });
 });
