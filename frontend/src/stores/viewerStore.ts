@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { TreeNode } from '../components/STPViewer/treeTypes';
 
 export interface ViewerState {
   // 模型状态
@@ -10,6 +11,15 @@ export interface ViewerState {
   selectedPartId: string | null;
   highlightedPartId: string | null;
   visibleParts: Set<string>;
+
+  // 装配树
+  treeData: TreeNode | null;
+  nodeMap: Map<string, TreeNode>;
+  meshOwner: Map<string, TreeNode>;
+  selectedNodeId: string | null;
+  isolateMode: boolean;
+  expandedIds: Set<string>;
+  hiddenParts: Set<string>;
 
   // 视图
   modelScale: number;
@@ -25,6 +35,12 @@ export interface ViewerState {
   selectPart: (id: string | null) => void;
   highlightPart: (id: string | null) => void;
   togglePartVisibility: (id: string) => void;
+  setTreeData: (t: TreeNode | null) => void;
+  selectNode: (id: string | null) => void;
+  selectByMesh: (meshUuid: string) => void;
+  setIsolateMode: (v: boolean) => void;
+  toggleExpanded: (id: string) => void;
+  toggleNodeVisibility: (node: TreeNode) => void;
   setClipPlane: (axis: 'x' | 'y' | 'z', position: number) => void;
   removeClipPlane: (axis: 'x' | 'y' | 'z') => void;
   setMeasureMode: (mode: ViewerState['measureMode']) => void;
@@ -40,6 +56,13 @@ const initialState = {
   selectedPartId: null as string | null,
   highlightedPartId: null as string | null,
   visibleParts: new Set<string>(),
+  treeData: null as TreeNode | null,
+  nodeMap: new Map<string, TreeNode>(),
+  meshOwner: new Map<string, TreeNode>(),
+  selectedNodeId: null as string | null,
+  isolateMode: true,
+  expandedIds: new Set<string>(),
+  hiddenParts: new Set<string>(),
   modelScale: 1,
   clipPlanes: [] as { axis: 'x' | 'y' | 'z'; position: number }[],
   measureMode: 'off' as const,
@@ -65,6 +88,51 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
     set({ visibleParts: visible });
   },
 
+  setTreeData: (t) => {
+    const nodeMap = new Map<string, TreeNode>();
+    const meshOwner = new Map<string, TreeNode>();
+    const visit = (n: TreeNode) => {
+      nodeMap.set(n.id, n);
+      if (n.type === 'part') n.meshUuids.forEach((u) => meshOwner.set(u, n));
+      n.children.forEach(visit);
+    };
+    if (t) visit(t);
+    set({ treeData: t, nodeMap, meshOwner, selectedNodeId: null, hiddenParts: new Set() });
+  },
+
+  selectNode: (id) => set({ selectedNodeId: id }),
+
+  selectByMesh: (meshUuid) => {
+    const owner = get().meshOwner.get(meshUuid);
+    if (!owner) return;
+    const expanded = new Set(get().expandedIds);
+    let p = owner.parentId;
+    while (p) {
+      expanded.add(p);
+      p = get().nodeMap.get(p)?.parentId ?? null;
+    }
+    set({ selectedNodeId: owner.id, expandedIds: expanded });
+  },
+
+  setIsolateMode: (v) => set({ isolateMode: v }),
+
+  toggleExpanded: (id) => {
+    const e = new Set(get().expandedIds);
+    e.has(id) ? e.delete(id) : e.add(id);
+    set({ expandedIds: e });
+  },
+
+  toggleNodeVisibility: (node) => {
+    const hidden = new Set(get().hiddenParts);
+    const allHidden = node.meshUuids.every((u) => hidden.has(u));
+    if (allHidden) {
+      node.meshUuids.forEach((u) => hidden.delete(u)); // 当前全隐 → 显示
+    } else {
+      node.meshUuids.forEach((u) => hidden.add(u)); // 否则 → 隐藏
+    }
+    set({ hiddenParts: hidden });
+  },
+
   setClipPlane: (axis, position) => {
     const planes = get().clipPlanes.filter((p) => p.axis !== axis);
     set({ clipPlanes: [...planes, { axis, position }] });
@@ -78,5 +146,13 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   setExplodeDistance: (d) => set({ explodeDistance: d }),
   toggleWireframe: () => set({ wireframe: !get().wireframe }),
 
-  reset: () => set({ ...initialState, visibleParts: new Set() }),
+  reset: () =>
+    set({
+      ...initialState,
+      visibleParts: new Set(),
+      nodeMap: new Map(),
+      meshOwner: new Map(),
+      expandedIds: new Set(),
+      hiddenParts: new Set(),
+    }),
 }));
