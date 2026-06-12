@@ -1,12 +1,12 @@
 import { useViewerStore } from '../../stores/viewerStore';
 
 const FACES: { key: string; label: string; css: string }[] = [
-  { key: 'front',  label: '前', css: 'translateZ(23px)' },
-  { key: 'back',   label: '后', css: 'rotateY(180deg) translateZ(23px)' },
-  { key: 'right',  label: '右', css: 'rotateY(90deg) translateZ(23px)' },
-  { key: 'left',   label: '左', css: 'rotateY(-90deg) translateZ(23px)' },
-  { key: 'top',    label: '上', css: 'rotateX(90deg) translateZ(23px)' },
-  { key: 'bottom', label: '下', css: 'rotateX(-90deg) translateZ(23px)' },
+  { key: 'front',  label: '前', css: 'translateZ(32px)' },
+  { key: 'back',   label: '后', css: 'rotateY(180deg) translateZ(32px)' },
+  { key: 'right',  label: '右', css: 'rotateY(90deg) translateZ(32px)' },
+  { key: 'left',   label: '左', css: 'rotateY(-90deg) translateZ(32px)' },
+  { key: 'top',    label: '上', css: 'rotateX(90deg) translateZ(32px)' },
+  { key: 'bottom', label: '下', css: 'rotateX(-90deg) translateZ(32px)' },
 ];
 
 function quatToMatrix3d(x: number, y: number, z: number, w: number): string {
@@ -49,7 +49,7 @@ export function ViewCube() {
 
   return (
     <div
-      className="absolute top-3 left-3 z-20 select-none"
+      className="absolute top-10 left-10 z-20 select-none"
       style={{ width: 64, height: 64, perspective: 200 }}
     >
       <div
