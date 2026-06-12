@@ -1,11 +1,11 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { ecoApi, documentsApi, assemblyPartsApi, partsApi, assembliesApi, customFieldsApi } from '../../services/api';
 import type { ECORequest, Document, ECRDocumentLink } from '../../types';
 import { ECOStatusBadge, ECOPriorityBadge } from './ECOStatusBadge';
 import { Modal } from '../Modal';
 import { toast } from '../Toast';
 import { useAuthStore, canDownload } from '../../stores/auth';
-import { exportDetailDomPdf } from '../../services/ecPdfExport';
+import { exportEcoPdf } from '../../services/ecPdfExport';
 import { useDataStore } from '../../stores/data';
 import { ECOEditView } from './ECOEditView';
 import { ECRReviewPanel } from '../ECR/ECRReviewPanel';
@@ -188,7 +188,6 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
     alert('该格式暂不支持预览');
   };
 
-  const printRef = useRef<HTMLDivElement>(null);
 
   return (
     <>
@@ -197,7 +196,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
       : !eco ? <div className="py-8 text-center text-gray-400 text-sm">未找到 ECO</div>
       : (
         <>
-        <div ref={printRef} className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
           {/* Header */}
           <div className="flex items-center justify-between pb-4 border-b border-gray-200">
             <div>
@@ -209,7 +208,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
               <ECOPriorityBadge priority={eco.priority} />
               {canDownload() && (
                 <button
-                  onClick={() => { try { if (printRef.current) exportDetailDomPdf(printRef.current, `${eco.eco_number || 'ECO'}_${eco.title || ''}`); } catch { toast.error('导出失败'); } }}
+                   onClick={() => { if (eco) exportEcoPdf(eco).catch(() => toast.error('导出失败')); }}
                   className="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
                   title="导出为 PDF 文档（复刻当前详情界面，打印另存为 PDF）"
                 >

@@ -412,6 +412,7 @@ export interface ECOExecutionItem {
   entity_id?: string;
   entity_code?: string;
   entity_name: string;
+  entity_version?: string;
   action: 'create' | 'upgrade' | 'qty_change' | 'delete' | 'no_change';
   status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped';
   detail?: Record<string, unknown>;
@@ -478,6 +479,7 @@ export interface ECOExecutionItem {
   entity_id?: string;
   entity_code?: string;
   entity_name: string;
+  entity_version?: string;
   action: 'create' | 'upgrade' | 'qty_change' | 'delete' | 'no_change';
   status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped';
   detail?: Record<string, unknown>;

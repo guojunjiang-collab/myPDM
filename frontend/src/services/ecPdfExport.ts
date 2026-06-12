@@ -1,10 +1,13 @@
 /**
  * ECR / ECO 详情 导出 PDF
- * 路线：内存数据 → Markdown（中间产物，复用 ecMarkdownExport）→ HTML（marked）→ 浏览器打印另存为 PDF
+ *
+ * 路线 1 (ECR): 内存数据 → Markdown → HTML → iframe 打印
+ * 路线 2 (ECO): 内存数据 → 富 HTML（卡片/徽章/彩色表）→ iframe 打印
  */
 
 import { marked } from 'marked';
 import { buildEcrMarkdown, buildEcoMarkdown } from './ecMarkdownExport';
+import { ecrApi } from './api';
 
 /** 打印用 HTML 模板的样式（与构型配置 PDF 导出一致） */
 const PRINT_CSS = `
@@ -77,88 +80,211 @@ export function exportEcrPdf(detail: any, statusLogs: any[] = []): void {
 }
 
 /**
- * 导出 ECO 详情为 PDF：拉源 ECR + 叠加执行项生成 MD → HTML → 打印另存为 PDF
+ * 导出 ECO 详情为 PDF：拉源 ECR + 叠加执行项生成富 HTML → iframe 打印。
  */
-export async function exportEcoPdf(eco: any): Promise<void> {
-  const md = await buildEcoMarkdown(eco);
-  printMarkdownAsPdf(md, `${eco?.eco_number || 'ECO'}_${eco?.title || ''}`);
+
+// ─── ECO 标签字典（与 ecMarkdownExport / 页面一致）──────────────
+const R: Record<string, string> = { quality_defect:'质量缺陷',design_opt:'设计优化',cost_reduce:'成本降低',customer_req:'客户要求',supplier_change:'供应商变更',process_improve:'工艺改进',new_release:'首次发布',other:'其他' };
+const C: Record<string, string> = { design_change:'设计变更',process_change:'工艺变更',material_change:'物料变更',new_release:'新发布',other:'其他' };
+const P: Record<string, string> = { urgent:'紧急',high:'高',normal:'普通',low:'低' };
+const ES: Record<string, string> = { draft:'草稿',reviewing:'评审中',approved:'已批准',rejected:'已驳回',executing:'执行中',completed:'已完成',closed:'已关闭',returned:'退回修改' };
+const DC: Record<string, string> = { approved:'通过',rejected:'驳回',returned:'退回' };
+const ETS: Record<string, string> = { draft:'草稿',frozen:'冻结',released:'发布',obsolete:'作废' };
+const AL: Record<string, string> = { upgrade:'升版',qty_change:'数量',delete:'删除',no_change:'不变',add_existing:'新增',add_new:'新增子项' };
+const XS: Record<string, string> = { released:'已发布',frozen:'已冻结',draft:'已升版' };
+const AC: Record<string,string> = { upgrade:'upgrade',qty_change:'qty_change',delete:'delete',no_change:'no_change',add_existing:'add_existing',add_new:'add_new' };
+const ROW_BG: Record<string,string> = { upgrade:'row-blue',qty_change:'row-orange',delete:'row-red',add_existing:'row-green',add_new:'row-green' };
+
+const lb = (m:Record<string,string>,k:unknown):string => m[String(k??'')]||String(k??'')||'-';
+const dt2 = (v:unknown):string => { if(!v) return '-'; const d=new Date(v as string); return Number.isNaN(d.getTime())?String(v):d.toLocaleString('zh-CN'); };
+const hsc = (v:unknown):string => String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')||'-';
+function nxv(v:string):string { if(!v) return 'A'; const c=[...v.toUpperCase()]; let i=c.length-1; while(i>=0){ if(c[i]==='Z'){c[i]='A';i--;} else {c[i]=String.fromCharCode(c[i].charCodeAt(0)+1); return c.join('');}} return 'A'+c.join(''); }
+function rv(a:string,v:string,isUp:boolean,nv?:string):string {
+  if(nv) return nv;
+  if(isUp){ return ['upgrade','qty_change','delete'].includes(a) ? nxv(v||'A') : (v||'-'); }
+  // downward: 仅升版会变版本；删除/数量变更/新增保持原版本
+  if(a==='upgrade') return nxv(v||'A');
+  if(a==='delete') return v||'-';
+  return v||'-';
+}
+function esl(a:string,s?:string):string { if(a==='no_change') return '不变更'; return XS[s||'']||'未执行'; }
+const byc = (a:any,b:any)=>String(a.entity_code||'').localeCompare(String(b.entity_code||''),'zh-CN');
+
+function orderUpHier(items:any[]):any[] {
+  interface T { node:any; children:T[] }
+  const roots:T[]=[]; const stack:T[]=[];
+  for(const item of items){ const t:T={node:item,children:[]}; while(stack.length>0&&(stack[stack.length-1].node.level??0)>=(item.level??0))stack.pop(); if(stack.length>0)stack[stack.length-1].children.push(t); else roots.push(t); stack.push(t); }
+  const ss=(ns:T[])=>{ns.sort((a,b)=>byc(a.node,b.node));ns.forEach(n=>ss(n.children));}; ss(roots);
+  const out:any[]=[]; const w=(ns:T[])=>{for(const t of ns){out.push(t.node);w(t.children);}}; w(roots); return out;
+}
+function ecoOver(n:any,s:any):any { return {...n,action:s?.action||n.action||'no_change',_t:s?.detail?._targetQty??(n.quantity_change?.to??n.quantity??''),_d:s?.detail?._desc||n.change_description||'',_nv:s?.new_version||'',_ns:s?.new_entity_status||''}; }
+
+// ─── 富 HTML 样式（仿网页布局）──────────────────────────────────
+const ECO_HTML_CSS = `
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif;color:#1f2937;padding:20px;font-size:12px;line-height:1.5}
+.header{border-bottom:1px solid #e5e7eb;padding-bottom:14px;margin-bottom:16px}
+.header h1{font-size:18px;margin-bottom:4px}
+.header .t{color:#6b7280;font-size:13px}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;margin-left:6px;vertical-align:middle}
+.bg-b{background:#dbeafe;color:#1d4ed8}.bg-g{background:#dcfce7;color:#15803d}
+.bg-o{background:#ffedd5;color:#c2410c}.bg-r{background:#fee2e2;color:#b91c1c}
+.bg-gr{background:#f3f4f6;color:#4b5563}.bg-p{background:#f3e8ff;color:#7c3aed}
+.section{margin-bottom:18px}
+.section h2{font-size:14px;border-bottom:1px solid #e5e7eb;padding-bottom:4px;margin-bottom:10px;color:#374151}
+.info-g{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.info-c{background:#f9fafb;border:1px solid #f3f4f6;border-radius:6px;padding:8px 10px}
+.info-c label{display:block;font-size:10px;color:#9ca3af;margin-bottom:2px}
+.info-c .v{font-size:12px;font-weight:500;word-break:break-word}
+.desc{background:#f9fafb;border:1px solid #f3f4f6;border-radius:6px;padding:10px;font-size:12px;white-space:pre-wrap;color:#374151}
+table{width:100%;border-collapse:collapse;margin:8px 0}
+th,td{border:1px solid #e5e7eb;padding:5px 8px;text-align:left;vertical-align:top;font-size:11px}
+th{background:#f3f4f6;font-weight:600;color:#6b7280}
+tr{page-break-inside:avoid}
+.row-blue{background:#eff6ff}.row-orange{background:#fff7ed}.row-red{background:#fef2f2}.row-green{background:#f0fdf4}
+.cc-list{display:flex;flex-wrap:wrap;gap:6px}.cc-b{background:#f3e8ff;color:#7c3aed;padding:2px 8px;border-radius:4px;font-size:11px}
+.log-i{padding:4px 8px;background:#f9fafb;border-radius:4px;margin-bottom:3px;font-size:10px}
+.log-i .t{color:#9ca3af}
+.bom-card{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin-bottom:12px}
+.bom-card h3{font-size:13px;margin-bottom:8px;color:#374151}
+.bom-card h4{font-size:11px;margin:10px 0 4px;color:#6b7280}
+.footer{margin-top:20px;padding-top:10px;border-top:1px solid #e5e7eb;color:#9ca3af;font-size:10px}
+.b1{font-weight:600}
+@page{size:A4 landscape;margin:10mm}
+@media print{body{padding:0}}
+`;
+
+function htag(cls:string,text:string):string { return `<span class="badge ${cls}">${hsc(text)}</span>`; }
+function acTag(a:string):string { const m:Record<string,[string,string]>={ upgrade:['bg-b','升版'],qty_change:['bg-o','数量'],delete:['bg-r','删除'],no_change:['bg-gr','不变'],add_existing:['bg-g','新增'],add_new:['bg-g','新增子项'] }; const [c,l]=m[a]||['bg-gr',lb(AL,a)]; return htag(c,l); }
+
+// ─── 构建 ECO 富 HTML ──────────────────────────────────────────
+async function buildEcoHtml(eco:any):Promise<string> {
+  const e=eco||{}; const p: string[]=[];
+  const esBadge = (s:string) => { const m:Record<string,string>={draft:'bg-gr',reviewing:'bg-b',approved:'bg-g',rejected:'bg-r',executing:'bg-o',completed:'bg-g',closed:'bg-r',returned:'bg-o'}; return htag(m[s]||'bg-gr',lb(ES,s)); };
+  const pBadge = (v:string) => { const m:Record<string,string>={urgent:'bg-r',high:'bg-o',normal:'bg-b',low:'bg-gr'}; return htag(m[v]||'bg-gr',lb(P,v)); };
+
+  // Header
+  p.push(`<div class="header"><h1>${hsc(e.eco_number||'ECO')} ${esBadge(e.status)} ${pBadge(e.priority)}</h1><div class="t">${hsc(e.title||'')}</div></div>`);
+
+  // 基本信息
+  p.push(`<div class="section"><h2>基本信息</h2><div class="info-g">`);
+  p.push(`<div class="info-c"><label>变更原因</label><div class="v">${hsc(lb(R,e.reason))}</div></div>`);
+  p.push(`<div class="info-c"><label>变更类别</label><div class="v">${hsc(lb(C,e.category))}</div></div>`);
+  p.push(`<div class="info-c"><label>优先级</label><div class="v">${lb(P,e.priority)}</div></div>`);
+  p.push(`<div class="info-c"><label>审批模式</label><div class="v">${e.review_mode==='all'?'会签':e.review_mode==='any'?'或签':'-'}</div></div>`);
+  p.push(`<div class="info-c"><label>创建人</label><div class="v">${hsc(e.creator_name||'-')}</div></div>`);
+  p.push(`<div class="info-c"><label>来源 ECR</label><div class="v">${hsc(e.ecr_number||'独立创建')}</div></div>`);
+  p.push(`<div class="info-c"><label>执行进度</label><div class="v">${e.execution_completed_count??0}/${e.execution_count??(e.execution_items?.length??0)}</div></div>`);
+  p.push(`<div class="info-c"><label>创建时间</label><div class="v">${dt2(e.created_at)}</div></div>`);
+  p.push(`<div class="info-c"><label>更新时间</label><div class="v">${dt2(e.updated_at)}</div></div>`);
+  p.push(`</div></div>`);
+
+  // 变更描述
+  if(e.description){ p.push(`<div class="section"><h2>变更描述</h2><div class="desc">${hsc(e.description)}</div></div>`); }
+
+  // 审批进度
+  const reviewers:any[]=e.reviewers||[];
+  if(reviewers.length>0){
+    const rm=new Map<string,any>(); for(const r of e.review_records||[]) rm.set(String(r.reviewer_id),r);
+    p.push(`<div class="section"><h2>审批进度（${e.approved_count||0}/${e.reviewers_count||reviewers.length} 已审批）</h2>`);
+    p.push(`<table><thead><tr><th>顺序</th><th>审批人</th><th>结果</th><th>意见</th><th>时间</th></tr></thead><tbody>`);
+    for(const r of reviewers.slice().sort((a:any,b:any)=>(a.seq??0)-(b.seq??0))){
+      const rec=rm.get(String(r.user_id));
+      const d=rec?lb(DC,rec.decision):'待审批';
+      p.push(`<tr><td>${r.seq??'-'}</td><td>${hsc(r.user_name||'-')}</td><td class="b1">${hsc(d)}</td><td>${hsc(rec?.comment||'')}</td><td>${rec?dt2(rec.created_at):'-'}</td></tr>`);
+    }
+    p.push(`</tbody></table></div>`);
+  }
+
+  // 关联图文档
+  const docs:any[]=e.document_links||[];
+  if(docs.length>0){
+    p.push(`<div class="section"><h2>关联图文档</h2><table><thead><tr><th>图文档编号</th><th>名称</th><th>版本</th></tr></thead><tbody>`);
+    for(const d of docs) p.push(`<tr><td>${hsc(d.document_code||d.document?.code||'-')}</td><td>${hsc(d.document_name||d.document?.name||'-')}</td><td>${hsc(d.document_version||d.document?.version||'-')}</td></tr>`);
+    p.push(`</tbody></table></div>`);
+  }
+
+  // 知会人
+  const cc:any[]=e.cc_users||[];
+  if(cc.length>0){ p.push(`<div class="section"><h2>知会用户</h2><div class="cc-list">${cc.map((c:any)=>`<span class="cc-b">${hsc(c.user_name)}</span>`).join('')}</div></div>`); }
+
+  // ECR 变更分析
+  const execItems:any[]=e.execution_items||[];
+  let ecrData:any=null;
+  if(e.ecr_id){ try{ecrData=(await ecrApi.get(e.ecr_id)).data;}catch{ecrData=null;} }
+  if(ecrData&&(ecrData.affected_items||[]).length>0){
+    const sm=new Map<string,any>();
+    for(const ei of execItems){ const aff=ei.detail?._affectedCode||''; const k=ei.entity_id||ei.entity_code; if(!k)continue; sm.set(k+'|'+aff,ei); if(!aff)sm.set(String(k),ei); }
+    const lk=(n:any,af:string)=>sm.get((n.entity_id||n.entity_code||'')+'|'+(af||''))||sm.get(n.entity_id)||sm.get(n.entity_code);
+    const uk=new Set<string>();
+    p.push(`<div class="section"><h2>ECR 变更分析（${hsc(e.ecr_number||ecrData.ecr_number||'ECR')}）</h2>`);
+    for(const ai of ecrData.affected_items||[]){
+      const bi=ai.bom_impact||{};
+      const up=(bi.upward_chain||[]).filter((n:any)=>(n.level??0)>0).map((n:any)=>{const s=lk(n,ai.entity_code);if(s)uk.add((s.entity_id||s.entity_code)+'|'+(s.detail?._affectedCode||''));return ecoOver(n,s);});
+      const down=(bi.downward_items||[]).map((n:any)=>{const s=lk(n,ai.entity_code);if(s)uk.add((s.entity_id||s.entity_code)+'|'+(s.detail?._affectedCode||''));return ecoOver(n,s);});
+      for(const ei of execItems){ if(!['qty_change','delete','add_existing','add_new'].includes(ei.action))continue; if((ei.detail?._affectedCode||'')!==ai.entity_code)continue; const k2=(ei.entity_id||ei.entity_code)+'|'+(ei.detail?._affectedCode||''); if(uk.has(k2))continue; uk.add(k2); down.push({entity_type:ei.entity_type,entity_code:ei.entity_code,entity_name:ei.entity_name,entity_version:ei.entity_version||'',action:ei.action,_t:ei.detail?._targetQty??'',_d:ei.detail?._desc||'',_nv:ei.new_version||'',_ns:ei.new_entity_status||''}); }
+      const uo=orderUpHier(up); down.sort(byc);
+      const tl = ai.entity_type === 'part' ? '零件' : '部件';
+      p.push(`<div class="bom-card"><h3>📦 ${hsc(ai.entity_code)} ${hsc(ai.entity_name||'')} v${hsc(ai.entity_version||'')}（${tl}）</h3>`);
+      // 受影响物料本身
+      const affExec = lk(ai, ai.entity_code);
+      const affNv = affExec?.new_version || '';
+      p.push(`<table style="margin-bottom:10px"><thead><tr><th style="width:20%">件号</th><th style="width:40%">名称</th><th style="width:20%">当前版本</th><th style="width:20%">变更后版本</th></tr></thead><tbody>`);
+      p.push(`<tr><td>${hsc(ai.entity_code)}</td><td>${hsc(ai.entity_name||'')}</td><td>${hsc(ai.entity_version||'-')}</td><td style="color:#2563eb;font-weight:600">${affNv||nxv(ai.entity_version||'A')}</td></tr>`);
+      p.push(`</tbody></table>`);
+      if(uo.length>0){
+        p.push(`<h4>📊 向上溯源链</h4>`);
+        p.push(`<table><thead><tr><th>层级</th><th>类型</th><th>件号</th><th>名称</th><th>原版本</th><th>动作</th><th>原数量</th><th>目标数量</th><th>说明</th><th>执行后版本</th><th>变更状态</th></tr></thead><tbody>`);
+        for(const n of uo) p.push(`<tr class="${ROW_BG[n.action]||''}"><td>${n.level??'-'}</td><td>${n.entity_type==='part'?'零件':'部件'}</td><td>${hsc(n.entity_code)}</td><td>${hsc(n.entity_name)}</td><td>${hsc(n.entity_version)}</td><td>${acTag(n.action||'no_change')}</td><td>${n.quantity??'-'}</td><td>${n._t??'-'}</td><td>${hsc(n._d||'')}</td><td>${rv(n.action,n.entity_version,true,n._nv)}</td><td>${hsc(esl(n.action,n._ns))}</td></tr>`);
+        p.push(`</tbody></table>`);
+      }
+      if(down.length>0){
+        p.push(`<h4>📋 向下子项</h4>`);
+        p.push(`<table><thead><tr><th>类型</th><th>件号</th><th>名称</th><th>原版本</th><th>动作</th><th>原数量</th><th>目标数量</th><th>说明</th><th>执行后版本</th><th>变更状态</th></tr></thead><tbody>`);
+        for(const n of down) p.push(`<tr class="${ROW_BG[n.action]||''}"><td>${n.entity_type==='part'?'零件':'部件'}</td><td>${hsc(n.entity_code)}</td><td>${hsc(n.entity_name)}</td><td>${hsc(n.entity_version||'-')}</td><td>${acTag(n.action||'no_change')}</td><td>${n.quantity??'-'}</td><td>${n._t??'-'}</td><td>${hsc(n._d||'')}</td><td>${rv(n.action,n.entity_version,false,n._nv)}</td><td>${hsc(esl(n.action,n._ns))}</td></tr>`);
+        p.push(`</tbody></table>`);
+      }
+      if(uo.length===0&&down.length===0) p.push(`<div style="color:#9ca3af;font-size:11px">无影响链节点</div>`);
+      p.push(`</div>`);
+    }
+  }
+
+  // 工程变更结果
+  const ri:any[]=e.release_items||[];
+  if(ri.length>0){
+    p.push(`<div class="section"><h2>工程变更结果</h2><table><thead><tr><th>类型</th><th>件号</th><th>名称</th><th>规格型号</th><th>版本</th><th>状态</th><th>用量</th></tr></thead><tbody>`);
+    for(const r of ri) p.push(`<tr><td>${r.entity_type==='assembly'?'部件':'零件'}</td><td>${hsc(r.entity_code)}</td><td>${hsc(r.entity_name)}</td><td>${hsc(r.spec||'-')}</td><td>${hsc(r.entity_version||'A')}</td><td>${hsc(lb(ETS,r.status))}</td><td>${r.quantity??1}</td></tr>`);
+    p.push(`</tbody></table></div>`);
+  }
+
+  // 状态日志
+  const logs:any[]=e.status_logs||[];
+  if(logs.length>0){
+    p.push(`<div class="section"><h2>状态日志</h2>`);
+    for(const l of logs) p.push(`<div class="log-i"><span class="t">${dt2(l.created_at)}</span> ${hsc(l.from_status||'-')} → <b>${hsc(lb(ES,l.to_status))}</b> by ${hsc(l.operator_name)} ${l.comment?`—— ${hsc(l.comment)}`:''}</div>`);
+    p.push(`</div>`);
+  }
+
+  p.push(`<div class="footer">导出时间：${new Date().toLocaleString('zh-CN')}</div>`);
+  return '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>' + hsc(`${e.eco_number||'ECO'}_${e.title||''}`) + '</title><style>' + ECO_HTML_CSS + '</style></head><body>' + p.join('\n') + '</body></html>';
 }
 
-/**
- * 复刻详情界面：原地打印「实时、已渲染、已应用样式」的详情 DOM（不克隆、不移动 → 不会空白、样式一致）。
- * 打印时用 @media print：隐藏目标以外的一切；同时「解包」目标的祖先链（去掉弹窗的 fixed 定位、
- * 居中、max-height/overflow 裁剪、transform 等），让内容回到正常文档流 —— 从页首顶格、跨多页正常分页。
- * 所见即所得（含当前展开的溯源层级）；按钮等交互元素打印时隐藏（不改动 DOM 结构）。
- */
-export function exportDetailDomPdf(rootEl: HTMLElement, title: string, landscape = true): void {
-  const prevTitle = document.title;
-  if (title) document.title = title;  // 影响打印页眉与「另存为 PDF」默认文件名
+/** 导出 ECO 详情为 PDF：生成富 HTML → 隐藏 iframe 打印 */
+export async function exportEcoPdf(eco: any): Promise<void> {
+  const html = await buildEcoHtml(eco);
+  const title = `${eco?.eco_number || 'ECO'}_${eco?.title || ''}`;
 
-  // 标记目标 + 其所有祖先（到 body 为止）
-  rootEl.setAttribute('data-pdf-root', '');
-  const ancestors: HTMLElement[] = [];
-  let el = rootEl.parentElement;
-  while (el && el !== document.body) {
-    el.setAttribute('data-pdf-ancestor', '');
-    ancestors.push(el);
-    el = el.parentElement;
-  }
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed'; iframe.style.right = '0'; iframe.style.bottom = '0';
+  iframe.style.width = '0'; iframe.style.height = '0'; iframe.style.border = '0';
+  document.body.appendChild(iframe);
 
-  // 沿祖先链把「路径之外」的兄弟节点用 display:none 移出布局，
-  // 这样不会再留下空白占位（visibility:hidden 会保留占位，导致首页空白+顶部大段留白）。
-  const onPath = new Set<Element>([rootEl, ...ancestors]);
-  const hidden: HTMLElement[] = [];
-  let cur: HTMLElement | null = rootEl;
-  while (cur && cur !== document.body) {
-    const p: HTMLElement | null = cur.parentElement;
-    if (!p) break;
-    Array.from(p.children).forEach((sib: Element) => {
-      if (!onPath.has(sib)) {
-        (sib as HTMLElement).setAttribute('data-pdf-hidden', '');
-        hidden.push(sib as HTMLElement);
-      }
-    });
-    cur = p;
-  }
+  const doc = iframe.contentWindow?.document;
+  if (!doc) { iframe.parentNode?.removeChild(iframe); throw new Error('无法创建打印文档'); }
 
-  const style = document.createElement('style');
-  style.setAttribute('data-print-style', '');
-  style.textContent = `
-    @media print {
-      /* 路径之外的内容移出布局，避免空白占位 */
-      [data-pdf-hidden] { display: none !important; }
-      /* 解包祖先链：去掉 fixed/居中/裁剪/阴影/限宽，让内容从页首正常铺排、跨页分页 */
-      [data-pdf-ancestor] {
-        position: static !important; display: block !important;
-        max-height: none !important; max-width: none !important; height: auto !important; width: auto !important;
-        overflow: visible !important; transform: none !important;
-        margin: 0 !important; padding: 0 !important;
-        background: #fff !important; box-shadow: none !important; border: 0 !important; border-radius: 0 !important;
-      }
-      [data-pdf-root] { max-height: none !important; overflow: visible !important; }
-      /* 隐藏交互元素（导出/操作/展开钮） */
-      [data-pdf-root] button { display: none !important; }
-      tr { page-break-inside: avoid; }
-      @page { size: A4 ${landscape ? 'landscape' : 'portrait'}; margin: 10mm; }
-    }
-  `;
-  document.head.appendChild(style);
+  const cleanup = () => { setTimeout(() => { if (iframe.parentNode) iframe.parentNode.removeChild(iframe); }, 1000); };
 
-  let done = false;
-  const cleanup = () => {
-    if (done) return;
-    done = true;
-    rootEl.removeAttribute('data-pdf-root');
-    ancestors.forEach((a) => a.removeAttribute('data-pdf-ancestor'));
-    hidden.forEach((h) => h.removeAttribute('data-pdf-hidden'));
-    if (style.parentNode) style.parentNode.removeChild(style);
-    document.title = prevTitle;
-    window.removeEventListener('afterprint', cleanup);
-  };
-  window.addEventListener('afterprint', cleanup);
-
-  // 等一帧让打印样式生效后再唤起打印对话框
-  setTimeout(() => window.print(), 80);
-  // 兜底清理（个别浏览器不触发 afterprint）
-  setTimeout(cleanup, 60000);
+  doc.open(); doc.write(html); doc.close();
+  iframe.contentWindow!.onafterprint = cleanup;
+  setTimeout(() => { iframe.contentWindow!.focus(); iframe.contentWindow!.print(); cleanup(); }, 400);
 }
