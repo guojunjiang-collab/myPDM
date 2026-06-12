@@ -28,7 +28,10 @@ export function ModelLoader({ url }: ModelLoaderProps) {
   useEffect(() => {
     if (!gltf?.scene || !groupRef.current) return;
 
-    // 1) 每个 mesh 独立材质，避免隔离透明时共享材质互相影响
+    // 1) 每个 mesh 独立材质，避免隔离透明时共享材质互相影响。
+    // 注意：这会就地修改 useLoader 缓存的 gltf.scene 材质（按 url 缓存），
+    // 同一模型的其他消费者(如 PartHighlighter)将看到 clone 后的材质。
+    // 高亮/隔离 useEffect 依赖此步先于其执行——二者同一次挂载内按声明顺序运行。
     gltf.scene.traverse((child) => {
       const m = child as THREE.Mesh;
       if (m.isMesh && m.material && !Array.isArray(m.material)) {
@@ -65,12 +68,15 @@ export function ModelLoader({ url }: ModelLoaderProps) {
     groupRef.current.traverse((child) => {
       const mesh = child as THREE.Mesh;
       if (!mesh.isMesh) return;
+
+      // 显隐不依赖材质，先处理，使多材质 mesh 也能正常隐藏/显示
+      mesh.visible = !hiddenParts.has(mesh.uuid);
+
       const mat = mesh.material;
-      if (Array.isArray(mat)) return;
+      if (Array.isArray(mat)) return; // 多材质 mesh：跳过高亮/隔离/线框样式
       const std = mat as THREE.MeshStandardMaterial;
 
       std.wireframe = wireframe;
-      mesh.visible = !hiddenParts.has(mesh.uuid);
 
       if (!sel) {
         if (std.emissive) { std.emissive.setHex(0x000000); std.emissiveIntensity = 0; }
