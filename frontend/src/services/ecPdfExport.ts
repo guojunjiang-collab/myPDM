@@ -71,12 +71,117 @@ function printMarkdownAsPdf(md: string, title: string): void {
   }, 200);
 }
 
-/**
- * 导出 ECR 详情为 PDF：生成 MD → HTML → 打印另存为 PDF
- */
+// ─── ECR 标签字典 ──────────────────────────────────────────────
+const ECR_ST: Record<string,string> = { draft:'草稿',created:'创建',submitted:'提交评审',reviewing:'审核中',approved:'审批通过',rejected:'审批驳回',returned:'退回修改',closed:'关闭' };
+const ECR_RV: Record<string,string> = { all:'会签',any:'或签' };
+
+const de = (v:unknown):string => { if(!v)return '-'; const d=new Date(v as string); return Number.isNaN(d.getTime())?String(v):d.toLocaleString('zh-CN'); };
+
+/** 导出 ECR 详情为 PDF：生成富 HTML → 隐藏 iframe 打印 */
 export function exportEcrPdf(detail: any, statusLogs: any[] = []): void {
-  const md = buildEcrMarkdown(detail, statusLogs);
-  printMarkdownAsPdf(md, `${detail?.ecr_number || 'ECR'}_${detail?.title || ''}`);
+  const d = detail || {};
+  const logs = statusLogs && statusLogs.length > 0 ? statusLogs : (d.status_logs || []);
+  const html = buildEcrHtml(d, logs);
+  const title = `${d.ecr_number || 'ECR'}_${d.title || ''}`;
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed'; iframe.style.right = '0'; iframe.style.bottom = '0';
+  iframe.style.width = '0'; iframe.style.height = '0'; iframe.style.border = '0';
+  document.body.appendChild(iframe);
+  const doc = iframe.contentWindow?.document;
+  if (!doc) { iframe.parentNode?.removeChild(iframe); throw new Error('无法创建打印文档'); }
+  const cleanup = () => { setTimeout(() => { if (iframe.parentNode) iframe.parentNode.removeChild(iframe); }, 1000); };
+  doc.open(); doc.write(html); doc.close();
+  iframe.contentWindow!.onafterprint = cleanup;
+  setTimeout(() => { iframe.contentWindow!.focus(); iframe.contentWindow!.print(); cleanup(); }, 400);
+}
+
+function buildEcrHtml(d:any, logs:any[]): string {
+  const p:string[]=[];
+  const esBadge = (s:string) => { const m:Record<string,string>={draft:'bg-gr',created:'bg-b',submitted:'bg-o',reviewing:'bg-b',approved:'bg-g',rejected:'bg-r',returned:'bg-o',closed:'bg-gr'}; return htag(m[s]||'bg-gr',lb(ECR_ST,s)); };
+  const pBadge = (v:string) => { const m:Record<string,string>={urgent:'bg-r',high:'bg-o',normal:'bg-b',low:'bg-gr'}; return htag(m[v]||'bg-gr',lb(P,v)); };
+
+  p.push(`<div class="header"><h1>${hsc(d.ecr_number||'ECR')} ${esBadge(d.status)} ${pBadge(d.priority)}</h1><div class="t">${hsc(d.title||'')}</div></div>`);
+
+  // 基本信息
+  p.push(`<div class="section"><h2>基本信息</h2><div class="info-g">`);
+  p.push(`<div class="info-c"><label>变更原因</label><div class="v">${hsc(lb(R,d.reason))}</div></div>`);
+  p.push(`<div class="info-c"><label>变更类别</label><div class="v">${hsc(lb(C,d.category))}</div></div>`);
+  p.push(`<div class="info-c"><label>优先级</label><div class="v">${lb(P,d.priority)}</div></div>`);
+  p.push(`<div class="info-c"><label>审批模式</label><div class="v">${hsc(lb(ECR_RV,d.review_mode))}</div></div>`);
+  p.push(`<div class="info-c"><label>创建人</label><div class="v">${hsc(d.creator_name||'-')}</div></div>`);
+  p.push(`<div class="info-c"><label>创建时间</label><div class="v">${de(d.created_at)}</div></div>`);
+  p.push(`<div class="info-c"><label>更新时间</label><div class="v">${de(d.updated_at)}</div></div>`);
+  p.push(`<div class="info-c"><label>审批时间</label><div class="v">${de(d.reviewed_at)}</div></div>`);
+  p.push(`</div></div>`);
+
+  if(d.description){ p.push(`<div class="section"><h2>变更描述</h2><div class="desc">${hsc(d.description)}</div></div>`); }
+
+  // 审批进度
+  const reviewers:any[]=d.reviewers||[];
+  if(reviewers.length>0){
+    const rm=new Map<string,any>(); for(const r of d.review_records||[]) rm.set(String(r.reviewer_id),r);
+    p.push(`<div class="section"><h2>审批进度（${d.approved_count||0}/${d.reviewers_count||reviewers.length} 已审批）</h2>`);
+    p.push(`<table><thead><tr><th>顺序</th><th>审批人</th><th>结果</th><th>意见</th><th>时间</th></tr></thead><tbody>`);
+    for(const r of reviewers.slice().sort((a:any,b:any)=>(a.seq??0)-(b.seq??0))){
+      const rec=rm.get(String(r.user_id));
+      const dl=rec?lb(DC,rec.decision):'待审批';
+      p.push(`<tr><td>${r.seq??'-'}</td><td>${hsc(r.user_name||'-')}</td><td class="b1">${hsc(dl)}</td><td>${hsc(rec?.comment||'')}</td><td>${rec?de(rec.created_at):'-'}</td></tr>`);
+    }
+    p.push(`</tbody></table></div>`);
+  }
+
+  // 关联图文档
+  const docs:any[]=d.document_links||[];
+  if(docs.length>0){
+    p.push(`<div class="section"><h2>关联图文档</h2><table><thead><tr><th>图文档编号</th><th>名称</th><th>版本</th></tr></thead><tbody>`);
+    for(const dl of docs) p.push(`<tr><td>${hsc(dl.document_code||dl.document?.code||'-')}</td><td>${hsc(dl.document_name||dl.document?.name||'-')}</td><td>${hsc(dl.document_version||dl.document?.version||'-')}</td></tr>`);
+    p.push(`</tbody></table></div>`);
+  }
+
+  // 知会人
+  const cc:any[]=d.cc_users||[];
+  if(cc.length>0){ p.push(`<div class="section"><h2>知会用户</h2><div class="cc-list">${cc.map((c:any)=>`<span class="cc-b">${hsc(c.user_name)}</span>`).join('')}</div></div>`); }
+
+  // 受影响物料 + BOM 影响分析
+  const affected:any[]=d.affected_items||[];
+  if(affected.length>0){
+    p.push(`<div class="section"><h2>受影响物料（${affected.length}）</h2>`);
+    for(const ai of affected){
+      const bi=ai.bom_impact||{};
+      const up:any[]=(bi.upward_chain||[]).filter((n:any)=>(n.level??0)>0);
+      const down:any[]=bi.downward_items||[];
+      const tl=ai.entity_type==='part'?'零件':'部件';
+      p.push(`<div class="bom-card"><h3>📦 ${hsc(ai.entity_code)} ${hsc(ai.entity_name||'')} v${hsc(ai.entity_version||'')}（${tl}）</h3>`);
+      // 受影响物料本身
+      p.push(`<table style="margin-bottom:10px"><thead><tr><th style="width:20%">件号</th><th style="width:40%">名称</th><th style="width:20%">当前版本</th><th style="width:20%">变更</th></tr></thead><tbody>`);
+      p.push(`<tr><td>${hsc(ai.entity_code)}</td><td>${hsc(ai.entity_name||'')}</td><td>${hsc(ai.entity_version||'-')}</td><td style="color:#2563eb;font-weight:600">${ai.change_type?lb(AL,ai.change_type):'-'}</td></tr>`);
+      p.push(`</tbody></table>`);
+      if(up.length>0){
+        p.push(`<h4>📊 向上溯源链</h4>`);
+        p.push(`<table><thead><tr><th>层级</th><th>类型</th><th>件号</th><th>名称</th><th>版本</th><th>动作</th><th>数量</th><th>目标数量</th><th>说明</th></tr></thead><tbody>`);
+        for(const n of up) p.push(`<tr class="${ROW_BG[n.action]||''}"><td>${n.level!=null?'-'.repeat(n.level)+n.level:'-'}</td><td>${n.entity_type==='part'?'零件':'部件'}</td><td>${hsc(n.entity_code)}</td><td>${hsc(n.entity_name)}</td><td>${hsc(n.entity_version)}</td><td>${acTag(n.action||'no_change')}</td><td>${n.quantity??'-'}</td><td>${n.quantity_change?.to??n.quantity??'-'}</td><td>${hsc(n.change_description||'')}</td></tr>`);
+        p.push(`</tbody></table>`);
+      }
+      if(down.length>0){
+        p.push(`<h4>📋 向下子项</h4>`);
+        p.push(`<table><thead><tr><th>类型</th><th>件号</th><th>名称</th><th>版本</th><th>动作</th><th>数量</th><th>目标数量</th><th>说明</th></tr></thead><tbody>`);
+        for(const n of down) p.push(`<tr class="${ROW_BG[n.action]||''}"><td>${n.entity_type==='part'?'零件':'部件'}</td><td>${hsc(n.entity_code)}</td><td>${hsc(n.entity_name)}</td><td>${hsc(n.entity_version)}</td><td>${acTag(n.action||'no_change')}</td><td>${n.quantity??'-'}</td><td>${n.quantity_change?.to??n.quantity??'-'}</td><td>${hsc(n.change_description||'')}</td></tr>`);
+        p.push(`</tbody></table>`);
+      }
+      if(up.length===0&&down.length===0) p.push(`<div style="color:#9ca3af;font-size:11px">无影响链节点</div>`);
+      p.push(`</div>`);
+    }
+  }
+
+  // 状态日志
+  if(logs.length>0){
+    p.push(`<div class="section"><h2>状态日志</h2>`);
+    for(const l of logs) p.push(`<div class="log-i"><span class="t">${de(l.created_at)}</span> ${hsc(l.from_status||'-')} → <b>${hsc(lb(ECR_ST,l.to_status))}</b> by ${hsc(l.operator_name)} ${l.comment?`—— ${hsc(l.comment)}`:''}</div>`);
+    p.push(`</div>`);
+  }
+
+  p.push(`<div class="footer">导出时间：${new Date().toLocaleString('zh-CN')}</div>`);
+  return '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>' + hsc(`${d.ecr_number||'ECR'}_${d.title||''}`) + '</title><style>' + ECO_HTML_CSS + '</style></head><body>' + p.join('\n') + '</body></html>';
 }
 
 /**
@@ -235,7 +340,7 @@ async function buildEcoHtml(eco:any):Promise<string> {
       if(uo.length>0){
         p.push(`<h4>📊 向上溯源链</h4>`);
         p.push(`<table><thead><tr><th>层级</th><th>类型</th><th>件号</th><th>名称</th><th>原版本</th><th>动作</th><th>原数量</th><th>目标数量</th><th>说明</th><th>执行后版本</th><th>变更状态</th></tr></thead><tbody>`);
-        for(const n of uo) p.push(`<tr class="${ROW_BG[n.action]||''}"><td>${n.level??'-'}</td><td>${n.entity_type==='part'?'零件':'部件'}</td><td>${hsc(n.entity_code)}</td><td>${hsc(n.entity_name)}</td><td>${hsc(n.entity_version)}</td><td>${acTag(n.action||'no_change')}</td><td>${n.quantity??'-'}</td><td>${n._t??'-'}</td><td>${hsc(n._d||'')}</td><td>${rv(n.action,n.entity_version,true,n._nv)}</td><td>${hsc(esl(n.action,n._ns))}</td></tr>`);
+        for(const n of uo) p.push(`<tr class="${ROW_BG[n.action]||''}"><td>${n.level!=null?'-'.repeat(n.level)+n.level:'-'}</td><td>${n.entity_type==='part'?'零件':'部件'}</td><td>${hsc(n.entity_code)}</td><td>${hsc(n.entity_name)}</td><td>${hsc(n.entity_version)}</td><td>${acTag(n.action||'no_change')}</td><td>${n.quantity??'-'}</td><td>${n._t??'-'}</td><td>${hsc(n._d||'')}</td><td>${rv(n.action,n.entity_version,true,n._nv)}</td><td>${hsc(esl(n.action,n._ns))}</td></tr>`);
         p.push(`</tbody></table>`);
       }
       if(down.length>0){

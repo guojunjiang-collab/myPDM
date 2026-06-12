@@ -191,7 +191,15 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
 
   return (
     <>
-    <Modal open={true} title={executionMode ? 'ECO 执行' : 'ECO 详情'} onClose={onClose} width="3xl">
+    <Modal open={true} title={executionMode ? 'ECO 执行' : 'ECO 详情'} onClose={onClose} width="3xl"
+      headerAction={eco && canDownload() ? (
+        <button
+          onClick={() => { if (eco) exportEcoPdf(eco).catch(() => toast.error('导出失败')); }}
+          className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
+          title="导出为 PDF 文档"
+        >📄 导出PDF</button>
+      ) : undefined}
+    >
       {loading ? <div className="py-8 text-center text-gray-400 text-sm">加载中...</div>
       : !eco ? <div className="py-8 text-center text-gray-400 text-sm">未找到 ECO</div>
       : (
@@ -206,15 +214,6 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
             <div className="flex items-center gap-2">
               <ECOStatusBadge status={eco.status} />
               <ECOPriorityBadge priority={eco.priority} />
-              {canDownload() && (
-                <button
-                   onClick={() => { if (eco) exportEcoPdf(eco).catch(() => toast.error('导出失败')); }}
-                  className="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
-                  title="导出为 PDF 文档（复刻当前详情界面，打印另存为 PDF）"
-                >
-                  📄 导出PDF
-                </button>
-              )}
             </div>
           </div>
 

@@ -88,7 +88,7 @@ def _build_eco_detail(db: Session, eco: ECO) -> dict:
             "id": str(ei.id), "source": ei.source, "entity_type": ei.entity_type,
             "entity_id": str(ei.entity_id) if ei.entity_id else None,
             "entity_code": ei.entity_code or "", "entity_name": ei.entity_name,
-            "entity_version": entity_version or ei.entity_version or "",
+            "entity_version": entity_version or "",
             "action": ei.action, "status": ei.status, "detail": ei.detail or {},
             "new_entity_id": str(ei.new_entity_id) if ei.new_entity_id else None,
             "new_version": ei.new_version,
