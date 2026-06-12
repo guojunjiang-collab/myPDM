@@ -8,9 +8,6 @@ export interface ViewerState {
   errorMessage: string;
 
   // 零件交互
-  selectedPartId: string | null;
-  highlightedPartId: string | null;
-  visibleParts: Set<string>;
 
   // 装配树
   treeData: TreeNode | null;
@@ -27,14 +24,14 @@ export interface ViewerState {
   measureMode: 'off' | 'distance' | 'angle';
   explodeDistance: number;
   wireframe: boolean;
+  cameraMode: 'orthographic' | 'perspective';
+  viewTarget: string | null;
+  cameraDir: [number, number, number];
 
   // Actions
   setModelUrl: (url: string | null) => void;
   setModelScale: (s: number) => void;
   setLoadingState: (state: ViewerState['loadingState'], msg?: string) => void;
-  selectPart: (id: string | null) => void;
-  highlightPart: (id: string | null) => void;
-  togglePartVisibility: (id: string) => void;
   setTreeData: (t: TreeNode | null) => void;
   selectNode: (id: string | null) => void;
   selectByMesh: (meshUuid: string) => void;
@@ -46,6 +43,8 @@ export interface ViewerState {
   setMeasureMode: (mode: ViewerState['measureMode']) => void;
   setExplodeDistance: (d: number) => void;
   toggleWireframe: () => void;
+  toggleCameraMode: () => void;
+  setViewTarget: (view: string | null) => void;
   reset: () => void;
 }
 
@@ -53,9 +52,6 @@ const initialState = {
   modelUrl: null as string | null,
   loadingState: 'idle' as const,
   errorMessage: '',
-  selectedPartId: null as string | null,
-  highlightedPartId: null as string | null,
-  visibleParts: new Set<string>(),
   treeData: null as TreeNode | null,
   nodeMap: new Map<string, TreeNode>(),
   meshOwner: new Map<string, TreeNode>(),
@@ -68,6 +64,9 @@ const initialState = {
   measureMode: 'off' as const,
   explodeDistance: 0,
   wireframe: false,
+  cameraMode: 'orthographic' as const,
+  viewTarget: null as string | null,
+  cameraDir: [0, 0, 1] as [number, number, number],
 };
 
 export const useViewerStore = create<ViewerState>((set, get) => ({
@@ -77,16 +76,6 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   setModelScale: (s) => set({ modelScale: s }),
   setLoadingState: (state, msg = '') =>
     set({ loadingState: state, errorMessage: msg }),
-
-  selectPart: (id) => set({ selectedPartId: id }),
-  highlightPart: (id) => set({ highlightedPartId: id }),
-
-  togglePartVisibility: (id) => {
-    const visible = new Set(get().visibleParts);
-    if (visible.has(id)) visible.delete(id);
-    else visible.add(id);
-    set({ visibleParts: visible });
-  },
 
   setTreeData: (t) => {
     const nodeMap = new Map<string, TreeNode>();
@@ -148,11 +137,12 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   setMeasureMode: (mode) => set({ measureMode: mode }),
   setExplodeDistance: (d) => set({ explodeDistance: d }),
   toggleWireframe: () => set({ wireframe: !get().wireframe }),
+  toggleCameraMode: () => set({ cameraMode: get().cameraMode === 'orthographic' ? 'perspective' : 'orthographic' }),
+  setViewTarget: (view) => set({ viewTarget: view }),
 
   reset: () =>
     set({
       ...initialState,
-      visibleParts: new Set(),
       nodeMap: new Map(),
       meshOwner: new Map(),
       expandedIds: new Set(),

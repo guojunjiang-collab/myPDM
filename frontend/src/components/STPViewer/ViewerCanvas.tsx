@@ -1,28 +1,15 @@
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
-import { ArcballControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { ModelLoader } from './ModelLoader';
+import { PartHighlighter } from './PartHighlighter';
 import { GLTFErrorBoundary } from './GLTFErrorBoundary';
 import { SectionPlanes } from './SectionPlanes';
 import { MeasureTool } from './MeasureTool';
 import { ExplodeView } from './ExplodeView';
-import { useEffect, useRef } from 'react';
-
-function ControlsWrapper() {
-  const controlsRef = useRef<any>(null);
-  const { gl } = useThree();
-
-  useEffect(() => {
-    if (controlsRef.current) {
-      // Increase rotation speed by 30%
-      (controlsRef.current as any).rotateSpeed = 1.3;
-    }
-  }, []);
-
-  return <ArcballControls ref={controlsRef} makeDefault />;
-}
+import { CameraController } from './CameraController';
+import { useViewerStore } from '../../stores/viewerStore';
 
 /**
  * 程序化室内环境光（three 内置 RoomEnvironment + PMREMGenerator）。
@@ -50,13 +37,22 @@ interface ViewerCanvasProps {
 }
 
 export function ViewerCanvas({ url }: ViewerCanvasProps) {
+  const selectNode = useViewerStore((s) => s.selectNode);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') selectNode(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectNode]);
+
   return (
     <Canvas
-      camera={{ position: [5, 5, 5], fov: 45 }}
+      camera={{ position: [5, 5, 5] }}
       style={{ width: '100%', height: '100%', background: '#e8e8e8' }}
       gl={{ preserveDrawingBuffer: true }}
     >
-      {/* 本地环境光(IBL) + 补充方向光，替代依赖 CDN 的 <Environment>，离线可用 */}
       <LocalEnvironment />
       <ambientLight intensity={0.25} />
       <directionalLight position={[10, 10, 5]} intensity={0.8} />
@@ -64,12 +60,13 @@ export function ViewerCanvas({ url }: ViewerCanvasProps) {
       <Suspense fallback={null}>
         <GLTFErrorBoundary>
           <ModelLoader url={url} />
+          <PartHighlighter url={url} />
         </GLTFErrorBoundary>
       </Suspense>
       <SectionPlanes />
       <MeasureTool />
       <ExplodeView />
-      <ControlsWrapper />
+      <CameraController />
     </Canvas>
   );
 }

@@ -10,11 +10,13 @@ export function Toolbar() {
   const setExplodeDistance = useViewerStore((s) => s.setExplodeDistance);
   const toggleWireframe = useViewerStore((s) => s.toggleWireframe);
   const wireframe = useViewerStore((s) => s.wireframe);
+  const cameraMode = useViewerStore((s) => s.cameraMode);
+  const toggleCameraMode = useViewerStore((s) => s.toggleCameraMode);
 
   const getPlane = (axis: string) => clipPlanes.find((p) => p.axis === axis);
 
   return (
-    <div className="absolute top-0 left-1/2 -translate-x-1/2 z-20 flex flex-wrap items-center gap-2 rounded-b-lg border border-t-0 border-gray-200 bg-white/90 px-3 py-2 shadow-lg backdrop-blur-sm">
+    <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 border-b border-gray-200 bg-gray-50">
       {/* Section planes */}
       {(['x', 'y', 'z'] as const).map((axis) => {
         const plane = getPlane(axis);
@@ -69,6 +71,16 @@ export function Toolbar() {
           className="w-16 h-1 accent-blue-500"
         />
       </label>
+
+      <div className="w-px h-4 bg-gray-300" />
+
+      {/* Camera mode */}
+      <button
+        onClick={toggleCameraMode}
+        className={`text-xs px-2 py-1 rounded ${cameraMode === 'orthographic' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+      >
+        {cameraMode === 'orthographic' ? '平行' : '透视'}
+      </button>
 
       <div className="w-px h-4 bg-gray-300" />
 

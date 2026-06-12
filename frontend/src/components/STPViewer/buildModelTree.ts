@@ -14,19 +14,35 @@ function collectMeshUuids(obj: THREE.Object3D): string[] {
   return out;
 }
 
+function hasAnyMesh(obj: THREE.Object3D): boolean {
+  let found = false;
+  obj.traverse((o) => { if (!found && isMeshObj(o)) found = true; });
+  return found;
+}
+
 function buildNode(obj: THREE.Object3D, parentId: string | null): TreeNode {
   const isMesh = isMeshObj(obj);
-  // 约定：part = 自身带 mesh 的节点；group = 仅分组的节点。
-  // 真实 Mayo/OCC 装配 GLB 里 part 一般是叶子(无子节点)，group 才有子节点。
-  // 但若某 part 节点恰好也带子节点(部分导出器可能产生)，仍会被归为 part，
-  // 且其 meshUuids 会聚合整子树——下游高亮/显隐据此处理。
+
+  const childNodes: TreeNode[] = [];
+  let hasNonMeshChild = false;
+  if (!isMesh) {
+    for (const c of obj.children) {
+      if (!hasAnyMesh(c)) continue;
+      if (!isMeshObj(c)) hasNonMeshChild = true;
+      childNodes.push(buildNode(c, obj.uuid));
+    }
+  }
+
+  // mesh 节点→叶子；group 节点若所有子节点都是 mesh（无子装配）→折叠为叶子
+  const collapse = isMesh || (!hasNonMeshChild && childNodes.length > 0);
+
   return {
     id: obj.uuid,
     name: obj.name || (isMesh ? '未命名零件' : '未命名组件'),
-    type: isMesh ? 'part' : 'group',
+    type: collapse ? 'part' : 'group',
     meshUuids: collectMeshUuids(obj),
     parentId,
-    children: obj.children.map((c) => buildNode(c, obj.uuid)),
+    children: collapse ? [] : childNodes,
   };
 }
 

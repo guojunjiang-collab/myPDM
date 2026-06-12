@@ -19,6 +19,7 @@ export function ModelLoader({ url }: ModelLoaderProps) {
     selectedNodeId, isolateMode, nodeMap, hiddenParts, wireframe,
   } = useViewerStore();
   const groupRef = useRef<THREE.Group>(null);
+  const pointerDown = useRef<{ x: number; y: number } | null>(null);
 
   const gltf = useLoader(GLTFLoader, url, (loader) => {
     loader.setDRACOLoader(dracoLoader);
@@ -96,14 +97,25 @@ export function ModelLoader({ url }: ModelLoaderProps) {
     });
   }, [selectedNodeId, isolateMode, nodeMap, hiddenParts, wireframe]);
 
+  const handlePointerDown = (e: any) => {
+    pointerDown.current = { x: e.clientX, y: e.clientY };
+  };
+
   const handleClick = (e: any) => {
     e.stopPropagation();
+    // 旋转/拖拽过程中不触发选中（移动超过 3px 视为拖拽）
+    if (pointerDown.current) {
+      const dx = e.clientX - pointerDown.current.x;
+      const dy = e.clientY - pointerDown.current.y;
+      pointerDown.current = null;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) return;
+    }
     if (e.object?.uuid) selectByMesh(e.object.uuid);
   };
 
   return (
     <group ref={groupRef}>
-      <primitive object={gltf.scene} onClick={handleClick} />
+      <primitive object={gltf.scene} onPointerDown={handlePointerDown} onClick={handleClick} />
     </group>
   );
 }
