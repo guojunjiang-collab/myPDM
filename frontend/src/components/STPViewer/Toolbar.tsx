@@ -12,55 +12,53 @@ export function Toolbar() {
   const wireframe = useViewerStore((s) => s.wireframe);
   const cameraMode = useViewerStore((s) => s.cameraMode);
   const toggleCameraMode = useViewerStore((s) => s.toggleCameraMode);
+  const triggerResetView = useViewerStore((s) => s.triggerResetView);
 
   const getPlane = (axis: string) => clipPlanes.find((p) => p.axis === axis);
+  const toggleClipFlip = useViewerStore((s) => s.toggleClipFlip);
+  const activeAxes = (['x', 'y', 'z'] as const).filter((a) => getPlane(a));
 
   return (
-    <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 border-b border-gray-200 bg-gray-50">
-      {/* Section planes */}
-      {(['x', 'y', 'z'] as const).map((axis) => {
-        const plane = getPlane(axis);
-        return (
-          <div key={axis} className="flex items-center gap-1">
-            <label className="flex items-center gap-1 text-xs font-medium uppercase text-gray-600 cursor-pointer select-none">
+    <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-100 bg-white shadow-sm">
+      {/* Section planes toggles */}
+      <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50 overflow-hidden shrink-0">
+        {(['x', 'y', 'z'] as const).map((axis, i) => {
+          const plane = getPlane(axis);
+          return (
+            <label
+              key={axis}
+              className={`flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium uppercase cursor-pointer select-none transition-colors
+                ${plane ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}
+                ${i > 0 ? 'border-l border-gray-200' : ''}`}
+            >
               <input
                 type="checkbox"
                 checked={!!plane}
                 onChange={(e) => e.target.checked ? setClipPlane(axis, 0) : removeClipPlane(axis)}
-                className="h-3.5 w-3.5 accent-blue-500"
+                className="sr-only"
               />
               {axis}
             </label>
-            {plane && (
-              <input
-                type="range"
-                min={-5}
-                max={5}
-                step={0.1}
-                value={plane.position}
-                onChange={(e) => setClipPlane(axis, Number(e.target.value))}
-                className="w-12 h-1 accent-blue-500"
-              />
-            )}
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
 
-      <div className="w-px h-4 bg-gray-300" />
+      <div className="w-px h-5 bg-gray-200 shrink-0" />
 
       {/* Measure mode */}
       <button
         onClick={() => setMeasureMode(measureMode === 'distance' ? 'off' : 'distance')}
-        className={`text-xs px-2 py-1 rounded ${measureMode === 'distance' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+        className={`text-[11px] px-3 py-1.5 rounded-md font-medium transition-colors
+          ${measureMode === 'distance'
+            ? 'bg-blue-50 text-blue-600 border border-blue-200'
+            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-transparent'}`}
       >
         测量
       </button>
 
-      <div className="w-px h-4 bg-gray-300" />
-
       {/* Explode distance */}
-      <label className="flex items-center gap-1 text-xs text-gray-600">
-        爆炸
+      <div className="flex items-center gap-2 text-[11px] text-gray-500">
+        <span className="font-medium">爆炸</span>
         <input
           type="range"
           min={0}
@@ -68,29 +66,71 @@ export function Toolbar() {
           step={0.1}
           value={explodeDistance}
           onChange={(e) => setExplodeDistance(Number(e.target.value))}
-          className="w-16 h-1 accent-blue-500"
+          className="w-14 h-1 accent-blue-500"
         />
-      </label>
+      </div>
 
-      <div className="w-px h-4 bg-gray-300" />
+      <div className="w-px h-5 bg-gray-200 shrink-0" />
+
+      {/* Reset view */}
+      <button
+        onClick={triggerResetView}
+        className="text-[11px] px-3 py-1.5 rounded-md font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-transparent transition-colors"
+      >
+        重置
+      </button>
 
       {/* Camera mode */}
       <button
         onClick={toggleCameraMode}
-        className={`text-xs px-2 py-1 rounded ${cameraMode === 'orthographic' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+        className={`text-[11px] px-3 py-1.5 rounded-md font-medium transition-colors
+          ${cameraMode === 'orthographic'
+            ? 'bg-blue-50 text-blue-600 border border-blue-200'
+            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-transparent'}`}
       >
         {cameraMode === 'orthographic' ? '平行' : '透视'}
       </button>
 
-      <div className="w-px h-4 bg-gray-300" />
-
       {/* Wireframe */}
       <button
         onClick={toggleWireframe}
-        className={`text-xs px-2 py-1 rounded ${wireframe ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+        className={`text-[11px] px-3 py-1.5 rounded-md font-medium transition-colors
+          ${wireframe
+            ? 'bg-blue-50 text-blue-600 border border-blue-200'
+            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-transparent'}`}
       >
         线框
       </button>
+
+      {/* Section plane sliders (右侧，3倍长) */}
+      {activeAxes.length > 0 && (
+        <div className="flex items-center gap-3 ml-auto">
+          {(['x', 'y', 'z'] as const).map((axis) => {
+            const plane = getPlane(axis);
+            return plane ? (
+              <label key={axis} className="flex items-center gap-1.5 text-[10px] font-semibold uppercase text-gray-400">
+                {axis}
+                <button
+                  onClick={() => toggleClipFlip(axis)}
+                  className={`text-[10px] px-1 rounded transition-colors ${plane.flip ? 'text-blue-500 bg-blue-50' : 'text-gray-400 hover:text-gray-600'}`}
+                  title="切换剖面方向"
+                >
+                  {plane.flip ? '>' : '<'}
+                </button>
+                <input
+                  type="range"
+                  min={-5}
+                  max={5}
+                  step={0.1}
+                  value={plane.position}
+                  onChange={(e) => setClipPlane(axis, Number(e.target.value))}
+                  className="w-[13.5rem] h-1 accent-blue-500"
+                />
+              </label>
+            ) : null;
+          })}
+        </div>
+      )}
     </div>
   );
 }

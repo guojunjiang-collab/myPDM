@@ -35,6 +35,7 @@ export function CameraController() {
   const cameraMode = useViewerStore((s) => s.cameraMode);
   const viewTarget = useViewerStore((s) => s.viewTarget);
   const setViewTarget = useViewerStore((s) => s.setViewTarget);
+  const resetViewTrigger = useViewerStore((s) => s.resetViewTrigger);
   const { camera, set, size } = useThree();
   const controlsRef = useRef<any>(null);
   const prevMode = useRef<string | null>(null);
@@ -46,29 +47,35 @@ export function CameraController() {
     }
   }, []);
 
-  // Camera mode switching
+  // Camera mode switching — 保持视角和缩放不变
   useEffect(() => {
     if (prevMode.current === cameraMode) return;
     prevMode.current = cameraMode;
 
     const pos = camera.position.clone();
     const quat = camera.quaternion.clone();
+    const target = (controlsRef.current as any)?.target as THREE.Vector3 | undefined;
+    const dist = target ? pos.distanceTo(target) : 5;
+
     if (cameraMode === 'orthographic') {
-      const frustumSize = 8;
+      // 透视→平行：用当前距离和FOV计算等效frustumSize
+      const fov = (camera as THREE.PerspectiveCamera).fov || 45;
+      const frustumSize = 2 * dist * Math.tan((fov * Math.PI) / 360);
       const aspect = size.width / size.height;
       const newCam = new THREE.OrthographicCamera(
-        frustumSize * aspect / -2,
-        frustumSize * aspect / 2,
-        frustumSize / 2,
-        frustumSize / -2,
-        0.1,
-        1000
+        frustumSize * aspect / -2, frustumSize * aspect / 2,
+        frustumSize / 2, frustumSize / -2,
+        0.1, 1000
       );
       newCam.position.copy(pos);
       newCam.quaternion.copy(quat);
       set({ camera: newCam as any });
     } else {
-      const newCam = new THREE.PerspectiveCamera(45, size.width / size.height, 0.1, 1000);
+      // 平行→透视：用当前frustumSize和距离计算等效FOV
+      const cam = camera as THREE.OrthographicCamera;
+      const frustumSize = (cam.top - cam.bottom) || 8;
+      const fov = 2 * Math.atan(frustumSize / (2 * dist)) * (180 / Math.PI);
+      const newCam = new THREE.PerspectiveCamera(fov, size.width / size.height, 0.1, 1000);
       newCam.position.copy(pos);
       newCam.quaternion.copy(quat);
       set({ camera: newCam as any });
@@ -96,6 +103,22 @@ export function CameraController() {
     };
     setViewTarget(null);
   }, [viewTarget]);
+
+  // 重置：恢复到初始视角
+  useEffect(() => {
+    if (resetViewTrigger === 0) return;
+    const { initCamPos, initCamTarget } = useViewerStore.getState();
+    const endPos = new THREE.Vector3(...initCamPos);
+    const tgt = new THREE.Vector3(...initCamTarget);
+    const up = bestUp(new THREE.Vector3().subVectors(endPos, tgt).normalize(), camera.up);
+    anim.current = {
+      start: camera.position.clone(),
+      end: endPos,
+      up,
+      target: tgt,
+      elapsed: 0,
+    };
+  }, [resetViewTrigger]);
 
   useFrame((_, delta) => {
     // 同步相机四元数到 store（用于 ViewCube 完美跟随）

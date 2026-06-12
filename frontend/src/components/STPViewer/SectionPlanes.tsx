@@ -16,14 +16,13 @@ export function SectionPlanes() {
     gl.localClippingEnabled = true;
 
     const planes: THREE.Plane[] = clipPlanes.map((cp) => {
+      const sign = cp.flip ? -1 : 1;
       const normal = new THREE.Vector3(
-        cp.axis === 'x' ? 1 : 0,
-        cp.axis === 'y' ? 1 : 0,
-        cp.axis === 'z' ? 1 : 0,
+        cp.axis === 'x' ? sign : 0,
+        cp.axis === 'y' ? sign : 0,
+        cp.axis === 'z' ? sign : 0,
       );
-      // Plane equation: normal·p + constant = 0
-      // Clip points where axis < position (distance < 0)
-      return new THREE.Plane(normal, -cp.position);
+      return new THREE.Plane(normal, -cp.position * sign);
     });
 
     // Global clipping fallback

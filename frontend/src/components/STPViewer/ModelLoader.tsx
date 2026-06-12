@@ -16,8 +16,9 @@ interface ModelLoaderProps {
 export function ModelLoader({ url }: ModelLoaderProps) {
   const {
     setLoadingState, setModelScale, setTreeData, selectByMesh,
-    selectedNodeId, isolateMode, nodeMap, hiddenParts, wireframe,
+    selectedNodeId, isolateMode, nodeMap, hiddenParts, wireframe, resetViewTrigger,
   } = useViewerStore();
+  const setInitialState = useViewerStore((s) => s.setInitialState);
   const groupRef = useRef<THREE.Group>(null);
   const pointerDown = useRef<{ x: number; y: number } | null>(null);
 
@@ -45,7 +46,7 @@ export function ModelLoader({ url }: ModelLoaderProps) {
 
     setLoadingState('ready');
 
-    // 3) 缩放居中
+    // 3) 缩放居中 + 保存初始状态
     requestAnimationFrame(() => {
       if (!groupRef.current) return;
       const box = new THREE.Box3().setFromObject(gltf.scene);
@@ -53,13 +54,27 @@ export function ModelLoader({ url }: ModelLoaderProps) {
       const size = box.getSize(new THREE.Vector3());
       const maxDim = Math.max(size.x, size.y, size.z);
       const scale = maxDim > 0.001 ? 4 / maxDim : 1;
-      const unitScale = maxDim < 0.5 ? 1000 : 1;
-      const modelScaleVal = unitScale > 1 ? scale / unitScale : scale;
-      setModelScale(modelScaleVal);
+      const center = box.getCenter(new THREE.Vector3());
       groupRef.current.scale.setScalar(scale);
-      groupRef.current.position.copy(box.getCenter(new THREE.Vector3()).multiplyScalar(-scale));
+      groupRef.current.position.copy(center.multiplyScalar(-scale));
+      // 保存初始状态用于重置
+      setInitialState({
+        groupScale: scale,
+        groupPos: [groupRef.current.position.x, groupRef.current.position.y, groupRef.current.position.z],
+        camPos: [5, 5, 5],
+        camTarget: [0, 0, 0],
+      });
     });
   }, [gltf, setLoadingState, setModelScale, setTreeData]);
+
+  // 重置：恢复到加载时的初始视角和大小
+  useEffect(() => {
+    if (resetViewTrigger === 0) return;
+    if (!groupRef.current) return;
+    const { initGroupScale, initGroupPos } = useViewerStore.getState();
+    groupRef.current.scale.setScalar(initGroupScale);
+    groupRef.current.position.set(...initGroupPos);
+  }, [resetViewTrigger]);
 
   useEffect(() => {
     if (!groupRef.current) return;

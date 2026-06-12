@@ -20,13 +20,19 @@ export interface ViewerState {
 
   // 视图
   modelScale: number;
-  clipPlanes: { axis: 'x' | 'y' | 'z'; position: number }[];
+  clipPlanes: { axis: 'x' | 'y' | 'z'; position: number; flip: boolean }[];
   measureMode: 'off' | 'distance' | 'angle';
   explodeDistance: number;
   wireframe: boolean;
   cameraMode: 'orthographic' | 'perspective';
   viewTarget: string | null;
   cameraQuat: [number, number, number, number];
+  resetViewTrigger: number;
+  // 初始状态（重置时恢复）
+  initGroupScale: number;
+  initGroupPos: [number, number, number];
+  initCamPos: [number, number, number];
+  initCamTarget: [number, number, number];
 
   // Actions
   setModelUrl: (url: string | null) => void;
@@ -39,12 +45,15 @@ export interface ViewerState {
   toggleExpanded: (id: string) => void;
   toggleNodeVisibility: (node: TreeNode) => void;
   setClipPlane: (axis: 'x' | 'y' | 'z', position: number) => void;
+  toggleClipFlip: (axis: 'x' | 'y' | 'z') => void;
   removeClipPlane: (axis: 'x' | 'y' | 'z') => void;
   setMeasureMode: (mode: ViewerState['measureMode']) => void;
   setExplodeDistance: (d: number) => void;
   toggleWireframe: () => void;
   toggleCameraMode: () => void;
   setViewTarget: (view: string | null) => void;
+  triggerResetView: () => void;
+  setInitialState: (s: { groupScale: number; groupPos: [number, number, number]; camPos: [number, number, number]; camTarget: [number, number, number] }) => void;
   reset: () => void;
 }
 
@@ -60,13 +69,18 @@ const initialState = {
   expandedIds: new Set<string>(),
   hiddenParts: new Set<string>(),
   modelScale: 1,
-  clipPlanes: [] as { axis: 'x' | 'y' | 'z'; position: number }[],
+  clipPlanes: [] as { axis: 'x' | 'y' | 'z'; position: number; flip: boolean }[],
   measureMode: 'off' as const,
   explodeDistance: 0,
   wireframe: false,
   cameraMode: 'orthographic' as const,
   viewTarget: null as string | null,
   cameraQuat: [0, 0, 0, 1] as [number, number, number, number],
+  resetViewTrigger: 0,
+  initGroupScale: 1,
+  initGroupPos: [0, 0, 0] as [number, number, number],
+  initCamPos: [5, 5, 5] as [number, number, number],
+  initCamTarget: [0, 0, 0] as [number, number, number],
 };
 
 export const useViewerStore = create<ViewerState>((set, get) => ({
@@ -127,7 +141,15 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
 
   setClipPlane: (axis, position) => {
     const planes = get().clipPlanes.filter((p) => p.axis !== axis);
-    set({ clipPlanes: [...planes, { axis, position }] });
+    set({ clipPlanes: [...planes, { axis, position, flip: false }] });
+  },
+
+  toggleClipFlip: (axis) => {
+    set({
+      clipPlanes: get().clipPlanes.map((p) =>
+        p.axis === axis ? { ...p, flip: !p.flip } : p
+      ),
+    });
   },
 
   removeClipPlane: (axis) => {
@@ -139,6 +161,13 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   toggleWireframe: () => set({ wireframe: !get().wireframe }),
   toggleCameraMode: () => set({ cameraMode: get().cameraMode === 'orthographic' ? 'perspective' : 'orthographic' }),
   setViewTarget: (view) => set({ viewTarget: view }),
+  triggerResetView: () => set({ resetViewTrigger: get().resetViewTrigger + 1 }),
+  setInitialState: (s) => set({
+    initGroupScale: s.groupScale,
+    initGroupPos: s.groupPos,
+    initCamPos: s.camPos,
+    initCamTarget: s.camTarget,
+  }),
 
   reset: () =>
     set({
