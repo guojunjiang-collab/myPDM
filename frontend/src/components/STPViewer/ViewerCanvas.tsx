@@ -51,7 +51,12 @@ export function ViewerCanvas({ url }: ViewerCanvasProps) {
     <Canvas
       camera={{ position: [5, 5, 5] }}
       style={{ width: '100%', height: '100%', background: '#e8e8e8' }}
-      gl={{ preserveDrawingBuffer: true }}
+       gl={{
+        preserveDrawingBuffer: true,
+        powerPreference: 'high-performance',
+        antialias: false,
+        stencil: false,
+      }}
     >
       <LocalEnvironment />
       <ambientLight intensity={0.25} />
