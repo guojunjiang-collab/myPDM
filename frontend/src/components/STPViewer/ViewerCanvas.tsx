@@ -35,6 +35,7 @@ function LocalEnvironment() {
     const pmrem = new THREE.PMREMGenerator(gl);
     const envMap = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     scene.environment = envMap;
+    scene.environmentIntensity = 0.8;
     return () => {
       scene.environment = null;
       envMap.dispose();
@@ -57,9 +58,9 @@ export function ViewerCanvas({ url }: ViewerCanvasProps) {
     >
       {/* 本地环境光(IBL) + 补充方向光，替代依赖 CDN 的 <Environment>，离线可用 */}
       <LocalEnvironment />
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[10, 10, 5]} intensity={1} />
-      <directionalLight position={[-8, 4, -6]} intensity={0.5} />
+      <ambientLight intensity={0.25} />
+      <directionalLight position={[10, 10, 5]} intensity={0.8} />
+      <directionalLight position={[-8, 4, -6]} intensity={0.4} />
       <Suspense fallback={null}>
         <GLTFErrorBoundary>
           <ModelLoader url={url} />
