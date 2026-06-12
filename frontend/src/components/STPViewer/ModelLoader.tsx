@@ -4,6 +4,7 @@ import { useLoader } from '@react-three/fiber';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { useViewerStore } from '../../stores/viewerStore';
+import { buildModelTree } from './buildModelTree';
 
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('/draco/');
@@ -13,8 +14,10 @@ interface ModelLoaderProps {
 }
 
 export function ModelLoader({ url }: ModelLoaderProps) {
-  const { setLoadingState, setModelScale, selectPart, highlightedPartId, visibleParts, wireframe } =
-    useViewerStore();
+  const {
+    setLoadingState, setModelScale, setTreeData, selectByMesh,
+    selectedNodeId, isolateMode, nodeMap, hiddenParts, wireframe,
+  } = useViewerStore();
   const groupRef = useRef<THREE.Group>(null);
 
   const gltf = useLoader(GLTFLoader, url, (loader) => {
@@ -24,9 +27,21 @@ export function ModelLoader({ url }: ModelLoaderProps) {
   // Mark ready immediately, then compute scale in background
   useEffect(() => {
     if (!gltf?.scene || !groupRef.current) return;
+
+    // 1) 每个 mesh 独立材质，避免隔离透明时共享材质互相影响
+    gltf.scene.traverse((child) => {
+      const m = child as THREE.Mesh;
+      if (m.isMesh && m.material && !Array.isArray(m.material)) {
+        m.material = (m.material as THREE.Material).clone();
+      }
+    });
+
+    // 2) 解析装配树
+    setTreeData(buildModelTree(gltf.scene));
+
     setLoadingState('ready');
 
-    // Use requestAnimationFrame to let React unmount the overlay first
+    // 3) 缩放居中
     requestAnimationFrame(() => {
       if (!groupRef.current) return;
       const box = new THREE.Box3().setFromObject(gltf.scene);
@@ -35,39 +50,49 @@ export function ModelLoader({ url }: ModelLoaderProps) {
       const maxDim = Math.max(size.x, size.y, size.z);
       const scale = maxDim > 0.001 ? 4 / maxDim : 1;
       const unitScale = maxDim < 0.5 ? 1000 : 1;
-      const modelScaleVal = (unitScale > 1) ? scale / unitScale : scale;
+      const modelScaleVal = unitScale > 1 ? scale / unitScale : scale;
       setModelScale(modelScaleVal);
       groupRef.current.scale.setScalar(scale);
       groupRef.current.position.copy(box.getCenter(new THREE.Vector3()).multiplyScalar(-scale));
     });
-  }, [gltf, setLoadingState, setModelScale]);
+  }, [gltf, setLoadingState, setModelScale, setTreeData]);
 
   useEffect(() => {
     if (!groupRef.current) return;
+    const selNode = selectedNodeId ? nodeMap.get(selectedNodeId) : null;
+    const sel = selNode ? new Set(selNode.meshUuids) : null;
+
     groupRef.current.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        const mat = child.material;
-        if (Array.isArray(mat)) return;
-        if (mat instanceof THREE.MeshStandardMaterial) {
-          mat.wireframe = wireframe;
-        }
-        const name = child.name || child.uuid;
-        if (visibleParts.size > 0 && !visibleParts.has(name)) child.visible = false;
-        else child.visible = true;
-        if (highlightedPartId === name && mat instanceof THREE.MeshStandardMaterial) {
-          mat.emissive = new THREE.Color(0x4488ff);
-          mat.emissiveIntensity = 0.6;
-        } else if (mat instanceof THREE.MeshStandardMaterial) {
-          mat.emissive = new THREE.Color(0x000000);
-          mat.emissiveIntensity = 0;
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const mat = mesh.material;
+      if (Array.isArray(mat)) return;
+      const std = mat as THREE.MeshStandardMaterial;
+
+      std.wireframe = wireframe;
+      mesh.visible = !hiddenParts.has(mesh.uuid);
+
+      if (!sel) {
+        if (std.emissive) { std.emissive.setHex(0x000000); std.emissiveIntensity = 0; }
+        std.transparent = false; std.opacity = 1; std.depthWrite = true;
+      } else if (sel.has(mesh.uuid)) {
+        if (std.emissive) { std.emissive.setHex(0x224488); std.emissiveIntensity = 0.5; }
+        std.transparent = false; std.opacity = 1; std.depthWrite = true;
+      } else {
+        if (std.emissive) { std.emissive.setHex(0x000000); std.emissiveIntensity = 0; }
+        if (isolateMode) {
+          std.transparent = true; std.opacity = 0.12; std.depthWrite = false;
+        } else {
+          std.transparent = false; std.opacity = 1; std.depthWrite = true;
         }
       }
+      std.needsUpdate = true;
     });
-  }, [wireframe, visibleParts, highlightedPartId]);
+  }, [selectedNodeId, isolateMode, nodeMap, hiddenParts, wireframe]);
 
   const handleClick = (e: any) => {
     e.stopPropagation();
-    if (e.object?.name) selectPart(e.object.name);
+    if (e.object?.uuid) selectByMesh(e.object.uuid);
   };
 
   return (
