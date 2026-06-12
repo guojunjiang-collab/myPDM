@@ -607,20 +607,23 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
 
   return (
     <>
-      <Modal open={open} onClose={onClose} title={title} width="3xl">
+      <Modal
+        open={open}
+        onClose={onClose}
+        title={title}
+        width="3xl"
+        headerAction={isView && profile && configTree ? (
+          <button
+            type="button"
+            onClick={() => { try { exportProfilePdf(profile, configTree); } catch (e: any) { setError(e?.message || '导出失败'); } }}
+            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
+            title="导出为 PDF（正式配置清单全展开）"
+          >
+            📄 导出PDF
+          </button>
+        ) : undefined}
+      >
       <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
-        {isView && profile && configTree && (
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => { try { exportProfilePdf(profile, configTree); } catch (e: any) { setError(e?.message || '导出失败'); } }}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
-              title="导出为 PDF（正式配置清单全展开）"
-            >
-              📄 导出PDF
-            </button>
-          </div>
-        )}
         {error && (
           <div className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{error}</div>
         )}

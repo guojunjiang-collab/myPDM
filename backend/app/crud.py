@@ -103,9 +103,11 @@ def get_part(db, part_id):
     return db.query(models.Part).filter(models.Part.id == part_id).first()
 
 def get_part_by_code(db, code, version=None):
+    # 仅匹配未删除记录：软删除的同编码+版本不应阻止新建（与 uix_part_code_version 部分唯一索引一致）
+    q = db.query(models.Part).filter(models.Part.code == code, models.Part.deleted_at.is_(None))
     if version:
-        return db.query(models.Part).filter(models.Part.code == code, models.Part.version == version).first()
-    return db.query(models.Part).filter(models.Part.code == code).first()
+        q = q.filter(models.Part.version == version)
+    return q.first()
 
 def get_parts(db, skip=0, limit=100, search=None, include_deleted=False, updated_since=None):
     q = db.query(models.Part)
@@ -181,10 +183,12 @@ def get_assembly_by_code(db, code):
     return db.query(models.Assembly).filter(models.Assembly.code == code).first()
 
 def get_assembly_by_code_version(db, code, version):
-    """按编码+版本号精确查找部件（支持同编码多版本）"""
+    """按编码+版本号精确查找部件（支持同编码多版本）；仅匹配未删除记录，
+    软删除的同编码+版本不应阻止新建（与 uix_assembly_code_version 部分唯一索引一致）"""
     return db.query(models.Assembly).filter(
         models.Assembly.code == code,
-        models.Assembly.version == version
+        models.Assembly.version == version,
+        models.Assembly.deleted_at.is_(None)
     ).first()
 
 def get_assemblies(db, skip=0, limit=100, search=None, include_deleted=False, updated_since=None):

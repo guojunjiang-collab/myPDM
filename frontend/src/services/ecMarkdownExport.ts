@@ -134,7 +134,8 @@ function bomImpactSection(item: any): string {
 }
 
 // ─── ECR 导出 ──────────────────────────────────────────────────
-export function exportEcrMarkdown(detail: any, statusLogs: any[] = []): void {
+/** 构建 ECR 详情的 Markdown 文本（PDF 导出复用此中间产物） */
+export function buildEcrMarkdown(detail: any, statusLogs: any[] = []): string {
   const d = detail || {};
   const out: string[] = [];
 
@@ -244,7 +245,12 @@ export function exportEcrMarkdown(detail: any, statusLogs: any[] = []): void {
   out.push('');
   out.push(`_导出时间：${new Date().toLocaleString('zh-CN')}_`);
 
-  downloadMarkdown(`${d.ecr_number || 'ECR'}_${d.title || ''}.md`, out.join('\n'));
+  return out.join('\n');
+}
+
+export function exportEcrMarkdown(detail: any, statusLogs: any[] = []): void {
+  const d = detail || {};
+  downloadMarkdown(`${d.ecr_number || 'ECR'}_${d.title || ''}.md`, buildEcrMarkdown(detail, statusLogs));
 }
 
 // ─── ECO 导出 ──────────────────────────────────────────────────
@@ -281,6 +287,30 @@ function execStatusLabel(action: string, newStatus?: string): string {
 
 const byCode = (a: any, b: any) => String(a.entity_code || '').localeCompare(String(b.entity_code || ''), 'zh-CN');
 
+/**
+ * 向上溯源链按层级树展开排序，与 ECOEditView 详情界面一致：
+ * 按 chain 原始顺序建树（父子嵌套依赖 level 序列），只对同级兄弟按件号排序，
+ * 再前序遍历展平 —— 保证父→子→孙相邻，而非全局按件号打散。
+ */
+function orderUpwardHierarchically(items: any[]): any[] {
+  interface T { node: any; children: T[]; }
+  const roots: T[] = [];
+  const stack: T[] = [];
+  for (const item of items) {
+    const t: T = { node: item, children: [] };
+    while (stack.length > 0 && (stack[stack.length - 1].node.level ?? 0) >= (item.level ?? 0)) stack.pop();
+    if (stack.length > 0) stack[stack.length - 1].children.push(t);
+    else roots.push(t);
+    stack.push(t);
+  }
+  const sortSiblings = (ns: T[]) => { ns.sort((a, b) => byCode(a.node, b.node)); ns.forEach((n) => sortSiblings(n.children)); };
+  sortSiblings(roots);
+  const out: any[] = [];
+  const walk = (ns: T[]) => { for (const t of ns) { out.push(t.node); walk(t.children); } };
+  walk(roots);
+  return out;
+}
+
 /** 把 ECR bom_impact 节点叠加 ECO 执行项编辑值 + 执行结果（与 ECOEditView 一致） */
 function ecoOverlayNode(n: any, saved: any): any {
   return {
@@ -298,7 +328,7 @@ function ecoOverlayNode(n: any, saved: any): any {
  * BOM 变更分析与详情界面一致：拉源 ECR 的 bom_impact 拓扑（含版本/层级），
  * 再叠加 ECO 自身 execution_items 的编辑内容（动作/目标数量/变更描述）。
  */
-export async function exportEcoMarkdown(eco: any): Promise<void> {
+export async function buildEcoMarkdown(eco: any): Promise<string> {
   const e = eco || {};
   const out: string[] = [];
 
@@ -401,18 +431,18 @@ export async function exportEcoMarkdown(eco: any): Promise<void> {
         });
       }
 
-      // 按件号排序（与 ECO 详情一致）
-      up.sort(byCode);
+      // 向上溯源链按层级树展开排序，向下子项按件号排序（与 ECO 详情一致）
+      const upOrdered = orderUpwardHierarchically(up);
       down.sort(byCode);
 
       const typeLabel = ai.entity_type === 'part' ? '零件' : '部件';
       out.push(`### 📦 ${ai.entity_code} ${ai.entity_name || ''} v${ai.entity_version || ''}（${typeLabel}）`);
       out.push('');
-      if (up.length > 0) {
+      if (upOrdered.length > 0) {
         out.push('**📊 向上溯源链**（ECR 评估 → ECO 执行后）\n');
         out.push(mdTable(
           ['层级', '类型', '件号', '名称', '原版本', '动作', '原数量', '目标数量', '变更描述', '执行后版本', '变更状态'],
-          up.map((n: any) => [
+          upOrdered.map((n: any) => [
             n.level ?? '-', n.entity_type === 'part' ? '零件' : '部件',
             n.entity_code, n.entity_name, n.entity_version,
             actionCell(n.action), n.quantity ?? '-', n._targetQty ?? '-', n._desc || '',
@@ -506,5 +536,10 @@ export async function exportEcoMarkdown(eco: any): Promise<void> {
   out.push('');
   out.push(`_导出时间：${new Date().toLocaleString('zh-CN')}_`);
 
-  downloadMarkdown(`${e.eco_number || 'ECO'}_${e.title || ''}.md`, out.join('\n'));
+  return out.join('\n');
+}
+
+export async function exportEcoMarkdown(eco: any): Promise<void> {
+  const e = eco || {};
+  downloadMarkdown(`${e.eco_number || 'ECO'}_${e.title || ''}.md`, await buildEcoMarkdown(eco));
 }

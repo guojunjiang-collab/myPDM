@@ -97,7 +97,11 @@ export default function DataManagement() {
         before_date: beforeDate || undefined,
         confirm: true,
       });
-      setPurgeResult(`成功清理 ${res.data.total} 条记录`);
+      const skipped: Record<string, string> = res.data.skipped || {};
+      const skippedNote = Object.keys(skipped).length > 0
+        ? `；跳过 ${Object.entries(skipped).map(([t, r]) => `${t}（${r}）`).join('、')}`
+        : '';
+      setPurgeResult(`成功清理 ${res.data.total} 条记录${skippedNote}`);
       fetchStats();
     } catch (e: any) {
       setPurgeResult(`清理失败: ${e.response?.data?.detail || e.message}`);

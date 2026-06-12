@@ -6,6 +6,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from typing import Optional
 
 from ..database import get_db
@@ -72,33 +73,56 @@ async def purge_soft_deleted(
             raise HTTPException(status_code=400, detail=f"无效的表名: {tbl}")
 
     before_date = body.get("before_date")
-    
+
+    # 按依赖顺序删除：被引用的父表放在引用它的子表之后，
+    # 否则同批清理（如同时选 ecrs + ecos）会因外键顺序失败。
+    # 目前唯一的可清理表内依赖：ecos.ecr_id -> ecrs。
+    purge_order = ["bom_items", "ecos", "ecrs", "configuration_items", "documents", "parts", "assemblies"]
+    ordered = [t for t in purge_order if t in tables]
+
     deleted_counts = {}
-    for tbl in tables:
-        if before_date:
-            result = db.execute(text(f"""
-                DELETE FROM {tbl}
-                WHERE deleted_at IS NOT NULL AND deleted_at < :before_date
-            """), {"before_date": before_date})
-        else:
-            result = db.execute(text(f"""
-                DELETE FROM {tbl}
-                WHERE deleted_at IS NOT NULL
-            """))
-        deleted_counts[tbl] = result.rowcount
+    skipped = {}
+    for tbl in ordered:
+        try:
+            # 每个表单独 SAVEPOINT：某个表因外键约束失败时只回滚该表，
+            # 不影响其它表已完成的清理，整体不再返回 500。
+            with db.begin_nested():
+                if before_date:
+                    result = db.execute(text(f"""
+                        DELETE FROM {tbl}
+                        WHERE deleted_at IS NOT NULL AND deleted_at < :before_date
+                    """), {"before_date": before_date})
+                else:
+                    result = db.execute(text(f"""
+                        DELETE FROM {tbl}
+                        WHERE deleted_at IS NOT NULL
+                    """))
+                deleted_counts[tbl] = result.rowcount
+        except IntegrityError as e:
+            deleted_counts[tbl] = 0
+            # 从底层 psycopg2 错误中取出仍在引用该表的子表名，给出可读原因
+            ref_table = getattr(getattr(e.orig, "diag", None), "table_name", None)
+            skipped[tbl] = (
+                f"仍被「{ref_table}」表中的现有记录引用，无法清理" if ref_table
+                else "仍被其他现有记录引用，无法清理"
+            )
 
     db.commit()
 
     ip = request.client.host if request.client else None
     from .. import crud
+    detail = f"清理了 {sum(deleted_counts.values())} 条记录: {deleted_counts}"
+    if skipped:
+        detail += f"；跳过: {skipped}"
     crud.create_log(
         db, current_user.id, current_user.username,
         "清除软删除数据", "admin", "purge",
-        f"清理了 {sum(deleted_counts.values())} 条记录: {deleted_counts}",
+        detail,
         ip
     )
 
     return {
         "deleted_counts": deleted_counts,
+        "skipped": skipped,
         "total": sum(deleted_counts.values())
     }

@@ -7,9 +7,11 @@ interface ModalProps {
   children: ReactNode;
   width?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | '3xl';
   zIndex?: number;
+  /** 标题栏右侧、关闭按钮左侧的操作区（如导出按钮） */
+  headerAction?: ReactNode;
 }
 
-export function Modal({ open, title, onClose, children, width = 'md', zIndex = 50 }: ModalProps) {
+export function Modal({ open, title, onClose, children, width = 'md', zIndex = 50, headerAction }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
 
@@ -55,12 +57,15 @@ export function Modal({ open, title, onClose, children, width = 'md', zIndex = 5
         {title && (
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-semibold">{title}</h3>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 text-xl"
-            >
-              ×
-            </button>
+            <div className="flex items-center gap-3">
+              {headerAction}
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-gray-600 text-xl"
+              >
+                ×
+              </button>
+            </div>
           </div>
         )}
         <div className="px-6 py-4">{children}</div>

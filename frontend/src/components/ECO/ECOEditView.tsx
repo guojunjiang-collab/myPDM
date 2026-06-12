@@ -40,6 +40,68 @@ const ROW_BG: Record<string, string> = {
 const th = 'px-2 py-2 text-left text-xs font-semibold text-gray-500 border-b border-gray-200 whitespace-nowrap';
 const td = 'px-2 py-1.5 text-xs text-gray-700 border-b border-gray-100';
 
+// ─── 向上溯源树：保持父→子→孙层级相邻，兄弟按件号排序，支持按层展开 ───
+interface UpwardTreeNode { node: MutableNode; children: UpwardTreeNode[]; }
+interface UpRowMeta { hasChildren: boolean; expanded: boolean; key: string; }
+
+// 只对同级兄弟排序（不改变输入顺序——树的父子嵌套依赖输入的 level 序列）
+function sortUpwardSiblings(nodes: UpwardTreeNode[]): void {
+  nodes.sort((a, b) => (a.node.entity_code || '').localeCompare(b.node.entity_code || '', 'zh-CN'));
+  for (const n of nodes) sortUpwardSiblings(n.children);
+}
+
+function buildUpwardTree(items: MutableNode[]): UpwardTreeNode[] {
+  const roots: UpwardTreeNode[] = [];
+  const stack: UpwardTreeNode[] = [];
+  for (const item of items) {
+    const treeNode: UpwardTreeNode = { node: item, children: [] };
+    while (stack.length > 0 && (stack[stack.length - 1].node.level ?? 0) >= (item.level ?? 0)) stack.pop();
+    if (stack.length > 0) stack[stack.length - 1].children.push(treeNode);
+    else roots.push(treeNode);
+    stack.push(treeNode);
+  }
+  sortUpwardSiblings(roots);
+  return roots;
+}
+
+// 前序遍历展平为可见行：默认仅展开 1 层级（根=level1 可见，更深层折叠），更多由 expandedKeys 控制
+function computeVisibleUpward(
+  items: MutableNode[], expandedKeys: Set<string>, aiCode: string,
+): { visible: MutableNode[]; meta: Map<MutableNode, UpRowMeta> } {
+  const tree = buildUpwardTree(items);
+  const visible: MutableNode[] = [];
+  const meta = new Map<MutableNode, UpRowMeta>();
+  const keyOf = (n: MutableNode) => `${aiCode}:${n.entity_id}:${n.level}`;
+  const walk = (nodes: UpwardTreeNode[]) => {
+    for (const t of nodes) {
+      const key = keyOf(t.node);
+      const hasChildren = t.children.length > 0;
+      const expanded = expandedKeys.has(key);
+      meta.set(t.node, { hasChildren, expanded, key });
+      visible.push(t.node);
+      if (hasChildren && expanded) walk(t.children);
+    }
+  };
+  walk(tree);
+  return { visible, meta };
+}
+
+// 层级单元格：有子项时显示展开/折叠按钮，缩进用 level 表示
+function LevelCell({ n, meta, onToggle }: { n: MutableNode; meta?: Map<MutableNode, UpRowMeta>; onToggle?: (key: string) => void }) {
+  const m = meta?.get(n);
+  return (
+    <td className={td}>
+      <span className="text-gray-400 inline-flex items-center gap-0.5">
+        {m?.hasChildren ? (
+          <button type="button" onClick={(e) => { e.stopPropagation(); onToggle?.(m.key); }}
+            className="text-gray-500 hover:text-gray-700 w-3 leading-none">{m.expanded ? '▼' : '▶'}</button>
+        ) : <span className="inline-block w-3" />}
+        {n.level != null ? '-'.repeat(n.level) + n.level : '-'}
+      </span>
+    </td>
+  );
+}
+
 const UPWARD_ACTIONS = ['no_change', 'upgrade', 'qty_change', 'delete'] as const;
 const DOWNWARD_ACTIONS = ['no_change', 'upgrade', 'qty_change', 'delete', 'add_existing'] as const;
 
@@ -112,7 +174,7 @@ function cloneNodes(ecrData: any): { up: MutableNode[]; down: MutableNode[] } {
 }
 
 // ── Editable upward table ──
-function EditableUpward({ rows, onUpdate, displayOnly = false }: { rows: MutableNode[]; onUpdate: (i: number, patch: Partial<MutableNode>) => void; displayOnly?: boolean }) {
+function EditableUpward({ rows, onUpdate, displayOnly = false, meta, onToggle }: { rows: MutableNode[]; onUpdate: (i: number, patch: Partial<MutableNode>) => void; displayOnly?: boolean; meta?: Map<MutableNode, UpRowMeta>; onToggle?: (key: string) => void }) {
   return (
     <div className="overflow-x-auto border border-gray-200 rounded-lg">
       <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
@@ -123,7 +185,7 @@ function EditableUpward({ rows, onUpdate, displayOnly = false }: { rows: Mutable
         <tbody>{rows.length === 0 ? <tr><td colSpan={8} className="text-xs text-gray-400 text-center py-6">无数据</td></tr>
         : rows.map((n, i) => (
           <tr key={i} className={ROW_BG[n.action||''] || (i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50')}>
-            <td className={td}><span className="text-gray-400">{n.level != null ? '-'.repeat(n.level)+n.level : '-'}</span></td>
+            <LevelCell n={n} meta={meta} onToggle={onToggle} />
             <td className={td}>{n.entity_code||'-'}</td>
             <td className={td}><span className="truncate block">{n.entity_name}</span></td>
             <td className={`${td} text-center`}>{n.entity_version || '-'}</td>
@@ -189,7 +251,7 @@ function EditableDownward({ rows, onUpdate, displayOnly = false, onRemove }: { r
 }
 
 // ── Read-only tables ──
-function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade, onRelease, onFreeze, onPublish, checkedIds, onToggleCheck, onViewItem, onEditItem }: { rows: MutableNode[]; execMap?: Map<string, any>; canExec?: boolean; ecoStatus?: string; ecoId?: string; onUpgrade?: (id: string, entityInfo?: { entity_type: string; entity_id: string; entity_code: string; entity_name: string; action: string }) => void; onRelease?: (id: string, newEntityId?: string) => void; onFreeze?: (id: string, newEntityId?: string) => void; onPublish?: (id: string, newEntityId?: string) => void; checkedIds?: Set<string>; onToggleCheck?: (id: string) => void; onViewItem?: (entityType: string, entityId: string) => void; onEditItem?: (entityType: string, entityId: string) => void }) {
+function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade, onRelease, onFreeze, onPublish, checkedIds, onToggleCheck, onViewItem, onEditItem, meta, onToggle }: { rows: MutableNode[]; execMap?: Map<string, any>; canExec?: boolean; ecoStatus?: string; ecoId?: string; onUpgrade?: (id: string, entityInfo?: { entity_type: string; entity_id: string; entity_code: string; entity_name: string; action: string }) => void; onRelease?: (id: string, newEntityId?: string) => void; onFreeze?: (id: string, newEntityId?: string) => void; onPublish?: (id: string, newEntityId?: string) => void; checkedIds?: Set<string>; onToggleCheck?: (id: string) => void; onViewItem?: (entityType: string, entityId: string) => void; onEditItem?: (entityType: string, entityId: string) => void; meta?: Map<MutableNode, UpRowMeta>; onToggle?: (key: string) => void }) {
   const getExec = (entityId: string) => execMap?.get(entityId);
   return (
     <div className="overflow-x-auto border border-gray-200 rounded-lg">
@@ -216,7 +278,7 @@ function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade, o
           };
           return (
             <tr key={i} className={`${ROW_BG[n.action||'']} ${!unchanged && exec?.new_entity_status ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={handleRowClick}>
-              <td className={td}><span className="text-gray-400">{n.level != null ? '-'.repeat(n.level)+n.level : '-'}</span></td>
+              <LevelCell n={n} meta={meta} onToggle={onToggle} />
               <td className={td}>{r.code}</td>
               <td className={td}><span className="truncate block">{r.name}</span></td>
               <td className={`${td} text-center ${n.action === 'upgrade' ? 'text-blue-600 font-semibold' : ''}`}>{r.ver}</td>
@@ -444,6 +506,15 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerParentId, setPickerParentId] = useState<string | null>(null);
   const [checkedExecIds, setCheckedExecIds] = useState<Set<string>>(new Set());
+  // 向上溯源链展开状态：默认空集 = 仅展开 1 层级（根/直接父项可见），更深层由用户手动展开
+  const [expandedUp, setExpandedUp] = useState<Set<string>>(() => new Set());
+  const toggleUp = useCallback((key: string) => {
+    setExpandedUp((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }, []);
 
   const toggleChecked = (execItemId: string) => {
     setCheckedExecIds(prev => {
@@ -636,7 +707,9 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
         {/* Per-group analysis cards */}
         {localAffected.map(ai => {
           const byCode = (a: any, b: any) => (a.entity_code || '').localeCompare(b.entity_code || '', 'zh-CN');
-          const upRows = localUp.filter(n => (n as any)._affectedCode === ai.entity_code && (n.level ?? 0) > 0).sort(byCode);
+          // 向上溯源链：按 chain 原始顺序建树（兄弟按件号排序），再按展开状态展平为可见行
+          const upFiltered = localUp.filter(n => (n as any)._affectedCode === ai.entity_code && (n.level ?? 0) > 0);
+          const { visible: upVisible, meta: upMeta } = computeVisibleUpward(upFiltered, expandedUp, ai.entity_code || '');
           const downRows = localDown.filter(n => (n as any)._affectedCode === ai.entity_code).sort(byCode);
           return (
             <div key={ai.entity_id || ai.entity_code} className="bg-gray-50/50 rounded-lg border border-gray-200 p-3 mb-4">
@@ -644,15 +717,15 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
               <AffectedTable rows={[ai]} execMap={execMap} canExec={canExecute} ecoStatus={ecoStatus} ecoId={ecoId} onUpgrade={onExecuteUpgrade} onRelease={onExecuteRelease} onFreeze={onExecuteFreeze} onPublish={onExecutePublish} onViewItem={onViewItem} onEditItem={onEditItem} checkedIds={checkedExecIds} onToggleCheck={toggleChecked} />
 
               {/* Upward chain */}
-              {upRows.length > 0 && (<>
+              {upFiltered.length > 0 && (<>
                 <div className="text-xs font-semibold text-gray-600 mt-3 mb-1">📊 向上溯源链</div>
                 <div className="grid grid-cols-2 gap-4 mb-3">
                   {readOnly ? (<>
-                    <div><div className="text-xs text-gray-500 mb-1">ECR 评估</div><EditableUpward rows={upRows} onUpdate={() => {}} displayOnly /></div>
-                    <div><div className="text-xs text-gray-500 mb-1">ECO 执行后</div><ReadOnlyUpward rows={upRows} execMap={execMap} canExec={canExecute} ecoStatus={ecoStatus} ecoId={ecoId} onUpgrade={onExecuteUpgrade} onRelease={onExecuteRelease} onFreeze={onExecuteFreeze} onPublish={onExecutePublish} onViewItem={onViewItem} onEditItem={onEditItem} checkedIds={checkedExecIds} onToggleCheck={toggleChecked} /></div>
+                    <div><div className="text-xs text-gray-500 mb-1">ECR 评估</div><EditableUpward rows={upVisible} meta={upMeta} onToggle={toggleUp} onUpdate={() => {}} displayOnly /></div>
+                    <div><div className="text-xs text-gray-500 mb-1">ECO 执行后</div><ReadOnlyUpward rows={upVisible} meta={upMeta} onToggle={toggleUp} execMap={execMap} canExec={canExecute} ecoStatus={ecoStatus} ecoId={ecoId} onUpgrade={onExecuteUpgrade} onRelease={onExecuteRelease} onFreeze={onExecuteFreeze} onPublish={onExecutePublish} onViewItem={onViewItem} onEditItem={onEditItem} checkedIds={checkedExecIds} onToggleCheck={toggleChecked} /></div>
                   </>) : (<>
-                    <div><div className="text-xs text-gray-500 mb-1">ECR 评估（可编辑）</div><EditableUpward rows={upRows} onUpdate={(i, patch) => { const origIdx = localUp.indexOf(upRows[i]); if (origIdx >= 0) updateUp(origIdx, patch); }} /></div>
-                    <div><div className="text-xs text-gray-500 mb-1">ECO 执行后</div><ReadOnlyUpward rows={upRows} execMap={execMap} canExec={canExecute} ecoStatus={ecoStatus} ecoId={ecoId} onUpgrade={onExecuteUpgrade} onRelease={onExecuteRelease} onFreeze={onExecuteFreeze} onPublish={onExecutePublish} onViewItem={onViewItem} onEditItem={onEditItem} checkedIds={checkedExecIds} onToggleCheck={toggleChecked} /></div>
+                    <div><div className="text-xs text-gray-500 mb-1">ECR 评估（可编辑）</div><EditableUpward rows={upVisible} meta={upMeta} onToggle={toggleUp} onUpdate={(i, patch) => { const origIdx = localUp.indexOf(upVisible[i]); if (origIdx >= 0) updateUp(origIdx, patch); }} /></div>
+                    <div><div className="text-xs text-gray-500 mb-1">ECO 执行后</div><ReadOnlyUpward rows={upVisible} meta={upMeta} onToggle={toggleUp} execMap={execMap} canExec={canExecute} ecoStatus={ecoStatus} ecoId={ecoId} onUpgrade={onExecuteUpgrade} onRelease={onExecuteRelease} onFreeze={onExecuteFreeze} onPublish={onExecutePublish} onViewItem={onViewItem} onEditItem={onEditItem} checkedIds={checkedExecIds} onToggleCheck={toggleChecked} /></div>
                   </>)}
                 </div>
               </>)}

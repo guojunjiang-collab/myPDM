@@ -46,6 +46,12 @@ interface UpwardTreeNode {
   children: UpwardTreeNode[];
 }
 
+// 按件号对同级兄弟节点排序（不改变输入顺序——树的父子嵌套依赖输入的 level 序列）
+function sortUpwardSiblings(nodes: UpwardTreeNode[]): void {
+  nodes.sort((a, b) => (a.node.entity_code || '').localeCompare(b.node.entity_code || ''));
+  for (const n of nodes) sortUpwardSiblings(n.children);
+}
+
 function buildUpwardTree(items: BomImpactNode[]): UpwardTreeNode[] {
   const filtered = items.filter((item) => item.level !== 0 && !item.is_change_target);
   const roots: UpwardTreeNode[] = [];
@@ -62,6 +68,8 @@ function buildUpwardTree(items: BomImpactNode[]): UpwardTreeNode[] {
     }
     stack.push(treeNode);
   }
+  // 仅对兄弟排序，保持父→子→孙的层级相邻关系
+  sortUpwardSiblings(roots);
   return roots;
 }
 
@@ -94,15 +102,10 @@ export function ECRBomImpactView({
     [],
   );
 
+  // 前序遍历：兄弟已在 buildUpwardTree 中按件号排好序，展开后父项后紧跟其子/孙项
   const flatUpward = useMemo(
     () => flattenUpwardTreeExpanded(upwardTree, expandedKeys),
     [upwardTree, expandedKeys, flattenUpwardTreeExpanded],
-  );
-
-  // Sort: upward chain by entity_code ascending (siblings within tree)
-  const sortedFlatUpward = useMemo(
-    () => [...flatUpward].sort((a, b) => (a.node.entity_code || '').localeCompare(b.node.entity_code || '')),
-    [flatUpward],
   );
 
   // Sort: downward items by entity_code ascending
@@ -253,7 +256,7 @@ export function ECRBomImpactView({
                   </td>
                 </tr>
               ) : (
-                sortedFlatUpward.map((treeNode) => {
+                flatUpward.map((treeNode) => {
                   const node = treeNode.node;
                   const idx = upwardChain.indexOf(node);
                   const hasChildren = treeNode.children.length > 0;

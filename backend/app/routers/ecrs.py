@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User, Part, Assembly
 from app.models_ecr import ECR as ECRModel, ECRReviewRecord, ECRStatusLog, ECRAffectedItem
+from app.models_eco import ECO as ECOModel
 from app import crud_ecr, schemas_ecr
 from app.routers.auth import require_role
 
@@ -230,8 +231,22 @@ async def delete_ecr(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(["admin", "engineer"]))
 ):
-    """删除 ECR（仅草稿状态）"""
-    crud_ecr.delete_ecr(db, ecr_id)
+    """删除 ECR。被 ECO 引用的 ECR 不允许删除（引用限制）。"""
+    # 引用限制：若有未删除的 ECO 以本 ECR 为来源，则禁止删除
+    ref_ecos = (
+        db.query(ECOModel.eco_number)
+        .filter(ECOModel.ecr_id == ecr_id, ECOModel.deleted_at.is_(None))
+        .all()
+    )
+    if ref_ecos:
+        numbers = "、".join(n for (n,) in ref_ecos)
+        raise HTTPException(
+            status_code=400,
+            detail=f"该 ECR 已被 ECO（{numbers}）引用，不可删除；请先删除相关 ECO",
+        )
+
+    if not crud_ecr.delete_ecr(db, ecr_id):
+        raise HTTPException(status_code=404, detail="ECR 不存在或已删除")
     return {"message": "ECR 已删除"}
 
 

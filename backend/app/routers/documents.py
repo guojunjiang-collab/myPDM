@@ -139,7 +139,12 @@ async def get_document_references(doc_id: uuid.UUID, db: Session = Depends(get_d
 
 @router.post("/")
 async def create_document(doc: schemas.DocumentCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
-    existing = db.query(Document).filter(Document.code == doc.code, Document.version == doc.version).first()
+    # 仅匹配未删除记录：软删除的同编号+版本不应阻止新建（与 uix_doc_code_version 部分唯一索引一致）
+    existing = db.query(Document).filter(
+        Document.code == doc.code,
+        Document.version == doc.version,
+        Document.deleted_at.is_(None),
+    ).first()
     if existing:
         raise HTTPException(status_code=400, detail="该编号和版本的组合已存在")
     d = Document(**doc.model_dump())

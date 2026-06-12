@@ -3,7 +3,7 @@ import { Modal } from '../Modal';
 import { toast } from '../Toast';
 import { ecrApi, documentsApi, customFieldsApi } from '../../services/api';
 import { useAuthStore, canEdit, isAdmin, canDownload } from '../../stores/auth';
-import { exportEcrMarkdown } from '../../services/ecMarkdownExport';
+import { exportEcrPdf } from '../../services/ecPdfExport';
 import { useDataStore } from '../../stores/data';
 import { ECRStatusBadge, ECRPriorityBadge } from './ECRStatusBadge';
 import { ECRReviewPanel } from './ECRReviewPanel';
@@ -291,11 +291,11 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
         <h3 className="text-lg font-semibold">ECR 详情</h3>
         {detail && canDownload() && (
           <button
-            onClick={() => { try { exportEcrMarkdown(detail, statusLogs); } catch { toast.error('导出失败'); } }}
+            onClick={() => { try { exportEcrPdf(detail, statusLogs); } catch { toast.error('导出失败'); } }}
             className="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
-            title="导出为 Markdown 文档（展开所有信息）"
+            title="导出为 PDF 文档（展开所有信息，打印另存为 PDF）"
           >
-            📄 导出MD
+            📄 导出PDF
           </button>
         )}
       </div>

@@ -113,7 +113,9 @@ export function ECRList() {
       setDeleteId(null);
       loadEcrs();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '删除失败';
+      // 后端引用限制等校验信息放在 response.data.detail
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      const message = detail || (err instanceof Error ? err.message : '删除失败');
       toast.error(message);
     } finally {
       setDeleting(false);
