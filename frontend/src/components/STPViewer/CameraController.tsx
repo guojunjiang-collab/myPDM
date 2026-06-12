@@ -98,12 +98,9 @@ export function CameraController() {
   }, [viewTarget]);
 
   useFrame((_, delta) => {
-    // 计算相机相对注视中心的归一化方向（用于 ViewCube 立方体跟随）
-    const target = (controlsRef.current as any)?.target as THREE.Vector3 | undefined;
-    const dir = target
-      ? new THREE.Vector3().subVectors(camera.position, target).normalize()
-      : camera.position.clone().normalize();
-    useViewerStore.setState({ cameraDir: [dir.x, dir.y, dir.z] });
+    // 同步相机四元数到 store（用于 ViewCube 完美跟随）
+    const q = camera.quaternion;
+    useViewerStore.setState({ cameraQuat: [q.x, q.y, q.z, q.w] });
 
     if (!anim.current || !controlsRef.current) return;
     const { start, end, up, target: tgt } = anim.current;
@@ -114,12 +111,14 @@ export function CameraController() {
     camera.position.lerpVectors(start, end, eased);
     camera.up.copy(up);
     (controlsRef.current as any).target.copy(tgt);
+    camera.lookAt(tgt);
     (controlsRef.current as any).update();
 
     if (t >= 1) {
       camera.position.copy(end);
       camera.up.copy(up);
       (controlsRef.current as any).target.copy(tgt);
+      camera.lookAt(tgt);
       (controlsRef.current as any).update();
       anim.current = null;
     }

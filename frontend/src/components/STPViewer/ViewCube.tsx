@@ -9,29 +9,43 @@ const FACES: { key: string; label: string; css: string }[] = [
   { key: 'bottom', label: '下', css: 'rotateX(-90deg) translateZ(23px)' },
 ];
 
-function closestFace(dir: [number, number, number]): string {
-  const [px, py, pz] = dir; // 相机位置方向（从原点指向相机）
-  // 用户视线方向 = -相机位置方向
-  const vx = -px, vy = -py, vz = -pz;
-  const ax = Math.abs(vx), ay = Math.abs(vy), az = Math.abs(vz);
-  if (ax >= ay && ax >= az) return vx > 0 ? 'right' : 'left';
-  if (ay >= ax && ay >= az) return vy > 0 ? 'top' : 'bottom';
-  return vz > 0 ? 'front' : 'back';
+function quatToMatrix3d(x: number, y: number, z: number, w: number): string {
+  const xx = x * x, yy = y * y, zz = z * z;
+  const xy = x * y, xz = x * z, yz = y * z;
+  const xw = x * w, yw = y * w, zw = z * w;
+
+  const m11 = 1 - 2 * (yy + zz);
+  const m21 = 2 * (xy - zw);
+  const m31 = 2 * (xz + yw);
+
+  const m12 = 2 * (xy + zw);
+  const m22 = 1 - 2 * (xx + zz);
+  const m32 = 2 * (yz - xw);
+
+  const m13 = 2 * (xz - yw);
+  const m23 = 2 * (yz + xw);
+  const m33 = 1 - 2 * (xx + yy);
+
+  return `matrix3d(${m11},${m21},${m31},0, ${m12},${m22},${m32},0, ${m13},${m23},${m33},0, 0,0,0,1)`;
 }
 
 export function ViewCube() {
-  const cameraDir = useViewerStore((s) => s.cameraDir);
+  const quat = useViewerStore((s) => s.cameraQuat);
   const setViewTarget = useViewerStore((s) => s.setViewTarget);
-  const active = closestFace(cameraDir);
 
-  const [px, py, pz] = cameraDir;
-  // 用 rotate3d 避免 rotateX/rotateY 顺序耦合（万向节锁）
-  const axisX = -py;
-  const axisY = px;
-  const axisLen = Math.sqrt(axisX * axisX + axisY * axisY);
-  const a = axisLen > 0.001 ? axisX / axisLen : 0;
-  const b = axisLen > 0.001 ? axisY / axisLen : 0;
-  const angle = Math.acos(Math.max(-1, Math.min(1, pz))) * (180 / Math.PI);
+  const [qx, qy, qz, qw] = quat;
+
+  const cssTransform = quatToMatrix3d(-qx, qy, -qz, qw);
+
+  const fwdX = 2 * (qx * qz + qw * qy);
+  const fwdY = 2 * (qy * qz - qw * qx);
+  const fwdZ = 1 - 2 * (qx * qx + qy * qy);
+  const vx = -fwdX, vy = -fwdY, vz = -fwdZ;
+  const ax = Math.abs(vx), ay = Math.abs(vy), az = Math.abs(vz);
+  let active: string;
+  if (ax >= ay && ax >= az) active = vx > 0 ? 'right' : 'left';
+  else if (ay >= ax && ay >= az) active = vy > 0 ? 'top' : 'bottom';
+  else active = vz > 0 ? 'front' : 'back';
 
   return (
     <div
@@ -42,7 +56,7 @@ export function ViewCube() {
         className="relative w-full h-full"
         style={{
           transformStyle: 'preserve-3d',
-          transform: `rotate3d(${a}, ${b}, 0, ${angle}deg)`,
+          transform: cssTransform,
         }}
       >
         {FACES.map((f) => (

@@ -26,7 +26,7 @@ export interface ViewerState {
   wireframe: boolean;
   cameraMode: 'orthographic' | 'perspective';
   viewTarget: string | null;
-  cameraDir: [number, number, number];
+  cameraQuat: [number, number, number, number];
 
   // Actions
   setModelUrl: (url: string | null) => void;
@@ -66,7 +66,7 @@ const initialState = {
   wireframe: false,
   cameraMode: 'orthographic' as const,
   viewTarget: null as string | null,
-  cameraDir: [0, 0, 1] as [number, number, number],
+  cameraQuat: [0, 0, 0, 1] as [number, number, number, number],
 };
 
 export const useViewerStore = create<ViewerState>((set, get) => ({
