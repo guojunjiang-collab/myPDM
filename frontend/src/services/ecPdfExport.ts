@@ -279,7 +279,6 @@ async function buildEcoHtml(eco:any):Promise<string> {
   p.push(`<div class="info-c"><label>审批模式</label><div class="v">${e.review_mode==='all'?'会签':e.review_mode==='any'?'或签':'-'}</div></div>`);
   p.push(`<div class="info-c"><label>创建人</label><div class="v">${hsc(e.creator_name||'-')}</div></div>`);
   p.push(`<div class="info-c"><label>来源 ECR</label><div class="v">${hsc(e.ecr_number||'独立创建')}</div></div>`);
-  p.push(`<div class="info-c"><label>执行进度</label><div class="v">${e.execution_completed_count??0}/${e.execution_count??(e.execution_items?.length??0)}</div></div>`);
   p.push(`<div class="info-c"><label>创建时间</label><div class="v">${dt2(e.created_at)}</div></div>`);
   p.push(`<div class="info-c"><label>更新时间</label><div class="v">${dt2(e.updated_at)}</div></div>`);
   p.push(`</div></div>`);
