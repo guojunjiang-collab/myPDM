@@ -27,7 +27,7 @@ export function Toolbar() {
           return (
             <label
               key={axis}
-              className={`flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium uppercase cursor-pointer select-none transition-colors
+              className={`flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium uppercase cursor-pointer select-none transition-colors
                 ${plane ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}
                 ${i > 0 ? 'border-l border-gray-200' : ''}`}
             >
@@ -48,7 +48,7 @@ export function Toolbar() {
       {/* Measure mode */}
       <button
         onClick={() => setMeasureMode(measureMode === 'distance' ? 'off' : 'distance')}
-        className={`text-[11px] px-3 py-1.5 rounded-md font-medium transition-colors
+        className={`text-sm px-3 py-1.5 rounded-md font-medium transition-colors
           ${measureMode === 'distance'
             ? 'bg-blue-50 text-blue-600 border border-blue-200'
             : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-transparent'}`}
@@ -57,7 +57,7 @@ export function Toolbar() {
       </button>
 
       {/* Explode distance */}
-      <div className="flex items-center gap-2 text-[11px] text-gray-500">
+      <div className="flex items-center gap-2 text-sm text-gray-500">
         <span className="font-medium">爆炸</span>
         <input
           type="range"
@@ -75,7 +75,7 @@ export function Toolbar() {
       {/* Reset view */}
       <button
         onClick={triggerResetView}
-        className="text-[11px] px-3 py-1.5 rounded-md font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-transparent transition-colors"
+        className="text-sm px-3 py-1.5 rounded-md font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-transparent transition-colors"
       >
         重置
       </button>
@@ -83,7 +83,7 @@ export function Toolbar() {
       {/* Camera mode */}
       <button
         onClick={toggleCameraMode}
-        className={`text-[11px] px-3 py-1.5 rounded-md font-medium transition-colors
+        className={`text-sm px-3 py-1.5 rounded-md font-medium transition-colors
           ${cameraMode === 'orthographic'
             ? 'bg-blue-50 text-blue-600 border border-blue-200'
             : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-transparent'}`}
@@ -94,7 +94,7 @@ export function Toolbar() {
       {/* Wireframe */}
       <button
         onClick={toggleWireframe}
-        className={`text-[11px] px-3 py-1.5 rounded-md font-medium transition-colors
+        className={`text-sm px-3 py-1.5 rounded-md font-medium transition-colors
           ${wireframe
             ? 'bg-blue-50 text-blue-600 border border-blue-200'
             : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-transparent'}`}
@@ -108,11 +108,11 @@ export function Toolbar() {
           {(['x', 'y', 'z'] as const).map((axis) => {
             const plane = getPlane(axis);
             return plane ? (
-              <label key={axis} className="flex items-center gap-1.5 text-[10px] font-semibold uppercase text-gray-400">
+              <label key={axis} className="flex items-center gap-1.5 text-sm font-semibold uppercase text-gray-400">
                 {axis}
                 <button
                   onClick={() => toggleClipFlip(axis)}
-                  className={`text-[10px] px-1 rounded transition-colors ${plane.flip ? 'text-blue-500 bg-blue-50' : 'text-gray-400 hover:text-gray-600'}`}
+                  className={`text-sm px-1 rounded transition-colors ${plane.flip ? 'text-blue-500 bg-blue-50' : 'text-gray-400 hover:text-gray-600'}`}
                   title="切换剖面方向"
                 >
                   {plane.flip ? '>' : '<'}

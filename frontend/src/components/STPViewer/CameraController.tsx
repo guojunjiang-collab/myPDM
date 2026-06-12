@@ -58,7 +58,6 @@ export function CameraController() {
     const dist = target ? pos.distanceTo(target) : 5;
 
     if (cameraMode === 'orthographic') {
-      // 透视→平行：用当前距离和FOV计算等效frustumSize
       const fov = (camera as THREE.PerspectiveCamera).fov || 45;
       const frustumSize = 2 * dist * Math.tan((fov * Math.PI) / 360);
       const aspect = size.width / size.height;
@@ -71,7 +70,6 @@ export function CameraController() {
       newCam.quaternion.copy(quat);
       set({ camera: newCam as any });
     } else {
-      // 平行→透视：用当前frustumSize和距离计算等效FOV
       const cam = camera as THREE.OrthographicCamera;
       const frustumSize = (cam.top - cam.bottom) || 8;
       const fov = 2 * Math.atan(frustumSize / (2 * dist)) * (180 / Math.PI);
@@ -81,6 +79,16 @@ export function CameraController() {
       set({ camera: newCam as any });
     }
   }, [cameraMode, set, size]);
+
+  // 窗口大小变化时更新正交相机视锥，保持模型视觉大小不变
+  useEffect(() => {
+    if (cameraMode !== 'orthographic' || !(camera instanceof THREE.OrthographicCamera)) return;
+    const aspect = size.width / size.height;
+    const halfH = (camera.top - camera.bottom) / 2;
+    camera.left = -halfH * aspect;
+    camera.right = halfH * aspect;
+    camera.updateProjectionMatrix();
+  }, [size, cameraMode]);
 
   // Standard view animation
   useEffect(() => {

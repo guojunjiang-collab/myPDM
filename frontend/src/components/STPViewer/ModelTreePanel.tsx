@@ -65,7 +65,7 @@ function NodeRow({ node, depth }: { node: TreeNode; depth: number }) {
       <div
         ref={rowRef}
         onClick={() => selectNode(node.id)}
-        className={`group flex items-center gap-0.5 py-0.5 pr-2 cursor-pointer select-none text-[12px] transition-colors relative
+        className={`group flex items-center gap-0.5 py-0.5 pr-2 cursor-pointer select-none text-sm transition-colors relative
           ${selected ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}
         style={{ paddingLeft: indent }}
         title={node.name}
@@ -101,7 +101,7 @@ function NodeRow({ node, depth }: { node: TreeNode; depth: number }) {
 
         {/* Child count badge */}
         {isGroup && (
-          <span className="text-[10px] text-gray-400 tabular-nums bg-gray-100 rounded px-1 py-px ml-1">
+          <span className="text-sm text-gray-400 tabular-nums bg-gray-100 rounded px-1 py-px ml-1">
             {node.children.length}
           </span>
         )}
@@ -131,10 +131,10 @@ export function ModelTreePanel() {
     <div className="flex flex-col h-full bg-white border-r border-gray-200">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-100">
-        <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">模型树</span>
+        <span className="text-sm font-semibold text-gray-500 uppercase tracking-wider">模型树</span>
         <button
           onClick={() => selectNode(null)}
-          className="text-[10px] text-gray-400 hover:text-blue-500 transition-colors"
+          className="text-sm text-gray-400 hover:text-blue-500 transition-colors"
         >
           取消选中
         </button>
@@ -142,7 +142,7 @@ export function ModelTreePanel() {
 
       {/* Isolate mode toggle */}
       <label className="flex items-center justify-between px-3 py-1.5 border-b border-gray-100 cursor-pointer select-none hover:bg-gray-50/50 transition-colors">
-        <span className="text-[11px] text-gray-500">隔离模式</span>
+        <span className="text-sm text-gray-500">隔离模式</span>
         <div className="relative">
           <input
             type="checkbox"
