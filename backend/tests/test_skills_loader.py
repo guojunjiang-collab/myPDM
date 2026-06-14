@@ -60,3 +60,18 @@ def test_load_skills_from_custom_dir(tmp_path):
     (tmp_path / "ignore.txt").write_text("不是技能", encoding="utf-8")
     out = sl.load_skills(str(tmp_path))
     assert {s["name"] for s in out} == {"t1"}
+
+
+def test_load_skills_finds_examples():
+    sl._CACHE = None
+    names = {s["name"] for s in sl.load_skills()}
+    for n in ["project_summary_report", "bom_change_impact",
+              "bom_compare_report", "part_where_used"]:
+        assert n in names
+
+
+def test_project_summary_limited_to_admin_engineer():
+    sl._CACHE = None
+    s = sl.get_skill("project_summary_report", "guest")
+    assert s is None  # guest 不可见
+    assert sl.get_skill("project_summary_report", "engineer") is not None
