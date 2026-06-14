@@ -18,6 +18,7 @@ from . import document_builder
 from . import api_gateway
 from . import knowledge
 from . import attachment_reader
+from . import skills_loader
 
 DOWNLOAD_ROLES = {"admin", "engineer", "production"}
 CONTENT_READ_ROLES = {"admin", "engineer"}
@@ -207,6 +208,15 @@ def create_document(db: Session, user: User, title: str, content: str, format: s
     return {"doc_id": meta["doc_id"], "title": meta["title"], "_card": card}
 
 
+def use_skill(db: Session, user: User, name: str):
+    """取出某命名技能的步骤说明，供模型按其剧本用现有工具执行。"""
+    role = getattr(user, "role", None) or "guest"
+    skill = skills_loader.get_skill(name, role)
+    if not skill:
+        return {"error": f"技能不可用：{name}（不存在、已停用或当前角色无权）"}
+    return {"skill": name, "instructions": skill["body"]}
+
+
 REGISTRY = {
     "search_entity": {
         "execute": search_entity,
@@ -352,6 +362,17 @@ REGISTRY = {
             "parameters": {"type": "object", "properties": {
                 "entity": {"type": "string", "description": "实体名（可选）"},
             }},
+        }},
+    },
+    "use_skill": {
+        "execute": use_skill,
+        "schema": {"type": "function", "function": {
+            "name": "use_skill",
+            "description": ("获取并执行某个命名技能的步骤。当用户意图匹配系统提示中列出的"
+                            "某个可用技能时调用，得到其多步剧本后用现有工具逐步执行。"),
+            "parameters": {"type": "object", "properties": {
+                "name": {"type": "string", "description": "技能名（见系统提示的可用技能清单）"},
+            }, "required": ["name"]},
         }},
     },
 }

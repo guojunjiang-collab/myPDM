@@ -185,3 +185,23 @@ def test_read_attachment_content_missing_file(db, engineer_user, monkeypatch):
     out = tools.REGISTRY["read_attachment_content"]["execute"](
         db, engineer_user, attachment_id=str(att.id))
     assert "error" in out
+
+
+def test_use_skill_returns_instructions(db, engineer_user):
+    out = tools.REGISTRY["use_skill"]["execute"](
+        db, engineer_user, name="bom_change_impact")
+    assert out["skill"] == "bom_change_impact"
+    assert "trace_bom" in out["instructions"]
+
+
+def test_use_skill_unknown_returns_error(db, engineer_user):
+    out = tools.REGISTRY["use_skill"]["execute"](
+        db, engineer_user, name="不存在的技能")
+    assert "error" in out
+
+
+def test_use_skill_role_gated(db, guest_user):
+    # project_summary_report 限 admin/engineer，guest 不可用
+    out = tools.REGISTRY["use_skill"]["execute"](
+        db, guest_user, name="project_summary_report")
+    assert "error" in out
