@@ -68,7 +68,8 @@ def run_agent(messages: list, db: Session, user: User, emit: Callable[[dict], No
     skills_line = ""
     if skills:
         catalog = "\n".join(f"- {s['name']}：{s['description']}" for s in skills)
-        skills_line = ("\n\n可用技能（当用户意图匹配某技能时，先调用 use_skill 获取其步骤再执行）：\n"
+        skills_line = ("\n\n可用技能（当用户请求与下列某技能的适用场景匹配时，"
+                       "必须先调用 use_skill 获取该技能的步骤并严格据此执行，不要凭直觉跳过）：\n"
                        + catalog)
     convo = [{"role": "system", "content": SYSTEM_PROMPT + role_line + skills_line}] + list(messages)
 
