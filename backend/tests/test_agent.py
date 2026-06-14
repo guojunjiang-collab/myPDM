@@ -164,3 +164,13 @@ def test_system_prompt_requires_comprehensive_search():
     assert "全面检索" in p
     # 报告类请求需读附件正文、取完整字段
     assert "read_attachment_content" in p
+
+
+def test_system_message_includes_skill_catalog(db, engineer_user, make_fake_llm):
+    llm = make_fake_llm([[{"type": "text", "delta": "hi"},
+                          {"type": "final", "finish_reason": "stop", "tool_calls": []}]])
+    events, emit = _emit_collector()
+    agent.run_agent([{"role": "user", "content": "hi"}], db, engineer_user, emit, llm=llm)
+    sys_msg = llm.calls[0]["messages"][0]["content"]
+    assert "可用技能" in sys_msg
+    assert "project_summary_report" in sys_msg  # engineer 可见
