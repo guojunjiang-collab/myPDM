@@ -794,3 +794,37 @@ export interface SyncStatus {
   config_items: number;
 }
 
+// ===== 库存管理 =====
+export type InvDocType = 'inbound' | 'outbound' | 'transfer' | 'stocktake' | 'adjustment';
+export type InvDocStatus = 'draft' | 'reviewing' | 'approved' | 'posted' | 'rejected' | 'cancelled';
+
+export interface Warehouse {
+  id: string; code: string; name: string; type?: string;
+  default_keeper_id?: string | null; status: string; remark?: string;
+}
+export interface InvMaterial {
+  id: string; code: string; name: string; spec?: string; unit?: string;
+  source_type: 'part' | 'assembly' | 'standalone';
+  ref_entity_type?: string | null; ref_entity_id?: string | null;
+  track_mode: 'quantity' | 'batch'; safety_stock?: number | null; status: string;
+}
+export interface StockRow {
+  material_id: string; material_code: string; material_name: string; unit?: string;
+  warehouse_id: string; batch_no: string; quantity: number;
+  safety_stock?: number | null; is_low: boolean;
+}
+export interface InvDocLine {
+  id?: string; material_id: string; batch_no: string; quantity: number;
+  direction?: 'in' | 'out' | null; book_quantity?: number | null;
+  counted_quantity?: number | null; remark?: string;
+}
+export interface InvReviewer { user_id: string; seq?: number; user_name?: string; role?: string; }
+export interface InvDocument {
+  id: string; doc_number: string; doc_type: InvDocType; biz_type?: string;
+  status: InvDocStatus; warehouse_id?: string | null; to_warehouse_id?: string | null;
+  keeper_id?: string | null; keeper_name?: string; creator_name?: string;
+  reviewers?: InvReviewer[]; review_mode?: 'all' | 'any'; remark?: string;
+  lines?: InvDocLine[]; review_records?: any[]; status_logs?: any[];
+  created_at?: string; updated_at?: string;
+}
+
