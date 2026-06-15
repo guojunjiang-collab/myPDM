@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useInventoryStore } from '../../stores/inventory';
 import { inventoryApi } from '../../services/inventoryApi';
 import { Modal } from '../Modal';
@@ -7,7 +7,7 @@ import type { StockRow } from '../../types';
 export default function StockTab() {
   const { warehouses, loadWarehouses } = useInventoryStore();
   const [loading, setLoading] = useState(false);
-  const [rows, setRows] = useState<StockRow[]>([]);
+  const [allRows, setAllRows] = useState<StockRow[]>([]);
   const [material, setMaterial] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
   const [lowOnly, setLowOnly] = useState(false);
@@ -17,16 +17,23 @@ export default function StockTab() {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await inventoryApi.listStock({
-        material: material || undefined,
-        warehouse_id: warehouseId || undefined,
-        low_only: lowOnly || undefined,
-      });
-      setRows(res.data.items);
+      const res = await inventoryApi.listStock();
+      setAllRows(res.data.items);
     } finally { setLoading(false); }
   };
 
   useEffect(() => { loadWarehouses(); load(); /* eslint-disable-next-line */ }, []);
+
+  // 客户端即时过滤（边输入边搜索）
+  const rows = useMemo(() => {
+    const kw = material.trim().toLowerCase();
+    return allRows.filter((r) => {
+      if (kw && !(r.material_code?.toLowerCase().includes(kw) || r.material_name?.toLowerCase().includes(kw))) return false;
+      if (warehouseId && r.warehouse_id !== warehouseId) return false;
+      if (lowOnly && !r.is_low) return false;
+      return true;
+    });
+  }, [allRows, material, warehouseId, lowOnly]);
 
   const openLedger = async (row: StockRow) => {
     setLedgerFor(row);
@@ -40,21 +47,19 @@ export default function StockTab() {
     <div>
       {/* 工具栏 */}
       <div className="flex gap-2 mb-4 items-center">
-        <input placeholder="物料编码/名称..." value={material}
+        <input placeholder="搜索物料编码/名称..." value={material}
           onChange={(e) => setMaterial(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && load()}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 flex-1" />
         <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}
           className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
           <option value="">全部仓库</option>
           {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
-        <label className="text-sm text-gray-600 flex items-center gap-1.5">
+        <label className="text-sm text-gray-600 flex items-center gap-1.5 whitespace-nowrap">
           <input type="checkbox" checked={lowOnly} onChange={(e) => setLowOnly(e.target.checked)}
             className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
           仅看低库存
         </label>
-        <button onClick={load} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">查询</button>
       </div>
 
       {/* 表格 */}
@@ -73,8 +78,10 @@ export default function StockTab() {
           <tbody className="divide-y divide-gray-200">
             {loading ? (
               <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
-            ) : rows.length === 0 ? (
+            ) : allRows.length === 0 ? (
               <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
+            ) : rows.length === 0 ? (
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
             ) : rows.map((r, i) => (
               <tr key={i} className={`hover:bg-gray-50 ${r.is_low ? 'bg-red-50' : ''}`}>
                 <td className={`px-4 py-3 text-sm font-medium ${r.is_low ? 'text-red-600' : ''}`}>{r.material_code} {r.material_name}</td>
