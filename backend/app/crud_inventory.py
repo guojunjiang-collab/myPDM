@@ -153,3 +153,103 @@ def update_material(db: Session, m: InventoryMaterial, data: MaterialEdit) -> In
 def delete_material(db: Session, m: InventoryMaterial):
     m.deleted_at = datetime.now(timezone.utc)
     db.commit()
+
+
+# ════════════════════════ 库存余额 / 流水 ════════════════════════
+def _get_or_create_stock(db: Session, material_id, warehouse_id, batch_no: str) -> InventoryStock:
+    batch_no = batch_no or ""
+    stock = db.query(InventoryStock).filter(
+        InventoryStock.material_id == material_id,
+        InventoryStock.warehouse_id == warehouse_id,
+        InventoryStock.batch_no == batch_no,
+    ).with_for_update().first()  # PG 行锁；SQLite 下被忽略
+    if not stock:
+        stock = InventoryStock(material_id=material_id, warehouse_id=warehouse_id,
+                               batch_no=batch_no, quantity=0)
+        db.add(stock); db.flush()
+    return stock
+
+
+def _apply_movement(db, doc, line, warehouse_id, direction: str, qty: Decimal, operator: User):
+    if qty <= 0:
+        return
+    stock = _get_or_create_stock(db, line.material_id, warehouse_id, line.batch_no)
+    current = Decimal(stock.quantity or 0)
+    if direction == "out":
+        if current < qty:
+            raise HTTPException(
+                status_code=400,
+                detail=f"库存不足：物料 {line.material_id} 仓库 {warehouse_id} 当前 {current}，需出 {qty}",
+            )
+        new_balance = current - qty
+    else:
+        new_balance = current + qty
+    stock.quantity = new_balance
+    db.add(InventoryLedger(
+        material_id=line.material_id, warehouse_id=warehouse_id, batch_no=line.batch_no or "",
+        direction=direction, quantity=qty, balance_after=new_balance,
+        doc_id=doc.id, doc_type=doc.doc_type, doc_number=doc.doc_number, doc_line_id=line.id,
+        operator_id=operator.id, operator_name=operator.real_name,
+    ))
+
+
+def get_stock_quantity(db: Session, material_id, warehouse_id, batch_no: str = "") -> Decimal:
+    s = db.query(InventoryStock).filter(
+        InventoryStock.material_id == material_id,
+        InventoryStock.warehouse_id == warehouse_id,
+        InventoryStock.batch_no == (batch_no or ""),
+    ).first()
+    return Decimal(s.quantity) if s else Decimal(0)
+
+
+# ════════════════════════ 过账引擎 ════════════════════════
+def post_document(db: Session, doc: InventoryDocument, operator: User) -> InventoryDocument:
+    """审批通过(approved)的单据过账：单事务内写流水 + 改余额；任一行失败整单回滚。"""
+    if doc.status != "approved":
+        raise HTTPException(status_code=400, detail="仅已审批单据可过账")
+    lines = db.query(InventoryDocumentLine).filter(
+        InventoryDocumentLine.doc_id == doc.id
+    ).order_by(InventoryDocumentLine.sort_order).all()
+    if not lines:
+        raise HTTPException(status_code=400, detail="单据无明细，无法过账")
+
+    try:
+        for line in lines:
+            qty = Decimal(line.quantity or 0)
+            if doc.doc_type == "inbound":
+                _apply_movement(db, doc, line, doc.warehouse_id, "in", qty, operator)
+            elif doc.doc_type == "outbound":
+                _apply_movement(db, doc, line, doc.warehouse_id, "out", qty, operator)
+            elif doc.doc_type == "transfer":
+                if not doc.to_warehouse_id:
+                    raise HTTPException(status_code=400, detail="调拨单缺少目标仓")
+                _apply_movement(db, doc, line, doc.warehouse_id, "out", qty, operator)
+                _apply_movement(db, doc, line, doc.to_warehouse_id, "in", qty, operator)
+            elif doc.doc_type == "stocktake":
+                stock = _get_or_create_stock(db, line.material_id, doc.warehouse_id, line.batch_no)
+                book = Decimal(stock.quantity or 0)
+                counted = Decimal(line.counted_quantity if line.counted_quantity is not None else book)
+                line.book_quantity = book  # 记录过账时实时账面
+                diff = counted - book
+                if diff > 0:
+                    _apply_movement(db, doc, line, doc.warehouse_id, "in", diff, operator)
+                elif diff < 0:
+                    _apply_movement(db, doc, line, doc.warehouse_id, "out", -diff, operator)
+            elif doc.doc_type == "adjustment":
+                direction = line.direction or "in"
+                _apply_movement(db, doc, line, doc.warehouse_id, direction, qty, operator)
+            else:
+                raise HTTPException(status_code=400, detail=f"未知单据类型 {doc.doc_type}")
+
+        doc.status = "posted"
+        doc.posted_at = datetime.now(timezone.utc)
+        db.add(InventoryStatusLog(
+            doc_id=doc.id, from_status="approved", to_status="posted",
+            operator_id=operator.id, operator_name=operator.real_name, comment="过账",
+        ))
+        db.commit()
+        db.refresh(doc)
+        return doc
+    except HTTPException:
+        db.rollback()
+        raise
