@@ -18,7 +18,7 @@ from app.schemas_inventory import (
 
 # ── 状态流转规则 ──
 _ALLOWED_TRANSITIONS = {
-    "draft":     {"reviewing"},
+    "draft":     {"reviewing", "approved"},
     "reviewing": {"approved", "rejected", "draft"},
     "approved":  {"posted", "cancelled"},
     "posted":    set(),
@@ -253,3 +253,244 @@ def post_document(db: Session, doc: InventoryDocument, operator: User) -> Invent
     except Exception:
         db.rollback()
         raise
+
+
+# ════════════════════════ 单据编号 ════════════════════════
+def generate_doc_number(db: Session, doc_type: str) -> str:
+    prefix = f"{_DOC_PREFIX[doc_type]}-{datetime.now(timezone.utc):%Y%m%d}-"
+    max_number = db.query(sqlfunc.max(InventoryDocument.doc_number)).filter(
+        InventoryDocument.doc_number.like(f"{prefix}%")
+    ).scalar()
+    if max_number:
+        try:
+            seq = int(max_number[len(prefix):]) + 1
+        except ValueError:
+            seq = 1
+    else:
+        seq = 1
+    return f"{prefix}{seq:04d}"
+
+
+def _build_reviewers_json(db: Session, reviewer_items) -> list:
+    result = []
+    for item in (reviewer_items or []):
+        uid = item.user_id if hasattr(item, "user_id") else item.get("user_id", "")
+        seq = item.seq if hasattr(item, "seq") else item.get("seq", 0)
+        u_uuid = _uuid(uid)
+        if not u_uuid:
+            continue
+        user = db.query(User).filter(User.id == u_uuid).first()
+        if user:
+            result.append({"seq": seq, "user_id": str(u_uuid),
+                           "user_name": user.real_name, "role": user.role})
+    return result
+
+
+def _add_status_log(db, doc_id, from_status, to_status, operator: User, comment=""):
+    db.add(InventoryStatusLog(
+        doc_id=doc_id, from_status=from_status, to_status=to_status,
+        operator_id=operator.id, operator_name=operator.real_name, comment=comment,
+    ))
+
+
+def _set_lines(db, doc, lines):
+    db.query(InventoryDocumentLine).filter(InventoryDocumentLine.doc_id == doc.id).delete()
+    for idx, ln in enumerate(lines or []):
+        db.add(InventoryDocumentLine(
+            doc_id=doc.id, material_id=_uuid(ln.material_id), batch_no=ln.batch_no or "",
+            quantity=ln.quantity or 0, direction=ln.direction,
+            counted_quantity=ln.counted_quantity, remark=ln.remark, sort_order=idx,
+        ))
+
+
+# ════════════════════════ 单据 CRUD ════════════════════════
+def create_document(db: Session, data: DocumentCreate, creator_id) -> InventoryDocument:
+    keeper_id = _uuid(data.keeper_id)
+    # 默认带出主仓默认库管员
+    if not keeper_id and data.warehouse_id:
+        wh = db.query(Warehouse).filter(Warehouse.id == _uuid(data.warehouse_id)).first()
+        if wh and wh.default_keeper_id:
+            keeper_id = wh.default_keeper_id
+    keeper_name = None
+    if keeper_id:
+        ku = db.query(User).filter(User.id == keeper_id).first()
+        keeper_name = ku.real_name if ku else None
+
+    doc = InventoryDocument(
+        doc_number=generate_doc_number(db, data.doc_type),
+        doc_type=data.doc_type, biz_type=data.biz_type, status="draft",
+        warehouse_id=_uuid(data.warehouse_id), to_warehouse_id=_uuid(data.to_warehouse_id),
+        reviewers=_build_reviewers_json(db, data.reviewers), review_mode=data.review_mode,
+        keeper_id=keeper_id, keeper_name=keeper_name, creator_id=creator_id, remark=data.remark,
+    )
+    db.add(doc); db.commit(); db.refresh(doc)
+    _set_lines(db, doc, data.lines)
+    db.commit(); db.refresh(doc)
+    return doc
+
+
+def get_document(db: Session, doc_id: uuid.UUID) -> InventoryDocument:
+    doc = db.query(InventoryDocument).filter(
+        InventoryDocument.id == doc_id, InventoryDocument.deleted_at.is_(None)
+    ).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="单据不存在")
+    return doc
+
+
+def update_document(db: Session, doc: InventoryDocument, data: DocumentEdit) -> InventoryDocument:
+    if doc.status != "draft":
+        raise HTTPException(status_code=400, detail="仅草稿状态可编辑")
+    for field in ("biz_type", "review_mode", "remark"):
+        val = getattr(data, field)
+        if val is not None:
+            setattr(doc, field, val)
+    if data.warehouse_id is not None:
+        doc.warehouse_id = _uuid(data.warehouse_id)
+    if data.to_warehouse_id is not None:
+        doc.to_warehouse_id = _uuid(data.to_warehouse_id)
+    if data.keeper_id is not None:
+        doc.keeper_id = _uuid(data.keeper_id)
+        ku = db.query(User).filter(User.id == doc.keeper_id).first()
+        doc.keeper_name = ku.real_name if ku else None
+    if data.reviewers is not None:
+        doc.reviewers = _build_reviewers_json(db, data.reviewers)
+    if data.lines is not None:
+        _set_lines(db, doc, data.lines)
+    db.commit(); db.refresh(doc)
+    return doc
+
+
+def delete_document(db: Session, doc: InventoryDocument):
+    if doc.status not in ("draft", "rejected"):
+        raise HTTPException(status_code=400, detail="仅草稿/已拒绝单据可删除")
+    doc.deleted_at = datetime.now(timezone.utc)
+    db.commit()
+
+
+def list_documents(db: Session, params: DocumentListParams, current_user: User):
+    from sqlalchemy import or_, String
+    q = db.query(InventoryDocument).filter(InventoryDocument.deleted_at.is_(None))
+    if current_user and current_user.role not in ("admin",):
+        uid = str(current_user.id)
+        q = q.filter(or_(
+            InventoryDocument.creator_id == current_user.id,
+            InventoryDocument.keeper_id == current_user.id,
+            InventoryDocument.reviewers.cast(String).contains(f'"user_id": "{uid}"'),
+        ))
+    if params.doc_type:
+        q = q.filter(InventoryDocument.doc_type == params.doc_type)
+    if params.status:
+        q = q.filter(InventoryDocument.status == params.status)
+    if params.search:
+        q = q.filter(InventoryDocument.doc_number.ilike(f"%{params.search}%"))
+    total = q.count()
+    docs = q.order_by(InventoryDocument.created_at.desc()).offset(
+        (params.page - 1) * params.page_size
+    ).limit(params.page_size).all()
+    return docs, total
+
+
+# ════════════════════════ 状态流转 / 审批 ════════════════════════
+def _change_status(db, doc, to_status, operator: User, comment="", skip_log=False):
+    if to_status not in _ALLOWED_TRANSITIONS.get(doc.status, set()):
+        raise HTTPException(status_code=400, detail=f"不允许从 {doc.status} 变更为 {to_status}")
+    if not skip_log:
+        _add_status_log(db, doc.id, doc.status, to_status, operator, comment)
+    doc.status = to_status
+    if to_status in ("approved", "rejected"):
+        doc.reviewed_at = datetime.now(timezone.utc)
+    db.commit(); db.refresh(doc)
+    return doc
+
+
+def submit_document(db, doc, user: User) -> InventoryDocument:
+    if doc.status != "draft":
+        raise HTTPException(status_code=400, detail="仅草稿状态可提交")
+    db.query(InventoryReviewRecord).filter(InventoryReviewRecord.doc_id == doc.id).delete()
+    db.commit()
+    if not doc.reviewers:
+        return _change_status(db, doc, "approved", user, "无审批人，自动批准")
+    return _change_status(db, doc, "reviewing", user, "提交审批")
+
+
+def withdraw_document(db, doc, user: User) -> InventoryDocument:
+    if doc.status != "reviewing":
+        raise HTTPException(status_code=400, detail="仅审批中可撤回")
+    if user.role != "admin" and doc.creator_id != user.id:
+        raise HTTPException(status_code=403, detail="仅创建人或管理员可撤回")
+    db.query(InventoryReviewRecord).filter(InventoryReviewRecord.doc_id == doc.id).delete()
+    db.commit()
+    return _change_status(db, doc, "draft", user, "撤回审批")
+
+
+def _check_all_approved(db, doc) -> bool:
+    rids = {_uuid(r["user_id"]) for r in (doc.reviewers or []) if r.get("user_id")}
+    if not rids:
+        return False
+    approved = db.query(InventoryReviewRecord).filter(
+        InventoryReviewRecord.doc_id == doc.id, InventoryReviewRecord.decision == "approved"
+    ).all()
+    aids = {r.reviewer_id for r in approved}
+    return len(aids & rids) > 0 if doc.review_mode == "any" else rids.issubset(aids)
+
+
+def review_document(db, doc, reviewer: User, decision: str, comment: str = "") -> InventoryDocument:
+    if doc.status != "reviewing":
+        raise HTTPException(status_code=400, detail="单据不在审批中")
+    is_admin = reviewer.role == "admin"
+    is_reviewer = any(r.get("user_id") == str(reviewer.id) for r in (doc.reviewers or []))
+    if not is_admin and not is_reviewer:
+        raise HTTPException(status_code=403, detail="您不是该单据的指定审批人")
+
+    if decision == "returned":
+        db.query(InventoryReviewRecord).filter(InventoryReviewRecord.doc_id == doc.id).delete()
+        db.commit()
+        return _change_status(db, doc, "draft", reviewer, comment or "退回修改")
+
+    db.add(InventoryReviewRecord(
+        doc_id=doc.id, reviewer_id=reviewer.id, reviewer_name=reviewer.real_name,
+        decision=decision, comment=comment,
+    ))
+    db.commit()
+    if decision == "approved" and _check_all_approved(db, doc):
+        return _change_status(db, doc, "approved", reviewer, "审批通过")
+    if decision == "rejected":
+        return _change_status(db, doc, "rejected", reviewer, comment or "驳回")
+    db.refresh(doc)
+    return doc
+
+
+def assign_keeper(db, doc, keeper_user: User) -> InventoryDocument:
+    if doc.status not in ("draft", "reviewing", "approved"):
+        raise HTTPException(status_code=400, detail="过账后不可改派库管员")
+    if keeper_user.role not in ("admin", "engineer", "production"):
+        raise HTTPException(status_code=400, detail="该用户无库存操作权限，不能指派为库管员")
+    doc.keeper_id = keeper_user.id
+    doc.keeper_name = keeper_user.real_name
+    db.commit(); db.refresh(doc)
+    return doc
+
+
+def cancel_document(db, doc, user: User) -> InventoryDocument:
+    if doc.status != "approved":
+        raise HTTPException(status_code=400, detail="仅已审批未过账单据可取消")
+    return _change_status(db, doc, "cancelled", user, "取消")
+
+
+def get_document_lines(db, doc_id):
+    return db.query(InventoryDocumentLine).filter(
+        InventoryDocumentLine.doc_id == doc_id
+    ).order_by(InventoryDocumentLine.sort_order).all()
+
+
+def get_review_records(db, doc_id):
+    return db.query(InventoryReviewRecord).filter(
+        InventoryReviewRecord.doc_id == doc_id
+    ).order_by(InventoryReviewRecord.created_at).all()
+
+
+def get_status_logs(db, doc_id):
+    return db.query(InventoryStatusLog).filter(
+        InventoryStatusLog.doc_id == doc_id
+    ).order_by(InventoryStatusLog.created_at).all()
