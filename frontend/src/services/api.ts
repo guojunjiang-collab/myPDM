@@ -129,7 +129,7 @@ export const bomApi = {
 
 // 用户 API
 export const usersApi = {
-  list: (params?: { page?: number; page_size?: number; search?: string }) =>
+  list: (params?: { page?: number; page_size?: number; search?: string; skip?: number; limit?: number }) =>
     api.get('/users/', { params }),
   get: (id: string) => api.get(`/users/${id}`),
   create: (data: unknown) => api.post('/users/', data),

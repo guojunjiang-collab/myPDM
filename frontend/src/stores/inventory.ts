@@ -25,7 +25,7 @@ export const useInventoryStore = create<InvState>((set) => ({
     set({ materials: res.data.items });
   },
   loadUsers: async () => {
-    const res = await usersApi.list({ page: 1, page_size: 200 });
+    const res = await usersApi.list({ skip: 0, limit: 500 });
     const items = (res.data.items || res.data || []).map((u: any) => ({
       id: u.id, real_name: u.real_name, role: u.role,
     }));
