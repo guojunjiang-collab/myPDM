@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useInventoryStore } from '../../stores/inventory';
+import { useDataStore } from '../../stores/data';
 import { inventoryApi } from '../../services/inventoryApi';
-import { partsApi, assembliesApi } from '../../services/api';
 import { canEdit } from '../../stores/auth';
 import { Modal } from '../Modal';
 import type { InvMaterial } from '../../types';
@@ -15,13 +15,24 @@ export default function MaterialTab() {
   const [editing, setEditing] = useState<Partial<InvMaterial> | null>(null);
   const [pdmMode, setPdmMode] = useState(false);
   const [pdmKeyword, setPdmKeyword] = useState('');
-  const [pdmResults, setPdmResults] = useState<{ id: string; code: string; name: string; entity_type: string }[]>([]);
+
+  // PDM 零件/部件来自全局 DataStore（已全量预加载），客户端即时过滤
+  const storeParts = useDataStore((s) => s.parts);
+  const storeAssemblies = useDataStore((s) => s.assemblies);
+  const syncAll = useDataStore((s) => s.syncAll);
 
   const reload = async (s?: string) => {
     setLoading(true);
     try { await loadMaterials(s); } finally { setLoading(false); }
   };
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
+
+  // 打开「从 PDM 启用」时，若 store 尚未加载则拉一次
+  useEffect(() => {
+    if (pdmMode && storeParts.length === 0 && storeAssemblies.length === 0) {
+      syncAll();
+    }
+  }, [pdmMode, storeParts.length, storeAssemblies.length, syncAll]);
 
   const saveStandalone = async () => {
     if (!editing) return;
@@ -31,22 +42,21 @@ export default function MaterialTab() {
     await reload(search);
   };
 
-  const searchPdm = async () => {
-    const [p, a] = await Promise.all([
-      partsApi.list({ search: pdmKeyword }),
-      assembliesApi.list({ search: pdmKeyword }),
-    ]);
-    // /parts、/assemblies 返回裸数组（非 {items}）；兼容两种结构
-    const toArr = (d: any) => (Array.isArray(d) ? d : d?.items || []);
-    const parts = toArr(p.data).map((x: any) => ({ id: x.id, code: x.code, name: x.name, entity_type: 'part' }));
-    const asms = toArr(a.data).map((x: any) => ({ id: x.id, code: x.code, name: x.name, entity_type: 'assembly' }));
-    setPdmResults([...parts, ...asms]);
-  };
+  const pdmResults = useMemo(() => {
+    const kw = pdmKeyword.trim().toLowerCase();
+    if (!kw) return [];
+    const match = (x: any) => (x.code || '').toLowerCase().includes(kw) || (x.name || '').toLowerCase().includes(kw);
+    const parts = storeParts.filter(match).slice(0, 50)
+      .map((x: any) => ({ id: x.id, code: x.code, name: x.name, entity_type: 'part' as const }));
+    const asms = storeAssemblies.filter(match).slice(0, 50)
+      .map((x: any) => ({ id: x.id, code: x.code, name: x.name, entity_type: 'assembly' as const }));
+    return [...parts, ...asms];
+  }, [pdmKeyword, storeParts, storeAssemblies]);
 
   const enablePdm = async (r: { id: string; entity_type: string }) => {
     try {
       await inventoryApi.enableFromPdm({ entity_type: r.entity_type, entity_id: r.id, track_mode: 'quantity' });
-      setPdmMode(false); setPdmResults([]); setPdmKeyword('');
+      setPdmMode(false); setPdmKeyword('');
       await reload(search);
     } catch (err: any) {
       alert(err?.response?.data?.detail || '启用失败，请重试');
@@ -153,16 +163,14 @@ export default function MaterialTab() {
       {/* 从 PDM 启用 */}
       <Modal open={pdmMode} title="从 PDM 零件/部件启用库存" onClose={() => setPdmMode(false)} width="lg">
         <div className="space-y-3">
-          <div className="flex gap-2">
-            <input placeholder="搜索零件/部件..." value={pdmKeyword}
-              onChange={(e) => setPdmKeyword(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && searchPdm()}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
-            <button onClick={searchPdm} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">搜索</button>
-          </div>
+          <input placeholder="输入零件/部件编码或名称，边输入边搜索..." value={pdmKeyword} autoFocus
+            onChange={(e) => setPdmKeyword(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
           <div className="max-h-72 overflow-auto rounded-lg border border-gray-200 divide-y divide-gray-200">
-            {pdmResults.length === 0 ? (
+            {!pdmKeyword.trim() ? (
               <div className="px-4 py-8 text-center text-sm text-gray-400">输入关键词搜索 PDM 零件/部件</div>
+            ) : pdmResults.length === 0 ? (
+              <div className="px-4 py-8 text-center text-sm text-gray-400">无匹配结果</div>
             ) : pdmResults.map((r) => (
               <div key={`${r.entity_type}-${r.id}`} className="flex justify-between items-center px-4 py-2 text-sm hover:bg-gray-50">
                 <span><span className="text-gray-400">[{r.entity_type === 'part' ? '零件' : '部件'}]</span> {r.code} {r.name}</span>
