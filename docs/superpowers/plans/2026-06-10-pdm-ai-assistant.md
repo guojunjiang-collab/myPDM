@@ -8,7 +8,15 @@
 
 **Tech Stack:** 后端 FastAPI + SQLAlchemy 2.0 + `openai` SDK（调 DeepSeek）+ pytest（新增，TDD）；前端 React 18 + TypeScript + Zustand + Tailwind（沿用现有 build + 浏览器手动验证）。
 
-**关键设计文档:** [docs/superpowers/specs/2026-06-10-pdm-ai-assistant-design.md](../specs/2026-06-10-pdm-ai-assistant-design.md)
+**关键设计文档:**]
+
+"..\specs\2026-06-10-assistant-ui-polish-design.md"
+
+"..\specs\2026-06-10-assistant-read-gateway-knowledge-design.md"
+
+"..\specs\2026-06-10-pdm-ai-assistant-design.md"
+
+"..\specs\2026-06-10-assistant-role-aware-design.md"
 
 **新增依赖（已征得用户同意）:** 后端 `openai`、`pytest`；前端无新增。
 
@@ -17,6 +25,7 @@
 ## 模块与文件结构
 
 ### 后端（`backend/`）
+
 ```
 app/assistant/
 ├── __init__.py
@@ -37,6 +46,7 @@ pytest.ini
 ```
 
 ### 前端（`frontend/src/`）
+
 ```
 stores/assistant.ts                     # Zustand：会话历史、面板开关、流式状态
 services/assistantApi.ts                # fetch 流式连接 + 解析 data: 行 + 产物下载 URL
@@ -55,16 +65,17 @@ components/assistant/
 ```
 
 ### 事件协议（后端 `emit` → 前端解析）
+
 每个事件是一行 `data: {json}\n\n`，JSON 含 `type` 字段：
 
-| type | 字段 | 用途 |
-|---|---|---|
-| `token` | `{type, delta}` | 文本增量（打字机） |
-| `tool_start` | `{type, name, summary}` | "正在查询 BOM 树…" |
-| `tool_end` | `{type, name, ok}` | 工具完成 |
-| `card` | `{type, card_type, payload}` | 富卡片（table/markdown_doc/download/link） |
-| `done` | `{type}` | 本轮结束 |
-| `error` | `{type, message}` | 友好错误 |
+| type         | 字段                           | 用途                                    |
+| ------------ | ---------------------------- | ------------------------------------- |
+| `token`      | `{type, delta}`              | 文本增量（打字机）                             |
+| `tool_start` | `{type, name, summary}`      | "正在查询 BOM 树…"                         |
+| `tool_end`   | `{type, name, ok}`           | 工具完成                                  |
+| `card`       | `{type, card_type, payload}` | 富卡片（table/markdown_doc/download/link） |
+| `done`       | `{type}`                     | 本轮结束                                  |
+| `error`      | `{type, message}`            | 友好错误                                  |
 
 ---
 
@@ -73,13 +84,17 @@ components/assistant/
 ### Task 0.1：新增依赖与 pytest 配置
 
 **Files:**
+
 - Modify: `backend/requirements.txt`
+
 - Create: `backend/pytest.ini`
+
 - Create: `backend/tests/__init__.py`（空文件）
 
 - [ ] **Step 1: 追加依赖到 requirements.txt**
 
 在 `backend/requirements.txt` 末尾追加两行：
+
 ```
 openai==1.55.0
 pytest==8.3.4
@@ -88,6 +103,7 @@ pytest==8.3.4
 - [ ] **Step 2: 创建 pytest.ini**
 
 `backend/pytest.ini`：
+
 ```ini
 [pytest]
 pythonpath = .
@@ -102,10 +118,12 @@ python_files = test_*.py
 - [ ] **Step 4: 安装依赖并验证 pytest 可用**
 
 Run（在 `backend/` 下，建议本地 venv 或容器内）：
+
 ```
 pip install -r requirements.txt
 pytest --version
 ```
+
 Expected: 打印 `pytest 8.3.4`。
 
 - [ ] **Step 5: Commit**
@@ -120,6 +138,7 @@ git commit -m "chore(assistant): 引入 openai 与 pytest 依赖及配置"
 ### Task 0.2：pytest fixtures（内存数据库 + 测试用户 + 假 LLM）
 
 **Files:**
+
 - Create: `backend/tests/conftest.py`
 
 - [ ] **Step 1: 写 conftest.py**
@@ -127,6 +146,7 @@ git commit -m "chore(assistant): 引入 openai 与 pytest 依赖及配置"
 > **已实测前提（务必保留）**：模型用 PostgreSQL 的 `JSONB`/`UUID` 列。内存 SQLite 下，`UUID` 在 SQLAlchemy 2.0 原生可用，但 `JSONB` 必须经 `@compiles` 映射为 `JSON`，否则 `create_all` 失败。下面的 conftest 已包含该 shim，**不要删除**。已验证 `create_all`、UUID 主键、`child_id.in_([uuid])` 过滤均可正常工作。
 
 `backend/tests/conftest.py`：
+
 ```python
 """pytest 公共 fixtures：内存数据库、测试用户、假 LLM 客户端。"""
 import uuid
@@ -221,13 +241,17 @@ git commit -m "test(assistant): 添加 pytest fixtures（内存库/用户/假LLM
 ### Task 1.1：工具注册表与首批只读取数工具
 
 **Files:**
+
 - Create: `backend/app/assistant/__init__.py`（空文件）
+
 - Create: `backend/app/assistant/tools.py`
+
 - Test: `backend/tests/test_tools.py`
 
 - [ ] **Step 1: 写失败测试**
 
 `backend/tests/test_tools.py`：
+
 ```python
 import uuid
 from app.assistant import tools
@@ -271,6 +295,7 @@ Expected: FAIL（`ModuleNotFoundError: app.assistant.tools` 或 `KeyError`）。
 - [ ] **Step 4: 实现 tools.py（首批工具）**
 
 `backend/app/assistant/tools.py`：
+
 ```python
 """AI 助手工具注册表。
 
@@ -408,12 +433,15 @@ git commit -m "feat(assistant): 工具注册表与首批只读取数工具"
 ### Task 1.2：LLM 客户端封装（DeepSeek 流式）
 
 **Files:**
+
 - Create: `backend/app/assistant/llm_client.py`
+
 - Test: `backend/tests/test_llm_client.py`
 
 - [ ] **Step 1: 写失败测试（只测累积逻辑，不真连网）**
 
 `backend/tests/test_llm_client.py`：
+
 ```python
 from app.assistant.llm_client import accumulate_tool_calls
 
@@ -441,6 +469,7 @@ Expected: FAIL（`ImportError`）。
 - [ ] **Step 3: 实现 llm_client.py**
 
 `backend/app/assistant/llm_client.py`：
+
 ```python
 """DeepSeek（OpenAI 兼容）流式客户端封装。
 
@@ -522,12 +551,15 @@ git commit -m "feat(assistant): DeepSeek 流式客户端封装与 tool_call 累�
 ### Task 1.3：Agent 编排循环
 
 **Files:**
+
 - Create: `backend/app/assistant/agent.py`
+
 - Test: `backend/tests/test_agent.py`
 
 - [ ] **Step 1: 写失败测试**
 
 `backend/tests/test_agent.py`：
+
 ```python
 import json
 import uuid
@@ -598,6 +630,7 @@ Expected: FAIL（`ImportError`）。
 - [ ] **Step 3: 实现 agent.py**
 
 `backend/app/assistant/agent.py`：
+
 ```python
 """AI 助手 Agent 编排循环。"""
 import json
@@ -678,6 +711,7 @@ def run_agent(messages: list, db: Session, user: User, emit: Callable[[dict], No
 - [ ] **Step 4: 临时占位 sanitizer 以通过导入**
 
 为让本任务测试可跑，先建最小 `backend/app/assistant/sanitizer.py`（Phase 5 再补完整逻辑与测试）：
+
 ```python
 """出境前脱敏（Phase 5 完善）。当前为透传占位。"""
 def sanitize_for_llm(data):
@@ -701,13 +735,17 @@ git commit -m "feat(assistant): Agent 编排循环（工具调用/卡片/上限�
 ### Task 1.4：SSE 聊天端点
 
 **Files:**
+
 - Create: `backend/app/routers/assistant.py`
+
 - Modify: `backend/app/main.py`（注册路由）
+
 - Test: `backend/tests/test_assistant_api.py`
 
 - [ ] **Step 1: 写失败测试（用 FastAPI TestClient + 依赖覆盖）**
 
 `backend/tests/test_assistant_api.py`：
+
 ```python
 import json
 from fastapi.testclient import TestClient
@@ -745,6 +783,7 @@ Expected: FAIL（404 或 ImportError）。
 - [ ] **Step 3: 实现 routers/assistant.py**
 
 `backend/app/routers/assistant.py`：
+
 ```python
 """AI 助手 SSE 端点。"""
 import json
@@ -813,15 +852,18 @@ async def chat(
 - [ ] **Step 4: 在 main.py 注册路由**
 
 修改 `backend/app/main.py`：
-1. 在路由 import 区（`from .routers.admin import router as admin_router` 附近）加：
-```python
-from .routers.assistant import router as assistant_router
-```
-2. 在 `app.include_router(admin_router, prefix="/api")` 之后加：
-```python
-app.include_router(assistant_router, prefix="/api")
-```
 
+1. 在路由 import 区（`from .routers.admin import router as admin_router` 附近）加：
+   
+   ```python
+   from .routers.assistant import router as assistant_router
+   ```
+
+2. 在 `app.include_router(admin_router, prefix="/api")` 之后加：
+   
+   ```python
+   app.include_router(assistant_router, prefix="/api")
+   ```
 - [ ] **Step 5: 运行确认通过**
 
 Run: `cd backend && pytest tests/test_assistant_api.py -v`
@@ -846,7 +888,9 @@ git commit -m "feat(assistant): SSE 聊天端点并注册路由"
 ### Task 2.1：diff_bom 工具（小 BOM 原始数据 / 大 BOM 服务端预处理）
 
 **Files:**
+
 - Modify: `backend/app/assistant/tools.py`
+
 - Test: `backend/tests/test_tools.py`（追加）
 
 - [ ] **Step 1: 追加失败测试**
@@ -854,6 +898,7 @@ git commit -m "feat(assistant): SSE 聊天端点并注册路由"
 > `get_bom_tree_recursive` 依赖 PostgreSQL 递归 CTE，内存 SQLite 跑不了，因此用 monkeypatch 替换它来控制节点数，DB 无关地覆盖「小→raw / 大→preprocessed」两条路径。
 
 在 `backend/tests/test_tools.py` 末尾追加：
+
 ```python
 def _make_assembly(db, code, name):
     a = models.Assembly(id=uuid.uuid4(), code=code, name=name, status="active")
@@ -906,11 +951,14 @@ Expected: FAIL（`KeyError: 'diff_bom'`）。
 - [ ] **Step 3: 实现 diff_bom 并注册**
 
 在 `backend/app/assistant/tools.py` 顶部 import 区追加：
+
 ```python
 import os
 from ..bom import compare
 ```
+
 追加函数（放在 REGISTRY 定义之前）：
+
 ```python
 def _flatten_tree(db, etype, eid):
     if etype != "assembly":
@@ -958,7 +1006,9 @@ def diff_bom(db: Session, user: User, left_id: str, right_id: str,
     return {"mode": "preprocessed", "diff": diff, "_card": card,
             "note": "BOM 较大，已服务端预处理为差异。"}
 ```
+
 在 `REGISTRY` 字典中追加一项：
+
 ```python
     "diff_bom": {
         "execute": diff_bom,
@@ -995,7 +1045,9 @@ git commit -m "feat(assistant): diff_bom 双通道（小BOM原始/大BOM预处�
 ### Task 3.1：trace_bom 反查工具
 
 **Files:**
+
 - Modify: `backend/app/assistant/tools.py`
+
 - Test: `backend/tests/test_tools.py`（追加）
 
 - [ ] **Step 1: 追加失败测试**
@@ -1020,6 +1072,7 @@ Expected: FAIL（`KeyError: 'trace_bom'`）。
 - [ ] **Step 3: 实现 trace_bom**
 
 在 `tools.py` 追加函数（复用 BOM 反查的递归 CTE，但 SQLite 测试库需兼容——用 SQLAlchemy ORM 逐层查询，避免 PG 专有语法）：
+
 ```python
 def trace_bom(db: Session, user: User, entity_type: str, entity_id: str, max_level: int = 10):
     from ..models import BOMItem
@@ -1048,7 +1101,9 @@ def trace_bom(db: Session, user: User, entity_type: str, entity_id: str, max_lev
         frontier = next_frontier
     return {"parents": parents}
 ```
+
 在 REGISTRY 追加：
+
 ```python
     "trace_bom": {
         "execute": trace_bom,
@@ -1080,7 +1135,9 @@ git commit -m "feat(assistant): trace_bom 反查工具（ORM 逐层，兼容测�
 ### Task 3.2：下载/导出工具 + 权限守卫
 
 **Files:**
+
 - Modify: `backend/app/assistant/tools.py`
+
 - Test: `backend/tests/test_tools.py`（追加）
 
 - [ ] **Step 1: 追加失败测试（含访客越权被拒）**
@@ -1109,6 +1166,7 @@ Expected: FAIL（`KeyError: 'export_bom'`）。
 - [ ] **Step 3: 实现下载/导出工具**
 
 在 `tools.py` 追加（`DOWNLOAD_ROLES` 已在 Task 1.1 定义）：
+
 ```python
 def export_bom(db: Session, user: User, type: str, id: str):
     if user.role not in DOWNLOAD_ROLES:
@@ -1126,7 +1184,9 @@ def download_document(db: Session, user: User, attachment_id: str):
     card = {"card_type": "download", "payload": {"label": "下载文档", "url": url}}
     return {"url": url, "_card": card}
 ```
+
 REGISTRY 追加：
+
 ```python
     "export_bom": {
         "execute": export_bom,
@@ -1158,12 +1218,15 @@ REGISTRY 追加：
 在 `backend/app/routers/bom.py` 末尾追加（复用已存在的 `compare.get_bom_tree_recursive`；文件顶部已 `from ..bom import compare`、`from fastapi.responses` 需新增 import）：
 
 文件顶部 import 区追加：
+
 ```python
 from fastapi.responses import StreamingResponse
 import csv
 import io
 ```
+
 追加端点：
+
 ```python
 @router.get("/export/{item_type}/{item_id}")
 async def export_bom_csv(
@@ -1209,12 +1272,15 @@ git commit -m "feat(assistant): 下载/导出工具、CSV导出端点与下载�
 ### Task 4.1：document_builder（Markdown 产物落地）
 
 **Files:**
+
 - Create: `backend/app/assistant/document_builder.py`
+
 - Test: `backend/tests/test_document_builder.py`
 
 - [ ] **Step 1: 写失败测试**
 
 `backend/tests/test_document_builder.py`：
+
 ```python
 import os
 from app.assistant import document_builder as db_mod
@@ -1250,6 +1316,7 @@ Expected: FAIL（`ImportError`）。
 - [ ] **Step 3: 实现 document_builder.py**
 
 `backend/app/assistant/document_builder.py`：
+
 ```python
 """AI 文档产物组装与落地（v1 仅 Markdown，预留 docx/xlsx/pdf）。"""
 import os
@@ -1310,13 +1377,17 @@ git commit -m "feat(assistant): document_builder Markdown 产物落地"
 ### Task 4.2：create_document 工具 + 产物下载端点
 
 **Files:**
+
 - Modify: `backend/app/assistant/tools.py`
+
 - Modify: `backend/app/routers/assistant.py`
+
 - Test: `backend/tests/test_tools.py`、`backend/tests/test_assistant_api.py`（追加）
 
 - [ ] **Step 1: 追加失败测试**
 
 `test_tools.py` 追加：
+
 ```python
 def test_create_document_returns_markdown_doc_card(db, engineer_user, tmp_path, monkeypatch):
     monkeypatch.setenv("UPLOAD_DIR", str(tmp_path))
@@ -1325,7 +1396,9 @@ def test_create_document_returns_markdown_doc_card(db, engineer_user, tmp_path, 
     assert out["_card"]["card_type"] == "markdown_doc"
     assert out["_card"]["payload"]["download_url"].endswith("/download")
 ```
+
 `test_assistant_api.py` 追加：
+
 ```python
 def test_artifact_download(db, engineer_user, tmp_path, monkeypatch):
     monkeypatch.setenv("UPLOAD_DIR", str(tmp_path))
@@ -1349,6 +1422,7 @@ Expected: FAIL。
 - [ ] **Step 3: 实现 create_document 工具**
 
 `tools.py` 顶部 import 追加：`from . import document_builder`。追加函数与注册：
+
 ```python
 def create_document(db: Session, user: User, title: str, content: str, format: str = "md"):
     meta = document_builder.build_document(title=title, content=content, fmt=format)
@@ -1358,6 +1432,7 @@ def create_document(db: Session, user: User, title: str, content: str, format: s
     # 不把全文回灌模型（节省 token），只回执行结果
     return {"doc_id": meta["doc_id"], "title": meta["title"], "_card": card}
 ```
+
 ```python
     "create_document": {
         "execute": create_document,
@@ -1377,6 +1452,7 @@ def create_document(db: Session, user: User, title: str, content: str, format: s
 - [ ] **Step 4: 实现产物下载端点**
 
 `routers/assistant.py` 追加（文件顶部 import 追加 `from fastapi import HTTPException` 与 `from ..assistant import document_builder`）：
+
 ```python
 @router.get("/artifacts/{doc_id}/download")
 async def download_artifact(
@@ -1410,12 +1486,15 @@ git commit -m "feat(assistant): create_document 工具与产物下载端点"
 ### Task 5.1：sanitizer 字段白名单/脱敏
 
 **Files:**
+
 - Modify: `backend/app/assistant/sanitizer.py`
+
 - Test: `backend/tests/test_sanitizer.py`
 
 - [ ] **Step 1: 写失败测试**
 
 `backend/tests/test_sanitizer.py`：
+
 ```python
 from app.assistant.sanitizer import sanitize_for_llm
 
@@ -1442,6 +1521,7 @@ Expected: FAIL（占位实现不脱敏）。
 - [ ] **Step 3: 实现 sanitizer.py（替换占位）**
 
 `backend/app/assistant/sanitizer.py`：
+
 ```python
 """出境前脱敏：递归剔除敏感字段。
 
@@ -1486,12 +1566,15 @@ git commit -m "feat(assistant): 出境前字段脱敏并接入 Agent 回灌"
 ### Task 5.2：.env 配置项与文档
 
 **Files:**
+
 - Modify: `.env`
+
 - Modify: `AGENTS.md`（在 API 概览补一节）
 
 - [ ] **Step 1: 追加 .env 配置**
 
 在项目根 `.env` 追加：
+
 ```
 DEEPSEEK_API_KEY=
 DEEPSEEK_BASE_URL=https://api.deepseek.com
@@ -1505,6 +1588,7 @@ ASSISTANT_SENSITIVE_FIELDS=
 
 Run: `grep -n "environment\|DEEPSEEK\|UPLOAD_DIR" docker-compose.yml`
 若 `bom_backend` 的 `environment` 未透传上述变量，在其 `environment:` 下追加：
+
 ```yaml
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
@@ -1517,6 +1601,7 @@ Run: `grep -n "environment\|DEEPSEEK\|UPLOAD_DIR" docker-compose.yml`
 - [ ] **Step 3: 在 AGENTS.md 追加「AI 助手」接口小节**
 
 在 `AGENTS.md` 的「📝 API 接口概览」末尾追加：
+
 ```markdown
 ### AI 助手
 
@@ -1540,12 +1625,15 @@ git commit -m "chore(assistant): 配置项透传与文档补充"
 ### Task 6.1：类型定义与 Zustand 会话 store
 
 **Files:**
+
 - Create: `frontend/src/types/assistant.ts`
+
 - Create: `frontend/src/stores/assistant.ts`
 
 - [ ] **Step 1: 写类型定义**
 
 `frontend/src/types/assistant.ts`：
+
 ```typescript
 export type CardType = 'table' | 'markdown_doc' | 'download' | 'link';
 
@@ -1573,6 +1661,7 @@ export type SSEEvent =
 - [ ] **Step 2: 写 store**
 
 `frontend/src/stores/assistant.ts`：
+
 ```typescript
 import { create } from 'zustand';
 import type { ChatMessage, AssistantCard } from '../types/assistant';
@@ -1648,12 +1737,15 @@ git commit -m "feat(assistant-fe): 会话类型与 Zustand store"
 ### Task 6.2：SSE 流式客户端与 hook
 
 **Files:**
+
 - Create: `frontend/src/services/assistantApi.ts`
+
 - Create: `frontend/src/hooks/useAssistantChat.ts`
 
 - [ ] **Step 1: 写 assistantApi.ts（fetch 流式读取）**
 
 `frontend/src/services/assistantApi.ts`：
+
 ```typescript
 import { useAuthStore } from '../stores/auth';
 import type { SSEEvent, ChatMessage } from '../types/assistant';
@@ -1712,6 +1804,7 @@ export function authedDownload(url: string): void {
 - [ ] **Step 2: 写 hook**
 
 `frontend/src/hooks/useAssistantChat.ts`：
+
 ```typescript
 import { useCallback } from 'react';
 import { useAssistantStore } from '../stores/assistant';
@@ -1762,10 +1855,15 @@ git commit -m "feat(assistant-fe): SSE 流式客户端与聊天 hook"
 ### Task 6.3：卡片组件
 
 **Files:**
+
 - Create: `frontend/src/components/assistant/cards/TextCard.tsx`
+
 - Create: `frontend/src/components/assistant/cards/TableCard.tsx`
+
 - Create: `frontend/src/components/assistant/cards/MarkdownCard.tsx`
+
 - Create: `frontend/src/components/assistant/cards/DownloadCard.tsx`
+
 - Create: `frontend/src/components/assistant/cards/LinkCard.tsx`
 
 - [ ] **Step 1: TableCard.tsx**
@@ -1877,9 +1975,13 @@ git commit -m "feat(assistant-fe): 富卡片组件（table/markdown/download/lin
 ### Task 6.4：消息流、输入框、悬浮面板并挂载
 
 **Files:**
+
 - Create: `frontend/src/components/assistant/MessageList.tsx`
+
 - Create: `frontend/src/components/assistant/ChatInput.tsx`
+
 - Create: `frontend/src/components/assistant/FloatingAssistant.tsx`
+
 - Modify: `frontend/src/components/Layout.tsx`（挂载悬浮组件）
 
 - [ ] **Step 1: MessageList.tsx**
@@ -1982,10 +2084,13 @@ export default function FloatingAssistant() {
 
 先确认 Layout 结构：`grep -n "return\|</" frontend/src/components/Layout.tsx | head`。
 在 `frontend/src/components/Layout.tsx` 顶部 import：
+
 ```typescript
 import FloatingAssistant from './assistant/FloatingAssistant';
 ```
+
 在 Layout 的最外层返回容器内、闭合标签前插入：
+
 ```tsx
       <FloatingAssistant />
 ```
@@ -1996,14 +2101,17 @@ Run: `cd frontend && npm run build`
 Expected: 构建成功。
 
 - [ ] **Step 6: 浏览器手动验证**
-
 1. 起后端（容器内或本地）并在 `.env` 填入有效 `DEEPSEEK_API_KEY`，重启 `bom_backend`。
-2. `docker-compose up -d --force-recreate nginx`，浏览器 Ctrl+F5。
-3. 登录后右下角出现 AI 悬浮球；点开输入"搜索 P-100"，确认有流式文字返回。
-4. 输入"对比 A-1 和 A-2 的 BOM"（用库中真实编码），确认返回表格卡片。
-5. 输入"把刚才的对比写成一份变更报告文档"，确认出现可下载的 markdown_doc 卡片，点下载得到 .md。
-6. 用 guest 账号登录，要求下载，确认被礼貌拒绝。
 
+2. `docker-compose up -d --force-recreate nginx`，浏览器 Ctrl+F5。
+
+3. 登录后右下角出现 AI 悬浮球；点开输入"搜索 P-100"，确认有流式文字返回。
+
+4. 输入"对比 A-1 和 A-2 的 BOM"（用库中真实编码），确认返回表格卡片。
+
+5. 输入"把刚才的对比写成一份变更报告文档"，确认出现可下载的 markdown_doc 卡片，点下载得到 .md。
+
+6. 用 guest 账号登录，要求下载，确认被礼貌拒绝。
 - [ ] **Step 7: Commit**
 
 ```bash
