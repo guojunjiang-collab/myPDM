@@ -29,7 +29,7 @@ const navItems: (NavItem | NavSeparator)[] = [
   { type: 'separator' },
   { path: '/configuration', label: '构型管理（试用）', icon: '📐', roles: ['admin', 'engineer', 'production', 'guest'] },
   { path: '/ec', label: '变更管理（试用）', icon: '🔄', roles: ['admin', 'engineer', 'production', 'guest'] },
-  { path: '/inventory', label: '库存管理（开发中）', icon: '🏗️', roles: ['admin', 'engineer', 'production', 'guest'] },
+  { path: '/inventory', label: '库存管理', icon: '🏬', roles: ['admin', 'engineer', 'production', 'guest'] },
   { path: '/business', label: '业务管理（开发中）', icon: '💼', roles: ['admin', 'engineer', 'production', 'guest'] },
   { type: 'separator' },
   { path: '/users', label: '用户管理', icon: '👥', roles: ['admin', 'engineer', 'production', 'guest'] },
