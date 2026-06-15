@@ -50,11 +50,12 @@ export default function MaterialTab() {
   return (
     <div>
       {/* 工具栏 */}
-      <div className="flex gap-2 mb-4">
-        <input placeholder="搜索编码/名称..." value={search}
+      <div className="flex items-center gap-2 mb-4">
+        <input type="text" placeholder="搜索编码/名称..." value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && reload(search)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 flex-1" />
+          className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
+        <div className="flex-1" />
         {canEdit() && (
           <>
             <button onClick={() => setPdmMode(true)}

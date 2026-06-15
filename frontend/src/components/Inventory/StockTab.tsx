@@ -46,18 +46,18 @@ export default function StockTab() {
   return (
     <div>
       {/* 工具栏 */}
-      <div className="flex gap-2 mb-4 items-center">
-        <input placeholder="搜索物料编码/名称..." value={material}
+      <div className="flex items-center gap-2 mb-4">
+        <input type="text" placeholder="搜索物料编码/名称..." value={material}
           onChange={(e) => setMaterial(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 flex-1" />
+          className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
         <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}
           className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
           <option value="">全部仓库</option>
           {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
-        <label className="text-sm text-gray-600 flex items-center gap-1.5 whitespace-nowrap">
+        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm whitespace-nowrap">
           <input type="checkbox" checked={lowOnly} onChange={(e) => setLowOnly(e.target.checked)}
-            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+            className="w-3.5 h-3.5" />
           仅看低库存
         </label>
       </div>
