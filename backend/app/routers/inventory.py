@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User
-from app.models_inventory import InventoryStock, InventoryMaterial, InventoryLedger
+from app.models_inventory import InventoryStock, InventoryMaterial, InventoryLedger, InventoryDocumentLine
 from app import crud_inventory
 from app.schemas_inventory import (
     WarehouseCreate, WarehouseEdit, MaterialCreate, MaterialEdit, MaterialEnableFromPDM,
@@ -140,7 +140,22 @@ async def list_documents(page: int = Query(1, ge=1), page_size: int = Query(20, 
                          current_user: User = Depends(require_role(READ_ROLES))):
     params = DocumentListParams(page=page, page_size=page_size, doc_type=doc_type, status=status, search=search)
     docs, total = crud_inventory.list_documents(db, params, current_user)
-    return {"items": [_doc_brief(db, d) for d in docs], "total": total, "page": page, "page_size": page_size}
+    items = [_doc_brief(db, d) for d in docs]
+    # 批量取每张单据的物料摘要（供前端按物料/单据内容搜索），避免逐单 N+1
+    doc_ids = [d.id for d in docs]
+    if doc_ids:
+        rows = (
+            db.query(InventoryDocumentLine.doc_id, InventoryMaterial.code, InventoryMaterial.name)
+            .join(InventoryMaterial, InventoryDocumentLine.material_id == InventoryMaterial.id)
+            .filter(InventoryDocumentLine.doc_id.in_(doc_ids))
+            .all()
+        )
+        mat_map: dict = {}
+        for did, code, name in rows:
+            mat_map.setdefault(did, []).append(f"{code} {name}")
+        for it, d in zip(items, docs):
+            it["materials"] = " ".join(mat_map.get(d.id, []))
+    return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
 @router.post("/documents")

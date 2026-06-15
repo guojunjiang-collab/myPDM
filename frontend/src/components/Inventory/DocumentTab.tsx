@@ -52,7 +52,7 @@ export default function DocumentTab() {
     if (!kw) return docs;
     return docs.filter((d) => {
       const typeLabel = DOC_TYPES.find((t) => t.key === d.doc_type)?.label || '';
-      return [d.doc_number, d.biz_type, d.creator_name, d.keeper_name, typeLabel]
+      return [d.doc_number, d.biz_type, d.creator_name, d.keeper_name, typeLabel, d.materials]
         .some((v) => (v || '').toLowerCase().includes(kw));
     });
   }, [docs, search]);
@@ -72,7 +72,7 @@ export default function DocumentTab() {
     <div>
       {/* 工具栏 */}
       <div className="flex gap-2 mb-4 items-center">
-        <input type="text" placeholder="搜索单据号/业务/创建人..." value={search}
+        <input type="text" placeholder="搜索单据号/业务/创建人/物料..." value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-52 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
         <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className={selectCls}>

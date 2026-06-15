@@ -40,3 +40,18 @@ def test_full_inbound_flow_via_api(client, db):
     # 库存查询
     stock = c.get("/api/inventory/stock").json()
     assert any(s["quantity"] == 10.0 for s in stock["items"])
+
+
+def test_document_list_includes_materials_summary(client, db):
+    """单据列表带出明细物料摘要，供前端按物料/单据内容搜索。"""
+    c, user = client
+    wh = c.post("/api/inventory/warehouses", json={"code": "WH01", "name": "原料库", "type": "raw"}).json()
+    mat = c.post("/api/inventory/materials", json={"code": "M001", "name": "螺丝", "unit": "个"}).json()
+    c.post("/api/inventory/documents", json={
+        "doc_type": "inbound", "warehouse_id": wh["id"], "keeper_id": str(user.id),
+        "lines": [{"material_id": mat["id"], "quantity": 10}],
+    })
+    items = c.get("/api/inventory/documents").json()["items"]
+    assert len(items) == 1
+    assert "螺丝" in items[0]["materials"]
+    assert "M001" in items[0]["materials"]
