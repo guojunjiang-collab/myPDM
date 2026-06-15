@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useInventoryStore } from '../../stores/inventory';
 import { inventoryApi } from '../../services/inventoryApi';
+import { Modal } from '../Modal';
 import type { InvDocType, InvDocLine } from '../../types';
 
 const DOC_LABELS: Record<InvDocType, string> = {
   inbound: '入库单', outbound: '出库单', transfer: '调拨单',
   stocktake: '盘点单', adjustment: '库存调整单',
 };
+
+const fieldCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm';
 
 export default function DocumentEditModal({ docType, onClose, onSaved }:
   { docType: InvDocType; onClose: () => void; onSaved: () => void }) {
@@ -53,52 +56,56 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
   };
 
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-      <div className="bg-white p-5 rounded w-[44rem] max-h-[88vh] overflow-auto space-y-3">
-        <h3 className="font-medium">新建{DOC_LABELS[docType]}</h3>
-
+    <Modal open title={`新建${DOC_LABELS[docType]}`} onClose={onClose} width="3xl">
+      <div className="space-y-4">
+        {/* 头部字段 */}
         <div className="grid grid-cols-2 gap-3">
-          <label className="text-sm">{isTransfer ? '源仓' : '仓库'}
-            <select value={warehouseId} onChange={(e) => onWarehouseChange(e.target.value)}
-              className="w-full border px-2 py-1 rounded mt-1">
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">{isTransfer ? '源仓' : '仓库'}</label>
+            <select value={warehouseId} onChange={(e) => onWarehouseChange(e.target.value)} className={fieldCls}>
               <option value="">请选择</option>
               {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
             </select>
-          </label>
+          </div>
           {isTransfer && (
-            <label className="text-sm">目标仓
-              <select value={toWarehouseId} onChange={(e) => setToWarehouseId(e.target.value)}
-                className="w-full border px-2 py-1 rounded mt-1">
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">目标仓</label>
+              <select value={toWarehouseId} onChange={(e) => setToWarehouseId(e.target.value)} className={fieldCls}>
                 <option value="">请选择</option>
                 {warehouses.filter((w) => w.id !== warehouseId).map((w) => (
                   <option key={w.id} value={w.id}>{w.name}</option>
                 ))}
               </select>
-            </label>
+            </div>
           )}
-          <label className="text-sm">业务子类
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">业务子类</label>
             <input value={bizType} onChange={(e) => setBizType(e.target.value)}
-              placeholder="如 采购入库/生产领料" className="w-full border px-2 py-1 rounded mt-1" />
-          </label>
-          <label className="text-sm">指定库管员
-            <select value={keeperId} onChange={(e) => setKeeperId(e.target.value)}
-              className="w-full border px-2 py-1 rounded mt-1">
+              placeholder="如 采购入库/生产领料" className={fieldCls} />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">指定库管员</label>
+            <select value={keeperId} onChange={(e) => setKeeperId(e.target.value)} className={fieldCls}>
               <option value="">（默认仓库库管员）</option>
               {users.filter((u) => u.role !== 'guest').map((u) => (
                 <option key={u.id} value={u.id}>{u.real_name}</option>
               ))}
             </select>
-          </label>
+          </div>
         </div>
 
         {/* 审批人 */}
-        <div className="text-sm">
-          审批人（{reviewMode === 'all' ? '会签' : '或签'}）
-          <button onClick={() => setReviewMode(reviewMode === 'all' ? 'any' : 'all')}
-            className="ml-2 text-blue-500 text-xs">切换</button>
+        <div>
+          <label className="block text-sm text-gray-600 mb-1">
+            审批人
+            <button onClick={() => setReviewMode(reviewMode === 'all' ? 'any' : 'all')}
+              className="ml-2 text-primary-600 hover:text-primary-800 text-xs">
+              {reviewMode === 'all' ? '会签' : '或签'}（点击切换）
+            </button>
+          </label>
           <select multiple value={reviewerIds}
             onChange={(e) => setReviewerIds(Array.from(e.target.selectedOptions, (o) => o.value))}
-            className="w-full border px-2 py-1 rounded mt-1 h-20">
+            className={`${fieldCls} h-24`}>
             {users.filter((u) => ['admin', 'engineer'].includes(u.role)).map((u) => (
               <option key={u.id} value={u.id}>{u.real_name}（{u.role}）</option>
             ))}
@@ -108,58 +115,69 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
         {/* 明细行 */}
         <div>
           <div className="flex justify-between items-center mb-1">
-            <span className="text-sm font-medium">明细</span>
-            <button onClick={addLine} className="text-blue-500 text-xs">+ 加一行</button>
+            <label className="text-sm text-gray-600">明细</label>
+            <button onClick={addLine} className="text-primary-600 hover:text-primary-800 text-sm">+ 加一行</button>
           </div>
-          <table className="w-full text-xs border">
-            <thead className="bg-gray-50"><tr>
-              <th className="p-1 text-left">物料</th><th className="p-1">批次</th>
-              {isAdjustment && <th className="p-1">方向</th>}
-              <th className="p-1">数量</th><th className="p-1"></th></tr></thead>
-            <tbody>
-              {lines.map((l, i) => (
-                <tr key={i} className="border-t">
-                  <td className="p-1">
-                    <select value={l.material_id} onChange={(e) => updateLine(i, { material_id: e.target.value })}
-                      className="w-full border px-1 py-0.5 rounded">
-                      <option value="">选择物料</option>
-                      {materials.map((m) => <option key={m.id} value={m.id}>{m.code} {m.name}</option>)}
-                    </select>
-                  </td>
-                  <td className="p-1"><input value={l.batch_no}
-                    onChange={(e) => updateLine(i, { batch_no: e.target.value })}
-                    className="w-20 border px-1 py-0.5 rounded" /></td>
-                  {isAdjustment && (
-                    <td className="p-1">
-                      <select value={l.direction || 'in'} onChange={(e) => updateLine(i, { direction: e.target.value as any })}
-                        className="border px-1 py-0.5 rounded">
-                        <option value="in">盘盈+</option><option value="out">报损-</option>
+          <div className="rounded-lg border border-gray-200 overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">物料</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">批次</th>
+                  {isAdjustment && <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">方向</th>}
+                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">数量</th>
+                  <th className="px-3 py-2"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {lines.map((l, i) => (
+                  <tr key={i}>
+                    <td className="px-3 py-2">
+                      <select value={l.material_id} onChange={(e) => updateLine(i, { material_id: e.target.value })}
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500">
+                        <option value="">选择物料</option>
+                        {materials.map((m) => <option key={m.id} value={m.id}>{m.code} {m.name}</option>)}
                       </select>
                     </td>
-                  )}
-                  <td className="p-1"><input type="number" value={l.quantity}
-                    onChange={(e) => updateLine(i, { quantity: Number(e.target.value) })}
-                    className="w-20 border px-1 py-0.5 rounded" /></td>
-                  <td className="p-1 text-center">
-                    <button onClick={() => removeLine(i)} className="text-red-500">✕</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    <td className="px-3 py-2">
+                      <input value={l.batch_no} onChange={(e) => updateLine(i, { batch_no: e.target.value })}
+                        className="w-24 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                    </td>
+                    {isAdjustment && (
+                      <td className="px-3 py-2">
+                        <select value={l.direction || 'in'} onChange={(e) => updateLine(i, { direction: e.target.value as any })}
+                          className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500">
+                          <option value="in">盘盈+</option><option value="out">报损-</option>
+                        </select>
+                      </td>
+                    )}
+                    <td className="px-3 py-2">
+                      <input type="number" value={l.quantity} onChange={(e) => updateLine(i, { quantity: Number(e.target.value) })}
+                        className="w-24 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <button onClick={() => removeLine(i)} className="text-red-500 hover:text-red-700">✕</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           {docType === 'stocktake' && (
-            <p className="text-xs text-gray-400 mt-1">盘点单的实盘数在「过账」时由库管员填写。</p>
+            <p className="text-xs text-gray-400 mt-1.5">盘点单的实盘数在「过账」时由库管员填写。</p>
           )}
         </div>
 
-        <textarea placeholder="备注" value={remark} onChange={(e) => setRemark(e.target.value)}
-          className="w-full border px-2 py-1 rounded text-sm" rows={2} />
+        <div>
+          <label className="block text-sm text-gray-600 mb-1">备注</label>
+          <textarea value={remark} onChange={(e) => setRemark(e.target.value)} className={fieldCls} rows={2} />
+        </div>
 
-        <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="px-3 py-1 text-sm">取消</button>
-          <button onClick={save} className="px-3 py-1 bg-blue-500 text-white text-sm rounded">保存草稿</button>
+        <div className="flex justify-end gap-2 pt-1">
+          <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">取消</button>
+          <button onClick={save} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">保存草稿</button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useInventoryStore } from '../../stores/inventory';
 import { inventoryApi } from '../../services/inventoryApi';
+import { canEdit, isAdmin } from '../../stores/auth';
+import { Modal, ConfirmModal } from '../Modal';
 import type { Warehouse } from '../../types';
 
 const WH_TYPES = [
@@ -10,84 +12,138 @@ const WH_TYPES = [
   { value: 'general', label: '通用' },
 ];
 
+const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500';
+
 export default function WarehouseTab() {
   const { warehouses, loadWarehouses, users } = useInventoryStore();
+  const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState<Partial<Warehouse> | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  useEffect(() => { loadWarehouses(); }, [loadWarehouses]);
+  const reload = async () => {
+    setLoading(true);
+    try { await loadWarehouses(); } finally { setLoading(false); }
+  };
+  useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
 
   const save = async () => {
     if (!editing) return;
-    if (editing.id) {
-      await inventoryApi.updateWarehouse(editing.id, editing);
-    } else {
-      await inventoryApi.createWarehouse(editing);
-    }
+    if (editing.id) await inventoryApi.updateWarehouse(editing.id, editing);
+    else await inventoryApi.createWarehouse(editing);
     setEditing(null);
-    await loadWarehouses();
+    await reload();
   };
 
-  const remove = async (id: string) => {
-    if (!confirm('确认删除该仓库？')) return;
-    await inventoryApi.deleteWarehouse(id);
-    await loadWarehouses();
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    setDeleteError(null);
+    try {
+      await inventoryApi.deleteWarehouse(deleteId);
+      setDeleteId(null);
+      await reload();
+    } catch (err: any) {
+      setDeleteError(err?.response?.data?.detail || '删除失败，请重试');
+    }
   };
 
   return (
     <div>
-      <button onClick={() => setEditing({ code: '', name: '', type: 'general' })}
-        className="mb-3 px-3 py-1.5 bg-blue-500 text-white text-sm rounded">+ 新建仓库</button>
-      <table className="w-full text-sm border">
-        <thead className="bg-gray-50">
-          <tr><th className="p-2 text-left">编码</th><th className="p-2 text-left">名称</th>
-            <th className="p-2 text-left">类型</th><th className="p-2 text-left">默认库管员</th>
-            <th className="p-2">操作</th></tr>
-        </thead>
-        <tbody>
-          {warehouses.map((w) => (
-            <tr key={w.id} className="border-t">
-              <td className="p-2">{w.code}</td><td className="p-2">{w.name}</td>
-              <td className="p-2">{WH_TYPES.find((t) => t.value === w.type)?.label || w.type}</td>
-              <td className="p-2">{users.find((u) => u.id === w.default_keeper_id)?.real_name || '-'}</td>
-              <td className="p-2 text-center">
-                <button onClick={() => setEditing(w)} className="text-blue-500 mr-2">编辑</button>
-                <button onClick={() => remove(w.id)} className="text-red-500">删除</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {/* 工具栏 */}
+      <div className="flex gap-2 mb-4">
+        <div className="flex-1" />
+        {canEdit() && (
+          <button onClick={() => setEditing({ code: '', name: '', type: 'general' })}
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建仓库</button>
+        )}
+      </div>
 
-      {editing && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div className="bg-white p-5 rounded w-96 space-y-3">
-            <h3 className="font-medium">{editing.id ? '编辑仓库' : '新建仓库'}</h3>
-            <input placeholder="编码" value={editing.code || ''} disabled={!!editing.id}
-              onChange={(e) => setEditing({ ...editing, code: e.target.value })}
-              className="w-full border px-2 py-1 rounded text-sm" />
-            <input placeholder="名称" value={editing.name || ''}
-              onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-              className="w-full border px-2 py-1 rounded text-sm" />
-            <select value={editing.type || 'general'}
-              onChange={(e) => setEditing({ ...editing, type: e.target.value })}
-              className="w-full border px-2 py-1 rounded text-sm">
-              {WH_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
-            <select value={editing.default_keeper_id || ''}
-              onChange={(e) => setEditing({ ...editing, default_keeper_id: e.target.value || null })}
-              className="w-full border px-2 py-1 rounded text-sm">
-              <option value="">（无默认库管员）</option>
-              {users.filter((u) => u.role !== 'guest').map((u) => (
-                <option key={u.id} value={u.id}>{u.real_name}</option>
-              ))}
-            </select>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setEditing(null)} className="px-3 py-1 text-sm">取消</button>
-              <button onClick={save} className="px-3 py-1 bg-blue-500 text-white text-sm rounded">保存</button>
+      {/* 表格 */}
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">编码</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">名称</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">类型</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">默认库管员</th>
+              <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">操作</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {loading ? (
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+            ) : warehouses.length === 0 ? (
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
+            ) : warehouses.map((w) => (
+              <tr key={w.id} className="hover:bg-gray-50">
+                <td className="px-4 py-3 text-sm font-medium">{w.code}</td>
+                <td className="px-4 py-3 text-sm">{w.name}</td>
+                <td className="px-4 py-3 text-sm text-gray-500">{WH_TYPES.find((t) => t.value === w.type)?.label || w.type || '-'}</td>
+                <td className="px-4 py-3 text-sm text-gray-500">{users.find((u) => u.id === w.default_keeper_id)?.real_name || '-'}</td>
+                <td className="px-4 py-3 text-right space-x-1">
+                  {canEdit() && (
+                    <button onClick={() => setEditing(w)} className="text-primary-600 hover:text-primary-800 mr-3">编辑</button>
+                  )}
+                  {isAdmin() && (
+                    <button onClick={() => setDeleteId(w.id)} className="text-red-600 hover:text-red-800">删除</button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 新建/编辑弹窗 */}
+      <Modal open={!!editing} title={editing?.id ? '编辑仓库' : '新建仓库'} onClose={() => setEditing(null)} width="md">
+        {editing && (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">编码</label>
+              <input placeholder="仓库编码" value={editing.code || ''} disabled={!!editing.id}
+                onChange={(e) => setEditing({ ...editing, code: e.target.value })} className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">名称</label>
+              <input placeholder="仓库名称" value={editing.name || ''}
+                onChange={(e) => setEditing({ ...editing, name: e.target.value })} className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">类型</label>
+              <select value={editing.type || 'general'}
+                onChange={(e) => setEditing({ ...editing, type: e.target.value })} className={inputCls}>
+                {WH_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">默认库管员</label>
+              <select value={editing.default_keeper_id || ''}
+                onChange={(e) => setEditing({ ...editing, default_keeper_id: e.target.value || null })} className={inputCls}>
+                <option value="">（无默认库管员）</option>
+                {users.filter((u) => u.role !== 'guest').map((u) => (
+                  <option key={u.id} value={u.id}>{u.real_name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button onClick={() => setEditing(null)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">取消</button>
+              <button onClick={save} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">保存</button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
+
+      {/* 删除确认 */}
+      <ConfirmModal
+        open={!!deleteId}
+        title={deleteError ? '无法删除' : '删除仓库'}
+        content={deleteError || '确认删除该仓库？'}
+        confirmText={deleteError ? '知道了' : '删除'}
+        type="danger"
+        onConfirm={deleteError ? () => { setDeleteId(null); setDeleteError(null); } : handleDelete}
+        onCancel={() => { setDeleteId(null); setDeleteError(null); }}
+      />
     </div>
   );
 }
