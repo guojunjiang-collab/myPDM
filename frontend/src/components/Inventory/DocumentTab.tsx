@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useInventoryStore } from '../../stores/inventory';
 import { inventoryApi } from '../../services/inventoryApi';
 import { canDownload } from '../../stores/auth';
@@ -25,6 +25,7 @@ export default function DocumentTab() {
   const { loadMaterials, loadWarehouses } = useInventoryStore();
   const [docs, setDocs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [creating, setCreating] = useState<InvDocType | null>(null);
@@ -36,7 +37,7 @@ export default function DocumentTab() {
     setLoading(true);
     try {
       const res = await inventoryApi.listDocuments({
-        doc_type: typeFilter || undefined, status: statusFilter || undefined,
+        doc_type: typeFilter || undefined, status: statusFilter || undefined, page_size: 200,
       });
       setDocs(res.data.items);
     } finally { setLoading(false); }
@@ -44,6 +45,17 @@ export default function DocumentTab() {
 
   useEffect(() => { loadMaterials(); loadWarehouses(); }, [loadMaterials, loadWarehouses]);
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [typeFilter, statusFilter]);
+
+  // 客户端即时过滤（边输入边搜索）：单据号/业务子类/创建人/库管员/类型
+  const filteredDocs = useMemo(() => {
+    const kw = search.trim().toLowerCase();
+    if (!kw) return docs;
+    return docs.filter((d) => {
+      const typeLabel = DOC_TYPES.find((t) => t.key === d.doc_type)?.label || '';
+      return [d.doc_number, d.biz_type, d.creator_name, d.keeper_name, typeLabel]
+        .some((v) => (v || '').toLowerCase().includes(kw));
+    });
+  }, [docs, search]);
 
   // 点击外部关闭新建菜单
   useEffect(() => {
@@ -60,6 +72,9 @@ export default function DocumentTab() {
     <div>
       {/* 工具栏 */}
       <div className="flex gap-2 mb-4 items-center">
+        <input type="text" placeholder="搜索单据号/业务/创建人..." value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-52 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
         <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className={selectCls}>
           <option value="">全部类型</option>
           {DOC_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
@@ -103,7 +118,9 @@ export default function DocumentTab() {
               <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
             ) : docs.length === 0 ? (
               <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
-            ) : docs.map((d) => (
+            ) : filteredDocs.length === 0 ? (
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
+            ) : filteredDocs.map((d) => (
               <tr key={d.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setDetailId(d.id)}>
                 <td className="px-4 py-3 text-sm font-medium text-primary-600">{d.doc_number}</td>
                 <td className="px-4 py-3 text-sm">{DOC_TYPES.find((t) => t.key === d.doc_type)?.label}</td>
