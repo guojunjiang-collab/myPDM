@@ -74,7 +74,7 @@ export default function DocumentTab() {
       <div className="flex gap-2 mb-4 items-center">
         <input type="text" placeholder="搜索单据号/业务/创建人/物料..." value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-52 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          className="w-80 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
         <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className={selectCls}>
           <option value="">全部类型</option>
           {DOC_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
