@@ -7,7 +7,7 @@ import asyncio
 ALLOWED_PREFIXES = (
     "/api/parts", "/api/assemblies", "/api/bom", "/api/documents",
     "/api/v2/attachments", "/api/configurations", "/api/custom-fields",
-    "/api/ecos", "/api/ecrs",
+    "/api/ecos", "/api/ecrs", "/api/inventory",
 )
 # 二进制/文件/导出子路径——拒绝（返回文件，不该进模型上下文）
 DENIED_PATTERNS = (
