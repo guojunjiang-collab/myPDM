@@ -37,7 +37,7 @@ export default function DocumentTab() {
     setLoading(true);
     try {
       const res = await inventoryApi.listDocuments({
-        doc_type: typeFilter || undefined, status: statusFilter || undefined, page_size: 200,
+        doc_type: typeFilter || undefined, status: statusFilter || undefined, page_size: 100,
       });
       setDocs(res.data.items);
     } finally { setLoading(false); }
