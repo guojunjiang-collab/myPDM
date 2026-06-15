@@ -33,18 +33,24 @@ export default function MaterialTab() {
 
   const searchPdm = async () => {
     const [p, a] = await Promise.all([
-      partsApi.list({ search: pdmKeyword, page_size: 20 }),
-      assembliesApi.list({ search: pdmKeyword, page_size: 20 }),
+      partsApi.list({ search: pdmKeyword }),
+      assembliesApi.list({ search: pdmKeyword }),
     ]);
-    const parts = (p.data.items || []).map((x: any) => ({ id: x.id, code: x.code, name: x.name, entity_type: 'part' }));
-    const asms = (a.data.items || []).map((x: any) => ({ id: x.id, code: x.code, name: x.name, entity_type: 'assembly' }));
+    // /parts、/assemblies 返回裸数组（非 {items}）；兼容两种结构
+    const toArr = (d: any) => (Array.isArray(d) ? d : d?.items || []);
+    const parts = toArr(p.data).map((x: any) => ({ id: x.id, code: x.code, name: x.name, entity_type: 'part' }));
+    const asms = toArr(a.data).map((x: any) => ({ id: x.id, code: x.code, name: x.name, entity_type: 'assembly' }));
     setPdmResults([...parts, ...asms]);
   };
 
   const enablePdm = async (r: { id: string; entity_type: string }) => {
-    await inventoryApi.enableFromPdm({ entity_type: r.entity_type, entity_id: r.id, track_mode: 'quantity' });
-    setPdmMode(false); setPdmResults([]); setPdmKeyword('');
-    await reload(search);
+    try {
+      await inventoryApi.enableFromPdm({ entity_type: r.entity_type, entity_id: r.id, track_mode: 'quantity' });
+      setPdmMode(false); setPdmResults([]); setPdmKeyword('');
+      await reload(search);
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || '启用失败，请重试');
+    }
   };
 
   return (
