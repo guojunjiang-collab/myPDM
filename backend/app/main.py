@@ -438,6 +438,10 @@ async def startup_event():
             import app.models_ecr  # noqa: F401
             import app.models_eco  # noqa: F401
             import app.models_configuration  # noqa: F401
+            import app.models_inventory  # noqa: F401
+
+            # 幂等建表：仅创建尚不存在的表（如库存模块新表）
+            Base.metadata.create_all(bind=engine)
 
             def _col_default_sql(col):
                 sd = getattr(col, "server_default", None)

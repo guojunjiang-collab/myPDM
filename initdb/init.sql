@@ -460,3 +460,115 @@ CREATE TABLE configuration_working_items (
 );
 
 CREATE INDEX idx_cwi_profile_id ON configuration_working_items(profile_id);
+
+-- ===== 库存管理模块 =====
+CREATE TABLE IF NOT EXISTS warehouses (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code VARCHAR(64) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    type VARCHAR(32),
+    default_keeper_id UUID REFERENCES users(id),
+    status VARCHAR(32) NOT NULL DEFAULT 'active',
+    remark TEXT,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    deleted_at TIMESTAMPTZ
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uix_warehouse_code ON warehouses (code) WHERE deleted_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS inventory_materials (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code VARCHAR(64) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    spec VARCHAR(255),
+    unit VARCHAR(32),
+    source_type VARCHAR(16) NOT NULL DEFAULT 'standalone',
+    ref_entity_type VARCHAR(16),
+    ref_entity_id UUID,
+    track_mode VARCHAR(16) NOT NULL DEFAULT 'quantity',
+    safety_stock NUMERIC(14,4),
+    status VARCHAR(32) NOT NULL DEFAULT 'active',
+    remark TEXT,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    deleted_at TIMESTAMPTZ
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uix_material_code ON inventory_materials (code) WHERE deleted_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS inventory_stock (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    material_id UUID NOT NULL REFERENCES inventory_materials(id),
+    warehouse_id UUID NOT NULL REFERENCES warehouses(id),
+    batch_no VARCHAR(64) NOT NULL DEFAULT '',
+    quantity NUMERIC(14,4) NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    CONSTRAINT uix_stock_mat_wh_batch UNIQUE (material_id, warehouse_id, batch_no)
+);
+
+CREATE TABLE IF NOT EXISTS inventory_ledger (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    material_id UUID NOT NULL,
+    warehouse_id UUID NOT NULL,
+    batch_no VARCHAR(64) NOT NULL DEFAULT '',
+    direction VARCHAR(4) NOT NULL,
+    quantity NUMERIC(14,4) NOT NULL,
+    balance_after NUMERIC(14,4) NOT NULL,
+    doc_id UUID, doc_type VARCHAR(16), doc_number VARCHAR(32), doc_line_id UUID,
+    operator_id UUID, operator_name VARCHAR(64),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS ix_ledger_material ON inventory_ledger (material_id, warehouse_id);
+
+CREATE TABLE IF NOT EXISTS inventory_documents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    doc_number VARCHAR(32) UNIQUE NOT NULL,
+    doc_type VARCHAR(16) NOT NULL,
+    biz_type VARCHAR(32),
+    status VARCHAR(16) NOT NULL DEFAULT 'draft',
+    warehouse_id UUID REFERENCES warehouses(id),
+    to_warehouse_id UUID REFERENCES warehouses(id),
+    reviewers JSONB NOT NULL DEFAULT '[]',
+    review_mode VARCHAR(8) NOT NULL DEFAULT 'all',
+    keeper_id UUID REFERENCES users(id),
+    keeper_name VARCHAR(64),
+    creator_id UUID NOT NULL REFERENCES users(id),
+    document_links JSONB NOT NULL DEFAULT '[]',
+    remark TEXT,
+    reviewed_at TIMESTAMPTZ, posted_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    deleted_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS inventory_document_lines (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    doc_id UUID NOT NULL REFERENCES inventory_documents(id) ON DELETE CASCADE,
+    material_id UUID NOT NULL REFERENCES inventory_materials(id),
+    batch_no VARCHAR(64) NOT NULL DEFAULT '',
+    quantity NUMERIC(14,4) NOT NULL DEFAULT 0,
+    direction VARCHAR(4),
+    book_quantity NUMERIC(14,4),
+    counted_quantity NUMERIC(14,4),
+    remark TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS inventory_review_records (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    doc_id UUID NOT NULL REFERENCES inventory_documents(id) ON DELETE CASCADE,
+    reviewer_id UUID NOT NULL REFERENCES users(id),
+    reviewer_name VARCHAR(64),
+    decision VARCHAR(16) NOT NULL,
+    comment TEXT,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS inventory_status_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    doc_id UUID NOT NULL REFERENCES inventory_documents(id) ON DELETE CASCADE,
+    from_status VARCHAR(16), to_status VARCHAR(16) NOT NULL,
+    operator_id UUID NOT NULL REFERENCES users(id),
+    operator_name VARCHAR(64),
+    comment TEXT,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
