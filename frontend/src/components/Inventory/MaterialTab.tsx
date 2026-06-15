@@ -8,6 +8,11 @@ import type { InvMaterial } from '../../types';
 
 const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500';
 
+// PDM 零件/部件状态中文（与零件管理一致）
+const STATUS_LABEL: Record<string, string> = {
+  draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废',
+};
+
 export default function MaterialTab() {
   const { materials, loadMaterials } = useInventoryStore();
   const [loading, setLoading] = useState(false);
@@ -45,11 +50,15 @@ export default function MaterialTab() {
   const pdmResults = useMemo(() => {
     const kw = pdmKeyword.trim().toLowerCase();
     if (!kw) return [];
-    const match = (x: any) => (x.code || '').toLowerCase().includes(kw) || (x.name || '').toLowerCase().includes(kw);
-    const parts = storeParts.filter(match).slice(0, 50)
-      .map((x: any) => ({ id: x.id, code: x.code, name: x.name, entity_type: 'part' as const }));
-    const asms = storeAssemblies.filter(match).slice(0, 50)
-      .map((x: any) => ({ id: x.id, code: x.code, name: x.name, entity_type: 'assembly' as const }));
+    const match = (x: any) =>
+      (x.code || '').toLowerCase().includes(kw) ||
+      (x.name || '').toLowerCase().includes(kw) ||
+      (x.spec || '').toLowerCase().includes(kw);
+    const pick = (x: any, entity_type: 'part' | 'assembly') => ({
+      id: x.id, code: x.code, name: x.name, spec: x.spec, version: x.version, status: x.status, entity_type,
+    });
+    const parts = storeParts.filter(match).slice(0, 50).map((x: any) => pick(x, 'part'));
+    const asms = storeAssemblies.filter(match).slice(0, 50).map((x: any) => pick(x, 'assembly'));
     return [...parts, ...asms];
   }, [pdmKeyword, storeParts, storeAssemblies]);
 
@@ -161,22 +170,46 @@ export default function MaterialTab() {
       </Modal>
 
       {/* 从 PDM 启用 */}
-      <Modal open={pdmMode} title="从 PDM 零件/部件启用库存" onClose={() => setPdmMode(false)} width="lg">
+      <Modal open={pdmMode} title="从 PDM 零件/部件启用库存" onClose={() => setPdmMode(false)} width="full">
         <div className="space-y-3">
-          <input placeholder="输入零件/部件编码或名称，边输入边搜索..." value={pdmKeyword} autoFocus
+          <input placeholder="输入编码 / 名称 / 规格型号，边输入边搜索..." value={pdmKeyword} autoFocus
             onChange={(e) => setPdmKeyword(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
-          <div className="max-h-72 overflow-auto rounded-lg border border-gray-200 divide-y divide-gray-200">
+          <div className="max-h-80 overflow-auto rounded-lg border border-gray-200">
             {!pdmKeyword.trim() ? (
               <div className="px-4 py-8 text-center text-sm text-gray-400">输入关键词搜索 PDM 零件/部件</div>
             ) : pdmResults.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-gray-400">无匹配结果</div>
-            ) : pdmResults.map((r) => (
-              <div key={`${r.entity_type}-${r.id}`} className="flex justify-between items-center px-4 py-2 text-sm hover:bg-gray-50">
-                <span><span className="text-gray-400">[{r.entity_type === 'part' ? '零件' : '部件'}]</span> {r.code} {r.name}</span>
-                <button onClick={() => enablePdm(r)} className="text-green-600 hover:text-green-800">启用</button>
-              </div>
-            ))}
+            ) : (
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
+                  <tr>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">类型</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">编号</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">名称</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">版本</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">规格型号</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">状态</th>
+                    <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">操作</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {pdmResults.map((r) => (
+                    <tr key={`${r.entity_type}-${r.id}`} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 text-sm text-gray-500">{r.entity_type === 'part' ? '零件' : '部件'}</td>
+                      <td className="px-3 py-2 text-sm font-medium">{r.code}</td>
+                      <td className="px-3 py-2 text-sm">{r.name}</td>
+                      <td className="px-3 py-2 text-sm text-gray-500">{r.version || '-'}</td>
+                      <td className="px-3 py-2 text-sm text-gray-500">{r.spec || '-'}</td>
+                      <td className="px-3 py-2 text-sm text-gray-500">{STATUS_LABEL[r.status as string] || r.status || '-'}</td>
+                      <td className="px-3 py-2 text-right">
+                        <button onClick={() => enablePdm(r)} className="text-green-600 hover:text-green-800">启用</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       </Modal>
