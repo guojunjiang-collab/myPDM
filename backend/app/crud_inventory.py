@@ -250,6 +250,6 @@ def post_document(db: Session, doc: InventoryDocument, operator: User) -> Invent
         db.commit()
         db.refresh(doc)
         return doc
-    except HTTPException:
+    except Exception:
         db.rollback()
         raise
