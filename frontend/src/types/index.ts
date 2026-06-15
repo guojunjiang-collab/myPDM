@@ -822,7 +822,7 @@ export interface InvReviewer { user_id: string; seq?: number; user_name?: string
 export interface InvDocument {
   id: string; doc_number: string; doc_type: InvDocType; biz_type?: string;
   status: InvDocStatus; warehouse_id?: string | null; to_warehouse_id?: string | null;
-  keeper_id?: string | null; keeper_name?: string; creator_name?: string;
+  keeper_id?: string | null; keeper_name?: string; creator_id?: string; creator_name?: string;
   reviewers?: InvReviewer[]; review_mode?: 'all' | 'any'; remark?: string;
   lines?: InvDocLine[]; review_records?: any[]; status_logs?: any[];
   created_at?: string; updated_at?: string;
