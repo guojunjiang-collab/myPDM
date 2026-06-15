@@ -4,7 +4,7 @@
 仓库 / 物料主数据 / 库存余额 / 库存流水 / 单据 / 明细行 / 审批记录 / 状态日志
 """
 import uuid
-from sqlalchemy import Column, String, Integer, Text, DateTime, Numeric, ForeignKey
+from sqlalchemy import Column, String, Integer, Text, DateTime, Numeric, ForeignKey, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.sql import func
 from app.database import Base
@@ -45,6 +45,9 @@ class InventoryMaterial(Base):
 
 class InventoryStock(Base):
     __tablename__ = "inventory_stock"
+    __table_args__ = (
+        UniqueConstraint("material_id", "warehouse_id", "batch_no", name="uix_stock_mat_wh_batch"),
+    )
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     material_id = Column(UUID(as_uuid=True), ForeignKey("inventory_materials.id"), nullable=False)
     warehouse_id = Column(UUID(as_uuid=True), ForeignKey("warehouses.id"), nullable=False)
