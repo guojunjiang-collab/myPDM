@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useInventoryStore } from '../../stores/inventory';
 import { inventoryApi } from '../../services/inventoryApi';
 import { Modal } from '../Modal';
+import ComboBox from './ComboBox';
 import type { InvDocType, InvDocLine, StockRow } from '../../types';
 
 const DOC_LABELS: Record<InvDocType, string> = {
@@ -140,7 +141,7 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
             <label className="text-sm text-gray-600">明细</label>
             <button onClick={addLine} className="text-primary-600 hover:text-primary-800 text-sm">+ 加一行</button>
           </div>
-          <div className="rounded-lg border border-gray-200 overflow-hidden">
+          <div className="rounded-lg border border-gray-200">
             {usesStockPicker ? (
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
@@ -161,16 +162,16 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
                     return (
                       <tr key={i}>
                         <td className="px-3 py-2">
-                          <select value={`${l.material_id}|${l.batch_no}`}
-                            onChange={(e) => { const [mid, b] = e.target.value.split('|'); updateLine(i, { material_id: mid, batch_no: b }); }}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500">
-                            <option value="|">{warehouseId ? '选择物料' : `请先选择${isTransfer ? '源仓' : '仓库'}`}</option>
-                            {sourceStock.map((s) => (
-                              <option key={`${s.material_id}|${s.batch_no}`} value={`${s.material_id}|${s.batch_no}`}>
-                                {s.material_code} · {s.material_name} · 批次:{s.batch_no || '无'} · 余:{s.quantity}{s.unit || ''}
-                              </option>
-                            ))}
-                          </select>
+                          <ComboBox
+                            value={`${l.material_id}|${l.batch_no}`}
+                            placeholder={warehouseId ? '选择物料' : `请先选择${isTransfer ? '源仓' : '仓库'}`}
+                            options={sourceStock.map((s) => ({
+                              value: `${s.material_id}|${s.batch_no}`,
+                              label: `${s.material_code} · ${s.material_name} · 批次:${s.batch_no || '无'} · 余:${s.quantity}${s.unit || ''}`,
+                              search: `${s.material_code} ${s.material_name} ${s.batch_no || ''}`,
+                            }))}
+                            onChange={(v) => { const [mid, b] = v.split('|'); updateLine(i, { material_id: mid, batch_no: b }); }}
+                          />
                         </td>
                         <td className="px-3 py-2 text-sm text-gray-500">{l.batch_no || '-'}</td>
                         <td className="px-3 py-2 text-sm text-right text-gray-500">{srcBal ?? '-'}</td>
@@ -203,11 +204,16 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
                   {lines.map((l, i) => (
                     <tr key={i}>
                       <td className="px-3 py-2">
-                        <select value={l.material_id} onChange={(e) => updateLine(i, { material_id: e.target.value })}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500">
-                          <option value="">选择物料</option>
-                          {materials.map((m) => <option key={m.id} value={m.id}>{m.code} {m.name}</option>)}
-                        </select>
+                        <ComboBox
+                          value={l.material_id}
+                          placeholder="选择物料"
+                          options={materials.map((m) => ({
+                            value: m.id,
+                            label: `${m.code} ${m.name}`,
+                            search: `${m.code} ${m.name} ${m.spec || ''}`,
+                          }))}
+                          onChange={(v) => updateLine(i, { material_id: v })}
+                        />
                       </td>
                       <td className="px-3 py-2">
                         <input value={l.batch_no} onChange={(e) => updateLine(i, { batch_no: e.target.value })}
