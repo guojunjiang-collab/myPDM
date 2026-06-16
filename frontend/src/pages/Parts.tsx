@@ -508,9 +508,9 @@ export default function Parts() {
         )}
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto max-h-[calc(100vh-230px)]">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
               <th onClick={() => handleSort('code' as keyof Part)} className="w-56 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">件号 {getSortIcon('code' as keyof Part)}</th>
               <th onClick={() => handleSort('name' as keyof Part)} className="w-80 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">中文名称 {getSortIcon('name' as keyof Part)}</th>
