@@ -25,14 +25,17 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
 
   const isTransfer = docType === 'transfer';
   const isAdjustment = docType === 'adjustment';
+  const isOutbound = docType === 'outbound';
+  // 调拨/出库：明细物料从「该仓有货」的库存中筛选，并展示余量
+  const usesStockPicker = isTransfer || isOutbound;
 
-  // 调拨单：加载库存余额，供「源仓可调拨物料」筛选与源仓/目标仓余量展示
+  // 加载库存余额，供「仓库有货物料」筛选与余量展示
   const [stockRows, setStockRows] = useState<StockRow[]>([]);
   useEffect(() => {
-    if (isTransfer) inventoryApi.listStock().then((res) => setStockRows(res.data.items)).catch(() => {});
-  }, [isTransfer]);
+    if (usesStockPicker) inventoryApi.listStock().then((res) => setStockRows(res.data.items)).catch(() => {});
+  }, [usesStockPicker]);
 
-  // 源仓有货的库存行（material+batch，余量>0），作为调拨明细的可选项
+  // 源仓/出库仓有货的库存行（material+batch，余量>0），作为明细可选项
   const sourceStock = useMemo(
     () => stockRows.filter((s) => s.warehouse_id === warehouseId && s.quantity > 0),
     [stockRows, warehouseId],
@@ -138,15 +141,15 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
             <button onClick={addLine} className="text-primary-600 hover:text-primary-800 text-sm">+ 加一行</button>
           </div>
           <div className="rounded-lg border border-gray-200 overflow-hidden">
-            {isTransfer ? (
+            {usesStockPicker ? (
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">物料（源仓有货）</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">物料（{isTransfer ? '源仓' : '仓库'}有货）</th>
                     <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">批次</th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">源仓余量</th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">目标仓余量</th>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">调拨数量</th>
+                    <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">{isTransfer ? '源仓余量' : '仓库余量'}</th>
+                    {isTransfer && <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">目标仓余量</th>}
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">{isTransfer ? '调拨数量' : '出库数量'}</th>
                     <th className="px-3 py-2"></th>
                   </tr>
                 </thead>
@@ -161,7 +164,7 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
                           <select value={`${l.material_id}|${l.batch_no}`}
                             onChange={(e) => { const [mid, b] = e.target.value.split('|'); updateLine(i, { material_id: mid, batch_no: b }); }}
                             className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500">
-                            <option value="|">{warehouseId ? '选择物料' : '请先选择源仓'}</option>
+                            <option value="|">{warehouseId ? '选择物料' : `请先选择${isTransfer ? '源仓' : '仓库'}`}</option>
                             {sourceStock.map((s) => (
                               <option key={`${s.material_id}|${s.batch_no}`} value={`${s.material_id}|${s.batch_no}`}>
                                 {s.material_code} {s.material_name}{s.batch_no ? ` · 批次:${s.batch_no}` : ''}
@@ -171,7 +174,7 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
                         </td>
                         <td className="px-3 py-2 text-sm text-gray-500">{l.batch_no || '-'}</td>
                         <td className="px-3 py-2 text-sm text-right text-gray-500">{srcBal ?? '-'}</td>
-                        <td className="px-3 py-2 text-sm text-right text-gray-500">{toWarehouseId ? tgtBal : '-'}</td>
+                        {isTransfer && <td className="px-3 py-2 text-sm text-right text-gray-500">{toWarehouseId ? tgtBal : '-'}</td>}
                         <td className="px-3 py-2">
                           <input type="number" value={l.quantity}
                             onChange={(e) => updateLine(i, { quantity: Number(e.target.value) })}
@@ -234,8 +237,10 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
           {docType === 'stocktake' && (
             <p className="text-xs text-gray-400 mt-1.5">盘点单的实盘数在「过账」时由库管员填写。</p>
           )}
-          {isTransfer && (
-            <p className="text-xs text-gray-400 mt-1.5">调拨物料仅从「源仓有货」的库存中选择；调拨数量超过源仓余量会标红。</p>
+          {usesStockPicker && (
+            <p className="text-xs text-gray-400 mt-1.5">
+              {isTransfer ? '调拨' : '出库'}物料仅从「{isTransfer ? '源仓' : '仓库'}有货」的库存中选择；数量超过{isTransfer ? '源仓' : '仓库'}余量会标红。
+            </p>
           )}
         </div>
 
