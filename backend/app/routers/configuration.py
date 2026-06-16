@@ -173,6 +173,15 @@ async def update_config_item(
     current_user=Depends(require_role(["admin", "engineer"])),
 ):
     """更新构型项"""
+    # 允许修改构型号：保存时做唯一性检查
+    if data.code:
+        current = crud.get_config_item(db, config_id)
+        if not current:
+            raise HTTPException(status_code=404, detail="构型项不存在")
+        if data.code != current.code:
+            existing = crud.get_config_item_by_code(db, data.code)
+            if existing and str(existing.id) != str(config_id):
+                raise HTTPException(status_code=400, detail=f"构型号 {data.code} 已存在")
     item = crud.update_config_item(db, config_id, data)
     if not item:
         raise HTTPException(status_code=404, detail="构型项不存在")

@@ -387,8 +387,8 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
             <label className="block text-xs text-gray-500 mb-0.5">构型号 *</label>
-            <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} disabled={isEdit}
-              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300 disabled:bg-gray-100 disabled:text-gray-400" placeholder="如 CFG-001" />
+            <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })}
+              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300" placeholder="如 CFG-001" />
           </div>
           <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
             <label className="block text-xs text-gray-500 mb-0.5">中文名称 *</label>
