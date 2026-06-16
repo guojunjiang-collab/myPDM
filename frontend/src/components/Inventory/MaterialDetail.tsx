@@ -81,7 +81,7 @@ export default function MaterialDetail({ material, onClose }: Props) {
   };
 
   return (
-    <Modal open={true} title="物料详情" onClose={onClose} width="lg">
+    <Modal open={true} title="物料详情" onClose={onClose} width="3xl">
       <div className="space-y-6 max-h-[72vh] overflow-y-auto pr-1">
         {/* 基本信息卡片 */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
