@@ -67,8 +67,6 @@ export default function DocumentDetail({ docId, onClose, onChanged }:
 
   const isAdmin = user?.role === 'admin';
   const isKeeper = !!doc && (doc.keeper_id === user?.id || isAdmin);
-  const isCreator = !!doc && (doc.creator_id === user?.id || isAdmin);
-  const isReviewer = !!doc && (doc.reviewers || []).some((r) => r.user_id === user?.id);
 
   const act = async (fn: () => Promise<any>) => { await fn(); await reload(); onChanged(); };
 
@@ -200,52 +198,26 @@ export default function DocumentDetail({ docId, onClose, onChanged }:
             </div>
           )}
 
-          {/* 操作按钮 */}
-          <div className="flex flex-wrap gap-2 justify-end border-t border-gray-200 pt-4">
-            {doc.status === 'draft' && isCreator && (
-              <>
-                <button onClick={() => act(() => inventoryApi.deleteDocument(doc.id)).then(onClose)}
-                  className="px-4 py-2 border border-gray-300 text-red-600 rounded-lg hover:bg-red-50 text-sm">删除</button>
-                <button onClick={() => act(() => inventoryApi.submit(doc.id))}
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">提交审批</button>
-              </>
-            )}
-            {doc.status === 'reviewing' && isCreator && (
-              <button onClick={() => act(() => inventoryApi.withdraw(doc.id))}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">撤回</button>
-            )}
-            {doc.status === 'reviewing' && isReviewer && (
-              <>
-                <button onClick={() => act(() => inventoryApi.review(doc.id, { decision: 'returned' }))}
-                  className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 text-sm">退回</button>
-                <button onClick={() => act(() => inventoryApi.review(doc.id, { decision: 'rejected' }))}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm">拒绝</button>
-                <button onClick={() => act(() => inventoryApi.review(doc.id, { decision: 'approved' }))}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">通过</button>
-              </>
-            )}
-            {doc.status === 'approved' && (
-              <>
-                <select value={reassign} onChange={(e) => setReassign(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm bg-white">
-                  <option value="">改派库管员…</option>
-                  {users.filter((u) => u.role !== 'guest').map((u) => (
-                    <option key={u.id} value={u.id}>{u.real_name}</option>
-                  ))}
-                </select>
-                {reassign && (
-                  <button onClick={() => act(() => inventoryApi.assignKeeper(doc.id, reassign)).then(() => setReassign(''))}
-                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">确认改派</button>
-                )}
-                <button onClick={() => act(() => inventoryApi.cancel(doc.id))}
-                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">取消单据</button>
-                {isKeeper && (
-                  <button onClick={doPost}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">过账</button>
-                )}
-              </>
-            )}
-          </div>
+          {/* 操作（其余动作在列表「操作」列；此处保留需详情上下文的改派/过账） */}
+          {doc.status === 'approved' && (
+            <div className="flex flex-wrap gap-2 justify-end border-t border-gray-200 pt-4">
+              <select value={reassign} onChange={(e) => setReassign(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm bg-white">
+                <option value="">改派库管员…</option>
+                {users.filter((u) => u.role !== 'guest').map((u) => (
+                  <option key={u.id} value={u.id}>{u.real_name}</option>
+                ))}
+              </select>
+              {reassign && (
+                <button onClick={() => act(() => inventoryApi.assignKeeper(doc.id, reassign)).then(() => setReassign(''))}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">确认改派</button>
+              )}
+              {isKeeper && (
+                <button onClick={doPost}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">过账</button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </Modal>

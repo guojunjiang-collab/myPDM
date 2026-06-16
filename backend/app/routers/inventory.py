@@ -263,8 +263,10 @@ def _doc_brief(db, d):
             "biz_type": d.biz_type, "status": d.status,
             "warehouse_id": str(d.warehouse_id) if d.warehouse_id else None,
             "to_warehouse_id": str(d.to_warehouse_id) if d.to_warehouse_id else None,
+            "keeper_id": str(d.keeper_id) if d.keeper_id else None,
             "keeper_name": d.keeper_name, "creator_id": str(d.creator_id),
             "creator_name": creator.real_name if creator else "",
+            "reviewers": d.reviewers or [],
             "created_at": d.created_at, "updated_at": d.updated_at}
 
 
