@@ -10,7 +10,10 @@ import PartDetailContent from '../PartDetailContent';
 import AssemblyDetailContent from '../AssemblyDetailContent';
 import type { InvMaterial, CustomFieldDefinition, CustomFieldValue } from '../../types';
 
-const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500';
+// ECR 式卡片字段样式
+const cardCls = 'bg-gray-50 rounded-lg px-3 py-2 border border-gray-100';
+const cardLabelCls = 'block text-xs text-gray-500 mb-0.5';
+const cardInputCls = 'w-full text-sm px-2 py-1 border border-gray-200 rounded bg-white focus:outline-none focus:ring-2 focus:ring-primary-500';
 
 // PDM 零件/部件状态中文（与零件管理一致）
 const STATUS_LABEL: Record<string, string> = {
@@ -167,45 +170,47 @@ export default function MaterialTab() {
       </div>
 
       {/* 新建/编辑非 PDM 物料 */}
-      <Modal open={!!editing} title={editing?.id ? '编辑物料' : '新建物料'} onClose={() => setEditing(null)} width="md">
+      <Modal open={!!editing} title={editing?.id ? '编辑物料' : '新建物料'} onClose={() => setEditing(null)} width="lg">
         {editing && (
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">编码</label>
-              <input placeholder="物料编码" value={editing.code || ''} disabled={!!editing.id}
-                onChange={(e) => setEditing({ ...editing, code: e.target.value })} className={inputCls} />
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className={cardCls}>
+                <label className={cardLabelCls}>编码</label>
+                <input placeholder="物料编码" value={editing.code || ''} disabled={!!editing.id}
+                  onChange={(e) => setEditing({ ...editing, code: e.target.value })} className={cardInputCls} />
+              </div>
+              <div className={cardCls}>
+                <label className={cardLabelCls}>名称</label>
+                <input placeholder="物料名称" value={editing.name || ''}
+                  onChange={(e) => setEditing({ ...editing, name: e.target.value })} className={cardInputCls} />
+              </div>
+              <div className={cardCls}>
+                <label className={cardLabelCls}>规格型号</label>
+                <input placeholder="规格型号（选填）" value={editing.spec || ''}
+                  onChange={(e) => setEditing({ ...editing, spec: e.target.value })} className={cardInputCls} />
+              </div>
+              <div className={cardCls}>
+                <label className={cardLabelCls}>单位</label>
+                <input placeholder="如 个 / kg / m" value={editing.unit || ''}
+                  onChange={(e) => setEditing({ ...editing, unit: e.target.value })} className={cardInputCls} />
+              </div>
+              <div className={cardCls}>
+                <label className={cardLabelCls}>追踪方式</label>
+                <select value={editing.track_mode || 'quantity'}
+                  onChange={(e) => setEditing({ ...editing, track_mode: e.target.value as any })} className={cardInputCls}>
+                  <option value="quantity">按数量</option>
+                  <option value="batch">按批次</option>
+                </select>
+              </div>
+              <div className={cardCls}>
+                <label className={cardLabelCls}>安全库存（选填）</label>
+                <input placeholder="低于则预警" type="number" value={editing.safety_stock ?? ''}
+                  onChange={(e) => setEditing({ ...editing, safety_stock: e.target.value ? Number(e.target.value) : null })} className={cardInputCls} />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">名称</label>
-              <input placeholder="物料名称" value={editing.name || ''}
-                onChange={(e) => setEditing({ ...editing, name: e.target.value })} className={inputCls} />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">规格型号</label>
-              <input placeholder="规格型号（选填）" value={editing.spec || ''}
-                onChange={(e) => setEditing({ ...editing, spec: e.target.value })} className={inputCls} />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">单位</label>
-              <input placeholder="如 个 / kg / m" value={editing.unit || ''}
-                onChange={(e) => setEditing({ ...editing, unit: e.target.value })} className={inputCls} />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">追踪方式</label>
-              <select value={editing.track_mode || 'quantity'}
-                onChange={(e) => setEditing({ ...editing, track_mode: e.target.value as any })} className={inputCls}>
-                <option value="quantity">按数量</option>
-                <option value="batch">按批次</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">安全库存（选填）</label>
-              <input placeholder="低于则预警" type="number" value={editing.safety_stock ?? ''}
-                onChange={(e) => setEditing({ ...editing, safety_stock: e.target.value ? Number(e.target.value) : null })} className={inputCls} />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setEditing(null)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">取消</button>
-              <button onClick={saveStandalone} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">保存</button>
+            <div className="flex justify-end gap-2 pt-1 border-t border-gray-200">
+              <button onClick={() => setEditing(null)} className="mt-3 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">取消</button>
+              <button onClick={saveStandalone} className="mt-3 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">保存</button>
             </div>
           </div>
         )}
