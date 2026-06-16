@@ -37,11 +37,15 @@ export default function ConfigurationList() {
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const PAGE_CAP = 10000;
+  const [serverTotal, setServerTotal] = useState(0);
+
   const load = async () => {
     setLoading(true);
     try {
-      const res = await configurationApi.listItems({ page: 1, page_size: 10000 });
+      const res = await configurationApi.listItems({ page: 1, page_size: PAGE_CAP });
       setItems(res.data.items || []);
+      setServerTotal(res.data.total ?? (res.data.items || []).length);
     } catch { } finally { setLoading(false); }
   };
 
@@ -169,6 +173,13 @@ export default function ConfigurationList() {
           <button onClick={() => setCreateOpen(true)} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建构型</button>
         )}
       </div>
+
+      {/* 数据超过加载上限时提示（避免静默截断） */}
+      {serverTotal > items.length && (
+        <div className="mb-3 px-4 py-2 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-700">
+          共 {serverTotal} 条，当前仅加载前 {items.length} 条。请用上方搜索缩小范围以定位目标构型项。
+        </div>
+      )}
 
       {/* 表格（滚动容器，不分页） */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto max-h-[calc(100vh-230px)]">
