@@ -128,6 +128,7 @@ async def list_ledger(material_id: uuid.UUID = Query(None), warehouse_id: uuid.U
         "id": str(r.id), "material_id": str(r.material_id), "warehouse_id": str(r.warehouse_id),
         "batch_no": r.batch_no, "direction": r.direction, "quantity": float(r.quantity),
         "balance_after": float(r.balance_after), "doc_number": r.doc_number, "doc_type": r.doc_type,
+        "doc_id": str(r.doc_id) if r.doc_id else None,
         "operator_name": r.operator_name, "created_at": r.created_at,
     } for r in rows]}
 

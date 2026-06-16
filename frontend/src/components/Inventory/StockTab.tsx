@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useInventoryStore } from '../../stores/inventory';
 import { inventoryApi } from '../../services/inventoryApi';
 import StockDetail from './StockDetail';
+import DocumentDetail from './DocumentDetail';
 import type { StockRow } from '../../types';
 
 export default function StockTab() {
@@ -12,6 +13,7 @@ export default function StockTab() {
   const [warehouseId, setWarehouseId] = useState('');
   const [lowOnly, setLowOnly] = useState(false);
   const [detailMatId, setDetailMatId] = useState<string | null>(null);
+  const [docDetailId, setDocDetailId] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -92,7 +94,12 @@ export default function StockTab() {
       {detailMatId && (
         <StockDetail materialId={detailMatId}
           rows={allRows.filter((r) => r.material_id === detailMatId)}
-          whName={whName} onClose={() => setDetailMatId(null)} />
+          whName={whName} onClose={() => setDetailMatId(null)} onViewDoc={setDocDetailId} />
+      )}
+
+      {/* 单据详情（与库存详情同级，避免被父弹窗 transform 限制宽度） */}
+      {docDetailId && (
+        <DocumentDetail docId={docDetailId} onClose={() => setDocDetailId(null)} onChanged={load} />
       )}
     </div>
   );

@@ -16,11 +16,12 @@ const DOC_TYPE_LABEL: Record<string, string> = {
   inbound: '入库', outbound: '出库', transfer: '调拨', stocktake: '盘点', adjustment: '调整',
 };
 
-export default function StockDetail({ materialId, rows, whName, onClose }: {
+export default function StockDetail({ materialId, rows, whName, onClose, onViewDoc }: {
   materialId: string;
   rows: StockRow[];
   whName: (id: string) => string;
   onClose: () => void;
+  onViewDoc: (docId: string) => void;
 }) {
   const [ledger, setLedger] = useState<any[]>([]);
   useEffect(() => {
@@ -93,8 +94,9 @@ export default function StockDetail({ materialId, rows, whName, onClose }: {
                 {ledger.length === 0 ? (
                   <tr><td colSpan={7} className="px-3 py-6 text-center text-sm text-gray-400">暂无流水</td></tr>
                 ) : ledger.map((l) => (
-                  <tr key={l.id}>
-                    <td className="px-3 py-2 text-sm text-gray-600">{l.doc_number}</td>
+                  <tr key={l.id} className={l.doc_id ? 'hover:bg-gray-50 cursor-pointer' : ''}
+                    onClick={() => l.doc_id && onViewDoc(l.doc_id)}>
+                    <td className="px-3 py-2 text-sm text-primary-600">{l.doc_number}</td>
                     <td className="px-3 py-2 text-sm text-gray-500">{DOC_TYPE_LABEL[l.doc_type] || l.doc_type || '-'}</td>
                     <td className="px-3 py-2 text-sm text-gray-500">{whName(l.warehouse_id)}</td>
                     <td className={`px-3 py-2 text-sm text-right font-medium ${l.direction === 'in' ? 'text-green-600' : 'text-red-600'}`}>
