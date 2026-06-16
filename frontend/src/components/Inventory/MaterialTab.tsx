@@ -176,7 +176,7 @@ export default function MaterialTab() {
       </div>
 
       {/* 新建/编辑非 PDM 物料 */}
-      <Modal open={!!editing} title={editing?.id ? '编辑物料' : '新建物料'} onClose={() => setEditing(null)} width="lg">
+      <Modal open={!!editing} title={editing?.id ? '编辑物料' : '新建物料'} onClose={() => setEditing(null)} width="3xl">
         {editing && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
