@@ -88,7 +88,7 @@ export default function MaterialTab() {
     if (editing.id) await inventoryApi.updateMaterial(editing.id, editing);
     else await inventoryApi.createMaterial(editing);
     setEditing(null);
-    await reload(search);
+    await reload();
   };
 
   const pdmResults = useMemo(() => {
@@ -110,20 +110,29 @@ export default function MaterialTab() {
     try {
       await inventoryApi.enableFromPdm({ entity_type: r.entity_type, entity_id: r.id, track_mode: 'quantity' });
       setPdmMode(false); setPdmKeyword('');
-      await reload(search);
+      await reload();
     } catch (err: any) {
       alert(err?.response?.data?.detail || '启用失败，请重试');
     }
   };
 
+  // 客户端即时过滤（边输入边搜索）：编码/名称/规格型号
+  const filteredMaterials = useMemo(() => {
+    const kw = search.trim().toLowerCase();
+    if (!kw) return materials;
+    return materials.filter((m) =>
+      (m.code || '').toLowerCase().includes(kw) ||
+      (m.name || '').toLowerCase().includes(kw) ||
+      (m.spec || '').toLowerCase().includes(kw));
+  }, [materials, search]);
+
   return (
     <div>
       {/* 工具栏 */}
       <div className="flex items-center gap-2 mb-4">
-        <input type="text" placeholder="搜索编码/名称..." value={search}
+        <input type="text" placeholder="搜索编码/名称/规格..." value={search}
           onChange={(e) => setSearch(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && reload(search)}
-          className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          className="w-64 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
         <div className="flex-1" />
         {canEdit() && (
           <>
@@ -155,7 +164,9 @@ export default function MaterialTab() {
               <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
             ) : materials.length === 0 ? (
               <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
-            ) : materials.map((m) => (
+            ) : filteredMaterials.length === 0 ? (
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
+            ) : filteredMaterials.map((m) => (
               <tr key={m.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setDetail(m)}>
                 <td className="px-4 py-3 text-sm font-medium">{m.code}</td>
                 <td className="px-4 py-3 text-sm">{m.name}</td>
