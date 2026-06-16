@@ -17,6 +17,7 @@ export function ModelLoader({ url }: ModelLoaderProps) {
   const {
     setLoadingState, setModelScale, setTreeData, selectByMesh,
     selectedNodeId, isolateMode, nodeMap, hiddenParts, wireframe, resetViewTrigger,
+    measureMode,
   } = useViewerStore();
   const setInitialState = useViewerStore((s) => s.setInitialState);
   const groupRef = useRef<THREE.Group>(null);
@@ -54,6 +55,10 @@ export function ModelLoader({ url }: ModelLoaderProps) {
       const size = box.getSize(new THREE.Vector3());
       const maxDim = Math.max(size.x, size.y, size.z);
       const scale = maxDim > 0.001 ? 4 / maxDim : 1;
+      // Mayo/OpenCascade 导出的 glTF 以"米"为单位(1 单位=1000mm)。
+      // modelScale = 显示坐标 → 真实毫米 的换算系数，供测量工具反算物理尺寸。
+      // distance_mm = worldDist / modelScale = (mDist_米 * scale) / (scale/1000) = mDist_米 * 1000
+      setModelScale(scale / 1000);
       const center = box.getCenter(new THREE.Vector3());
       groupRef.current.scale.setScalar(scale);
       groupRef.current.position.copy(center.multiplyScalar(-scale));
@@ -118,6 +123,11 @@ export function ModelLoader({ url }: ModelLoaderProps) {
 
   const handleClick = (e: any) => {
     e.stopPropagation();
+    // 测量模式下屏蔽零件选中/高亮，让左键专用于拾取测量点
+    if (measureMode !== 'off') {
+      pointerDown.current = null;
+      return;
+    }
     // 旋转/拖拽过程中不触发选中（移动超过 3px 视为拖拽）
     if (pointerDown.current) {
       const dx = e.clientX - pointerDown.current.x;

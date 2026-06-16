@@ -41,9 +41,16 @@ export function MeasureTool() {
       raycaster.setFromCamera(new THREE.Vector2(nx, ny), camera);
       const intersects = raycaster.intersectObjects(scene.children, true);
 
-      // Exclude measurement markers from being hit
+      // 测量点只落在真实模型网格表面上：
+      //  - 排除测量标记球(__measure_marker__)
+      //  - 排除装饰性叠加层（高亮包围盒是 LineSegments、测量线段是 Line，均非 Mesh）
+      //  - 排除隐藏的零件（three.js 的 raycaster 不会自动跳过 visible=false 的对象，
+      //    故包围盒 ESC 取消后仍残留可命中，必须显式过滤）
       const hit = intersects.find(
-        (i) => !(i.object instanceof THREE.Mesh && i.object.name === '__measure_marker__'),
+        (i) =>
+          (i.object as THREE.Mesh).isMesh &&
+          i.object.visible !== false &&
+          i.object.name !== '__measure_marker__',
       );
       if (!hit) return;
 
@@ -92,11 +99,8 @@ export function MeasureTool() {
     ? new THREE.Vector3().addVectors(pointA, pointB).multiplyScalar(0.5)
     : pointA.clone();
 
+  // modelScale = 显示坐标→真实毫米 的换算系数（由 ModelLoader 按 glTF 米单位算出）
   const distance = pointB ? pointA.distanceTo(pointB) / Math.max(modelScale, 0.001) : 0;
-  // 显示缩放比例（仅当 modelScale 不是标准值时）
-  const ratio = modelScale > 1.1 || modelScale < 0.9
-    ? ` (1:${(1/modelScale).toFixed(1)})`
-    : '';
 
   return (
     <>
@@ -125,7 +129,7 @@ export function MeasureTool() {
           {/* Distance label */}
           <Html position={midPoint.add(new THREE.Vector3(0, 0.15, 0))} center style={{ pointerEvents: 'none' }}>
             <div className="rounded bg-gray-900/85 px-2 py-1 text-xs text-white shadow-lg whitespace-nowrap">
-              {distance.toFixed(1)} mm{ratio}
+              {distance.toFixed(1)} mm
             </div>
           </Html>
         </>

@@ -156,7 +156,9 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
     set({ clipPlanes: get().clipPlanes.filter((p) => p.axis !== axis) });
   },
 
-  setMeasureMode: (mode) => set({ measureMode: mode }),
+  // 进入测量模式时清除已选中零件，避免高亮/隔离透明遮挡测量
+  setMeasureMode: (mode) =>
+    set(mode === 'off' ? { measureMode: mode } : { measureMode: mode, selectedNodeId: null }),
   setExplodeDistance: (d) => set({ explodeDistance: d }),
   toggleWireframe: () => set({ wireframe: !get().wireframe }),
   toggleCameraMode: () => set({ cameraMode: get().cameraMode === 'orthographic' ? 'perspective' : 'orthographic' }),

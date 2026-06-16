@@ -57,6 +57,15 @@ export function PartHighlighter({ url }: PartHighlighterProps) {
   });
 
   return (
-    <lineSegments ref={lineRef} visible={false} geometry={edgeGeometry} material={lineMaterial} renderOrder={999} />
+    <lineSegments
+      ref={lineRef}
+      visible={false}
+      geometry={edgeGeometry}
+      material={lineMaterial}
+      renderOrder={999}
+      // 纯装饰性高亮包围盒——任何拾取(测量/选中)都不应命中它。
+      // three.js raycaster 不跳过 visible=false 的对象，故显式置空 raycast。
+      raycast={() => null}
+    />
   );
 }
