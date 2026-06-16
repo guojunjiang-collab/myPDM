@@ -74,6 +74,7 @@ export default function MaterialDetail({ material, onClose, onViewEntity }: Prop
                     <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">类型</th>
                     <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">件号</th>
                     <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">名称</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">规格型号</th>
                     <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">版本</th>
                     <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">状态</th>
                   </tr>
@@ -84,6 +85,7 @@ export default function MaterialDetail({ material, onClose, onViewEntity }: Prop
                     <td className="px-3 py-2 text-sm text-gray-500">{m.ref_entity_type === 'part' ? '零件' : '部件'}</td>
                     <td className="px-3 py-2 text-sm font-medium text-primary-600">{pdmEntity?.code || m.code}</td>
                     <td className="px-3 py-2 text-sm">{pdmEntity?.name || m.name}</td>
+                    <td className="px-3 py-2 text-sm text-gray-500">{pdmEntity?.spec || m.spec || '-'}</td>
                     <td className="px-3 py-2 text-sm text-gray-500">{pdmEntity?.version || '-'}</td>
                     <td className="px-3 py-2 text-sm text-gray-500">{pdmEntity ? (PDM_STATUS[pdmEntity.status] || pdmEntity.status) : '-'}</td>
                   </tr>

@@ -190,6 +190,7 @@ export default function MaterialTab() {
                           <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">类型</th>
                           <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">件号</th>
                           <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">名称</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">规格型号</th>
                           <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">版本</th>
                           <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">状态</th>
                         </tr>
@@ -200,6 +201,7 @@ export default function MaterialTab() {
                           <td className="px-3 py-2 text-sm text-gray-500">{editing.source_type === 'part' ? '零件' : '部件'}</td>
                           <td className="px-3 py-2 text-sm font-medium text-primary-600">{editingPdm?.code || editing.code}</td>
                           <td className="px-3 py-2 text-sm">{editingPdm?.name || editing.name}</td>
+                          <td className="px-3 py-2 text-sm text-gray-500">{editingPdm?.spec || editing.spec || '-'}</td>
                           <td className="px-3 py-2 text-sm text-gray-500">{editingPdm?.version || '-'}</td>
                           <td className="px-3 py-2 text-sm text-gray-500">{editingPdm ? (STATUS_LABEL[editingPdm.status] || editingPdm.status) : '-'}</td>
                         </tr>
