@@ -581,6 +581,8 @@ export default function Components() {
     setFormData(initialFormData);
     setCustomFieldValues({});
     setEditParts([]);
+    setExpandedParts({});
+    setLoadingPart(null);
     loadCustomFields();
     setModalOpen(true);
   };
@@ -595,6 +597,9 @@ export default function Components() {
       status: assembly.status,
       remark: assembly.remark || '',
     });
+    // 重置上一次编辑遗留的嵌套展开状态（其 key 按行号索引，会与新部件的行号串台）
+    setExpandedParts({});
+    setLoadingPart(null);
     await loadCustomFields();
     await loadCustomFieldValues(assembly.id);
     loadEditParts(assembly.id);
