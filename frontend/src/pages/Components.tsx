@@ -192,7 +192,7 @@ export default function Components() {
       return editSortDir === 'asc' ? cmp : -cmp;
     });
   }, [editParts, editSortField, editSortDir]);
-  const [versionSelectState, setVersionSelectState] = useState<{ itemId: string; childId: string; childType: string; childName: string } | null>(null);
+  const [versionSelectState, setVersionSelectState] = useState<{ itemId: string; childId: string; childType: string; childName: string; parentId: string; quantity: number } | null>(null);
 
 /* ---- 详情弹窗 ---- */
   const [viewingAssembly, setViewingAssembly] = useState<Assembly | null>(null);
@@ -457,16 +457,21 @@ export default function Components() {
 
   const handleVersionSelectChild = async (selectedVersionId: string) => {
     if (!editingAssembly || !versionSelectState) return;
-    const item = editParts.find(p => p.id === versionSelectState.itemId);
-    if (!item) return;
+    const { itemId, childType, parentId, quantity } = versionSelectState;
+    // 顶层子项的父级是当前部件，嵌套子项的父级是其所属子部件
+    const targetParentId = parentId || editingAssembly.id;
     try {
-      await assemblyPartsApi.remove(editingAssembly.id, versionSelectState.itemId);
-      await assemblyPartsApi.add(editingAssembly.id, {
-        child_type: versionSelectState.childType,
+      await assemblyPartsApi.remove(targetParentId, itemId);
+      await assemblyPartsApi.add(targetParentId, {
+        child_type: childType,
         child_id: selectedVersionId,
-        quantity: item.quantity,
+        quantity,
       });
-      await loadEditParts(editingAssembly.id);
+      if (targetParentId === editingAssembly.id) {
+        await loadEditParts(editingAssembly.id);
+      } else {
+        refreshParentParts(targetParentId);
+      }
     } catch {
       alert('切换版本失败');
     } finally {
@@ -914,7 +919,7 @@ export default function Components() {
           <td className="px-3 py-2 text-right whitespace-nowrap">
             <span className="inline-flex items-center gap-1">
               {canEdit() && (
-                <button type="button" onClick={() => setVersionSelectState({ itemId: part.id, childId: part.child_id, childType: part.childType === 'component' ? 'assembly' : part.childType, childName: part.child_detail?.code || part.child_detail?.name || '' })} className="text-primary-600 hover:text-primary-800 text-xs" title="选择版本">选择</button>
+                <button type="button" onClick={() => setVersionSelectState({ itemId: part.id, childId: part.child_id, childType: part.childType === 'component' ? 'assembly' : part.childType, childName: part.child_detail?.code || part.child_detail?.name || '', parentId: level === 0 ? (editingAssembly?.id || '') : (part.parent_id || ''), quantity: part.quantity })} className="text-primary-600 hover:text-primary-800 text-xs" title="选择版本">选择</button>
               )}
               {isAssembly && canEdit() && (
                 <button type="button" onClick={() => { setPickerTargetId(part.child_id); setPickerOpen(true); }} className="text-primary-600 hover:text-primary-800 text-xs" title="添加子项">+子项</button>
