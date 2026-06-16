@@ -109,7 +109,7 @@ def enable_material_from_pdm(db: Session, data: MaterialEnableFromPDM) -> Invent
     if dup:
         raise HTTPException(status_code=400, detail="该零部件已启用库存")
     m = InventoryMaterial(
-        code=entity.code, name=entity.name, spec=getattr(entity, "spec", None),
+        code=f"{entity.code}_{entity.version}", name=entity.name, spec=getattr(entity, "spec", None),
         unit=data.unit, source_type=data.entity_type,
         ref_entity_type=data.entity_type, ref_entity_id=entity.id,
         track_mode=data.track_mode, safety_stock=data.safety_stock,

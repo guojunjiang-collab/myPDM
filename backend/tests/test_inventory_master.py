@@ -21,4 +21,5 @@ def test_enable_material_from_pdm_part(db):
     )
     assert m.source_type == "part"
     assert m.ref_entity_id == part.id
-    assert m.code == "P-100" and m.name == "法兰"
+    # 编码用 code_version 避免版本不清
+    assert m.code == "P-100_A" and m.name == "法兰"

@@ -4,6 +4,7 @@ import { useDataStore } from '../../stores/data';
 import { inventoryApi } from '../../services/inventoryApi';
 import { canEdit } from '../../stores/auth';
 import { Modal } from '../Modal';
+import MaterialDetail from './MaterialDetail';
 import type { InvMaterial } from '../../types';
 
 const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500';
@@ -20,6 +21,7 @@ export default function MaterialTab() {
   const [editing, setEditing] = useState<Partial<InvMaterial> | null>(null);
   const [pdmMode, setPdmMode] = useState(false);
   const [pdmKeyword, setPdmKeyword] = useState('');
+  const [detail, setDetail] = useState<InvMaterial | null>(null);
 
   // PDM 零件/部件来自全局 DataStore（已全量预加载），客户端即时过滤
   const storeParts = useDataStore((s) => s.parts);
@@ -98,6 +100,7 @@ export default function MaterialTab() {
             <tr>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">编码</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">名称</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">规格型号</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">单位</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">来源</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">追踪</th>
@@ -107,20 +110,21 @@ export default function MaterialTab() {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
             ) : materials.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
             ) : materials.map((m) => (
-              <tr key={m.id} className="hover:bg-gray-50">
+              <tr key={m.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setDetail(m)}>
                 <td className="px-4 py-3 text-sm font-medium">{m.code}</td>
                 <td className="px-4 py-3 text-sm">{m.name}</td>
+                <td className="px-4 py-3 text-sm text-gray-500">{m.spec || '-'}</td>
                 <td className="px-4 py-3 text-sm text-gray-500">{m.unit || '-'}</td>
                 <td className="px-4 py-3 text-sm text-gray-500">{m.source_type === 'standalone' ? '非PDM' : m.source_type === 'part' ? '零件' : '部件'}</td>
                 <td className="px-4 py-3 text-sm text-gray-500">{m.track_mode === 'batch' ? '批次' : '数量'}</td>
                 <td className="px-4 py-3 text-sm text-gray-500">{m.safety_stock ?? '-'}</td>
                 <td className="px-4 py-3 text-right">
                   {canEdit() && (
-                    <button onClick={() => setEditing(m)} className="text-primary-600 hover:text-primary-800">编辑</button>
+                    <button onClick={(e) => { e.stopPropagation(); setEditing(m); }} className="text-primary-600 hover:text-primary-800">编辑</button>
                   )}
                 </td>
               </tr>
@@ -142,6 +146,11 @@ export default function MaterialTab() {
               <label className="block text-sm text-gray-600 mb-1">名称</label>
               <input placeholder="物料名称" value={editing.name || ''}
                 onChange={(e) => setEditing({ ...editing, name: e.target.value })} className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">规格型号</label>
+              <input placeholder="规格型号（选填）" value={editing.spec || ''}
+                onChange={(e) => setEditing({ ...editing, spec: e.target.value })} className={inputCls} />
             </div>
             <div>
               <label className="block text-sm text-gray-600 mb-1">单位</label>
@@ -213,6 +222,9 @@ export default function MaterialTab() {
           </div>
         </div>
       </Modal>
+
+      {/* 物料详情 */}
+      {detail && <MaterialDetail material={detail} onClose={() => setDetail(null)} />}
     </div>
   );
 }

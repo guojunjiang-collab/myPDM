@@ -806,7 +806,7 @@ export interface InvMaterial {
   id: string; code: string; name: string; spec?: string; unit?: string;
   source_type: 'part' | 'assembly' | 'standalone';
   ref_entity_type?: string | null; ref_entity_id?: string | null;
-  track_mode: 'quantity' | 'batch'; safety_stock?: number | null; status: string;
+  track_mode: 'quantity' | 'batch'; safety_stock?: number | null; status: string; remark?: string;
 }
 export interface StockRow {
   material_id: string; material_code: string; material_name: string; unit?: string;
