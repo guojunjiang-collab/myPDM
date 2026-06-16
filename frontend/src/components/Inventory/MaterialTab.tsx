@@ -64,6 +64,12 @@ export default function MaterialTab() {
   const storeAssemblies = useDataStore((s) => s.assemblies);
   const syncAll = useDataStore((s) => s.syncAll);
 
+  // 正在编辑的物料是否来自 PDM，及其关联零部件（用于编辑弹窗体现来源）
+  const editingIsPdm = !!editing && !!editing.source_type && editing.source_type !== 'standalone';
+  const editingPdm = editingIsPdm && editing!.ref_entity_id
+    ? (editing!.source_type === 'part' ? storeParts : storeAssemblies).find((e: any) => e.id === editing!.ref_entity_id)
+    : null;
+
   const reload = async (s?: string) => {
     setLoading(true);
     try { await loadMaterials(s); } finally { setLoading(false); }
@@ -174,6 +180,23 @@ export default function MaterialTab() {
         {editing && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
+              <div className={`${cardCls} col-span-2`}>
+                <label className={cardLabelCls}>来源</label>
+                {editingIsPdm ? (
+                  <div className="text-sm flex items-center gap-2 flex-wrap">
+                    <span className="text-xs px-2 py-0.5 rounded bg-primary-100 text-primary-700">
+                      {editing.source_type === 'part' ? '零件' : '部件'} · PDM 关联
+                    </span>
+                    <span className="text-gray-700">
+                      {editingPdm
+                        ? `${editingPdm.code} ${editingPdm.name} · 版本${editingPdm.version || '-'} · ${STATUS_LABEL[editingPdm.status] || editingPdm.status}`
+                        : `${editing.code} ${editing.name}`}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-700">非PDM（独立物料）</div>
+                )}
+              </div>
               <div className={cardCls}>
                 <label className={cardLabelCls}>编码</label>
                 <input placeholder="物料编码" value={editing.code || ''} disabled={!!editing.id}
