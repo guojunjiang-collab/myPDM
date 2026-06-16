@@ -1,9 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useInventoryStore } from '../../stores/inventory';
+import { useAuthStore } from '../../stores/auth';
 import { inventoryApi } from '../../services/inventoryApi';
 import { Modal } from '../Modal';
 import ComboBox from './ComboBox';
 import type { InvDocType, InvDocLine, StockRow } from '../../types';
+
+interface ReviewerFormItem { user_id: string; seq: number; }
 
 const DOC_LABELS: Record<InvDocType, string> = {
   inbound: '入库单', outbound: '出库单', transfer: '调拨单',
@@ -15,13 +18,23 @@ const fieldCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outli
 export default function DocumentEditModal({ docType, onClose, onSaved }:
   { docType: InvDocType; onClose: () => void; onSaved: () => void }) {
   const { warehouses, materials, users } = useInventoryStore();
+  const currentUserId = useAuthStore((s) => s.user?.id);
   const [warehouseId, setWarehouseId] = useState('');
   const [toWarehouseId, setToWarehouseId] = useState('');
   const [bizType, setBizType] = useState('');
   const [remark, setRemark] = useState('');
-  const [reviewerIds, setReviewerIds] = useState<string[]>([]);
+  const [reviewers, setReviewers] = useState<ReviewerFormItem[]>([]);
   const [reviewMode, setReviewMode] = useState<'all' | 'any'>('all');
   const [keeperId, setKeeperId] = useState('');
+
+  // 审批人管理（仿 ECR）：可添加多个
+  const addReviewer = () => {
+    const nextSeq = reviewers.length > 0 ? Math.max(...reviewers.map((r) => r.seq)) + 1 : 1;
+    setReviewers([...reviewers, { user_id: '', seq: nextSeq }]);
+  };
+  const removeReviewer = (index: number) => setReviewers(reviewers.filter((_, i) => i !== index));
+  const updateReviewer = (index: number, field: 'user_id' | 'seq', value: string | number) =>
+    setReviewers(reviewers.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
   const [lines, setLines] = useState<InvDocLine[]>([{ material_id: '', batch_no: '', quantity: 0 }]);
 
   const isTransfer = docType === 'transfer';
@@ -68,7 +81,7 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
       doc_type: docType, biz_type: bizType || undefined,
       warehouse_id: warehouseId, to_warehouse_id: isTransfer ? toWarehouseId : undefined,
       review_mode: reviewMode, keeper_id: keeperId || undefined, remark,
-      reviewers: reviewerIds.map((id, seq) => ({ user_id: id, seq })),
+      reviewers: reviewers.filter((r) => r.user_id).map((r) => ({ user_id: r.user_id, seq: r.seq })),
       lines: lines.filter((l) => l.material_id).map((l) => ({
         material_id: l.material_id, batch_no: l.batch_no || '',
         quantity: Number(l.quantity) || 0,
@@ -118,22 +131,49 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
           </div>
         </div>
 
-        {/* 审批人 */}
+        {/* 审批人（仿 ECR：可添加多个） */}
         <div>
-          <label className="block text-sm text-gray-600 mb-1">
-            审批人
-            <button onClick={() => setReviewMode(reviewMode === 'all' ? 'any' : 'all')}
-              className="ml-2 text-primary-600 hover:text-primary-800 text-xs">
-              {reviewMode === 'all' ? '会签' : '或签'}（点击切换）
-            </button>
-          </label>
-          <select multiple value={reviewerIds}
-            onChange={(e) => setReviewerIds(Array.from(e.target.selectedOptions, (o) => o.value))}
-            className={`${fieldCls} h-24`}>
-            {users.filter((u) => ['admin', 'engineer'].includes(u.role)).map((u) => (
-              <option key={u.id} value={u.id}>{u.real_name}（{u.role}）</option>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium text-gray-700">👤 审批人</label>
+            <div className="flex items-center gap-2">
+              <select value={reviewMode} onChange={(e) => setReviewMode(e.target.value as 'all' | 'any')}
+                className="px-2 py-1 border border-gray-300 rounded text-xs bg-white focus:outline-none focus:ring-1 focus:ring-primary-500">
+                <option value="all">会签（全部通过）</option>
+                <option value="any">或签（任一通过）</option>
+              </select>
+              <button type="button" onClick={addReviewer}
+                className="text-xs px-3 py-1 rounded bg-primary-50 text-primary-600 hover:bg-primary-100 transition-colors">
+                + 添加审批人
+              </button>
+            </div>
+          </div>
+
+          {reviewers.length === 0 && (
+            <div className="text-center text-gray-400 py-3 text-sm border border-dashed border-gray-300 rounded-lg">
+              暂无审批人，请点击上方按钮添加
+            </div>
+          )}
+
+          <div className="space-y-2">
+            {reviewers.map((reviewer, index) => (
+              <div key={index} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg border border-gray-200">
+                <span className="text-xs text-gray-400 w-6 text-center">{reviewer.seq}</span>
+                <select value={reviewer.user_id}
+                  onChange={(e) => updateReviewer(index, 'user_id', e.target.value)}
+                  className="flex-1 border border-gray-300 rounded px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-primary-500">
+                  <option value="">请选择审批人</option>
+                  {users.filter((u) => u.role !== 'guest' && u.id !== currentUserId).map((u) => (
+                    <option key={u.id} value={u.id}>{u.real_name}（{u.role}）</option>
+                  ))}
+                </select>
+                <input type="number" min={1} value={reviewer.seq}
+                  onChange={(e) => updateReviewer(index, 'seq', parseInt(e.target.value) || 1)}
+                  className="w-16 border border-gray-300 rounded px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                <button type="button" onClick={() => removeReviewer(index)}
+                  className="text-red-400 hover:text-red-600 text-sm px-2" title="移除">✕</button>
+              </div>
             ))}
-          </select>
+          </div>
         </div>
 
         {/* 明细行 */}
