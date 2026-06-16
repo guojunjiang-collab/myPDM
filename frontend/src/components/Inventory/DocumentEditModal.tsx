@@ -167,7 +167,7 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
                             <option value="|">{warehouseId ? '选择物料' : `请先选择${isTransfer ? '源仓' : '仓库'}`}</option>
                             {sourceStock.map((s) => (
                               <option key={`${s.material_id}|${s.batch_no}`} value={`${s.material_id}|${s.batch_no}`}>
-                                {s.material_code} {s.material_name}{s.batch_no ? ` · 批次:${s.batch_no}` : ''}
+                                {s.material_code} · {s.material_name} · 批次:{s.batch_no || '无'} · 余:{s.quantity}{s.unit || ''}
                               </option>
                             ))}
                           </select>
