@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useInventoryStore } from '../../stores/inventory';
 import { inventoryApi } from '../../services/inventoryApi';
 import { Modal } from '../Modal';
-import type { InvDocType, InvDocLine } from '../../types';
+import type { InvDocType, InvDocLine, StockRow } from '../../types';
 
 const DOC_LABELS: Record<InvDocType, string> = {
   inbound: '入库单', outbound: '出库单', transfer: '调拨单',
@@ -25,6 +25,25 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
 
   const isTransfer = docType === 'transfer';
   const isAdjustment = docType === 'adjustment';
+
+  // 调拨单：加载库存余额，供「源仓可调拨物料」筛选与源仓/目标仓余量展示
+  const [stockRows, setStockRows] = useState<StockRow[]>([]);
+  useEffect(() => {
+    if (isTransfer) inventoryApi.listStock().then((res) => setStockRows(res.data.items)).catch(() => {});
+  }, [isTransfer]);
+
+  // 源仓有货的库存行（material+batch，余量>0），作为调拨明细的可选项
+  const sourceStock = useMemo(
+    () => stockRows.filter((s) => s.warehouse_id === warehouseId && s.quantity > 0),
+    [stockRows, warehouseId],
+  );
+  const balanceOf = (wh: string, materialId: string, batch: string): number | null => {
+    if (!wh || !materialId) return null;
+    const row = stockRows.find(
+      (s) => s.warehouse_id === wh && s.material_id === materialId && (s.batch_no || '') === (batch || ''),
+    );
+    return row ? row.quantity : 0;
+  };
 
   const onWarehouseChange = (id: string) => {
     setWarehouseId(id);
@@ -119,52 +138,104 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
             <button onClick={addLine} className="text-primary-600 hover:text-primary-800 text-sm">+ 加一行</button>
           </div>
           <div className="rounded-lg border border-gray-200 overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">物料</th>
-                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">批次</th>
-                  {isAdjustment && <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">方向</th>}
-                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">数量</th>
-                  <th className="px-3 py-2"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {lines.map((l, i) => (
-                  <tr key={i}>
-                    <td className="px-3 py-2">
-                      <select value={l.material_id} onChange={(e) => updateLine(i, { material_id: e.target.value })}
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500">
-                        <option value="">选择物料</option>
-                        {materials.map((m) => <option key={m.id} value={m.id}>{m.code} {m.name}</option>)}
-                      </select>
-                    </td>
-                    <td className="px-3 py-2">
-                      <input value={l.batch_no} onChange={(e) => updateLine(i, { batch_no: e.target.value })}
-                        className="w-24 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500" />
-                    </td>
-                    {isAdjustment && (
+            {isTransfer ? (
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">物料（源仓有货）</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">批次</th>
+                    <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">源仓余量</th>
+                    <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">目标仓余量</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">调拨数量</th>
+                    <th className="px-3 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {lines.map((l, i) => {
+                    const srcBal = balanceOf(warehouseId, l.material_id, l.batch_no);
+                    const tgtBal = balanceOf(toWarehouseId, l.material_id, l.batch_no);
+                    const over = !!l.material_id && srcBal !== null && Number(l.quantity) > srcBal;
+                    return (
+                      <tr key={i}>
+                        <td className="px-3 py-2">
+                          <select value={`${l.material_id}|${l.batch_no}`}
+                            onChange={(e) => { const [mid, b] = e.target.value.split('|'); updateLine(i, { material_id: mid, batch_no: b }); }}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500">
+                            <option value="|">{warehouseId ? '选择物料' : '请先选择源仓'}</option>
+                            {sourceStock.map((s) => (
+                              <option key={`${s.material_id}|${s.batch_no}`} value={`${s.material_id}|${s.batch_no}`}>
+                                {s.material_code} {s.material_name}{s.batch_no ? ` · 批次:${s.batch_no}` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-3 py-2 text-sm text-gray-500">{l.batch_no || '-'}</td>
+                        <td className="px-3 py-2 text-sm text-right text-gray-500">{srcBal ?? '-'}</td>
+                        <td className="px-3 py-2 text-sm text-right text-gray-500">{toWarehouseId ? tgtBal : '-'}</td>
+                        <td className="px-3 py-2">
+                          <input type="number" value={l.quantity}
+                            onChange={(e) => updateLine(i, { quantity: Number(e.target.value) })}
+                            className={`w-24 px-2 py-1 border rounded text-sm focus:outline-none focus:ring-1 ${over ? 'border-red-400 text-red-600 focus:ring-red-400' : 'border-gray-300 focus:ring-primary-500'}`} />
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <button onClick={() => removeLine(i)} className="text-red-500 hover:text-red-700">✕</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : (
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">物料</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">批次</th>
+                    {isAdjustment && <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">方向</th>}
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">数量</th>
+                    <th className="px-3 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {lines.map((l, i) => (
+                    <tr key={i}>
                       <td className="px-3 py-2">
-                        <select value={l.direction || 'in'} onChange={(e) => updateLine(i, { direction: e.target.value as any })}
-                          className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500">
-                          <option value="in">盘盈+</option><option value="out">报损-</option>
+                        <select value={l.material_id} onChange={(e) => updateLine(i, { material_id: e.target.value })}
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500">
+                          <option value="">选择物料</option>
+                          {materials.map((m) => <option key={m.id} value={m.id}>{m.code} {m.name}</option>)}
                         </select>
                       </td>
-                    )}
-                    <td className="px-3 py-2">
-                      <input type="number" value={l.quantity} onChange={(e) => updateLine(i, { quantity: Number(e.target.value) })}
-                        className="w-24 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500" />
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      <button onClick={() => removeLine(i)} className="text-red-500 hover:text-red-700">✕</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      <td className="px-3 py-2">
+                        <input value={l.batch_no} onChange={(e) => updateLine(i, { batch_no: e.target.value })}
+                          className="w-24 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                      </td>
+                      {isAdjustment && (
+                        <td className="px-3 py-2">
+                          <select value={l.direction || 'in'} onChange={(e) => updateLine(i, { direction: e.target.value as any })}
+                            className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500">
+                            <option value="in">盘盈+</option><option value="out">报损-</option>
+                          </select>
+                        </td>
+                      )}
+                      <td className="px-3 py-2">
+                        <input type="number" value={l.quantity} onChange={(e) => updateLine(i, { quantity: Number(e.target.value) })}
+                          className="w-24 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <button onClick={() => removeLine(i)} className="text-red-500 hover:text-red-700">✕</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
           {docType === 'stocktake' && (
             <p className="text-xs text-gray-400 mt-1.5">盘点单的实盘数在「过账」时由库管员填写。</p>
+          )}
+          {isTransfer && (
+            <p className="text-xs text-gray-400 mt-1.5">调拨物料仅从「源仓有货」的库存中选择；调拨数量超过源仓余量会标红。</p>
           )}
         </div>
 
