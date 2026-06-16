@@ -1,14 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { Modal } from '../Modal';
 import { useDataStore } from '../../stores/data';
-import { partsApi, assembliesApi, customFieldsApi } from '../../services/api';
-import PartDetailContent from '../PartDetailContent';
-import AssemblyDetailContent from '../AssemblyDetailContent';
-import type { InvMaterial, CustomFieldDefinition, CustomFieldValue } from '../../types';
+import type { InvMaterial } from '../../types';
 
 interface Props {
   material: InvMaterial;
   onClose: () => void;
+  onViewEntity: (type: 'part' | 'assembly', id: string) => void;
 }
 
 function InfoItem({ label, value, icon }: { label: string; value: string; icon?: string }) {
@@ -32,7 +30,7 @@ const statusLabel = (s: string) => {
 // PDM 零件/部件状态中文
 const PDM_STATUS: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' };
 
-export default function MaterialDetail({ material, onClose }: Props) {
+export default function MaterialDetail({ material, onClose, onViewEntity }: Props) {
   const m = material;
   const hasPdmRef = m.source_type !== 'standalone' && !!m.ref_entity_id;
 
@@ -49,36 +47,6 @@ export default function MaterialDetail({ material, onClose }: Props) {
   useEffect(() => {
     if (hasPdmRef && storeParts.length === 0 && storeAssemblies.length === 0) syncAll();
   }, [hasPdmRef, storeParts.length, storeAssemblies.length, syncAll]);
-
-  // 零部件详情（嵌套弹窗）
-  const [detailEntity, setDetailEntity] = useState<{ type: 'part' | 'assembly'; id: string } | null>(null);
-  const [detailData, setDetailData] = useState<any>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [detailDefs, setDetailDefs] = useState<CustomFieldDefinition[]>([]);
-  const [detailValues, setDetailValues] = useState<Record<string, any>>({});
-
-  const viewEntity = async (type: 'part' | 'assembly', id: string) => {
-    setDetailEntity({ type, id });
-    setDetailData(null); setDetailLoading(true); setDetailDefs([]); setDetailValues({});
-    try {
-      const api = type === 'part' ? partsApi : assembliesApi;
-      const res = await api.get(id);
-      setDetailData(res.data);
-      const allDefs = useDataStore.getState().customFieldDefs;
-      const entityType = type === 'part' ? 'part' : 'component';
-      const defs = allDefs.filter((d: CustomFieldDefinition) => d.applies_to?.includes(entityType));
-      setDetailDefs(defs);
-      if (defs.length > 0) {
-        try {
-          const valuesRes = await customFieldsApi.getValues(entityType, id);
-          const vals: Record<string, any> = {};
-          (valuesRes.data || []).forEach((v: CustomFieldValue) => { vals[v.field_id] = v.value; });
-          setDetailValues(vals);
-        } catch { /* 自定义字段可选 */ }
-      }
-    } catch { setDetailData(null); }
-    finally { setDetailLoading(false); }
-  };
 
   return (
     <Modal open={true} title="物料详情" onClose={onClose} width="3xl">
@@ -112,7 +80,7 @@ export default function MaterialDetail({ material, onClose }: Props) {
                 </thead>
                 <tbody>
                   <tr className="hover:bg-gray-50 cursor-pointer"
-                    onClick={() => viewEntity(m.ref_entity_type as 'part' | 'assembly', m.ref_entity_id!)}>
+                    onClick={() => onViewEntity(m.ref_entity_type as 'part' | 'assembly', m.ref_entity_id!)}>
                     <td className="px-3 py-2 text-sm text-gray-500">{m.ref_entity_type === 'part' ? '零件' : '部件'}</td>
                     <td className="px-3 py-2 text-sm font-medium text-primary-600">{pdmEntity?.code || m.code}</td>
                     <td className="px-3 py-2 text-sm">{pdmEntity?.name || m.name}</td>
@@ -138,26 +106,6 @@ export default function MaterialDetail({ material, onClose }: Props) {
           <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">关闭</button>
         </div>
       </div>
-
-      {/* 零部件详情（嵌套弹窗，层级更高） */}
-      <Modal
-        open={!!detailEntity}
-        title={detailEntity ? (detailEntity.type === 'part' ? '零件详情' : '部件详情') : ''}
-        onClose={() => setDetailEntity(null)}
-        width="full"
-        zIndex={60}
-      >
-        {detailLoading ? (
-          <div className="py-8 text-center text-sm text-gray-400">加载中...</div>
-        ) : !detailData ? (
-          <div className="py-8 text-center text-sm text-gray-400">加载失败</div>
-        ) : detailEntity?.type === 'part' ? (
-          <PartDetailContent part={detailData} customFieldDefs={detailDefs} customFieldValues={detailValues} />
-        ) : (
-          <AssemblyDetailContent assembly={detailData} customFieldDefs={detailDefs} customFieldValues={detailValues}
-            onSubItemClick={(item: any) => viewEntity(item.childType === 'part' ? 'part' : 'assembly', item.child_id)} />
-        )}
-      </Modal>
     </Modal>
   );
 }
