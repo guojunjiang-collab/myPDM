@@ -132,23 +132,23 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
               ))}
             </select>
           </div>
+          <div className={cardCls}>
+            <label className={cardLabelCls}>审批模式</label>
+            <select value={reviewMode} onChange={(e) => setReviewMode(e.target.value as 'all' | 'any')} className={cardInputCls}>
+              <option value="all">会签（全部通过）</option>
+              <option value="any">或签（任一通过）</option>
+            </select>
+          </div>
         </div>
 
         {/* 审批人（仿 ECR：可添加多个） */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-gray-700">👤 审批人</label>
-            <div className="flex items-center gap-2">
-              <select value={reviewMode} onChange={(e) => setReviewMode(e.target.value as 'all' | 'any')}
-                className="px-2 py-1 border border-gray-300 rounded text-xs bg-white focus:outline-none focus:ring-1 focus:ring-primary-500">
-                <option value="all">会签（全部通过）</option>
-                <option value="any">或签（任一通过）</option>
-              </select>
-              <button type="button" onClick={addReviewer}
-                className="text-xs px-3 py-1 rounded bg-primary-50 text-primary-600 hover:bg-primary-100 transition-colors">
-                + 添加审批人
-              </button>
-            </div>
+            <button type="button" onClick={addReviewer}
+              className="text-xs px-3 py-1 rounded bg-primary-50 text-primary-600 hover:bg-primary-100 transition-colors">
+              + 添加审批人
+            </button>
           </div>
 
           {reviewers.length === 0 && (
