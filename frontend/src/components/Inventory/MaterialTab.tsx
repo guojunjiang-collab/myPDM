@@ -180,23 +180,40 @@ export default function MaterialTab() {
         {editing && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <div className={`${cardCls} col-span-2`}>
-                <label className={cardLabelCls}>来源</label>
-                {editingIsPdm ? (
-                  <div className="text-sm flex items-center gap-2 flex-wrap">
-                    <span className="text-xs px-2 py-0.5 rounded bg-primary-100 text-primary-700">
-                      {editing.source_type === 'part' ? '零件' : '部件'} · PDM 关联
-                    </span>
-                    <span className="text-gray-700">
-                      {editingPdm
-                        ? `${editingPdm.code} ${editingPdm.name} · 版本${editingPdm.version || '-'} · ${STATUS_LABEL[editingPdm.status] || editingPdm.status}`
-                        : `${editing.code} ${editing.name}`}
-                    </span>
+              {editingIsPdm ? (
+                <div className="col-span-2">
+                  <label className={cardLabelCls}>PDM 关联零部件</label>
+                  <div className="rounded-lg border border-gray-200 overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">类型</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">件号</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">名称</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">版本</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">状态</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="hover:bg-gray-50 cursor-pointer"
+                          onClick={() => editing.ref_entity_id && viewEntity((editing.ref_entity_type || editing.source_type) as 'part' | 'assembly', editing.ref_entity_id)}>
+                          <td className="px-3 py-2 text-sm text-gray-500">{editing.source_type === 'part' ? '零件' : '部件'}</td>
+                          <td className="px-3 py-2 text-sm font-medium text-primary-600">{editingPdm?.code || editing.code}</td>
+                          <td className="px-3 py-2 text-sm">{editingPdm?.name || editing.name}</td>
+                          <td className="px-3 py-2 text-sm text-gray-500">{editingPdm?.version || '-'}</td>
+                          <td className="px-3 py-2 text-sm text-gray-500">{editingPdm ? (STATUS_LABEL[editingPdm.status] || editingPdm.status) : '-'}</td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
-                ) : (
+                  <p className="text-xs text-gray-400 mt-1">点击上方行可查看零部件详情。</p>
+                </div>
+              ) : (
+                <div className={`${cardCls} col-span-2`}>
+                  <label className={cardLabelCls}>来源</label>
                   <div className="text-sm text-gray-700">非PDM（独立物料）</div>
-                )}
-              </div>
+                </div>
+              )}
               <div className={cardCls}>
                 <label className={cardLabelCls}>编码</label>
                 <input placeholder="物料编码" value={editing.code || ''} disabled={!!editing.id}
