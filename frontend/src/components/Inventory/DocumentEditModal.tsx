@@ -13,7 +13,10 @@ const DOC_LABELS: Record<InvDocType, string> = {
   stocktake: '盘点单', adjustment: '库存调整单',
 };
 
-const fieldCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm';
+// ECR 式卡片字段样式
+const cardCls = 'bg-gray-50 rounded-lg px-3 py-2 border border-gray-100';
+const cardLabelCls = 'block text-xs text-gray-500 mb-0.5';
+const cardInputCls = 'w-full text-sm px-2 py-1 border border-gray-200 rounded bg-white focus:outline-none focus:ring-2 focus:ring-primary-500';
 
 export default function DocumentEditModal({ docType, onClose, onSaved }:
   { docType: InvDocType; onClose: () => void; onSaved: () => void }) {
@@ -94,20 +97,20 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
 
   return (
     <Modal open title={`新建${DOC_LABELS[docType]}`} onClose={onClose} width="3xl">
-      <div className="space-y-4">
-        {/* 头部字段 */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">{isTransfer ? '源仓' : '仓库'}</label>
-            <select value={warehouseId} onChange={(e) => onWarehouseChange(e.target.value)} className={fieldCls}>
+      <div className="space-y-4 max-h-[78vh] overflow-y-auto pr-1">
+        {/* 基本信息（卡片字段） */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className={cardCls}>
+            <label className={cardLabelCls}>{isTransfer ? '源仓' : '仓库'}</label>
+            <select value={warehouseId} onChange={(e) => onWarehouseChange(e.target.value)} className={cardInputCls}>
               <option value="">请选择</option>
               {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
             </select>
           </div>
           {isTransfer && (
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">目标仓</label>
-              <select value={toWarehouseId} onChange={(e) => setToWarehouseId(e.target.value)} className={fieldCls}>
+            <div className={cardCls}>
+              <label className={cardLabelCls}>目标仓</label>
+              <select value={toWarehouseId} onChange={(e) => setToWarehouseId(e.target.value)} className={cardInputCls}>
                 <option value="">请选择</option>
                 {warehouses.filter((w) => w.id !== warehouseId).map((w) => (
                   <option key={w.id} value={w.id}>{w.name}</option>
@@ -115,14 +118,14 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
               </select>
             </div>
           )}
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">业务子类</label>
+          <div className={cardCls}>
+            <label className={cardLabelCls}>业务子类</label>
             <input value={bizType} onChange={(e) => setBizType(e.target.value)}
-              placeholder="如 采购入库/生产领料" className={fieldCls} />
+              placeholder="如 采购入库/生产领料" className={cardInputCls} />
           </div>
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">指定库管员</label>
-            <select value={keeperId} onChange={(e) => setKeeperId(e.target.value)} className={fieldCls}>
+          <div className={cardCls}>
+            <label className={cardLabelCls}>指定库管员</label>
+            <select value={keeperId} onChange={(e) => setKeeperId(e.target.value)} className={cardInputCls}>
               <option value="">（默认仓库库管员）</option>
               {users.filter((u) => u.role !== 'guest').map((u) => (
                 <option key={u.id} value={u.id}>{u.real_name}</option>
@@ -178,8 +181,8 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
 
         {/* 明细行 */}
         <div>
-          <div className="flex justify-between items-center mb-1">
-            <label className="text-sm text-gray-600">明细</label>
+          <div className="flex justify-between items-center mb-2">
+            <label className="text-sm font-semibold text-gray-700">📋 明细</label>
             <button onClick={addLine} className="text-primary-600 hover:text-primary-800 text-sm">+ 加一行</button>
           </div>
           <div className="rounded-lg border border-gray-200">
@@ -292,9 +295,9 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
           )}
         </div>
 
-        <div>
-          <label className="block text-sm text-gray-600 mb-1">备注</label>
-          <textarea value={remark} onChange={(e) => setRemark(e.target.value)} className={fieldCls} rows={2} />
+        <div className={cardCls}>
+          <label className={cardLabelCls}>备注</label>
+          <textarea value={remark} onChange={(e) => setRemark(e.target.value)} className={`${cardInputCls} resize-none`} rows={2} />
         </div>
 
         <div className="flex justify-end gap-2 pt-1">
