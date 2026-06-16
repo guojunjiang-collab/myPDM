@@ -14,11 +14,8 @@ import {
 import type { ImportPreview } from '../../services/importExport';
 import ImportPreviewModal from '../ImportPreviewModal';
 
-const PAGE_SIZE = 20;
-
 export default function ConfigurationList() {
   const [items, setItems] = useState<ConfigurationItem[]>([]);
-  const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [searchField, setSearchField] = useState('all');
   const [loading, setLoading] = useState(false);
@@ -43,7 +40,7 @@ export default function ConfigurationList() {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await configurationApi.listItems({ page: 1, page_size: 100 });
+      const res = await configurationApi.listItems({ page: 1, page_size: 10000 });
       setItems(res.data.items || []);
     } catch { } finally { setLoading(false); }
   };
@@ -67,13 +64,6 @@ export default function ConfigurationList() {
     });
   }, [items, search, searchField]);
 
-  // 分页
-  const total = filteredData.length;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const pagedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  // 搜索变化时重置页码
-  useEffect(() => { setPage(1); }, [search, searchField]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -180,10 +170,10 @@ export default function ConfigurationList() {
         )}
       </div>
 
-      {/* 表格 */}
-       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      {/* 表格（滚动容器，不分页） */}
+      <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto max-h-[calc(100vh-230px)]">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">构型号</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">名称</th>
@@ -196,9 +186,9 @@ export default function ConfigurationList() {
               <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
             ) : items.length === 0 ? (
               <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
-            ) : pagedData.length === 0 ? (
+            ) : filteredData.length === 0 ? (
               <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
-            ) : pagedData.map((item) => (
+            ) : filteredData.map((item) => (
               <tr key={item.id} onClick={() => setDetailItem(item)} className="hover:bg-gray-50 cursor-pointer">
                 <td className="px-4 py-3 text-sm font-medium">{item.code}</td>
                 <td className="px-4 py-3 text-sm">{item.name}</td>
@@ -217,16 +207,6 @@ export default function ConfigurationList() {
         </table>
       </div>
 
-      {/* 分页 */}
-      {totalPages > 1 && (
-        <div className="flex justify-center gap-1 mt-4">
-          {Array.from({ length: totalPages }, (_, i) => (
-            <button key={i} onClick={() => setPage(i + 1)}
-              className={`px-3 py-1 text-xs rounded ${page === i + 1 ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-            >{i + 1}</button>
-          ))}
-        </div>
-      )}
 
       {/* 新建弹窗 */}
       <ConfigurationCreateModal
