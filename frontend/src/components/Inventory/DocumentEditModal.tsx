@@ -27,8 +27,9 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
   const isTransfer = docType === 'transfer';
   const isAdjustment = docType === 'adjustment';
   const isOutbound = docType === 'outbound';
-  // 调拨/出库：明细物料从「该仓有货」的库存中筛选，并展示余量
-  const usesStockPicker = isTransfer || isOutbound;
+  const isStocktake = docType === 'stocktake';
+  // 调拨/出库/盘点：明细物料从「该仓有货」的库存中筛选，并展示余量
+  const usesStockPicker = isTransfer || isOutbound || isStocktake;
 
   // 加载库存余额，供「仓库有货物料」筛选与余量展示
   const [stockRows, setStockRows] = useState<StockRow[]>([]);
@@ -148,9 +149,9 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
                   <tr>
                     <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">物料（{isTransfer ? '源仓' : '仓库'}有货）</th>
                     <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">批次</th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">{isTransfer ? '源仓余量' : '仓库余量'}</th>
+                    <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">{isStocktake ? '账面量' : isTransfer ? '源仓余量' : '仓库余量'}</th>
                     {isTransfer && <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">目标仓余量</th>}
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">{isTransfer ? '调拨数量' : '出库数量'}</th>
+                    {!isStocktake && <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">{isTransfer ? '调拨数量' : '出库数量'}</th>}
                     <th className="px-3 py-2"></th>
                   </tr>
                 </thead>
@@ -158,7 +159,7 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
                   {lines.map((l, i) => {
                     const srcBal = balanceOf(warehouseId, l.material_id, l.batch_no);
                     const tgtBal = balanceOf(toWarehouseId, l.material_id, l.batch_no);
-                    const over = !!l.material_id && srcBal !== null && Number(l.quantity) > srcBal;
+                    const over = !isStocktake && !!l.material_id && srcBal !== null && Number(l.quantity) > srcBal;
                     return (
                       <tr key={i}>
                         <td className="px-3 py-2">
@@ -176,11 +177,13 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
                         <td className="px-3 py-2 text-sm text-gray-500">{l.batch_no || '-'}</td>
                         <td className="px-3 py-2 text-sm text-right text-gray-500">{srcBal ?? '-'}</td>
                         {isTransfer && <td className="px-3 py-2 text-sm text-right text-gray-500">{toWarehouseId ? tgtBal : '-'}</td>}
-                        <td className="px-3 py-2">
-                          <input type="number" value={l.quantity}
-                            onChange={(e) => updateLine(i, { quantity: Number(e.target.value) })}
-                            className={`w-24 px-2 py-1 border rounded text-sm focus:outline-none focus:ring-1 ${over ? 'border-red-400 text-red-600 focus:ring-red-400' : 'border-gray-300 focus:ring-primary-500'}`} />
-                        </td>
+                        {!isStocktake && (
+                          <td className="px-3 py-2">
+                            <input type="number" value={l.quantity}
+                              onChange={(e) => updateLine(i, { quantity: Number(e.target.value) })}
+                              className={`w-24 px-2 py-1 border rounded text-sm focus:outline-none focus:ring-1 ${over ? 'border-red-400 text-red-600 focus:ring-red-400' : 'border-gray-300 focus:ring-primary-500'}`} />
+                          </td>
+                        )}
                         <td className="px-3 py-2 text-center">
                           <button onClick={() => removeLine(i)} className="text-red-500 hover:text-red-700">✕</button>
                         </td>
@@ -240,12 +243,11 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
               </table>
             )}
           </div>
-          {docType === 'stocktake' && (
-            <p className="text-xs text-gray-400 mt-1.5">盘点单的实盘数在「过账」时由库管员填写。</p>
-          )}
           {usesStockPicker && (
             <p className="text-xs text-gray-400 mt-1.5">
-              {isTransfer ? '调拨' : '出库'}物料仅从「{isTransfer ? '源仓' : '仓库'}有货」的库存中选择；数量超过{isTransfer ? '源仓' : '仓库'}余量会标红。
+              {isStocktake
+                ? '盘点物料从「仓库有货」中选择，账面量为当前库存；实盘数在过账时由库管员填写。'
+                : `${isTransfer ? '调拨' : '出库'}物料仅从「${isTransfer ? '源仓' : '仓库'}有货」的库存中选择；数量超过${isTransfer ? '源仓' : '仓库'}余量会标红。`}
             </p>
           )}
         </div>
