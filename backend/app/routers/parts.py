@@ -55,6 +55,7 @@ async def get_part(part_id: uuid.UUID, db: Session = Depends(get_db), current_us
 
 @router.put("/{part_id}", response_model=schemas.PartResponse)
 async def update_part(part_id: uuid.UUID, part_update: schemas.PartUpdate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+    crud.assert_entity_editable(db, "part", part_id, current_user.role)
     db_part = crud.update_part(db, part_id, part_update)
     if not db_part:
         raise HTTPException(status_code=404, detail="零件不存在")

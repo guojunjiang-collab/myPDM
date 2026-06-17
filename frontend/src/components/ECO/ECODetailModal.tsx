@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ecoApi, documentsApi, assemblyPartsApi, partsApi, assembliesApi, customFieldsApi } from '../../services/api';
 import type { ECORequest, Document, ECRDocumentLink } from '../../types';
 import { ECOStatusBadge, ECOPriorityBadge } from './ECOStatusBadge';
-import { Modal } from '../Modal';
+import { Modal, ConfirmModal } from '../Modal';
 import { toast } from '../Toast';
 import { useAuthStore, canDownload } from '../../stores/auth';
 import { exportEcoPdf } from '../../services/ecPdfExport';
@@ -62,6 +62,9 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
   const [versionSelectState, setVersionSelectState] = useState<{ docId: string; oldDocId: string } | null>(null);
   const [detailTab, setDetailTab] = useState<'detail' | 'versions'>('detail');
   const [editEntity, setEditEntity] = useState<{ type: string; id: string } | null>(null);
+  const [showPublishAll, setShowPublishAll] = useState(false);
+  const [publishStatus, setPublishStatus] = useState<{ has_pending: boolean; pending_count: number; total: number } | null>(null);
+  const [publishedNonce, setPublishedNonce] = useState(0);  // 一键发布后递增，通知列表就地刷新已展开子项状态
 
   const load = async () => {
     setLoading(true);
@@ -95,7 +98,17 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
     } catch { toast.error('加载失败'); }
     finally { setLoading(false); }
   };
-  useEffect(() => { load(); }, [ecoId]);
+  useEffect(() => { setShowPublishAll(false); load(); }, [ecoId]);
+
+  // 进入执行界面时校验工程变更结果：递归检查所有层级子项，若仍有草稿/冻结件则激活"一键发布"。
+  // 依赖 releaseItems：load() 刷新或编辑实体后会更新其引用，从而自动重新校验
+  //（覆盖"用户临时退改状态后再发布"的场景）。
+  useEffect(() => {
+    if (!executionMode || eco?.status !== 'executing') { setPublishStatus(null); return; }
+    ecoApi.getReleaseItemsPublishStatus(ecoId)
+      .then(r => setPublishStatus(r.data))
+      .catch(() => setPublishStatus(null));
+  }, [ecoId, executionMode, eco?.status, releaseItems]);
 
   const act = async (fn: () => Promise<any>, msg: string) => {
     setActionLoading(true);
@@ -188,6 +201,10 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
     alert('该格式暂不支持预览');
   };
 
+  // 是否可一键发布：以后端递归校验（含所有层级子项）为准。
+  // 校验结果未知（加载中 / 接口失败）时默认允许点击——发布是幂等且安全的操作，
+  // 宁可让用户点一次（无待发布项时仅提示"已发布 0"），也不要用浅层启发式误判为"已全部发布"而错误阻断。
+  const canPublishAll = publishStatus ? publishStatus.has_pending : true;
 
   return (
     <>
@@ -344,11 +361,17 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
           <div className="border-t pt-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-bold text-gray-700">工程变更结果</h4>
+              {executionMode && eco.status === 'executing' && releaseItems.length > 0 && (
+                <button onClick={() => setShowPublishAll(true)} disabled={actionLoading || !canPublishAll}
+                  title={canPublishAll ? '存在草稿/冻结状态的零部件，可一键发布' : '工程变更结果已全部发布'}
+                  className={`px-3 py-1 text-sm rounded-lg disabled:cursor-not-allowed disabled:opacity-60 ${canPublishAll ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-300 text-gray-500'}`}>
+                  {canPublishAll ? '一键发布' : '已全部发布'}</button>
+              )}
             </div>
             {releaseItems.length === 0 ? (
               <div className="border rounded-lg px-4 py-6 text-center text-sm text-gray-400">暂无工程变更结果</div>
             ) : (
-              <ReleaseItemsTable items={releaseItems} onViewItem={viewItem} />
+              <ReleaseItemsTable items={releaseItems} onViewItem={viewItem} publishedNonce={publishedNonce} />
             )}
           </div>
 
@@ -471,6 +494,26 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
     <VersionSelectModal open={!!versionSelectState} entityType="document" entityId={versionSelectState?.docId || ''} entityName={documents.find(d => d.id === versionSelectState?.docId)?.code || ''} currentVersionId={versionSelectState?.oldDocId || ''}
       onSelect={(newVerId) => { if (versionSelectState) { const newLinks = documentLinks.map(d => d.document_id === versionSelectState.oldDocId ? { document_id: newVerId, document_code: '', document_name: '', document_version: '' } : d); saveDocumentLinks(newLinks); } setVersionSelectState(null); }}
       onClose={() => setVersionSelectState(null)} />
+
+    {/* 一键发布确认 */}
+    <ConfirmModal open={showPublishAll} type="warning" title="一键发布" confirmText="全部发布"
+      content="将把工程变更结果中所有关联零部件及其全部层级子项的状态置为「发布」（作废件除外），确认继续？"
+      onCancel={() => setShowPublishAll(false)}
+      onConfirm={async () => {
+        setShowPublishAll(false);
+        setActionLoading(true);
+        try {
+          const r = await ecoApi.publishAllReleaseItems(ecoId);
+          toast.success(r.data?.detail || '已一键发布');
+          // 仅就地更新工程变更结果列表的状态，避免整屏 load() 造成的闪屏与滚动复位。
+          // 一键发布确定性地把树中所有非作废件置为 released，故可乐观更新顶层 + 已展开子项。
+          setReleaseItems(prev => prev.map((ri: any) => ri.status === 'obsolete' ? ri : { ...ri, status: 'released' }));
+          setPublishedNonce(n => n + 1);
+          // releaseItems 引用变化会触发发布状态校验，从而自动把"一键发布"按钮置灰
+        } catch (err: any) {
+          toast.error(err?.response?.data?.detail || '操作失败');
+        } finally { setActionLoading(false); }
+      }} />
     </>
   );
 }
@@ -490,9 +533,21 @@ function InfoItem({ label, value, icon, className }: { label: string; value: str
   );
 }
 
-function ReleaseItemsTable({ items, onViewItem }: { items: any[]; onViewItem: (type: string, id: string, mode?: 'view' | 'edit') => void }) {
+function ReleaseItemsTable({ items, onViewItem, publishedNonce }: { items: any[]; onViewItem: (type: string, id: string, mode?: 'view' | 'edit') => void; publishedNonce?: number }) {
   const [expanded, setExpanded] = useState<Record<string, any[]>>({});
   const [loadingIdx, setLoadingIdx] = useState<string | null>(null);
+
+  // 一键发布后：就地把已展开子项的非作废状态更新为 released（与后端一致），无需重新拉取、不收起、不闪屏
+  useEffect(() => {
+    setExpanded(prev => {
+      if (Object.keys(prev).length === 0) return prev;
+      const next: Record<string, any[]> = {};
+      for (const [k, rows] of Object.entries(prev)) {
+        next[k] = rows.map((c: any) => c.status === 'obsolete' ? c : { ...c, status: 'released' });
+      }
+      return next;
+    });
+  }, [publishedNonce]);
 
   const toggleExpand = async (idx: string, entityId: string, entityType: string) => {
     if (expanded[idx]) { setExpanded(prev => { const n = {...prev}; delete n[idx]; return n; }); return; }

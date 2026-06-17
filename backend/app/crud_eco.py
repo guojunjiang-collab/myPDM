@@ -19,7 +19,7 @@ from app.crud import _get_next_version
 # 状态流转规则
 # ─────────────────────────────────────────────────────
 _ALLOWED_TRANSITIONS = {
-    "draft":     {"reviewing"},
+    "draft":     {"reviewing", "approved"},  # approved：提交时无审批人则自动批准
     "reviewing": {"approved", "rejected", "draft"},
     "approved":  {"executing"},
     "executing": {"completed"},
@@ -359,11 +359,102 @@ def delete_eco(db: Session, eco_id: uuid.UUID) -> bool:
     return True
 
 
+def collect_release_tree_entities(db: Session, release_items: list) -> list:
+    """收集工程变更结果中所有关联件及其全部层级子项（去重、防循环、排除软删除）。
+
+    返回 [(entity_type, entity), ...]（entity 为 Part / Assembly ORM 对象）。
+    一键发布、发布状态校验、提交冻结共用同一遍历，确保对"树"的定义完全一致。
+    """
+    from app.models import Part, Assembly, BOMItem
+    visited: set = set()
+    entities: list = []
+    stack: list = []
+    for ri in release_items or []:
+        et = ri.get("entity_type")
+        eid = ri.get("entity_id")
+        if not et or not eid:
+            continue
+        try:
+            stack.append((et, uuid.UUID(str(eid))))
+        except (ValueError, AttributeError):
+            continue
+
+    while stack:
+        entity_type, entity_id = stack.pop()
+        key = (entity_type, str(entity_id))
+        if key in visited:
+            continue
+        visited.add(key)
+
+        model = Part if entity_type == "part" else Assembly
+        entity = db.query(model).filter(
+            model.id == entity_id, model.deleted_at.is_(None)
+        ).first()
+        if not entity:
+            continue
+        entities.append((entity_type, entity))
+
+        if entity_type != "part":
+            children = db.query(BOMItem).filter(
+                BOMItem.parent_type == "assembly",
+                BOMItem.parent_id == entity_id,
+                BOMItem.deleted_at.is_(None),
+            ).all()
+            for c in children:
+                child_type = "part" if c.child_type == "part" else "assembly"
+                stack.append((child_type, c.child_id))
+    return entities
+
+
+def freeze_release_tree_on_submit(db: Session, eco: ECO) -> int:
+    """提交审批：将工程变更结果树中所有"草稿"零部件置为"冻结"，并记录被冻结的实体用于日后精确解冻。
+
+    仅冻结草稿件——已冻结/已发布/作废件保持原状且不计入 frozen_entities，
+    这样撤回/驳回解冻时不会误动原本就冻结的件。不在此提交，由调用方统一提交。
+    """
+    frozen = []
+    for et, entity in collect_release_tree_entities(db, eco.release_items or []):
+        if entity.status == "draft":
+            entity.status = "frozen"
+            frozen.append({"entity_type": et, "entity_id": str(entity.id)})
+    eco.frozen_entities = frozen
+    return len(frozen)
+
+
+def unfreeze_release_tree(db: Session, eco: ECO) -> int:
+    """撤回/驳回回到草稿：仅将"本次提交时由系统冻结的"实体从"冻结"恢复为"草稿"。
+
+    仅当实体当前仍为"冻结"时才恢复，避免覆盖审批期间发生的其它状态变化。不在此提交，由调用方统一提交。
+    """
+    from app.models import Part, Assembly
+    count = 0
+    for rec in (eco.frozen_entities or []):
+        et = rec.get("entity_type")
+        eid = rec.get("entity_id")
+        if not et or not eid:
+            continue
+        try:
+            uid = uuid.UUID(str(eid))
+        except (ValueError, AttributeError):
+            continue
+        model = Part if et == "part" else Assembly
+        entity = db.query(model).filter(model.id == uid, model.deleted_at.is_(None)).first()
+        if entity and entity.status == "frozen":
+            entity.status = "draft"
+            count += 1
+    eco.frozen_entities = []
+    return count
+
+
 def change_eco_status(
     db: Session, eco_id: uuid.UUID, to_status: str,
     operator_id: uuid.UUID, comment: str = "", skip_log: bool = False
 ) -> ECO:
-    """变更 ECO 状态，校验流转合法性，写入状态日志"""
+    """变更 ECO 状态，校验流转合法性，写入状态日志。
+
+    副作用：提交审批（草稿→评审/已批准）时冻结工程变更结果中的草稿件；
+    退回草稿（评审/驳回→草稿）时解冻本次提交所冻结的件——均与状态变更同一事务提交。
+    """
     eco = get_eco(db, eco_id)
     from_status = eco.status
     allowed = _ALLOWED_TRANSITIONS.get(from_status, set())
@@ -381,6 +472,12 @@ def change_eco_status(
     elif to_status == "completed": eco.executed_at = now
     elif to_status == "closed": eco.closed_at = now
     eco.updated_at = now
+    # 提交审批：冻结草稿件，防止审批期间工程师手动修改零部件信息
+    if from_status == "draft" and to_status in ("reviewing", "approved"):
+        freeze_release_tree_on_submit(db, eco)
+    # 退回草稿：解冻本次提交所冻结的件，便于工程师按意见修改
+    elif to_status == "draft" and from_status in ("reviewing", "rejected"):
+        unfreeze_release_tree(db, eco)
     db.commit()
     db.refresh(eco)
     return eco

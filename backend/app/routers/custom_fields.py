@@ -171,6 +171,7 @@ async def set_values(
 ):
     if entity_type not in ('part', 'component', 'document'):
         raise HTTPException(status_code=400, detail="entity_type 必须为 part、component 或 document")
+    crud.assert_entity_editable(db, entity_type, entity_id, current_user.role)
     crud.set_custom_field_values(db, entity_type, entity_id, batch.values)
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username, "更新自定义字段值", entity_type, str(entity_id), f"{len(batch.values)}个字段", ip)

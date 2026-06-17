@@ -450,6 +450,10 @@ export const ecoApi = {
     api.post(`/ecos/${ecoId}/execution-items/${itemId}/freeze`, newEntityId ? { new_entity_id: newEntityId } : undefined),
   revertItem: (ecoId: string, itemId: string, newEntityId?: string) =>
     api.post(`/ecos/${ecoId}/execution-items/${itemId}/revert`, newEntityId ? { new_entity_id: newEntityId } : undefined),
+  publishAllReleaseItems: (ecoId: string) =>
+    api.post(`/ecos/${ecoId}/release-items/publish-all`),
+  getReleaseItemsPublishStatus: (ecoId: string) =>
+    api.get(`/ecos/${ecoId}/release-items/publish-status`),
   executeAll: (id: string) =>
     api.post(`/ecos/${id}/execute-all`),
   getExecutionItems: (ecoId: string) =>

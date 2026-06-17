@@ -621,6 +621,50 @@ async def manual_release_item(
 
 
 # ─────────────────────────────────────────────────────
+# 16f. 一键发布：发布状态校验 / 一键发布（BOM 树遍历复用 crud_eco.collect_release_tree_entities）
+# ─────────────────────────────────────────────────────
+@router.get("/{eco_id}/release-items/publish-status")
+async def get_release_items_publish_status(
+    eco_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin", "engineer"]))
+):
+    """校验工程变更结果：树中（含所有层级子项）是否仍有草稿/冻结状态的零部件。
+
+    用于在进入执行界面时决定是否激活"一键发布"——解决用户临时退改状态后需要再发布的场景。
+    """
+    eco = crud_eco.get_eco(db, eco_id)
+    entities = crud_eco.collect_release_tree_entities(db, eco.release_items or [])
+    pending = sum(1 for _et, e in entities if e.status in ("draft", "frozen"))
+    return {"has_pending": pending > 0, "pending_count": pending, "total": len(entities)}
+
+
+@router.post("/{eco_id}/release-items/publish-all")
+async def publish_all_release_items(
+    eco_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin", "engineer"]))
+):
+    eco = crud_eco.get_eco(db, eco_id)
+    if eco.status != "executing":
+        raise HTTPException(status_code=400, detail="仅执行中状态可一键发布")
+    release_items = eco.release_items or []
+    if not release_items:
+        raise HTTPException(status_code=400, detail="暂无工程变更结果")
+
+    published_count = 0
+    for _et, entity in crud_eco.collect_release_tree_entities(db, release_items):
+        # 草稿/冻结 → 发布；作废保持不变；已发布无需重复处理。
+        # published_count 仅统计本次实际改变状态的件，确保"已发布 N 个"语义准确（幂等再调用返回 0）。
+        if entity.status not in ("obsolete", "released"):
+            entity.status = "released"
+            published_count += 1
+
+    db.commit()
+    return {"detail": f"已发布 {published_count} 个零部件（含全部层级子项）", "published_count": published_count}
+
+
+# ─────────────────────────────────────────────────────
 # 17. 状态变更日志
 # ─────────────────────────────────────────────────────
 @router.get("/{eco_id}/status-logs")

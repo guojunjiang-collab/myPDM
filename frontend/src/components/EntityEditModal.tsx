@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Modal } from './Modal';
 import { customFieldsApi, partsApi, assembliesApi, assemblyPartsApi } from '../services/api';
 import { useDataStore } from '../stores/data';
+import { isAdmin } from '../stores/auth';
 import EntityDocumentSection from './EntityDocumentSection';
 import AssemblyPartPicker from './AssemblyPartPicker';
 import VersionSelectModal from './VersionSelectModal';
@@ -30,6 +31,8 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
   const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDefinition[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
   const [loadingCustomFields, setLoadingCustomFields] = useState(false);
+  // 审批锁定：加载时若该零部件已冻结/发布且当前用户非管理员，则整个表单只读
+  const [locked, setLocked] = useState(false);
   const specRef = useRef<HTMLTextAreaElement>(null);
   const remarkRef = useRef<HTMLTextAreaElement>(null);
 
@@ -66,6 +69,7 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
     api.get(entityId).then(r => {
       const d = r.data;
       setFormData({ code: d.code || '', name: d.name || '', spec: d.spec || '', remark: d.remark || '', version: d.version || '-', status: d.status || 'draft' });
+      setLocked((d.status === 'frozen' || d.status === 'released') && !isAdmin());
     }).catch(() => { setSaveError('加载失败'); }).finally(() => setLoading(false));
 
     // 加载自定义字段定义
@@ -192,6 +196,7 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (locked) return;  // 审批锁定：冻结/发布件非管理员不可保存（后端亦有校验兜底）
     setSaving(true);
     setSaveError(null);
     try {
@@ -259,12 +264,13 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
           </td>
           <td className="px-3 py-2">
             {level === 0 ? (
-              <input type="number" min={1} defaultValue={part.quantity} onBlur={e => { const v = parseInt(e.target.value); if (v > 0 && v !== part.quantity) handleUpdateQuantity(part.id, v); }} className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-1 focus:ring-primary-500" />
+              <input type="number" min={1} defaultValue={part.quantity} disabled={locked} onBlur={e => { const v = parseInt(e.target.value); if (v > 0 && v !== part.quantity) handleUpdateQuantity(part.id, v); }} className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-500" />
             ) : (
-              <input type="number" min={1} defaultValue={part.quantity} onBlur={e => { const v = parseInt(e.target.value); if (v > 0 && v !== part.quantity) handleNestedQuantity(part.parent_id || part.id, part.id, v); }} className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-1 focus:ring-primary-500" />
+              <input type="number" min={1} defaultValue={part.quantity} disabled={locked} onBlur={e => { const v = parseInt(e.target.value); if (v > 0 && v !== part.quantity) handleNestedQuantity(part.parent_id || part.id, part.id, v); }} className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-500" />
             )}
           </td>
           <td className="px-3 py-2 text-right whitespace-nowrap">
+            {locked ? <span className="text-gray-300 text-xs">—</span> : (
             <span className="inline-flex items-center gap-1">
               <button type="button" onClick={() => setVersionSelectState({ itemId: part.id, childType: part.childType === 'assembly' ? 'assembly' : part.childType })} className="text-primary-600 hover:text-primary-800 text-xs" title="选择版本">选择</button>
               {isAssembly && (
@@ -277,6 +283,7 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
                 else { handleNestedRemove(part.parent_id || entityId, part.id); }
               }} className="text-red-500 hover:text-red-700 text-xs" title="移除子项">移除</button>
             </span>
+            )}
           </td>
         </tr>
         {childRows && childRows.map((c: any, j: number) => renderPartRow(c, level + 1, `${idx}-${j}`))}
@@ -288,20 +295,20 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
   const renderCustomFieldInput = (def: CustomFieldDefinition) => {
     const value = customFieldValues[def.id] ?? '';
     const onChange = (val: any) => setCustomFieldValues(prev => ({ ...prev, [def.id]: val }));
-    const baseClass = "w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500";
+    const baseClass = "w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-500";
 
     if (def.field_type === 'select') {
       return (
-        <select value={value} onChange={e => onChange(e.target.value)} className={baseClass}>
+        <select value={value} onChange={e => onChange(e.target.value)} disabled={locked} className={baseClass}>
           <option value="">请选择</option>
           {(def.options || []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
         </select>
       );
     }
     if (def.field_type === 'number') {
-      return <input type="number" value={value} onChange={e => onChange(e.target.value)} className={baseClass} />;
+      return <input type="number" value={value} onChange={e => onChange(e.target.value)} disabled={locked} className={baseClass} />;
     }
-    return <input type="text" value={value} onChange={e => onChange(e.target.value)} className={baseClass} />;
+    return <input type="text" value={value} onChange={e => onChange(e.target.value)} disabled={locked} className={baseClass} />;
   };
 
   const title = entityType === 'assembly' ? '编辑部件' : '编辑零件';
@@ -313,6 +320,11 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
         <div className="text-center py-8 text-sm text-gray-400">加载中...</div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
+          {locked && (
+            <div className="bg-orange-50 border border-orange-200 text-orange-700 px-4 py-2 rounded-lg text-sm">
+              该零部件{formData.status === 'released' ? '已发布' : '已冻结'}，审批/发布期间不可修改（仅管理员可修改）。
+            </div>
+          )}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">件号</label>
@@ -320,7 +332,7 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
             </div>
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">中文名称 <span className="text-red-500">*</span></label>
-              <input type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" required />
+              <input type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} disabled={locked} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-500" required />
             </div>
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">版本</label>
@@ -328,17 +340,17 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
             </div>
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">状态</label>
-              <select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500">
+              <select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })} disabled={locked} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-500">
                 {STATUS_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
               </select>
             </div>
             <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">规格型号</label>
-              <textarea ref={specRef} value={formData.spec} onChange={e => setFormData({ ...formData, spec: e.target.value })} onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" rows={1} />
+              <textarea ref={specRef} value={formData.spec} onChange={e => setFormData({ ...formData, spec: e.target.value })} disabled={locked} onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none disabled:bg-gray-100 disabled:text-gray-500" rows={1} />
             </div>
             <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">备注</label>
-              <textarea ref={remarkRef} value={formData.remark} onChange={e => setFormData({ ...formData, remark: e.target.value })} onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" rows={1} placeholder="可选" />
+              <textarea ref={remarkRef} value={formData.remark} onChange={e => setFormData({ ...formData, remark: e.target.value })} disabled={locked} onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none disabled:bg-gray-100 disabled:text-gray-500" rows={1} placeholder="可选" />
             </div>
           </div>
 
@@ -365,14 +377,14 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
           )}
 
           {/* 关联图文档 */}
-          <EntityDocumentSection entityType={entityType} entityId={entityId} editable />
+          <EntityDocumentSection entityType={entityType} entityId={entityId} editable={!locked} />
 
           {/* 子项清单（仅部件编辑时显示） */}
           {entityType === 'assembly' && (
             <div className="border-t pt-4">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-sm font-bold text-gray-700">子项清单</h4>
-                <button type="button" onClick={() => { setPickerTargetId(null); setExpandedParts({}); setPickerOpen(true); }} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 添加子项</button>
+                {!locked && <button type="button" onClick={() => { setPickerTargetId(null); setExpandedParts({}); setPickerOpen(true); }} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 添加子项</button>}
               </div>
               <div className="border rounded-lg overflow-hidden">
                 {loadingEditParts ? (
@@ -410,10 +422,12 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
           )}
 
           <div className="flex justify-end gap-2 pt-4 border-t">
-            <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-            <button type="submit" disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
-              {saving ? '保存中...' : '保存'}
-            </button>
+            <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">{locked ? '关闭' : '取消'}</button>
+            {!locked && (
+              <button type="submit" disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+                {saving ? '保存中...' : '保存'}
+              </button>
+            )}
           </div>
         </form>
       )}

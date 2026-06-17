@@ -135,6 +135,26 @@ def create_part(db, part):
     db.refresh(db_part)
     return db_part
 
+def assert_entity_editable(db, entity_type: str, entity_id, user_role: str):
+    """审批锁定：处于"冻结/发布"状态的零部件，非管理员不可修改。
+
+    entity_type: part | assembly | component（component 视为 assembly）。其它类型（如 document）不在锁定范围。
+    冻结/发布状态本身由 ECO 提交/执行流程通过 ORM 直接设置，不经过本校验，故不受影响。
+    """
+    if user_role == "admin":
+        return
+    if entity_type == "part":
+        ent = get_part(db, entity_id)
+    elif entity_type in ("assembly", "component"):
+        ent = get_assembly(db, entity_id)
+    else:
+        return
+    if ent and ent.status in ("frozen", "released"):
+        from fastapi import HTTPException
+        label = "已冻结" if ent.status == "frozen" else "已发布"
+        raise HTTPException(status_code=403, detail=f"该零部件{label}，审批/发布期间不可修改（仅管理员可修改）")
+
+
 def update_part(db, part_id, part_update):
     db_part = get_part(db, part_id)
     if not db_part:

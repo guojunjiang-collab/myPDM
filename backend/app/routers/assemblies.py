@@ -54,6 +54,7 @@ async def get_assembly(assembly_id: uuid.UUID, db: Session = Depends(get_db), cu
 
 @router.put("/{assembly_id}", response_model=schemas.AssemblyResponse)
 async def update_assembly(assembly_id: uuid.UUID, assembly_update: schemas.AssemblyUpdate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+    crud.assert_entity_editable(db, "assembly", assembly_id, current_user.role)
     db_assembly = crud.update_assembly(db, assembly_id, assembly_update)
     if not db_assembly:
         raise HTTPException(status_code=404, detail="部件不存在")
@@ -147,6 +148,7 @@ async def add_assembly_part(assembly_id: uuid.UUID, item: schemas.BOMItemCreate,
     db_assembly = crud.get_assembly(db, assembly_id)
     if not db_assembly:
         raise HTTPException(status_code=404, detail="部件不存在")
+    crud.assert_entity_editable(db, "assembly", assembly_id, current_user.role)
     # 设置 parent 为当前 assembly
     item.parent_type = "assembly"
     item.parent_id = assembly_id
@@ -161,6 +163,7 @@ async def remove_assembly_part(assembly_id: uuid.UUID, item_id: uuid.UUID, reque
     db_assembly = crud.get_assembly(db, assembly_id)
     if not db_assembly:
         raise HTTPException(status_code=404, detail="部件不存在")
+    crud.assert_entity_editable(db, "assembly", assembly_id, current_user.role)
     crud.delete_bom_item(db, item_id)
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username, "删除子项", "assembly_part", str(assembly_id), f"子项ID:{item_id}", ip)
@@ -172,6 +175,7 @@ async def update_assembly_part(assembly_id: uuid.UUID, item_id: uuid.UUID, item_
     db_assembly = crud.get_assembly(db, assembly_id)
     if not db_assembly:
         raise HTTPException(status_code=404, detail="部件不存在")
+    crud.assert_entity_editable(db, "assembly", assembly_id, current_user.role)
     db_item = crud.get_bom_item(db, item_id)
     if not db_item:
         raise HTTPException(status_code=404, detail="子项不存在")

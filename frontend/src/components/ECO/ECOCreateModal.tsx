@@ -263,6 +263,12 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         }
         items[idx] = updated;
         setLocalEco({ ...localEco, execution_items: items });
+      } else {
+        // 执行项在子组件中即时创建（如向下子项"添加子项"后直接点冻结/还原），
+        // 本地 execution_items 尚无该项，乐观更新无法命中；从后端拉取最新执行项，
+        // 确保变更状态 Badge 与操作按钮（冻结↔还原）正确刷新。
+        const fresh = await ecoApi.detail(localEco.id);
+        setLocalEco(fresh.data);
       }
     } catch (err: any) {
       const detail = err?.response?.data?.detail;

@@ -30,6 +30,7 @@ class ECO(Base):
     document_links = Column(JSONB, nullable=False, default=[])
     cc_users = Column(JSONB, nullable=False, default=[])
     release_items = Column(JSONB, nullable=False, default=[])  # 工程预变更关联的零部件列表
+    frozen_entities = Column(JSONB, nullable=False, default=[])  # 提交审批时由系统冻结的零部件 [{entity_type, entity_id}]，用于撤回/驳回时精确解冻
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
