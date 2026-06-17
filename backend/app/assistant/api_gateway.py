@@ -104,10 +104,22 @@ def _walk_dependant(dep):
 
 
 def roles_for_route(route):
-    """从路由的 require_role 依赖闭包提取允许角色集；无角色门返回 None。"""
+    """从路由的 require_role / require_permission 依赖闭包提取允许角色集；无角色门返回 None。"""
+    from ..permissions._generated import PERMISSIONS
+
     for d in _walk_dependant(route.dependant):
         call = getattr(d, "call", None)
-        if call and getattr(call, "__qualname__", "").endswith("require_role.<locals>.checker"):
+        if call is None:
+            continue
+        qname = getattr(call, "__qualname__", "")
+        # 新: require_permission → 从 PERMISSIONS 查角色
+        if qname.endswith("require_permission.<locals>.checker"):
+            for cell in (call.__closure__ or []):
+                v = cell.cell_contents
+                if isinstance(v, str) and v in PERMISSIONS:
+                    return set(PERMISSIONS[v])
+        # 旧: require_role → 从闭包直接提取角色列表（逐步迁移中）
+        if qname.endswith("require_role.<locals>.checker"):
             for cell in (call.__closure__ or []):
                 v = cell.cell_contents
                 if isinstance(v, (list, tuple, set)) and v and all(isinstance(x, str) for x in v):

@@ -7,7 +7,7 @@ import uuid
 from ..database import get_db
 from ..models import User, Document
 from .. import crud, schemas
-from .auth import require_role
+from ..permissions import require_permission
 
 router = APIRouter(prefix="/parts", tags=["零件管理"])
 
@@ -28,7 +28,7 @@ def _part_response(part):
     }
 
 @router.get("/")
-async def list_parts(skip: int = 0, limit: int = 100, search: str = None, updated_since: float = None, brief: bool = False, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def list_parts(skip: int = 0, limit: int = 100, search: str = None, updated_since: float = None, brief: bool = False, db: Session = Depends(get_db), current_user: User = Depends(require_permission("parts:read"))):
     include_deleted = bool(updated_since)  # 增量模式可能包含已删除记录
     parts = crud.get_parts(db, skip=skip, limit=limit, search=search, updated_since=updated_since, include_deleted=include_deleted)
     if brief:
@@ -37,7 +37,7 @@ async def list_parts(skip: int = 0, limit: int = 100, search: str = None, update
     return [_part_response(p) for p in parts]
 
 @router.post("/", response_model=schemas.PartResponse)
-async def create_part(part: schemas.PartCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def create_part(part: schemas.PartCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("parts:create"))):
     # 检查 (code, version) 联合唯一
     if crud.get_part_by_code(db, part.code, part.version):
         raise HTTPException(status_code=400, detail="该编码和版本的组合已存在")
@@ -47,14 +47,14 @@ async def create_part(part: schemas.PartCreate, request: Request, db: Session = 
     return _part_response(db_part)
 
 @router.get("/{part_id}", response_model=schemas.PartResponse)
-async def get_part(part_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def get_part(part_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("parts:read"))):
     db_part = crud.get_part(db, part_id)
     if not db_part:
         raise HTTPException(status_code=404, detail="零件不存在")
     return _part_response(db_part)
 
 @router.put("/{part_id}", response_model=schemas.PartResponse)
-async def update_part(part_id: uuid.UUID, part_update: schemas.PartUpdate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def update_part(part_id: uuid.UUID, part_update: schemas.PartUpdate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("parts:update"))):
     crud.assert_entity_editable(db, "part", part_id, current_user.role)
     db_part = crud.update_part(db, part_id, part_update)
     if not db_part:
@@ -64,7 +64,7 @@ async def update_part(part_id: uuid.UUID, part_update: schemas.PartUpdate, reque
     return _part_response(db_part)
 
 @router.get("/{part_id}/can-delete")
-async def check_part_can_delete(part_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def check_part_can_delete(part_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("parts:read"))):
     """检查零件是否可以被删除（是否有父项引用）"""
     from ..models import BOMItem, Assembly
     
@@ -102,7 +102,7 @@ async def check_part_can_delete(part_id: uuid.UUID, db: Session = Depends(get_db
     }
 
 @router.delete("/{part_id}")
-async def delete_part(part_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin"]))):
+async def delete_part(part_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("parts:delete"))):
     from ..models import BOMItem, Assembly
     db_part = crud.get_part(db, part_id)
     if not db_part:
@@ -138,7 +138,7 @@ async def delete_part(part_id: uuid.UUID, request: Request, db: Session = Depend
 # ===== 零件关联图文档 =====
 
 @router.get("/{part_id}/documents")
-async def get_part_documents(part_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def get_part_documents(part_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("parts.doc:read"))):
     """获取零件关联的图文档列表（从 document_links JSONB 读取）"""
     from ..models import Part
     part = db.query(Part).filter(Part.id == part_id).first()
@@ -171,7 +171,7 @@ async def get_part_documents(part_id: uuid.UUID, db: Session = Depends(get_db), 
     return result
 
 @router.post("/{part_id}/documents")
-async def add_part_document(part_id: uuid.UUID, body: schemas.EntityDocumentCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def add_part_document(part_id: uuid.UUID, body: schemas.EntityDocumentCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("parts.doc:link"))):
     """关联图文档到零件（写入 document_links JSONB）"""
     from ..models import Part
     doc = db.query(Document).filter(Document.id == body.document_id).first()
@@ -199,7 +199,7 @@ async def add_part_document(part_id: uuid.UUID, body: schemas.EntityDocumentCrea
     return {"id": link_id, "message": "图文档关联成功"}
 
 @router.put("/{part_id}/documents/{link_id}")
-async def update_part_document(part_id: uuid.UUID, link_id: uuid.UUID, body: schemas.EntityDocumentUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def update_part_document(part_id: uuid.UUID, link_id: uuid.UUID, body: schemas.EntityDocumentUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_permission("parts.doc:unlink"))):
     """更新关联信息（类别/排序）"""
     from ..models import Part
     part = db.query(Part).filter(Part.id == part_id).first()
@@ -224,7 +224,7 @@ async def update_part_document(part_id: uuid.UUID, link_id: uuid.UUID, body: sch
     return {"message": "关联已更新"}
 
 @router.delete("/{part_id}/documents/{link_id}")
-async def delete_part_document(part_id: uuid.UUID, link_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def delete_part_document(part_id: uuid.UUID, link_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("parts.doc:unlink"))):
     """移除图文档关联"""
     from ..models import Part
     part = db.query(Part).filter(Part.id == part_id).first()
@@ -244,7 +244,7 @@ async def delete_part_document(part_id: uuid.UUID, link_id: uuid.UUID, db: Sessi
 # ===== 版本控制 (升版) =====
 
 @router.post("/{part_id}/upgrade")
-async def upgrade_part_endpoint(part_id: uuid.UUID, body: schemas.UpgradeRequest, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def upgrade_part_endpoint(part_id: uuid.UUID, body: schemas.UpgradeRequest, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("parts:update"))):
     db_part, err = crud.upgrade_part(db, part_id, current_user.real_name or current_user.username)
     if err:
         raise HTTPException(status_code=400, detail=err)
@@ -254,6 +254,6 @@ async def upgrade_part_endpoint(part_id: uuid.UUID, body: schemas.UpgradeRequest
 
 
 @router.get("/{part_id}/versions")
-async def get_part_versions_endpoint(part_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def get_part_versions_endpoint(part_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("parts:read"))):
     versions = crud.get_part_versions(db, part_id)
     return [_part_response(v) for v in versions]

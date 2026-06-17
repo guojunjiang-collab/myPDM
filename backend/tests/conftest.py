@@ -50,6 +50,26 @@ def guest_user(db):
     return user
 
 
+@pytest.fixture
+def admin_user(db):
+    user = models.User(
+        id=uuid.uuid4(), username="admin1", password_hash="x", real_name="管理员",
+        role="admin", status="active",
+    )
+    db.add(user); db.commit(); db.refresh(user)
+    return user
+
+
+@pytest.fixture
+def production_user(db):
+    user = models.User(
+        id=uuid.uuid4(), username="prod1", password_hash="x", real_name="生产人员",
+        role="production", status="active",
+    )
+    db.add(user); db.commit(); db.refresh(user)
+    return user
+
+
 class FakeLLM:
     """脚本化的假 LLM：按预设序列产出 stream_chat 事件。
 
