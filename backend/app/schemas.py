@@ -1,7 +1,9 @@
-from pydantic import BaseModel, Field, ConfigDict, BeforeValidator
+from pydantic import BaseModel, Field, ConfigDict, BeforeValidator, field_validator
 from typing import Optional, List, Any, Dict, Union, Annotated
 from datetime import datetime
 import uuid
+
+from .permissions._generated import ROLES
 
 
 def _normalize_applies_to(v):
@@ -25,6 +27,13 @@ class UserBase(BaseSchema):
     phone: Optional[str] = None
     status: str = "active"
 
+    @field_validator("role")
+    @classmethod
+    def _check_role(cls, v):
+        if v not in ROLES:
+            raise ValueError(f"非法角色: {v}")
+        return v
+
 class UserCreate(UserBase):
     id: Optional[uuid.UUID] = None
     password: str = Field(..., min_length=6)
@@ -36,6 +45,13 @@ class UserUpdate(BaseSchema):
     phone: Optional[str] = None
     status: Optional[str] = None
     password: Optional[str] = None
+
+    @field_validator("role")
+    @classmethod
+    def _check_role_opt(cls, v):
+        if v is not None and v not in ROLES:
+            raise ValueError(f"非法角色: {v}")
+        return v
 
 class UserResponse(UserBase):
     id: uuid.UUID
