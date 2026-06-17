@@ -171,27 +171,34 @@ D:\OpenCode\myPDM\
 
 ### API 权限控制
 
-通过 `require_role()` 装饰器实现：
+通过 `require_permission()` 依赖实现，权限定义单一事实源为 `permissions/permissions.json`：
 
 ```python
-# 仅管理员
-current_user: User = Depends(require_role(["admin"]))
+# 从生成模块导入
+from ..permissions import require_permission, has_permission, enforce_object_policy
 
-# 管理员 + 工程师
-current_user: User = Depends(require_role(["admin", "engineer"]))
+# 角色门（替代旧 require_role）
+current_user: User = Depends(require_permission("parts:read"))
 
-# 所有已登录用户
-current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
+# 内联检查（非路由依赖场景）
+if not has_permission(current_user, "parts:delete"):
+    raise HTTPException(403)
+
+# 对象级策略（创建者/审批人/保管人等）
+enforce_object_policy("ecr_owner_or_admin", current_user, ecr)
 ```
+
+> **生成命令**: `python tools/gen_permissions.py` — 从 `permissions/permissions.json` 生成后端 `_generated.py` 与前端 `permissions.generated.ts`。`npm run build` 前会自动执行（prebuild 钩子）。
 
 ### 前端权限检查
 
-| 方法                   | 用途      |
-| -------------------- | ------- |
-| `Auth.isAdmin()`     | 删除按钮    |
-| `Auth.canEdit()`     | 新增/编辑按钮 |
-| `Auth.canDownload()` | 导出/下载   |
-| `Auth.canPreview()`  | PDF 预览  |
+| 方法 | 用途 | 底层 |
+| ---- | ---- | ---- |
+| `can('perm:action')` | **新推荐**：精确权限判定 | `PERMISSIONS[perm]` |
+| `canEdit()` | 新增/编辑按钮 | `can('parts:create')` |
+| `canDownload()` | 导出/下载 | `can('parts:export')` |
+| `isAdmin()` | 删除按钮 | `can('parts:delete')` |
+| `canPreview()` | PDF 预览 | 始终 true |
 
 ---
 
