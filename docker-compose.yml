@@ -37,6 +37,7 @@ services:
       - CHUNK_DIR=/app/uploads/chunks
       - MAX_FILE_SIZE=1073741824
       - CHUNK_SIZE=5242880
+      - APP_ENV=development
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
       - DEEPSEEK_MODEL=${DEEPSEEK_MODEL:-deepseek-chat}
