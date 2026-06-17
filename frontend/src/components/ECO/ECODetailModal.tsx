@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ecoApi, documentsApi, assemblyPartsApi, partsApi, assembliesApi, customFieldsApi } from '../../services/api';
+import { ecoApi, documentsApi, assemblyPartsApi, partsApi, assembliesApi, customFieldsApi, mediaApi } from '../../services/api';
 import type { ECORequest, Document, ECRDocumentLink } from '../../types';
 import { ECOStatusBadge, ECOPriorityBadge } from './ECOStatusBadge';
 import { Modal, ConfirmModal } from '../Modal';
@@ -183,21 +183,20 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
     finally { setNestedLoading(false); }
   };
 
-  const handleDocDownload = (attId: string, fileName: string) => {
-    const token = useAuthStore.getState().token;
-    if (!token) { alert('登录已过期'); return; }
-    const a = document.createElement('a');
-    a.href = `/api/v2/attachments/${attId}/direct-download?token=${encodeURIComponent(token)}`;
-    a.download = fileName; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  const handleDocDownload = async (attId: string, fileName: string) => {
+    try {
+      const mt = await mediaApi.token(attId, 'direct-download');
+      const a = document.createElement('a');
+      a.href = `/api/v2/attachments/${attId}/direct-download?token=${encodeURIComponent(mt)}`;
+      a.download = fileName; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    } catch { alert('下载失败，请重试'); }
   };
 
-  const handleDocPreview = (attId: string, fileName: string) => {
+  const handleDocPreview = async (attId: string, fileName: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase() || '';
-    const token = useAuthStore.getState().token;
-    if (!token) { alert('登录已过期'); return; }
-    if (ext === 'pdf') { window.open(`/api/v2/attachments/${attId}/preview?token=${encodeURIComponent(token)}`, '_blank'); return; }
-    if (['zip', 'tar', 'gz', 'tgz', 'rar', '7z'].includes(ext)) { window.open(`/api/v2/attachments/${attId}/preview?token=${encodeURIComponent(token)}`, '_blank'); return; }
-    if (ext === 'stp' || ext === 'step') { window.open(`/stp-viewer?id=${attId}&token=${encodeURIComponent(token)}`, '_blank'); return; }
+    if (ext === 'pdf') { try { const mt = await mediaApi.token(attId, 'preview'); window.open(`/api/v2/attachments/${attId}/preview?token=${encodeURIComponent(mt)}`, '_blank'); } catch { alert('预览失败，请重试'); } return; }
+    if (['zip', 'tar', 'gz', 'tgz', 'rar', '7z'].includes(ext)) { try { const mt = await mediaApi.token(attId, 'preview'); window.open(`/api/v2/attachments/${attId}/preview?token=${encodeURIComponent(mt)}`, '_blank'); } catch { alert('预览失败，请重试'); } return; }
+    if (ext === 'stp' || ext === 'step') { try { const mt = await mediaApi.token(attId, 'gltf'); window.open(`/stp-viewer?id=${attId}&token=${encodeURIComponent(mt)}`, '_blank'); } catch { alert('预览失败，请重试'); } return; }
     alert('该格式暂不支持预览');
   };
 

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Document, CustomFieldDefinition, DocumentAttachment } from '../types';
-import { documentsApi } from '../services/api';
-import { useAuthStore } from '../stores/auth';
+import { documentsApi, mediaApi } from '../services/api';
 import { formatDateTime } from '../utils/date';
 
 interface DocumentDetailContentProps {
@@ -51,29 +50,30 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
   }, [doc.id]);
 
   // 下载附件（直接流式下载，不阻塞界面）
-  const handleDownload = (attId: string, fileName: string) => {
-    const token = useAuthStore.getState().token;
-    if (!token) {
-      alert('登录已过期，请重新登录');
-      return;
+  const handleDownload = async (attId: string, fileName: string) => {
+    try {
+      const mt = await mediaApi.token(attId, 'direct-download');
+      const a = document.createElement('a');
+      a.href = `/api/v2/attachments/${attId}/direct-download?token=${encodeURIComponent(mt)}`;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {
+      alert('下载失败，请重试');
     }
-    const a = document.createElement('a');
-    a.href = `/api/v2/attachments/${attId}/direct-download?token=${encodeURIComponent(token)}`;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
   };
 
   // 预览附件
-  const handlePreview = (attId: string, fileName: string) => {
+  const handlePreview = async (attId: string, fileName: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase() || '';
-    const token = useAuthStore.getState().token;
-    if (!token) { alert('登录已过期，请重新登录'); return; }
 
     // PDF — 浏览器内嵌预览
     if (ext === 'pdf') {
-      window.open(`/api/v2/attachments/${attId}/preview?token=${encodeURIComponent(token)}`, '_blank');
+      try {
+        const mt = await mediaApi.token(attId, 'preview');
+        window.open(`/api/v2/attachments/${attId}/preview?token=${encodeURIComponent(mt)}`, '_blank');
+      } catch { alert('预览失败，请重试'); }
       return;
     }
     // 压缩包 — 树形预览
@@ -83,7 +83,10 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
     }
     // STP — 三维预览（新窗口）
     if (ext === 'stp' || ext === 'step') {
-      window.open(`/stp-viewer?id=${attId}&token=${encodeURIComponent(token)}`, '_blank');
+      try {
+        const mt = await mediaApi.token(attId, 'gltf');
+        window.open(`/stp-viewer?id=${attId}&token=${encodeURIComponent(mt)}`, '_blank');
+      } catch { alert('预览失败，请重试'); }
       return;
     }
     alert('该格式暂不支持预览');

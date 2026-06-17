@@ -1,8 +1,7 @@
 import React from 'react';
 import { useState, useEffect } from 'react';
 import { Modal } from './Modal';
-import { attachmentApi } from '../services/api';
-import { useAuthStore } from '../stores/auth';
+import { attachmentApi, mediaApi } from '../services/api';
 import type { ArchiveTreeNode, ArchiveTreeResponse } from '../types';
 
 interface ArchiveTreeModalProps {
@@ -10,7 +9,6 @@ interface ArchiveTreeModalProps {
   onClose: () => void;
   attachmentId: string;
   fileName: string;
-  token: string;
 }
 
 /** 文件大小格式化 */
@@ -79,22 +77,32 @@ function TreeNodeItem({ node, depth, attId, token }: { node: ArchiveTreeNode; de
 }
 
 export default function ArchiveTreeModal({
-  open, onClose, attachmentId, fileName, token
+  open, onClose, attachmentId, fileName
 }: ArchiveTreeModalProps) {
   const [data, setData] = useState<ArchiveTreeResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [extractToken, setExtractToken] = useState('');
 
   useEffect(() => {
-    if (!open || !attachmentId || !token) return;
+    if (!open || !attachmentId) return;
     setLoading(true);
     setError('');
     setData(null);
-    attachmentApi.archiveTree(attachmentId, token)
+    setExtractToken('');
+
+    Promise.all([
+      mediaApi.token(attachmentId, 'archive-tree'),
+      mediaApi.token(attachmentId, 'extract-file'),
+    ])
+      .then(([treeToken, exToken]) => {
+        setExtractToken(exToken);
+        return attachmentApi.archiveTree(attachmentId, treeToken);
+      })
       .then(res => setData(res.data))
       .catch(err => setError(err?.response?.data?.detail || '读取压缩包失败'))
       .finally(() => setLoading(false));
-  }, [open, attachmentId, token]);
+  }, [open, attachmentId]);
 
   return (
     <Modal open={open} title={`压缩包预览：${fileName}`} onClose={onClose} width="lg">
@@ -119,7 +127,7 @@ export default function ArchiveTreeModal({
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {data.tree.map((node, i) => (
-                    <TreeNodeItem key={i} node={node} depth={0} attId={attachmentId} token={token} />
+                    <TreeNodeItem key={i} node={node} depth={0} attId={attachmentId} token={extractToken} />
                   ))}
               </tbody>
             </table>

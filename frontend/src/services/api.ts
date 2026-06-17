@@ -248,6 +248,12 @@ export const attachmentApi = {
     api.get<import('../types').ArchiveTreeResponse>(`/v2/attachments/${id}/archive-tree`, { params: { token } }),
 };
 
+// 媒体令牌 API（替代 ?token= 的会话 JWT）
+export const mediaApi = {
+  token: (attId: string, action: 'preview' | 'direct-download' | 'gltf' | 'archive-tree' | 'extract-file') =>
+    api.get(`/v2/attachments/${attId}/media-token`, { params: { action } }).then(r => r.data.token as string),
+};
+
 // ============================================================
 // V2 分块上传 API (支持大文件上传)
 // ============================================================

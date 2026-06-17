@@ -5,6 +5,7 @@ import { Toolbar } from './Toolbar';
 import { ModelTreePanel } from './ModelTreePanel';
 import { ViewCube } from './ViewCube';
 import { useViewerStore } from '../../stores/viewerStore';
+import { mediaApi } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
 import axios from 'axios';
 
@@ -21,8 +22,23 @@ export function STPViewerModal({ open, attachmentId, fileName, onClose }: STPVie
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [treeWidth, setTreeWidth] = useState(240);
   const dragging = useRef(false);
+  const gltfUrlRef = useRef<string | null>(null);
 
-  const gltfUrl = `/api/v2/attachments/${attachmentId}/gltf?token=${encodeURIComponent(token || '')}`;
+  // Start loading when modal opens
+  useEffect(() => {
+    if (!open || !attachmentId) return;
+    setLoadingState('converting', '正在检查模型...');
+    mediaApi.token(attachmentId, 'gltf').then(mt => {
+      const url = `/api/v2/attachments/${attachmentId}/gltf?token=${encodeURIComponent(mt)}`;
+      gltfUrlRef.current = url;
+      checkAndLoad(url);
+    }).catch(() => {
+      setLoadingState('error', '获取令牌失败');
+    });
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [open, attachmentId]);
 
   // Resize handle
   const onResizeDown = useCallback(() => { dragging.current = true; }, []);
@@ -40,16 +56,6 @@ export function STPViewerModal({ open, attachmentId, fileName, onClose }: STPVie
     };
   }, []);
 
-  // Start loading when modal opens
-  useEffect(() => {
-    if (!open || !token) return;
-    setLoadingState('converting', '正在检查模型...');
-    checkAndLoad();
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-    };
-  }, [open, attachmentId, token]);
-
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -58,7 +64,7 @@ export function STPViewerModal({ open, attachmentId, fileName, onClose }: STPVie
     };
   }, []);
 
-  const checkAndLoad = useCallback(async () => {
+  const checkAndLoad = useCallback(async (gltfUrl: string) => {
     try {
       const resp = await axios.head(gltfUrl);
       if (resp.status === 200) {
@@ -68,21 +74,21 @@ export function STPViewerModal({ open, attachmentId, fileName, onClose }: STPVie
       }
       if (resp.status === 202) {
         setLoadingState('converting', '模型转换中，请稍后...');
-        startPolling();
+        startPolling(gltfUrl);
         return;
       }
       setLoadingState('error', '服务器异常');
     } catch (e: any) {
       if (e.response?.status === 202) {
         setLoadingState('converting', '模型转换中，请稍后...');
-        startPolling();
+        startPolling(gltfUrl);
       } else {
         setLoadingState('error', e.response?.status === 404 ? '附件不存在' : '加载失败');
       }
     }
-  }, [gltfUrl]);
+  }, []);
 
-  const startPolling = useCallback(() => {
+  const startPolling = useCallback((gltfUrl: string) => {
     let retries = 0;
     const maxRetries = 30;
     pollingRef.current = setInterval(async () => {
@@ -105,7 +111,7 @@ export function STPViewerModal({ open, attachmentId, fileName, onClose }: STPVie
         setLoadingState('error', '转换超时，请关闭后重试');
       }
     }, 2000);
-  }, [gltfUrl]);
+  }, []);
 
   return (
     <Modal open={open} title={`三维预览 - ${fileName || ''}`} onClose={onClose} width="full" zIndex={60}>

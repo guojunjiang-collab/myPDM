@@ -626,7 +626,6 @@ export default function Board() {
           onClose={() => setArchivePreview(null)}
           attachmentId={archivePreview.attId}
           fileName={archivePreview.fileName}
-          token={useAuthStore.getState().token || ''}
         />
       )}
     </div>

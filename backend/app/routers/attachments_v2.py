@@ -13,7 +13,9 @@ from pathlib import Path
 from ..database import get_db
 from ..models import User, DocumentAttachment, Document
 from ..file_storage import file_storage, chunked_uploader, MAX_FILE_SIZE, CHUNK_SIZE
-from .auth import require_role
+from .auth import get_current_active_user
+from ..permissions import require_permission, has_permission
+from ..media_token import mint_media_token, verify_media_token
 from ..stp_converter import is_stp_file, convert_stp_to_gltf, get_gltf_path_for_attachment, delete_glb_cache
 from ..bom.archive_reader import read_archive_tree, extract_file, SUPPORTED_EXTENSIONS
 import zipfile
@@ -38,7 +40,7 @@ def _attachment_response(att):
 @router.get("/")
 async def list_attachments(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("attachments:list"))
 ):
     """获取附件列表"""
     attachments = db.query(DocumentAttachment).all()
@@ -51,7 +53,7 @@ async def upload_file(
     entity_type: str = Form("document"),
     entity_id: str = Form(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("attachments:upload"))
 ):
     """
     上传文件（小文件直接上传）
@@ -148,7 +150,7 @@ async def init_chunked_upload(
     entity_type: str = Form("document"),
     entity_id: str = Form(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("attachments:upload"))
 ):
     """
     初始化分块上传
@@ -197,7 +199,8 @@ async def upload_chunk(
     upload_id: str = Form(...),
     chunk_index: int = Form(...),
     chunk: UploadFile = File(...),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("attachments:upload"))
 ):
     """
     上传分块
@@ -236,7 +239,7 @@ async def upload_chunk(
 async def complete_chunked_upload(
     upload_id: str = Form(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("attachments:upload"))
 ):
     """
     完成分块上传
@@ -297,7 +300,7 @@ async def complete_chunked_upload(
 @router.get("/chunk/status/{upload_id}")
 async def get_upload_status(
     upload_id: str,
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("attachments:upload"))
 ):
     """
     获取上传状态
@@ -319,7 +322,7 @@ async def get_upload_status(
 @router.delete("/chunk/cancel/{upload_id}")
 async def cancel_upload(
     upload_id: str,
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("attachments:upload"))
 ):
     """
     取消上传
@@ -342,7 +345,7 @@ async def cancel_upload(
 
 @router.post("/convert-pending")
 async def convert_pending_stp(
-    current_user: User = Depends(require_role(["admin"])),
+    current_user: User = Depends(require_permission("attachments:convert_manage")),
     db: Session = Depends(get_db),
 ):
     """扫描所有未转换的 STP 附件并后台批量转换（仅管理员）"""
@@ -372,7 +375,7 @@ async def convert_pending_stp(
 
 @router.get("/convert-status")
 async def convert_status(
-    current_user: User = Depends(require_role(["admin"])),
+    current_user: User = Depends(require_permission("attachments:convert_manage")),
     db: Session = Depends(get_db),
 ):
     """查询待转换的 STP 数量（用于轮询批量转换进度）"""
@@ -388,7 +391,7 @@ async def convert_status(
 async def get_attachment(
     attachment_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("attachments:list"))
 ):
     """获取单个附件信息"""
     att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
@@ -417,7 +420,7 @@ async def get_attachment(
 async def download_attachment(
     attachment_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
+    current_user: User = Depends(require_permission("attachments:download"))
 ):
     """下载附件"""
     import base64
@@ -450,7 +453,7 @@ async def download_attachment(
 async def stream_attachment(
     attachment_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
+    current_user: User = Depends(require_permission("attachments:download"))
 ):
     """流式下载附件（直接返回二进制文件，比 base64 更快）"""
     att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
@@ -476,6 +479,26 @@ async def stream_attachment(
     )
 
 
+_ACTION_PERM = {
+    "preview": "attachments:preview",
+    "direct-download": "attachments:direct_download",
+    "gltf": "attachments:gltf",
+    "archive-tree": "attachments:archive_browse",
+    "extract-file": "attachments:archive_browse",
+}
+
+
+@router.get("/{attachment_id}/media-token")
+async def issue_media_token(attachment_id: uuid.UUID, action: str,
+                            current_user: User = Depends(get_current_active_user)):
+    perm = _ACTION_PERM.get(action)
+    if not perm:
+        raise HTTPException(status_code=400, detail="未知媒体操作")
+    if not has_permission(current_user, perm):
+        raise HTTPException(status_code=403, detail="权限不足")
+    return {"token": mint_media_token(str(attachment_id), action, ttl=300)}
+
+
 @router.get("/{attachment_id}/direct-download")
 async def direct_download_attachment(
     attachment_id: uuid.UUID,
@@ -486,21 +509,8 @@ async def direct_download_attachment(
     直接下载附件（支持 query token，用于浏览器原生下载）
     浏览器直接访问此 URL 会触发下载并显示进度
     """
-    from jose import JWTError, jwt
-    from .auth import SECRET_KEY, ALGORITHM
-    
-    # 验证 token
-    if not token:
-        raise HTTPException(status_code=401, detail="缺少认证令牌")
-    
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
-        if not username:
-            raise HTTPException(status_code=401, detail="无效的认证令牌")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="认证令牌验证失败")
-    
+    verify_media_token(token, str(attachment_id), "direct-download")
+
     # 获取附件
     att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
     if not att:
@@ -542,24 +552,9 @@ async def preview_attachment(
     预览附件（支持 query token，浏览器直接打开）
     返回 Content-Disposition: inline 让浏览器内嵌显示
     支持 Range 请求，浏览器可流式加载大文件
-    production 可预览，guest 不可预览
     """
-    from jose import JWTError, jwt
-    from .auth import SECRET_KEY, ALGORITHM
-    
-    # 验证 token
-    if not token:
-        raise HTTPException(status_code=401, detail="缺少认证令牌")
-    
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
-        user_role = payload.get("role", "")
-        if not username:
-            raise HTTPException(status_code=401, detail="无效的认证令牌")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="认证令牌验证失败")
-    
+    verify_media_token(token, str(attachment_id), "preview")
+
     # 获取附件
     att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
     if not att:
@@ -606,21 +601,7 @@ async def get_gltf(
     - 缓存存在 → 直接返回 GLB (200)
     - 缓存不存在 → 后台异步转换 + 返回 202（前端轮询重试）
     """
-    # JWT 验证
-    if not token:
-        raise HTTPException(status_code=401, detail="缺少认证令牌")
-    from jose import JWTError, jwt
-    from .auth import SECRET_KEY, ALGORITHM
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
-        user_role = payload.get("role", "")
-        if not username:
-            raise HTTPException(status_code=401, detail="无效的认证令牌")
-        if user_role == "guest":
-            raise HTTPException(status_code=403, detail="访客无预览权限")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="认证令牌验证失败")
+    verify_media_token(token, str(attachment_id), "gltf")
 
     att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
     if not att:
@@ -661,7 +642,7 @@ async def get_gltf(
 async def delete_attachment(
     attachment_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("attachments:delete"))
 ):
     """删除附件"""
     att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
@@ -693,25 +674,7 @@ async def get_archive_tree(
     获取压缩包内容树（ZIP / TAR / TAR.GZ）
     返回内部文件夹层级和文件列表
     """
-    from jose import JWTError, jwt
-    from .auth import SECRET_KEY, ALGORITHM
-
-    # JWT 认证（复用 /preview 端点的逻辑）
-    if not token:
-        raise HTTPException(status_code=401, detail="缺少认证令牌")
-
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
-        user_role = payload.get("role", "")
-        if not username:
-            raise HTTPException(status_code=401, detail="无效的认证令牌")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="认证令牌验证失败")
-
-    # 权限：访客不可预览
-    if user_role == "guest":
-        raise HTTPException(status_code=403, detail="访客无预览权限")
+    verify_media_token(token, str(attachment_id), "archive-tree")
 
     # 获取附件记录
     att = db.query(DocumentAttachment).filter(
@@ -766,21 +729,7 @@ async def extract_archive_file(
     db: Session = Depends(get_db)
 ):
     """从压缩包中提取单个文件并返回"""
-    from jose import JWTError, jwt
-    from .auth import SECRET_KEY, ALGORITHM
-
-    if not token:
-        raise HTTPException(status_code=401, detail="缺少认证令牌")
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
-        user_role = payload.get("role", "")
-        if not username:
-            raise HTTPException(status_code=401, detail="无效的认证令牌")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="认证令牌验证失败")
-    if user_role == "guest":
-        raise HTTPException(status_code=403, detail="访客无预览权限")
+    verify_media_token(token, str(attachment_id), "extract-file")
 
     att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
     if not att:

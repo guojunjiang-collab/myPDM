@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { entityDocumentsApi, customFieldsApi, attachmentApi, documentsApi } from '../services/api';
+import { entityDocumentsApi, customFieldsApi, documentsApi, mediaApi } from '../services/api';
 import type { EntityDocument, CustomFieldDefinition, CustomFieldValue, Document } from '../types';
-import { canEdit, useAuthStore } from '../stores/auth';
+import { canEdit } from '../stores/auth';
 import { useDataStore } from '../stores/data';
 import { Modal } from './Modal';
 import DocumentPicker from './DocumentPicker';
@@ -147,28 +147,29 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
     }
   };
 
-  const handleDownload = (fileId: string, fileName: string) => {
-    const token = useAuthStore.getState().token;
-    if (!token) {
-      alert('登录已过期，请重新登录');
-      return;
+  const handleDownload = async (fileId: string, fileName: string) => {
+    try {
+      const mt = await mediaApi.token(fileId, 'direct-download');
+      const a = document.createElement('a');
+      a.href = `/api/v2/attachments/${fileId}/direct-download?token=${encodeURIComponent(mt)}`;
+      a.download = fileName || 'download';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {
+      alert('下载失败，请重试');
     }
-    const a = document.createElement('a');
-    a.href = `/api/v2/attachments/${fileId}/direct-download?token=${encodeURIComponent(token)}`;
-    a.download = fileName || 'download';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
   };
 
-  const handlePreviewAttachment = (fileId: string, fileName: string) => {
+  const handlePreviewAttachment = async (fileId: string, fileName: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase() || '';
-    const token = useAuthStore.getState().token;
-    if (!token) { alert('登录已过期，请重新登录'); return; }
 
     // PDF — 浏览器内嵌预览
     if (ext === 'pdf') {
-      window.open(`/api/v2/attachments/${fileId}/preview?token=${encodeURIComponent(token)}`, '_blank');
+      try {
+        const mt = await mediaApi.token(fileId, 'preview');
+        window.open(`/api/v2/attachments/${fileId}/preview?token=${encodeURIComponent(mt)}`, '_blank');
+      } catch { alert('预览失败，请重试'); }
       return;
     }
     // 压缩包 — 树形预览
@@ -178,10 +179,10 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
     }
     // STP — 三维预览（新窗口）
     if (ext === 'stp' || ext === 'step') {
-      const token = useAuthStore.getState().token;
-      if (token) {
-        window.open(`/stp-viewer?id=${fileId}&token=${encodeURIComponent(token)}`, '_blank');
-      }
+      try {
+        const mt = await mediaApi.token(fileId, 'gltf');
+        window.open(`/stp-viewer?id=${fileId}&token=${encodeURIComponent(mt)}`, '_blank');
+      } catch { alert('预览失败，请重试'); }
       return;
     }
     alert('该格式暂不支持预览');
@@ -363,7 +364,6 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
           onClose={() => setArchivePreview(null)}
           attachmentId={archivePreview.attId}
           fileName={archivePreview.fileName}
-          token={useAuthStore.getState().token || ''}
         />
       )}
     </div>

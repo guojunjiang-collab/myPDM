@@ -50,9 +50,11 @@ function filenameFromDisposition(cd: string): string {
 
 /**
  * 鉴权下载。两类下载端点鉴权方式不同，故同时附带：
- * - 附件端点（/api/v2/attachments/.../direct-download）用 ?token= 查询参数鉴权
+ * - 附件端点（/api/v2/attachments/.../direct-download）应使用 mediaApi.token() 获取短期令牌
  * - BOM 导出 / 助手产物端点用 Authorization 头鉴权（require_role）
  * 并校验 response.ok，避免把 401/404 的错误 JSON 当成文件下载下来。
+ *
+ * 注意：调用方若传入附件端点 URL，应改用 mediaApi.token() 获取短期令牌后直接拼接。
  */
 export async function authedDownload(url: string): Promise<void> {
   const token = useAuthStore.getState().token;
