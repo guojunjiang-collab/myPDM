@@ -1,0 +1,5 @@
+# Permission codegen: keep LF so byte-for-byte sync checks are stable across OSes
+permissions/permissions.json                     text eol=lf
+tools/gen_permissions.py                          text eol=lf
+backend/app/permissions/_generated.py             text eol=lf
+frontend/src/constants/permissions.generated.ts   text eol=lf
