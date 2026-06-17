@@ -9,13 +9,13 @@ import base64
 from ..database import get_db
 from ..models import User, Document, DocumentAttachment, Part, Assembly
 from .. import crud, schemas
-from .auth import require_role
+from ..permissions import require_permission
 from ..stp_converter import is_stp_file, delete_glb_cache
 
 router = APIRouter(prefix="/documents", tags=["图文档管理"])
 
 @router.get("/")
-async def list_documents(skip: int = 0, limit: int = 100, keyword: str = None, status: str = None, updated_since: float = None, brief: bool = False, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def list_documents(skip: int = 0, limit: int = 100, keyword: str = None, status: str = None, updated_since: float = None, brief: bool = False, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents:read"))):
     query = db.query(Document)
     if not updated_since:  # 非增量模式排除已删除
         query = query.filter(Document.deleted_at.is_(None))
@@ -54,7 +54,7 @@ async def list_documents(skip: int = 0, limit: int = 100, keyword: str = None, s
     } for d in docs]
 
 @router.get("/{doc_id}/references")
-async def get_document_references(doc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def get_document_references(doc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents:read_refs"))):
     """
     获取图文档的引用信息（扫描 document_links JSONB）
     """
@@ -138,7 +138,7 @@ async def get_document_references(doc_id: uuid.UUID, db: Session = Depends(get_d
     }
 
 @router.post("/")
-async def create_document(doc: schemas.DocumentCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def create_document(doc: schemas.DocumentCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents:create"))):
     # 仅匹配未删除记录：软删除的同编号+版本不应阻止新建（与 uix_doc_code_version 部分唯一索引一致）
     existing = db.query(Document).filter(
         Document.code == doc.code,
@@ -162,7 +162,7 @@ async def create_document(doc: schemas.DocumentCreate, request: Request, db: Ses
     }
 
 @router.get("/{doc_id}")
-async def get_document(doc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def get_document(doc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents:read"))):
     d = db.query(Document).filter(Document.id == doc_id).first()
     if not d:
         raise HTTPException(status_code=404, detail="图文档不存在")
@@ -175,7 +175,7 @@ async def get_document(doc_id: uuid.UUID, db: Session = Depends(get_db), current
     }
 
 @router.put("/{doc_id}")
-async def update_document(doc_id: uuid.UUID, body: schemas.DocumentUpdate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def update_document(doc_id: uuid.UUID, body: schemas.DocumentUpdate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents:update"))):
     d = db.query(Document).filter(Document.id == doc_id).first()
     if not d:
         raise HTTPException(status_code=404, detail="图文档不存在")
@@ -233,7 +233,7 @@ def _find_doc_refs(db, doc_id_str):
     return references
 
 @router.get("/{doc_id}/can-delete")
-async def check_document_can_delete(doc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def check_document_can_delete(doc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents:read"))):
     """检查图文档是否可以被删除（扫描 document_links JSONB）"""
     d = db.query(Document).filter(Document.id == doc_id).first()
     if not d:
@@ -246,7 +246,7 @@ async def check_document_can_delete(doc_id: uuid.UUID, db: Session = Depends(get
     }
 
 @router.delete("/{doc_id}")
-async def delete_document(doc_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin"]))):
+async def delete_document(doc_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents:delete"))):
     # 扫描 document_links JSONB 检查引用
     refs = _find_doc_refs(db, str(doc_id))
     if refs:
@@ -279,7 +279,7 @@ async def delete_document(doc_id: uuid.UUID, request: Request, db: Session = Dep
     return {"message": "图文档已软删除"}
 
 @router.post("/{doc_id}/attachments")
-async def upload_document_attachment(doc_id: uuid.UUID, body: schemas.DocumentAttachmentCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def upload_document_attachment(doc_id: uuid.UUID, body: schemas.DocumentAttachmentCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents.attachment:upload"))):
     from ..file_storage import file_storage
     d = db.query(Document).filter(Document.id == doc_id).first()
     if not d:
@@ -310,7 +310,7 @@ async def upload_document_attachment(doc_id: uuid.UUID, body: schemas.DocumentAt
     return {"id": att.id, "file_name": att.file_name, "file_size": att.file_size, "created_at": att.created_at}
 
 @router.get("/{doc_id}/attachments/{att_id}")
-async def download_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def download_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents.attachment:download"))):
     from ..file_storage import file_storage
     att = db.query(DocumentAttachment).filter(DocumentAttachment.id == att_id, DocumentAttachment.document_id == doc_id).first()
     if not att:
@@ -333,7 +333,7 @@ async def download_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, db: Session 
     }
 
 @router.get("/{doc_id}/attachments/")
-async def list_attachments(doc_id: uuid.UUID, skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def list_attachments(doc_id: uuid.UUID, skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents.attachment:download"))):
     atts = db.query(DocumentAttachment).filter(DocumentAttachment.document_id == doc_id).offset(skip).limit(limit).all()
     return [{
         "id": a.id, "document_id": a.document_id,
@@ -341,7 +341,7 @@ async def list_attachments(doc_id: uuid.UUID, skip: int = 0, limit: int = 100, d
     } for a in atts]
 
 @router.delete("/{doc_id}/attachments/{att_id}")
-async def delete_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def delete_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents.attachment:delete"))):
     from ..file_storage import file_storage
     att = db.query(DocumentAttachment).filter(DocumentAttachment.id == att_id, DocumentAttachment.document_id == doc_id).first()
     if not att:
@@ -370,7 +370,7 @@ async def delete_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, request: Reque
 # ===== 版本控制 (升版) =====
 
 @router.post("/{doc_id}/upgrade")
-async def upgrade_document_endpoint(doc_id: uuid.UUID, body: schemas.UpgradeRequest, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def upgrade_document_endpoint(doc_id: uuid.UUID, body: schemas.UpgradeRequest, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents:create"))):
     db_doc, err = crud.upgrade_document(db, doc_id, current_user.real_name or current_user.username)
     if err:
         raise HTTPException(status_code=400, detail=err)
@@ -386,7 +386,7 @@ async def upgrade_document_endpoint(doc_id: uuid.UUID, body: schemas.UpgradeRequ
 
 
 @router.get("/{doc_id}/versions")
-async def get_document_versions_endpoint(doc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def get_document_versions_endpoint(doc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents:read"))):
     versions = crud.get_document_versions(db, doc_id)
     return [{
         "id": v.id, "code": v.code, "name": v.name,

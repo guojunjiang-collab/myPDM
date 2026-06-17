@@ -18,7 +18,7 @@ from app import schemas_configuration as schemas
 from app import schemas as core_schemas
 from app import crud_configuration as crud
 from app import crud as core_crud
-from app.routers.auth import require_role
+from ..permissions import require_permission
 
 router = APIRouter(prefix="/configurations", tags=["构型配置"])
 
@@ -35,7 +35,7 @@ async def list_config_items(
     updated_since: float = Query(None),
     brief: bool = Query(False),
     db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin", "engineer", "production", "guest"])),
+    current_user=Depends(require_permission("configuration:read")),
 ):
     """构型项列表"""
     skip = (page - 1) * page_size
@@ -97,7 +97,7 @@ async def list_config_items(
 @router.get("/items/{config_id}", response_model=dict)
 async def get_config_item(
     config_id: str, db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin", "engineer", "production", "guest"])),
+    current_user=Depends(require_permission("configuration:read")),
 ):
     """构型项详情（含关联零部件 + 子构型项 + 构型方案）"""
     item = crud.get_config_item(db, config_id)
@@ -153,7 +153,7 @@ async def get_config_item(
 @router.post("/items", response_model=dict)
 async def create_config_item(
     data: schemas.ConfigurationItemCreate, db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin", "engineer"])),
+    current_user=Depends(require_permission("configuration:create")),
 ):
     """创建构型项"""
     existing = crud.get_config_item_by_code(db, data.code)
@@ -170,7 +170,7 @@ async def create_config_item(
 @router.put("/items/{config_id}", response_model=dict)
 async def update_config_item(
     config_id: str, data: schemas.ConfigurationItemUpdate, db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin", "engineer"])),
+    current_user=Depends(require_permission("configuration:update")),
 ):
     """更新构型项"""
     # 允许修改构型号：保存时做唯一性检查
@@ -191,7 +191,7 @@ async def update_config_item(
 @router.delete("/items/{config_id}")
 async def delete_config_item(
     config_id: str, db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin"])),
+    current_user=Depends(require_permission("configuration:delete")),
 ):
     """删除构型项（检查父项引用）"""
     # 检查是否被其他构型项引用为子项（仅统计未被软删除的父构型项）
@@ -223,7 +223,7 @@ async def delete_config_item(
 @router.post("/items/{config_id}/parts", response_model=dict)
 async def add_parts(
     config_id: str, data: schemas.ConfigPartBulkCreate, db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin", "engineer"])),
+    current_user=Depends(require_permission("configuration.item:manage")),
 ):
     """批量关联零部件"""
     if not crud.get_config_item(db, config_id):
@@ -234,7 +234,7 @@ async def add_parts(
 @router.put("/items/{config_id}/parts/{part_id}", response_model=dict)
 async def update_part(
     config_id: str, part_id: str, data: schemas.ConfigPartUpdate, db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin", "engineer"])),
+    current_user=Depends(require_permission("configuration.item:manage")),
 ):
     """更新关联零部件属性"""
     part = crud.update_config_part(db, part_id, data)
@@ -246,7 +246,7 @@ async def update_part(
 @router.delete("/items/{config_id}/parts/{part_id}")
 async def remove_part(
     config_id: str, part_id: str, db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin", "engineer"])),
+    current_user=Depends(require_permission("configuration.item:manage")),
 ):
     """移除关联零部件"""
     if not crud.remove_config_part(db, part_id):
@@ -261,7 +261,7 @@ async def remove_part(
 @router.post("/items/{config_id}/children", response_model=dict)
 async def add_children(
     config_id: str, data: schemas.ConfigChildBulkCreate, db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin", "engineer"])),
+    current_user=Depends(require_permission("configuration.item:manage")),
 ):
     """批量添加子构型项"""
     if not crud.get_config_item(db, config_id):
@@ -275,7 +275,7 @@ async def add_children(
 @router.put("/items/{config_id}/children/{child_id}", response_model=dict)
 async def update_child(
     config_id: str, child_id: str, data: schemas.ConfigChildUpdate, db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin", "engineer"])),
+    current_user=Depends(require_permission("configuration.item:manage")),
 ):
     """更新子构型项属性"""
     child = crud.update_config_child(db, child_id, data)
@@ -287,7 +287,7 @@ async def update_child(
 @router.delete("/items/{config_id}/children/{child_id}")
 async def remove_child(
     config_id: str, child_id: str, db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin", "engineer"])),
+    current_user=Depends(require_permission("configuration.item:manage")),
 ):
     """移除子构型项"""
     if not crud.remove_config_child(db, child_id):
@@ -332,7 +332,7 @@ def _get_config_documents(db: Session, item: models.ConfigurationItem) -> list:
 @router.get("/items/{config_id}/documents")
 async def get_config_documents(
     config_id: str, db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin", "engineer", "production", "guest"])),
+    current_user=Depends(require_permission("configuration:read")),
 ):
     """获取构型项关联的图文档列表"""
     item = crud.get_config_item(db, config_id)
@@ -345,7 +345,7 @@ async def get_config_documents(
 async def add_config_document(
     config_id: str, body: core_schemas.EntityDocumentCreate, request: Request,
     db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin", "engineer"])),
+    current_user=Depends(require_permission("configuration.doc:manage")),
 ):
     """关联图文档到构型项"""
     doc = db.query(Document).filter(Document.id == body.document_id).first()
@@ -379,7 +379,7 @@ async def add_config_document(
 async def update_config_document(
     config_id: str, link_id: str, body: core_schemas.EntityDocumentUpdate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin", "engineer"])),
+    current_user=Depends(require_permission("configuration.doc:manage")),
 ):
     """更新构型项关联图文档信息（类别/排序）"""
     item = crud.get_config_item(db, config_id)
@@ -406,7 +406,7 @@ async def update_config_document(
 @router.delete("/items/{config_id}/documents/{link_id}")
 async def remove_config_document(
     config_id: str, link_id: str, db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin", "engineer"])),
+    current_user=Depends(require_permission("configuration.doc:manage")),
 ):
     """移除构型项关联的图文档"""
     item = crud.get_config_item(db, config_id)
@@ -433,7 +433,7 @@ async def list_profiles(
     search: str = Query(None),
     status: str = Query(None),
     db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin", "engineer", "production", "guest"])),
+    current_user=Depends(require_permission("profile:read")),
 ):
     """配置列表"""
     skip = (page - 1) * page_size
@@ -458,7 +458,7 @@ async def list_profiles(
 async def create_profile(
     data: schemas.ConfigurationProfileCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin", "engineer"])),
+    current_user=Depends(require_permission("profile:create")),
 ):
     """创建配置"""
     existing = crud.get_profile_by_code(db, data.code)
@@ -496,7 +496,7 @@ async def create_profile(
 async def get_profile(
     profile_id: str,
     db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin", "engineer", "production", "guest"])),
+    current_user=Depends(require_permission("profile:read")),
 ):
     """配置详情 + 清单"""
     profile = crud.get_profile(db, profile_id)
@@ -532,7 +532,7 @@ async def update_profile(
     profile_id: str,
     data: schemas.ConfigurationProfileUpdate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin", "engineer"])),
+    current_user=Depends(require_permission("profile:update")),
 ):
     """编辑配置（仅 draft）"""
     profile = crud.get_profile(db, profile_id)
@@ -561,7 +561,7 @@ async def update_profile(
 async def delete_profile(
     profile_id: str,
     db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin"])),
+    current_user=Depends(require_permission("profile:delete")),
 ):
     """删除配置（管理员可删除任意状态）"""
     profile = crud.get_profile(db, profile_id)
@@ -575,7 +575,7 @@ async def delete_profile(
 async def activate_profile(
     profile_id: str,
     db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin", "engineer"])),
+    current_user=Depends(require_permission("profile:activate_archive")),
 ):
     """生效（draft → active）"""
     profile = crud.get_profile(db, profile_id)
@@ -596,7 +596,7 @@ async def update_profile_status(
     profile_id: str,
     data: ProfileStatusUpdate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin"])),
+    current_user=Depends(require_permission("profile:change_status")),
 ):
     """管理员直接修改状态"""
     profile = crud.get_profile(db, profile_id)
@@ -612,7 +612,7 @@ async def update_profile_status(
 async def archive_profile(
     profile_id: str,
     db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin"])),
+    current_user=Depends(require_permission("profile:activate_archive")),
 ):
     """归档（active → archived）"""
     profile = crud.get_profile(db, profile_id)
@@ -640,7 +640,7 @@ async def restore_profile_checklist(
     profile_id: str,
     data: ChecklistRestoreRequest,
     db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin", "engineer"])),
+    current_user=Depends(require_permission("profile.bom:manage")),
 ):
     """按导入数据强制还原工作清单勾选（含必选件，用于导入恢复），再同步正式清单。仅 draft。
 
@@ -691,7 +691,7 @@ async def update_profile_item(
     item_id: str,
     data: schemas.ConfigurationProfileItemUpdate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin", "engineer"])),
+    current_user=Depends(require_permission("profile.bom:manage")),
 ):
     """勾选/取消可选件（仅 draft）"""
     profile = crud.get_profile(db, profile_id)
@@ -814,7 +814,7 @@ async def toggle_config_item_node(
     profile_id: str,
     config_item_id: str,
     db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin", "engineer"])),
+    current_user=Depends(require_permission("profile.bom:manage")),
 ):
     """切换构型项节点及其下属所有零部件的勾选状态（仅 draft + 可选节点）"""
     profile = crud.get_profile(db, profile_id)
@@ -865,7 +865,7 @@ async def toggle_config_item_node(
 async def regenerate_profile_checklist(
     profile_id: str,
     db: Session = Depends(get_db),
-    current_user=Depends(require_role(["admin", "engineer"])),
+    current_user=Depends(require_permission("profile.bom:manage")),
 ):
     """以最新构型项内容强制重建配置清单（仅 draft）"""
     profile = crud.get_profile(db, profile_id)

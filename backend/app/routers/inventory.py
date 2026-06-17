@@ -11,39 +11,35 @@ from app.schemas_inventory import (
     WarehouseCreate, WarehouseEdit, MaterialCreate, MaterialEdit, MaterialEnableFromPDM,
     DocumentCreate, DocumentEdit, DocumentListParams, ReviewAction, AssignKeeperAction, PostAction,
 )
-from app.routers.auth import require_role
+from ..permissions import require_permission, enforce_object_policy
 
 router = APIRouter(prefix="/inventory", tags=["库存管理"])
-
-READ_ROLES = ["admin", "engineer", "production", "guest"]
-WRITE_ROLES = ["admin", "engineer", "production"]
-MASTER_ROLES = ["admin", "engineer"]
 
 
 # ──────────── 仓库 ────────────
 @router.get("/warehouses")
 async def list_warehouses(db: Session = Depends(get_db),
-                          current_user: User = Depends(require_role(READ_ROLES))):
+                          current_user: User = Depends(require_permission("inventory.warehouse:read"))):
     items = crud_inventory.list_warehouses(db)
     return {"items": [_wh_dict(w) for w in items]}
 
 
 @router.post("/warehouses")
 async def create_warehouse(data: WarehouseCreate, db: Session = Depends(get_db),
-                           current_user: User = Depends(require_role(MASTER_ROLES))):
+                           current_user: User = Depends(require_permission("inventory.warehouse:write"))):
     return _wh_dict(crud_inventory.create_warehouse(db, data))
 
 
 @router.put("/warehouses/{wh_id}")
 async def update_warehouse(wh_id: uuid.UUID, data: WarehouseEdit, db: Session = Depends(get_db),
-                           current_user: User = Depends(require_role(MASTER_ROLES))):
+                           current_user: User = Depends(require_permission("inventory.warehouse:write"))):
     wh = crud_inventory.get_warehouse(db, wh_id)
     return _wh_dict(crud_inventory.update_warehouse(db, wh, data))
 
 
 @router.delete("/warehouses/{wh_id}")
 async def delete_warehouse(wh_id: uuid.UUID, db: Session = Depends(get_db),
-                           current_user: User = Depends(require_role(MASTER_ROLES))):
+                           current_user: User = Depends(require_permission("inventory.warehouse:delete"))):
     crud_inventory.delete_warehouse(db, crud_inventory.get_warehouse(db, wh_id))
     return {"detail": "已删除"}
 
@@ -52,33 +48,33 @@ async def delete_warehouse(wh_id: uuid.UUID, db: Session = Depends(get_db),
 @router.get("/materials")
 async def list_materials(search: str = Query(None), source_type: str = Query(None),
                          track_mode: str = Query(None), db: Session = Depends(get_db),
-                         current_user: User = Depends(require_role(READ_ROLES))):
+                          current_user: User = Depends(require_permission("inventory.material:read"))):
     items = crud_inventory.list_materials(db, search, source_type, track_mode)
     return {"items": [_mat_dict(m) for m in items]}
 
 
 @router.post("/materials")
 async def create_material(data: MaterialCreate, db: Session = Depends(get_db),
-                          current_user: User = Depends(require_role(MASTER_ROLES))):
+                           current_user: User = Depends(require_permission("inventory.material:write"))):
     return _mat_dict(crud_inventory.create_material(db, data))
 
 
 @router.post("/materials/enable-from-pdm")
 async def enable_from_pdm(data: MaterialEnableFromPDM, db: Session = Depends(get_db),
-                          current_user: User = Depends(require_role(MASTER_ROLES))):
+                           current_user: User = Depends(require_permission("inventory.material:enable_from_pdm"))):
     return _mat_dict(crud_inventory.enable_material_from_pdm(db, data))
 
 
 @router.put("/materials/{m_id}")
 async def update_material(m_id: uuid.UUID, data: MaterialEdit, db: Session = Depends(get_db),
-                          current_user: User = Depends(require_role(MASTER_ROLES))):
+                           current_user: User = Depends(require_permission("inventory.material:write"))):
     m = crud_inventory.get_material(db, m_id)
     return _mat_dict(crud_inventory.update_material(db, m, data))
 
 
 @router.delete("/materials/{m_id}")
 async def delete_material(m_id: uuid.UUID, db: Session = Depends(get_db),
-                          current_user: User = Depends(require_role(MASTER_ROLES))):
+                           current_user: User = Depends(require_permission("inventory.material:delete"))):
     crud_inventory.delete_material(db, crud_inventory.get_material(db, m_id))
     return {"detail": "已删除"}
 
@@ -87,7 +83,7 @@ async def delete_material(m_id: uuid.UUID, db: Session = Depends(get_db),
 @router.get("/stock")
 async def list_stock(material: str = Query(None), warehouse_id: uuid.UUID = Query(None),
                      low_only: bool = Query(False), db: Session = Depends(get_db),
-                     current_user: User = Depends(require_role(READ_ROLES))):
+                     current_user: User = Depends(require_permission("inventory.stock:read"))):
     q = db.query(InventoryStock, InventoryMaterial).join(
         InventoryMaterial, InventoryStock.material_id == InventoryMaterial.id
     )
@@ -115,7 +111,7 @@ async def list_stock(material: str = Query(None), warehouse_id: uuid.UUID = Quer
 async def list_ledger(material_id: uuid.UUID = Query(None), warehouse_id: uuid.UUID = Query(None),
                       doc_id: uuid.UUID = Query(None), limit: int = Query(200, le=1000),
                       db: Session = Depends(get_db),
-                      current_user: User = Depends(require_role(READ_ROLES))):
+                      current_user: User = Depends(require_permission("inventory.stock:read"))):
     q = db.query(InventoryLedger)
     if material_id:
         q = q.filter(InventoryLedger.material_id == material_id)
@@ -138,7 +134,7 @@ async def list_ledger(material_id: uuid.UUID = Query(None), warehouse_id: uuid.U
 async def list_documents(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
                          doc_type: str = Query(None), status: str = Query(None), search: str = Query(None),
                          db: Session = Depends(get_db),
-                         current_user: User = Depends(require_role(READ_ROLES))):
+                         current_user: User = Depends(require_permission("inventory.doc:read"))):
     params = DocumentListParams(page=page, page_size=page_size, doc_type=doc_type, status=status, search=search)
     docs, total = crud_inventory.list_documents(db, params, current_user)
     items = [_doc_brief(db, d) for d in docs]
@@ -161,55 +157,55 @@ async def list_documents(page: int = Query(1, ge=1), page_size: int = Query(20, 
 
 @router.post("/documents")
 async def create_document(data: DocumentCreate, db: Session = Depends(get_db),
-                          current_user: User = Depends(require_role(WRITE_ROLES))):
+                          current_user: User = Depends(require_permission("inventory.doc:write"))):
     doc = crud_inventory.create_document(db, data, current_user.id)
     return _doc_detail(db, doc)
 
 
 @router.get("/documents/{doc_id}")
 async def get_document(doc_id: uuid.UUID, db: Session = Depends(get_db),
-                       current_user: User = Depends(require_role(READ_ROLES))):
+                       current_user: User = Depends(require_permission("inventory.doc:read"))):
     return _doc_detail(db, crud_inventory.get_document(db, doc_id))
 
 
 @router.put("/documents/{doc_id}")
 async def update_document(doc_id: uuid.UUID, data: DocumentEdit, db: Session = Depends(get_db),
-                          current_user: User = Depends(require_role(WRITE_ROLES))):
+                          current_user: User = Depends(require_permission("inventory.doc:write"))):
     doc = crud_inventory.get_document(db, doc_id)
     return _doc_detail(db, crud_inventory.update_document(db, doc, data))
 
 
 @router.delete("/documents/{doc_id}")
 async def delete_document(doc_id: uuid.UUID, db: Session = Depends(get_db),
-                          current_user: User = Depends(require_role(WRITE_ROLES))):
+                          current_user: User = Depends(require_permission("inventory.doc:delete"))):
     crud_inventory.delete_document(db, crud_inventory.get_document(db, doc_id))
     return {"detail": "已删除"}
 
 
 @router.post("/documents/{doc_id}/submit")
 async def submit_document(doc_id: uuid.UUID, db: Session = Depends(get_db),
-                          current_user: User = Depends(require_role(WRITE_ROLES))):
+                          current_user: User = Depends(require_permission("inventory.doc:submit_withdraw_approve"))):
     doc = crud_inventory.get_document(db, doc_id)
     return _doc_detail(db, crud_inventory.submit_document(db, doc, current_user))
 
 
 @router.post("/documents/{doc_id}/withdraw")
 async def withdraw_document(doc_id: uuid.UUID, db: Session = Depends(get_db),
-                            current_user: User = Depends(require_role(WRITE_ROLES))):
+                            current_user: User = Depends(require_permission("inventory.doc:submit_withdraw_approve"))):
     doc = crud_inventory.get_document(db, doc_id)
     return _doc_detail(db, crud_inventory.withdraw_document(db, doc, current_user))
 
 
 @router.post("/documents/{doc_id}/review")
 async def review_document(doc_id: uuid.UUID, data: ReviewAction, db: Session = Depends(get_db),
-                          current_user: User = Depends(require_role(WRITE_ROLES))):
+                          current_user: User = Depends(require_permission("inventory.doc:submit_withdraw_approve"))):
     doc = crud_inventory.get_document(db, doc_id)
     return _doc_detail(db, crud_inventory.review_document(db, doc, current_user, data.decision, data.comment or ""))
 
 
 @router.post("/documents/{doc_id}/assign-keeper")
 async def assign_keeper(doc_id: uuid.UUID, data: AssignKeeperAction, db: Session = Depends(get_db),
-                        current_user: User = Depends(require_role(WRITE_ROLES))):
+                        current_user: User = Depends(require_permission("inventory.doc:submit_withdraw_approve"))):
     doc = crud_inventory.get_document(db, doc_id)
     keeper = db.query(User).filter(User.id == uuid.UUID(data.keeper_id)).first()
     if not keeper:
@@ -219,11 +215,12 @@ async def assign_keeper(doc_id: uuid.UUID, data: AssignKeeperAction, db: Session
 
 @router.post("/documents/{doc_id}/post")
 async def post_document(doc_id: uuid.UUID, data: PostAction = None, db: Session = Depends(get_db),
-                        current_user: User = Depends(require_role(WRITE_ROLES))):
+                        current_user: User = Depends(require_permission("inventory.doc:post"))):
     doc = crud_inventory.get_document(db, doc_id)
     # 仅指定库管员或管理员可过账
     if current_user.role != "admin" and doc.keeper_id != current_user.id:
         raise HTTPException(status_code=403, detail="仅指定库管员可过账")
+    enforce_object_policy("inventory_keeper_or_admin", current_user, doc)
     # 盘点单：先写入各行实盘数
     if data and data.counts:
         line_map = {str(l.id): l for l in crud_inventory.get_document_lines(db, doc.id)}
@@ -236,7 +233,7 @@ async def post_document(doc_id: uuid.UUID, data: PostAction = None, db: Session 
 
 @router.post("/documents/{doc_id}/cancel")
 async def cancel_document(doc_id: uuid.UUID, db: Session = Depends(get_db),
-                          current_user: User = Depends(require_role(WRITE_ROLES))):
+                          current_user: User = Depends(require_permission("inventory.doc:submit_withdraw_approve"))):
     doc = crud_inventory.get_document(db, doc_id)
     return _doc_detail(db, crud_inventory.cancel_document(db, doc, current_user))
 

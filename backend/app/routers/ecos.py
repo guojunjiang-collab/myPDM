@@ -11,7 +11,7 @@ from app.database import get_db
 from app.models import User, Part, Assembly, BOMItem
 from app.models_eco import ECO, ECOExecutionItem, ECOReviewRecord, ECOStatusLog
 from app import crud_eco, schemas_eco
-from app.routers.auth import require_role
+from ..permissions import require_permission, enforce_object_policy
 
 router = APIRouter(prefix="/ecos", tags=["变更管理-ECO"])
 
@@ -137,7 +137,7 @@ async def list_ecos(
     updated_since: float = Query(None, description="仅返回指定 UNIX 时间戳之后更新的记录（含已删除）"),
     brief: bool = Query(False, description="仅返回简要字段：eco_number, title, status, priority, creator_name, updated_at, deleted_at"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
+    current_user: User = Depends(require_permission("eco:read"))
 ):
     params = schemas_eco.ECOListParams(page=page, page_size=page_size, search=search, status=status, priority=priority)
     include_deleted = bool(updated_since)
@@ -174,7 +174,7 @@ async def list_ecos(
 async def create_eco(
     data: schemas_eco.ECOCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("eco:create"))
 ):
     eco = crud_eco.create_eco(db, data, current_user.id)
     return _build_eco_detail(db, eco)
@@ -187,7 +187,7 @@ async def create_eco(
 async def get_eco(
     eco_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
+    current_user: User = Depends(require_permission("eco:read"))
 ):
     eco = crud_eco.get_eco(db, eco_id)
     return _build_eco_detail(db, eco)
@@ -200,9 +200,10 @@ async def get_eco(
 async def update_eco(
     eco_id: uuid.UUID, data: schemas_eco.ECOEdit,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("eco:update"))
 ):
     eco = crud_eco.get_eco(db, eco_id)
+    enforce_object_policy("eco_owner_or_admin", current_user, eco)
     crud_eco.update_eco(db, eco, data)
     return _build_eco_detail(db, eco)
 
@@ -214,9 +215,10 @@ async def update_eco(
 async def delete_eco(
     eco_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("eco:delete"))
 ):
     eco = crud_eco.get_eco(db, eco_id)
+    enforce_object_policy("eco_owner_or_admin", current_user, eco)
     if eco.status != "draft":
         raise HTTPException(status_code=400, detail="仅草稿状态的 ECO 可以删除")
     crud_eco.delete_eco(db, eco_id)
@@ -230,9 +232,10 @@ async def delete_eco(
 async def submit_eco(
     eco_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("eco:submit"))
 ):
     eco = crud_eco.get_eco(db, eco_id)
+    enforce_object_policy("eco_owner_or_admin", current_user, eco)
     if eco.status != "draft":
         raise HTTPException(status_code=400, detail="仅草稿状态可提交评审")
     crud_eco.clear_review_records(db, eco_id)
@@ -252,9 +255,10 @@ async def submit_eco(
 async def withdraw_eco(
     eco_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("eco:withdraw"))
 ):
     eco = crud_eco.get_eco(db, eco_id)
+    enforce_object_policy("eco_owner_or_admin", current_user, eco)
     if eco.status != "reviewing":
         raise HTTPException(status_code=400, detail="仅评审中状态可撤回")
     if current_user.role != "admin" and eco.creator_id != current_user.id:
@@ -272,7 +276,7 @@ async def review_eco(
     eco_id: uuid.UUID,
     data: schemas_eco.ECOReviewAction,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("eco:update"))
 ):
     eco = crud_eco.get_eco(db, eco_id)
     if eco.status != "reviewing":
@@ -318,7 +322,7 @@ async def review_eco(
 async def start_execution(
     eco_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("eco:execute"))
 ):
     eco = crud_eco.get_eco(db, eco_id)
     if eco.status != "approved":
@@ -334,7 +338,7 @@ async def start_execution(
 async def execute_single_item(
     eco_id: uuid.UUID, item_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("eco:execute_item"))
 ):
     eco = crud_eco.get_eco(db, eco_id)
     if eco.status not in ("executing", "approved"):
@@ -355,7 +359,7 @@ async def execute_single_item(
 async def execute_all_items(
     eco_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("eco:execute_all"))
 ):
     eco = crud_eco.get_eco(db, eco_id)
     if eco.status not in ("approved", "executing"):
@@ -373,7 +377,7 @@ async def execute_all_items(
 async def complete_execution(
     eco_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("eco:close"))
 ):
     eco = crud_eco.get_eco(db, eco_id)
     if eco.status != "executing":
@@ -389,7 +393,7 @@ async def complete_execution(
 async def list_execution_items(
     eco_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
+    current_user: User = Depends(require_permission("eco:read"))
 ):
     items = crud_eco.get_execution_items(db, eco_id)
     serialized = []
@@ -416,7 +420,7 @@ async def list_execution_items(
 async def add_execution_item(
     eco_id: uuid.UUID, data: schemas_eco.ECOExecutionItemCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("eco.affected:manage"))
 ):
     eco = crud_eco.get_eco(db, eco_id)
     if eco.status != "draft":
@@ -437,7 +441,7 @@ async def edit_execution_item(
     eco_id: uuid.UUID, item_id: uuid.UUID,
     data: schemas_eco.ECOExecutionItemEdit,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("eco.affected:manage"))
 ):
     eco = crud_eco.get_eco(db, eco_id)
     if eco.status != "draft":
@@ -461,7 +465,7 @@ async def edit_execution_item(
 async def remove_execution_item(
     eco_id: uuid.UUID, item_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("eco.affected:manage"))
 ):
     eco = crud_eco.get_eco(db, eco_id)
     if eco.status != "draft":
@@ -477,7 +481,7 @@ async def remove_execution_item(
 async def manual_upgrade_item(
     eco_id: uuid.UUID, item_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("eco:revise"))
 ):
     item = crud_eco.get_execution_item(db, item_id)
     if not item:
@@ -508,7 +512,7 @@ async def manual_revert_item(
     eco_id: uuid.UUID, item_id: uuid.UUID,
     body: schemas_eco.ECOExecutionItemAction = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("eco:restore"))
 ):
     item = crud_eco.get_execution_item(db, item_id)
     if not item:
@@ -567,7 +571,7 @@ async def manual_freeze_item(
     eco_id: uuid.UUID, item_id: uuid.UUID,
     body: schemas_eco.ECOExecutionItemAction = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("eco:freeze"))
 ):
     item = crud_eco.get_execution_item(db, item_id)
     if not item:
@@ -599,7 +603,7 @@ async def manual_release_item(
     eco_id: uuid.UUID, item_id: uuid.UUID,
     body: schemas_eco.ECOExecutionItemAction = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("eco:publish"))
 ):
     item = crud_eco.get_execution_item(db, item_id)
     if not item:
@@ -627,7 +631,7 @@ async def manual_release_item(
 async def get_release_items_publish_status(
     eco_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("eco:read"))
 ):
     """校验工程变更结果：树中（含所有层级子项）是否仍有草稿/冻结状态的零部件。
 
@@ -643,7 +647,7 @@ async def get_release_items_publish_status(
 async def publish_all_release_items(
     eco_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("eco:publish"))
 ):
     eco = crud_eco.get_eco(db, eco_id)
     if eco.status != "executing":
@@ -671,7 +675,7 @@ async def publish_all_release_items(
 async def get_status_logs(
     eco_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
+    current_user: User = Depends(require_permission("eco:read_status_log"))
 ):
     logs = crud_eco.get_status_logs(db, eco_id)
     serialized = [
@@ -689,7 +693,7 @@ async def get_status_logs(
 async def cc_users(
     eco_id: uuid.UUID, data: schemas_eco.ECOCcAction,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
+    current_user: User = Depends(require_permission("eco:cc_manage"))
 ):
     eco = crud_eco.get_eco(db, eco_id)
     crud_eco.add_cc_users(db, eco, data.user_ids)
@@ -703,7 +707,7 @@ async def cc_users(
 async def uncc_user(
     eco_id: uuid.UUID, user_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("eco:cc_manage"))
 ):
     eco = crud_eco.get_eco(db, eco_id)
     crud_eco.remove_cc_user(db, eco, str(user_id))
@@ -717,7 +721,7 @@ async def uncc_user(
 async def bom_trace(
     eco_id: uuid.UUID, entity_type: str, entity_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
+    current_user: User = Depends(require_permission("eco:bom_trace"))
 ):
     try:
         from app.crud_ecr import _get_upward_trace, _get_downward_trace

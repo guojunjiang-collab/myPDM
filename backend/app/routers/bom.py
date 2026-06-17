@@ -10,7 +10,7 @@ from ..database import get_db
 from ..models import User
 from .. import crud, models, schemas
 from ..bom import compare
-from .auth import require_role
+from ..permissions import require_permission
 from sqlalchemy import cast, String, text
 
 router = APIRouter(prefix="/bom", tags=["BOM管理"])
@@ -21,7 +21,7 @@ async def check_references(
     entity_type: str,
     entity_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer", "production"])),
+    current_user: User = Depends(require_permission("bom:doc_refs")),
 ):
     """检查某个实体是否被引用（用于删除前校验）"""
     references = []
@@ -69,7 +69,7 @@ async def check_references(
     return references
 
 @router.get("/items/all")
-async def get_all_bom_items_route(updated_since: float = None, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def get_all_bom_items_route(updated_since: float = None, db: Session = Depends(get_db), current_user: User = Depends(require_permission("bom:doc_refs"))):
     """获取所有 BOM 关系，用于前端反查"""
     include_deleted = bool(updated_since)
     items = crud.get_all_bom_items(db, include_deleted=include_deleted, updated_since=updated_since)
@@ -91,7 +91,7 @@ async def get_all_bom_items_route(updated_since: float = None, db: Session = Dep
 
 
 @router.get("/tree/{item_type}/{item_id}")
-async def get_bom_tree(item_type: str, item_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production"]))):
+async def get_bom_tree(item_type: str, item_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("bom:tree"))):
     if item_type not in ["part", "assembly"]:
         raise HTTPException(status_code=400, detail="无效的类型")
     items = crud.get_bom_items(db, item_type, item_id)
@@ -120,7 +120,7 @@ async def get_bom_trace(
     entity_type: str,
     entity_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer", "production"])),
+    current_user: User = Depends(require_permission("bom:trace")),
 ):
     """递归反查：查找使用该零件/部件的所有父装配体（向上追溯最多10层）"""
     if entity_type not in ("part", "assembly"):
@@ -195,14 +195,14 @@ async def get_bom_trace(
 
 
 @router.post("/items", response_model=schemas.BOMItemResponse)
-async def create_bom_item(item: schemas.BOMItemCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def create_bom_item(item: schemas.BOMItemCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("bom:create_relation"))):
     db_item = crud.create_bom_item(db, item)
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username, "添加BOM项", "bom", str(db_item.id), None, ip)
     return db_item
 
 @router.delete("/items/{item_id}")
-async def delete_bom_item(item_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin"]))):
+async def delete_bom_item(item_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("bom:delete_relation"))):
     if not crud.delete_bom_item(db, item_id):
         raise HTTPException(status_code=404, detail="BOM项不存在")
     ip = request.client.host if request.client else None
@@ -213,7 +213,7 @@ async def delete_bom_item(item_id: uuid.UUID, request: Request, db: Session = De
 async def compare_bom_assemblies(
     request: schemas.BOMCompareRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer", "production"]))
+    current_user: User = Depends(require_permission("bom:compare"))
 ):
     """对比两个装配体的BOM结构"""
     try:
@@ -233,7 +233,7 @@ async def compare_bom_assemblies(
 async def compare_bom_components(
     request: schemas.BOMCompareRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer", "production"]))
+    current_user: User = Depends(require_permission("bom:compare"))
 ):
     """对比两个子部件（装配体）的BOM结构"""
     try:
@@ -255,7 +255,7 @@ async def export_bom_csv(
     item_type: str,
     item_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer", "production"])),
+    current_user: User = Depends(require_permission("bom:export")),
 ):
     """导出零件/部件 BOM 为 CSV（供 AI 助手与前端下载）。"""
     if item_type not in ("part", "assembly"):

@@ -7,7 +7,7 @@ import uuid
 from ..database import get_db
 from ..models import User, Document
 from .. import crud, schemas
-from .auth import require_role
+from ..permissions import require_permission
 
 router = APIRouter(prefix="/assemblies", tags=["部件管理"])
 
@@ -28,7 +28,7 @@ def _assembly_response(asm):
     }
 
 @router.get("/")
-async def list_assemblies(skip: int = 0, limit: int = 100, search: str = None, updated_since: float = None, brief: bool = False, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def list_assemblies(skip: int = 0, limit: int = 100, search: str = None, updated_since: float = None, brief: bool = False, db: Session = Depends(get_db), current_user: User = Depends(require_permission("assemblies:read"))):
     include_deleted = bool(updated_since)  # 增量模式可能包含已删除记录
     asms = crud.get_assemblies(db, skip=skip, limit=limit, search=search, updated_since=updated_since, include_deleted=include_deleted)
     if brief:
@@ -37,7 +37,7 @@ async def list_assemblies(skip: int = 0, limit: int = 100, search: str = None, u
     return [_assembly_response(a) for a in asms]
 
 @router.post("/", response_model=schemas.AssemblyResponse)
-async def create_assembly(assembly: schemas.AssemblyCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def create_assembly(assembly: schemas.AssemblyCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("assemblies:create"))):
     if crud.get_assembly_by_code_version(db, assembly.code, assembly.version):
         raise HTTPException(status_code=400, detail="部件编码+版本已存在")
     db_assembly = crud.create_assembly(db, assembly)
@@ -46,15 +46,14 @@ async def create_assembly(assembly: schemas.AssemblyCreate, request: Request, db
     return _assembly_response(db_assembly)
 
 @router.get("/{assembly_id}", response_model=schemas.AssemblyResponse)
-async def get_assembly(assembly_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def get_assembly(assembly_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("assemblies:read"))):
     db_assembly = crud.get_assembly(db, assembly_id)
     if not db_assembly:
         raise HTTPException(status_code=404, detail="部件不存在")
     return _assembly_response(db_assembly)
 
 @router.put("/{assembly_id}", response_model=schemas.AssemblyResponse)
-async def update_assembly(assembly_id: uuid.UUID, assembly_update: schemas.AssemblyUpdate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
-    crud.assert_entity_editable(db, "assembly", assembly_id, current_user.role)
+async def update_assembly(assembly_id: uuid.UUID, assembly_update: schemas.AssemblyUpdate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("assemblies:update"))):
     db_assembly = crud.update_assembly(db, assembly_id, assembly_update)
     if not db_assembly:
         raise HTTPException(status_code=404, detail="部件不存在")
@@ -63,7 +62,7 @@ async def update_assembly(assembly_id: uuid.UUID, assembly_update: schemas.Assem
     return _assembly_response(db_assembly)
 
 @router.get("/{assembly_id}/can-delete")
-async def check_assembly_can_delete(assembly_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def check_assembly_can_delete(assembly_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("assemblies:read"))):
     """检查部件是否可以被删除（是否有父项引用）"""
     from ..models import BOMItem, Assembly
     
@@ -101,12 +100,11 @@ async def check_assembly_can_delete(assembly_id: uuid.UUID, db: Session = Depend
     }
 
 @router.delete("/{assembly_id}")
-async def delete_assembly(assembly_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin"]))):
+async def delete_assembly(assembly_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("assemblies:delete"))):
     from ..models import BOMItem, Assembly
     db_assembly = crud.get_assembly(db, assembly_id)
     if not db_assembly:
         raise HTTPException(status_code=404, detail="部件不存在")
-    
     # 检查是否被其他部件引用为子项（排除已软删除的 BOM 关系和部件）
     ref_count = db.query(BOMItem).filter(
         BOMItem.child_type == 'component',
@@ -135,7 +133,7 @@ async def delete_assembly(assembly_id: uuid.UUID, request: Request, db: Session 
     return {"message": "部件已删除"}
 
 @router.get("/{assembly_id}/parts")
-async def get_assembly_parts(assembly_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def get_assembly_parts(assembly_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("assemblies:read"))):
     """获取部件的子项列表"""
     db_assembly = crud.get_assembly(db, assembly_id)
     if not db_assembly:
@@ -143,7 +141,7 @@ async def get_assembly_parts(assembly_id: uuid.UUID, db: Session = Depends(get_d
     return crud.get_assembly_parts(db, assembly_id)
 
 @router.post("/{assembly_id}/parts")
-async def add_assembly_part(assembly_id: uuid.UUID, item: schemas.BOMItemCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def add_assembly_part(assembly_id: uuid.UUID, item: schemas.BOMItemCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("assemblies.bom:manage"))):
     """添加子项到部件"""
     db_assembly = crud.get_assembly(db, assembly_id)
     if not db_assembly:
@@ -158,7 +156,7 @@ async def add_assembly_part(assembly_id: uuid.UUID, item: schemas.BOMItemCreate,
     return db_item
 
 @router.delete("/{assembly_id}/parts/{item_id}")
-async def remove_assembly_part(assembly_id: uuid.UUID, item_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def remove_assembly_part(assembly_id: uuid.UUID, item_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("assemblies.bom:manage"))):
     """删除部件的子项"""
     db_assembly = crud.get_assembly(db, assembly_id)
     if not db_assembly:
@@ -170,7 +168,7 @@ async def remove_assembly_part(assembly_id: uuid.UUID, item_id: uuid.UUID, reque
     return {"message": "子项已删除"}
 
 @router.put("/{assembly_id}/parts/{item_id}")
-async def update_assembly_part(assembly_id: uuid.UUID, item_id: uuid.UUID, item_update: schemas.BOMItemUpdate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def update_assembly_part(assembly_id: uuid.UUID, item_id: uuid.UUID, item_update: schemas.BOMItemUpdate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("assemblies.bom:manage"))):
     """更新部件的子项（数量等）"""
     db_assembly = crud.get_assembly(db, assembly_id)
     if not db_assembly:
@@ -188,7 +186,7 @@ async def update_assembly_part(assembly_id: uuid.UUID, item_id: uuid.UUID, item_
     return db_item
 
 @router.get("/{assembly_id}/documents")
-async def get_assembly_documents(assembly_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def get_assembly_documents(assembly_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("assemblies.doc:read"))):
     """获取部件关联的图文档列表（从 document_links JSONB 读取）"""
     db_assembly = crud.get_assembly(db, assembly_id)
     if not db_assembly:
@@ -220,7 +218,7 @@ async def get_assembly_documents(assembly_id: uuid.UUID, db: Session = Depends(g
     return result
 
 @router.post("/{assembly_id}/documents")
-async def add_assembly_document(assembly_id: uuid.UUID, body: schemas.EntityDocumentCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def add_assembly_document(assembly_id: uuid.UUID, body: schemas.EntityDocumentCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("assemblies.doc:link"))):
     """关联图文档到部件（写入 document_links JSONB）"""
     doc = db.query(Document).filter(Document.id == body.document_id).first()
     if not doc:
@@ -247,7 +245,7 @@ async def add_assembly_document(assembly_id: uuid.UUID, body: schemas.EntityDocu
     return {"id": link_id, "message": "图文档关联成功"}
 
 @router.put("/{assembly_id}/documents/{link_id}")
-async def update_assembly_document(assembly_id: uuid.UUID, link_id: uuid.UUID, body: schemas.EntityDocumentUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def update_assembly_document(assembly_id: uuid.UUID, link_id: uuid.UUID, body: schemas.EntityDocumentUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_permission("assemblies.doc:link"))):
     """更新关联信息（类别/排序）"""
     db_assembly = crud.get_assembly(db, assembly_id)
     if not db_assembly:
@@ -271,7 +269,7 @@ async def update_assembly_document(assembly_id: uuid.UUID, link_id: uuid.UUID, b
     return {"message": "关联已更新"}
 
 @router.delete("/{assembly_id}/documents/{link_id}")
-async def delete_assembly_document(assembly_id: uuid.UUID, link_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def delete_assembly_document(assembly_id: uuid.UUID, link_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("assemblies.doc:unlink"))):
     """移除图文档关联"""
     db_assembly = crud.get_assembly(db, assembly_id)
     if not db_assembly:
@@ -290,7 +288,7 @@ async def delete_assembly_document(assembly_id: uuid.UUID, link_id: uuid.UUID, d
 # ===== 版本控制 (升版) =====
 
 @router.post("/{assembly_id}/upgrade")
-async def upgrade_assembly_endpoint(assembly_id: uuid.UUID, body: schemas.UpgradeRequest, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer"]))):
+async def upgrade_assembly_endpoint(assembly_id: uuid.UUID, body: schemas.UpgradeRequest, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("assemblies:update"))):
     db_assembly, err = crud.upgrade_assembly(db, assembly_id, current_user.real_name or current_user.username)
     if err:
         raise HTTPException(status_code=400, detail=err)
@@ -300,6 +298,6 @@ async def upgrade_assembly_endpoint(assembly_id: uuid.UUID, body: schemas.Upgrad
 
 
 @router.get("/{assembly_id}/versions")
-async def get_assembly_versions_endpoint(assembly_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def get_assembly_versions_endpoint(assembly_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("assemblies:read"))):
     versions = crud.get_assembly_versions(db, assembly_id)
     return [_assembly_response(v) for v in versions]

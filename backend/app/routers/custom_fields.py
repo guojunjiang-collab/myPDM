@@ -5,7 +5,7 @@ import uuid
 from ..database import get_db
 from ..models import User
 from .. import crud, schemas
-from .auth import require_role
+from ..permissions import require_permission
 
 router = APIRouter(prefix="/custom-fields", tags=["自定义字段管理"])
 
@@ -56,7 +56,7 @@ def _value_response(val, field_def=None):
 async def list_definitions(
     applies_to: str = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("custom_field.def:read"))
 ):
     definitions = crud.get_custom_field_definitions(db, applies_to=applies_to)
     return [_def_response(d) for d in definitions]
@@ -67,7 +67,7 @@ async def create_definition(
     field_def: schemas.CustomFieldDefinitionCreate,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin"]))
+    current_user: User = Depends(require_permission("custom_field.def:write"))
 ):
     # 检查 field_key 唯一性
     existing = crud.get_custom_field_definition_by_key(db, field_def.field_key)
@@ -85,7 +85,7 @@ async def update_definition(
     field_update: schemas.CustomFieldDefinitionUpdate,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin"]))
+    current_user: User = Depends(require_permission("custom_field.def:write"))
 ):
     db_field = crud.update_custom_field_definition(db, field_id, field_update)
     if not db_field:
@@ -100,7 +100,7 @@ async def delete_definition(
     field_id: uuid.UUID,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin"]))
+    current_user: User = Depends(require_permission("custom_field.def:write"))
 ):
     db_field = crud.get_custom_field_definition(db, field_id)
     if not db_field:
@@ -116,7 +116,7 @@ async def reorder_definitions(
     reorder: schemas.ReorderRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin"]))
+    current_user: User = Depends(require_permission("custom_field.def:sort"))
 ):
     crud.reorder_custom_field_definitions(db, reorder.items)
     return {"message": "排序已更新"}
@@ -129,7 +129,7 @@ async def get_values_batch(
     type: str,
     ids: str,  # comma-separated UUIDs
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
+    current_user: User = Depends(require_permission("custom_field.value:read"))
 ):
     """批量获取多个实体的自定义字段值，替代 N+1 查询。
     
@@ -152,7 +152,7 @@ async def get_values(
     entity_type: str,
     entity_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("custom_field.value:read"))
 ):
     if entity_type not in ('part', 'component', 'document'):
         raise HTTPException(status_code=400, detail="entity_type 必须为 part、component 或 document")
@@ -167,7 +167,7 @@ async def set_values(
     batch: schemas.CustomFieldValuesBatch,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("custom_field.value:write"))
 ):
     if entity_type not in ('part', 'component', 'document'):
         raise HTTPException(status_code=400, detail="entity_type 必须为 part、component 或 document")
@@ -185,7 +185,7 @@ async def reset_business_data(
     data: dict,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin"]))
+    current_user: User = Depends(require_permission("custom_field:reset_data"))
 ):
     """清除所有业务数据（需验证管理员密码）"""
     password = data.get("password", "")

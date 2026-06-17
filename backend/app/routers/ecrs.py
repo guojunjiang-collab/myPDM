@@ -12,7 +12,7 @@ from app.models import User, Part, Assembly
 from app.models_ecr import ECR as ECRModel, ECRReviewRecord, ECRStatusLog, ECRAffectedItem
 from app.models_eco import ECO as ECOModel
 from app import crud_ecr, schemas_ecr
-from app.routers.auth import require_role
+from ..permissions import require_permission, enforce_object_policy
 
 router = APIRouter(prefix="/ecrs", tags=["变更管理"])
 
@@ -137,7 +137,7 @@ async def list_ecrs(
     updated_since: float = Query(None, description="仅返回指定 UNIX 时间戳之后更新的记录（含已删除）"),
     brief: bool = Query(False, description="仅返回简要字段：ecr_number, title, status, priority, creator_name, updated_at, deleted_at"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
+    current_user: User = Depends(require_permission("ecr:read"))
 ):
   """获取 ECR 列表（分页 + 筛选）。非管理员用户看不到他人创建的草稿 ECR"""
   params = schemas_ecr.ECRListParams(
@@ -186,7 +186,7 @@ async def create_ecr(
     data: schemas_ecr.ECRCreate,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("ecr:create"))
 ):
     """创建 ECR"""
     ecr = crud_ecr.create_ecr(db, data, current_user.id)
@@ -200,7 +200,7 @@ async def create_ecr(
 async def get_ecr(
     ecr_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
+    current_user: User = Depends(require_permission("ecr:read"))
 ):
     """获取 ECR 详情"""
     ecr = crud_ecr.get_ecr(db, ecr_id)
@@ -215,9 +215,11 @@ async def update_ecr(
     ecr_id: uuid.UUID,
     data: schemas_ecr.ECREdit,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("ecr:update"))
 ):
     """更新 ECR（仅草稿状态）"""
+    ecr = crud_ecr.get_ecr(db, ecr_id)
+    enforce_object_policy("ecr_owner_or_admin", current_user, ecr)
     ecr = crud_ecr.update_ecr(db, ecr_id, data)
     return _build_ecr_detail(db, ecr)
 
@@ -229,7 +231,7 @@ async def update_ecr(
 async def delete_ecr(
     ecr_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("ecr:delete"))
 ):
     """删除 ECR。被 ECO 引用的 ECR 不允许删除（引用限制）。"""
     # 引用限制：若有未删除的 ECO 以本 ECR 为来源，则禁止删除
@@ -245,6 +247,8 @@ async def delete_ecr(
             detail=f"该 ECR 已被 ECO（{numbers}）引用，不可删除；请先删除相关 ECO",
         )
 
+    ecr = crud_ecr.get_ecr(db, ecr_id)
+    enforce_object_policy("ecr_owner_or_admin", current_user, ecr)
     if not crud_ecr.delete_ecr(db, ecr_id):
         raise HTTPException(status_code=404, detail="ECR 不存在或已删除")
     return {"message": "ECR 已删除"}
@@ -257,10 +261,11 @@ async def delete_ecr(
 async def submit_ecr(
     ecr_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("ecr:submit"))
 ):
     """提交评审"""
     ecr = crud_ecr.get_ecr(db, ecr_id)
+    enforce_object_policy("ecr_owner_or_admin", current_user, ecr)
     if ecr.status != "draft":
         raise HTTPException(status_code=400, detail="仅草稿状态的 ECR 可以提交评审")
 
@@ -281,10 +286,11 @@ async def submit_ecr(
 async def withdraw_ecr(
     ecr_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("ecr:withdraw"))
 ):
   """撤回评审，将 ECR 从评审中退回到草稿状态"""
   ecr = crud_ecr.get_ecr(db, ecr_id)
+  enforce_object_policy("ecr_owner_or_admin", current_user, ecr)
   if ecr.status != "reviewing":
       raise HTTPException(status_code=400, detail="仅评审中状态的 ECR 可以撤回")
   # 仅创建人或 admin 可撤回
@@ -308,7 +314,7 @@ async def review_ecr(
     ecr_id: uuid.UUID,
     data: schemas_ecr.ECRReviewAction,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("ecr:approve"))
 ):
   """审批操作（通过/驳回/退回）"""
   ecr = crud_ecr.get_ecr(db, ecr_id)
@@ -322,6 +328,9 @@ async def review_ecr(
           reviewer_ids.add(uuid.UUID(r["user_id"]))
       except (ValueError, KeyError):
           pass
+
+  enforce_object_policy("ecr_approver_or_admin", current_user, ecr, reviewer_ids=reviewer_ids)
+
   if current_user.role != "admin" and current_user.id not in reviewer_ids:
       raise HTTPException(status_code=403, detail="您不是该 ECR 的指定审批人")
 
@@ -383,7 +392,7 @@ async def close_ecr(
     ecr_id: uuid.UUID,
     data: schemas_ecr.ECRCloseAction = schemas_ecr.ECRCloseAction(),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("ecr:close"))
 ):
     """关闭 ECR"""
     ecr = crud_ecr.get_ecr(db, ecr_id)
@@ -405,7 +414,7 @@ async def add_affected_item(
     ecr_id: uuid.UUID,
     data: schemas_ecr.AffectedItemCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("ecr:update"))
 ):
     """添加受影响对象"""
     item = crud_ecr.add_affected_item(db, ecr_id, data)
@@ -430,7 +439,7 @@ async def remove_affected_item(
     ecr_id: uuid.UUID,
     item_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("ecr:update"))
 ):
     """移除受影响对象"""
     crud_ecr.delete_affected_item(db, item_id)
@@ -443,7 +452,7 @@ async def update_affected_item(
     item_id: uuid.UUID,
     data: dict,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer"]))
+    current_user: User = Depends(require_permission("ecr:update"))
 ):
     """更新受影响对象（含 BOM 影响评估结果）"""
     item = db.query(ECRAffectedItem).filter(
@@ -469,7 +478,7 @@ async def update_affected_item(
 async def get_status_logs(
     ecr_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
+    current_user: User = Depends(require_permission("ecr:read_status_log"))
 ):
     """获取状态变更日志"""
     logs = db.query(ECRStatusLog).filter(
@@ -497,7 +506,7 @@ async def get_bom_trace(
     entity_type: str,
     entity_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
+    current_user: User = Depends(require_permission("ecr:bom_trace"))
 ):
     """BOM 双向溯源：向上追溯父级 + 部件时向下展开一级子项"""
     if entity_type not in ("part", "assembly"):
@@ -527,7 +536,7 @@ async def cc_ecr(
     ecr_id: uuid.UUID,
     data: dict,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
+    current_user: User = Depends(require_permission("ecr:cc_manage"))
 ):
     """知会其他用户"""
     ecr = crud_ecr.get_ecr(db, ecr_id)
@@ -553,7 +562,7 @@ async def uncc_ecr(
     ecr_id: uuid.UUID,
     user_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
+    current_user: User = Depends(require_permission("ecr:cc_manage"))
 ):
     """取消知会"""
     ecr = crud_ecr.get_ecr(db, ecr_id)

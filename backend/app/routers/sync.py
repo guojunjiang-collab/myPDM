@@ -8,7 +8,7 @@ from sqlalchemy import func, text
 
 from ..database import get_db
 from ..models import User
-from .auth import require_role
+from ..permissions import require_permission
 
 router = APIRouter(prefix="/sync", tags=["数据同步"])
 
@@ -29,7 +29,7 @@ def _max_ts(db: Session, table: str) -> float:
 @router.get("/status")
 async def sync_status(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
+    current_user: User = Depends(require_permission("sync:read"))
 ):
     """返回所有需要同步的表的最新时间戳。
     前端每 10s 轮询此端点，对比本地 lastSyncTime 决定是否拉取增量。

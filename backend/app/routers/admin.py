@@ -11,7 +11,7 @@ from typing import Optional
 
 from ..database import get_db
 from ..models import User
-from .auth import require_role
+from ..permissions import require_permission
 
 router = APIRouter(prefix="/admin", tags=["数据管理"])
 
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/admin", tags=["数据管理"])
 @router.get("/soft-deleted-stats")
 async def get_soft_deleted_stats(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin"]))
+    current_user: User = Depends(require_permission("admin.soft_delete:read"))
 ):
     """获取各表软删除记录统计"""
     tables = ["parts", "assemblies", "documents", "bom_items", "ecrs", "ecos", "configuration_items"]
@@ -49,7 +49,7 @@ async def purge_soft_deleted(
     body: dict,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin"]))
+    current_user: User = Depends(require_permission("admin.soft_delete:cleanup"))
 ):
     """清除指定表的软删除数据。
     

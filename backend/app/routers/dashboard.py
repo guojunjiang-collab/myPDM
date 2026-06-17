@@ -8,7 +8,7 @@ from ..models import (
     DashboardItem, DashboardFolderShare
 )
 from ..models_configuration import ConfigurationItem
-from .auth import require_role
+from ..permissions import require_permission, enforce_object_policy
 
 router = APIRouter(prefix="/dashboard", tags=["用户看板"])
 
@@ -172,7 +172,7 @@ def _ensure_dashboard(db: Session, user_id: uuid.UUID) -> UserDashboard:
 # ===== 看板 =====
 
 @router.get("/")
-async def get_dashboard(db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def get_dashboard(db: Session = Depends(get_db), current_user: User = Depends(require_permission("dashboard:read"))):
     """获取当前用户看板（含完整文件夹树 + 关联项 + 共享文件夹）"""
     dash = _ensure_dashboard(db, current_user.id)
 
@@ -236,7 +236,7 @@ async def get_dashboard(db: Session = Depends(get_db), current_user: User = Depe
 
 
 @router.post("/init")
-async def init_dashboard(db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def init_dashboard(db: Session = Depends(get_db), current_user: User = Depends(require_permission("dashboard:read"))):
     """初始化用户看板"""
     dash = _ensure_dashboard(db, current_user.id)
     return {"id": dash.id, "name": dash.name}
@@ -245,7 +245,7 @@ async def init_dashboard(db: Session = Depends(get_db), current_user: User = Dep
 # ===== 文件夹 =====
 
 @router.post("/folders")
-async def create_folder(data: dict, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def create_folder(data: dict, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("dashboard.folder:create"))):
     """创建文件夹"""
     name = data.get("name", "").strip()
     if not name:
@@ -313,7 +313,7 @@ async def create_folder(data: dict, request: Request, db: Session = Depends(get_
 
 
 @router.put("/folders/{folder_id}")
-async def update_folder(folder_id: uuid.UUID, data: dict, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def update_folder(folder_id: uuid.UUID, data: dict, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("dashboard.folder:rename"))):
     """更新文件夹（重命名 / 移动）"""
     folder = db.query(DashboardFolder).filter(DashboardFolder.id == folder_id).first()
     if not folder:
@@ -372,7 +372,7 @@ async def update_folder(folder_id: uuid.UUID, data: dict, request: Request, db: 
 
 
 @router.delete("/folders/{folder_id}")
-async def delete_folder(folder_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def delete_folder(folder_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("dashboard.folder:delete"))):
     """删除文件夹（级联删除子文件夹和关联项）"""
     folder = db.query(DashboardFolder).filter(DashboardFolder.id == folder_id).first()
     if not folder:
@@ -399,7 +399,7 @@ async def delete_folder(folder_id: uuid.UUID, request: Request, db: Session = De
 # ===== 关联项 =====
 
 @router.post("/items")
-async def add_items(data: dict, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def add_items(data: dict, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("dashboard.item:add"))):
     """批量添加关联项到指定文件夹"""
     folder_id = data.get("folder_id")
     items = data.get("items", [])
@@ -460,7 +460,7 @@ async def add_items(data: dict, request: Request, db: Session = Depends(get_db),
 
 
 @router.delete("/items/{item_id}")
-async def delete_item(item_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def delete_item(item_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("dashboard.item:delete"))):
     """移除单个关联项"""
     item = db.query(DashboardItem).filter(DashboardItem.id == item_id).first()
     if not item:
@@ -479,7 +479,7 @@ async def delete_item(item_id: uuid.UUID, request: Request, db: Session = Depend
 # ===== 共享 =====
 
 @router.get("/folders/{folder_id}/shares")
-async def get_folder_shares(folder_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def get_folder_shares(folder_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("dashboard:read"))):
     """查看文件夹共享列表（只显示直接设置的共享，不含继承的）"""
     folder = db.query(DashboardFolder).filter(DashboardFolder.id == folder_id).first()
     if not folder:
@@ -489,6 +489,8 @@ async def get_folder_shares(folder_id: uuid.UUID, db: Session = Depends(get_db),
     dash = db.query(UserDashboard).filter(UserDashboard.id == folder.dashboard_id).first()
     if not dash or dash.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="只有文件夹拥有者可以查看共享列表")
+    folder.owner_user_id = dash.user_id if dash else None
+    enforce_object_policy("dashboard_folder_editor", current_user, folder)
 
     shares = db.query(DashboardFolderShare).filter(
         DashboardFolderShare.folder_id == folder_id
@@ -514,7 +516,7 @@ async def get_folder_shares(folder_id: uuid.UUID, db: Session = Depends(get_db),
 
 
 @router.post("/folders/{folder_id}/shares")
-async def add_folder_share(folder_id: uuid.UUID, data: dict, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def add_folder_share(folder_id: uuid.UUID, data: dict, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("dashboard.folder:share"))):
     """添加共享（权限自动继承到所有子文件夹）"""
     folder = db.query(DashboardFolder).filter(DashboardFolder.id == folder_id).first()
     if not folder:
@@ -524,6 +526,8 @@ async def add_folder_share(folder_id: uuid.UUID, data: dict, request: Request, d
     dash = db.query(UserDashboard).filter(UserDashboard.id == folder.dashboard_id).first()
     if not dash or dash.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="只有文件夹拥有者可以设置共享")
+    folder.owner_user_id = dash.user_id if dash else None
+    enforce_object_policy("dashboard_folder_editor", current_user, folder)
 
     user_id = data.get("shared_with_user_id")
     permission = data.get("permission", "view")
@@ -567,7 +571,7 @@ async def add_folder_share(folder_id: uuid.UUID, data: dict, request: Request, d
 
 
 @router.put("/folders/{folder_id}/shares/{share_id}")
-async def update_folder_share_permission(folder_id: uuid.UUID, share_id: uuid.UUID, data: dict, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def update_folder_share_permission(folder_id: uuid.UUID, share_id: uuid.UUID, data: dict, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("dashboard.folder:share"))):
     """修改共享权限（级联更新所有子文件夹的共享记录）"""
     share = db.query(DashboardFolderShare).filter(
         DashboardFolderShare.id == share_id,
@@ -580,6 +584,8 @@ async def update_folder_share_permission(folder_id: uuid.UUID, share_id: uuid.UU
     dash = db.query(UserDashboard).filter(UserDashboard.id == db.query(DashboardFolder).filter(DashboardFolder.id == folder_id).first().dashboard_id).first()
     if not dash or dash.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="只有文件夹拥有者可以修改共享权限")
+    folder.owner_user_id = dash.user_id if dash else None
+    enforce_object_policy("dashboard_folder_editor", current_user, folder)
 
     permission = data.get("permission")
     if not permission or permission not in ("view", "edit"):
@@ -611,7 +617,7 @@ async def update_folder_share_permission(folder_id: uuid.UUID, share_id: uuid.UU
 
 
 @router.delete("/folders/{folder_id}/shares/{share_id}")
-async def delete_folder_share(folder_id: uuid.UUID, share_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))):
+async def delete_folder_share(folder_id: uuid.UUID, share_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("dashboard.folder:unshare"))):
     """取消共享（级联移除所有子文件夹的共享记录）"""
     share = db.query(DashboardFolderShare).filter(
         DashboardFolderShare.id == share_id,
@@ -639,7 +645,7 @@ async def save_folder_shares_batch(
     data: dict,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
+    current_user: User = Depends(require_permission("dashboard.folder:share"))
 ):
     """批量保存共享设置（原子操作：先清空再重建）"""
     folder = db.query(DashboardFolder).filter(DashboardFolder.id == folder_id).first()
@@ -650,6 +656,8 @@ async def save_folder_shares_batch(
     dash = db.query(UserDashboard).filter(UserDashboard.id == folder.dashboard_id).first()
     if not dash or dash.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="只有文件夹拥有者可以设置共享")
+    folder.owner_user_id = dash.user_id if dash else None
+    enforce_object_policy("dashboard_folder_editor", current_user, folder)
 
     shares_data = data.get("shares", [])
     # 去重：同一用户只保留一条
@@ -693,7 +701,7 @@ async def remove_shared_folder(
     folder_id: uuid.UUID,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "engineer", "production", "guest"]))
+    current_user: User = Depends(require_permission("dashboard.folder:unshare"))
 ):
     """被共享者从自己看板移除共享文件夹（主动退出，不删除原文件夹）"""
     folder = db.query(DashboardFolder).filter(DashboardFolder.id == folder_id).first()
@@ -740,7 +748,7 @@ async def remove_shared_folder(
 @router.get("/export-all")
 async def export_all_dashboards(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin"]))
+    current_user: User = Depends(require_permission("dashboard:export_all"))
 ):
     """导出所有用户的看板数据（仅管理员）"""
     dashboards = db.query(UserDashboard).all()
@@ -879,7 +887,7 @@ async def export_all_dashboards(
 async def import_all_dashboards(
     data: list = Body(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin"]))
+    current_user: User = Depends(require_permission("dashboard:import_all"))
 ):
     """导入所有用户的看板数据（仅管理员）"""
 

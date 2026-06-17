@@ -10,14 +10,12 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db, SessionLocal
 from ..models import User
-from .auth import require_role, get_current_active_user, oauth2_scheme
+from .auth import oauth2_scheme
+from ..permissions import require_permission
 from ..assistant import agent as agent_mod
 from ..assistant import document_builder
 
 router = APIRouter(prefix="/assistant", tags=["AI助手"])
-
-ASSISTANT_ROLES = ["admin", "engineer", "production", "guest"]
-
 
 class ChatRequest(BaseModel):
     messages: list
@@ -30,7 +28,7 @@ def _sse(data: dict) -> str:
 @router.post("/chat")
 async def chat(
     req: ChatRequest,
-    current_user: User = Depends(require_role(ASSISTANT_ROLES)),
+    current_user: User = Depends(require_permission("assistant:chat")),
     token: str = Depends(oauth2_scheme),
 ):
     """SSE 流式：在独立线程跑 Agent，通过队列把事件推给响应生成器。
@@ -65,7 +63,7 @@ async def chat(
 @router.get("/artifacts/{doc_id}/download")
 async def download_artifact(
     doc_id: str,
-    current_user: User = Depends(require_role(ASSISTANT_ROLES)),
+    current_user: User = Depends(require_permission("assistant:download_artifact")),
 ):
     content = document_builder.read_document(doc_id)
     if content is None:
