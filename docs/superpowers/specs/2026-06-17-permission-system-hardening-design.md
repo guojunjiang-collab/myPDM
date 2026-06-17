@@ -181,7 +181,7 @@
 ### 自定义字段 / 系统设置 custom_fields + admin
 - `custom_field.def:read` / `custom_field.def:write` / `custom_field.def:sort` → A
 - `custom_field.value:read` → A E P G
-- `custom_field.value:write` → A E
+- `custom_field.value:write` → A
 - `custom_field:reset_data` → A
 - `admin.soft_delete:read` / `admin.soft_delete:cleanup` → A
 

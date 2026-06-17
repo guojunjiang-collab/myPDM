@@ -45,7 +45,7 @@ PERMISSIONS: dict[str, list[str]] = {
     "custom_field.def:sort": ["admin"],
     "custom_field.def:write": ["admin"],
     "custom_field.value:read": ["admin", "engineer", "production", "guest"],
-    "custom_field.value:write": ["admin", "engineer"],
+    "custom_field.value:write": ["admin"],
     "custom_field:reset_data": ["admin"],
     "dashboard.folder:create": ["admin", "engineer", "production", "guest"],
     "dashboard.folder:delete": ["admin", "engineer", "production", "guest"],
