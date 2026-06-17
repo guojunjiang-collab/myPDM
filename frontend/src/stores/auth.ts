@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User } from '../types';
+import { PERMISSIONS, type Permission, type Role } from '../constants/permissions.generated';
 
 interface AuthState {
   user: User | null;
@@ -31,8 +32,15 @@ export const useAuthStore = create<AuthState>()(
   )
 );
 
-// 权限辅助函数
-export const canEdit = () => useAuthStore.getState().hasRole(['admin', 'engineer']);
-export const canDownload = () => useAuthStore.getState().hasRole(['admin', 'engineer', 'production']);
+// 单一权限判定：角色 × 生成的权限矩阵
+export const can = (perm: Permission): boolean => {
+  const user = useAuthStore.getState().user;
+  if (!user) return false;
+  return (PERMISSIONS[perm] as Role[]).includes(user.role as Role);
+};
+
+// 旧 helper 改为 can() 薄封装（保持向后兼容）
+export const canEdit = () => can('parts:create');
+export const canDownload = () => can('parts:export');
 export const canPreview = () => true;
-export const isAdmin = () => useAuthStore.getState().hasRole(['admin']);
+export const isAdmin = () => can('parts:delete');

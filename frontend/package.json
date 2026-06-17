@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "gen:perms": "python ../tools/gen_permissions.py",
+    "prebuild": "python ../tools/gen_permissions.py",
     "build": "tsc && vite build",
     "test": "vitest run",
     "preview": "vite preview",
