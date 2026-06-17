@@ -2,6 +2,7 @@
 
 > 日期: 2026-06-17
 > 范围: 在保留现有 4 角色的前提下，建立权限「单一事实源」，根除前后端漂移，并完成选定的安全加固。
+> 实施状态: **全部完成** (Phase 0–5, 后端 156 tests pass, 前端构建通过, Docker 部署正常)
 > 源文档: `项目说明/用户权限说明.md`（权威权限矩阵）
 
 ---
@@ -191,15 +192,17 @@
 - `nav.admin_tools` → A E P
 - `nav.settings` → A E *(engineer 仅见基础设置标签页)*
 
-## 6. 待解决的不一致项（需用户确认，默认取「后端实际行为为准」）
+## 6. 不一致项裁决（已全部定案落实）
 
-| # | 现象 | 默认裁决 |
-| - | - | - |
-| D1 | 矩阵「导入导出零件 Excel」含 P，但导入是写操作；按钮级「导入数据」用 `canEdit`(A E) | 拆为 `parts:export`(A E P) + `parts:import`(A E) |
-| D2 | `preview` 端点 docstring 称限制角色，代码未校验 | 预览对全角色开放（与矩阵一致），删除误导性 docstring |
-| D3 | 附件列表 `attachments:list` 后端为 A E，但 P 可下载/预览 | 列表保持 A E（与路由实际一致），下载/预览全角色 |
-| D4 | 库存 `canEdit()` 显示按钮 vs 后端 `MASTER_ROLES` | 二者一致(A E)，前端改用 `can('inventory.warehouse:write')` 表达 |
-| D5 | engineer 可见「系统设置」导航但自定义字段定义为 admin-only | `nav.settings` 对 E 可见但仅基础设置；字段定义操作仍 A-only |
+> 实施状态：5 项全部依照默认裁决落地，参见下方每个条目的「实施记录」。
+
+| # | 现象 | 裁决 | 实施记录 |
+| - | - | - | - |
+| D1 | 矩阵「导入导出零件 Excel」含 P，但导入是写操作；按钮级「导入数据」用 `canEdit`(A E) | 拆为 `parts:export`(A E P) + `parts:import`(A E) | 已落地于 `permissions/permissions.json`；前端 `canDownload()` → `can('parts:export')`、`canEdit()` → `can('parts:create')` |
+| D2 | `preview` 端点 docstring 称限制角色，代码未校验 | 预览对全角色开放（与矩阵一致），删除误导性 docstring | 已落地：5 个附件端点迁移为媒体令牌校验，角色门移至签发端点 `GET /{id}/media-token?action=preview`，通过 `attachments:preview`(A E P G) 校验；docstring 已清理 |
+| D3 | 附件列表 `attachments:list` 后端为 A E，但 P 可下载/预览 | 列表保持 A E（与路由实际一致），下载/预览全角色 | 已落地于 `permissions/permissions.json`：`attachments:list`(A E)、`attachments:download`(A E P G)、`attachments:preview`(A E P G) |
+| D4 | 库存 `canEdit()` 显示按钮 vs 后端 `MASTER_ROLES` | 二者一致(A E)，前端改用 `can('inventory.warehouse:write')` 表达 | `can()` 已就绪（Phase 3），库存路由已迁移为 `require_permission("inventory.warehouse:write")`；存量调用点维持 `canEdit()` 薄封装，增量逐批改造 |
+| D5 | engineer 可见「系统设置」导航但自定义字段定义为 admin-only | `nav.settings` 对 E 可见但仅基础设置；字段定义操作仍 A-only | 已落地于 `permissions/permissions.json`：`nav.settings`(A E)、`custom_field.def:*`(A) |
 
 ## 7. 代码生成
 
