@@ -13,15 +13,20 @@ router = APIRouter(prefix="/auth", tags=["认证"])
 
 SECRET_KEY = os.getenv("JWT_SECRET", "bom-secret-key-change-in-production")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 480
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "480"))
+REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
 
 def create_access_token(data, expires_delta=None):
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
-    to_encode.update({"exp": expire})
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire, "typ": "access"})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def create_refresh_token(username):
+    expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    return jwt.encode({"sub": username, "exp": expire, "typ": "refresh"}, SECRET_KEY, algorithm=ALGORITHM)
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     try:
@@ -53,11 +58,29 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
     user = crud.authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(status_code=401, detail="用户名或密码错误", headers={"WWW-Authenticate": "Bearer"})
-    access_token = create_access_token(
-        data={"sub": user.username, "role": user.role},
-        expires_delta=timedelta(minutes=60)
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "access_token": create_access_token({"sub": user.username, "role": user.role}),
+        "refresh_token": create_refresh_token(user.username),
+        "token_type": "bearer",
+    }
+
+@router.post("/refresh", response_model=schemas.Token)
+async def refresh(req: schemas.RefreshRequest, db: Session = Depends(get_db)):
+    try:
+        payload = jwt.decode(req.refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("typ") != "refresh":
+            raise HTTPException(status_code=401, detail="无效的刷新令牌")
+        username = payload.get("sub")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="刷新令牌验证失败")
+    user = crud.get_user_by_username(db, username=username)
+    if not user or user.status != "active":
+        raise HTTPException(status_code=401, detail="用户不可用")
+    return {
+        "access_token": create_access_token({"sub": user.username, "role": user.role}),
+        "refresh_token": create_refresh_token(user.username),
+        "token_type": "bearer",
+    }
 
 @router.get("/me", response_model=schemas.UserResponse)
 async def get_me(current_user: User = Depends(get_current_active_user)):

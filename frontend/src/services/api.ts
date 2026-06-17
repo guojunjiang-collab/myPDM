@@ -32,12 +32,38 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// 响应拦截器：统一错误处理
+// 响应拦截器：401 自动刷新
+let refreshing: Promise<string | null> | null = null;
+
+async function doRefresh(): Promise<string | null> {
+  const rt = localStorage.getItem('refresh_token');
+  if (!rt) return null;
+  try {
+    const resp = await axios.post('/api/auth/refresh', { refresh_token: rt });
+    const { access_token, refresh_token } = resp.data;
+    useAuthStore.getState().setUser(useAuthStore.getState().user, access_token);
+    if (refresh_token) localStorage.setItem('refresh_token', refresh_token);
+    return access_token;
+  } catch {
+    return null;
+  }
+}
+
 api.interceptors.response.use(
   (response) => response,
-  (error: AxiosError) => {
-    if (error.response?.status === 401) {
+  async (error: AxiosError) => {
+    const original: any = error.config;
+    if (error.response?.status === 401 && original && !original._retry) {
+      original._retry = true;
+      refreshing = refreshing || doRefresh();
+      const newToken = await refreshing;
+      refreshing = null;
+      if (newToken) {
+        original.headers.Authorization = `Bearer ${newToken}`;
+        return api(original);
+      }
       useAuthStore.getState().logout();
+      localStorage.removeItem('refresh_token');
       window.location.href = '/login';
     }
     return Promise.reject(error);

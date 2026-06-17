@@ -114,6 +114,7 @@ class BOMItemResponse(BOMItemBase):
 
 class Token(BaseSchema):
     access_token: str
+    refresh_token: Optional[str] = None
     token_type: str
 
 class TokenData(BaseSchema):
@@ -123,6 +124,9 @@ class TokenData(BaseSchema):
 class LoginRequest(BaseSchema):
     username: str
     password: str
+
+class RefreshRequest(BaseSchema):
+    refresh_token: str
 
 class ChangePasswordRequest(BaseSchema):
     old_password: str
