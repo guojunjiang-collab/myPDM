@@ -1647,8 +1647,10 @@ export async function executeDocumentsImport(preview: ImportPreview): Promise<vo
               file_name: originalName,
               file_data: base64,
             });
-          } catch (err) {
-            console.error(`上传附件失败: ${attFileName}`, err);
+          } catch (err: any) {
+            // 单个附件失败不中断整批导入，记录服务端给出的原因（如不允许的文件类型）后跳过
+            const detail = err?.response?.data?.detail || err?.message || '';
+            console.error(`上传附件失败(已跳过): ${attFileName} — ${detail}`, err);
           }
         }
       }

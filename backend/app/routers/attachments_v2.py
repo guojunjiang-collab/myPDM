@@ -137,6 +137,9 @@ async def upload_file(
         
     except HTTPException:
         raise  # 重新抛出 HTTPException
+    except ValueError as e:
+        # 文件校验失败（不允许的扩展名 / 文件名非法 / 无效实体类型 / 超大）属于客户端数据问题
+        raise HTTPException(status_code=400, detail=f"文件上传失败: {str(e)}")
     except Exception as e:
         import traceback
         traceback.print_exc()  # 输出详细的错误信息到日志
