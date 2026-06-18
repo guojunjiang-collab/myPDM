@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field, ConfigDict, BeforeValidator, field_valida
 from typing import Optional, List, Any, Dict, Union, Annotated
 from datetime import datetime
 import uuid
+import re
 
 from .permissions._generated import ROLES
 
@@ -147,6 +148,19 @@ class RefreshRequest(BaseSchema):
 class ChangePasswordRequest(BaseSchema):
     old_password: str
     new_password: str
+
+    @field_validator('new_password')
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError('密码长度不能少于8位')
+        if not re.search(r'[A-Z]', v):
+            raise ValueError('密码需包含大写字母')
+        if not re.search(r'[a-z]', v):
+            raise ValueError('密码需包含小写字母')
+        if not re.search(r'\d', v):
+            raise ValueError('密码需包含数字')
+        return v
 
 class LogResponse(BaseSchema):
     id: uuid.UUID

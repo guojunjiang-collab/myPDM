@@ -10,21 +10,30 @@
 
 ### 基本信息
 
-| 属性   | 值                                   |
-| ---- | ----------------------------------- |
-| 项目名称 | 网页版 BOM 管理工具 (PDM 系统)               |
-| 项目类型 | 前后端分离 Web 应用                        |
-| 版本   | v1.2.1                              |
-| 架构   | React SPA + RESTful API (Docker 部署) |
+| 属性     | 値                                    |
+| ------ | ------------------------------------ |
+| 项目名称   | 网页版 BOM 管理工具 (PDM 系统)                |
+| 项目类型   | 前后端分离 Web 应用                         |
+| 版本     | v1.5.1                               |
+| 架构     | React SPA + RESTful API (Docker 部署)  |
+| 语言     | TypeScript + Python                   |
 
 ### 核心功能
 
-- **零件管理**: 物料清单全生命周期管理
-- **部件管理**: 部件层级管理（树形 BOM）
+- **零件管理**: 物料清单全生命周期管理（版本、自定义字段、软删除）
+- **部件管理**: 部件层级管理（树形 BOM、BOM 导出）
 - **图文档管理**: 图纸文档与附件管理
-- **BOM 管理**: BOM 对比、BOM 反查、图文档反查
-- **用户看板**: 用户自定义文件夹式数据看板
-- **附件管理**: 上传 / 下载 / PDF 预览 / STP 三维预览
+- **BOM 管理**: BOM 树、BOM 对比、BOM 反查、图文档反查、BOM 导出
+- **ECR/ECO 变更管理**: 工程变更请求/变更单全生命周期（创建→提交→审批→执行→关闭）
+- **配置管理**: 配置项与配置概要管理（BOM 配置对比、PDF 导出）
+- **库存管理**: 仓库/物料/库存/单据管理（入库/出库/盘点）
+- **用户看板**: 用户自定义文件夹式数据看板（支持共享）
+- **附件管理**: 上传/下载/PDF 预览/STP 三维预览/压缩包浏览
+- **AI 助手**: DeepSeek 驱动的自然语言交互（SSE 流式、工具编排、文档生成）
+- **数据导入导出**: 零件/部件/文档 Excel 批量导入导出
+- **数据同步**: 跨环境数据同步 API
+- **操作日志**: 全量操作审计追踪（仅管理员可见）
+- **版本管理**: 零件/部件/文档版本升级（A→B→...→ZZ 序列）
 
 ---
 
@@ -32,43 +41,50 @@
 
 ### 后端
 
-| 类别       | 技术                                 |
-| -------- | ---------------------------------- |
-| 框架       | FastAPI                            |
-| ASGI 服务器 | Uvicorn                            |
-| ORM      | SQLAlchemy 2.0                     |
-| 数据验证     | Pydantic 2.x                       |
-| 认证       | JWT (python-jose + passlib/bcrypt) |
-| 数据库      | PostgreSQL 16                      |
-| 缓存       | Redis 7                            |
-| 文件存储     | 本地文件系统 (`./uploads/`)              |
-| 3D 转换    | PythonOCC (STP → glTF/glb)         |
+| 类别       | 技术                                       |
+| -------- | ---------------------------------------- |
+| 框架       | FastAPI                                   |
+| ASGI 服务器 | Uvicorn                                   |
+| ORM      | SQLAlchemy 2.0                            |
+| 数据验证     | Pydantic 2.x                              |
+| 认证       | JWT (python-jose + passlib/bcrypt)        |
+| 数据库      | PostgreSQL 16                             |
+| 缓存       | Redis 7                                   |
+| 文件存储     | 本地文件系统 (`./uploads/`)                    |
+| 3D 转换    | MayoConv (STP → glTF/glb via AppImage)    |
+| AI 模型   | DeepSeek (OpenAI 兼容接口)                    |
+| 文档生成     | python-docx, openpyxl, pypdf              |
+| 测试       | pytest                                    |
 
 **依赖文件**: `backend/requirements.txt`
 
 ### 前端
 
-| 类别       | 技术                            |
-| -------- | ----------------------------- |
-| 框架       | React 18 + TypeScript         |
-| 构建工具     | Vite 5                        |
-| 样式       | Tailwind CSS 3                |
-| 路由       | React Router 6                |
-| 状态管理     | Zustand                       |
-| HTTP 客户端 | Axios                         |
-| 存储       | localStorage + sessionStorage |
+| 类别       | 技术                                       |
+| -------- | ---------------------------------------- |
+| 框架       | React 18 + TypeScript                    |
+| 构建工具     | Vite 5                                   |
+| 样式       | Tailwind CSS 3 + @tailwindcss/typography |
+| 路由       | React Router 6                           |
+| 状态管理     | Zustand (persist 持久化)                    |
+| HTTP 客户端 | Axios                                    |
+| 3D 渲染   | Three.js + @react-three/fiber + @react-three/drei |
+| Markdown | react-markdown + remark-gfm + marked     |
+| 电子表格     | xlsx                                     |
+| 日期       | dayjs                                    |
+| 测试       | Vitest                                   |
 
 **源码目录**: `frontend/`
 **构建输出**: `frontend/dist/`
 
 ### 基础设施
 
-| 服务         | 容器名          | 端口                                 |
-| ---------- | ------------ | ---------------------------------- |
-| Nginx      | bom_nginx    | 80 (映射 `${NGINX_HOST_PORT:-8080}`) |
-| FastAPI    | bom_backend  | 8000                               |
-| PostgreSQL | bom_postgres | 5432                               |
-| Redis      | bom_redis    | 6379                               |
+| 服务         | 容器名           | 端口                                     |
+| ---------- | ------------- | -------------------------------------- |
+| Nginx      | bom_nginx     | 443 HTTPS (映射 `${NGINX_HOST_PORT:-8080}`) |
+| FastAPI    | bom_backend   | 8000                                   |
+| PostgreSQL | bom_postgres  | 5432                                   |
+| Redis      | bom_redis     | 6379                                   |
 
 ---
 
@@ -76,55 +92,155 @@
 
 ```
 D:\OpenCode\myPDM\
-├── frontend/                  # React + Vite 前端项目
-│   ├── src/                # TypeScript 源码
-│   │   ├── components/     # 可复用组件
-│   │   ├── pages/          # 页面组件
-│   │   ├── services/       # API 客户端
-│   │   ├── stores/         # Zustand 状态管理
-│   │   ├── hooks/          # 自定义 Hooks
-│   │   ├── utils/          # 工具函数
-│   │   ├── constants/      # 常量定义
-│   │   └── types/          # TypeScript 类型定义
-│   ├── dist/               # Vite 构建输出（nginx 挂载）
-│   ├── index.html          # 入口 HTML
-│   ├── vite.config.ts
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── tailwind.config.js
-├── backend/                 # FastAPI 后端
+├── frontend/                     # React + Vite 前端项目
+│   ├── src/
+│   │   ├── App.tsx               # 根组件（路由定义）
+│   │   ├── main.tsx              # 入口
+│   │   ├── index.css             # Tailwind 全局样式
+│   │   ├── components/           # 可复用组件
+│   │   │   ├── Layout.tsx        # 导航布局（侧边栏+顶栏）
+│   │   │   ├── Modal.tsx / Toast.tsx / Loading.tsx
+│   │   │   ├── BOMTreeTable.tsx / ArchiveTreeModal.tsx
+│   │   │   ├── EntityEditModal.tsx / EntityDocumentSection.tsx
+│   │   │   ├── ImportPreviewModal.tsx
+│   │   │   ├── VersionHistory.tsx / VersionSelectModal.tsx
+│   │   │   ├── PartDetailContent.tsx / AssemblyDetailContent.tsx / DocumentDetailContent.tsx
+│   │   │   ├── AssemblyPartPicker.tsx / DocumentPicker.tsx
+│   │   │   ├── assistant/       # AI 助手组件
+│   │   │   │   ├── FloatingAssistant.tsx / ChatInput.tsx / MessageList.tsx / Markdown.tsx
+│   │   │   │   └── cards/       # 消息卡片（TextCard/MarkdownCard/TableCard/LinkCard/DownloadCard）
+│   │   │   ├── Configuration/   # 配置管理组件（ConfigItemPicker/ConfigList/ProfileList 等）
+│   │   │   ├── ECO/             # ECO 组件（ECOList/ECOCreateModal/ECODetailModal/ECOExecutionPanel 等）
+│   │   │   ├── ECR/             # ECR 组件（ECRList/ECRCreateModal/ECRDetailModal/ECRReviewPanel 等）
+│   │   │   ├── Inventory/       # 库存组件（WarehouseTab/MaterialTab/StockTab/DocumentTab 等）
+│   │   │   └── STPViewer/       # STP 3D 查看器组件
+│   │   │       ├── index.tsx / ViewerCanvas.tsx / CameraController.tsx
+│   │   │       ├── ModelLoader.tsx / ModelTreePanel.tsx / Toolbar.tsx
+│   │   │       ├── MeasureTool.tsx / SectionPlanes.tsx / ExplodeView.tsx
+│   │   │       ├── PartHighlighter.tsx / ViewCube.tsx / AxisGizmo.tsx
+│   │   │       ├── GLTFErrorBoundary.tsx
+│   │   │       └── buildModelTree.ts + test / treeTypes.ts
+│   │   ├── pages/               # 页面组件
+│   │   │   ├── Login.tsx
+│   │   │   ├── Dashboard.tsx / Board.tsx
+│   │   │   ├── Parts.tsx / Components.tsx / Documents.tsx
+│   │   │   ├── Configuration.tsx
+│   │   │   ├── EC.tsx           # ECR/ECO 工程变更
+│   │   │   ├── Inventory.tsx    # 库存管理
+│   │   │   ├── Business.tsx / DataManagement.tsx
+│   │   │   ├── Users.tsx / Logs.tsx / Settings.tsx
+│   │   │   ├── STPViewer.tsx    # 3D 查看器（懒加载）
+│   │   │   └── BOM/             # BOM 工具页面
+│   │   │       ├── BOM.tsx / BOMTreePanel.tsx / BOMComparePanel.tsx
+│   │   │       ├── BOMTracePanel.tsx / DocTracePanel.tsx
+│   │   │       └── helpers.ts / types.ts
+│   │   ├── services/            # API 客户端
+│   │   │   ├── api.ts           # 主 API 客户端
+│   │   │   ├── assistantApi.ts  # AI 助手 API
+│   │   │   ├── inventoryApi.ts  # 库存 API
+│   │   │   ├── syncApi.ts / syncService.ts
+│   │   │   ├── importExport.ts  # 导入导出
+│   │   │   ├── ecPdfExport.ts / ecMarkdownExport.ts
+│   │   │   └── configProfilePdfExport.ts
+│   │   ├── stores/              # Zustand 状态管理
+│   │   │   ├── auth.ts          # 认证状态（persist 持久化）
+│   │   │   ├── data.ts / assistant.ts / inventory.ts
+│   │   │   └── viewerStore.ts   # 3D 查看器状态
+│   │   ├── hooks/               # 自定义 Hooks
+│   │   │   ├── useAssistantChat.ts / useCommon.ts
+│   │   │   └── useResizable.ts / useTableSort.ts
+│   │   ├── types/               # TypeScript 类型
+│   │   │   ├── index.ts         # 全体类型定义
+│   │   │   └── assistant.ts
+│   │   ├── constants/           # 常量
+│   │   │   ├── index.ts         # APP_VERSION=v1.5.1 / 状态/角色/分页/文件限制
+│   │   │   └── permissions.generated.ts  # 自动生成的权限矩阵
+│   │   ├── lib/                 # 工具库
+│   │   │   ├── date.ts / file.ts / utils.ts
+│   │   └── utils/               # 工具函数
+│   │       └── date.ts
+│   ├── public/draco/            # Draco 解压 (glTF 压缩)
+│   ├── index.html               # 入口 HTML (lang=zh-CN)
+│   ├── vite.config.ts           # Vite + Vitest 配置 (路径别名 @, proxy)
+│   ├── tailwind.config.js       # 主题扩展 (primary color, Inter 字体)
+│   ├── tsconfig.json            # TypeScript 配置
+│   └── package.json
+├── backend/                     # FastAPI 后端
 │   ├── app/
-│   │   ├── main.py         # FastAPI 入口
-│   │   ├── models.py       # SQLAlchemy 模型
-│   │   ├── schemas.py      # Pydantic schemas
-│   │   ├── crud.py         # 数据库操作
-│   │   ├── database.py     # 数据库连接
-│   │   ├── file_storage.py # 文件系统存储服务
-│   │   ├── stp_converter.py# STP → glTF 转换
-│   │   └── routers/        # API 路由
-│   │       ├── auth.py
-│   │       ├── users.py
-│   │       ├── parts.py
-│   │       ├── assemblies.py
-│   │       ├── bom.py
-│   │       ├── documents.py
-│   │       ├── attachments_v2.py  # 新版附件 API（含预览/流式下载）
-│   │       ├── dashboard.py
-│   │       ├── custom_fields.py
-│   │       └── logs.py
-│   ├── requirements.txt
-│   └── Dockerfile
-├── nginx/                   # Nginx 配置
-│   └── nginx.conf
-├── initdb/                  # 数据库初始化
-│   └── init.sql
-├── migrations/              # 数据库迁移脚本
-├── uploads/                 # 上传文件存储目录
+│   │   ├── main.py              # FastAPI 入口（启动自动建表/迁移）
+│   │   ├── database.py          # 数据库 + Redis 连接
+│   │   ├── models.py            # 核心模型（User/Part/Assembly/BOMItem/Document/Dashboard/CustomField）
+│   │   ├── models_ecr.py        # ECR 模型
+│   │   ├── models_eco.py        # ECO 模型
+│   │   ├── models_configuration.py  # 配置管理模型
+│   │   ├── models_inventory.py      # 库存管理模型
+│   │   ├── schemas.py           # 核心 Pydantic Schema
+│   │   ├── schemas_ecr.py / schemas_eco.py / schemas_configuration.py / schemas_inventory.py
+│   │   ├── crud.py              # 核心数据库操作（含版本升级/软删除恢复）
+│   │   ├── crud_ecr.py / crud_eco.py / crud_configuration.py / crud_inventory.py
+│   │   ├── file_storage.py      # 文件存储服务（分块上传 5MB/块）
+│   │   ├── stp_converter.py     # STP → glTF 转换服务
+│   │   ├── stp_to_gltf.py       # 替代 STP→glTF 流水线
+│   │   ├── media_token.py       # 媒体访问令牌
+│   │   ├── permissions/         # 权限系统
+│   │   │   ├── __init__.py      # require_permission / has_permission / enforce_object_policy
+│   │   │   ├── _generated.py    # 自动生成（from permissions.json）
+│   │   │   └── policies.py      # 对象级策略（owner/approver/admin）
+│   │   ├── routers/             # API 路由（17 个文件，16 个活动路由）
+│   │   │   ├── auth.py          # JWT 认证（登录/令牌/修改密码/当前用户）
+│   │   │   ├── users.py         # 用户管理（仅 admin）
+│   │   │   ├── parts.py         # 零件 CRUD + 导入导出 + 版本
+│   │   │   ├── assemblies.py    # 部件 CRUD + BOM 导出
+│   │   │   ├── bom.py           # BOM 树/对比/反查/关系
+│   │   │   ├── documents.py     # 图文档 CRUD + 附件
+│   │   │   ├── attachments_v2.py# V2 附件（multipart/分块/预览/stream）
+│   │   │   ├── dashboard.py     # 用户看板
+│   │   │   ├── custom_fields.py # 自定义字段
+│   │   │   ├── ecrs.py          # ECR（工程变更请求）
+│   │   │   ├── ecos.py          # ECO（工程变更单）
+│   │   │   ├── configuration.py # 配置项与配置概要
+│   │   │   ├── inventory.py     # 库存管理
+│   │   │   ├── sync.py          # 数据同步
+│   │   │   ├── admin.py         # 管理工具（软删除清理等）
+│   │   │   ├── assistant.py     # AI 助手（SSE 聊天 + 产物下载）
+│   │   │   └── logs.py          # 操作日志
+│   │   ├── assistant/           # AI 助手引擎
+│   │   │   ├── agent.py         # 核心编排
+│   │   │   ├── api_gateway.py   # 内部 API 网关
+│   │   │   ├── llm_client.py    # LLM 客户端 (DeepSeek)
+│   │   │   ├── tools.py         # 工具定义
+│   │   │   ├── knowledge.py / knowledge_glossary.py
+│   │   │   ├── attachment_reader.py / document_builder.py
+│   │   │   ├── skills_loader.py / sanitizer.py
+│   │   │   ├── system_prompt.md
+│   │   │   └── skills/          # 技能定义（bom_change_impact 等）
+│   │   └── bom/                 # BOM 工具
+│   │       ├── compare.py       # BOM 对比算法
+│   │       └── archive_reader.py # 压缩包读取
+│   ├── Dockerfile               # Python 3.12-slim, MayoConv AppImage
+│   └── requirements.txt
+├── nginx/                       # Nginx 配置
+│   └── nginx.conf               # HTTPS (443), SSE 流式支持, 1G 上传限制
+├── certs/                       # SSL 自签名证书
+│   ├── selfsigned.crt
+│   └── selfsigned.key
+├── initdb/                      # 数据库初始化
+│   ├── init.sql                 # 全套建表（~20 张表）
+│   ├── test_data.sql            # 测试数据
+│   └── migrations/              # 增量迁移脚本 (001-006)
+├── permissions/                 # 权限定义单一事实源
+│   └── permissions.json         # 权限矩阵 JSON (155 行, ~140 权限项)
+├── tools/                       # 工具脚本
+│   └── gen_permissions.py       # 从 permissions.json 生成后端+前端权限代码
+├── docs/                        # 设计文档与规格
+│   └── superpowers/
+│       ├── plans/               # 实施计划
+│       └── specs/               # 设计文档
+├── uploads/                     # 上传文件存储目录
 ├── docker-compose.yml
-└── 项目说明/                # 项目文档
-    ├── 项目说明.md
-    ├── 用户权限说明.md
-    └── ...
+├── Dockerfile.nginx
+├── .env                         # 环境变量（端口/路径/AI配置）
+└── 项目说明/                     # 项目文档（中文）
 ```
 
 ---
@@ -145,14 +261,15 @@ D:\OpenCode\myPDM\
 - **Pydantic**: 用于 API 请求/响应验证
 - **SQLAlchemy 2.0**: 使用新版 Declarative API
 - **异常处理**: 使用 `HTTPException` 而非裸 raise
+- **模型文件**: 核心模型在 `models.py`，领域模块独立文件（`models_ecr.py` / `models_eco.py` / `models_configuration.py` / `models_inventory.py`），Schema 和 CRUD 同理
 
 ### 前端 (React + TypeScript)
 
-- **组件**: `src/components/` 下每个组件一个文件，使用 `export default`
+- **组件**: `src/components/` 下每个组件一个文件，使用 `export default`，领域组件分目录（如 `ECO/`, `STPViewer/`）
 - **页面**: `src/pages/` 下按功能命名，路由组件
-- **类型**: 统一在 `src/types/index.ts` 定义
-- **状态管理**: Zustand store 放在 `src/stores/`
-- **API 调用**: 在 `src/services/api.ts` 集中管理
+- **类型**: 统一在 `src/types/` 定义（`index.ts` 为通用类型，`assistant.ts` 为 AI 类型）
+- **状态管理**: Zustand store 放在 `src/stores/`（支持 persist 持久化）
+- **API 调用**: 按领域分文件（`api.ts` 主客户端，`inventoryApi.ts` / `assistantApi.ts` / `syncApi.ts` 等）
 - **样式**: Tailwind CSS 原子类，避免自定义 CSS
 - **排序图标**: 可排序列表头添加 `cursor-pointer select-none whitespace-nowrap`
 
@@ -162,43 +279,55 @@ D:\OpenCode\myPDM\
 
 ### 用户角色
 
-| 角色   | 标识           | 说明            |
-| ---- | ------------ | ------------- |
-| 管理员  | `admin`      | 全部功能，管理用户     |
-| 工程师  | `engineer`   | 创建/编辑，无删除主体权限 |
-| 生产人员 | `production` | 查看、下载、导出      |
-| 访客   | `guest`      | 仅查看           |
+| 角色     | 标识            | 说明             |
+| ------ | ------------- | -------------- |
+| 管理员    | `admin`       | 全部功能，用户管理, 软删除管理 |
+| 工程师    | `engineer`    | 创建/编辑，CRU 大部分资源  |
+| 生产人员   | `production`  | 查看、下载、导出，库存单据操作 |
+| 访客     | `guest`       | 仅查看            |
+
+### 权限体系
+
+权限定义的**单一事实源**为 `permissions/permissions.json`（~140 个权限项）：
+
+- **基础角色权限**: 每个权限直接映射到角色列表
+- **对象级策略**: 某些权限绑定到对象创建者/审批人等（如 ECR 只有所有者可编辑、审批人可审批等）
+
+```
+permissions/permissions.json  (单一事实源)
+    ├──→ tools/gen_permissions.py  (生成器)
+    │       ├──→ backend/app/permissions/_generated.py
+    │       └──→ frontend/src/constants/permissions.generated.ts
+    └──→ backend/app/permissions/policies.py  (对象策略实现)
+```
 
 ### API 权限控制
 
-通过 `require_permission()` 依赖实现，权限定义单一事实源为 `permissions/permissions.json`：
-
 ```python
-# 从生成模块导入
 from ..permissions import require_permission, has_permission, enforce_object_policy
 
-# 角色门（替代旧 require_role）
+# 路由依赖注入
 current_user: User = Depends(require_permission("parts:read"))
 
-# 内联检查（非路由依赖场景）
+# 内联检查
 if not has_permission(current_user, "parts:delete"):
     raise HTTPException(403)
 
-# 对象级策略（创建者/审批人/保管人等）
+# 对象级策略（ECR 所有者 / 审批人等）
 enforce_object_policy("ecr_owner_or_admin", current_user, ecr)
 ```
 
-> **生成命令**: `python tools/gen_permissions.py` — 从 `permissions/permissions.json` 生成后端 `_generated.py` 与前端 `permissions.generated.ts`。`npm run build` 前会自动执行（prebuild 钩子）。
+> **生成命令**: `python tools/gen_permissions.py` — `npm run build` 前自动执行（prebuild 钩子）。
 
 ### 前端权限检查
 
-| 方法 | 用途 | 底层 |
-| ---- | ---- | ---- |
-| `can('perm:action')` | **新推荐**：精确权限判定 | `PERMISSIONS[perm]` |
-| `canEdit()` | 新增/编辑按钮 | `can('parts:create')` |
-| `canDownload()` | 导出/下载 | `can('parts:export')` |
-| `isAdmin()` | 删除按钮 | `can('parts:delete')` |
-| `canPreview()` | PDF 预览 | 始终 true |
+| 方法                           | 用途                     | 底层                        |
+| ---------------------------- | ---------------------- | ------------------------- |
+| `can('perm:action')`         | **推荐**：精确权限判定          | `PERMISSIONS[perm]`       |
+| `canEdit()`                  | 新增/编辑按钮                | `can('parts:create')`    |
+| `canDownload()`              | 导出/下载                  | `can('parts:export')`    |
+| `isAdmin()`                  | 删除按钮                   | `can('parts:delete')`    |
+| `canPreview()`               | PDF 预览                 | 始终 true                  |
 
 ---
 
@@ -222,7 +351,7 @@ docker restart bom_backend
 ### 修改前端
 
 1. 编辑 `frontend/src/` 下的源码
-2. 构建：`cd frontend; npm run build`（PowerShell 不支持 `&&`，需分开执行）
+2. 构建：`cd frontend; npm run build`
 3. 刷新浏览器（注意清缓存 Ctrl+F5）
 4. **重要**：每次前端修改后必须立即构建，无需用户提醒
 
@@ -230,40 +359,40 @@ docker restart bom_backend
 
 1. 在 `backend/app/routers/` 创建路由文件
 2. 在 `backend/app/main.py` 注册路由
-3. 在对应 `crud.py` / `schemas.py` 添加数据操作
+3. 在对应 `crud_*.py` / `schemas_*.py` 添加数据操作
+4. 在 `permissions/permissions.json` 定义所需权限
+5. 运行 `python tools/gen_permissions.py` 重新生成权限代码
 
 ---
 
 ## 🧪 测试
 
-### 后端测试
+### 后端
 
 ```powershell
-# 启动后端（开发模式）
 cd backend
-uvicorn app.main:app --reload --port 8000
-
+pytest
 # 或通过 Docker
 docker-compose up -d --build backend
 ```
 
-### 前端测试
+### 前端
 
 ```powershell
-# 开发服务器（热更新）
-cd frontend && npm run dev
-
+# 开发服务器（热更新，端口 8080）
+cd frontend; npm run dev
+# 测试
+cd frontend; npm run test
 # 生产构建
-cd frontend && npm run build
+cd frontend; npm run build
 ```
 
 ### API 文档
 
 - **Swagger UI**（在线调试）：http://localhost:8000/api/docs
-- **ReDoc**（阅读友好）：http://localhost:8000/api/redoc
 - **OpenAPI JSON**：http://localhost:8000/api/openapi.json
 
-> 通过 Nginx 访问时替换为 `http://localhost:${NGINX_HOST_PORT:-8080}/api/docs`
+> 通过 Nginx (HTTPS) 访问时替换为 `https://localhost:${NGINX_HOST_PORT:-8080}/api/docs`
 
 ---
 
@@ -279,7 +408,7 @@ docker-compose up -d
 ### 构建前端后重启 Nginx
 
 ```powershell
-cd frontend && npm run build
+cd frontend; npm run build
 docker-compose up -d --force-recreate nginx
 ```
 
@@ -291,14 +420,14 @@ docker ps
 
 4 个容器均为 Up 时正常：
 
-- bom_nginx      :80 → localhost:${NGINX_HOST_PORT:-8080}
-- bom_backend   :8000
-- bom_postgres  :5432
-- bom_redis    :6379
+| 容器           | 端口映射                         |
+| ------------ | ---------------------------- |
+| bom_nginx    | :443 → `${NGINX_HOST_PORT:-8080}` (HTTPS) |
+| bom_backend  | :8000                        |
+| bom_postgres | :5432                        |
+| bom_redis    | :6379                        |
 
 ### 新服务器部署
-
-从旧环境迁移到新服务器，数据库和附件自动恢复：
 
 ```powershell
 # 1. 拉取代码
@@ -310,17 +439,17 @@ cd myPDM
 #    scp -r old-server:~/myPDM/uploads ./
 
 # 3. 安装依赖并构建前端
-cd frontend
-npm install
-npm run build
-cd ..
+cd frontend; npm install; npm run build; cd ..
 
-# 4. 一键启动所有服务
+# 4. 配置 .env（AI Key 等）
+#    可选配置: NGINX_HOST_PORT, PGDATA_HOST_PATH, UPLOADS_HOST_PATH, DEEPSEEK_API_KEY
+
+# 5. 一键启动所有服务
 docker-compose up -d
 ```
 
-> **注意**：确保新旧服务器使用相同的 PostgreSQL 镜像版本（`postgres:16-alpine`），跨大版本不兼容。
-> `./pgdata` 已存在时 PostgreSQL 会跳过 `./initdb/` 的初始化脚本，避免重复执行。
+> **注意**: 确保新旧服务器使用相同的 PostgreSQL 镜像版本（`postgres:16-alpine`），跨大版本不兼容。
+> `./pgdata` 已存在时 PostgreSQL 会跳过 `./initdb/` 的初始化脚本。
 
 ---
 
@@ -328,81 +457,51 @@ docker-compose up -d
 
 ### 存储路径总览
 
-| 数据            | 宿主机默认路径      | 容器内路径                      | 配置方式                         |
-| ------------- | ------------ | -------------------------- | ---------------------------- |
-| Nginx 端口      | `8080`       | 80                         | `.env` → `NGINX_HOST_PORT`   |
-| PostgreSQL 数据 | `./pgdata/`  | `/var/lib/postgresql/data` | `.env` → `PGDATA_HOST_PATH`  |
-| 上传附件          | `./uploads/` | `/app/uploads`             | `.env` → `UPLOADS_HOST_PATH` |
+| 数据            | 宿主机默认路径       | 容器内路径                       | 配置方式                           |
+| ------------- | ------------- | --------------------------- | ------------------------------ |
+| Nginx 端口      | `8080`        | 443                         | `.env` → `NGINX_HOST_PORT`     |
+| PostgreSQL 数据 | `./pgdata/`   | `/var/lib/postgresql/data`  | `.env` → `PGDATA_HOST_PATH`    |
+| 上传附件          | `./uploads/`  | `/app/uploads`              | `.env` → `UPLOADS_HOST_PATH`   |
+| SSL 证书        | `./certs/`    | `/etc/nginx/certs`          | volume 挂载                      |
 
 ### 修改存储位置
 
-通过 `.env` 文件配置宿主机路径（优先级高），或直接修改 `docker-compose.yml` 中的默认值：
+通过 `.env` 文件配置宿主机路径（优先级高）：
 
 ```powershell
-# 方式一: .env 文件（推荐）
-# 编辑项目根目录的 .env 文件:
+# .env 文件（推荐）
 PGDATA_HOST_PATH=D:/data/pgdata
 UPLOADS_HOST_PATH=D:/data/uploads
-
-# 方式二: 直接在 docker-compose.yml 的 volumes 里改路径
 ```
 
 > 如果未创建 `.env` 文件，默认使用 `./pgdata` 和 `./uploads`。
-
-### 修改后生效
-
-```powershell
-docker-compose up -d
-```
-
-> **注意**: 修改路径后旧数据不会自动迁移，需手动复制：
-> 
-> ```powershell
-> # 停服务
-> docker-compose down
-> # 复制旧数据到新目录
-> Copy-Item ./pgdata D:/data/pgdata -Recurse
-> Copy-Item ./uploads D:/data/uploads -Recurse
-> # 重新启动
-> docker-compose up -d
-> ```
-
-### 附件上传路径（后端内部）
-
-后端 `backend/app/file_storage.py` 通过环境变量读取容器内路径：
-
-| 环境变量         | 当前值                   | 说明         |
-| ------------ | --------------------- | ---------- |
-| `UPLOAD_DIR` | `/app/uploads`        | 附件根目录（容器内） |
-| `CHUNK_DIR`  | `/app/uploads/chunks` | 分块上传临时目录   |
-
-一般无需修改——宿主机路径通过 volume 映射到容器内，改 `UPLOADS_HOST_PATH` 即可。
 
 ---
 
 ## 🔧 常用命令
 
-| 操作       | 命令                                                                     |
-| -------- | ---------------------------------------------------------------------- |
-| 启动所有服务   | `docker-compose up -d`                                                 |
-| 停止服务     | `docker-compose down`                                                  |
-| 清除数据（慎用） | `docker-compose down -v`                                               |
-| 查看后端日志   | `docker logs bom_backend -f`                                           |
-| 重启后端     | `docker restart bom_backend`                                           |
-| 构建前端     | `cd frontend && npm run build`                                         |
-| 重启 Nginx | `docker-compose up -d --force-recreate nginx`                          |
-| 备份数据库    | `docker exec bom_postgres pg_dump -U bomadmin bom_system > backup.sql` |
+| 操作          | 命令                                                                      |
+| ----------- | ----------------------------------------------------------------------- |
+| 启动所有服务      | `docker-compose up -d`                                                  |
+| 停止服务        | `docker-compose down`                                                   |
+| 清除数据（慎用）    | `docker-compose down -v`                                                |
+| 查看后端日志      | `docker logs bom_backend -f`                                            |
+| 重启后端        | `docker restart bom_backend`                                            |
+| 构建前端        | `cd frontend; npm run build`                                            |
+| 生成权限代码      | `cd frontend; npm run gen:perms`                                        |
+| 重启 Nginx    | `docker-compose up -d --force-recreate nginx`                           |
+| 备份数据库       | `docker exec bom_postgres pg_dump -U bomadmin bom_system > backup.sql`  |
 
 ---
 
 ## 👤 演示账号
 
-| 角色   | 用户名        | 密码     |
-| ---- | ---------- | ------ |
-| 管理员  | admin      | 123456 |
-| 工程师  | engineer   | 123456 |
-| 生产人员 | production | 123456 |
-| 访客   | guest      | 123456 |
+| 角色     | 用户名         | 密码      |
+| ------ | ----------- | ------- |
+| 管理员    | admin       | 123456  |
+| 工程师    | engineer    | 123456  |
+| 生产人员   | production  | 123456  |
+| 访客     | guest       | 123456  |
 
 ---
 
@@ -417,45 +516,98 @@ docker-compose up -d
 ### 零件管理
 
 - `GET/POST /api/parts/` - 列表/创建
-- `GET/PUT/DELETE /api/parts/{part_id}` - 详情/更新/删除
+- `GET/PUT/DELETE /api/parts/{part_id}` - 详情/更新/软删除
+- `POST /api/parts/import` - 批量导入
+- `GET /api/parts/export` - 批量导出
+- `GET /api/parts/{part_id}/versions` - 版本历史
+- `POST /api/parts/{part_id}/upgrade` - 版本升级
 
 ### 部件管理
 
 - `GET/POST /api/assemblies/` - 列表/创建
-- `GET/PUT/DELETE /api/assemblies/{id}` - 详情/更新/删除
+- `GET/PUT/DELETE /api/assemblies/{id}` - 详情/更新/软删除
+- `GET /api/assemblies/{id}/bom/export` - BOM 导出
+- `POST /api/assemblies/{id}/upgrade` - 版本升级
 
 ### BOM 管理
 
 - `GET /api/bom/tree/{type}/{id}` - BOM 树
 - `POST /api/bom/items` - 创建 BOM 关系
 - `DELETE /api/bom/items/{item_id}` - 删除 BOM 关系
-- `GET /api/bom/compare` - BOM 对比
-- `GET /api/bom/trace` - BOM 反查
+- `POST /api/bom/compare` - BOM 对比
+- `POST /api/bom/trace` - BOM 反查
+- `POST /api/bom/doc-refs` - 图文档反查
 
 ### 图文档管理
 
 - `GET/POST /api/documents/` - 列表/创建
-- `GET/PUT/DELETE /api/documents/{doc_id}` - 详情/更新/删除
+- `GET/PUT/DELETE /api/documents/{doc_id}` - 详情/更新/软删除
 - `POST /api/documents/{doc_id}/attachments` - 上传附件 (base64)
 - `GET /api/documents/{doc_id}/attachments/` - 附件列表
 
 ### 附件管理 (V2)
 
-| 端点                                                    | 说明                         |
-| ----------------------------------------------------- | -------------------------- |
-| `POST /api/v2/attachments/upload`                     | Multipart 上传               |
-| `GET /api/v2/attachments/{id}/stream`                 | 流式下载（二进制）                  |
-| `GET /api/v2/attachments/{id}/download`               | Base64 下载                  |
-| `GET /api/v2/attachments/{id}/preview?token=`         | **浏览器内联预览**（PDF 流式加载）      |
-| `GET /api/v2/attachments/{id}/direct-download?token=` | 浏览器原生下载（显示进度）              |
-| `GET /api/v2/attachments/{id}/gltf`                   | STP → glTF 3D 预览           |
-| `POST /api/v2/attachments/chunk/*`                    | 分块上传（init/upload/complete） |
-| `DELETE /api/v2/attachments/{id}`                     | 删除附件                       |
+| 端点                                                     | 说明                         |
+| ------------------------------------------------------ | -------------------------- |
+| `POST /api/v2/attachments/upload`                      | Multipart 上传               |
+| `GET /api/v2/attachments/{id}/stream`                  | 流式下载（二进制）                  |
+| `GET /api/v2/attachments/{id}/download`                | Base64 下载                  |
+| `GET /api/v2/attachments/{id}/preview?token=`          | **浏览器内联预览**（PDF 流式加载）      |
+| `GET /api/v2/attachments/{id}/direct-download?token=`  | 浏览器原生下载（显示进度）              |
+| `GET /api/v2/attachments/{id}/gltf`                    | STP → glTF 3D 预览           |
+| `POST /api/v2/attachments/chunk/*`                     | 分块上传（init/upload/complete） |
+| `POST /api/v2/attachments/{id}/convert`                | 触发格式转换                     |
+| `DELETE /api/v2/attachments/{id}`                      | 删除附件                       |
+
+### ECR（工程变更请求）
+
+- `GET/POST /api/ecrs/` - 列表/创建
+- `GET/PUT/DELETE /api/ecrs/{id}` - 详情/更新/软删除
+- `POST /api/ecrs/{id}/submit` - 提交
+- `POST /api/ecrs/{id}/withdraw` - 撤回
+- `POST /api/ecrs/{id}/approve` - 审批
+- `POST /api/ecrs/{id}/close` - 关闭
+- `GET /api/ecrs/{id}/export-pdf` - 导出 PDF
+
+### ECO（工程变更单）
+
+- `GET/POST /api/ecos/` - 列表/创建
+- `GET/PUT/DELETE /api/ecos/{id}` - 详情/更新/软删除
+- `POST /api/ecos/{id}/submit` - 提交
+- `POST /api/ecos/{id}/withdraw` - 撤回
+- `POST /api/ecos/{id}/close` - 关闭
+- `POST /api/ecos/{id}/execute` - 执行
+- `POST /api/ecos/{id}/revise` - 修订
+- `POST /api/ecos/{id}/restore` - 恢复
+- `POST /api/ecos/{id}/freeze` / `publish` - 冻结/发布
+- `GET /api/ecos/{id}/export-pdf` - 导出 PDF
+
+### 配置管理
+
+- `GET/POST /api/configuration/items/` - 配置项列表/创建
+- `GET/PUT/DELETE /api/configuration/items/{id}` - 配置项详情/更新/软删除
+- `GET/POST /api/configuration/profiles/` - 配置概要列表/创建
+- `GET/PUT/DELETE /api/configuration/profiles/{id}` - 配置概要详情/更新/删除
+- `POST /api/configuration/profiles/{id}/activate` / `archive` - 激活/归档
+- `GET /api/configuration/profiles/{id}/export-pdf` - 导出 PDF
+
+### 库存管理
+
+- `GET/POST /api/inventory/warehouses/` - 仓库列表/创建
+- `GET/PUT/DELETE /api/inventory/warehouses/{id}` - 仓库详情/更新/删除
+- `GET/POST /api/inventory/materials/` - 物料列表/创建
+- `GET/PUT/DELETE /api/inventory/materials/{id}` - 物料详情/更新/删除
+- `GET/POST /api/inventory/stock/` - 库存查询/盘点
+- `GET/POST /api/inventory/documents/` - 库存单据列表/创建
+- `GET/PUT/DELETE /api/inventory/documents/{id}` - 单据详情/更新/删除
+- `POST /api/inventory/documents/{id}/submit` / `approve` / `post` - 单据流程
 
 ### 用户管理（仅 admin）
 
 - `GET/POST /api/users/` - 用户列表/创建
 - `GET/PUT/DELETE /api/users/{user_id}` - 用户 CRUD
+- `POST /api/users/{user_id}/reset-password` - 重置密码
+- `POST /api/users/import` / `export` - 导入/导出
 
 ### 用户看板
 
@@ -463,6 +615,25 @@ docker-compose up -d
 - `POST /api/dashboard/folders` - 创建文件夹
 - `POST /api/dashboard/items` - 关联项目
 - `POST /api/dashboard/folders/{id}/share` - 共享文件夹
+
+### 操作日志
+
+- `GET /api/logs/` - 查询操作日志（仅 admin）
+
+### 自定义字段
+
+- `GET/POST /api/custom-fields/definitions` - 字段定义
+- `GET/POST /api/custom-fields/values` - 字段值
+
+### 数据同步
+
+- `GET /api/sync/info` - 同步信息
+- `POST /api/sync/pull` / `push` - 拉取/推送
+
+### 管理工具
+
+- `GET /api/admin/soft-deletes` - 查询软删除数据
+- `POST /api/admin/soft-deletes/cleanup` - 清理软删除数据
 
 ### AI 助手
 
@@ -477,7 +648,7 @@ docker-compose up -d
 
 - PDF 附件通过 `/api/v2/attachments/{id}/preview?token={jwt}` 端点流式加载
 - 新标签页 `window.open()` 打开，浏览器原生 PDF 查看器渲染
-- 后端 `Content-Disposition: inline` + Range 请求支持，自动显示加载进度
+- 后端 `Content-Disposition: inline` + Range 请求支持
 - 非 PDF 格式弹窗提示"该格式暂不支持预览"
 
 ### 附件存储
@@ -486,11 +657,38 @@ docker-compose up -d
 - 数据库 `document_attachments` 表仅存元数据（路径、大小、哈希）
 - 支持分块上传（5MB/块），适合大文件
 
-### 前端目录合并
+### 软删除
 
-- 源码目录 `frontend-next/` 已合并至 `frontend/`
-- `frontend/` 为源码 + `dist/` 为构建输出
-- Nginx 挂载 `./frontend/dist:/usr/share/nginx/html`
+- Part/Assembly/Document/BOMItem/ECR/ECO 等核心实体均支持软删除（`deleted_at` 列）
+- 唯一约束使用部分索引（`WHERE deleted_at IS NULL`）避免冲突
+- admin 可通过 `/api/admin/soft-deletes` 查看和清理软删除数据
+
+### 自动迁移
+
+- `main.py` 启动时自动检测数据库 schema，创建缺失的表和列
+- 无需手动运行 migration 命令
+- 增量迁移脚本在 `initdb/migrations/` 作为历史记录保留
+
+### Nginx HTTPS
+
+- Nginx 监听 443 端口（HTTPS），使用 `certs/` 下的自签名证书
+- 宿主机映射到 `${NGINX_HOST_PORT:-8080}`
+- 支持 SSE 流式传输（`proxy_buffering off`）
+- 支持大文件上传（`client_max_body_size 1G`）
+
+### AI 助手
+
+- 后端通过 OpenAI 兼容接口调用 DeepSeek
+- SSE 流式返回，支持工具编排（查询 BOM/零件/ECR 等内部 API）
+- 技能系统：加载 Markdown 定义的 domain 技能（BOM 对比报告、变更影响分析等）
+- 配置通过 `.env`：`DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL`, `ASSISTANT_MAX_ITERS` 等
+
+### STP 3D 查看器
+
+- 前端 STPViewer 使用 Three.js + React Three Fiber
+- 支持模型树、剖切面、测量工具、爆炸视图、零件高亮
+- 后端使用 MayoConv AppImage 将 STP 转为 glTF/glb
+- Draco 压缩数据通过 `public/draco/` 提供解码器
 
 ---
 
@@ -513,4 +711,4 @@ docker-compose up -d
 
 ---
 
-*最后更新: 2026-05-08*
+*最后更新: 2026-06-18*

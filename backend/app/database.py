@@ -18,7 +18,13 @@ Base = declarative_base()
 
 REDIS_HOST = os.getenv("REDIS_HOST", "redis")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
-redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "")
+redis_client = redis.Redis(
+    host=REDIS_HOST,
+    port=REDIS_PORT,
+    password=REDIS_PASSWORD if REDIS_PASSWORD else None,
+    decode_responses=True,
+)
 
 def get_db():
     db = SessionLocal()

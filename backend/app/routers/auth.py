@@ -11,9 +11,11 @@ from .. import crud, schemas
 
 router = APIRouter(prefix="/auth", tags=["认证"])
 
-SECRET_KEY = os.getenv("JWT_SECRET", "bom-secret-key-change-in-production")
-if os.getenv("APP_ENV", "production") == "production" and SECRET_KEY == "bom-secret-key-change-in-production":
-    raise RuntimeError("生产环境必须设置 JWT_SECRET 环境变量（当前为弱默认值）")
+SECRET_KEY = os.getenv("JWT_SECRET")
+if not SECRET_KEY:
+    raise RuntimeError("必须设置 JWT_SECRET 环境变量，生成命令: openssl rand -hex 32")
+if len(SECRET_KEY) < 32:
+    raise RuntimeError("JWT_SECRET 长度不足，至少需要 32 个字符")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "480"))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))

@@ -15,6 +15,17 @@ CHUNK_DIR = os.getenv("CHUNK_DIR", "./uploads/chunks")
 MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE", 100 * 1024 * 1024))  # 默认 100MB
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", 5 * 1024 * 1024))  # 默认 5MB 每块
 
+# 安全白名单
+ALLOWED_ENTITY_TYPES = {"document", "part", "assembly"}
+ALLOWED_EXTENSIONS = {
+    '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+    '.dwg', '.dxf', '.stp', '.step', '.igs', '.iges',
+    '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp',
+    '.zip', '.rar', '.7z',
+    '.glb', '.gltf', '.obj',
+    '.txt', '.csv',
+}
+
 
 class FileStorage:
     """文件系统存储服务"""
@@ -29,23 +40,45 @@ class FileStorage:
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.chunk_dir.mkdir(parents=True, exist_ok=True)
     
+    def _validate_filename(self, filename: str):
+        """验证文件名合法性"""
+        if not filename:
+            raise ValueError("文件名不能为空")
+        ext = filename.lower().rsplit('.', maxsplit=1)[-1]
+        if f'.{ext}' not in ALLOWED_EXTENSIONS:
+            raise ValueError(f"不允许的文件类型: .{ext}")
+        if '..' in filename or '/' in filename or '\\' in filename or '\x00' in filename:
+            raise ValueError("文件名包含非法字符")
+
+    def _safe_resolve(self, relative_path: str) -> Path:
+        """安全解析路径，防止路径遍历"""
+        full_path = (self.base_dir / relative_path).resolve()
+        if not full_path.is_relative_to(self.base_dir.resolve()):
+            raise ValueError("非法文件路径")
+        return full_path
+
     def _get_file_path(self, entity_type: str, entity_id: str, filename: str, folder_name: str = None) -> Path:
-        """获取文件存储路径
-        
-        Args:
-            folder_name: 可选的文件夹名，若提供则替代 entity_id 作为目录名
-        """
+        """获取文件存储路径"""
+        if entity_type not in ALLOWED_ENTITY_TYPES:
+            raise ValueError(f"无效的实体类型: {entity_type}")
+
         dir_name = str(entity_id)
         if folder_name:
-            # 替换文件系统非法字符为下划线
-            illegal_chars = r'\/:*?"<>|'
-            sanitized = folder_name
+            sanitized = folder_name.strip().strip('.')
+            illegal_chars = r'\/:*?"<>|\x00'
             for ch in illegal_chars:
                 sanitized = sanitized.replace(ch, '_')
-            dir_name = sanitized
-        entity_dir = self.base_dir / entity_type / dir_name
+            dir_name = sanitized if sanitized else str(entity_id)
+
+        entity_dir = (self.base_dir / entity_type / dir_name).resolve()
+        if not entity_dir.is_relative_to(self.base_dir.resolve()):
+            raise ValueError("非法文件路径")
         entity_dir.mkdir(parents=True, exist_ok=True)
-        return entity_dir / filename
+
+        file_path = (entity_dir / filename).resolve()
+        if not file_path.is_relative_to(self.base_dir.resolve()):
+            raise ValueError("非法文件路径")
+        return file_path
     
     def save_file(self, file_data: bytes, entity_type: str, entity_id: str, 
                   filename: str, folder_name: str = None) -> Dict[str, Any]:
@@ -66,7 +99,10 @@ class FileStorage:
         file_size = len(file_data)
         if file_size > MAX_FILE_SIZE:
             raise ValueError(f"文件大小 {file_size} 超过限制 {MAX_FILE_SIZE}")
-        
+
+        # 验证文件名
+        self._validate_filename(filename)
+
         # 计算文件哈希
         file_hash = hashlib.sha256(file_data).hexdigest()
         
@@ -94,39 +130,23 @@ class FileStorage:
         }
     
     def read_file(self, file_path: str) -> bytes:
-        """
-        读取文件
-        
-        Args:
-            file_path: 相对于 base_dir 的文件路径
-            
-        Returns:
-            文件二进制数据
-        """
-        full_path = self.base_dir / file_path
+        """读取文件"""
+        full_path = self._safe_resolve(file_path)
         if not full_path.exists():
             raise FileNotFoundError(f"文件不存在: {file_path}")
-        
+
         with open(full_path, 'rb') as f:
             return f.read()
-    
+
     def delete_file(self, file_path: str) -> bool:
-        """
-        删除文件
-        
-        Args:
-            file_path: 相对于 base_dir 的文件路径
-            
-        Returns:
-            是否删除成功
-        """
-        full_path = self.base_dir / file_path
+        """删除文件"""
+        full_path = self._safe_resolve(file_path)
         if full_path.exists():
             full_path.unlink()
-            
+
             # 删除空目录
             self._remove_empty_parent_dirs(full_path)
-            
+
             return True
         return False
     
@@ -152,16 +172,8 @@ class FileStorage:
             print(f"[WARNING] Failed to remove empty parent dirs: {e}")
     
     def get_file_info(self, file_path: str) -> Dict[str, Any]:
-        """
-        获取文件信息
-        
-        Args:
-            file_path: 相对于 base_dir 的文件路径
-            
-        Returns:
-            文件信息字典
-        """
-        full_path = self.base_dir / file_path
+        """获取文件信息"""
+        full_path = self._safe_resolve(file_path)
         if not full_path.exists():
             raise FileNotFoundError(f"文件不存在: {file_path}")
         

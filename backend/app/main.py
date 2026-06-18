@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
+import os
 
 from .routers import auth_router, users_router, parts_router, assemblies_router, bom_router, logs_router, custom_fields_router, documents_router, dashboard_router, ecr_router, eco_router, config_router, inventory_router
 from .routers.attachments_v2 import router as attachments_v2_router
@@ -17,11 +18,12 @@ app = FastAPI(
     openapi_url="/api/openapi.json"
 )
 
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "https://localhost:8080").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
     allow_headers=["*"],
 )
 

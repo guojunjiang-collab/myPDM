@@ -11,12 +11,15 @@ services:
     volumes:
       - ${PGDATA_HOST_PATH:-./pgdata}:/var/lib/postgresql/data
       - ./initdb:/docker-entrypoint-initdb.d
+    restart: unless-stopped
     networks:
       - bom_network
 
   redis:
     image: redis:7-alpine
     container_name: bom_redis
+    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD not set}
+    restart: unless-stopped
     networks:
       - bom_network
 
@@ -47,16 +50,18 @@ services:
       - ASSISTANT_API_MAX_CHARS=${ASSISTANT_API_MAX_CHARS:-8000}
       - ASSISTANT_API_TIMEOUT=${ASSISTANT_API_TIMEOUT:-15}
       - ASSISTANT_ATTACHMENT_MAX_CHARS=${ASSISTANT_ATTACHMENT_MAX_CHARS:-20000}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET not set}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD not set}
+      - CORS_ORIGINS=${CORS_ORIGINS:-https://localhost:8080}
     volumes:
       - ${UPLOADS_HOST_PATH:-./uploads}:/app/uploads
       - ./backend/app:/app/app
     depends_on:
       - postgres
       - redis
+    restart: unless-stopped
     networks:
       - bom_network
-    ports:
-      - "8000:8000"
 
   nginx:
     image: nginx:alpine
@@ -67,6 +72,7 @@ services:
       - ./certs:/etc/nginx/certs
     depends_on:
       - backend
+    restart: unless-stopped
     networks:
       - bom_network
     ports:
