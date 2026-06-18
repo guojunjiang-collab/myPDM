@@ -287,7 +287,7 @@ async def upload_document_attachment(doc_id: uuid.UUID, body: schemas.DocumentAt
     
     file_data_bytes = base64.b64decode(body.file_data)
     folder_name = f"{d.code}_{d.version}"
-    result = file_storage.save_file(file_data_bytes, "documents", str(doc_id), body.file_name, folder_name=folder_name)
+    result = file_storage.save_file(file_data_bytes, "document", str(doc_id), body.file_name, folder_name=folder_name)
     
     att = DocumentAttachment(
         id=body.id,

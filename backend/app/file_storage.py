@@ -17,6 +17,9 @@ CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", 5 * 1024 * 1024))  # 默认 5MB 每块
 
 # 安全白名单
 ALLOWED_ENTITY_TYPES = {"document", "part", "assembly"}
+# 历史代码中实体类型存在单复数混用（如 "documents"），统一归一到单数规范，
+# 避免白名单校验把合法上传判为“无效的实体类型”而返回 500。
+ENTITY_TYPE_ALIASES = {"documents": "document", "parts": "part", "assemblies": "assembly"}
 ALLOWED_EXTENSIONS = {
     '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
     '.dwg', '.dxf', '.stp', '.step', '.igs', '.iges',
@@ -59,6 +62,7 @@ class FileStorage:
 
     def _get_file_path(self, entity_type: str, entity_id: str, filename: str, folder_name: str = None) -> Path:
         """获取文件存储路径"""
+        entity_type = ENTITY_TYPE_ALIASES.get(entity_type, entity_type)
         if entity_type not in ALLOWED_ENTITY_TYPES:
             raise ValueError(f"无效的实体类型: {entity_type}")
 
