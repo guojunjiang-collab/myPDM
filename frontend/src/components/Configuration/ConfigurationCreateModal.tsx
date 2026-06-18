@@ -541,62 +541,66 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                   {pickerSelected.length === 0 ? (
                     <div className="px-4 py-4 text-center text-sm text-gray-400">请在下方列表中选择</div>
                   ) : (
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-50 border-b"><tr>
-                        <th className="px-3 py-2 text-left text-xs text-gray-500">构型号</th>
-                        <th className="px-3 py-2 text-left text-xs text-gray-500">名称</th>
-                        <th className="px-3 py-2 text-right text-xs text-gray-500 w-12"></th>
-                      </tr></thead>
-                      <tbody className="divide-y">
-                        {pickerSelected.map((s: any) => (
-                          <tr key={s.id} className="hover:bg-gray-50">
-                            <td className="px-3 py-2 font-medium text-xs">{s.code}</td>
-                            <td className="px-3 py-2 text-xs">{s.name}</td>
-                            <td className="px-3 py-2 text-right">
-                              <button onClick={() => setPickerSelected(prev => prev.filter(x => x.id !== s.id))}
-                                className="text-xs text-red-500 hover:text-red-700">移除</button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <div className="max-h-48 overflow-y-auto">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-gray-50 border-b"><tr>
+                          <th className="px-3 py-2 text-left text-xs text-gray-500">构型号</th>
+                          <th className="px-3 py-2 text-left text-xs text-gray-500">名称</th>
+                          <th className="px-3 py-2 text-right text-xs text-gray-500 w-12"></th>
+                        </tr></thead>
+                        <tbody className="divide-y">
+                          {pickerSelected.map((s: any) => (
+                            <tr key={s.id} className="hover:bg-gray-50">
+                              <td className="px-3 py-2 font-medium text-xs">{s.code}</td>
+                              <td className="px-3 py-2 text-xs">{s.name}</td>
+                              <td className="px-3 py-2 text-right">
+                                <button onClick={() => setPickerSelected(prev => prev.filter(x => x.id !== s.id))}
+                                  className="text-xs text-red-500 hover:text-red-700">移除</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
                 </div>
 
                 {/* 搜索 + 候选列表 */}
-                <div className="p-4 flex-1 overflow-auto">
-                  <div className="flex gap-2 mb-3 items-center">
+                <div className="px-4 flex-1 flex flex-col min-h-0">
+                  <div className="flex gap-2 pt-4 pb-3 items-center flex-shrink-0">
                     <input value={cfgSearch} onChange={e => setCfgSearch(e.target.value)} autoFocus
                       className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm" placeholder="搜索构型号/名称（实时）..." />
                     {cfgSearching && <span className="text-xs text-gray-400 whitespace-nowrap">搜索中...</span>}
                   </div>
-                  {cfgResults.length === 0 ? (
-                    <div className="text-center py-8 text-sm text-gray-400">{cfgSearching ? '加载中...' : '无可用构型项'}</div>
-                  ) : (
-                    <table className="w-full text-sm border border-gray-200 rounded">
-                      <thead className="bg-gray-50 border-b">
-                        <tr>
-                          <th className="px-3 py-2 text-left text-xs text-gray-500">构型号</th>
-                          <th className="px-3 py-2 text-left text-xs text-gray-500">名称</th>
-                          <th className="px-3 py-2 text-left text-xs text-gray-500">规格型号</th>
-                          <th className="px-3 py-2 text-center text-xs text-gray-500 w-20">操作</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {cfgResults.filter((r: any) => !children.some(c => c.child_id === r.id) && !pickerSelected.some(s => s.id === r.id) && r.id !== pickerParentId).map((r: any) => (
-                          <tr key={r.id} className="hover:bg-gray-50">
-                            <td className="px-3 py-2 font-medium text-xs">{r.code}</td>
-                            <td className="px-3 py-2 text-xs">{r.name}</td>
-                            <td className="px-3 py-2 text-xs text-gray-400">{r.spec || '-'}</td>
-                            <td className="px-3 py-2 text-center">
-                              <button onClick={() => setPickerSelected(prev => [...prev, r])}
-                                className="px-2.5 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">添加</button>
-                            </td>
+                  <div className="flex-1 overflow-y-auto border border-gray-200 rounded">
+                    {cfgResults.length === 0 ? (
+                      <div className="text-center py-8 text-sm text-gray-400">{cfgSearching ? '加载中...' : '无可用构型项'}</div>
+                    ) : (
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-gray-50 border-b">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-xs text-gray-500">构型号</th>
+                            <th className="px-3 py-2 text-left text-xs text-gray-500">名称</th>
+                            <th className="px-3 py-2 text-left text-xs text-gray-500">规格型号</th>
+                            <th className="px-3 py-2 text-center text-xs text-gray-500 w-20">操作</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
+                        </thead>
+                        <tbody className="divide-y">
+                          {cfgResults.filter((r: any) => !children.some(c => c.child_id === r.id) && !pickerSelected.some(s => s.id === r.id) && r.id !== pickerParentId).map((r: any) => (
+                            <tr key={r.id} className="hover:bg-gray-50">
+                              <td className="px-3 py-2 font-medium text-xs">{r.code}</td>
+                              <td className="px-3 py-2 text-xs">{r.name}</td>
+                              <td className="px-3 py-2 text-xs text-gray-400">{r.spec || '-'}</td>
+                              <td className="px-3 py-2 text-center">
+                                <button onClick={() => setPickerSelected(prev => [...prev, r])}
+                                  className="px-2.5 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">添加</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
                 </div>
 
                 {/* 底部按钮 */}

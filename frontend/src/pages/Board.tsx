@@ -6,6 +6,7 @@ import PartDetailContent from '../components/PartDetailContent';
 import DocumentDetailContent from '../components/DocumentDetailContent';
 import ArchiveTreeModal from '../components/ArchiveTreeModal';
 import AssemblyDetailContent from '../components/AssemblyDetailContent';
+import ConfigurationDetailModal from '../components/Configuration/ConfigurationDetailModal';
 import { useAuthStore } from '../stores/auth';
 import type { CustomFieldDefinition, CustomFieldValue } from '../types';
 
@@ -555,7 +556,7 @@ export default function Board() {
       <ItemPicker open={pickerOpen} onClose={() => setPickerOpen(false)} onConfirm={handleAddItems} existingIds={existingIds} />
 
       {/* ---- Detail Modal ---- */}
-      <Modal open={!!detailItem} title={detailItem ? `${ENTITY_LABEL[detailItem.entity_type]}详情` : ''} onClose={() => setDetailItem(null)} width="full">
+      <Modal open={!!detailItem && detailItem.entity_type !== 'configuration'} title={detailItem ? `${ENTITY_LABEL[detailItem.entity_type]}详情` : ''} onClose={() => setDetailItem(null)} width="full">
         {detailLoading ? (
           <div className="py-8 text-center text-sm text-gray-400">加载中...</div>
         ) : !detailData ? (
@@ -588,31 +589,15 @@ export default function Board() {
             customFieldValues={detailCustomValues}
             onArchivePreview={(attId, fileName) => setArchivePreview({ attId, fileName })}
           />
-        ) : detailItem?.entity_type === 'configuration' ? (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">构型编号</label>
-                <p className="text-sm font-medium text-gray-900">{detailData.code || '-'}</p>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">构型名称</label>
-                <p className="text-sm text-gray-900">{detailData.name || '-'}</p>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">规格</label>
-                <p className="text-sm text-gray-900">{detailData.spec || '-'}</p>
-              </div>
-            </div>
-            {detailData.remark && (
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">备注</label>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{detailData.remark}</p>
-              </div>
-            )}
-          </div>
         ) : null}
       </Modal>
+
+      {detailItem?.entity_type === 'configuration' && (
+        <ConfigurationDetailModal
+          itemId={detailItem?.entity_id || null}
+          onClose={() => setDetailItem(null)}
+        />
+      )}
 
       {/* ---- Delete Confirm ---- */}
       <ConfirmModal open={!!deleteId} title="删除文件夹" content="确定要删除该文件夹吗？所有子文件夹和关联项将一并删除。" confirmText="删除" cancelText="取消" type="danger" onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />

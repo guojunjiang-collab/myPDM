@@ -128,6 +128,24 @@ export default function ImportPreviewModal({
                   )}
                 </span>
               )}
+              {preview.orphanParentCodes && preview.orphanParentCodes.length > 0 && (
+                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2 mt-1">
+                  ⚠️ 子构型项 sheet 中有 {preview.orphanParentCodes.length} 个父构型号不存在于构型项清单中，关联将丢失。
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-xs">查看详情</summary>
+                    <div className="text-xs mt-1 max-h-20 overflow-y-auto">{preview.orphanParentCodes.join('、')}</div>
+                  </details>
+                </div>
+              )}
+              {preview.orphanChildCodes && preview.orphanChildCodes.length > 0 && (
+                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2 mt-1">
+                  ⚠️ 子构型项 sheet 中有 {preview.orphanChildCodes.length} 个子构型号不存在于构型项清单中，关联将丢失。
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-xs">查看详情</summary>
+                    <div className="text-xs mt-1 max-h-20 overflow-y-auto">{preview.orphanChildCodes.join('、')}</div>
+                  </details>
+                </div>
+              )}
             </>
           )}
           {/* 构型配置统计 */}

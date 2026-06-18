@@ -144,6 +144,10 @@ export interface ImportPreview {
   profileItemCount?: number;
   /** 构型配置：关联构型项未找到数 */
   ciWarnings?: number;
+  /** 构型项：子构型项 sheet 中父构型号不存在于构型项清单 */
+  orphanParentCodes?: string[];
+  /** 构型项：子构型项 sheet 中子构型号不存在于构型项清单 */
+  orphanChildCodes?: string[];
 }
 
 // ================================================================
@@ -3138,12 +3142,19 @@ export async function previewConfigurationItemsImport(file: File): Promise<Impor
   }
 
   const childrenByCode = new Map<string, any[]>();
+  const allCodes = new Set(rawRows.map((r) => String(r['构型号'] || '').trim()));
+  const orphanParents = new Set<string>();
+  const orphanChildren = new Set<string>();
   for (const r of childRelRows) {
     const code = String(r['父构型号'] || '').trim();
     if (!childrenByCode.has(code)) childrenByCode.set(code, []);
     const childCode = String(r['子构型号'] || '').trim();
     const found = existingMap.has(childCode);
     if (!found) childWarnings++;
+    // 检查父构型号是否存在于此批导入的构型项清单中
+    if (!allCodes.has(code)) orphanParents.add(code);
+    // 检查子构型号是否存在于此批导入的构型项清单中
+    if (!allCodes.has(childCode)) orphanChildren.add(childCode);
     childrenByCode.get(code)!.push(r);
   }
 
@@ -3211,6 +3222,8 @@ export async function previewConfigurationItemsImport(file: File): Promise<Impor
     partRelationCount: partRelRows.length,
     childRelationCount: childRelRows.length,
     docRelationCount: docRelRows.length,
+    orphanParentCodes: orphanParents.size > 0 ? [...orphanParents] : undefined,
+    orphanChildCodes: orphanChildren.size > 0 ? [...orphanChildren] : undefined,
   };
 }
 
@@ -3352,7 +3365,8 @@ export async function executeConfigurationItemsImport(preview: ImportPreview): P
       if (childrenToAdd.length > 0) {
         await configurationApi.addChildren(ciId, childrenToAdd);
       }
-    } catch (err) {
+    } catch (err: any) {
+      warnings.push(`构型项 ${row.code}: 子项关联写入失败 ${err?.message || ''}`);
       console.warn(`处理构型项子项关联失败: ${row.code}`, err);
     }
   }
