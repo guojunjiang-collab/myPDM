@@ -21,6 +21,7 @@ def get_config_items(
     exclude_ids: set | None = None,
     include_deleted: bool = False,
     updated_since: Optional[float] = None,
+    top_level: bool = False,
 ) -> Tuple[List[models.ConfigurationItem], int]:
     """构型项列表"""
     q = db.query(models.ConfigurationItem)
@@ -28,6 +29,16 @@ def get_config_items(
         q = q.filter(models.ConfigurationItem.deleted_at.is_(None))
     if exclude_ids:
         q = q.filter(models.ConfigurationItem.id.notin_(exclude_ids))
+    if top_level:
+        # 仅顶层构型项：id 未作为任何“存活父项”的子项出现。
+        # 注意软删除父项的关联边仍残留在表中，故需排除已删除父项，避免误判。
+        live_parent_ids = db.query(models.ConfigurationItem.id).filter(
+            models.ConfigurationItem.deleted_at.is_(None)
+        )
+        parented_child_ids = db.query(models.ConfigurationItemChild.child_id).filter(
+            models.ConfigurationItemChild.parent_id.in_(live_parent_ids)
+        )
+        q = q.filter(models.ConfigurationItem.id.notin_(parented_child_ids))
     if search:
         like = f"%{search}%"
         q = q.filter(or_(

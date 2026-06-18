@@ -34,6 +34,7 @@ async def list_config_items(
     exclude_ancestors_of: str = Query(None),
     updated_since: float = Query(None),
     brief: bool = Query(False),
+    top_level: bool = Query(False),
     db: Session = Depends(get_db),
     current_user=Depends(require_permission("configuration:read")),
 ):
@@ -59,7 +60,7 @@ async def list_config_items(
                 if pid not in exclude_ids:
                     exclude_ids.add(pid)
                     queue.append(pid)
-    crud_kwargs = dict(search=search, skip=skip, limit=page_size, exclude_ids=exclude_ids)
+    crud_kwargs = dict(search=search, skip=skip, limit=page_size, exclude_ids=exclude_ids, top_level=top_level)
     if updated_since is not None:
         crud_kwargs["include_deleted"] = True
         crud_kwargs["updated_since"] = updated_since

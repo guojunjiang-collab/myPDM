@@ -19,6 +19,8 @@ export default function ConfigurationList() {
   const [search, setSearch] = useState('');
   const [searchField, setSearchField] = useState('all');
   const [loading, setLoading] = useState(false);
+  // 仅显示顶层构型项（不作为任何其它构型项的子项）。由服务端按父子关系筛选。
+  const [topLevelOnly, setTopLevelOnly] = useState(false);
 
   // 弹窗
   const [createOpen, setCreateOpen] = useState(false);
@@ -43,13 +45,13 @@ export default function ConfigurationList() {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await configurationApi.listItems({ page: 1, page_size: PAGE_CAP });
+      const res = await configurationApi.listItems({ page: 1, page_size: PAGE_CAP, top_level: topLevelOnly || undefined });
       setItems(res.data.items || []);
       setServerTotal(res.data.total ?? (res.data.items || []).length);
     } catch { } finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [topLevelOnly]);
 
   // 客户端筛选
   const filteredData = useMemo(() => {
@@ -159,6 +161,15 @@ export default function ConfigurationList() {
           placeholder={searchField === 'all' ? '搜索全部字段...' : searchField.startsWith('cf_') ? `搜索${configCustomDefs.find(d => d.id === searchField.replace('cf_', ''))?.name || '自定义字段'}...` : `搜索${searchField === 'code' ? '构型号' : searchField === 'name' ? '名称' : searchField === 'spec' ? '规格型号' : '备注'}...`}
           className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 flex-1"
         />
+        <label className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 whitespace-nowrap cursor-pointer select-none" title="只显示没有父项的最顶层构型项">
+          <input
+            type="checkbox"
+            checked={topLevelOnly}
+            onChange={(e) => setTopLevelOnly(e.target.checked)}
+            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+          />
+          仅顶层构型项
+        </label>
         <div className="flex-1" />
         {canDownload() && (
           <button onClick={handleExport} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">导出全部</button>
