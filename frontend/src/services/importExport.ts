@@ -246,6 +246,57 @@ async function fetchAllPages<T>(
   return all;
 }
 
+/**
+ * 批量导入/导出的并发上限。一次性 Promise.all 扇出成百上千请求会触发
+ * nginx 限流（被拒的请求表现为 4xx/5xx），故统一改为受限并发分批执行。
+ */
+const BATCH_CONCURRENCY = 20;
+
+/**
+ * 受限并发执行：同时最多 limit 个任务在飞行，结果保留输入顺序。
+ * 语义同 Promise.all（任一任务抛出则整体抛出）。
+ */
+async function mapLimit<T, R>(
+  items: T[],
+  fn: (item: T, index: number) => Promise<R>,
+  limit = BATCH_CONCURRENCY,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+  async function worker() {
+    while (cursor < items.length) {
+      const i = cursor++;
+      results[i] = await fn(items[i], i);
+    }
+  }
+  const workers = Math.max(1, Math.min(limit, items.length));
+  await Promise.all(Array.from({ length: workers }, () => worker()));
+  return results;
+}
+
+/** 同 mapLimit，但语义同 Promise.allSettled：单个任务失败不影响其它。 */
+async function mapLimitSettled<T, R>(
+  items: T[],
+  fn: (item: T, index: number) => Promise<R>,
+  limit = BATCH_CONCURRENCY,
+): Promise<PromiseSettledResult<R>[]> {
+  const results = new Array<PromiseSettledResult<R>>(items.length);
+  let cursor = 0;
+  async function worker() {
+    while (cursor < items.length) {
+      const i = cursor++;
+      try {
+        results[i] = { status: 'fulfilled', value: await fn(items[i], i) };
+      } catch (reason) {
+        results[i] = { status: 'rejected', reason };
+      }
+    }
+  }
+  const workers = Math.max(1, Math.min(limit, items.length));
+  await Promise.all(Array.from({ length: workers }, () => worker()));
+  return results;
+}
+
 /** 将文件 handle 读取为 ArrayBuffer */
 async function readFileAsBuffer(
   dirHandle: FileSystemDirectoryHandle,
@@ -315,8 +366,8 @@ async function loadCustomFieldValues(
   entityIds: string[],
 ): Promise<Map<string, Record<string, unknown>>> {
   const map = new Map<string, Record<string, unknown>>();
-  const results = await Promise.allSettled(
-    entityIds.map((id) => customFieldsApi.getValues(entityType, id)),
+  const results = await mapLimitSettled(entityIds, (id) =>
+    customFieldsApi.getValues(entityType, id),
   );
   results.forEach((res, idx) => {
     if (res.status === 'fulfilled') {
@@ -364,8 +415,8 @@ async function loadEntityDocuments(
   entityIds: string[],
 ): Promise<Map<string, any[]>> {
   const map = new Map<string, any[]>();
-  const results = await Promise.allSettled(
-    entityIds.map((id) => entityDocumentsApi.list(entityType, id)),
+  const results = await mapLimitSettled(entityIds, (id) =>
+    entityDocumentsApi.list(entityType, id),
   );
   results.forEach((res, idx) => {
     if (res.status === 'fulfilled') {
@@ -609,10 +660,9 @@ async function linkPartDocuments(
  * 执行零件导入（用户确认后调用）
  */
 export async function executePartsImport(preview: ImportPreview): Promise<void> {
-  const results = await Promise.allSettled(
-    preview.rows
-      .filter((r) => r.status !== '错误')
-      .map(async (row) => {
+  const results = await mapLimitSettled(
+    preview.rows.filter((r) => r.status !== '错误'),
+    async (row) => {
         const data = row._data!;
         try {
           if (row.status === '更新') {
@@ -663,7 +713,7 @@ export async function executePartsImport(preview: ImportPreview): Promise<void> 
           throw err;
         }
         return null;
-      }),
+      },
   );
 
   const errors = results.filter((r) => r.status === 'rejected');
@@ -1962,10 +2012,9 @@ export async function previewUsersImport(file: File): Promise<ImportPreview> {
  * 执行用户导入
  */
 export async function executeUsersImport(preview: ImportPreview): Promise<void> {
-  const results = await Promise.allSettled(
-    preview.rows
-      .filter((r) => r.status !== '错误')
-      .map(async (row) => {
+  const results = await mapLimitSettled(
+    preview.rows.filter((r) => r.status !== '错误'),
+    async (row) => {
         const data = row._data!;
         try {
           if (row.status === '更新') {
@@ -1994,7 +2043,7 @@ export async function executeUsersImport(preview: ImportPreview): Promise<void> 
           throw err;
         }
         return null;
-      }),
+      },
   );
 
   const errors = results.filter((r) => r.status === 'rejected');
@@ -2984,7 +3033,7 @@ async function _buildConfigItemsWorkbook(): Promise<XLSX.WorkBook | null> {
   if (items.length === 0) return null;
 
   // 并发获取每个构型项的详情（含关联数据）
-  const details = await Promise.all(items.map((i: any) => configurationApi.getItem(i.id)));
+  const details = await mapLimit(items, (i: any) => configurationApi.getItem(i.id));
   const detailData: any[] = details.map((r: any) => r.data);
 
   // Sheet1: 构型项清单
@@ -3451,7 +3500,7 @@ async function _buildConfigProfilesWorkbook(): Promise<XLSX.WorkBook | null> {
   for (const ci of ciItems) ciIdToCode.set(String(ci.id), ci.code);
 
   // 并发获取每个 Profile 的详情（含完整配置清单 items，每项带真实 is_selected）
-  const details = await Promise.all(profiles.map((p: any) => configurationProfileApi.get(p.id)));
+  const details = await mapLimit(profiles, (p: any) => configurationProfileApi.get(p.id));
   const detailData: any[] = details.map((r: any) => r.data);
 
   // Sheet1: 配置清单
