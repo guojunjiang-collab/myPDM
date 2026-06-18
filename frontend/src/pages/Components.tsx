@@ -76,6 +76,9 @@ export default function Components() {
   const [searchField, setSearchField] = useState('all');
   const [status, setStatus] = useState('');
   const [showAllVersions, setShowAllVersions] = useState(false);
+  // 仅显示顶层部件（不作为任何其它部件的子部件）。由服务端按 BOM 父子关系返回 id 集合后过滤。
+  const [topLevelOnly, setTopLevelOnly] = useState(false);
+  const [topLevelIds, setTopLevelIds] = useState<Set<string> | null>(null);
 
   /* ---- 编辑弹窗 ---- */
   const [modalOpen, setModalOpen] = useState(false);
@@ -243,6 +246,8 @@ export default function Components() {
 
   // 筛选逻辑
   const filteredData = sortedData.filter(assembly => {
+    // 仅顶层部件：只保留服务端返回的顶层 id 集合中的部件（集合加载完成前不显示）
+    if (topLevelOnly && (!topLevelIds || !topLevelIds.has(assembly.id))) return false;
     if (status && assembly.status !== status) return false;
     if (search) {
       const keyword = search.toLowerCase();
@@ -297,6 +302,22 @@ export default function Components() {
   useEffect(() => {
     loadAssemblies();
   }, [search, status, storeAssemblies]);
+
+  // 勾选“仅顶层部件”时，向服务端拉取顶层部件 id 集合用于过滤；取消勾选则清空
+  useEffect(() => {
+    if (!topLevelOnly) { setTopLevelIds(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await assembliesApi.list({ top_level: true, page_size: 10000, brief: true });
+        const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+        if (!cancelled) setTopLevelIds(new Set(arr.map((a: any) => a.id)));
+      } catch {
+        if (!cancelled) setTopLevelIds(new Set());
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [topLevelOnly, storeAssemblies]);
 
   // 从 URL 参数 auto-open 编辑弹窗
   useEffect(() => {
@@ -1084,6 +1105,15 @@ export default function Components() {
             className="w-3.5 h-3.5"
           />
           全部版本
+        </label>
+        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm whitespace-nowrap" title="只显示没有父部件的最顶层部件">
+          <input
+            type="checkbox"
+            checked={topLevelOnly}
+            onChange={(e) => setTopLevelOnly(e.target.checked)}
+            className="w-3.5 h-3.5"
+          />
+          仅顶层部件
         </label>
         <div className="flex-1" />
         {isAdmin() && (

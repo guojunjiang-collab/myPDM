@@ -28,9 +28,9 @@ def _assembly_response(asm):
     }
 
 @router.get("/")
-async def list_assemblies(skip: int = 0, limit: int = 100, search: str = None, updated_since: float = None, brief: bool = False, db: Session = Depends(get_db), current_user: User = Depends(require_permission("assemblies:read"))):
+async def list_assemblies(skip: int = 0, limit: int = 100, search: str = None, updated_since: float = None, brief: bool = False, top_level: bool = False, db: Session = Depends(get_db), current_user: User = Depends(require_permission("assemblies:read"))):
     include_deleted = bool(updated_since)  # 增量模式可能包含已删除记录
-    asms = crud.get_assemblies(db, skip=skip, limit=limit, search=search, updated_since=updated_since, include_deleted=include_deleted)
+    asms = crud.get_assemblies(db, skip=skip, limit=limit, search=search, updated_since=updated_since, include_deleted=include_deleted, top_level=top_level)
     if brief:
         from ..crud import _assembly_brief
         return JSONResponse(content=[_assembly_brief(a) for a in asms])

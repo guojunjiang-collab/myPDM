@@ -104,7 +104,7 @@ export const partsApi = {
 
 // 部件 API
 export const assembliesApi = {
-  list: (params?: { page?: number; page_size?: number; search?: string; status?: string; brief?: boolean; updated_since?: number }) =>
+  list: (params?: { page?: number; page_size?: number; search?: string; status?: string; brief?: boolean; updated_since?: number; top_level?: boolean }) =>
     api.get('/assemblies/', { params }),
   get: (id: string) => api.get(`/assemblies/${id}`),
   create: (data: unknown) => api.post('/assemblies/', data),

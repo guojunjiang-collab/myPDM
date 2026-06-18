@@ -211,7 +211,7 @@ def get_assembly_by_code_version(db, code, version):
         models.Assembly.deleted_at.is_(None)
     ).first()
 
-def get_assemblies(db, skip=0, limit=100, search=None, include_deleted=False, updated_since=None):
+def get_assemblies(db, skip=0, limit=100, search=None, include_deleted=False, updated_since=None, top_level=False):
     q = db.query(models.Assembly)
     if not include_deleted:
         q = q.filter(models.Assembly.deleted_at.is_(None))
@@ -228,6 +228,16 @@ def get_assemblies(db, skip=0, limit=100, search=None, include_deleted=False, up
             (models.Assembly.updated_at >= since_dt) |
             (models.Assembly.deleted_at >= since_dt)
         )
+    if top_level:
+        # 仅顶层部件：未作为任何“存活父部件”的子部件(child_type='component')出现。
+        # BOM 关系与父部件均按未软删除判定，避免被已删除父项残留的关系边误判。
+        live_parent_ids = db.query(models.Assembly.id).filter(models.Assembly.deleted_at.is_(None))
+        parented_child_ids = db.query(models.BOMItem.child_id).filter(
+            models.BOMItem.child_type == 'component',
+            models.BOMItem.deleted_at.is_(None),
+            models.BOMItem.parent_id.in_(live_parent_ids),
+        )
+        q = q.filter(models.Assembly.id.notin_(parented_child_ids))
     return q.offset(skip).limit(limit).all()
 
 def create_assembly(db, assembly):
