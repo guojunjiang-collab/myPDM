@@ -35,6 +35,11 @@ export default function BOMTraceModal({ entity, onClose }: BOMTraceModalProps) {
 
   // 载入反查结果
   useEffect(() => {
+    // entity 变化时清理上一次遗留的详情子弹窗状态
+    setDetailEntity(null);
+    setDetailData(null);
+    setDetailCustomDefs([]);
+    setDetailCustomValues({});
     if (!entity) {
       setTraceResult([]);
       setError('');
