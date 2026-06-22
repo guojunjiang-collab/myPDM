@@ -229,11 +229,13 @@ def get_assemblies(db, skip=0, limit=100, search=None, include_deleted=False, up
             (models.Assembly.deleted_at >= since_dt)
         )
     if top_level:
-        # 仅顶层部件：未作为任何“存活父部件”的子部件(child_type='component')出现。
+        # 仅顶层部件：未作为任何“存活父部件”的子部件出现。
+        # 子部件的 child_type 历史上有 'component'(旧数据) 与 'assembly'(新数据) 两种，
+        # 须同时匹配（与 bom/compare 一致），否则新数据(child_type='assembly')会被漏判，导致筛选无效。
         # BOM 关系与父部件均按未软删除判定，避免被已删除父项残留的关系边误判。
         live_parent_ids = db.query(models.Assembly.id).filter(models.Assembly.deleted_at.is_(None))
         parented_child_ids = db.query(models.BOMItem.child_id).filter(
-            models.BOMItem.child_type == 'component',
+            models.BOMItem.child_type.in_(('component', 'assembly')),
             models.BOMItem.deleted_at.is_(None),
             models.BOMItem.parent_id.in_(live_parent_ids),
         )
