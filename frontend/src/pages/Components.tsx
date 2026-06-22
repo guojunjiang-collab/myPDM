@@ -1185,7 +1185,7 @@ export default function Components() {
                   <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                     {can('bom:trace') && (
                       <button
-                        onClick={() => setTraceEntity({ type: 'assembly', id: assembly.id, code: assembly.code, name: assembly.name })}
+                        onClick={() => setTraceEntity({ type: 'assembly', id: assembly.id, code: assembly.code, name: assembly.name, version: assembly.version })}
                         className="text-indigo-600 hover:text-indigo-800 mr-3"
                       >
                         反查

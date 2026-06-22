@@ -9,7 +9,7 @@ import PartDetailContent from './PartDetailContent';
 import AssemblyDetailContent from './AssemblyDetailContent';
 
 interface BOMTraceModalProps {
-  entity: { type: 'part' | 'assembly'; id: string; code: string; name: string } | null;
+  entity: { type: 'part' | 'assembly'; id: string; code: string; name: string; version?: string } | null;
   onClose: () => void;
 }
 
@@ -108,7 +108,7 @@ export default function BOMTraceModal({ entity, onClose }: BOMTraceModalProps) {
     <>
       <Modal
         open={!!entity}
-        title={entity ? `反查 — ${entity.code} ${entity.name}` : ''}
+        title={entity ? `反查 — ${entity.code} ${entity.name}${entity.version ? ' ' + entity.version : ''}` : ''}
         onClose={onClose}
         width="3xl"
       >
