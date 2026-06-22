@@ -11,6 +11,7 @@ from ..models import User, Document, DocumentAttachment, Part, Assembly
 from .. import crud, schemas
 from ..permissions import require_permission
 from ..stp_converter import is_stp_file, delete_glb_cache
+from ..office_converter import is_office_file, delete_pdf_cache
 
 router = APIRouter(prefix="/documents", tags=["图文档管理"])
 
@@ -374,6 +375,11 @@ async def delete_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, request: Reque
     # 删除对应的 glb 缓存
     if is_stp_file(att.file_name):
         delete_glb_cache(str(att.id))
+
+    # 删除对应的 PDF 缓存（Office 预览）
+    if is_office_file(att.file_name):
+        delete_pdf_cache(str(att.id), att.file_path)
+
     d = db.query(Document).filter(Document.id == doc_id).first()
     if d and d.file_id == att.id:
         d.file_id = None
