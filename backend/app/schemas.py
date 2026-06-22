@@ -273,6 +273,7 @@ class DocumentCreate(DocumentBase):
     id: Optional[uuid.UUID] = None
 
 class DocumentUpdate(BaseSchema):
+    code: Optional[str] = None
     name: Optional[str] = None
     version: Optional[str] = None
     status: Optional[str] = None
