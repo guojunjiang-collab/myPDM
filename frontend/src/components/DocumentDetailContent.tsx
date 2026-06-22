@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { Document, CustomFieldDefinition, DocumentAttachment } from '../types';
 import { documentsApi, mediaApi } from '../services/api';
+import { previewAttachment } from '../utils/attachmentPreview';
 import { formatDateTime } from '../utils/date';
 
 interface DocumentDetailContentProps {
@@ -64,32 +65,11 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
     }
   };
 
-  // 预览附件
-  const handlePreview = async (attId: string, fileName: string) => {
-    const ext = fileName.split('.').pop()?.toLowerCase() || '';
-
-    // PDF — 浏览器内嵌预览
-    if (ext === 'pdf') {
-      try {
-        const mt = await mediaApi.token(attId, 'preview');
-        window.open(`/api/v2/attachments/${attId}/preview?token=${encodeURIComponent(mt)}`, '_blank');
-      } catch { alert('预览失败，请重试'); }
-      return;
-    }
-    // 压缩包 — 树形预览
-    if (['zip', 'tar', 'gz', 'tgz', 'rar', '7z'].includes(ext)) {
-      onArchivePreview?.(attId, fileName);
-      return;
-    }
-    // STP — 三维预览（新窗口）
-    if (ext === 'stp' || ext === 'step') {
-      try {
-        const mt = await mediaApi.token(attId, 'gltf');
-        window.open(`/stp-viewer?id=${attId}&token=${encodeURIComponent(mt)}`, '_blank');
-      } catch { alert('预览失败，请重试'); }
-      return;
-    }
-    alert('该格式暂不支持预览');
+  // 预览附件（统一分发）
+  const handlePreview = (attId: string, fileName: string) => {
+    previewAttachment(attId, fileName, {
+      onArchive: (id, name) => onArchivePreview?.(id, name),
+    });
   };
 
   return (
