@@ -159,14 +159,14 @@ export default function ConfigurationList() {
           type="text"
           value={search} onChange={(e) => setSearch(e.target.value)}
           placeholder={searchField === 'all' ? '搜索全部字段...' : searchField.startsWith('cf_') ? `搜索${configCustomDefs.find(d => d.id === searchField.replace('cf_', ''))?.name || '自定义字段'}...` : `搜索${searchField === 'code' ? '构型号' : searchField === 'name' ? '名称' : searchField === 'spec' ? '规格型号' : '备注'}...`}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 flex-1"
+          className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
-        <label className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 whitespace-nowrap cursor-pointer select-none" title="只显示没有父项的最顶层构型项">
+        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm whitespace-nowrap" title="只显示没有父项的最顶层构型项">
           <input
             type="checkbox"
             checked={topLevelOnly}
             onChange={(e) => setTopLevelOnly(e.target.checked)}
-            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+            className="w-3.5 h-3.5"
           />
           仅顶层构型项
         </label>
