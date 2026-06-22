@@ -2,9 +2,10 @@ import { useEffect, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { partsApi, customFieldsApi, bomApi } from '../services/api';
 import type { Part, CustomFieldDefinition, CustomFieldValue } from '../types';
-import { canEdit, isAdmin, canDownload } from '../stores/auth';
+import { canEdit, isAdmin, canDownload, can } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
 import PartDetailContent from '../components/PartDetailContent';
+import BOMTraceModal from '../components/BOMTraceModal';
 import VersionHistory from '../components/VersionHistory';
 import EntityDocumentSection from '../components/EntityDocumentSection';
 import { useDataStore } from '../stores/data';
@@ -67,6 +68,8 @@ export default function Parts() {
 
   // 详情弹窗
   const [viewingPart, setViewingPart] = useState<Part | null>(null);
+  // 反查弹窗
+  const [traceEntity, setTraceEntity] = useState<{ type: 'part' | 'assembly'; id: string; code: string; name: string } | null>(null);
   const [viewingCustomDefs, setViewingCustomDefs] = useState<CustomFieldDefinition[]>([]);
   const [viewingCustomValues, setViewingCustomValues] = useState<Record<string, any>>({});
   const [detailTab, setDetailTab] = useState<'detail' | 'versions'>('detail');
@@ -549,6 +552,14 @@ export default function Parts() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                    {can('bom:trace') && (
+                      <button
+                        onClick={() => setTraceEntity({ type: 'part', id: part.id, code: part.code, name: part.name })}
+                        className="text-indigo-600 hover:text-indigo-800 mr-3"
+                      >
+                        反查
+                      </button>
+                    )}
                     {canEdit() && <button onClick={() => handleEdit(part)} className="text-primary-600 hover:text-primary-800 mr-3">编辑</button>}
                     {isAdmin() && (
                       <button onClick={() => setDeleteId(part.id)} className="text-red-600 hover:text-red-800">删除</button>
@@ -713,6 +724,9 @@ export default function Parts() {
         onConfirm={deleteError ? () => { setDeleteId(null); setDeleteError(null); } : handleDelete}
         onCancel={() => { setDeleteId(null); setDeleteError(null); }}
       />
+
+      {/* 反查弹窗 */}
+      <BOMTraceModal entity={traceEntity} onClose={() => setTraceEntity(null)} />
 
       {/* 零件详情弹窗 */}
       <Modal
