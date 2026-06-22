@@ -82,7 +82,7 @@ export default function Components() {
   const [topLevelIds, setTopLevelIds] = useState<Set<string> | null>(null);
 
   // 反查弹窗
-  const [traceEntity, setTraceEntity] = useState<{ type: 'part' | 'assembly'; id: string; code: string; name: string } | null>(null);
+  const [traceEntity, setTraceEntity] = useState<{ type: 'part' | 'assembly'; id: string; code: string; name: string; version?: string } | null>(null);
 
   /* ---- 编辑弹窗 ---- */
   const [modalOpen, setModalOpen] = useState(false);

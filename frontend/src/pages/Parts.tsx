@@ -69,7 +69,7 @@ export default function Parts() {
   // 详情弹窗
   const [viewingPart, setViewingPart] = useState<Part | null>(null);
   // 反查弹窗
-  const [traceEntity, setTraceEntity] = useState<{ type: 'part' | 'assembly'; id: string; code: string; name: string } | null>(null);
+  const [traceEntity, setTraceEntity] = useState<{ type: 'part' | 'assembly'; id: string; code: string; name: string; version?: string } | null>(null);
   const [viewingCustomDefs, setViewingCustomDefs] = useState<CustomFieldDefinition[]>([]);
   const [viewingCustomValues, setViewingCustomValues] = useState<Record<string, any>>({});
   const [detailTab, setDetailTab] = useState<'detail' | 'versions'>('detail');
