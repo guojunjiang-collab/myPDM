@@ -1,7 +1,7 @@
 """pytest 公共 fixtures：内存数据库、测试用户、假 LLM 客户端。"""
 import os
 os.environ.setdefault("APP_ENV", "development")
-os.environ.setdefault("JWT_SECRET", "test-secret-key-for-tests-only")
+os.environ.setdefault("JWT_SECRET", "test-secret-key-for-tests-only-xx")
 
 import uuid
 import pytest

@@ -488,6 +488,7 @@ _ACTION_PERM = {
     "gltf": "attachments:gltf",
     "archive-tree": "attachments:archive_browse",
     "extract-file": "attachments:archive_browse",
+    "office-pdf": "attachments:preview",
 }
 
 
