@@ -6,7 +6,7 @@ RUN sed -i 's|deb.debian.org/d|mirrors.aliyun.com/d|g' /etc/apt/sources.list.d/d
     sed -i 's|security.debian.org/d|mirrors.aliyun.com/d|g' /etc/apt/sources.list.d/debian.sources && \
     sed -i 's/Components: main/Components: main non-free/g' /etc/apt/sources.list.d/debian.sources && \
     apt-get update && apt-get install -y libpq-dev gcc unrar xvfb libfuse2 \
-        libfontconfig1 libgl1 libglib2.0-0 libxkbcommon0 libegl1 && \
+        libfontconfig1 libgl1 libglib2.0-0 libxkbcommon0 libegl1 libreoffice && \
     rm -rf /var/lib/apt/lists/*
 
 # Mayo CLI — OCC 原生 STEP→GLB 转换器（手动下载的 AppImage）
