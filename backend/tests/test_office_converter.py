@@ -41,3 +41,10 @@ def test_delete_pdf_cache_removes_existing_and_noops_on_missing():
     assert p.exists()
     delete_pdf_cache("att-1", "documents/test-DOC_A/spec.docx")
     assert not p.exists()
+
+
+from app.office_converter import convert_office_to_pdf
+
+
+def test_convert_office_missing_source_returns_none():
+    assert convert_office_to_pdf("/nonexistent/path/a.docx", "att-1", "documents/x/a.docx") is None

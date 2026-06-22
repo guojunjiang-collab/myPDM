@@ -8,6 +8,9 @@ Office 文档转 PDF 服务（用于浏览器内嵌预览）
 结构对齐 stp_converter.py。
 """
 import logging
+import shutil
+import subprocess
+import tempfile
 import threading
 from pathlib import Path
 from typing import Optional
@@ -55,3 +58,57 @@ def delete_pdf_cache(attachment_id: str, file_path: str = None):
     if pdf_path.exists():
         pdf_path.unlink()
         logger.info(f"已删除 PDF 缓存: {pdf_path}")
+
+
+def convert_office_to_pdf(src_path: str, attachment_id: str, file_path: str = None) -> Optional[str]:
+    """
+    将 Office 文件转换为 PDF。
+    使用 _office_semaphore 限制并发 soffice 进程数（最多 2 个）。
+    Returns: PDF 路径，失败返回 None。
+    """
+    src_file = Path(src_path)
+    if not src_file.exists():
+        logger.error(f"Office 源文件不存在: {src_path}")
+        return None
+
+    pdf_path = get_pdf_cache_path(attachment_id, file_path)
+    if pdf_path.exists():
+        logger.info(f"PDF 缓存已存在: {pdf_path}")
+        return str(pdf_path)
+
+    logger.info(f"等待 Office 转换槽位: {src_path}")
+    with _office_semaphore:
+        # 排队期间可能已由其它任务生成
+        if pdf_path.exists():
+            logger.info(f"PDF 缓存已存在（排队期间生成）: {pdf_path}")
+            return str(pdf_path)
+
+        logger.info(f"开始转换 Office → PDF: {src_path}")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            try:
+                result = subprocess.run(
+                    ["soffice", "--headless", "--convert-to", "pdf",
+                     "--outdir", tmpdir, str(src_file)],
+                    capture_output=True, text=True, timeout=120,
+                )
+                if result.returncode != 0:
+                    logger.error(f"Office 转换失败 (exit={result.returncode}): {result.stderr}")
+                    return None
+
+                # soffice 输出文件名为 {源stem}.pdf
+                out_pdf = Path(tmpdir) / (src_file.stem + ".pdf")
+                if not out_pdf.exists():
+                    logger.error("Office 转换完成但输出 PDF 不存在")
+                    return None
+
+                pdf_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(out_pdf), str(pdf_path))
+                size_mb = pdf_path.stat().st_size / 1024 / 1024
+                logger.info(f"Office 转换成功: {pdf_path} ({size_mb:.2f} MB)")
+                return str(pdf_path)
+            except subprocess.TimeoutExpired:
+                logger.error(f"Office 转换超时 (120s): {src_path}")
+                return None
+            except Exception as e:
+                logger.error(f"Office 转换异常: {e}")
+                return None
