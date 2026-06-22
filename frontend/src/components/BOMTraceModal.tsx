@@ -155,7 +155,7 @@ export default function BOMTraceModal({ entity, onClose }: BOMTraceModalProps) {
                           handleViewEntity(type, parent.id);
                         }}
                       >
-                        <td className="px-3 py-2 whitespace-nowrap text-left">
+                        <td className="px-3 py-2 whitespace-nowrap text-left" onClick={(e) => e.stopPropagation()}>
                           <span className="inline-flex items-center gap-0.5">
                             <span className="text-xs text-gray-400">{'-'.repeat(item.level)}{item.level}</span>
                             {hasChildren ? (
