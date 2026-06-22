@@ -29,3 +29,15 @@ def test_get_pdf_cache_path_uses_folder_and_stem():
 
 def test_get_pdf_path_for_attachment_missing_returns_none():
     assert get_pdf_path_for_attachment("att-x", "documents/none/none.docx") is None
+
+
+def test_delete_pdf_cache_removes_existing_and_noops_on_missing():
+    from app.office_converter import get_pdf_cache_path, delete_pdf_cache
+    # missing → no error
+    delete_pdf_cache("att-1", "documents/test-DOC_A/spec.docx")
+    # create then delete
+    p = get_pdf_cache_path("att-1", "documents/test-DOC_A/spec.docx")
+    p.write_bytes(b"%PDF-1.4 test")
+    assert p.exists()
+    delete_pdf_cache("att-1", "documents/test-DOC_A/spec.docx")
+    assert not p.exists()

@@ -7,10 +7,7 @@ Office 文档转 PDF 服务（用于浏览器内嵌预览）
 - 使用 Semaphore 限制并发 soffice 进程
 结构对齐 stp_converter.py。
 """
-import shutil
-import subprocess
 import logging
-import tempfile
 import threading
 from pathlib import Path
 from typing import Optional
