@@ -181,6 +181,9 @@ async def update_document(doc_id: uuid.UUID, body: schemas.DocumentUpdate, reque
         raise HTTPException(status_code=404, detail="图文档不存在")
     # 修改编号后须保证 (编号+版本) 仍唯一（version 不可改，按当前版本校验 code 冲突）
     if body.code and body.code != d.code:
+        # 仅 A 版允许改编号：升版后的版本按编号归集，改编号会丢失版本升级关联
+        if d.version != 'A':
+            raise HTTPException(status_code=400, detail="仅 A 版允许修改编号，升版后的版本不可修改编号")
         existing = db.query(Document).filter(
             Document.code == body.code,
             Document.version == d.version,

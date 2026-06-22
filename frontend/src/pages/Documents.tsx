@@ -729,8 +729,8 @@ export default function Documents() {
                 type="text"
                 value={formData.code}
                 onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                disabled={!!editingDoc && !isAdmin()}
-                title={editingDoc && isAdmin() ? '管理员可修改编号' : undefined}
+                disabled={!!editingDoc && !(isAdmin() && formData.version === 'A')}
+                title={editingDoc && isAdmin() ? (formData.version === 'A' ? '管理员可修改编号' : '仅 A 版允许修改编号，升版后的版本不可改') : undefined}
                 className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300 disabled:bg-gray-100 disabled:text-gray-400"
                 required
               />

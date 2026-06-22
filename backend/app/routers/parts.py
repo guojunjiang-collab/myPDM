@@ -61,6 +61,9 @@ async def update_part(part_id: uuid.UUID, part_update: schemas.PartUpdate, reque
         raise HTTPException(status_code=404, detail="零件不存在")
     # 修改件号后须保证 (件号+版本) 仍唯一（version 不可改，按当前版本校验 code 冲突）
     if part_update.code and part_update.code != db_part.code:
+        # 仅 A 版允许改件号：升版后的版本按编码归集，改件号会丢失版本升级关联
+        if db_part.version != 'A':
+            raise HTTPException(status_code=400, detail="仅 A 版允许修改件号，升版后的版本不可修改件号")
         dup = crud.get_part_by_code(db, part_update.code, db_part.version)
         if dup and dup.id != part_id:
             raise HTTPException(status_code=400, detail="该编码和版本的组合已存在")

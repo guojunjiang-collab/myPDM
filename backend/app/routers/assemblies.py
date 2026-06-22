@@ -59,6 +59,9 @@ async def update_assembly(assembly_id: uuid.UUID, assembly_update: schemas.Assem
         raise HTTPException(status_code=404, detail="部件不存在")
     # 修改件号后须保证 (件号+版本) 仍唯一（version 不可改，按当前版本校验 code 冲突）
     if assembly_update.code and assembly_update.code != db_assembly.code:
+        # 仅 A 版允许改件号：升版后的版本按编码归集，改件号会丢失版本升级关联
+        if db_assembly.version != 'A':
+            raise HTTPException(status_code=400, detail="仅 A 版允许修改件号，升版后的版本不可修改件号")
         dup = crud.get_assembly_by_code_version(db, assembly_update.code, db_assembly.version)
         if dup and dup.id != assembly_id:
             raise HTTPException(status_code=400, detail="部件编码+版本已存在")
