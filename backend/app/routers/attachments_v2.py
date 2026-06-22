@@ -17,6 +17,10 @@ from .auth import get_current_active_user
 from ..permissions import require_permission, has_permission
 from ..media_token import mint_media_token, verify_media_token
 from ..stp_converter import is_stp_file, convert_stp_to_gltf, get_gltf_path_for_attachment, delete_glb_cache
+from ..office_converter import (
+    is_office_file, convert_office_to_pdf,
+    get_pdf_path_for_attachment, delete_pdf_cache,
+)
 from ..bom.archive_reader import read_archive_tree, extract_file, SUPPORTED_EXTENSIONS
 import zipfile
 import tarfile
@@ -654,6 +658,50 @@ async def get_gltf(
     )
 
 
+@router.get("/{attachment_id}/office-pdf")
+async def get_office_pdf(
+    attachment_id: uuid.UUID,
+    token: str = None,
+    db: Session = Depends(get_db),
+):
+    """获取 Office 文档转换后的 PDF（用于浏览器内嵌预览）
+
+    认证: ?token= 媒体令牌（action=office-pdf）
+    流程: 命中缓存直接返回内嵌 PDF；未命中则同步阻塞转换后返回。
+    """
+    verify_media_token(token, str(attachment_id), "office-pdf")
+
+    att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
+    if not att:
+        raise HTTPException(status_code=404, detail="附件不存在")
+
+    if not is_office_file(att.file_name):
+        raise HTTPException(status_code=400, detail="该附件不是 Office 文档")
+
+    if not att.file_path:
+        raise HTTPException(status_code=404, detail="附件文件路径为空")
+
+    src_full = file_storage.base_dir / att.file_path
+    if not src_full.exists():
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    pdf_path = get_pdf_path_for_attachment(str(attachment_id), att.file_path)
+    if not pdf_path:
+        # 同步阻塞转换（信号量 + 120s 超时在 converter 内部）
+        pdf_path = convert_office_to_pdf(str(src_full), str(attachment_id), att.file_path)
+        if not pdf_path:
+            raise HTTPException(status_code=500, detail="Office 文档转换失败")
+
+    from urllib.parse import quote
+    encoded_filename = quote(Path(att.file_name).stem + ".pdf")
+    return FileResponse(
+        path=pdf_path,
+        filename=Path(att.file_name).stem + ".pdf",
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename*=UTF-8''{encoded_filename}"},
+    )
+
+
 @router.delete("/{attachment_id}")
 async def delete_attachment(
     attachment_id: uuid.UUID,
@@ -672,6 +720,10 @@ async def delete_attachment(
     # 删除对应的 glb 缓存
     if is_stp_file(att.file_name):
         delete_glb_cache(str(attachment_id), att.file_path)
+
+    # 删除对应的 PDF 缓存（Office 预览）
+    if is_office_file(att.file_name):
+        delete_pdf_cache(str(attachment_id), att.file_path)
     
     # 从数据库删除
     db.delete(att)
