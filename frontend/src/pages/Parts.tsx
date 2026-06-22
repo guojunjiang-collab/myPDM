@@ -587,7 +587,8 @@ export default function Parts() {
                 type="text"
                 value={formData.code}
                 onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                disabled={!!editingPart}
+                disabled={!!editingPart && !isAdmin()}
+                title={editingPart && isAdmin() ? '管理员可修改件号' : undefined}
                 className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300 disabled:bg-gray-100 disabled:text-gray-400"
                 required
               />

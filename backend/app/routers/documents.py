@@ -179,6 +179,16 @@ async def update_document(doc_id: uuid.UUID, body: schemas.DocumentUpdate, reque
     d = db.query(Document).filter(Document.id == doc_id).first()
     if not d:
         raise HTTPException(status_code=404, detail="图文档不存在")
+    # 修改编号后须保证 (编号+版本) 仍唯一（version 不可改，按当前版本校验 code 冲突）
+    if body.code and body.code != d.code:
+        existing = db.query(Document).filter(
+            Document.code == body.code,
+            Document.version == d.version,
+            Document.deleted_at.is_(None),
+            Document.id != doc_id,
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="该编号和版本的组合已存在")
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(d, field, value)
     db.commit()

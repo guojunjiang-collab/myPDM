@@ -54,6 +54,14 @@ async def get_assembly(assembly_id: uuid.UUID, db: Session = Depends(get_db), cu
 
 @router.put("/{assembly_id}", response_model=schemas.AssemblyResponse)
 async def update_assembly(assembly_id: uuid.UUID, assembly_update: schemas.AssemblyUpdate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("assemblies:update"))):
+    db_assembly = crud.get_assembly(db, assembly_id)
+    if not db_assembly:
+        raise HTTPException(status_code=404, detail="部件不存在")
+    # 修改件号后须保证 (件号+版本) 仍唯一（version 不可改，按当前版本校验 code 冲突）
+    if assembly_update.code and assembly_update.code != db_assembly.code:
+        dup = crud.get_assembly_by_code_version(db, assembly_update.code, db_assembly.version)
+        if dup and dup.id != assembly_id:
+            raise HTTPException(status_code=400, detail="部件编码+版本已存在")
     db_assembly = crud.update_assembly(db, assembly_id, assembly_update)
     if not db_assembly:
         raise HTTPException(status_code=404, detail="部件不存在")

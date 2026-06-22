@@ -56,6 +56,14 @@ async def get_part(part_id: uuid.UUID, db: Session = Depends(get_db), current_us
 @router.put("/{part_id}", response_model=schemas.PartResponse)
 async def update_part(part_id: uuid.UUID, part_update: schemas.PartUpdate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("parts:update"))):
     crud.assert_entity_editable(db, "part", part_id, current_user.role)
+    db_part = crud.get_part(db, part_id)
+    if not db_part:
+        raise HTTPException(status_code=404, detail="零件不存在")
+    # 修改件号后须保证 (件号+版本) 仍唯一（version 不可改，按当前版本校验 code 冲突）
+    if part_update.code and part_update.code != db_part.code:
+        dup = crud.get_part_by_code(db, part_update.code, db_part.version)
+        if dup and dup.id != part_id:
+            raise HTTPException(status_code=400, detail="该编码和版本的组合已存在")
     db_part = crud.update_part(db, part_id, part_update)
     if not db_part:
         raise HTTPException(status_code=404, detail="零件不存在")
