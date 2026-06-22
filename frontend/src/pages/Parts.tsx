@@ -520,7 +520,7 @@ export default function Parts() {
               <th onClick={() => handleSort('spec' as keyof Part)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">规格型号 {getSortIcon('spec' as keyof Part)}</th>
               <th onClick={() => handleSort('version' as keyof Part)} className="w-14 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">版本 {getSortIcon('version' as keyof Part)}</th>
               <th onClick={() => handleSort('status' as keyof Part)} className="w-20 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">状态 {getSortIcon('status' as keyof Part)}</th>
-              <th className="w-40 px-4 py-3 text-right text-sm font-medium text-gray-500">操作</th>
+              <th className="w-52 px-4 py-3 text-right text-sm font-medium text-gray-500">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
