@@ -16,7 +16,6 @@ import Settings from './pages/Settings';
 import EC from './pages/EC';
 import Configuration from './pages/Configuration';
 import Inventory from './pages/Inventory';
-import Business from './pages/Business';
 import DataManagement from './pages/DataManagement';
 const STPViewer = lazy(() => import('./pages/STPViewer'));
 
@@ -62,7 +61,6 @@ export default function App() {
           <Route path="bom" element={<BOM />} />
           <Route path="ec" element={<EC />} />
           <Route path="inventory" element={<Inventory />} />
-          <Route path="business" element={<Business />} />
           <Route path="users" element={<Users />} />
           <Route path="logs" element={<Logs />} />
           <Route path="settings" element={<Settings />} />
