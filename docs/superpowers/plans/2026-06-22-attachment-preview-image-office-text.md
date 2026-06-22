@@ -40,7 +40,15 @@
 ```python
 # backend/tests/test_office_converter.py
 from pathlib import Path
+import pytest
+from app import office_converter
 from app.office_converter import is_office_file, get_pdf_cache_path, get_pdf_path_for_attachment
+
+
+@pytest.fixture(autouse=True)
+def _tmp_cache_dir(tmp_path, monkeypatch):
+    """把 PDF_CACHE_DIR 指向临时目录，避免依赖容器内 /app 路径"""
+    monkeypatch.setattr(office_converter, "PDF_CACHE_DIR", tmp_path / "pdf_cache")
 
 
 def test_is_office_file_true():
