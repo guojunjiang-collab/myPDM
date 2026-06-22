@@ -2,10 +2,11 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { assembliesApi, assemblyPartsApi, customFieldsApi, bomApi, partsApi } from '../services/api';
 import type { Assembly, AssemblyPartItem, CustomFieldDefinition, CustomFieldValue } from '../types';
-import { canEdit, isAdmin, canDownload } from '../stores/auth';
+import { canEdit, isAdmin, canDownload, can } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
 import AssemblyDetailContent from '../components/AssemblyDetailContent';
 import PartDetailContent from '../components/PartDetailContent';
+import BOMTraceModal from '../components/BOMTraceModal';
 import VersionHistory from '../components/VersionHistory';
 import VersionSelectModal from '../components/VersionSelectModal';
 import AssemblyPartPicker from '../components/AssemblyPartPicker';
@@ -79,6 +80,9 @@ export default function Components() {
   // 仅显示顶层部件（不作为任何其它部件的子部件）。由服务端按 BOM 父子关系返回 id 集合后过滤。
   const [topLevelOnly, setTopLevelOnly] = useState(false);
   const [topLevelIds, setTopLevelIds] = useState<Set<string> | null>(null);
+
+  // 反查弹窗
+  const [traceEntity, setTraceEntity] = useState<{ type: 'part' | 'assembly'; id: string; code: string; name: string } | null>(null);
 
   /* ---- 编辑弹窗 ---- */
   const [modalOpen, setModalOpen] = useState(false);
@@ -1139,7 +1143,7 @@ export default function Components() {
               <th onClick={() => handleSort('spec' as keyof Assembly)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">规格型号 {getSortIcon('spec' as keyof Assembly)}</th>
               <th onClick={() => handleSort('version' as keyof Assembly)} className="w-14 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">版本 {getSortIcon('version' as keyof Assembly)}</th>
               <th onClick={() => handleSort('status' as keyof Assembly)} className="w-20 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">状态 {getSortIcon('status' as keyof Assembly)}</th>
-              <th className="w-40 px-4 py-3 text-right text-sm font-medium text-gray-500">操作</th>
+              <th className="w-52 px-4 py-3 text-right text-sm font-medium text-gray-500">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -1179,6 +1183,14 @@ export default function Components() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                    {can('bom:trace') && (
+                      <button
+                        onClick={() => setTraceEntity({ type: 'assembly', id: assembly.id, code: assembly.code, name: assembly.name })}
+                        className="text-indigo-600 hover:text-indigo-800 mr-3"
+                      >
+                        反查
+                      </button>
+                    )}
                     {canDownload() && (
                       <button
                         onClick={() => handleExportSingleBOM(assembly.id)}
@@ -1210,6 +1222,9 @@ export default function Components() {
           </tbody>
         </table>
       </div>
+
+      {/* 反查弹窗 */}
+      <BOMTraceModal entity={traceEntity} onClose={() => setTraceEntity(null)} />
 
       {/* ========== 新增/编辑弹窗 ========== */}
       <Modal
