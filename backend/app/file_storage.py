@@ -69,7 +69,7 @@ class FileStorage:
         dir_name = str(entity_id)
         if folder_name:
             sanitized = folder_name.strip().strip('.')
-            illegal_chars = r'\/:*?"<>|\x00'
+            illegal_chars = r'\/:*?"<>|' + '\x00'
             for ch in illegal_chars:
                 sanitized = sanitized.replace(ch, '_')
             dir_name = sanitized if sanitized else str(entity_id)
