@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, lazy, Suspense } from 'react';
 import { documentsApi, customFieldsApi, bomApi, v2UploadApi, CHUNK_SIZE, CHUNK_THRESHOLD } from '../services/api';
 import type { Document, CustomFieldDefinition, CustomFieldValue, DocumentAttachment } from '../types';
 import { canEdit, isAdmin, canDownload, useAuthStore } from '../stores/auth';
@@ -15,6 +15,7 @@ import {
 import type { ImportPreview } from '../services/importExport';
 import ImportPreviewModal from '../components/ImportPreviewModal';
 import ArchiveTreeModal from '../components/ArchiveTreeModal';
+const OfficeReaderModal = lazy(() => import('../components/OfficeReaderModal'));
 
 /** 生成 UUID */
 function generateUUID(): string {
@@ -93,6 +94,7 @@ export default function Documents() {
   const [viewingCustomValues, setViewingCustomValues] = useState<Record<string, any>>({});
   const [detailTab, setDetailTab] = useState<'detail' | 'versions'>('detail');
   const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
+  const [officePreview, setOfficePreview] = useState<{ attId: string; fileName: string } | null>(null);
 
   // 从 store 订阅数据
   const storeDocuments = useDataStore((s) => s.documents);
@@ -973,6 +975,7 @@ export default function Documents() {
                 customFieldDefs={viewingCustomDefs}
                 customFieldValues={viewingCustomValues}
                 onArchivePreview={(attId, fileName) => setArchivePreview({ attId, fileName })}
+                onOfficePreview={(attId, fileName) => setOfficePreview({ attId, fileName })}
               />
             ) : (
               <VersionHistory
@@ -1011,6 +1014,17 @@ export default function Documents() {
           attachmentId={archivePreview.attId}
           fileName={archivePreview.fileName}
         />
+      )}
+
+      {officePreview && (
+        <Suspense fallback={null}>
+          <OfficeReaderModal
+            open={!!officePreview}
+            onClose={() => setOfficePreview(null)}
+            attachmentId={officePreview.attId}
+            fileName={officePreview.fileName}
+          />
+        </Suspense>
       )}
     </div>
   );
