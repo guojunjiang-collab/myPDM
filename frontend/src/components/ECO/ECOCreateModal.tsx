@@ -490,7 +490,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
                   className="flex-1 border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   disabled={usersLoading}>
                   <option value="">{usersLoading ? '加载中...' : '请选择审批人'}</option>
-                  {users.filter((u) => u.id !== currentUserId).map((u) => (
+                  {users.filter((u) => u.id !== currentUserId && (u.role === 'admin' || u.role === 'engineer')).map((u) => (
                     <option key={u.id} value={u.id}>{u.real_name} ({u.username}) - {u.role}</option>
                   ))}
                 </select>

@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { configurationProfileApi } from '../../services/api';
+import { configurationProfileApi, usersApi } from '../../services/api';
 import type { ConfigurationProfile } from '../../types';
 import { canEdit, isAdmin, canDownload } from '../../stores/auth';
 import { ConfirmModal } from '../Modal';
@@ -33,6 +33,10 @@ export default function ProfileList() {
   const [importLoading, setImportLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 知会
+  const [ccTargetId, setCcTargetId] = useState<string | null>(null);
+  const [ccUsers, setCcUsers] = useState<{ id: string; real_name: string }[]>([]);
 
   const load = async () => {
     setLoading(true);
@@ -78,8 +82,11 @@ export default function ProfileList() {
     try { await configurationProfileApi.delete(deleteId); setDeleteId(null); load(); } catch {}
   };
 
-  const handleSubmit = async (id: string) => {
-    try { await configurationProfileApi.submit(id); load(); } catch {}
+  const handleSubmit = async (profile: ConfigurationProfile) => {
+    if ((profile.reviewer_count ?? profile.reviewers?.length ?? 0) === 0) {
+      if (!confirm('当前无审批人，提交后将直接生效。确认提交？')) return;
+    }
+    try { await configurationProfileApi.submit(profile.id); load(); } catch {}
   };
   const handleWithdraw = async (id: string) => {
     try { await configurationProfileApi.withdraw(id); load(); } catch {}
@@ -90,6 +97,24 @@ export default function ProfileList() {
   const handleArchive = async (id: string) => {
     if (!confirm('确认归档该配置？')) return;
     try { await configurationProfileApi.archive(id); load(); } catch {}
+  };
+
+  const handleCcOpen = async (id: string) => {
+    setCcTargetId(id);
+    try {
+      const resp = await usersApi.list({ page_size: 200 });
+      const list = resp.data?.items || resp.data || [];
+      setCcUsers(Array.isArray(list) ? list : []);
+    } catch { setCcUsers([]); }
+  };
+  const handleCcAdd = async (userId: string) => {
+    if (!ccTargetId) return;
+    const u = ccUsers.find((x) => x.id === userId);
+    try {
+      await configurationProfileApi.addCc(ccTargetId, userId, u?.real_name || '');
+      setCcTargetId(null);
+      load();
+    } catch {}
   };
 
   const handleExport = async () => {
@@ -227,17 +252,23 @@ export default function ProfileList() {
                       {canEdit() && (
                         <button onClick={() => setEditId(profile.id)} className="text-primary-600 hover:text-primary-800">编辑</button>
                       )}
-                      <button onClick={() => handleSubmit(profile.id)} className="text-green-600 hover:text-green-800 ml-2">提交评审</button>
+                      <button onClick={() => handleSubmit(profile)} className="text-green-600 hover:text-green-800 ml-2">提交评审</button>
                     </>
                   )}
                   {profile.status === 'reviewing' && (
                     <>
                       <button onClick={() => setDetailId(profile.id)} className="text-primary-600 hover:text-primary-800">审批</button>
                       <button onClick={() => handleWithdraw(profile.id)} className="text-orange-600 hover:text-orange-800 ml-2">撤回</button>
+                      <button onClick={() => handleCcOpen(profile.id)} className="text-blue-600 hover:text-blue-800 ml-2">知会</button>
                     </>
                   )}
-                  {profile.status === 'active' && isAdmin() && (
-                    <button onClick={() => handleArchive(profile.id)} className="text-gray-600 hover:text-gray-800">归档</button>
+                  {profile.status === 'active' && (
+                    <>
+                      {isAdmin() && (
+                        <button onClick={() => handleArchive(profile.id)} className="text-gray-600 hover:text-gray-800">归档</button>
+                      )}
+                      <button onClick={() => handleCcOpen(profile.id)} className="text-blue-600 hover:text-blue-800 ml-2">知会</button>
+                    </>
                   )}
                   {profile.status === 'rejected' && (
                     <>
@@ -245,6 +276,7 @@ export default function ProfileList() {
                       {isAdmin() && (
                         <button onClick={() => handleArchive(profile.id)} className="text-gray-600 hover:text-gray-800 ml-2">归档</button>
                       )}
+                      <button onClick={() => handleCcOpen(profile.id)} className="text-blue-600 hover:text-blue-800 ml-2">知会</button>
                     </>
                   )}
                   {profile.status === 'archived' && (
@@ -259,6 +291,24 @@ export default function ProfileList() {
           </tbody>
         </table>
       </div>
+
+      {/* 知会用户选择 */}
+      {ccTargetId && (
+        <div className="flex items-center gap-2 mt-2 px-4 py-2 bg-blue-50 rounded-lg border border-blue-200">
+          <span className="text-sm text-blue-700">选择知会人：</span>
+          <select
+            onChange={(e) => { if (e.target.value) handleCcAdd(e.target.value); }}
+            className="border border-blue-300 rounded px-2 py-1 text-sm bg-white"
+            autoFocus
+          >
+            <option value="">请选择</option>
+            {ccUsers.map((u) => (
+              <option key={u.id} value={u.id}>{u.real_name}</option>
+            ))}
+          </select>
+          <button onClick={() => setCcTargetId(null)} className="text-gray-400 hover:text-gray-600 text-sm">取消</button>
+        </div>
+      )}
 
       {/* 分页 */}
       {totalPages > 1 && (

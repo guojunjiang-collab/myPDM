@@ -187,14 +187,13 @@ class SyncService {
 
   private async poll() {
     const store = useDataStore.getState();
-    store.setSyncing(true);
-    store.setSyncError(null);
 
     try {
       const res = await syncApi.getStatus();
       const serverTime: SyncStatus = res.data;
 
       const entities = buildEntities();
+      let hasChanges = false;
 
       for (const entity of entities) {
         const serverTs = serverTime[entity.key] || 0;
@@ -202,6 +201,10 @@ class SyncService {
 
         if (serverTs > localTs) {
           try {
+            if (!hasChanges) {
+              hasChanges = true;
+              store.setSyncing(true);
+            }
             const items = await entity.fetch(localTs);
             entity.merge(items);
             this.lastSync[entity.key] = serverTs;
@@ -212,7 +215,9 @@ class SyncService {
         }
       }
 
-      store.setLastSyncTime(Date.now() / 1000);
+      if (hasChanges) {
+        store.setLastSyncTime(Date.now() / 1000);
+      }
     } catch (e) {
       store.setSyncError('同步失败，稍后重试');
     } finally {

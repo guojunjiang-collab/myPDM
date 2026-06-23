@@ -375,6 +375,9 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
   // ── Approval flow handlers ──
   const handleSubmitReview = async () => {
     if (!profileId) return;
+    if (reviewers.length === 0) {
+      if (!confirm('当前无审批人，提交后将直接生效。确认提交？')) return;
+    }
     setSaving(true);
     try {
       await configurationProfileApi.submit(profileId);
@@ -789,13 +792,6 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
             {/* ── Approval action buttons ── */}
             {!isCreate && !isView && profile && (
               <div className="flex items-center gap-2 border-t pt-3">
-                <ProfileStatusBadge status={profile.status} />
-                {profile.status === 'draft' && (
-                  <button onClick={handleSubmitReview} disabled={saving}
-                    className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50">
-                    提交评审
-                  </button>
-                )}
                 {profile.status === 'reviewing' && (
                   <button onClick={handleWithdraw} disabled={saving}
                     className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50">
@@ -839,7 +835,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                           disabled={usersLoading}
                           className="flex-1 border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500">
                           <option value="">{usersLoading ? '加载中...' : '请选择审批人'}</option>
-                          {users.filter((u) => u.id !== currentUserId).map((u) => (
+                          {users.filter((u) => u.id !== currentUserId && (u.role === 'admin' || u.role === 'engineer')).map((u) => (
                             <option key={u.id} value={u.id}>{u.real_name} ({u.username})</option>
                           ))}
                         </select>
@@ -848,28 +844,6 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                       </div>
                     ))}
                   </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-sm font-medium">知会人</label>
-                  </div>
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    {ccUsers.map((c) => (
-                      <span key={c.user_id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-xs">
-                        {c.user_name}
-                        <button type="button" onClick={() => removeCc(c.user_id)} className="hover:text-red-500">✕</button>
-                      </span>
-                    ))}
-                  </div>
-                  <select value=""
-                    onChange={(e) => { if (e.target.value) { addCc(e.target.value); e.target.value = ''; } }}
-                    disabled={usersLoading}
-                    className="border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500">
-                    <option value="">{usersLoading ? '加载中...' : '+ 添加知会'}</option>
-                    {users.filter((u) => u.id !== currentUserId && !ccUsers.some((c) => c.user_id === u.id)).map((u) => (
-                      <option key={u.id} value={u.id}>{u.real_name} ({u.username})</option>
-                    ))}
-                  </select>
-                </div>
               </div>
             )}
 
@@ -887,19 +861,6 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                     await loadProfile();
                   }}
                 />
-                <div>
-                  <div className="text-sm font-medium mb-1">状态日志</div>
-                  <ul className="text-xs text-gray-500 space-y-1 max-h-32 overflow-y-auto">
-                    {(profile.status_logs || []).map((l) => (
-                      <li key={l.id} className="flex gap-1">
-                        <span className="text-gray-400">{l.created_at ? new Date(l.created_at).toLocaleString() : ''}</span>
-                        <span>{l.from_status || '—'} → {l.to_status}</span>
-                        <span>{l.operator_name}</span>
-                        <span className="text-gray-400">{l.comment}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
               </div>
             )}
 
@@ -993,6 +954,23 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
               </div>
             )}
 
+            {/* ── 状态日志 ── */}
+            {profile && profile.status !== 'draft' && !isCreate && (profile.status_logs || []).length > 0 && (
+              <div className="border-t pt-3">
+                <h4 className="text-sm font-bold text-gray-700 mb-2">状态日志</h4>
+                <ul className="text-xs text-gray-500 space-y-1 max-h-32 overflow-y-auto">
+                  {(profile.status_logs || []).map((l) => (
+                    <li key={l.id} className="flex gap-2">
+                      <span className="text-gray-400">{l.created_at ? new Date(l.created_at).toLocaleString() : ''}</span>
+                      <span>{l.from_status || '—'} → {l.to_status}</span>
+                      <span>{l.operator_name}</span>
+                      <span className="text-gray-400">{l.comment}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
           </>
         )}
       </div>
@@ -1015,13 +993,22 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
           </button>
         )}
         {canEdit && (
-          <button
-            onClick={handleUpdate}
-            disabled={saving}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm disabled:opacity-50"
-          >
-            {saving ? '保存中...' : '保存'}
-          </button>
+          <>
+            <button
+              onClick={handleUpdate}
+              disabled={saving}
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm disabled:opacity-50"
+            >
+              {saving ? '保存中...' : '保存'}
+            </button>
+            <button
+              onClick={handleSubmitReview}
+              disabled={saving}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm disabled:opacity-50"
+            >
+              提交
+            </button>
+          </>
         )}
       </div>
     </Modal>

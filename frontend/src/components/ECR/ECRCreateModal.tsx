@@ -547,7 +547,7 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
                   <option value="">
                     {usersLoading ? '加载中...' : '请选择审批人'}
                   </option>
-                  {users.filter((u) => u.id !== currentUserId).map((u) => (
+                  {users.filter((u) => u.id !== currentUserId && (u.role === 'admin' || u.role === 'engineer')).map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.real_name} ({u.username}) - {u.role}
                     </option>
