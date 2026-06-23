@@ -10,7 +10,7 @@ import BOMTreePanel from './BOMTreePanel';
 import BOMComparePanel from './BOMComparePanel';
 import BOMTracePanel from './BOMTracePanel';
 import DocTracePanel from './DocTracePanel';
-import { usePageHeader } from '../../stores/pageHeader';
+import { useHeaderTabs } from '../../hooks/useHeaderTabs';
 
 type ModeKey = 'tree' | 'compare' | 'trace' | 'doc-trace';
 const modeTabs: { key: ModeKey; label: string }[] = [
@@ -22,29 +22,9 @@ const modeTabs: { key: ModeKey; label: string }[] = [
 
 export default function BOM() {
   const [mode, setMode] = useState<ModeKey>('tree');
-  const setHeader = usePageHeader((s) => s.setContent);
 
   // 将模式 Tab 注入顶栏，替代默认的“管理工具”标题，节省一行高度、内容区更高
-  useEffect(() => {
-    setHeader(
-      <div className="flex items-center gap-1">
-        {modeTabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setMode(tab.key)}
-            className={`px-3 py-1 text-lg font-semibold rounded-md transition-colors ${
-              mode === tab.key
-                ? 'text-primary-600 bg-primary-50'
-                : 'text-gray-800 hover:bg-gray-50'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-    );
-    return () => setHeader(null);
-  }, [mode, setHeader]);
+  useHeaderTabs(modeTabs, mode, setMode);
 
   // 部件列表（BOM 树模式 & BOM 对比模式共用）
   const [assemblies, setAssemblies] = useState<SelectOption[]>([]);
