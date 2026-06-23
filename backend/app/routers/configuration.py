@@ -438,7 +438,7 @@ async def list_profiles(
 ):
     """配置列表"""
     skip = (page - 1) * page_size
-    profiles, total = crud.get_profiles(db, search=search, status=status, skip=skip, limit=page_size)
+    profiles, total = crud.get_profiles_for_user(db, current_user, search=search, status=status, skip=skip, limit=page_size)
     return {
         "items": [{
             "id": str(p.id), "code": p.code, "name": p.name,
@@ -450,6 +450,8 @@ async def list_profiles(
             "creator_id": str(p.creator_id),
             "created_at": p.created_at.isoformat() if p.created_at else None,
             "updated_at": p.updated_at.isoformat() if p.updated_at else None,
+            "review_mode": p.review_mode,
+            "reviewer_count": len(p.reviewers or []),
         } for p in profiles],
         "total": total, "page": page, "page_size": page_size,
     }
@@ -525,6 +527,23 @@ async def get_profile(
         "items": [_format_profile_item(item, entity_map) for item in working_items],
         "config_tree": _build_config_tree(db, str(profile.configuration_item_id), working_items, entity_map) if profile.configuration_item_id else None,
         "formal_items": [_format_profile_item(item) for item in formal_items],
+        "reviewers": profile.reviewers or [],
+        "review_mode": profile.review_mode,
+        "cc_users": profile.cc_users or [],
+        "review_records": [{
+            "id": str(r.id), "reviewer_id": str(r.reviewer_id),
+            "reviewer_name": r.reviewer_name, "decision": r.decision,
+            "comment": r.comment or "",
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        } for r in crud.get_review_records(db, profile_id)],
+        "status_logs": [{
+            "id": str(l.id), "from_status": l.from_status, "to_status": l.to_status,
+            "operator_name": l.operator_name, "comment": l.comment or "",
+            "created_at": l.created_at.isoformat() if l.created_at else None,
+        } for l in crud.get_status_logs(db, profile_id)],
+        "submitted_at": profile.submitted_at.isoformat() if profile.submitted_at else None,
+        "reviewed_at": profile.reviewed_at.isoformat() if profile.reviewed_at else None,
+        "archived_at": profile.archived_at.isoformat() if profile.archived_at else None,
     }
 
 
@@ -572,20 +591,70 @@ async def delete_profile(
     return {"detail": "ok"}
 
 
-@router.post("/profiles/{profile_id}/activate")
-async def activate_profile(
+@router.post("/profiles/{profile_id}/submit")
+async def submit_profile_review(
     profile_id: str,
     db: Session = Depends(get_db),
     current_user=Depends(require_permission("profile:activate_archive")),
 ):
-    """生效（draft → active）"""
+    """提交评审（draft→reviewing；无审批人→active）"""
     profile = crud.get_profile(db, profile_id)
     if not profile:
         raise HTTPException(status_code=404, detail="配置不存在")
     if profile.status != "draft":
-        raise HTTPException(status_code=400, detail="仅草稿状态可生效")
-    crud.change_profile_status(db, profile_id, "active")
-    return {"detail": "ok", "status": "active"}
+        raise HTTPException(status_code=400, detail="仅草稿状态可提交评审")
+    profile = crud.submit_profile(db, profile, current_user)
+    return {"detail": "ok", "status": profile.status}
+
+
+@router.post("/profiles/{profile_id}/withdraw")
+async def withdraw_profile_review(
+    profile_id: str,
+    data: schemas.ProfileWithdrawRequest = None,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("profile:activate_archive")),
+):
+    """撤回评审（reviewing→draft）"""
+    profile = crud.get_profile(db, profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="配置不存在")
+    if profile.status != "reviewing":
+        raise HTTPException(status_code=400, detail="仅评审中状态可撤回")
+    profile = crud.withdraw_profile(db, profile, current_user, (data.comment if data else "") or "")
+    return {"detail": "ok", "status": profile.status}
+
+
+@router.post("/profiles/{profile_id}/review")
+async def review_profile_endpoint(
+    profile_id: str,
+    data: schemas.ProfileReviewRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("profile:read")),
+):
+    """审批操作（通过/驳回/退回）"""
+    profile = crud.get_profile(db, profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="配置不存在")
+    if data.decision not in ("approved", "rejected", "returned"):
+        raise HTTPException(status_code=400, detail="无效审批决定")
+    profile = crud.review_profile(db, profile, current_user, data.decision, data.comment or "")
+    return {"detail": "ok", "status": profile.status}
+
+
+@router.post("/profiles/{profile_id}/reopen")
+async def reopen_profile_endpoint(
+    profile_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("profile:update")),
+):
+    """重新编辑（rejected→draft）"""
+    profile = crud.get_profile(db, profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="配置不存在")
+    if profile.status != "rejected":
+        raise HTTPException(status_code=400, detail="仅已驳回状态可重新编辑")
+    profile = crud.reopen_profile(db, profile, current_user)
+    return {"detail": "ok", "status": profile.status}
 
 
 class ProfileStatusUpdate(BaseModel):
@@ -603,8 +672,11 @@ async def update_profile_status(
     profile = crud.get_profile(db, profile_id)
     if not profile:
         raise HTTPException(status_code=404, detail="配置不存在")
-    if data.status not in ("draft", "active", "archived"):
+    if data.status not in ("draft", "reviewing", "active", "rejected", "archived"):
         raise HTTPException(status_code=400, detail="无效状态")
+    old = profile.status
+    crud._add_profile_status_log(db, profile.id, old, data.status,
+                                 current_user.id, current_user.real_name, "管理员强制变更")
     crud.change_profile_status(db, profile_id, data.status)
     return {"detail": "ok", "status": data.status}
 
@@ -615,14 +687,58 @@ async def archive_profile(
     db: Session = Depends(get_db),
     current_user=Depends(require_permission("profile:activate_archive")),
 ):
-    """归档（active → archived）"""
+    """归档（active/rejected → archived）"""
     profile = crud.get_profile(db, profile_id)
     if not profile:
         raise HTTPException(status_code=404, detail="配置不存在")
-    if profile.status != "active":
-        raise HTTPException(status_code=400, detail="仅生效状态可归档")
-    crud.change_profile_status(db, profile_id, "archived")
-    return {"detail": "ok", "status": "archived"}
+    if profile.status not in ("active", "rejected"):
+        raise HTTPException(status_code=400, detail="仅生效或已驳回状态可归档")
+    profile = crud.archive_profile(db, profile, current_user)
+    return {"detail": "ok", "status": profile.status}
+
+
+@router.get("/profiles/{profile_id}/status-logs", response_model=dict)
+async def get_profile_status_logs(
+    profile_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("profile:read")),
+):
+    profile = crud.get_profile(db, profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="配置不存在")
+    return {"items": [{
+        "id": str(l.id), "from_status": l.from_status, "to_status": l.to_status,
+        "operator_name": l.operator_name, "comment": l.comment or "",
+        "created_at": l.created_at.isoformat() if l.created_at else None,
+    } for l in crud.get_status_logs(db, profile_id)]}
+
+
+@router.post("/profiles/{profile_id}/cc")
+async def add_profile_cc_endpoint(
+    profile_id: str,
+    data: schemas.ProfileCcAddRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("profile:read")),
+):
+    profile = crud.get_profile(db, profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="配置不存在")
+    profile = crud.add_profile_cc(db, profile, data.user_id, data.user_name or "")
+    return {"detail": "ok", "cc_users": profile.cc_users}
+
+
+@router.delete("/profiles/{profile_id}/cc/{user_id}")
+async def remove_profile_cc_endpoint(
+    profile_id: str,
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("profile:read")),
+):
+    profile = crud.get_profile(db, profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="配置不存在")
+    profile = crud.remove_profile_cc(db, profile, user_id)
+    return {"detail": "ok", "cc_users": profile.cc_users}
 
 
 class ChecklistRestoreItem(BaseModel):
