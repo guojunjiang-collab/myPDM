@@ -6,6 +6,8 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func as sqlfunc
 from typing import Optional, List, Tuple
+from datetime import datetime, timezone
+from fastapi import HTTPException
 
 from . import models_configuration as models
 from . import schemas_configuration as schemas
@@ -303,6 +305,9 @@ def create_profile(
         effectivity_end=data.effectivity_end,
         remark=data.remark,
         creator_id=creator_id,
+        reviewers=[r.model_dump() for r in (data.reviewers or [])],
+        review_mode=data.review_mode or "all",
+        cc_users=[c.model_dump() for c in (data.cc_users or [])],
     )
     db.add(profile)
     db.flush()
@@ -342,6 +347,8 @@ def update_profile(
     update_data = data.model_dump(exclude_unset=True)
     update_data.pop("configuration_item_id", None)
     for k, v in update_data.items():
+        if v is None and k in ("reviewers", "cc_users", "review_mode"):
+            continue
         setattr(profile, k, v)
 
     db.flush()
@@ -458,3 +465,212 @@ def update_profile_item(
 ) -> Optional[models.ConfigurationWorkingItem]:
     """更新工作表单项的选中态（别名，兼容旧调用）"""
     return update_working_item(db, item_id, is_selected, force)
+
+
+# ════════════════════════════════════════════════════════
+# 审批流（参照 ECO）
+# ════════════════════════════════════════════════════════
+
+_ALLOWED_PROFILE_TRANSITIONS = {
+    "draft": {"reviewing", "active", "archived"},
+    "reviewing": {"active", "rejected", "draft"},
+    "active": {"archived"},
+    "rejected": {"draft", "archived"},
+    "archived": set(),
+}
+
+
+def _validate_profile_transition(current: str, target: str):
+    if target not in _ALLOWED_PROFILE_TRANSITIONS.get(current, set()):
+        raise HTTPException(status_code=400, detail=f"不允许从 {current} 转为 {target}")
+
+
+def _add_profile_status_log(db, profile_id, from_status, to_status,
+                            operator_id, operator_name, comment=""):
+    db.add(models.ConfigurationStatusLog(
+        profile_id=profile_id, from_status=from_status, to_status=to_status,
+        operator_id=operator_id, operator_name=operator_name, comment=comment,
+    ))
+
+
+def _clear_profile_review_records(db, profile_id):
+    db.query(models.ConfigurationReviewRecord).filter(
+        models.ConfigurationReviewRecord.profile_id == profile_id
+    ).delete()
+
+
+def submit_profile(db, profile, user):
+    """提交评审：有审批人→reviewing；无审批人→自动生效 active。"""
+    reviewers = profile.reviewers or []
+    _clear_profile_review_records(db, profile.id)
+    if not reviewers:
+        _validate_profile_transition(profile.status, "active")
+        _add_profile_status_log(db, profile.id, profile.status, "active",
+                                user.id, user.real_name, "无审批人自动生效")
+        profile.status = "active"
+        profile.submitted_at = datetime.now(timezone.utc)
+        profile.reviewed_at = datetime.now(timezone.utc)
+    else:
+        _validate_profile_transition(profile.status, "reviewing")
+        _add_profile_status_log(db, profile.id, profile.status, "reviewing",
+                                user.id, user.real_name, "提交评审")
+        profile.status = "reviewing"
+        profile.submitted_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+def withdraw_profile(db, profile, user, comment=""):
+    """撤回评审：reviewing→draft，清空审批记录。"""
+    _validate_profile_transition(profile.status, "draft")
+    _clear_profile_review_records(db, profile.id)
+    _add_profile_status_log(db, profile.id, profile.status, "draft",
+                            user.id, user.real_name, comment or "撤回评审")
+    profile.status = "draft"
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+def reopen_profile(db, profile, user):
+    """重新编辑：rejected→draft。"""
+    _validate_profile_transition(profile.status, "draft")
+    _clear_profile_review_records(db, profile.id)
+    _add_profile_status_log(db, profile.id, profile.status, "draft",
+                            user.id, user.real_name, "重新编辑")
+    profile.status = "draft"
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+def archive_profile(db, profile, user, comment=""):
+    """归档：active/rejected→archived。"""
+    _validate_profile_transition(profile.status, "archived")
+    _add_profile_status_log(db, profile.id, profile.status, "archived",
+                            user.id, user.real_name, comment or "归档")
+    profile.status = "archived"
+    profile.archived_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+def review_profile(db, profile, reviewer, decision, comment=""):
+    """审批操作：通过/驳回/退回。会签全通过或或签任一通过 → active。"""
+    if profile.status != "reviewing":
+        raise HTTPException(status_code=400, detail="配置不在评审中状态")
+
+    is_admin = reviewer.role == "admin"
+    is_reviewer = any(r.get("user_id") == str(reviewer.id) for r in (profile.reviewers or []))
+    if not is_admin and not is_reviewer:
+        raise HTTPException(status_code=403, detail="您不是该配置的指定审批人")
+
+    db.add(models.ConfigurationReviewRecord(
+        profile_id=profile.id, reviewer_id=reviewer.id,
+        reviewer_name=reviewer.real_name, decision=decision, comment=comment,
+    ))
+    db.commit()
+
+    if decision == "approved":
+        if profile.review_mode == "all":
+            all_ids = {r.get("user_id") for r in (profile.reviewers or [])}
+            approved_ids = {
+                str(r.reviewer_id) for r in db.query(models.ConfigurationReviewRecord).filter(
+                    models.ConfigurationReviewRecord.profile_id == profile.id,
+                    models.ConfigurationReviewRecord.decision == "approved",
+                ).all()
+            }
+            if all_ids and all_ids.issubset(approved_ids):
+                _add_profile_status_log(db, profile.id, profile.status, "active",
+                                        reviewer.id, reviewer.real_name, "全部审批通过")
+                profile.status = "active"
+                profile.reviewed_at = datetime.now(timezone.utc)
+        else:
+            _add_profile_status_log(db, profile.id, profile.status, "active",
+                                    reviewer.id, reviewer.real_name, "或签通过")
+            profile.status = "active"
+            profile.reviewed_at = datetime.now(timezone.utc)
+    elif decision == "rejected":
+        _add_profile_status_log(db, profile.id, profile.status, "rejected",
+                                reviewer.id, reviewer.real_name, comment or "驳回")
+        profile.status = "rejected"
+        profile.reviewed_at = datetime.now(timezone.utc)
+    elif decision == "returned":
+        _add_profile_status_log(db, profile.id, profile.status, "draft",
+                                reviewer.id, reviewer.real_name, comment or "退回修改")
+        profile.status = "draft"
+        _clear_profile_review_records(db, profile.id)
+    else:
+        raise HTTPException(status_code=400, detail="无效审批决定")
+
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+def get_review_records(db, profile_id):
+    return db.query(models.ConfigurationReviewRecord).filter(
+        models.ConfigurationReviewRecord.profile_id == profile_id
+    ).order_by(models.ConfigurationReviewRecord.created_at).all()
+
+
+def get_status_logs(db, profile_id):
+    return db.query(models.ConfigurationStatusLog).filter(
+        models.ConfigurationStatusLog.profile_id == profile_id
+    ).order_by(models.ConfigurationStatusLog.created_at).all()
+
+
+def add_profile_cc(db, profile, user_id, user_name):
+    cc = list(profile.cc_users or [])
+    if not any(c.get("user_id") == user_id for c in cc):
+        cc.append({"user_id": user_id, "user_name": user_name})
+        profile.cc_users = cc
+        db.commit()
+        db.refresh(profile)
+    return profile
+
+
+def remove_profile_cc(db, profile, user_id):
+    profile.cc_users = [c for c in (profile.cc_users or []) if c.get("user_id") != user_id]
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+def get_profiles_for_user(db, user, search=None, status=None, skip=0, limit=20):
+    """列表 + 权限过滤：
+    - 管理员：全部
+    - 非管理员：active/archived 全可见 + draft/reviewing/rejected 中 自己创建/审批人/知会 的
+    """
+    q = db.query(models.ConfigurationProfile)
+    if status:
+        q = q.filter(models.ConfigurationProfile.status == status)
+    if search:
+        like = f"%{search}%"
+        q = q.filter(or_(
+            models.ConfigurationProfile.code.ilike(like),
+            models.ConfigurationProfile.name.ilike(like),
+        ))
+    if user.role != "admin":
+        uid = str(user.id)
+        all_rows = q.order_by(models.ConfigurationProfile.code).all()
+
+        def visible(p):
+            if p.status in ("active", "archived"):
+                return True
+            if str(p.creator_id) == uid:
+                return True
+            if any(r.get("user_id") == uid for r in (p.reviewers or [])):
+                return True
+            if any(c.get("user_id") == uid for c in (p.cc_users or [])):
+                return True
+            return False
+
+        rows = [p for p in all_rows if visible(p)]
+        total = len(rows)
+        return rows[skip:skip + limit], total
+    total = q.count()
+    items = q.order_by(models.ConfigurationProfile.code).offset(skip).limit(limit).all()
+    return items, total
