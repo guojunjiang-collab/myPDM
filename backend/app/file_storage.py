@@ -26,7 +26,7 @@ ALLOWED_EXTENSIONS = {
     '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp',
     '.zip', '.rar', '.7z',
     '.glb', '.gltf', '.obj',
-    '.txt', '.csv',
+    '.txt', '.csv', '.md', '.log', '.json', '.xml',
 }
 
 
