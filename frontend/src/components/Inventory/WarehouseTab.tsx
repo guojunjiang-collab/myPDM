@@ -48,9 +48,9 @@ export default function WarehouseTab() {
   };
 
   return (
-    <div>
+    <div className="flex-1 min-h-0 flex flex-col">
       {/* 工具栏 */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4 shrink-0">
         <div className="flex-1" />
         {canEdit() && (
           <button onClick={() => setEditing({ code: '', name: '', type: 'general' })}
@@ -59,9 +59,9 @@ export default function WarehouseTab() {
       </div>
 
       {/* 表格 */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">编码</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">名称</th>

@@ -121,9 +121,9 @@ export default function DocumentTab() {
   };
 
   return (
-    <div>
+    <div className="flex-1 min-h-0 flex flex-col">
       {/* 工具栏 */}
-      <div className="flex gap-2 mb-4 items-center">
+      <div className="flex gap-2 mb-4 items-center shrink-0">
         <input type="text" placeholder="搜索单据号/业务/创建人/物料..." value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-80 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
@@ -153,9 +153,9 @@ export default function DocumentTab() {
       </div>
 
       {/* 表格 */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">单据号</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">类型</th>
