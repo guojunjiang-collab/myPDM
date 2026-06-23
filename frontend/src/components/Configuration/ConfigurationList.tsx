@@ -138,9 +138,9 @@ export default function ConfigurationList() {
   };
 
   return (
-    <div>
+    <div className="flex-1 min-h-0 flex flex-col">
       {/* 搜索 + 新建 */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4 shrink-0">
         <select
           value={searchField}
           onChange={(e) => setSearchField(e.target.value)}
@@ -193,7 +193,7 @@ export default function ConfigurationList() {
       )}
 
       {/* 表格（滚动容器，不分页） */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto max-h-[calc(100vh-230px)]">
+      <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>

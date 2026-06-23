@@ -172,9 +172,9 @@ export default function ProfileList() {
   };
 
   return (
-    <div>
+    <div className="flex-1 min-h-0 flex flex-col">
       {/* 搜索 + 新建 */}
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-4 shrink-0">
         <select
           value={searchField}
           onChange={(e) => setSearchField(e.target.value)}
@@ -220,7 +220,7 @@ export default function ProfileList() {
       </div>
 
       {/* 表格 */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
