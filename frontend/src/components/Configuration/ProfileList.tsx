@@ -246,20 +246,20 @@ export default function ProfileList() {
                 <td className="px-4 py-3 text-sm"><ProfileStatusBadge status={profile.status} /></td>
                 <td className="px-4 py-3 text-sm text-gray-500">{profile.effectivity_start || '-'} ~ {profile.effectivity_end || '-'}</td>
                 <td className="px-4 py-3 text-sm text-gray-500">{formatDate(profile.created_at)}</td>
-                <td className="px-4 py-3 text-right space-x-1 w-0 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                <td className="px-4 py-3 text-right space-x-3 w-0 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                   {profile.status === 'draft' && (
                     <>
                       {canEdit() && (
                         <button onClick={() => setEditId(profile.id)} className="text-primary-600 hover:text-primary-800">编辑</button>
                       )}
-                      <button onClick={() => handleSubmit(profile)} className="text-green-600 hover:text-green-800 ml-2">提交评审</button>
+                      <button onClick={() => handleSubmit(profile)} className="text-green-600 hover:text-green-800">提交评审</button>
                     </>
                   )}
                   {profile.status === 'reviewing' && (
                     <>
                       <button onClick={() => setDetailId(profile.id)} className="text-primary-600 hover:text-primary-800">审批</button>
-                      <button onClick={() => handleWithdraw(profile.id)} className="text-orange-600 hover:text-orange-800 ml-2">撤回</button>
-                      <button onClick={() => handleCcOpen(profile.id)} className="text-blue-600 hover:text-blue-800 ml-2">知会</button>
+                      <button onClick={() => handleWithdraw(profile.id)} className="text-orange-600 hover:text-orange-800">撤回</button>
+                      <button onClick={() => handleCcOpen(profile.id)} className="text-blue-600 hover:text-blue-800">知会</button>
                     </>
                   )}
                   {profile.status === 'active' && (
@@ -267,23 +267,23 @@ export default function ProfileList() {
                       {isAdmin() && (
                         <button onClick={() => handleArchive(profile.id)} className="text-gray-600 hover:text-gray-800">归档</button>
                       )}
-                      <button onClick={() => handleCcOpen(profile.id)} className="text-blue-600 hover:text-blue-800 ml-2">知会</button>
+                      <button onClick={() => handleCcOpen(profile.id)} className="text-blue-600 hover:text-blue-800">知会</button>
                     </>
                   )}
                   {profile.status === 'rejected' && (
                     <>
                       <button onClick={() => handleReopen(profile.id)} className="text-primary-600 hover:text-primary-800">重新编辑</button>
                       {isAdmin() && (
-                        <button onClick={() => handleArchive(profile.id)} className="text-gray-600 hover:text-gray-800 ml-2">归档</button>
+                        <button onClick={() => handleArchive(profile.id)} className="text-gray-600 hover:text-gray-800">归档</button>
                       )}
-                      <button onClick={() => handleCcOpen(profile.id)} className="text-blue-600 hover:text-blue-800 ml-2">知会</button>
+                      <button onClick={() => handleCcOpen(profile.id)} className="text-blue-600 hover:text-blue-800">知会</button>
                     </>
                   )}
                   {profile.status === 'archived' && (
                     <button onClick={() => setDetailId(profile.id)} className="text-gray-600 hover:text-gray-800">查看</button>
                   )}
                   {isAdmin() && (
-                    <button onClick={() => setDeleteId(profile.id)} className="text-red-600 hover:text-red-800 ml-2">删除</button>
+                    <button onClick={() => setDeleteId(profile.id)} className="text-red-600 hover:text-red-800">删除</button>
                   )}
                 </td>
               </tr>
