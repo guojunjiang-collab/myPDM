@@ -10,17 +10,41 @@ import BOMTreePanel from './BOMTreePanel';
 import BOMComparePanel from './BOMComparePanel';
 import BOMTracePanel from './BOMTracePanel';
 import DocTracePanel from './DocTracePanel';
+import { usePageHeader } from '../../stores/pageHeader';
+
+type ModeKey = 'tree' | 'compare' | 'trace' | 'doc-trace';
+const modeTabs: { key: ModeKey; label: string }[] = [
+  { key: 'tree', label: 'BOM 树' },
+  { key: 'compare', label: 'BOM 对比' },
+  { key: 'trace', label: 'BOM 反查' },
+  { key: 'doc-trace', label: '图文档反查' },
+];
 
 export default function BOM() {
-  type ModeKey = 'tree' | 'compare' | 'trace' | 'doc-trace';
   const [mode, setMode] = useState<ModeKey>('tree');
+  const setHeader = usePageHeader((s) => s.setContent);
 
-  const modeTabs: { key: ModeKey; label: string }[] = [
-    { key: 'tree', label: 'BOM 树' },
-    { key: 'compare', label: 'BOM 对比' },
-    { key: 'trace', label: 'BOM 反查' },
-    { key: 'doc-trace', label: '图文档反查' },
-  ];
+  // 将模式 Tab 注入顶栏，替代默认的“管理工具”标题，节省一行高度、内容区更高
+  useEffect(() => {
+    setHeader(
+      <div className="flex items-center gap-1">
+        {modeTabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setMode(tab.key)}
+            className={`px-3 py-1 text-lg font-semibold rounded-md transition-colors ${
+              mode === tab.key
+                ? 'text-primary-600 bg-primary-50'
+                : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+    );
+    return () => setHeader(null);
+  }, [mode, setHeader]);
 
   // 部件列表（BOM 树模式 & BOM 对比模式共用）
   const [assemblies, setAssemblies] = useState<SelectOption[]>([]);
@@ -80,23 +104,6 @@ export default function BOM() {
 
   return (
     <div>
-      {/* 模式切换 */}
-      <div className="flex border-b border-gray-200 mb-4">
-        {modeTabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setMode(tab.key)}
-            className={`px-4 py-2 text-lg font-semibold border-b-2 -mb-px transition-colors cursor-pointer ${
-              mode === tab.key
-                ? 'border-primary-500 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
       {/* 各模式 Panel */}
       {mode === 'tree'      && <BOMTreePanel assemblies={assemblies} onViewEntity={handleViewEntity} />}
       {mode === 'compare'   && <BOMComparePanel assemblies={assemblies} onViewEntity={handleViewEntity} />}

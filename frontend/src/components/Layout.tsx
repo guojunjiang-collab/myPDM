@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuthStore } from '../stores/auth';
 import { useDataStore } from '../stores/data';
+import { usePageHeader } from '../stores/pageHeader';
 import { syncService } from '../services/syncService';
 import { APP_VERSION } from '../constants';
 import { ConfirmModal } from './Modal';
@@ -44,6 +45,7 @@ export default function Layout() {
   const [confirmSyncOpen, setConfirmSyncOpen] = useState(false);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [lastSyncText, setLastSyncText] = useState<string>('--');
+  const headerContent = usePageHeader((s) => s.content);
   const userRole = user?.role || 'guest';
 
   // Auto-start sync on mount
@@ -148,9 +150,11 @@ export default function Layout() {
         {/* 顶部栏 */}
         <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4">
           <div className="left">
-            <span className="text-lg font-semibold text-gray-800">
-              {(navItems.filter((item): item is NavItem => !isSeparator(item)).find((item) => item.path === location.pathname))?.label || ''}
-            </span>
+            {headerContent ?? (
+              <span className="text-lg font-semibold text-gray-800">
+                {(navItems.filter((item): item is NavItem => !isSeparator(item)).find((item) => item.path === location.pathname))?.label || ''}
+              </span>
+            )}
           </div>
           <div className="right flex items-center gap-3">
             {/* 同步状态指示器 */}
