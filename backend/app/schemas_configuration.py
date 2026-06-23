@@ -111,6 +111,18 @@ class ConfigChildBulkCreate(BaseSchema):
 # 构型配置 (Configuration Profile)
 # ============================================================
 
+class ReviewerItem(BaseSchema):
+    user_id: str
+    user_name: Optional[str] = ""
+    role: Optional[str] = ""
+    seq: int = 0
+
+
+class CcUserItem(BaseSchema):
+    user_id: str
+    user_name: Optional[str] = ""
+
+
 class ConfigurationProfileCreate(BaseSchema):
     code: str
     name: str
@@ -118,6 +130,9 @@ class ConfigurationProfileCreate(BaseSchema):
     effectivity_start: Optional[str] = None
     effectivity_end: Optional[str] = None
     remark: Optional[str] = None
+    reviewers: List[ReviewerItem] = []
+    review_mode: str = "all"
+    cc_users: List[CcUserItem] = []
 
 
 class ConfigurationProfileUpdate(BaseSchema):
@@ -127,6 +142,9 @@ class ConfigurationProfileUpdate(BaseSchema):
     effectivity_start: Optional[str] = None
     effectivity_end: Optional[str] = None
     remark: Optional[str] = None
+    reviewers: Optional[List[ReviewerItem]] = None
+    review_mode: Optional[str] = None
+    cc_users: Optional[List[CcUserItem]] = None
 
 
 class ConfigurationProfileResponse(BaseSchema):
@@ -162,3 +180,17 @@ class ConfigurationProfileItemResponse(BaseSchema):
     sort_order: int
     created_at: datetime
     source_config_item: Optional[dict] = None
+
+
+class ProfileReviewRequest(BaseSchema):
+    decision: str  # approved / rejected / returned
+    comment: Optional[str] = ""
+
+
+class ProfileWithdrawRequest(BaseSchema):
+    comment: Optional[str] = ""
+
+
+class ProfileCcAddRequest(BaseSchema):
+    user_id: str
+    user_name: Optional[str] = ""
