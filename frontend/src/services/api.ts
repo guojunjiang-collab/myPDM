@@ -563,11 +563,20 @@ export const configurationProfileApi = {
   delete: (id: string) =>
     api.delete(`/configurations/profiles/${id}`),
 
-  activate: (id: string) =>
-    api.post(`/configurations/profiles/${id}/activate`),
+  submit: (id: string) =>
+    api.post(`/configurations/profiles/${id}/submit`).then(r => r.data),
+
+  withdraw: (id: string, comment = '') =>
+    api.post(`/configurations/profiles/${id}/withdraw`, { comment }).then(r => r.data),
+
+  review: (id: string, decision: 'approved' | 'rejected' | 'returned', comment = '') =>
+    api.post(`/configurations/profiles/${id}/review`, { decision, comment }).then(r => r.data),
+
+  reopen: (id: string) =>
+    api.post(`/configurations/profiles/${id}/reopen`).then(r => r.data),
 
   archive: (id: string) =>
-    api.post(`/configurations/profiles/${id}/archive`),
+    api.post(`/configurations/profiles/${id}/archive`).then(r => r.data),
 
   updateItem: (profileId: string, itemId: string, data: { is_selected: boolean }) =>
     api.put(`/configurations/profiles/${profileId}/items/${itemId}`, data),
@@ -583,6 +592,15 @@ export const configurationProfileApi = {
 
   regenerate: (profileId: string) =>
     api.post(`/configurations/profiles/${profileId}/regenerate`),
+
+  statusLogs: (id: string) =>
+    api.get(`/configurations/profiles/${id}/status-logs`).then(r => r.data),
+
+  addCc: (id: string, user_id: string, user_name = '') =>
+    api.post(`/configurations/profiles/${id}/cc`, { user_id, user_name }).then(r => r.data),
+
+  removeCc: (id: string, userId: string) =>
+    api.delete(`/configurations/profiles/${id}/cc/${userId}`).then(r => r.data),
 
   updateStatus: (profileId: string, status: string) =>
     api.put(`/configurations/profiles/${profileId}/status`, { status }),

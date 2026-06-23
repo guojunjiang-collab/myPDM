@@ -360,7 +360,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
   const handleActivate = async () => {
     setSaving(true);
     try {
-      await configurationProfileApi.activate(profileId!);
+      await configurationProfileApi.submit(profileId!);
       await loadProfile();
     } catch (e: any) {
       setError(e?.response?.data?.detail || '操作失败');

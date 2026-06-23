@@ -3807,9 +3807,9 @@ export async function executeConfigurationProfilesImport(preview: ImportPreview)
     if (targetStatus && targetStatus !== 'draft') {
       try {
         if (targetStatus === 'active') {
-          await configurationProfileApi.activate(profileId);
+          await configurationProfileApi.submit(profileId);
         } else if (targetStatus === 'archived') {
-          await configurationProfileApi.updateStatus(profileId, 'archived');
+          await configurationProfileApi.archive(profileId);
         }
       } catch (err: any) {
         warnings.push(`配置 ${row.code}: 状态恢复为 ${targetStatus} 失败（可能权限不足或不允许的状态转换）${err?.message || ''}`);
