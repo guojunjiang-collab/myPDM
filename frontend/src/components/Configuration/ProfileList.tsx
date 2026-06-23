@@ -246,7 +246,7 @@ export default function ProfileList() {
                 <td className="px-4 py-3 text-sm"><ProfileStatusBadge status={profile.status} /></td>
                 <td className="px-4 py-3 text-sm text-gray-500">{profile.effectivity_start || '-'} ~ {profile.effectivity_end || '-'}</td>
                 <td className="px-4 py-3 text-sm text-gray-500">{formatDate(profile.created_at)}</td>
-                <td className="px-4 py-3 text-right space-x-3 w-0 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                <td className="px-4 py-3 text-right text-sm space-x-3 w-0 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                   {profile.status === 'draft' && (
                     <>
                       {canEdit() && (
