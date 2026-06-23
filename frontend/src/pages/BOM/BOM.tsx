@@ -35,7 +35,7 @@ export default function BOM() {
             className={`px-3 py-1 text-lg font-semibold rounded-md transition-colors ${
               mode === tab.key
                 ? 'text-primary-600 bg-primary-50'
-                : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                : 'text-gray-800 hover:bg-gray-50'
             }`}
           >
             {tab.label}
