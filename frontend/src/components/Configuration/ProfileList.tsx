@@ -4,6 +4,7 @@ import type { ConfigurationProfile } from '../../types';
 import { canEdit, isAdmin, canDownload } from '../../stores/auth';
 import { ConfirmModal } from '../Modal';
 import ProfileEditModal from './ProfileEditModal';
+import ProfileStatusBadge from './ProfileStatusBadge';
 import {
   exportConfigurationProfiles,
   previewConfigurationProfilesImport,
@@ -12,23 +13,12 @@ import {
 import type { ImportPreview } from '../../services/importExport';
 import ImportPreviewModal from '../ImportPreviewModal';
 
-const statusBadge = (status: string) => {
-  const map: Record<string, string> = {
-    draft: 'bg-blue-100 text-blue-800',
-    active: 'bg-green-100 text-green-800',
-    archived: 'bg-gray-100 text-gray-800',
-  };
-  const label: Record<string, string> = {
-    draft: '草稿', active: '生效', archived: '归档',
-  };
-  return <span className={`px-2 py-0.5 rounded text-xs font-medium ${map[status] || ''}`}>{label[status] || status}</span>;
-};
-
 export default function ProfileList() {
   const [items, setItems] = useState<ConfigurationProfile[]>([]);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [searchField, setSearchField] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(false);
 
   // 弹窗
@@ -56,10 +46,14 @@ export default function ProfileList() {
 
   // 客户端筛选
   const filteredData = useMemo(() => {
-    if (!search) return items;
+    let result = items;
+    if (statusFilter) {
+      result = result.filter((item) => item.status === statusFilter);
+    }
+    if (!search) return result;
     const keyword = search.toLowerCase();
     const match = (val: string | undefined) => val?.toLowerCase().includes(keyword);
-    return items.filter(item => {
+    return result.filter(item => {
       if (searchField === 'all') {
         return match(item.code) || match(item.name) || match(item.remark);
       }
@@ -68,7 +62,7 @@ export default function ProfileList() {
       if (searchField === 'remark') return match(item.remark);
       return true;
     });
-  }, [items, search, searchField]);
+  }, [items, search, searchField, statusFilter]);
 
   // 分页
   const PAGE_SIZE = 20;
@@ -77,11 +71,25 @@ export default function ProfileList() {
   const pagedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // 搜索变化时重置页码
-  useEffect(() => { setPage(1); }, [search, searchField]);
+  useEffect(() => { setPage(1); }, [search, searchField, statusFilter]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
     try { await configurationProfileApi.delete(deleteId); setDeleteId(null); load(); } catch {}
+  };
+
+  const handleSubmit = async (id: string) => {
+    try { await configurationProfileApi.submit(id); load(); } catch {}
+  };
+  const handleWithdraw = async (id: string) => {
+    try { await configurationProfileApi.withdraw(id); load(); } catch {}
+  };
+  const handleReopen = async (id: string) => {
+    try { await configurationProfileApi.reopen(id); load(); } catch {}
+  };
+  const handleArchive = async (id: string) => {
+    if (!confirm('确认归档该配置？')) return;
+    try { await configurationProfileApi.archive(id); load(); } catch {}
   };
 
   const handleExport = async () => {
@@ -159,6 +167,18 @@ export default function ProfileList() {
           onChange={(e) => setSearch(e.target.value)}
           className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+        >
+          <option value="">全部状态</option>
+          <option value="draft">草稿</option>
+          <option value="reviewing">评审中</option>
+          <option value="active">生效中</option>
+          <option value="rejected">已驳回</option>
+          <option value="archived">已归档</option>
+        </select>
         <div className="flex-1" />
         {canDownload() && (
           <button onClick={handleExport} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">导出全部</button>
@@ -195,18 +215,43 @@ export default function ProfileList() {
             ) : pagedData.length === 0 ? (
               <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
             ) : pagedData.map((profile) => (
-              <tr key={profile.id} onClick={() => setDetailId(profile.id)} className="hover:bg-gray-50 cursor-pointer">
-                <td className="px-4 py-3 text-sm font-medium">{profile.code}</td>
-                <td className="px-4 py-3 text-sm">{profile.name}</td>
-                <td className="px-4 py-3 text-sm">{statusBadge(profile.status)}</td>
+              <tr key={profile.id} className="hover:bg-gray-50">
+                <td className="px-4 py-3 text-sm font-medium cursor-pointer" onClick={() => setDetailId(profile.id)}>{profile.code}</td>
+                <td className="px-4 py-3 text-sm cursor-pointer" onClick={() => setDetailId(profile.id)}>{profile.name}</td>
+                <td className="px-4 py-3 text-sm"><ProfileStatusBadge status={profile.status} /></td>
                 <td className="px-4 py-3 text-sm text-gray-500">{profile.effectivity_start || '-'} ~ {profile.effectivity_end || '-'}</td>
                 <td className="px-4 py-3 text-sm text-gray-500">{formatDate(profile.created_at)}</td>
-                <td className="px-4 py-3 text-right space-x-1">
-                  {profile.status === 'draft' && canEdit() && (
-                    <button onClick={(e) => { e.stopPropagation(); setEditId(profile.id); }} className="text-primary-600 hover:text-primary-800 mr-3">编辑</button>
+                <td className="px-4 py-3 text-right space-x-1" onClick={(e) => e.stopPropagation()}>
+                  {profile.status === 'draft' && (
+                    <>
+                      {canEdit() && (
+                        <button onClick={() => setEditId(profile.id)} className="text-primary-600 hover:text-primary-800">编辑</button>
+                      )}
+                      <button onClick={() => handleSubmit(profile.id)} className="text-green-600 hover:text-green-800 ml-2">提交评审</button>
+                    </>
+                  )}
+                  {profile.status === 'reviewing' && (
+                    <>
+                      <button onClick={() => setDetailId(profile.id)} className="text-primary-600 hover:text-primary-800">审批</button>
+                      <button onClick={() => handleWithdraw(profile.id)} className="text-orange-600 hover:text-orange-800 ml-2">撤回</button>
+                    </>
+                  )}
+                  {profile.status === 'active' && isAdmin() && (
+                    <button onClick={() => handleArchive(profile.id)} className="text-gray-600 hover:text-gray-800">归档</button>
+                  )}
+                  {profile.status === 'rejected' && (
+                    <>
+                      <button onClick={() => handleReopen(profile.id)} className="text-primary-600 hover:text-primary-800">重新编辑</button>
+                      {isAdmin() && (
+                        <button onClick={() => handleArchive(profile.id)} className="text-gray-600 hover:text-gray-800 ml-2">归档</button>
+                      )}
+                    </>
+                  )}
+                  {profile.status === 'archived' && (
+                    <button onClick={() => setDetailId(profile.id)} className="text-gray-600 hover:text-gray-800">查看</button>
                   )}
                   {isAdmin() && (
-                    <button onClick={(e) => { e.stopPropagation(); setDeleteId(profile.id); }} className="text-red-600 hover:text-red-800">删除</button>
+                    <button onClick={() => setDeleteId(profile.id)} className="text-red-600 hover:text-red-800 ml-2">删除</button>
                   )}
                 </td>
               </tr>
