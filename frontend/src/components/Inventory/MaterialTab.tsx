@@ -3,8 +3,8 @@ import { useInventoryStore } from '../../stores/inventory';
 import { useDataStore } from '../../stores/data';
 import { inventoryApi } from '../../services/inventoryApi';
 import { partsApi, assembliesApi, customFieldsApi } from '../../services/api';
-import { canEdit } from '../../stores/auth';
-import { Modal } from '../Modal';
+import { canEdit, isAdmin } from '../../stores/auth';
+import { Modal, ConfirmModal } from '../Modal';
 import MaterialDetail from './MaterialDetail';
 import PartDetailContent from '../PartDetailContent';
 import AssemblyDetailContent from '../AssemblyDetailContent';
@@ -28,6 +28,8 @@ export default function MaterialTab() {
   const [pdmMode, setPdmMode] = useState(false);
   const [pdmKeyword, setPdmKeyword] = useState('');
   const [detail, setDetail] = useState<InvMaterial | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // 零部件详情（与物料详情同级，避免被父弹窗 transform 限制宽度）
   const [entity, setEntity] = useState<{ type: 'part' | 'assembly'; id: string } | null>(null);
@@ -73,6 +75,18 @@ export default function MaterialTab() {
   const reload = async (s?: string) => {
     setLoading(true);
     try { await loadMaterials(s); } finally { setLoading(false); }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    setDeleteError(null);
+    try {
+      await inventoryApi.deleteMaterial(deleteId);
+      setDeleteId(null);
+      await reload(search);
+    } catch (err: any) {
+      setDeleteError(err?.response?.data?.detail || '删除失败，请重试');
+    }
   };
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
 
@@ -175,9 +189,12 @@ export default function MaterialTab() {
                 <td className="px-4 py-3 text-sm text-gray-500">{m.source_type === 'standalone' ? '非PDM' : m.source_type === 'part' ? '零件' : '部件'}</td>
                 <td className="px-4 py-3 text-sm text-gray-500">{m.track_mode === 'batch' ? '批次' : '数量'}</td>
                 <td className="px-4 py-3 text-sm text-gray-500">{m.safety_stock ?? '-'}</td>
-                <td className="px-4 py-3 text-right">
+                <td className="px-4 py-3 text-right space-x-3">
                   {canEdit() && (
                     <button onClick={(e) => { e.stopPropagation(); setEditing(m); }} className="text-primary-600 hover:text-primary-800">编辑</button>
+                  )}
+                  {isAdmin() && (
+                    <button onClick={(e) => { e.stopPropagation(); setDeleteId(m.id); }} className="text-red-600 hover:text-red-800">删除</button>
                   )}
                 </td>
               </tr>
@@ -331,6 +348,16 @@ export default function MaterialTab() {
             onSubItemClick={(item: any) => viewEntity(item.childType === 'part' ? 'part' : 'assembly', item.child_id)} />
         )}
       </Modal>
+
+      <ConfirmModal
+        open={!!deleteId}
+        title={deleteError ? '无法删除' : '删除物料'}
+        content={deleteError || '确认删除该物料？删除后不影响已有库存流水记录。'}
+        confirmText={deleteError ? '知道了' : '删除'}
+        type="danger"
+        onConfirm={deleteError ? () => { setDeleteId(null); setDeleteError(null); } : handleDelete}
+        onCancel={() => { setDeleteId(null); setDeleteError(null); }}
+      />
     </div>
   );
 }
