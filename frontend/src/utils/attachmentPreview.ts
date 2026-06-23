@@ -3,7 +3,6 @@ import { mediaApi } from '../services/api';
 
 export const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'];
 export const TEXT_EXTS = ['txt', 'md', 'csv', 'log', 'json', 'xml'];
-export const OFFICE_EXTS = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'];
 export const ARCHIVE_EXTS = ['zip', 'tar', 'gz', 'tgz', 'rar', '7z'];
 
 const INLINE_EXTS = ['pdf', ...IMAGE_EXTS, ...TEXT_EXTS];
