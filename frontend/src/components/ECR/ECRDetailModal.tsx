@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Modal } from '../Modal';
 import { toast } from '../Toast';
 import { ecrApi, documentsApi, customFieldsApi, mediaApi } from '../../services/api';
@@ -9,7 +9,6 @@ import { ECRStatusBadge, ECRPriorityBadge } from './ECRStatusBadge';
 import { ECRReviewPanel } from './ECRReviewPanel';
 import { ECRBomImpactView } from './ECRBomImpactView';
 import DocumentDetailContent from '../DocumentDetailContent';
-const OfficeReaderModal = lazy(() => import('../OfficeReaderModal'));
 import type { ECRRequest, ECRReviewRecord, ECRAffectedItem, ECRStatusLog, ECRDocumentLink, Document } from '../../types';
 
 const REASON_LABELS: Record<string, string> = {
@@ -77,7 +76,6 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
   const [docDetails, setDocDetails] = useState<Record<string, any>>({});
   const [docAttachments, setDocAttachments] = useState<Record<string, any[]>>({});
   const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
-  const [officePreview, setOfficePreview] = useState<{ attId: string; fileName: string } | null>(null);
   const [docCustomValues, setDocCustomValues] = useState<Record<string, Record<string, any>>>({});
 
   // Review action state
@@ -623,21 +621,10 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
     <Modal open={!!viewingDoc} title="图文档详情" onClose={() => setViewingDoc(null)} width="full">
       {viewingDoc && (
         <div className="max-h-[70vh] overflow-y-auto pr-1">
-          <DocumentDetailContent doc={viewingDoc} customFieldDefs={[]} customFieldValues={{}} onOfficePreview={(attId, fileName) => setOfficePreview({ attId, fileName })} />
+          <DocumentDetailContent doc={viewingDoc} customFieldDefs={[]} customFieldValues={{}} />
         </div>
       )}
     </Modal>
-
-    {officePreview && (
-      <Suspense fallback={null}>
-        <OfficeReaderModal
-          open={!!officePreview}
-          onClose={() => setOfficePreview(null)}
-          attachmentId={officePreview.attId}
-          fileName={officePreview.fileName}
-        />
-      </Suspense>
-    )}
     </>
   );
 }

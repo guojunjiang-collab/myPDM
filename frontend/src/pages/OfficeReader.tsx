@@ -1,50 +1,41 @@
 import { useEffect, useRef, useState } from 'react';
-import { Modal } from './Modal';
-import { mediaApi } from '../services/api';
 
-interface OfficeReaderModalProps {
-  open: boolean;
-  onClose: () => void;
-  attachmentId: string;
-  fileName: string;
-  /** 叠放层级，默认 70，确保浮于详情弹窗（z-50/60）之上 */
-  zIndex?: number;
-}
-
-/** 取附件原始字节（复用 preview 媒体令牌，按 arrayBuffer 读取） */
-async function fetchAttachmentBytes(attId: string): Promise<ArrayBuffer> {
-  const token = await mediaApi.token(attId, 'preview');
-  const resp = await fetch(
-    `/api/v2/attachments/${attId}/preview?token=${encodeURIComponent(token)}`,
-  );
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-  return resp.arrayBuffer();
-}
-
-export default function OfficeReaderModal({
-  open, onClose, attachmentId, fileName, zIndex = 70,
-}: OfficeReaderModalProps) {
-  const [loading, setLoading] = useState(false);
+/**
+ * Office 文档只读阅读页（独立标签页）。
+ * 通过 /office-reader?id=...&token=...&name=... 打开：
+ * - 用 preview 媒体令牌 fetch 附件字节（arrayBuffer）
+ * - docx 用 docx-preview 渲染；xlsx/xls 用 SheetJS 渲染为表格
+ * 渲染库均动态 import，按需加载。
+ */
+export default function OfficeReader() {
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   // xlsx 渲染结果：每个 sheet 的 name + html
   const [sheets, setSheets] = useState<{ name: string; html: string }[]>([]);
   const [activeSheet, setActiveSheet] = useState(0);
   const docxRef = useRef<HTMLDivElement>(null);
 
-  const ext = fileName.split('.').pop()?.toLowerCase() || '';
+  const params = new URLSearchParams(location.search);
+  const id = params.get('id');
+  const token = params.get('token');
+  const name = params.get('name') || '文档';
+  const ext = name.split('.').pop()?.toLowerCase() || '';
 
   useEffect(() => {
-    if (!open || !attachmentId) return;
-    let cancelled = false;
+    document.title = `预览：${name}`;
+  }, [name]);
 
-    setLoading(true);
-    setError('');
-    setSheets([]);
-    setActiveSheet(0);
+  useEffect(() => {
+    if (!id || !token) { setError('参数缺失，无法预览'); setLoading(false); return; }
+    let cancelled = false;
 
     (async () => {
       try {
-        const buf = await fetchAttachmentBytes(attachmentId);
+        const resp = await fetch(
+          `/api/v2/attachments/${id}/preview?token=${encodeURIComponent(token)}`,
+        );
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const buf = await resp.arrayBuffer();
         if (cancelled) return;
 
         if (ext === 'docx') {
@@ -56,9 +47,9 @@ export default function OfficeReaderModal({
           const XLSX = await import('xlsx');
           if (cancelled) return;
           const wb = XLSX.read(buf, { type: 'array' });
-          const result = wb.SheetNames.map((name) => ({
-            name,
-            html: XLSX.utils.sheet_to_html(wb.Sheets[name]),
+          const result = wb.SheetNames.map((sheetName) => ({
+            name: sheetName,
+            html: XLSX.utils.sheet_to_html(wb.Sheets[sheetName]),
           }));
           if (cancelled) return;
           setSheets(result);
@@ -67,27 +58,31 @@ export default function OfficeReaderModal({
         }
       } catch (e) {
         console.error('Office 预览渲染失败', e);
-        if (!cancelled) setError('渲染失败，请下载查看');
+        if (!cancelled) setError('渲染失败，请关闭后下载查看');
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
 
     return () => { cancelled = true; };
-  }, [open, attachmentId, ext]);
+  }, [id, token, ext]);
 
   return (
-    <Modal open={open} title={`文档预览：${fileName}`} onClose={onClose} width="3xl" zIndex={zIndex}>
+    <div className="w-screen h-screen flex flex-col bg-gray-100">
+      <div className="shrink-0 px-4 py-3 bg-white border-b border-gray-200">
+        <h1 className="text-sm font-semibold text-gray-800 truncate">文档预览：{name}</h1>
+      </div>
+
       {loading ? (
-        <div className="py-8 text-center text-sm text-gray-400">加载中...</div>
+        <div className="flex-1 flex items-center justify-center text-sm text-gray-400">加载中...</div>
       ) : error ? (
-        <div className="py-8 text-center text-sm text-red-500">{error}</div>
+        <div className="flex-1 flex items-center justify-center text-sm text-red-500">{error}</div>
       ) : ext === 'docx' ? (
-        <div ref={docxRef} className="overflow-auto max-h-[70vh] bg-gray-100 p-4 rounded" />
+        <div ref={docxRef} className="flex-1 overflow-auto p-6" />
       ) : (
-        <div>
+        <div className="flex-1 flex flex-col min-h-0">
           {sheets.length > 1 && (
-            <div className="flex gap-1 mb-2 border-b overflow-x-auto">
+            <div className="shrink-0 flex gap-1 px-4 pt-2 border-b bg-white overflow-x-auto">
               {sheets.map((s, i) => (
                 <button
                   key={s.name + i}
@@ -105,11 +100,11 @@ export default function OfficeReaderModal({
           )}
           {/* sheet_to_html 生成的表格 HTML；内容来自受信任的内部附件，无脚本注入 */}
           <div
-            className="overflow-auto max-h-[70vh] office-xlsx-table"
+            className="flex-1 overflow-auto p-4 office-xlsx-table bg-white"
             dangerouslySetInnerHTML={{ __html: sheets[activeSheet]?.html ?? '' }}
           />
         </div>
       )}
-    </Modal>
+    </div>
   );
 }

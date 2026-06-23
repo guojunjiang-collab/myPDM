@@ -9,7 +9,6 @@ interface DocumentDetailContentProps {
   customFieldDefs: CustomFieldDefinition[];
   customFieldValues: Record<string, any>;
   onArchivePreview?: (attId: string, fileName: string) => void;
-  onOfficePreview?: (attId: string, fileName: string) => void;
 }
 
 /** 文件大小格式化 */
@@ -29,7 +28,7 @@ const statusTag = (s: string) => {
   return tags[s] || { label: s, class: 'bg-gray-100 text-gray-800' };
 };
 
-export default function DocumentDetailContent({ doc, customFieldDefs, customFieldValues, onArchivePreview, onOfficePreview }: DocumentDetailContentProps) {
+export default function DocumentDetailContent({ doc, customFieldDefs, customFieldValues, onArchivePreview }: DocumentDetailContentProps) {
   const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
 
@@ -70,7 +69,6 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
   const handlePreview = (attId: string, fileName: string) => {
     previewAttachment(attId, fileName, {
       onArchive: (id, name) => onArchivePreview?.(id, name),
-      onOffice: (id, name) => onOfficePreview?.(id, name),
     });
   };
 

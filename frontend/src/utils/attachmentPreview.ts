@@ -17,7 +17,7 @@ export const DOWNLOAD_ONLY_OFFICE_EXTS = ['pptx', 'doc', 'ppt'];
  * - pdf/图片/文本：媒体令牌 + 新窗口内嵌 /preview
  * - 压缩包：交给调用方弹窗（opts.onArchive）
  * - stp/step：新窗口三维预览
- * - docx/xlsx/xls：交给调用方弹窗前端渲染（opts.onOffice）
+ * - docx/xlsx/xls：媒体令牌 + 新标签页前端渲染（/office-reader）
  * - pptx/doc/ppt：暂不支持在线预览，提示下载
  * - 其它：提示不支持
  */
@@ -26,7 +26,6 @@ export async function previewAttachment(
   fileName: string,
   opts: {
     onArchive: (attId: string, fileName: string) => void;
-    onOffice: (attId: string, fileName: string) => void;
   },
 ): Promise<void> {
   const ext = fileName.split('.').pop()?.toLowerCase() || '';
@@ -53,7 +52,13 @@ export async function previewAttachment(
   }
 
   if (FRONTEND_OFFICE_EXTS.includes(ext)) {
-    opts.onOffice(attId, fileName);
+    try {
+      const mt = await mediaApi.token(attId, 'preview');
+      window.open(
+        `/office-reader?id=${attId}&token=${encodeURIComponent(mt)}&name=${encodeURIComponent(fileName)}`,
+        '_blank',
+      );
+    } catch { alert('预览失败，请重试'); }
     return;
   }
 

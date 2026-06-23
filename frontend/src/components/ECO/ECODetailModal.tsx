@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useEffect, useState } from 'react';
 import { ecoApi, documentsApi, assemblyPartsApi, partsApi, assembliesApi, customFieldsApi, mediaApi } from '../../services/api';
 import type { ECORequest, Document, ECRDocumentLink } from '../../types';
 import { ECOStatusBadge, ECOPriorityBadge } from './ECOStatusBadge';
@@ -15,7 +15,6 @@ import VersionSelectModal from '../VersionSelectModal';
 import PartDetailContent from '../PartDetailContent';
 import AssemblyDetailContent from '../AssemblyDetailContent';
 import DocumentDetailContent from '../DocumentDetailContent';
-const OfficeReaderModal = lazy(() => import('../OfficeReaderModal'));
 import VersionHistory from '../VersionHistory';
 import EntityEditModal from '../EntityEditModal';
 
@@ -50,7 +49,6 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
   const [docAttachments, setDocAttachments] = useState<Record<string, any[]>>({});
   const [docCustomValues, setDocCustomValues] = useState<Record<string, Record<string, any>>>({});
   const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
-  const [officePreview, setOfficePreview] = useState<{ attId: string; fileName: string } | null>(null);
   const [nestedDetail, setNestedDetail] = useState<{ type: string; id: string } | null>(null);
   const [nestedData, setNestedData] = useState<any>(null);
   const [nestedLoading, setNestedLoading] = useState(false);
@@ -460,19 +458,8 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
 
     {/* 图文档详情弹窗 */}
     <Modal open={!!viewingDoc} title="图文档详情" onClose={() => setViewingDoc(null)} width="full">
-      {viewingDoc && <div className="max-h-[70vh] overflow-y-auto pr-1"><DocumentDetailContent doc={viewingDoc} customFieldDefs={docFieldDefs} customFieldValues={docCustomValues[viewingDoc.id] || {}} onOfficePreview={(attId, fileName) => setOfficePreview({ attId, fileName })} /></div>}
+      {viewingDoc && <div className="max-h-[70vh] overflow-y-auto pr-1"><DocumentDetailContent doc={viewingDoc} customFieldDefs={docFieldDefs} customFieldValues={docCustomValues[viewingDoc.id] || {}} /></div>}
     </Modal>
-
-    {officePreview && (
-      <Suspense fallback={null}>
-        <OfficeReaderModal
-          open={!!officePreview}
-          onClose={() => setOfficePreview(null)}
-          attachmentId={officePreview.attId}
-          fileName={officePreview.fileName}
-        />
-      </Suspense>
-    )}
 
     {/* 编辑弹窗 */}
     {editEntity && (

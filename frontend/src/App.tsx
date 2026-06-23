@@ -18,6 +18,7 @@ import Configuration from './pages/Configuration';
 import Inventory from './pages/Inventory';
 import DataManagement from './pages/DataManagement';
 const STPViewer = lazy(() => import('./pages/STPViewer'));
+const OfficeReader = lazy(() => import('./pages/OfficeReader'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
@@ -39,6 +40,16 @@ export default function App() {
             <ProtectedRoute>
               <Suspense fallback={<div className="w-screen h-screen flex items-center justify-center text-gray-400">加载中...</div>}>
                 <STPViewer />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/office-reader"
+          element={
+            <ProtectedRoute>
+              <Suspense fallback={<div className="w-screen h-screen flex items-center justify-center text-gray-400">加载中...</div>}>
+                <OfficeReader />
               </Suspense>
             </ProtectedRoute>
           }
