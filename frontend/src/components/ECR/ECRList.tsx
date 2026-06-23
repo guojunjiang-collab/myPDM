@@ -303,9 +303,9 @@ export function ECRList() {
   };
 
   return (
-    <div>
+    <div className="flex-1 min-h-0 flex flex-col">
       {/* Header & Filters */}
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-4 shrink-0">
         <input
           type="text"
           placeholder="搜索..."
@@ -345,9 +345,9 @@ export function ECRList() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">
                 ECR 编号
@@ -436,7 +436,7 @@ export function ECRList() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4">
+        <div className="flex items-center justify-between mt-4 shrink-0">
           <span className="text-sm text-gray-500">
             共 {total} 条，第 {page} / {totalPages} 页
           </span>

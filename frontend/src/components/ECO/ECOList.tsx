@@ -152,8 +152,8 @@ export function ECOList() {
   };
 
   return (
-    <div>
-      <div className="flex items-center gap-2 mb-4">
+    <div className="flex-1 min-h-0 flex flex-col">
+      <div className="flex items-center gap-2 mb-4 shrink-0">
         <input type="text" placeholder="搜索..." value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
@@ -170,9 +170,9 @@ export function ECOList() {
         <div className="flex-1" />
         {canEdit() && <button onClick={() => { editReqId.current++; setEditingEco(null); setCreateOpen(true); }} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建 ECO</button>}
       </div>
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">ECO 编号</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">标题</th>
@@ -203,7 +203,7 @@ export function ECOList() {
         </table>
       </div>
       {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4">
+        <div className="flex items-center justify-between mt-4 shrink-0">
           <span className="text-sm text-gray-500">共 {total} 条，第 {page} / {totalPages} 页</span>
           <div className="flex gap-1 justify-end">
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
