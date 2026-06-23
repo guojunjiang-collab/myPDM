@@ -9,8 +9,8 @@ const INLINE_EXTS = ['pdf', ...IMAGE_EXTS, ...TEXT_EXTS];
 
 /** 前端可在线渲染的 Office 格式 */
 export const FRONTEND_OFFICE_EXTS = ['docx', 'xlsx', 'xls'];
-/** 暂不支持在线预览、仅可下载的 Office 格式 */
-export const DOWNLOAD_ONLY_OFFICE_EXTS = ['pptx', 'doc', 'ppt'];
+/** 经后端 LibreOffice 转 PDF 预览的 Office 格式（前端渲染库支持差） */
+export const BACKEND_PDF_OFFICE_EXTS = ['pptx', 'doc', 'ppt'];
 
 /**
  * 统一的附件预览分发。
@@ -18,7 +18,7 @@ export const DOWNLOAD_ONLY_OFFICE_EXTS = ['pptx', 'doc', 'ppt'];
  * - 压缩包：交给调用方弹窗（opts.onArchive）
  * - stp/step：新窗口三维预览
  * - docx/xlsx/xls：媒体令牌 + 新标签页前端渲染（/office-reader）
- * - pptx/doc/ppt：暂不支持在线预览，提示下载
+ * - pptx/doc/ppt：媒体令牌 + 新标签页内嵌后端转换的 PDF（/office-pdf）
  * - 其它：提示不支持
  */
 export async function previewAttachment(
@@ -62,8 +62,11 @@ export async function previewAttachment(
     return;
   }
 
-  if (DOWNLOAD_ONLY_OFFICE_EXTS.includes(ext)) {
-    alert('该格式暂不支持在线预览，请下载查看');
+  if (BACKEND_PDF_OFFICE_EXTS.includes(ext)) {
+    try {
+      const mt = await mediaApi.token(attId, 'office-pdf');
+      window.open(`/api/v2/attachments/${attId}/office-pdf?token=${encodeURIComponent(mt)}`, '_blank');
+    } catch { alert('预览失败，请重试'); }
     return;
   }
 

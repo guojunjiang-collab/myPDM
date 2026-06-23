@@ -29,13 +29,16 @@ describe('previewAttachment office 分发', () => {
     }
   });
 
-  it('pptx/doc/ppt 降级下载提示，不打开新窗口', async () => {
+  it('pptx/doc/ppt 取 office-pdf 令牌并在新标签页打开 /office-pdf', async () => {
     for (const name of ['a.pptx', 'b.doc', 'c.ppt']) {
       (window.open as ReturnType<typeof vi.fn>).mockClear();
+      (mediaApi.token as ReturnType<typeof vi.fn>).mockClear();
       const onArchive = vi.fn();
       await previewAttachment('att-1', name, { onArchive });
-      expect(window.open).not.toHaveBeenCalled();
-      expect(window.alert).toHaveBeenCalledWith('该格式暂不支持在线预览，请下载查看');
+      expect(mediaApi.token).toHaveBeenCalledWith('att-1', 'office-pdf');
+      const url = (window.open as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      expect(url).toContain('/office-pdf?token=tok-123');
+      expect(window.alert).not.toHaveBeenCalled();
     }
   });
 
