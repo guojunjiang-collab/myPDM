@@ -4,10 +4,13 @@ import ConfigItemPicker from './ConfigItemPicker';
 import ConfigurationDetailModal from './ConfigurationDetailModal';
 import PartDetailContent from '../PartDetailContent';
 import AssemblyDetailContent from '../AssemblyDetailContent';
-import { configurationApi, configurationProfileApi, partsApi, assembliesApi } from '../../services/api';
+import ProfileStatusBadge from './ProfileStatusBadge';
+import ProfileReviewPanel from './ProfileReviewPanel';
+import { configurationApi, configurationProfileApi, partsApi, assembliesApi, usersApi } from '../../services/api';
 import { exportProfilePdf, exportProfileExcel } from '../../services/configProfilePdfExport';
 import { isAdmin } from '../../stores/auth';
-import type { ConfigurationProfileDetail, ConfigTreeNode, Part, Assembly } from '../../types';
+import { useAuthStore } from '../../stores/auth';
+import type { ConfigurationProfileDetail, ConfigTreeNode, Part, Assembly, ProfileReviewer, ProfileCcUser } from '../../types';
 
 interface Props {
   open: boolean;
@@ -16,24 +19,6 @@ interface Props {
   onClose: () => void;
   onSaved: () => void;
 }
-
-const statusBadge = (status: string) => {
-  const map: Record<string, string> = {
-    draft: 'bg-blue-100 text-blue-800',
-    active: 'bg-green-100 text-green-800',
-    archived: 'bg-gray-100 text-gray-800',
-  };
-  const label: Record<string, string> = {
-    draft: '草稿',
-    active: '生效中',
-    archived: '已归档',
-  };
-  return (
-    <span className={`px-1.5 py-0.5 rounded text-xs ${map[status] || 'bg-gray-100 text-gray-600'}`}>
-      {label[status] || status}
-    </span>
-  );
-};
 
 /* ──── Tree helpers for optimistic local updates ──── */
 
@@ -107,6 +92,7 @@ function isParentSelected(nodeId: string, root: ConfigTreeNode): boolean {
 export default function ProfileEditModal({ open, profileId, readOnly, onClose, onSaved }: Props) {
   const isCreate = !profileId;
   const isView = !!profileId && !!readOnly;
+  const currentUserId = useAuthStore((s) => s.user?.id);
   const [form, setForm] = useState({
     code: '',
     name: '',
@@ -127,6 +113,13 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
   }, [form.remark]);
   const [profile, setProfile] = useState<ConfigurationProfileDetail | null>(null);
   const [configTree, setConfigTree] = useState<ConfigTreeNode | null>(null);
+
+  // ── Approval flow state ──
+  const [reviewers, setReviewers] = useState<ProfileReviewer[]>([]);
+  const [reviewMode, setReviewMode] = useState<'all' | 'any'>('all');
+  const [ccUsers, setCcUsers] = useState<ProfileCcUser[]>([]);
+  const [users, setUsers] = useState<{ id: string; real_name: string; username: string; role: string }[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
 
   // 递归按构型号排序
   const sortTreeByCode = (node: ConfigTreeNode | null): ConfigTreeNode | null => {
@@ -189,6 +182,9 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         effectivity_end: data.effectivity_end || '',
         remark: data.remark || '',
       });
+      setReviewers(data.reviewers || []);
+      setReviewMode(data.review_mode || 'all');
+      setCcUsers(data.cc_users || []);
     } catch (e: any) {
       setError('加载配置详情失败');
     } finally {
@@ -204,11 +200,25 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         setProfile(null);
         setConfigTree(null);
         setExpandedNodes(new Set());
+        setReviewers([]);
+        setReviewMode('all');
+        setCcUsers([]);
       } else {
         loadProfile();
       }
     }
   }, [open, profileId]);
+
+  // Fetch users for reviewer/cc selection
+  useEffect(() => {
+    if (open && (isCreate || (profile && profile.status === 'draft'))) {
+      setUsersLoading(true);
+      usersApi.list({ page_size: 200 }).then((resp) => {
+        const list = resp.data?.items || resp.data || [];
+        setUsers(Array.isArray(list) ? list : []);
+      }).finally(() => setUsersLoading(false));
+    }
+  }, [open, isCreate, profile?.status]);
 
   const canEdit = profile && !readOnly && profile.status === 'draft';
   const fieldDisabled = isView || (profile && !canEdit && !isCreate);
@@ -225,7 +235,10 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         effectivity_start: form.effectivity_start || undefined,
         effectivity_end: form.effectivity_end || undefined,
         remark: form.remark || undefined,
-      });
+        reviewers: reviewers.map((r, i) => ({ ...r, seq: i })),
+        review_mode: reviewMode,
+        cc_users: ccUsers,
+      } as any);
       onSaved();
     } catch (e: any) {
       setError(e?.response?.data?.detail || '保存失败');
@@ -246,6 +259,9 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         effectivity_start: form.effectivity_start || undefined,
         effectivity_end: form.effectivity_end || undefined,
         remark: form.remark || undefined,
+        reviewers: reviewers.map((r, i) => ({ ...r, seq: i })),
+        review_mode: reviewMode,
+        cc_users: ccUsers,
       } as any);
       onSaved();
     } catch (e: any) {
@@ -356,11 +372,34 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
     }
   };
 
-  // ── Status change handlers ──
-  const handleActivate = async () => {
+  // ── Approval flow handlers ──
+  const handleSubmitReview = async () => {
+    if (!profileId) return;
     setSaving(true);
     try {
-      await configurationProfileApi.submit(profileId!);
+      await configurationProfileApi.submit(profileId);
+      await loadProfile();
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || '操作失败');
+    } finally { setSaving(false); }
+  };
+
+  const handleWithdraw = async () => {
+    if (!profileId) return;
+    setSaving(true);
+    try {
+      await configurationProfileApi.withdraw(profileId);
+      await loadProfile();
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || '操作失败');
+    } finally { setSaving(false); }
+  };
+
+  const handleReopen = async () => {
+    if (!profileId) return;
+    setSaving(true);
+    try {
+      await configurationProfileApi.reopen(profileId);
       await loadProfile();
     } catch (e: any) {
       setError(e?.response?.data?.detail || '操作失败');
@@ -368,27 +407,38 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
   };
 
   const handleArchive = async () => {
+    if (!profileId) return;
     setSaving(true);
     try {
-      await configurationProfileApi.archive(profileId!);
+      await configurationProfileApi.archive(profileId);
       await loadProfile();
     } catch (e: any) {
       setError(e?.response?.data?.detail || '操作失败');
     } finally { setSaving(false); }
   };
 
-  // ── Table rendering helpers ──
+  // ── Reviewer helpers ──
+  const addReviewer = () => {
+    const nextSeq = reviewers.length > 0 ? Math.max(...reviewers.map((r) => r.seq || 0)) + 1 : 1;
+    setReviewers([...reviewers, { user_id: '', user_name: '', seq: nextSeq }]);
+  };
+  const removeReviewer = (index: number) => {
+    setReviewers(reviewers.filter((_, i) => i !== index));
+  };
+  const updateReviewer = (index: number, user_id: string) => {
+    const u = users.find((x) => x.id === user_id);
+    const updated = [...reviewers];
+    updated[index] = { ...updated[index], user_id, user_name: u?.real_name || '', role: u?.role || '' };
+    setReviewers(updated);
+  };
 
-  const statusLabel: Record<string, string> = { draft: '草稿', active: '生效', archived: '归档' };
-
-  const handleStatusChange = async (newStatus: string) => {
-    setSaving(true);
-    try {
-      await configurationProfileApi.updateStatus(profileId!, newStatus);
-      await loadProfile();
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || '操作失败');
-    } finally { setSaving(false); }
+  const addCc = (user_id: string) => {
+    const u = users.find((x) => x.id === user_id);
+    if (!u || ccUsers.some((c) => c.user_id === user_id)) return;
+    setCcUsers([...ccUsers, { user_id, user_name: u.real_name || '' }]);
+  };
+  const removeCc = (user_id: string) => {
+    setCcUsers(ccUsers.filter((c) => c.user_id !== user_id));
   };
 
   const getStatusLabel = (s: string | undefined) => {
@@ -652,7 +702,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                     ? `${profile.effectivity_start || '-'} ~ ${profile.effectivity_end || '-'}`
                     : '-'
                 } />
-                <InfoItem label="状态" value={statusLabel[profile.status] || profile.status} />
+                <InfoItem label="状态" value={<ProfileStatusBadge status={profile.status} />} />
                 <InfoItem label="备注" value={profile.remark || '-'} className="col-span-2 md:col-span-2" />
               </div>
             ) : (
@@ -711,31 +761,146 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
               {!isCreate && profile && (
                 <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                   <label className="block text-xs text-gray-500 mb-0.5">状态</label>
-                  {isAdmin() && !readOnly ? (
-                    <div className="flex items-center gap-3 pt-0.5">
-                      {(['draft', 'active', 'archived'] as const).map(s => (
-                        <label key={s} className="inline-flex items-center gap-1 cursor-pointer select-none">
-                          <input
-                            type="radio"
-                            name="profileStatus"
-                            value={s}
-                            checked={profile.status === s}
-                            onChange={() => handleStatusChange(s)}
-                            disabled={saving}
-                            className="w-3.5 h-3.5 text-primary-600"
-                          />
-                          <span className="text-xs text-gray-600">{statusLabel[s]}</span>
-                        </label>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 pt-0.5">
-                      {statusBadge(profile.status)}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 pt-0.5">
+                    <ProfileStatusBadge status={profile.status} />
+                  </div>
                 </div>
               )}
             </div>
+            )}
+
+            {/* ── Approval action buttons ── */}
+            {!isCreate && !isView && profile && (
+              <div className="flex items-center gap-2 border-t pt-3">
+                <ProfileStatusBadge status={profile.status} />
+                {profile.status === 'draft' && (
+                  <button onClick={handleSubmitReview} disabled={saving}
+                    className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50">
+                    提交评审
+                  </button>
+                )}
+                {profile.status === 'reviewing' && (
+                  <button onClick={handleWithdraw} disabled={saving}
+                    className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50">
+                    撤回
+                  </button>
+                )}
+                {profile.status === 'rejected' && (
+                  <button onClick={handleReopen} disabled={saving}
+                    className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50">
+                    重新编辑
+                  </button>
+                )}
+                {(profile.status === 'active' || profile.status === 'rejected') && isAdmin() && (
+                  <button onClick={handleArchive} disabled={saving}
+                    className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50">
+                    归档
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* ── Reviewers & CC section (draft / new) ── */}
+            {(!isCreate ? (profile && profile.status === 'draft') : true) && (
+              <div className="space-y-3 border-t pt-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">审批模式</label>
+                  <div className="flex gap-4 text-sm">
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <input type="radio" checked={reviewMode === 'all'} onChange={() => setReviewMode('all')}
+                        className="text-primary-600" />
+                      会签（全部通过）
+                    </label>
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <input type="radio" checked={reviewMode === 'any'} onChange={() => setReviewMode('any')}
+                        className="text-primary-600" />
+                      或签（任一通过）
+                    </label>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-sm font-medium">审批人</label>
+                    <button type="button" onClick={addReviewer}
+                      className="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100">
+                      + 添加
+                    </button>
+                  </div>
+                  <div className="space-y-1">
+                    {reviewers.length === 0 && (
+                      <div className="text-sm text-gray-400 py-2">暂无审批人（提交时将自动生效）</div>
+                    )}
+                    {reviewers.map((rv, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <span className="text-xs text-gray-400 w-5">{rv.seq || i + 1}</span>
+                        <select value={rv.user_id}
+                          onChange={(e) => updateReviewer(i, e.target.value)}
+                          disabled={usersLoading}
+                          className="flex-1 border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500">
+                          <option value="">{usersLoading ? '加载中...' : '请选择审批人'}</option>
+                          {users.filter((u) => u.id !== currentUserId).map((u) => (
+                            <option key={u.id} value={u.id}>{u.real_name} ({u.username})</option>
+                          ))}
+                        </select>
+                        <button type="button" onClick={() => removeReviewer(i)}
+                          className="text-red-400 hover:text-red-600 text-sm">✕</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-sm font-medium">知会人</label>
+                  </div>
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {ccUsers.map((c) => (
+                      <span key={c.user_id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-xs">
+                        {c.user_name}
+                        <button type="button" onClick={() => removeCc(c.user_id)} className="hover:text-red-500">✕</button>
+                      </span>
+                    ))}
+                  </div>
+                  <select value=""
+                    onChange={(e) => { if (e.target.value) { addCc(e.target.value); e.target.value = ''; } }}
+                    disabled={usersLoading}
+                    className="border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500">
+                    <option value="">{usersLoading ? '加载中...' : '+ 添加知会'}</option>
+                    {users.filter((u) => u.id !== currentUserId && !ccUsers.some((c) => c.user_id === u.id)).map((u) => (
+                      <option key={u.id} value={u.id}>{u.real_name} ({u.username})</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* ── Review panel (viewing mode, non-draft) ── */}
+            {profile && profile.status !== 'draft' && !isCreate && (
+              <div className="border-t pt-3 space-y-4">
+                <ProfileReviewPanel
+                  reviewers={profile.reviewers || []}
+                  records={profile.review_records || []}
+                  reviewMode={profile.review_mode}
+                  canReview={profile.status === 'reviewing' &&
+                    (isAdmin() || (profile.reviewers || []).some((r) => r.user_id === currentUserId))}
+                  onReview={async (decision, comment) => {
+                    await configurationProfileApi.review(profile.id, decision, comment);
+                    await loadProfile();
+                  }}
+                />
+                <div>
+                  <div className="text-sm font-medium mb-1">状态日志</div>
+                  <ul className="text-xs text-gray-500 space-y-1 max-h-32 overflow-y-auto">
+                    {(profile.status_logs || []).map((l) => (
+                      <li key={l.id} className="flex gap-1">
+                        <span className="text-gray-400">{l.created_at ? new Date(l.created_at).toLocaleString() : ''}</span>
+                        <span>{l.from_status || '—'} → {l.to_status}</span>
+                        <span>{l.operator_name}</span>
+                        <span className="text-gray-400">{l.comment}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
             )}
 
             {/* ── 配置清单（仅编辑模式） ── */}
@@ -899,7 +1064,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
 );
 }
 
-function InfoItem({ label, value, className }: { label: string; value: string; className?: string }) {
+function InfoItem({ label, value, className }: { label: string; value: React.ReactNode; className?: string }) {
   return (
     <div className={`bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 ${className || ''}`}>
       <div className="text-xs text-gray-500 mb-0.5">{label}</div>
