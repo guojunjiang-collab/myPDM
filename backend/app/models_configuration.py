@@ -70,6 +70,12 @@ class ConfigurationProfile(Base):
     creator_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    reviewers = Column(JSONB, nullable=False, default=[])
+    review_mode = Column(String(8), nullable=False, default="all")  # all=会签 / any=或签
+    cc_users = Column(JSONB, nullable=False, default=[])
+    submitted_at = Column(DateTime(timezone=True), nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    archived_at = Column(DateTime(timezone=True), nullable=True)
 
 
 class ConfigurationProfileItem(Base):
@@ -107,4 +113,31 @@ class ConfigurationWorkingItem(Base):
     quantity = Column(Integer, nullable=False, default=1)
     source_type = Column(String(16), nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ConfigurationReviewRecord(Base):
+    """构型配置审批记录表"""
+    __tablename__ = "configuration_review_records"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    profile_id = Column(UUID(as_uuid=True), ForeignKey("configuration_profiles.id", ondelete="CASCADE"), nullable=False)
+    reviewer_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    reviewer_name = Column(String(64), nullable=True)
+    decision = Column(String(16), nullable=False)  # approved / rejected / returned
+    comment = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ConfigurationStatusLog(Base):
+    """构型配置状态变更日志表"""
+    __tablename__ = "configuration_status_logs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    profile_id = Column(UUID(as_uuid=True), ForeignKey("configuration_profiles.id", ondelete="CASCADE"), nullable=False)
+    from_status = Column(String(16), nullable=True)
+    to_status = Column(String(16), nullable=False)
+    operator_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    operator_name = Column(String(64), nullable=True)
+    comment = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
