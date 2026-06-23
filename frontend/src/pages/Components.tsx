@@ -1129,7 +1129,7 @@ export default function Components() {
           </>
         )}
         {canEdit() && (
-          <button onClick={handleAdd} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">+ 新增部件</button>
+          <button onClick={handleAdd} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新增部件</button>
         )}
       </div>
 
@@ -1182,7 +1182,7 @@ export default function Components() {
                       {statusTag(assembly.status).label}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-4 py-3 text-right text-sm" onClick={(e) => e.stopPropagation()}>
                     {can('bom:trace') && (
                       <button
                         onClick={() => setTraceEntity({ type: 'assembly', id: assembly.id, code: assembly.code, name: assembly.name, version: assembly.version })}

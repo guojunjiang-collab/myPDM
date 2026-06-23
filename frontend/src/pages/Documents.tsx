@@ -663,7 +663,7 @@ export default function Documents() {
           <button onClick={handleImportDocumentsClick} disabled={importLoading} className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm disabled:opacity-50">{importLoading ? '解析中...' : '📤 导入'}</button>
         )}
         {canEdit() && (
-          <button onClick={handleAdd} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">+ 新增图文档</button>
+          <button onClick={handleAdd} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新增图文档</button>
         )}
       </div>
 
@@ -701,7 +701,7 @@ export default function Documents() {
                       {getStatusTag(doc.status).label}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-4 py-3 text-right text-sm" onClick={(e) => e.stopPropagation()}>
                     {canEdit() && <button onClick={() => handleEdit(doc)} className="text-primary-600 hover:text-primary-800 mr-3">编辑</button>}
                     {isAdmin() && (
                       <button onClick={() => setDeleteId(doc.id)} className="text-red-600 hover:text-red-800">删除</button>

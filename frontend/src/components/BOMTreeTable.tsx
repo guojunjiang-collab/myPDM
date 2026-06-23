@@ -4,7 +4,9 @@ import { assemblyPartsApi } from '../services/api';
 
 interface BOMTreeTableProps {
   assemblyId: string;
-  maxHeight?: string; // Tailwind max-height class, default 'max-h-[calc(100vh-300px)]'
+  assemblyCode?: string;
+  assemblyName?: string;
+  maxHeight?: string;
   onRowClick?: (item: AssemblyPartItem) => void;
 }
 
@@ -27,7 +29,7 @@ const statusTag = (s: string) => {
   return map[s] || { label: s, cls: 'bg-gray-100 text-gray-800' };
 };
 
-export default function BOMTreeTable({ assemblyId, maxHeight = 'max-h-[calc(100vh-300px)]', onRowClick }: BOMTreeTableProps) {
+export default function BOMTreeTable({ assemblyId, assemblyCode, assemblyName, maxHeight = 'max-h-[calc(100vh-300px)]', onRowClick }: BOMTreeTableProps) {
   const [viewParts, setViewParts] = useState<TreeNode[]>([]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [loadingViewParts, setLoadingViewParts] = useState(false);
@@ -201,12 +203,22 @@ export default function BOMTreeTable({ assemblyId, maxHeight = 'max-h-[calc(100v
   const renderViewPartsTable = () => {
     const sorted = sortViewParts(viewParts);
     const flatRows = flattenTree(sorted);
+    const allExpanded = viewParts.length > 0 && viewParts.every((n) => n.expanded);
+    const toggleAll = async () => {
+      if (allExpanded) {
+        const newNodes = viewParts.map((n) => ({ ...n, expanded: false, children: [] }));
+        setExpandedIds(new Set());
+        setViewParts(newNodes);
+      } else {
+        setExpandedIds(new Set(viewParts.map((n) => n.item.id)));
+        const newNodes = await Promise.all(viewParts.map((n) => expandChildren({ ...n, expanded: true })));
+        setViewParts(newNodes);
+      }
+    };
     return (
       <div className="border rounded-lg overflow-hidden mt-1">
-        {loadingViewParts && flatRows.length === 0 ? (
+        {loadingViewParts && flatRows.length === 0 && !assemblyCode ? (
           <div className="px-4 py-8 text-center text-sm text-gray-400">加载子项中...</div>
-        ) : flatRows.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-gray-400">暂无子项</div>
         ) : (
           <div className={`overflow-auto ${maxHeight}`}>
             <table className="w-full text-sm">
@@ -223,6 +235,36 @@ export default function BOMTreeTable({ assemblyId, maxHeight = 'max-h-[calc(100v
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
+                {assemblyCode && (
+                  <tr className="bg-gray-50 hover:bg-gray-100 cursor-pointer"
+                    onClick={() => onRowClick?.({
+                      id: assemblyId, childType: 'assembly', child_id: assemblyId,
+                      child_detail: { code: assemblyCode, name: assemblyName || '', spec: '', version: '', status: 'draft' },
+                      quantity: 1, unit: '', seq: 0,
+                    } as unknown as AssemblyPartItem)}>
+                    <td className="px-3 py-2 text-gray-400 whitespace-nowrap">
+                      <span className="text-xs text-gray-400">0</span>
+                      {flatRows.length > 0 && (
+                        <button onClick={(e) => { e.stopPropagation(); toggleAll(); }}
+                          className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
+                          {allExpanded ? '▼' : '▶'}
+                        </button>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className="px-1.5 py-0.5 text-xs rounded bg-purple-50 text-purple-700">部件</span>
+                    </td>
+                    <td className="px-3 py-2 font-medium">{assemblyCode}</td>
+                    <td className="px-3 py-2">{assemblyName || '-'}</td>
+                    <td className="px-3 py-2">-</td>
+                    <td className="px-3 py-2">-</td>
+                    <td className="px-3 py-2">-</td>
+                    <td className="px-3 py-2">1</td>
+                  </tr>
+                )}
+                {flatRows.length === 0 && !loadingViewParts && (
+                  <tr><td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-400">暂无子项</td></tr>
+                )}
                 {flatRows.map(renderViewTreeNode)}
               </tbody>
             </table>

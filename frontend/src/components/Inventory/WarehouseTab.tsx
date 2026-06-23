@@ -78,10 +78,10 @@ export default function WarehouseTab() {
             ) : warehouses.map((w) => (
               <tr key={w.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 text-sm font-medium">{w.code}</td>
-                <td className="px-4 py-3 text-sm">{w.name}</td>
-                <td className="px-4 py-3 text-sm text-gray-500">{WH_TYPES.find((t) => t.value === w.type)?.label || w.type || '-'}</td>
-                <td className="px-4 py-3 text-sm text-gray-500">{users.find((u) => u.id === w.default_keeper_id)?.real_name || '-'}</td>
-                <td className="px-4 py-3 text-right space-x-1">
+                <td className="px-4 py-3 text-sm font-medium">{w.name}</td>
+                <td className="px-4 py-3 text-sm font-medium">{WH_TYPES.find((t) => t.value === w.type)?.label || w.type || '-'}</td>
+                <td className="px-4 py-3 text-sm font-medium">{users.find((u) => u.id === w.default_keeper_id)?.real_name || '-'}</td>
+                <td className="px-4 py-3 text-right text-sm space-x-1">
                   {canEdit() && (
                     <button onClick={() => setEditing(w)} className="text-primary-600 hover:text-primary-800 mr-3">编辑</button>
                   )}

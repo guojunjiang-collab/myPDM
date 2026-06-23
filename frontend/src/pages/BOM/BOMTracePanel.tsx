@@ -94,6 +94,19 @@ export default function BOMTracePanel({ onViewEntity }: BOMTracePanelProps) {
   }, [traceResult]);
 
   // 展开/收起反查树节点
+  const toggleTraceAll = () => {
+    const allExpanded = traceTree.length > 0 && traceTree.every((n) => n.expanded);
+    setTraceTree((prev) => {
+      const toggleAll = (nodes: TraceTreeNode[]): TraceTreeNode[] =>
+        nodes.map((n) => ({
+          ...n,
+          expanded: !allExpanded,
+          children: n.children.length > 0 ? toggleAll(n.children) : n.children,
+        }));
+      return toggleAll(prev);
+    });
+  };
+
   const toggleTraceNode = (targetId: string) => {
     setTraceTree(prev => {
       const toggle = (nodes: TraceTreeNode[]): TraceTreeNode[] =>
@@ -232,6 +245,36 @@ export default function BOMTracePanel({ onViewEntity }: BOMTracePanelProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
+                {/* 反查根节点 */}
+                {selectedTraceEntity && (
+                  <tr className="bg-gray-50 hover:bg-gray-100 cursor-pointer"
+                    onClick={() => onViewEntity(traceType, selectedTraceEntity.id)}>
+                    <td className="px-3 py-2 whitespace-nowrap text-left">
+                      <span className="inline-flex items-center gap-0.5">
+                        <span className="text-xs text-gray-400">0</span>
+                        {traceTree.length > 0 && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleTraceAll(); }}
+                            className="w-4 h-4 inline-flex items-center justify-center text-gray-500 hover:bg-gray-200 rounded"
+                          >
+                            {traceTree.every((n) => n.expanded) ? '▼' : '▶'}
+                          </button>
+                        )}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className={`px-1.5 py-0.5 text-xs rounded ${traceType === 'part' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>
+                        {traceType === 'part' ? '零件' : '部件'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 font-medium">{selectedTraceEntity.code}</td>
+                    <td className="px-3 py-2">{selectedTraceEntity.name}</td>
+                    <td className="px-3 py-2">-</td>
+                    <td className="px-3 py-2">{selectedTraceEntity.version || '-'}</td>
+                    <td className="px-3 py-2">-</td>
+                    <td className="px-3 py-2">-</td>
+                  </tr>
+                )}
                 {flattenTraceTree(traceTree).map((node, idx) => {
                   const item = node.item;
                   const parent = item.parent_assembly || item.parent_part;

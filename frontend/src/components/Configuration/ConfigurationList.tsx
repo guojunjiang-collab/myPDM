@@ -214,7 +214,7 @@ export default function ConfigurationList() {
               <tr key={item.id} onClick={() => setDetailItem(item)} className="hover:bg-gray-50 cursor-pointer">
                 <td className="px-4 py-3 text-sm font-medium">{item.code}</td>
                 <td className="px-4 py-3 text-sm">{item.name}</td>
-                <td className="px-4 py-3 text-sm text-gray-500">{item.remark || '-'}</td>
+                <td className="px-4 py-3 text-sm">{item.remark || '-'}</td>
                 <td className="px-4 py-3 text-right text-sm" onClick={(e) => e.stopPropagation()}>
                   {canEdit() && (
                     <button onClick={(e) => { e.stopPropagation(); setEditItem(item); }} className="text-primary-600 hover:text-primary-800 mr-3">编辑</button>

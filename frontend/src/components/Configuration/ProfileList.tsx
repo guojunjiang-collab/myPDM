@@ -242,10 +242,10 @@ export default function ProfileList() {
             ) : pagedData.map((profile) => (
               <tr key={profile.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setDetailId(profile.id)}>
                 <td className="px-4 py-3 text-sm font-medium">{profile.code}</td>
-                <td className="px-4 py-3 text-sm">{profile.name}</td>
-                <td className="px-4 py-3 text-sm"><ProfileStatusBadge status={profile.status} /></td>
-                <td className="px-4 py-3 text-sm text-gray-500">{profile.effectivity_start || '-'} ~ {profile.effectivity_end || '-'}</td>
-                <td className="px-4 py-3 text-sm text-gray-500">{formatDate(profile.created_at)}</td>
+                <td className="px-4 py-3 text-sm font-medium">{profile.name}</td>
+                <td className="px-4 py-3 text-sm font-medium"><ProfileStatusBadge status={profile.status} /></td>
+                <td className="px-4 py-3 text-sm font-medium">{profile.effectivity_start || '-'} ~ {profile.effectivity_end || '-'}</td>
+                <td className="px-4 py-3 text-sm font-medium">{formatDate(profile.created_at)}</td>
                 <td className="px-4 py-3 text-right text-sm space-x-3 w-0 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                   {profile.status === 'draft' && (
                     <>

@@ -80,10 +80,10 @@ export default function StockTab() {
               <tr key={i} className={`hover:bg-gray-50 cursor-pointer ${r.is_low ? 'bg-red-50' : ''}`}
                 onClick={() => setDetailMatId(r.material_id)}>
                 <td className={`px-4 py-3 text-sm font-medium ${r.is_low ? 'text-red-600' : 'text-primary-600'}`}>{r.material_code} {r.material_name}</td>
-                <td className="px-4 py-3 text-sm text-gray-500">{whName(r.warehouse_id)}</td>
-                <td className="px-4 py-3 text-sm text-gray-500">{r.batch_no || '-'}</td>
+                <td className="px-4 py-3 text-sm font-medium">{whName(r.warehouse_id)}</td>
+                <td className="px-4 py-3 text-sm font-medium">{r.batch_no || '-'}</td>
                 <td className={`px-4 py-3 text-sm text-right font-medium ${r.is_low ? 'text-red-600' : ''}`}>{r.quantity} {r.unit || ''}</td>
-                <td className="px-4 py-3 text-sm text-right text-gray-500">{r.safety_stock ?? '-'}</td>
+                <td className="px-4 py-3 text-sm text-right font-medium">{r.safety_stock ?? '-'}</td>
               </tr>
             ))}
           </tbody>

@@ -183,13 +183,13 @@ export default function MaterialTab() {
             ) : filteredMaterials.map((m) => (
               <tr key={m.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setDetail(m)}>
                 <td className="px-4 py-3 text-sm font-medium">{m.code}</td>
-                <td className="px-4 py-3 text-sm">{m.name}</td>
-                <td className="px-4 py-3 text-sm text-gray-500">{m.spec || '-'}</td>
-                <td className="px-4 py-3 text-sm text-gray-500">{m.unit || '-'}</td>
-                <td className="px-4 py-3 text-sm text-gray-500">{m.source_type === 'standalone' ? '非PDM' : m.source_type === 'part' ? '零件' : '部件'}</td>
-                <td className="px-4 py-3 text-sm text-gray-500">{m.track_mode === 'batch' ? '批次' : '数量'}</td>
-                <td className="px-4 py-3 text-sm text-gray-500">{m.safety_stock ?? '-'}</td>
-                <td className="px-4 py-3 text-right space-x-3">
+                <td className="px-4 py-3 text-sm font-medium">{m.name}</td>
+                <td className="px-4 py-3 text-sm font-medium">{m.spec || '-'}</td>
+                <td className="px-4 py-3 text-sm font-medium">{m.unit || '-'}</td>
+                <td className="px-4 py-3 text-sm font-medium">{m.source_type === 'standalone' ? '非PDM' : m.source_type === 'part' ? '零件' : '部件'}</td>
+                <td className="px-4 py-3 text-sm font-medium">{m.track_mode === 'batch' ? '批次' : '数量'}</td>
+                <td className="px-4 py-3 text-sm font-medium">{m.safety_stock ?? '-'}</td>
+                <td className="px-4 py-3 text-right text-sm space-x-3">
                   {canEdit() && (
                     <button onClick={(e) => { e.stopPropagation(); setEditing(m); }} className="text-primary-600 hover:text-primary-800">编辑</button>
                   )}

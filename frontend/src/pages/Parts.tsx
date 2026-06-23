@@ -507,7 +507,7 @@ export default function Parts() {
           </>
         )}
         {canEdit() && (
-          <button onClick={handleAdd} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">+ 新增零件</button>
+          <button onClick={handleAdd} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新增零件</button>
         )}
       </div>
 
@@ -551,7 +551,7 @@ export default function Parts() {
                       {getStatusTag(part.status).label}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-4 py-3 text-right text-sm" onClick={(e) => e.stopPropagation()}>
                     {can('bom:trace') && (
                       <button
                         onClick={() => setTraceEntity({ type: 'part', id: part.id, code: part.code, name: part.name, version: part.version })}

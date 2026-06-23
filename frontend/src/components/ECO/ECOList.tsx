@@ -98,7 +98,7 @@ export function ECOList() {
     const admin = isAdmin();
     const ccBtn = (
       <button onClick={(e) => { e.stopPropagation(); setCcEcoId(eco.id); }}
-        className="px-2 py-1 rounded bg-purple-50 text-purple-700 hover:bg-purple-100">
+        className="text-purple-600 hover:text-purple-800 text-sm">
         知会
       </button>
     );
@@ -108,11 +108,11 @@ export function ECOList() {
           <div className="flex gap-1 justify-end">
             {(isCreator || admin) && <>
               <button onClick={(e) => { e.stopPropagation(); handleSubmit(eco.id); }} disabled={busy}
-                className="px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50">{busy ? '...' : '提交'}</button>
+                className="text-blue-600 hover:text-blue-800 text-sm disabled:opacity-50 mr-2">{busy ? '...' : '提交'}</button>
               <button onClick={(e) => { e.stopPropagation(); handleEdit(eco); }}
-                className="px-2 py-1 rounded bg-gray-50 text-gray-700 hover:bg-gray-100">编辑</button>
+                className="text-primary-600 hover:text-primary-800 text-sm mr-2">编辑</button>
               <button onClick={(e) => { e.stopPropagation(); handleDelete(eco.id); }} disabled={busy}
-                className="px-2 py-1 rounded bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50">{busy ? '...' : '删除'}</button>
+                className="text-red-600 hover:text-red-800 text-sm disabled:opacity-50 mr-2">{busy ? '...' : '删除'}</button>
             </>}
             {ccBtn}
           </div>);
@@ -120,21 +120,21 @@ export function ECOList() {
         return (
           <div className="flex gap-1 justify-end">
             {isCreator && <button onClick={(e) => { e.stopPropagation(); handleWithdraw(eco.id); }} disabled={busy}
-              className="px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50">{busy ? '...' : '撤回'}</button>}
+              className="text-blue-600 hover:text-blue-800 text-sm disabled:opacity-50 mr-2">{busy ? '...' : '撤回'}</button>}
             {ccBtn}
           </div>);
       case 'approved':
         return (
           <div className="flex gap-1 justify-end">
             {(isCreator || admin) && <button onClick={(e) => { e.stopPropagation(); handleExecute(eco.id); }} disabled={busy}
-              className="px-2 py-1 rounded bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-50">{busy ? '...' : '开始执行'}</button>}
+              className="text-green-600 hover:text-green-800 text-sm disabled:opacity-50 mr-2">{busy ? '...' : '开始执行'}</button>}
             {ccBtn}
           </div>);
       case 'executing':
         return (
           <div className="flex gap-1 justify-end">
             {(isCreator || admin) && <button onClick={(e) => { e.stopPropagation(); setExecId(eco.id); }}
-              className="px-2 py-1 rounded bg-orange-50 text-orange-700 hover:bg-orange-100">执行</button>}
+              className="text-orange-600 hover:text-orange-800 text-sm mr-2">执行</button>}
             {ccBtn}
           </div>);
       case 'completed':
@@ -176,7 +176,6 @@ export function ECOList() {
             <tr>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">ECO 编号</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">标题</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">来源</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">状态</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">优先级</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">创建人</th>
@@ -185,18 +184,17 @@ export function ECOList() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {loading ? (<tr><td colSpan={8} className="px-4 py-12 text-center text-gray-400">加载中...</td></tr>)
-              : ecos.length === 0 ? (<tr><td colSpan={8} className="px-4 py-12 text-center text-gray-400">暂无数据</td></tr>)
+            {loading ? (<tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">加载中...</td></tr>)
+              : ecos.length === 0 ? (<tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">暂无数据</td></tr>)
                 : ecos.map(eco => (
                   <tr key={eco.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setDetailId(eco.id)}>
                     <td className="px-4 py-3 text-sm font-medium whitespace-nowrap">{eco.eco_number}</td>
-                    <td className="px-4 py-3 text-sm max-w-48 truncate">{eco.title}</td>
-                    <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{eco.ecr_number || '独立创建'}</td>
-                    <td className="px-4 py-3 whitespace-nowrap"><ECOStatusBadge status={eco.status} /></td>
-                    <td className="px-4 py-3 whitespace-nowrap"><ECOPriorityBadge priority={eco.priority} /></td>
-                    <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{eco.creator_name}</td>
-                    <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{formatDate(eco.created_at)}</td>
-                    <td className="px-4 py-3">{renderActions(eco)}</td>
+                    <td className="px-4 py-3 text-sm font-medium max-w-48 truncate">{eco.title}</td>
+                    <td className="px-4 py-3 font-medium whitespace-nowrap"><ECOStatusBadge status={eco.status} /></td>
+                    <td className="px-4 py-3 font-medium whitespace-nowrap"><ECOPriorityBadge priority={eco.priority} /></td>
+                    <td className="px-4 py-3 text-sm font-medium whitespace-nowrap">{eco.creator_name}</td>
+                    <td className="px-4 py-3 text-sm font-medium whitespace-nowrap">{formatDate(eco.created_at)}</td>
+                    <td className="px-4 py-3 text-right text-sm" onClick={(e) => e.stopPropagation()}>{renderActions(eco)}</td>
                   </tr>))
             }
           </tbody>

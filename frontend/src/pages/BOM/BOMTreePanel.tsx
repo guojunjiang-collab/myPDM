@@ -10,6 +10,8 @@ interface BOMTreePanelProps {
 
 export default function BOMTreePanel({ assemblies: _assemblies, onViewEntity }: BOMTreePanelProps) {
   const [selectedAssembly, setSelectedAssembly] = useState('');
+  const [selectedAssemblyCode, setSelectedAssemblyCode] = useState('');
+  const [selectedAssemblyName, setSelectedAssemblyName] = useState('');
   const [treeSearch, setTreeSearch] = useState('');
   const [treeSearchResults, setTreeSearchResults] = useState<any[]>([]);
   const [treeSearchLoading, setTreeSearchLoading] = useState(false);
@@ -64,6 +66,8 @@ export default function BOMTreePanel({ assemblies: _assemblies, onViewEntity }: 
                   type="button"
                   onClick={() => {
                     setSelectedAssembly(item.id);
+                    setSelectedAssemblyCode(item.code);
+                    setSelectedAssemblyName(item.name);
                     setTreeSearch(item.code + ' - ' + item.name);
                     setTreeSearchResults([]);
                   }}
@@ -94,6 +98,8 @@ export default function BOMTreePanel({ assemblies: _assemblies, onViewEntity }: 
       {selectedAssembly ? (
         <BOMTreeTable
           assemblyId={selectedAssembly}
+          assemblyCode={selectedAssemblyCode}
+          assemblyName={selectedAssemblyName}
           onRowClick={(item) => onViewEntity(item.childType === 'part' ? 'part' : 'assembly', item.child_id)}
         />
       ) : (
