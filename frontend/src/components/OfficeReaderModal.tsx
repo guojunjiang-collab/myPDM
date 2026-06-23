@@ -7,6 +7,8 @@ interface OfficeReaderModalProps {
   onClose: () => void;
   attachmentId: string;
   fileName: string;
+  /** 叠放层级，默认 70，确保浮于详情弹窗（z-50/60）之上 */
+  zIndex?: number;
 }
 
 /** 取附件原始字节（复用 preview 媒体令牌，按 arrayBuffer 读取） */
@@ -20,7 +22,7 @@ async function fetchAttachmentBytes(attId: string): Promise<ArrayBuffer> {
 }
 
 export default function OfficeReaderModal({
-  open, onClose, attachmentId, fileName,
+  open, onClose, attachmentId, fileName, zIndex = 70,
 }: OfficeReaderModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -75,7 +77,7 @@ export default function OfficeReaderModal({
   }, [open, attachmentId, ext]);
 
   return (
-    <Modal open={open} title={`文档预览：${fileName}`} onClose={onClose} width="3xl">
+    <Modal open={open} title={`文档预览：${fileName}`} onClose={onClose} width="3xl" zIndex={zIndex}>
       {loading ? (
         <div className="py-8 text-center text-sm text-gray-400">加载中...</div>
       ) : error ? (

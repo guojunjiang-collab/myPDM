@@ -1,10 +1,11 @@
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { boardApi, usersApi, partsApi, assembliesApi, documentsApi, customFieldsApi, configurationApi } from '../services/api';
 import { useDataStore } from '../stores/data';
 import { Modal, ConfirmModal } from '../components/Modal';
 import PartDetailContent from '../components/PartDetailContent';
 import DocumentDetailContent from '../components/DocumentDetailContent';
 import ArchiveTreeModal from '../components/ArchiveTreeModal';
+const OfficeReaderModal = lazy(() => import('../components/OfficeReaderModal'));
 import AssemblyDetailContent from '../components/AssemblyDetailContent';
 import ConfigurationDetailModal from '../components/Configuration/ConfigurationDetailModal';
 import { useAuthStore } from '../stores/auth';
@@ -127,6 +128,7 @@ export default function Board() {
   const [detailCustomDefs, setDetailCustomDefs] = useState<CustomFieldDefinition[]>([]);
   const [detailCustomValues, setDetailCustomValues] = useState<Record<string, any>>({});
   const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
+  const [officePreview, setOfficePreview] = useState<{ attId: string; fileName: string } | null>(null);
 
   /* Load */
   const loadDashboard = useCallback(async () => {
@@ -588,6 +590,7 @@ export default function Board() {
             customFieldDefs={detailCustomDefs}
             customFieldValues={detailCustomValues}
             onArchivePreview={(attId, fileName) => setArchivePreview({ attId, fileName })}
+            onOfficePreview={(attId, fileName) => setOfficePreview({ attId, fileName })}
           />
         ) : null}
       </Modal>
@@ -612,6 +615,17 @@ export default function Board() {
           attachmentId={archivePreview.attId}
           fileName={archivePreview.fileName}
         />
+      )}
+
+      {officePreview && (
+        <Suspense fallback={null}>
+          <OfficeReaderModal
+            open={!!officePreview}
+            onClose={() => setOfficePreview(null)}
+            attachmentId={officePreview.attId}
+            fileName={officePreview.fileName}
+          />
+        </Suspense>
       )}
     </div>
   );
