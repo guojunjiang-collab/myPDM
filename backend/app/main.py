@@ -203,6 +203,56 @@ async def startup_event():
             db.commit()
             print("✓ Created table configuration_working_items")
 
+        # 审批流新增列 + 表
+        for col_def in [
+            ("reviewers", "JSONB NOT NULL DEFAULT '[]'"),
+            ("review_mode", "VARCHAR(8) NOT NULL DEFAULT 'all'"),
+            ("cc_users", "JSONB NOT NULL DEFAULT '[]'"),
+            ("submitted_at", "TIMESTAMPTZ"),
+            ("reviewed_at", "TIMESTAMPTZ"),
+            ("archived_at", "TIMESTAMPTZ"),
+        ]:
+            result = db.execute(text(
+                f"SELECT column_name FROM information_schema.columns WHERE table_name='configuration_profiles' AND column_name='{col_def[0]}'"
+            ))
+            if not result.fetchone():
+                db.execute(text(f"ALTER TABLE configuration_profiles ADD COLUMN {col_def[0]} {col_def[1]}"))
+                db.commit()
+                print(f"✓ Added column {col_def[0]} to configuration_profiles table")
+
+        result = db.execute(text("SELECT table_name FROM information_schema.tables WHERE table_name = 'configuration_review_records'"))
+        if not result.fetchone():
+            db.execute(text("""
+                CREATE TABLE configuration_review_records (
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    profile_id UUID NOT NULL REFERENCES configuration_profiles(id) ON DELETE CASCADE,
+                    reviewer_id UUID NOT NULL REFERENCES users(id),
+                    reviewer_name VARCHAR(64),
+                    decision VARCHAR(16) NOT NULL,
+                    comment TEXT,
+                    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            db.commit()
+            print("✓ Created table configuration_review_records")
+
+        result = db.execute(text("SELECT table_name FROM information_schema.tables WHERE table_name = 'configuration_status_logs'"))
+        if not result.fetchone():
+            db.execute(text("""
+                CREATE TABLE configuration_status_logs (
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    profile_id UUID NOT NULL REFERENCES configuration_profiles(id) ON DELETE CASCADE,
+                    from_status VARCHAR(16),
+                    to_status VARCHAR(16) NOT NULL,
+                    operator_id UUID NOT NULL REFERENCES users(id),
+                    operator_name VARCHAR(64),
+                    comment TEXT,
+                    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            db.commit()
+            print("✓ Created table configuration_status_logs")
+
         # ── ECO/ECR 表结构（变更管理）──
         # ECR 表
         result = db.execute(text("SELECT table_name FROM information_schema.tables WHERE table_name = 'ecrs'"))

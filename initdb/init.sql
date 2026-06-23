@@ -417,7 +417,13 @@ CREATE TABLE configuration_profiles (
     remark TEXT,
     creator_id UUID NOT NULL REFERENCES users(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    reviewers JSONB NOT NULL DEFAULT '[]',
+    review_mode VARCHAR(8) NOT NULL DEFAULT 'all',
+    cc_users JSONB NOT NULL DEFAULT '[]',
+    submitted_at TIMESTAMPTZ,
+    reviewed_at TIMESTAMPTZ,
+    archived_at TIMESTAMPTZ
 );
 
 CREATE INDEX idx_cp_config_item_id ON configuration_profiles(configuration_item_id);
@@ -460,6 +466,29 @@ CREATE TABLE configuration_working_items (
 );
 
 CREATE INDEX idx_cwi_profile_id ON configuration_working_items(profile_id);
+
+-- 构型配置审批记录表
+CREATE TABLE configuration_review_records (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    profile_id UUID NOT NULL REFERENCES configuration_profiles(id) ON DELETE CASCADE,
+    reviewer_id UUID NOT NULL REFERENCES users(id),
+    reviewer_name VARCHAR(64),
+    decision VARCHAR(16) NOT NULL,
+    comment TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 构型配置状态变更日志表
+CREATE TABLE configuration_status_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    profile_id UUID NOT NULL REFERENCES configuration_profiles(id) ON DELETE CASCADE,
+    from_status VARCHAR(16),
+    to_status VARCHAR(16) NOT NULL,
+    operator_id UUID NOT NULL REFERENCES users(id),
+    operator_name VARCHAR(64),
+    comment TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
 
 -- ===== 库存管理模块 =====
 CREATE TABLE IF NOT EXISTS warehouses (
