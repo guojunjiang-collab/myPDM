@@ -64,6 +64,7 @@ export default function OfficeReaderModal({
           throw new Error(`不支持的格式: ${ext}`);
         }
       } catch (e) {
+        console.error('Office 预览渲染失败', e);
         if (!cancelled) setError('渲染失败，请下载查看');
       } finally {
         if (!cancelled) setLoading(false);
@@ -100,6 +101,7 @@ export default function OfficeReaderModal({
               ))}
             </div>
           )}
+          {/* sheet_to_html 生成的表格 HTML；内容来自受信任的内部附件，无脚本注入 */}
           <div
             className="overflow-auto max-h-[70vh] office-xlsx-table"
             dangerouslySetInnerHTML={{ __html: sheets[activeSheet]?.html ?? '' }}
