@@ -73,12 +73,18 @@ export default function OfficeReader() {
         <h1 className="text-sm font-semibold text-gray-800 truncate">文档预览：{name}</h1>
       </div>
 
-      {loading ? (
-        <div className="flex-1 flex items-center justify-center text-sm text-gray-400">加载中...</div>
-      ) : error ? (
+      {error ? (
         <div className="flex-1 flex items-center justify-center text-sm text-red-500">{error}</div>
       ) : ext === 'docx' ? (
-        <div ref={docxRef} className="flex-1 overflow-auto p-6" />
+        // docx 容器须始终挂载，否则 renderAsync 时 ref 为空导致渲染落空
+        <div className="flex-1 overflow-auto p-6 relative">
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-400">加载中...</div>
+          )}
+          <div ref={docxRef} />
+        </div>
+      ) : loading ? (
+        <div className="flex-1 flex items-center justify-center text-sm text-gray-400">加载中...</div>
       ) : (
         <div className="flex-1 flex flex-col min-h-0">
           {sheets.length > 1 && (
