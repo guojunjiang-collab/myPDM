@@ -582,12 +582,44 @@ export interface ConfigChildItem {
 // 构型配置 (Configuration Profile)
 // ──────────────────────────────────────────
 
+export interface ProfileReviewer {
+  user_id: string;
+  user_name?: string;
+  role?: string;
+  seq?: number;
+}
+
+export interface ProfileCcUser {
+  user_id: string;
+  user_name?: string;
+}
+
+export interface ProfileReviewRecord {
+  id: string;
+  reviewer_id: string;
+  reviewer_name?: string;
+  decision: 'approved' | 'rejected' | 'returned';
+  comment?: string;
+  created_at?: string;
+}
+
+export interface ProfileStatusLog {
+  id: string;
+  from_status?: string;
+  to_status: string;
+  operator_name?: string;
+  comment?: string;
+  created_at?: string;
+}
+
+export type ProfileStatus = 'draft' | 'reviewing' | 'active' | 'rejected' | 'archived';
+
 export interface ConfigurationProfile {
   id: string;
   code: string;
   name: string;
   configuration_item_id: string;
-  status: 'draft' | 'active' | 'archived';
+  status: ProfileStatus;
   effectivity_start?: string;
   effectivity_end?: string;
   remark?: string;
@@ -595,6 +627,15 @@ export interface ConfigurationProfile {
   created_at: string;
   updated_at?: string;
   configuration_item?: { id: string; code: string; name: string };
+  reviewers?: ProfileReviewer[];
+  review_mode?: 'all' | 'any';
+  cc_users?: ProfileCcUser[];
+  review_records?: ProfileReviewRecord[];
+  status_logs?: ProfileStatusLog[];
+  submitted_at?: string | null;
+  reviewed_at?: string | null;
+  archived_at?: string | null;
+  reviewer_count?: number;
 }
 
 export interface ConfigurationProfileItem {
