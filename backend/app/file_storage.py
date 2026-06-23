@@ -24,7 +24,7 @@ ALLOWED_EXTENSIONS = {
     '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
     '.dwg', '.dxf', '.stp', '.step', '.igs', '.iges',
     '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp',
-    '.zip', '.rar', '.7z',
+    '.zip', '.rar', '.7z', '.tar', '.gz', '.tgz',
     '.glb', '.gltf', '.obj',
     '.txt', '.csv', '.md', '.log', '.json', '.xml',
 }
