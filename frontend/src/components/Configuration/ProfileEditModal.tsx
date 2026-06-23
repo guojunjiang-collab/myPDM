@@ -766,6 +766,23 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                   </div>
                 </div>
               )}
+              {!isView && (!isCreate ? (profile && profile.status === 'draft') : true) && (
+                <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                  <label className="block text-xs text-gray-500 mb-0.5">审批模式</label>
+                  <div className="flex gap-3 pt-0.5 text-sm">
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <input type="radio" checked={reviewMode === 'all'} onChange={() => setReviewMode('all')}
+                        className="text-primary-600" />
+                      会签
+                    </label>
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <input type="radio" checked={reviewMode === 'any'} onChange={() => setReviewMode('any')}
+                        className="text-primary-600" />
+                      或签
+                    </label>
+                  </div>
+                </div>
+              )}
             </div>
             )}
 
@@ -801,25 +818,9 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
             )}
 
             {/* ── Reviewers & CC section (draft / new) ── */}
-            {(!isCreate ? (profile && profile.status === 'draft') : true) && (
+            {!isView && (!isCreate ? (profile && profile.status === 'draft') : true) && (
               <div className="space-y-3 border-t pt-3">
-                <div>
-                  <label className="block text-sm font-medium mb-1">审批模式</label>
-                  <div className="flex gap-4 text-sm">
-                    <label className="flex items-center gap-1 cursor-pointer">
-                      <input type="radio" checked={reviewMode === 'all'} onChange={() => setReviewMode('all')}
-                        className="text-primary-600" />
-                      会签（全部通过）
-                    </label>
-                    <label className="flex items-center gap-1 cursor-pointer">
-                      <input type="radio" checked={reviewMode === 'any'} onChange={() => setReviewMode('any')}
-                        className="text-primary-600" />
-                      或签（任一通过）
-                    </label>
-                  </div>
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center justify-between mb-1">
                     <label className="text-sm font-medium">审批人</label>
                     <button type="button" onClick={addReviewer}
                       className="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100">
@@ -847,7 +848,6 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                       </div>
                     ))}
                   </div>
-                </div>
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-sm font-medium">知会人</label>

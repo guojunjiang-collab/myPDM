@@ -204,7 +204,7 @@ export default function ProfileList() {
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">状态</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">架次</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">创建时间</th>
-              <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">操作</th>
+              <th className="text-right px-4 py-3 text-sm font-medium text-gray-500 w-0 whitespace-nowrap">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -215,13 +215,13 @@ export default function ProfileList() {
             ) : pagedData.length === 0 ? (
               <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
             ) : pagedData.map((profile) => (
-              <tr key={profile.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm font-medium cursor-pointer" onClick={() => setDetailId(profile.id)}>{profile.code}</td>
-                <td className="px-4 py-3 text-sm cursor-pointer" onClick={() => setDetailId(profile.id)}>{profile.name}</td>
+              <tr key={profile.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setDetailId(profile.id)}>
+                <td className="px-4 py-3 text-sm font-medium">{profile.code}</td>
+                <td className="px-4 py-3 text-sm">{profile.name}</td>
                 <td className="px-4 py-3 text-sm"><ProfileStatusBadge status={profile.status} /></td>
                 <td className="px-4 py-3 text-sm text-gray-500">{profile.effectivity_start || '-'} ~ {profile.effectivity_end || '-'}</td>
                 <td className="px-4 py-3 text-sm text-gray-500">{formatDate(profile.created_at)}</td>
-                <td className="px-4 py-3 text-right space-x-1" onClick={(e) => e.stopPropagation()}>
+                <td className="px-4 py-3 text-right space-x-1 w-0 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                   {profile.status === 'draft' && (
                     <>
                       {canEdit() && (
