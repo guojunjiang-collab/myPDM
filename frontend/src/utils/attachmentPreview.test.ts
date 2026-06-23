@@ -15,8 +15,8 @@ describe('previewAttachment office 分发', () => {
     vi.stubGlobal('open', vi.fn());
   });
 
-  it('docx/xlsx/xls 取 preview 令牌并在新标签页打开 /office-reader', async () => {
-    for (const name of ['a.docx', 'b.xlsx', 'c.xls', 'D.DOCX']) {
+  it('xlsx/xls 取 preview 令牌并在新标签页打开 /office-reader（前端渲染）', async () => {
+    for (const name of ['b.xlsx', 'c.xls', 'D.XLSX']) {
       (window.open as ReturnType<typeof vi.fn>).mockClear();
       const onArchive = vi.fn();
       await previewAttachment('att-1', name, { onArchive });
@@ -29,8 +29,8 @@ describe('previewAttachment office 分发', () => {
     }
   });
 
-  it('pptx/doc/ppt 取 office-pdf 令牌并在新标签页打开 /office-pdf', async () => {
-    for (const name of ['a.pptx', 'b.doc', 'c.ppt']) {
+  it('docx/doc/ppt/pptx 取 office-pdf 令牌并在新标签页打开 /office-pdf（后端转 PDF）', async () => {
+    for (const name of ['a.docx', 'b.doc', 'c.ppt', 'd.pptx']) {
       (window.open as ReturnType<typeof vi.fn>).mockClear();
       (mediaApi.token as ReturnType<typeof vi.fn>).mockClear();
       const onArchive = vi.fn();

@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 /**
- * Office 文档只读阅读页（独立标签页）。
+ * Excel 只读阅读页（独立标签页）。
  * 通过 /office-reader?id=...&token=...&name=... 打开：
  * - 用 preview 媒体令牌 fetch 附件字节（arrayBuffer）
- * - docx 用 docx-preview 渲染；xlsx/xls 用 SheetJS 渲染为表格
- * 渲染库均动态 import，按需加载。
+ * - xlsx/xls 用 SheetJS 渲染为表格（动态 import，按需加载）
+ * 其余 Office 格式（docx/doc/ppt/pptx）由后端转 PDF 预览，不走此页。
  */
 export default function OfficeReader() {
   const [loading, setLoading] = useState(true);
@@ -13,7 +13,6 @@ export default function OfficeReader() {
   // xlsx 渲染结果：每个 sheet 的 name + html
   const [sheets, setSheets] = useState<{ name: string; html: string }[]>([]);
   const [activeSheet, setActiveSheet] = useState(0);
-  const docxRef = useRef<HTMLDivElement>(null);
 
   const params = new URLSearchParams(location.search);
   const id = params.get('id');
@@ -38,12 +37,7 @@ export default function OfficeReader() {
         const buf = await resp.arrayBuffer();
         if (cancelled) return;
 
-        if (ext === 'docx') {
-          const { renderAsync } = await import('docx-preview');
-          if (cancelled || !docxRef.current) return;
-          docxRef.current.innerHTML = '';
-          await renderAsync(buf, docxRef.current);
-        } else if (ext === 'xlsx' || ext === 'xls') {
+        if (ext === 'xlsx' || ext === 'xls') {
           const XLSX = await import('xlsx');
           if (cancelled) return;
           const wb = XLSX.read(buf, { type: 'array' });
@@ -57,7 +51,7 @@ export default function OfficeReader() {
           throw new Error(`不支持的格式: ${ext}`);
         }
       } catch (e) {
-        console.error('Office 预览渲染失败', e);
+        console.error('Excel 预览渲染失败', e);
         if (!cancelled) setError('渲染失败，请关闭后下载查看');
       } finally {
         if (!cancelled) setLoading(false);
@@ -75,14 +69,6 @@ export default function OfficeReader() {
 
       {error ? (
         <div className="flex-1 flex items-center justify-center text-sm text-red-500">{error}</div>
-      ) : ext === 'docx' ? (
-        // docx 容器须始终挂载，否则 renderAsync 时 ref 为空导致渲染落空
-        <div className="flex-1 overflow-auto p-6 relative">
-          {loading && (
-            <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-400">加载中...</div>
-          )}
-          <div ref={docxRef} />
-        </div>
       ) : loading ? (
         <div className="flex-1 flex items-center justify-center text-sm text-gray-400">加载中...</div>
       ) : (

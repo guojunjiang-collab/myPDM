@@ -7,18 +7,18 @@ export const ARCHIVE_EXTS = ['zip', 'tar', 'gz', 'tgz', 'rar', '7z'];
 
 const INLINE_EXTS = ['pdf', ...IMAGE_EXTS, ...TEXT_EXTS];
 
-/** 前端可在线渲染的 Office 格式 */
-export const FRONTEND_OFFICE_EXTS = ['docx', 'xlsx', 'xls'];
-/** 经后端 LibreOffice 转 PDF 预览的 Office 格式（前端渲染库支持差） */
-export const BACKEND_PDF_OFFICE_EXTS = ['pptx', 'doc', 'ppt'];
+/** 前端可在线渲染的 Office 格式（仅 Excel，保真度可接受） */
+export const FRONTEND_OFFICE_EXTS = ['xlsx', 'xls'];
+/** 经后端 LibreOffice 转 PDF 预览的 Office 格式（前端渲染保真度差） */
+export const BACKEND_PDF_OFFICE_EXTS = ['docx', 'doc', 'ppt', 'pptx'];
 
 /**
  * 统一的附件预览分发。
  * - pdf/图片/文本：媒体令牌 + 新窗口内嵌 /preview
  * - 压缩包：交给调用方弹窗（opts.onArchive）
  * - stp/step：新窗口三维预览
- * - docx/xlsx/xls：媒体令牌 + 新标签页前端渲染（/office-reader）
- * - pptx/doc/ppt：媒体令牌 + 新标签页内嵌后端转换的 PDF（/office-pdf）
+ * - xlsx/xls：媒体令牌 + 新标签页前端渲染（/office-reader）
+ * - docx/doc/ppt/pptx：媒体令牌 + 新标签页内嵌后端转换的 PDF（/office-pdf）
  * - 其它：提示不支持
  */
 export async function previewAttachment(
