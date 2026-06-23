@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { entityDocumentsApi, customFieldsApi, documentsApi, mediaApi } from '../services/api';
 import { previewAttachment } from '../utils/attachmentPreview';
 import type { EntityDocument, CustomFieldDefinition, CustomFieldValue, Document } from '../types';
@@ -9,6 +9,7 @@ import DocumentPicker from './DocumentPicker';
 import DocumentDetailContent from './DocumentDetailContent';
 import VersionSelectModal from './VersionSelectModal';
 import ArchiveTreeModal from './ArchiveTreeModal';
+const OfficeReaderModal = lazy(() => import('./OfficeReaderModal'));
 
 /* ----------------------------------------------------------------
    Types
@@ -64,6 +65,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
   const [viewDocCustomDefs, setViewDocCustomDefs] = useState<CustomFieldDefinition[]>([]);
   const [viewDocCustomValues, setViewDocCustomValues] = useState<Record<string, any>>({});
   const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
+  const [officePreview, setOfficePreview] = useState<{ attId: string; fileName: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -165,6 +167,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
   const handlePreviewAttachment = (fileId: string, fileName: string) => {
     previewAttachment(fileId, fileName, {
       onArchive: (id, name) => setArchivePreview({ attId: id, fileName: name }),
+      onOffice: (id, name) => setOfficePreview({ attId: id, fileName: name }),
     });
   };
 
@@ -323,6 +326,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
             customFieldDefs={viewDocCustomDefs}
             customFieldValues={viewDocCustomValues}
             onArchivePreview={(attId, fileName) => setArchivePreview({ attId, fileName })}
+            onOfficePreview={(attId, fileName) => setOfficePreview({ attId, fileName })}
           />
         )}
       </Modal>
@@ -345,6 +349,17 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
           attachmentId={archivePreview.attId}
           fileName={archivePreview.fileName}
         />
+      )}
+
+      {officePreview && (
+        <Suspense fallback={null}>
+          <OfficeReaderModal
+            open={!!officePreview}
+            onClose={() => setOfficePreview(null)}
+            attachmentId={officePreview.attId}
+            fileName={officePreview.fileName}
+          />
+        </Suspense>
       )}
     </div>
   );
