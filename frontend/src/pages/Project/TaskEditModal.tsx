@@ -128,7 +128,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
   };
 
   return (
-    <Modal open={open} title={task ? `编辑任务 · ${task.name}` : '新建任务'} onClose={onClose} width="3xl">
+    <Modal open={open} title={task ? `${task.code}_${task.name}` : '新建任务'} onClose={onClose} width="3xl">
       <div className="space-y-4">
         <div className="grid grid-cols-3 gap-3">
           <div className="col-span-2">
