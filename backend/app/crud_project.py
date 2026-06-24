@@ -104,7 +104,18 @@ def _next_task_code(db: Session, project: Project) -> str:
 
 
 def get_task(db: Session, task_id: uuid.UUID) -> ProjectTask:
+    """按 id 取任务，含已软删的(供 delete_task 子树遍历/状态检视用)。"""
     t = db.query(ProjectTask).filter(ProjectTask.id == task_id).first()
+    if not t:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    return t
+
+
+def get_active_task(db: Session, task_id: uuid.UUID) -> ProjectTask:
+    """按 id 取未软删的任务；变更类接口(编辑/状态/移动/关联/评论)应用此函数，避免操作已删任务。"""
+    t = db.query(ProjectTask).filter(
+        ProjectTask.id == task_id, ProjectTask.deleted_at.is_(None)
+    ).first()
     if not t:
         raise HTTPException(status_code=404, detail="任务不存在")
     return t
