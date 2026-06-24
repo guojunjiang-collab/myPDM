@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useProjectStore } from '../../stores/project';
 import { projectApi } from '../../services/projectApi';
+import { usersApi } from '../../services/api';
 import { can } from '../../stores/auth';
 import { Modal, ConfirmModal } from '../../components/Modal';
 import { toast } from '../../components/Toast';
@@ -47,9 +48,10 @@ export default function Projects() {
   const [statusFilter, setStatusFilter] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [form, setForm] = useState({ name: '', planned_start: '', planned_end: '', description: '', status: '进行中' as ProjectStatus });
+  const [form, setForm] = useState({ name: '', planned_start: '', planned_end: '', description: '', status: '进行中' as ProjectStatus, owner_id: '' });
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [allUsers, setAllUsers] = useState<{ id: string; real_name: string; username: string }[]>([]);
 
   // Detail tab state
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -76,11 +78,11 @@ export default function Projects() {
 
   const handleOpenCreate = () => {
     setEditingProject(null);
-    setForm({ name: '', planned_start: '', planned_end: '', description: '', status: '进行中' });
+    setForm({ name: '', planned_start: '', planned_end: '', description: '', status: '进行中', owner_id: '' });
     setCreateOpen(true);
   };
 
-  const handleOpenEdit = (p: Project, e: React.MouseEvent) => {
+  const handleOpenEdit = async (p: Project, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingProject(p);
     setForm({
@@ -89,7 +91,12 @@ export default function Projects() {
       planned_end: p.planned_end || '',
       description: p.description || '',
       status: p.status,
+      owner_id: p.owner_id,
     });
+    try {
+      const r = await usersApi.list();
+      setAllUsers((r.data as any).items || r.data || []);
+    } catch { setAllUsers([]); }
     setCreateOpen(true);
   };
 
@@ -118,6 +125,7 @@ export default function Projects() {
         await projectApi.updateProject(editingProject.id, {
           name: form.name,
           status: form.status,
+          owner_id: form.owner_id || undefined,
           planned_start: form.planned_start || undefined,
           planned_end: form.planned_end || undefined,
           description: form.description || undefined,
@@ -129,8 +137,11 @@ export default function Projects() {
       }
       setCreateOpen(false);
       setEditingProject(null);
-      setForm({ name: '', planned_start: '', planned_end: '', description: '', status: '进行中' });
+      setForm({ name: '', planned_start: '', planned_end: '', description: '', status: '进行中', owner_id: '' });
       loadProjects();
+      if (editingProject && selectedProjectId === editingProject.id) {
+        loadProject(selectedProjectId);
+      }
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || (editingProject ? '更新失败' : '创建失败'));
     } finally {
@@ -341,6 +352,18 @@ export default function Projects() {
                         className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
                       >
                         {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  {editingProject && (
+                    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                      <label className="block text-xs text-gray-500 mb-0.5">负责人</label>
+                      <select
+                        value={form.owner_id}
+                        onChange={(e) => setForm({ ...form, owner_id: e.target.value })}
+                        className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      >
+                        {allUsers.map((u) => <option key={u.id} value={u.id}>{u.real_name} ({u.username})</option>)}
                       </select>
                     </div>
                   )}

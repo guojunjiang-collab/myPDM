@@ -20,6 +20,7 @@ class ProjectCreate(BaseSchema):
 
 class ProjectEdit(BaseSchema):
     name: Optional[str] = None
+    owner_id: Optional[str] = None
     status: Optional[Literal["进行中", "已完成", "已暂停", "已归档"]] = None
     planned_start: Optional[str] = None
     planned_end: Optional[str] = None

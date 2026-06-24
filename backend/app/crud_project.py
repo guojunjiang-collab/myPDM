@@ -61,6 +61,8 @@ def update_project(db: Session, p: Project, data: ProjectEdit) -> Project:
         val = getattr(data, field)
         if val is not None:
             setattr(p, field, val)
+    if data.owner_id is not None:
+        p.owner_id = _uuid(data.owner_id)
     db.commit(); db.refresh(p)
     return p
 
