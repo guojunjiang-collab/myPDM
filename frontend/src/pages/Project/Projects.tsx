@@ -194,7 +194,7 @@ export default function Projects() {
     const rows: JSX.Element[] = [
       <tr key={t.id} onClick={() => openEdit(t)}
           className={`${overdue ? 'bg-red-50' : 'hover:bg-gray-50'} cursor-pointer`}>
-        <td className="px-4 py-2 text-sm text-gray-500 font-mono" onClick={(e) => e.stopPropagation()}>
+        <td className="px-4 py-2 text-sm text-gray-500 font-mono whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
           <span style={{ paddingLeft: depth * 20 }} className="inline-flex items-center gap-1">
             {hasChildren ? (
               <button onClick={() => toggle(t.id)} className="text-gray-400 w-4 shrink-0">{isOpen ? '▾' : '▸'}</button>
@@ -214,6 +214,7 @@ export default function Projects() {
           <span className={`px-2 py-0.5 text-xs rounded-full ${TASK_STATUS_CLASS[t.status]}`}>{t.status}</span>
         </td>
         <td className="px-2 py-2 text-sm">{t.priority}</td>
+        <td className="px-2 py-2 text-sm text-gray-500">{t.planned_start || '—'}</td>
         <td className="px-2 py-2 text-sm text-gray-500">{t.planned_end || '—'}</td>
         <td className="px-4 py-2 text-right text-gray-400" onClick={(e) => e.stopPropagation()}>
           {(t.link_count ?? 0) > 0 && <span className="mr-2">🔗 {t.link_count}</span>}
@@ -445,11 +446,12 @@ export default function Projects() {
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
                       <tr>
-                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-500 w-32">编号</th>
-                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">任务名称</th>
+                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-500 whitespace-nowrap">编号</th>
+                        <th className="text-left px-2 py-3 text-sm font-medium text-gray-500">任务名称</th>
                         <th className="text-left px-2 py-3 text-sm font-medium text-gray-500">负责人</th>
                         <th className="text-left px-2 py-3 text-sm font-medium text-gray-500">状态</th>
                         <th className="text-left px-2 py-3 text-sm font-medium text-gray-500">优先级</th>
+                        <th className="text-left px-2 py-3 text-sm font-medium text-gray-500">计划开始</th>
                         <th className="text-left px-2 py-3 text-sm font-medium text-gray-500">计划完成</th>
                         <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">关联/操作</th>
                       </tr>
@@ -457,7 +459,7 @@ export default function Projects() {
                     <tbody className="divide-y divide-gray-200">
                       {tasks.flatMap((t) => renderRow(t, 0))}
                       {tasks.length === 0 && (
-                        <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">暂无任务</td></tr>
+                        <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">暂无任务</td></tr>
                       )}
                     </tbody>
                   </table>
