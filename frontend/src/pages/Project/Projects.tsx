@@ -198,8 +198,9 @@ export default function Projects() {
     const isOpen = expanded.has(t.id);
     const overdue = isOverdue(t);
     const rows: JSX.Element[] = [
-      <tr key={t.id} className={`${overdue ? 'bg-red-50' : 'hover:bg-gray-50'}`}>
-        <td className="px-4 py-2">
+      <tr key={t.id} onClick={() => openEdit(t)}
+          className={`${overdue ? 'bg-red-50' : 'hover:bg-gray-50'} cursor-pointer`}>
+        <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
           <span style={{ paddingLeft: depth * 20 }} className="inline-flex items-center gap-1">
             {hasChildren ? (
               <button onClick={() => toggle(t.id)} className="text-gray-400 w-4">{isOpen ? '▾' : '▸'}</button>
@@ -211,7 +212,7 @@ export default function Projects() {
           </span>
         </td>
         <td className="px-2 py-2 text-sm">{t.assignee_name || '—'}</td>
-        <td className="px-2 py-2">
+        <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
           <select value={t.status} onChange={(e) => changeStatus(t, e.target.value)}
                   className={`text-xs px-2 py-0.5 rounded border-0 ${TASK_STATUS_CLASS[t.status]}`}>
             {(['未开始', '进行中', '已完成', '挂起'] as TaskStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
@@ -219,10 +220,9 @@ export default function Projects() {
         </td>
         <td className="px-2 py-2 text-sm">{t.priority}</td>
         <td className="px-2 py-2 text-sm text-gray-500">{t.planned_end || '—'}</td>
-        <td className="px-4 py-2 text-right text-gray-400">
+        <td className="px-4 py-2 text-right text-gray-400" onClick={(e) => e.stopPropagation()}>
           {(t.link_count ?? 0) > 0 && <span className="mr-2">🔗 {t.link_count}</span>}
           {isManager && <button onClick={() => openCreate(t.id)} className="text-primary-600 text-sm mr-2">+子</button>}
-          {isManager && <button onClick={() => openEdit(t)} className="text-gray-600 text-sm mr-2">编辑</button>}
           {can('project.task:delete') && <button onClick={() => setDelTask(t)} className="text-red-600 text-sm">删除</button>}
         </td>
       </tr>,
