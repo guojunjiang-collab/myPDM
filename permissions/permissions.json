@@ -113,6 +113,18 @@
     "inventory.doc:submit_withdraw_approve": ["admin", "engineer", "production"],
     "inventory.doc:post": { "roles": ["admin", "engineer", "production"], "object_policy": "inventory_keeper_or_admin" },
 
+    "project:read": ["admin", "engineer", "production", "guest"],
+    "project:create": ["admin", "engineer"],
+    "project:update": { "roles": ["admin", "engineer"], "object_policy": "project_manager_or_admin" },
+    "project:delete": { "roles": ["admin", "engineer"], "object_policy": "project_manager_or_admin" },
+    "project.member:manage": { "roles": ["admin", "engineer"], "object_policy": "project_manager_or_admin" },
+    "project.task:create": { "roles": ["admin", "engineer", "production"], "object_policy": "project_manager_or_admin" },
+    "project.task:update": { "roles": ["admin", "engineer", "production"], "object_policy": "project_manager_or_admin" },
+    "project.task:update_status": ["admin", "engineer", "production"],
+    "project.task:delete": { "roles": ["admin", "engineer", "production"], "object_policy": "project_manager_or_admin" },
+    "project.task:link": ["admin", "engineer", "production"],
+    "project.task:comment": ["admin", "engineer", "production", "guest"],
+
     "dashboard:read": ["admin", "engineer", "production", "guest"],
     "dashboard.folder:create": { "roles": ["admin", "engineer", "production", "guest"], "object_policy": "dashboard_folder_editor" },
     "dashboard.folder:rename": { "roles": ["admin", "engineer", "production", "guest"], "object_policy": "dashboard_folder_editor" },

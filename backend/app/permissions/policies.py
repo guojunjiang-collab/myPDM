@@ -52,3 +52,8 @@ def _dashboard_folder_editor(user, folder, **_) -> bool:
         if share.shared_with_user_id == user.id and share.permission == "edit":
             return True
     return False
+
+
+@register_policy("project_manager_or_admin")
+def _project_manager_or_admin(user, project, **_) -> bool:
+    return _is_admin(user) or getattr(project, "owner_id", None) == user.id
