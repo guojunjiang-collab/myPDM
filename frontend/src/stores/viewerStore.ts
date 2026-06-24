@@ -24,6 +24,7 @@ export interface ViewerState {
   measureMode: 'off' | 'distance' | 'angle';
   explodeDistance: number;
   wireframe: boolean;
+  autoColor: boolean;
   cameraMode: 'orthographic' | 'perspective';
   viewTarget: string | null;
   cameraQuat: [number, number, number, number];
@@ -50,6 +51,7 @@ export interface ViewerState {
   setMeasureMode: (mode: ViewerState['measureMode']) => void;
   setExplodeDistance: (d: number) => void;
   toggleWireframe: () => void;
+  toggleAutoColor: () => void;
   toggleCameraMode: () => void;
   setViewTarget: (view: string | null) => void;
   triggerResetView: () => void;
@@ -73,6 +75,7 @@ const initialState = {
   measureMode: 'off' as const,
   explodeDistance: 0,
   wireframe: false,
+  autoColor: false,
   cameraMode: 'orthographic' as const,
   viewTarget: null as string | null,
   cameraQuat: [0, 0, 0, 1] as [number, number, number, number],
@@ -161,6 +164,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
     set(mode === 'off' ? { measureMode: mode } : { measureMode: mode, selectedNodeId: null }),
   setExplodeDistance: (d) => set({ explodeDistance: d }),
   toggleWireframe: () => set({ wireframe: !get().wireframe }),
+  toggleAutoColor: () => set({ autoColor: !get().autoColor }),
   toggleCameraMode: () => set({ cameraMode: get().cameraMode === 'orthographic' ? 'perspective' : 'orthographic' }),
   setViewTarget: (view) => set({ viewTarget: view }),
   triggerResetView: () => set({ resetViewTrigger: get().resetViewTrigger + 1 }),
