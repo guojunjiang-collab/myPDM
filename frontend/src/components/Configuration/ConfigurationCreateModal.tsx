@@ -501,43 +501,6 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                   <button onClick={() => setCfgPickerOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
                 </div>
 
-                {/* 快速新建构型项 */}
-                <div className="border-b">
-                  <button onClick={() => { setQuickCreateOpen(!quickCreateOpen); if (!quickCreateOpen) setQuickForm({ code: '', name: '', remark: '' }); }}
-                    className="w-full px-4 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 flex items-center gap-1">
-                    <span className="text-xs">{quickCreateOpen ? '▼' : '▶'}</span>
-                    快速新建构型项
-                  </button>
-                  {quickCreateOpen && (
-                    <div className="px-4 pb-3 space-y-2">
-                      <div className="flex gap-2">
-                        <input value={quickForm.code} onChange={e => setQuickForm({ ...quickForm, code: e.target.value })}
-                          placeholder="构型号 *" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
-                        <input value={quickForm.name} onChange={e => setQuickForm({ ...quickForm, name: e.target.value })}
-                          placeholder="名称 *" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
-                      </div>
-                      <div className="flex gap-2">
-                        <input value={quickForm.remark} onChange={e => setQuickForm({ ...quickForm, remark: e.target.value })}
-                          placeholder="备注（可选）" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
-                        <button onClick={async () => {
-                          if (!quickForm.code.trim() || !quickForm.name.trim()) return;
-                          setQuickCreating(true);
-                          try {
-                            const r = await configurationApi.createItem({ code: quickForm.code.trim(), name: quickForm.name.trim(), remark: quickForm.remark.trim() || undefined });
-                            const newItem = { id: r.data.id, code: r.data.code, name: r.data.name, spec: r.data.spec || '', remark: r.data.remark || '' };
-                            setPickerSelected(prev => [...prev, newItem]);
-                            setQuickForm({ code: '', name: '', remark: '' });
-                          } catch (e: any) { /* 失败静默，用户可重试 */ }
-                          finally { setQuickCreating(false); }
-                        }} disabled={quickCreating}
-                          className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 whitespace-nowrap">
-                          {quickCreating ? '创建中...' : '新建并添加'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
                 {/* 已选子项 */}
                 <div className="border-b">
                   <div className="bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700">已选子项 ({pickerSelected.length})</div>
@@ -568,13 +531,51 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                   )}
                 </div>
 
-                {/* 搜索 + 候选列表 */}
+                {/* 搜索 + 快速新建 + 候选列表 */}
                 <div className="px-4 flex-1 flex flex-col min-h-0">
                   <div className="flex gap-2 pt-4 pb-3 items-center flex-shrink-0">
                     <input value={cfgSearch} onChange={e => setCfgSearch(e.target.value)} autoFocus
                       className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm" placeholder="搜索构型号/名称（实时）..." />
                     {cfgSearching && <span className="text-xs text-gray-400 whitespace-nowrap">搜索中...</span>}
                   </div>
+
+                  {/* 快速新建构型项 */}
+                  <div className="border rounded-lg overflow-hidden mb-3 flex-shrink-0">
+                    <button onClick={() => { setQuickCreateOpen(!quickCreateOpen); if (!quickCreateOpen) setQuickForm({ code: '', name: '', remark: '' }); }}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 flex items-center gap-1">
+                      <span className="text-xs">{quickCreateOpen ? '▼' : '▶'}</span>
+                      快速新建构型项
+                    </button>
+                    {quickCreateOpen && (
+                      <div className="px-4 py-3 border-t space-y-2 bg-gray-50">
+                        <div className="flex gap-2">
+                          <input value={quickForm.code} onChange={e => setQuickForm({ ...quickForm, code: e.target.value })}
+                            placeholder="构型号 *" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                          <input value={quickForm.name} onChange={e => setQuickForm({ ...quickForm, name: e.target.value })}
+                            placeholder="名称 *" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                        </div>
+                        <div className="flex gap-2">
+                          <input value={quickForm.remark} onChange={e => setQuickForm({ ...quickForm, remark: e.target.value })}
+                            placeholder="备注（可选）" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                          <button onClick={async () => {
+                            if (!quickForm.code.trim() || !quickForm.name.trim()) return;
+                            setQuickCreating(true);
+                            try {
+                              const r = await configurationApi.createItem({ code: quickForm.code.trim(), name: quickForm.name.trim(), remark: quickForm.remark.trim() || undefined });
+                              const newItem = { id: r.data.id, code: r.data.code, name: r.data.name, spec: r.data.spec || '', remark: r.data.remark || '' };
+                              setPickerSelected(prev => [...prev, newItem]);
+                              setQuickForm({ code: '', name: '', remark: '' });
+                            } catch (e: any) { /* 失败静默，用户可重试 */ }
+                            finally { setQuickCreating(false); }
+                          }} disabled={quickCreating}
+                            className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 whitespace-nowrap">
+                            {quickCreating ? '创建中...' : '新建并添加'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="flex-1 overflow-y-auto border border-gray-200 rounded">
                     {cfgResults.length === 0 ? (
                       <div className="text-center py-8 text-sm text-gray-400">{cfgSearching ? '加载中...' : '无可用构型项'}</div>
