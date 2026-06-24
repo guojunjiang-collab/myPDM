@@ -111,11 +111,15 @@ def get_task(db: Session, task_id: uuid.UUID) -> ProjectTask:
     return t
 
 
-def get_active_task(db: Session, task_id: uuid.UUID) -> ProjectTask:
-    """按 id 取未软删的任务；变更类接口(编辑/状态/移动/关联/评论)应用此函数，避免操作已删任务。"""
-    t = db.query(ProjectTask).filter(
+def get_active_task(db: Session, task_id: uuid.UUID, project_id: uuid.UUID = None) -> ProjectTask:
+    """按 id 取未软删的任务；变更类接口应用此函数。
+    传入 project_id 时同时校验任务属于该项目(避免跨项目越权)。"""
+    q = db.query(ProjectTask).filter(
         ProjectTask.id == task_id, ProjectTask.deleted_at.is_(None)
-    ).first()
+    )
+    if project_id is not None:
+        q = q.filter(ProjectTask.project_id == project_id)
+    t = q.first()
     if not t:
         raise HTTPException(status_code=404, detail="任务不存在")
     return t
@@ -234,6 +238,13 @@ def list_links(db: Session, task_id: uuid.UUID) -> list:
 def remove_link(db: Session, link_id: uuid.UUID):
     db.query(ProjectTaskLink).filter(ProjectTaskLink.id == link_id).delete()
     db.commit()
+
+
+def get_link(db: Session, link_id: uuid.UUID) -> ProjectTaskLink:
+    link = db.query(ProjectTaskLink).filter(ProjectTaskLink.id == link_id).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="关联不存在")
+    return link
 
 
 # ════════════════════════ 任务评论 ════════════════════════

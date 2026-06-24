@@ -115,3 +115,21 @@ def test_task_comments_add_list_delete(db):
     assert len(crud_project.list_comments(db, t.id)) == 1
     crud_project.delete_comment(db, c)
     assert len(crud_project.list_comments(db, t.id)) == 0
+
+
+def test_get_active_task_scoped_to_project(db):
+    owner = _make_user(db)
+    p1 = crud_project.create_project(db, ProjectCreate(name="P1"), owner.id)
+    p2 = crud_project.create_project(db, ProjectCreate(name="P2"), owner.id)
+    t1 = crud_project.create_task(db, p1, TaskCreate(name="T1"))
+    # 同项目可取到
+    assert crud_project.get_active_task(db, t1.id, p1.id).id == t1.id
+    # 跨项目应 404
+    import pytest
+    from fastapi import HTTPException
+    with pytest.raises(HTTPException):
+        crud_project.get_active_task(db, t1.id, p2.id)
+    # 软删后也 404
+    crud_project.delete_task(db, t1)
+    with pytest.raises(HTTPException):
+        crud_project.get_active_task(db, t1.id, p1.id)

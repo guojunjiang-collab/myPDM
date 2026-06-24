@@ -110,7 +110,7 @@ async def update_task(project_id: uuid.UUID, task_id: uuid.UUID, data: TaskEdit,
                       current_user: User = Depends(require_permission("project.task:update"))):
     p = crud_project.get_project(db, project_id)
     enforce_object_policy("project_manager_or_admin", current_user, p)
-    t = crud_project.get_active_task(db, task_id)
+    t = crud_project.get_active_task(db, task_id, project_id)
     return _task_dict(db, crud_project.update_task(db, t, data))
 
 
@@ -119,7 +119,7 @@ async def update_task_status(project_id: uuid.UUID, task_id: uuid.UUID, data: Ta
                              db: Session = Depends(get_db),
                              current_user: User = Depends(require_permission("project.task:update_status"))):
     p = crud_project.get_project(db, project_id)
-    t = crud_project.get_active_task(db, task_id)
+    t = crud_project.get_active_task(db, task_id, project_id)
     is_mgr = current_user.role == "admin" or p.owner_id == current_user.id
     if not is_mgr and t.assignee_id != current_user.id:
         raise HTTPException(status_code=403, detail="仅项目经理或任务负责人可更新状态")
@@ -133,7 +133,7 @@ async def move_task(project_id: uuid.UUID, task_id: uuid.UUID, data: TaskMove, d
                     current_user: User = Depends(require_permission("project.task:update"))):
     p = crud_project.get_project(db, project_id)
     enforce_object_policy("project_manager_or_admin", current_user, p)
-    t = crud_project.get_active_task(db, task_id)
+    t = crud_project.get_active_task(db, task_id, project_id)
     return _task_dict(db, crud_project.move_task(db, t, data))
 
 
@@ -142,7 +142,7 @@ async def delete_task(project_id: uuid.UUID, task_id: uuid.UUID, db: Session = D
                       current_user: User = Depends(require_permission("project.task:delete"))):
     p = crud_project.get_project(db, project_id)
     enforce_object_policy("project_manager_or_admin", current_user, p)
-    crud_project.delete_task(db, crud_project.get_active_task(db, task_id))
+    crud_project.delete_task(db, crud_project.get_active_task(db, task_id, project_id))
     return {"detail": "已删除"}
 
 
@@ -152,6 +152,7 @@ async def list_links(project_id: uuid.UUID, task_id: uuid.UUID, db: Session = De
                      current_user: User = Depends(require_permission("project:read"))):
     crud_project.get_project(db, project_id)
     _require_member(db, project_id, current_user)
+    crud_project.get_active_task(db, task_id, project_id)
     return {"items": [_link_dict(db, l) for l in crud_project.list_links(db, task_id)]}
 
 
@@ -160,7 +161,7 @@ async def add_link(project_id: uuid.UUID, task_id: uuid.UUID, data: TaskLinkAdd,
                    current_user: User = Depends(require_permission("project.task:link"))):
     crud_project.get_project(db, project_id)
     _require_member(db, project_id, current_user)
-    crud_project.get_active_task(db, task_id)
+    crud_project.get_active_task(db, task_id, project_id)
     return _link_dict(db, crud_project.add_link(db, task_id, data))
 
 
@@ -170,6 +171,10 @@ async def remove_link(project_id: uuid.UUID, task_id: uuid.UUID, link_id: uuid.U
                       current_user: User = Depends(require_permission("project.task:link"))):
     crud_project.get_project(db, project_id)
     _require_member(db, project_id, current_user)
+    crud_project.get_active_task(db, task_id, project_id)
+    link = crud_project.get_link(db, link_id)
+    if link.task_id != task_id:
+        raise HTTPException(status_code=404, detail="关联不存在")
     crud_project.remove_link(db, link_id)
     return {"detail": "已解除"}
 
@@ -180,6 +185,7 @@ async def list_comments(project_id: uuid.UUID, task_id: uuid.UUID, db: Session =
                         current_user: User = Depends(require_permission("project:read"))):
     crud_project.get_project(db, project_id)
     _require_member(db, project_id, current_user)
+    crud_project.get_active_task(db, task_id, project_id)
     return {"items": [_comment_dict(db, c) for c in crud_project.list_comments(db, task_id)]}
 
 
@@ -188,7 +194,7 @@ async def add_comment(project_id: uuid.UUID, task_id: uuid.UUID, data: CommentAd
                       current_user: User = Depends(require_permission("project.task:comment"))):
     crud_project.get_project(db, project_id)
     _require_member(db, project_id, current_user)
-    crud_project.get_active_task(db, task_id)
+    crud_project.get_active_task(db, task_id, project_id)
     return _comment_dict(db, crud_project.add_comment(db, task_id, current_user.id, data))
 
 
@@ -197,7 +203,10 @@ async def delete_comment(project_id: uuid.UUID, task_id: uuid.UUID, comment_id: 
                          db: Session = Depends(get_db),
                          current_user: User = Depends(require_permission("project.task:comment"))):
     p = crud_project.get_project(db, project_id)
+    crud_project.get_active_task(db, task_id, project_id)
     c = crud_project.get_comment(db, comment_id)
+    if c.task_id != task_id:
+        raise HTTPException(status_code=404, detail="评论不存在")
     is_mgr = current_user.role == "admin" or p.owner_id == current_user.id
     if not is_mgr and c.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="只能删除本人评论")
