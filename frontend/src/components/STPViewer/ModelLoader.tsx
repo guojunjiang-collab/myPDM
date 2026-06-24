@@ -5,6 +5,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { useViewerStore } from '../../stores/viewerStore';
 import { buildModelTree } from './buildModelTree';
+import { buildColorMap } from './autoColor';
 
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('/draco/');
@@ -17,10 +18,11 @@ export function ModelLoader({ url }: ModelLoaderProps) {
   const {
     setLoadingState, setModelScale, setTreeData, selectByMesh,
     selectedNodeId, isolateMode, nodeMap, hiddenParts, wireframe, resetViewTrigger,
-    measureMode,
+    measureMode, autoColor,
   } = useViewerStore();
   const setInitialState = useViewerStore((s) => s.setInitialState);
   const groupRef = useRef<THREE.Group>(null);
+  const origColorRef = useRef<Map<string, number>>(new Map());
   const pointerDown = useRef<{ x: number; y: number } | null>(null);
 
   const gltf = useLoader(GLTFLoader, url, (loader) => {
@@ -43,6 +45,16 @@ export function ModelLoader({ url }: ModelLoaderProps) {
     });
 
     // 2) 解析装配树
+    // 1b) 记录每个单材质 mesh 的原始颜色，供自动上色关闭时还原
+    origColorRef.current = new Map();
+    gltf.scene.traverse((child) => {
+      const m = child as THREE.Mesh;
+      if (m.isMesh && m.material && !Array.isArray(m.material)) {
+        const std = m.material as THREE.MeshStandardMaterial;
+        if (std.color) origColorRef.current.set(m.uuid, std.color.getHex());
+      }
+    });
+
     setTreeData(buildModelTree(gltf.scene));
 
     setLoadingState('ready');
@@ -116,6 +128,40 @@ export function ModelLoader({ url }: ModelLoaderProps) {
       std.needsUpdate = true;
     });
   }, [selectedNodeId, isolateMode, nodeMap, hiddenParts, wireframe]);
+
+  // 自动上色：按零件名称着色；关闭时还原原始色。只改 color，不触碰 emissive/opacity。
+  useEffect(() => {
+    const group = groupRef.current;
+    const { treeData } = useViewerStore.getState();
+    if (!group || !treeData) return;
+
+    const target = new Map<string, number>();
+    if (autoColor) {
+      const names: string[] = [];
+      nodeMap.forEach((n) => { if (n.type === 'part') names.push(n.name); });
+      const colorMap = buildColorMap(names);
+      nodeMap.forEach((n) => {
+        if (n.type !== 'part') return;
+        const color = colorMap.get(n.name);
+        if (color === undefined) return;
+        n.meshUuids.forEach((u) => target.set(u, color));
+      });
+    } else {
+      origColorRef.current.forEach((hex, uuid) => target.set(uuid, hex));
+    }
+
+    group.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const mat = mesh.material;
+      if (Array.isArray(mat)) return;
+      const std = mat as THREE.MeshStandardMaterial;
+      const hex = target.get(mesh.uuid);
+      if (hex === undefined || !std.color) return;
+      std.color.setHex(hex);
+      std.needsUpdate = true;
+    });
+  }, [autoColor, nodeMap]);
 
   const handlePointerDown = (e: any) => {
     pointerDown.current = { x: e.clientX, y: e.clientY };
