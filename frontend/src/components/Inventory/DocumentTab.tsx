@@ -141,7 +141,7 @@ export default function DocumentTab() {
             <button onClick={() => setShowMenu(!showMenu)}
               className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建单据 ▾</button>
             {showMenu && (
-              <div className="absolute right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 overflow-hidden">
+              <div className="absolute right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
                 {DOC_TYPES.map((t) => (
                   <button key={t.key} onClick={() => { setCreating(t.key); setShowMenu(false); }}
                     className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50 whitespace-nowrap">{t.label}</button>
