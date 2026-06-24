@@ -11,7 +11,7 @@ class BaseSchema(BaseModel):
 # ---- 项目 ----
 class ProjectCreate(BaseSchema):
     name: str = Field(..., max_length=255)
-    status: Literal["进行中", "已完成", "已暂停", "已归档"] = "进行中"
+    status: Literal["待启动", "进行中", "已完成", "已暂停", "已归档"] = "进行中"
     planned_start: Optional[str] = None
     planned_end: Optional[str] = None
     description: Optional[str] = None
@@ -21,7 +21,7 @@ class ProjectCreate(BaseSchema):
 class ProjectEdit(BaseSchema):
     name: Optional[str] = None
     owner_id: Optional[str] = None
-    status: Optional[Literal["进行中", "已完成", "已暂停", "已归档"]] = None
+    status: Optional[Literal["待启动", "进行中", "已完成", "已暂停", "已归档"]] = None
     planned_start: Optional[str] = None
     planned_end: Optional[str] = None
     description: Optional[str] = None

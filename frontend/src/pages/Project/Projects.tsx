@@ -10,8 +10,9 @@ import MemberManageModal from './MemberManageModal';
 import TaskEditModal from './TaskEditModal';
 import type { Project, ProjectStatus, ProjectTask, TaskStatus } from '../../types/project';
 
-const STATUSES: ProjectStatus[] = ['进行中', '已完成', '已暂停', '已归档'];
+const STATUSES: ProjectStatus[] = ['待启动', '进行中', '已完成', '已暂停', '已归档'];
 const STATUS_CLASS: Record<ProjectStatus, string> = {
+  待启动: 'bg-gray-100 text-gray-500',
   进行中: 'bg-blue-100 text-blue-800',
   已完成: 'bg-green-100 text-green-800',
   已暂停: 'bg-amber-100 text-amber-800',

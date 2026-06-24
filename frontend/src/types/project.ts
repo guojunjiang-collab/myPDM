@@ -1,4 +1,4 @@
-export type ProjectStatus = '进行中' | '已完成' | '已暂停' | '已归档';
+export type ProjectStatus = '待启动' | '进行中' | '已完成' | '已暂停' | '已归档';
 export type TaskType = '任务' | '里程碑' | '评审';
 export type TaskStatus = '未开始' | '进行中' | '已完成' | '挂起';
 export type TaskPriority = '高' | '中' | '低';
