@@ -55,6 +55,8 @@ export interface TaskLink {
   entity_id: string;
   entity_code?: string | null;
   entity_name?: string | null;
+  entity_spec?: string | null;
+  entity_remark?: string | null;
 }
 
 export interface TaskComment {

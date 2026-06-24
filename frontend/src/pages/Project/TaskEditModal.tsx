@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { projectApi } from '../../services/projectApi';
-import { usersApi } from '../../services/api';
+import { usersApi, partsApi, assembliesApi, documentsApi } from '../../services/api';
 import AssemblyPartPicker from '../../components/AssemblyPartPicker';
 import DocumentPicker from '../../components/DocumentPicker';
 import ConfigItemPicker from '../../components/Configuration/ConfigItemPicker';
 import ECPicker from '../../components/ECPicker';
+import PartDetailContent from '../../components/PartDetailContent';
+import AssemblyDetailContent from '../../components/AssemblyDetailContent';
+import DocumentDetailContent from '../../components/DocumentDetailContent';
+import ConfigurationDetailModal from '../../components/Configuration/ConfigurationDetailModal';
 import type { ProjectTask, TaskType, TaskStatus, TaskPriority, TaskLink, TaskComment } from '../../types/project';
 
 interface Props {
@@ -36,6 +40,10 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
   const [showDocPicker, setShowDocPicker] = useState(false);
   const [showECPicker, setShowECPicker] = useState(false);
   const [showConfigPicker, setShowConfigPicker] = useState(false);
+  const [detailEntityId, setDetailEntityId] = useState<string | null>(null);
+  const [detailEntityType, setDetailEntityType] = useState<string | null>(null);
+  const [detailData, setDetailData] = useState<any>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -98,6 +106,25 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
     const tid = ensureTaskId(); if (!tid) return;
     await projectApi.deleteComment(projectId, tid, commentId);
     loadComments(tid);
+  };
+
+  const handleViewEntity = async (entityType: string, entityId: string) => {
+    setDetailEntityId(entityId);
+    setDetailEntityType(entityType);
+    setDetailData(null);
+    if (entityType === 'config_item' || entityType === 'ec') return;
+    setDetailLoading(true);
+    try {
+      let res;
+      if (entityType === 'part') res = await partsApi.get(entityId);
+      else if (entityType === 'assembly') res = await assembliesApi.get(entityId);
+      else if (entityType === 'document') res = await documentsApi.get(entityId);
+      if (res) setDetailData(res.data);
+    } catch {
+      setDetailEntityId(null);
+      setDetailEntityType(null);
+    }
+    setDetailLoading(false);
   };
 
   return (
@@ -163,17 +190,39 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
             <button onClick={() => setShowECPicker(true)} className="text-xs px-2 py-1 rounded bg-amber-50 text-amber-700">EC +</button>
             <button onClick={() => setShowDocPicker(true)} className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700">图文档 +</button>
           </div>
-          <div className="space-y-1">
-            {links.map((l) => (
-              <div key={l.id} className="flex items-center gap-2 text-sm bg-gray-50 px-3 py-1.5 rounded">
-                <span className="text-xs px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">{LINK_LABEL[l.entity_type]}</span>
-                <span>{l.entity_code || l.entity_id} {l.entity_name || ''}</span>
-                <div className="flex-1" />
-                <button onClick={() => removeLink(l.id)} className="text-gray-400 hover:text-red-600">×</button>
-              </div>
-            ))}
-            {links.length === 0 && <div className="text-xs text-gray-400">暂无关联</div>}
-          </div>
+          {links.length > 0 ? (
+            <div className="border border-gray-200 rounded-lg overflow-hidden max-h-48 overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+                  <tr>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-20 whitespace-nowrap">类型</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-36 whitespace-nowrap">件号</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">名称</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">规格/备注</th>
+                    <th className="text-right px-3 py-2 text-xs font-medium text-gray-500 w-12">操作</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {links.map((l) => (
+                    <tr key={l.id} className="hover:bg-gray-50 cursor-pointer"
+                        onClick={() => handleViewEntity(l.entity_type, l.entity_id)}>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">{LINK_LABEL[l.entity_type]}</span>
+                      </td>
+                      <td className="px-3 py-2 font-mono text-gray-700 whitespace-nowrap">{l.entity_code || '—'}</td>
+                      <td className="px-3 py-2 text-gray-700">{l.entity_name || '—'}</td>
+                      <td className="px-3 py-2 text-gray-500">{l.entity_spec || l.entity_remark || '—'}</td>
+                      <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
+                        <button onClick={() => removeLink(l.id)} className="text-gray-400 hover:text-red-600 text-sm">×</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-xs text-gray-400">暂无关联</div>
+          )}
         </div>
 
         <div className="border-t pt-3">
@@ -218,6 +267,27 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
           <button onClick={handleSave} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">保存</button>
         </div>
       </div>
+
+      {detailEntityId && detailEntityType === 'config_item' && (
+        <ConfigurationDetailModal itemId={detailEntityId} onClose={() => { setDetailEntityId(null); setDetailEntityType(null); }} />
+      )}
+
+      {detailEntityId && (detailEntityType === 'part' || detailEntityType === 'assembly' || detailEntityType === 'document') && (
+        <Modal
+          open={!!detailEntityId}
+          title={detailEntityType === 'part' ? '零件详情' : detailEntityType === 'assembly' ? '部件详情' : '图文档详情'}
+          onClose={() => { setDetailEntityId(null); setDetailEntityType(null); setDetailData(null); }}
+          width="full"
+        >
+          {detailLoading ? (
+            <div className="flex items-center justify-center py-8 text-gray-400">加载中...</div>
+          ) : detailData ? (
+            detailEntityType === 'part' ? <PartDetailContent part={detailData} customFieldDefs={[]} customFieldValues={{}} /> :
+            detailEntityType === 'assembly' ? <AssemblyDetailContent assembly={detailData} customFieldDefs={[]} customFieldValues={{}} /> :
+            <DocumentDetailContent doc={detailData} customFieldDefs={[]} customFieldValues={{}} />
+          ) : null}
+        </Modal>
+      )}
 
       {showPartPicker && (
         <AssemblyPartPicker
