@@ -76,6 +76,12 @@ myPDM(v1.5.1)围绕"物料数据"主线已很完整(零件/部件/BOM/图文档/
 - `entity_id`
 - 仅建引用,不改对象本身
 
+### `project_task_comments`(任务评论,讨论线程)
+- `id` / `task_id` / `user_id`
+- `content` — 评论正文
+- `created_at` / `updated_at` / `deleted_at`(软删除)
+- 约定:**项目成员无论任务处于何种状态都可添加评论**;评论删除限本人或项目经理/admin
+
 ### 任务附件
 - 复用现有附件系统,`entity_type='project_task'`,无需新表、无需图文档权限。
 
@@ -104,15 +110,23 @@ myPDM(v1.5.1)围绕"物料数据"主线已很完整(零件/部件/BOM/图文档/
 - `POST .../links` — 新增关联(校验对象读权限即可)
 - `DELETE .../links/{link_id}` — 解除关联
 
+### 任务评论
+- `GET /api/projects/{id}/tasks/{task_id}/comments` — 评论列表(后端回填评论人姓名)
+- `POST .../comments` — 新增评论(**任何项目成员可发,不受任务状态限制**)
+- `DELETE .../comments/{comment_id}` — 删除评论(本人或项目经理/admin)
+
 ### 任务附件
 - 直接走现有 `/api/v2/attachments/*`,`entity_type='project_task'`,无需新端点。
 
 ### 权限(`permissions/permissions.json` 新增,跑 `gen_permissions.py`)
 - 角色权限:`projects:read` / `projects:create` / `projects:update` / `projects:delete`、
   `project_tasks:create` / `project_tasks:update` / `project_tasks:delete`
+- 角色权限新增:`project_tasks:comment`(任务评论)
 - 对象级策略(`policies.py` 新增):
   - `project_manager_or_admin` — 改项目 / 删任务
   - `task_assignee_or_manager` — 改任务状态(负责人可改自己任务)
+  - `project_member_can_comment` — 任何项目成员可发评论(不受任务状态限制)
+  - `comment_author_or_manager` — 删评论(本人或项目经理/admin)
   - 成员可见性过滤 — 列表与详情按 `project_members` 过滤
 - 角色映射要点:
   - 创建项目:admin、engineer
@@ -143,6 +157,7 @@ myPDM(v1.5.1)围绕"物料数据"主线已很完整(零件/部件/BOM/图文档/
   - EC 需新建轻量 `ECPicker`(现有没有,工作量小)
   - 已关联项列表 + 解除关联
 - 任务附件区:复用现有附件上传/预览组件(生产人员在此传产出物)
+- 评论区:时间线式评论列表(头像/姓名/时间/正文)+ 底部输入框;**对所有项目成员可见可发,不受任务状态限制**;本人/经理可删自己/他人评论
 
 ### 状态与服务
 - 新增 `stores/project.ts`(Zustand)
@@ -160,7 +175,7 @@ myPDM(v1.5.1)围绕"物料数据"主线已很完整(零件/部件/BOM/图文档/
 
 ## 测试要点
 
-- 后端 pytest:项目/任务/成员/关联 CRUD;成员可见性过滤;对象级策略(经理/负责人/admin);
-  自引用树组装与子树软删;改状态端点的负责人权限。
-- 前端 vitest / build:任务树渲染与展开折叠;权限按钮显隐;逾期标红计算;Picker 关联交互。
+- 后端 pytest:项目/任务/成员/关联/评论 CRUD;成员可见性过滤;对象级策略(经理/负责人/admin);
+  自引用树组装与子树软删;改状态端点的负责人权限;评论权限(任意成员可发、不受状态限制、删评限本人/经理)。
+- 前端 vitest / build:任务树渲染与展开折叠;权限按钮显隐;逾期标红计算;Picker 关联交互;评论区发/删。
 ```
