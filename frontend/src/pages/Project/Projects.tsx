@@ -291,7 +291,24 @@ export default function Projects() {
     const hasChildren = (t.children?.length || 0) > 0;
     const isOpen = expanded.has(t.id);
     const overdue = isOverdue(t);
-    const rows: JSX.Element[] = [
+    const isDragAbove = dragOver?.taskId === t.id && dragOver?.position === 'above';
+    const isDragBelow = dragOver?.taskId === t.id && dragOver?.position === 'below';
+    const isDragInto = dragOver?.taskId === t.id && dragOver?.position === 'into';
+    const isDragging = dragTask?.id === t.id;
+
+    const rows: JSX.Element[] = [];
+
+    if (isDragAbove) {
+      rows.push(
+        <tr key={t.id + '-above'} className="h-1">
+          <td colSpan={8} className="p-0 border-0">
+            <div className="h-1 bg-primary-500 rounded-full mx-1" />
+          </td>
+        </tr>
+      );
+    }
+
+    rows.push(
       <tr
         key={t.id}
         draggable
@@ -302,10 +319,8 @@ export default function Projects() {
         onDrop={(e) => handleDrop(t, e)}
         onClick={() => openEdit(t)}
         className={`${overdue ? 'bg-red-50' : 'hover:bg-gray-50'} cursor-pointer transition-colors ${
-          dragOver?.taskId === t.id && dragOver?.position === 'into' ? 'bg-blue-50 ring-2 ring-primary-300 ring-inset' : ''
-        } ${dragOver?.taskId === t.id && dragOver?.position === 'above' ? 'border-t-2 border-primary-500' : ''} ${
-          dragOver?.taskId === t.id && dragOver?.position === 'below' ? 'border-b-2 border-primary-500' : ''
-        } ${dragTask?.id === t.id ? 'opacity-40' : ''}`}
+          isDragInto ? 'bg-blue-50 ring-2 ring-primary-300 ring-inset' : ''
+        } ${isDragging ? 'opacity-40' : ''}`}
       >
         <td className="px-4 py-2 text-sm text-gray-500 font-mono whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
           <span style={{ paddingLeft: depth * 20 }} className="inline-flex items-center gap-1">
@@ -334,8 +349,19 @@ export default function Projects() {
           {isManager && <button onClick={() => openCreate(t.id)} className="text-primary-600 text-sm mr-2">+子</button>}
           {can('project.task:delete') && <button onClick={() => setDelTask(t)} className="text-red-600 text-sm">删除</button>}
         </td>
-      </tr>,
-    ];
+      </tr>
+    );
+
+    if (isDragBelow) {
+      rows.push(
+        <tr key={t.id + '-below'} className="h-1">
+          <td colSpan={8} className="p-0 border-0">
+            <div className="h-1 bg-primary-500 rounded-full mx-1" />
+          </td>
+        </tr>
+      );
+    }
+
     if (hasChildren && isOpen) {
       for (const c of t.children!) rows.push(...renderRow(c, depth + 1));
     }
