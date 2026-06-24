@@ -177,12 +177,6 @@ export default function Projects() {
     setEditTask(t); setEditParentId(null); setEditOpen(true);
   };
 
-  const changeStatus = async (t: ProjectTask, status: string) => {
-    if (!selectedProjectId) return;
-    await projectApi.updateTaskStatus(selectedProjectId, t.id, status);
-    reload();
-  };
-
   const confirmDelete = async () => {
     if (!selectedProjectId || !delTask) return;
     await projectApi.deleteTask(selectedProjectId, delTask.id);
@@ -200,23 +194,24 @@ export default function Projects() {
     const rows: JSX.Element[] = [
       <tr key={t.id} onClick={() => openEdit(t)}
           className={`${overdue ? 'bg-red-50' : 'hover:bg-gray-50'} cursor-pointer`}>
-        <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
+        <td className="px-4 py-2 text-sm text-gray-500 font-mono" onClick={(e) => e.stopPropagation()}>
           <span style={{ paddingLeft: depth * 20 }} className="inline-flex items-center gap-1">
             {hasChildren ? (
-              <button onClick={() => toggle(t.id)} className="text-gray-400 w-4">{isOpen ? '▾' : '▸'}</button>
-            ) : <span className="inline-block w-4" />}
+              <button onClick={() => toggle(t.id)} className="text-gray-400 w-4 shrink-0">{isOpen ? '▾' : '▸'}</button>
+            ) : <span className="inline-block w-4 shrink-0" />}
+            <span>{t.code}</span>
+          </span>
+        </td>
+        <td className="px-4 py-2">
+          <span className="inline-flex items-center gap-1">
             <span>{TYPE_ICON[t.task_type]}</span>
             <span className="font-medium">{t.name}</span>
-            <span className="text-xs text-gray-400">{t.code}</span>
             {overdue && <span className="text-xs text-red-600">⚠ 逾期</span>}
           </span>
         </td>
         <td className="px-2 py-2 text-sm">{t.assignee_name || '—'}</td>
-        <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
-          <select value={t.status} onChange={(e) => changeStatus(t, e.target.value)}
-                  className={`text-xs px-2 py-0.5 rounded border-0 ${TASK_STATUS_CLASS[t.status]}`}>
-            {(['未开始', '进行中', '已完成', '挂起'] as TaskStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
+        <td className="px-2 py-2">
+          <span className={`px-2 py-0.5 text-xs rounded-full ${TASK_STATUS_CLASS[t.status]}`}>{t.status}</span>
         </td>
         <td className="px-2 py-2 text-sm">{t.priority}</td>
         <td className="px-2 py-2 text-sm text-gray-500">{t.planned_end || '—'}</td>
@@ -450,6 +445,7 @@ export default function Projects() {
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
                       <tr>
+                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-500 w-32">编号</th>
                         <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">任务名称</th>
                         <th className="text-left px-2 py-3 text-sm font-medium text-gray-500">负责人</th>
                         <th className="text-left px-2 py-3 text-sm font-medium text-gray-500">状态</th>
@@ -461,7 +457,7 @@ export default function Projects() {
                     <tbody className="divide-y divide-gray-200">
                       {tasks.flatMap((t) => renderRow(t, 0))}
                       {tasks.length === 0 && (
-                        <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">暂无任务</td></tr>
+                        <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">暂无任务</td></tr>
                       )}
                     </tbody>
                   </table>
