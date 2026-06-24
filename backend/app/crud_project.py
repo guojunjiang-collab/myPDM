@@ -113,6 +113,18 @@ def get_task(db: Session, task_id: uuid.UUID) -> ProjectTask:
     return t
 
 
+def get_active_task(db: Session, task_id: uuid.UUID, project_id: uuid.UUID) -> ProjectTask:
+    """取未软删的任务。"""
+    t = db.query(ProjectTask).filter(
+        ProjectTask.id == task_id,
+        ProjectTask.project_id == project_id,
+        ProjectTask.deleted_at.is_(None),
+    ).first()
+    if not t:
+        raise HTTPException(status_code=404, detail="任务不存在或已删除")
+    return t
+
+
 def get_active_task(db: Session, task_id: uuid.UUID, project_id: uuid.UUID = None) -> ProjectTask:
     """按 id 取未软删的任务；变更类接口应用此函数。
     传入 project_id 时同时校验任务属于该项目(避免跨项目越权)。"""
@@ -177,20 +189,28 @@ def move_task(db: Session, t: ProjectTask, data: TaskMove) -> ProjectTask:
 
 def reorder_task(db: Session, project_id: uuid.UUID, data: "TaskReorder") -> dict:
     """将任务移动到新的父节点和位置，自动重排 sort_order。"""
-    task = get_task(db, _uuid(data.task_id))
-    if str(task.project_id) != str(project_id):
-        raise HTTPException(status_code=400, detail="任务不属于该项目")
-
+    task = get_active_task(db, _uuid(data.task_id), project_id)
     old_parent_id = task.parent_id
     new_parent_id = _uuid(data.new_parent_id) if data.new_parent_id else None
 
     if new_parent_id:
-        parent = get_task(db, new_parent_id)
-        if str(parent.project_id) != str(project_id):
-            raise HTTPException(status_code=400, detail="目标父任务不属于该项目")
-        # 防止拖到自己或后代身上
+        parent = get_active_task(db, new_parent_id, project_id)
+        # 防止拖到自己身上
         if new_parent_id == task.id:
             raise HTTPException(status_code=400, detail="不能拖到自己身上")
+        # 防止拖到自己的后代身上(循环引用)
+        def is_descendant(ancestor_id, node_id):
+            children = db.query(ProjectTask).filter(
+                ProjectTask.parent_id == ancestor_id, ProjectTask.deleted_at.is_(None)
+            ).all()
+            for child in children:
+                if child.id == node_id:
+                    return True
+                if is_descendant(child.id, node_id):
+                    return True
+            return False
+        if is_descendant(task.id, new_parent_id):
+            raise HTTPException(status_code=400, detail="不能拖到自己的子任务下")
 
     task.parent_id = new_parent_id
     db.flush()
