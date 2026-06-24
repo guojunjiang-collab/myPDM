@@ -17,7 +17,6 @@ import EC from './pages/EC';
 import Configuration from './pages/Configuration';
 import Inventory from './pages/Inventory';
 import Projects from './pages/Project/Projects';
-import ProjectWorkspace from './pages/Project/ProjectWorkspace';
 import DataManagement from './pages/DataManagement';
 const STPViewer = lazy(() => import('./pages/STPViewer'));
 const OfficeReader = lazy(() => import('./pages/OfficeReader'));
@@ -75,7 +74,6 @@ export default function App() {
           <Route path="ec" element={<EC />} />
           <Route path="inventory" element={<Inventory />} />
           <Route path="projects" element={<Projects />} />
-          <Route path="projects/:id" element={<ProjectWorkspace />} />
           <Route path="users" element={<Users />} />
           <Route path="logs" element={<Logs />} />
           <Route path="settings" element={<Settings />} />
