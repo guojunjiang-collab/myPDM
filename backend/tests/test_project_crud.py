@@ -61,3 +61,57 @@ def test_delete_project_soft(db):
     crud_project.delete_project(db, p)
     assert p.deleted_at is not None
     assert len(crud_project.list_projects(db, owner)) == 0
+
+
+from app.schemas_project import TaskCreate, TaskEdit, TaskMove, TaskLinkAdd, CommentAdd
+
+
+def test_create_task_auto_code_and_tree(db):
+    owner = _make_user(db)
+    p = crud_project.create_project(db, ProjectCreate(name="A"), owner.id)
+    root = crud_project.create_task(db, p, TaskCreate(name="阶段一"))
+    assert root.code.startswith(p.code + "-")
+    child = crud_project.create_task(db, p, TaskCreate(name="子任务", parent_id=str(root.id)))
+    assert child.parent_id == root.id
+    tree = crud_project.get_task_tree(db, p.id)
+    assert len(tree) == 1 and tree[0]["id"] == str(root.id)
+    assert tree[0]["children"][0]["id"] == str(child.id)
+
+
+def test_update_task_status(db):
+    owner = _make_user(db)
+    p = crud_project.create_project(db, ProjectCreate(name="A"), owner.id)
+    t = crud_project.create_task(db, p, TaskCreate(name="T"))
+    crud_project.update_task_status(db, t, "进行中")
+    assert t.status == "进行中"
+
+
+def test_delete_task_soft_cascades_subtree(db):
+    owner = _make_user(db)
+    p = crud_project.create_project(db, ProjectCreate(name="A"), owner.id)
+    root = crud_project.create_task(db, p, TaskCreate(name="R"))
+    child = crud_project.create_task(db, p, TaskCreate(name="C", parent_id=str(root.id)))
+    crud_project.delete_task(db, root)
+    assert crud_project.get_task(db, root.id).deleted_at is not None
+    assert crud_project.get_task(db, child.id).deleted_at is not None
+    assert crud_project.get_task_tree(db, p.id) == []
+
+
+def test_task_links_add_list_remove(db):
+    owner = _make_user(db)
+    p = crud_project.create_project(db, ProjectCreate(name="A"), owner.id)
+    t = crud_project.create_task(db, p, TaskCreate(name="T"))
+    link = crud_project.add_link(db, t.id, TaskLinkAdd(entity_type="part", entity_id=str(uuid.uuid4())))
+    assert len(crud_project.list_links(db, t.id)) == 1
+    crud_project.remove_link(db, link.id)
+    assert len(crud_project.list_links(db, t.id)) == 0
+
+
+def test_task_comments_add_list_delete(db):
+    owner = _make_user(db)
+    p = crud_project.create_project(db, ProjectCreate(name="A"), owner.id)
+    t = crud_project.create_task(db, p, TaskCreate(name="T"))
+    c = crud_project.add_comment(db, t.id, owner.id, CommentAdd(content="hi"))
+    assert len(crud_project.list_comments(db, t.id)) == 1
+    crud_project.delete_comment(db, c)
+    assert len(crud_project.list_comments(db, t.id)) == 0
