@@ -220,8 +220,7 @@ export default function Projects() {
   };
 
   const handleDragLeave = () => {
-    setDragOver(null);
-    if (expandTimerRef.current) { clearTimeout(expandTimerRef.current); expandTimerRef.current = null; }
+    // dragOver is set immediately on dragOver event of next row; only clear on table-wide leave
   };
 
   const handleDrop = async (target: ProjectTask, e: React.DragEvent) => {
@@ -581,7 +580,8 @@ export default function Projects() {
                   </select>
                 </div>
 
-                <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
+                <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0"
+                     onDragLeave={() => { setDragOver(null); if (expandTimerRef.current) { clearTimeout(expandTimerRef.current); expandTimerRef.current = null; } }}>
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
                       <tr>
