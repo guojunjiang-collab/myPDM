@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState, ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 interface ModalProps {
   open: boolean;
@@ -40,7 +41,7 @@ export function Modal({ open, title, onClose, children, width = 'md', zIndex = 5
 
   if (!visible && !open) return null;
 
-  return (
+  return createPortal((
     <div
       ref={overlayRef}
       onClick={handleOverlayClick}
@@ -71,7 +72,7 @@ export function Modal({ open, title, onClose, children, width = 'md', zIndex = 5
         <div className="px-6 py-4">{children}</div>
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 interface ConfirmModalProps {

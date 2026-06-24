@@ -78,6 +78,11 @@ export default function DocumentPicker({
   const [fetchedDocs, setFetchedDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState(false);
 
+  /* ---- 快速新建 ---- */
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickForm, setQuickForm] = useState({ code: '', name: '', remark: '' });
+  const [quickCreating, setQuickCreating] = useState(false);
+
   /* ---- 内部自定义字段（props 未传入时自行加载） ---- */
   const [localFieldDefs, setLocalFieldDefs] = useState<CustomFieldDefinition[]>([]);
   const [localFieldValues, setLocalFieldValues] = useState<Record<string, Record<string, unknown>>>({});
@@ -85,6 +90,9 @@ export default function DocumentPicker({
   /* 加载数据 */
   useEffect(() => {
     if (!open) return;
+    setQuickForm({ code: '', name: '', remark: '' });
+    setQuickOpen(false);
+    setQuickCreating(false);
     setLoading(true);
 
     const docPromise: Promise<Document[]> = storeDocuments.length > 0
@@ -171,6 +179,35 @@ export default function DocumentPicker({
     const next = new Map(selected);
     next.delete(id);
     setSelected(next);
+  };
+
+  const handleQuickCreate = async () => {
+    if (!quickForm.code.trim() || !quickForm.name.trim()) return;
+    setQuickCreating(true);
+    try {
+      const r = await documentsApi.create({
+        code: quickForm.code.trim(),
+        name: quickForm.name.trim(),
+        remark: quickForm.remark.trim() || undefined,
+      });
+      const doc = r.data as Document;
+      // 加入已选
+      setSelected((prev) => new Map(prev).set(doc.id, {
+        id: doc.id,
+        code: doc.code,
+        name: doc.name,
+        version: doc.version || 'A',
+        status: doc.status,
+      }));
+      // 同步进候选数据源，无需重新搜索
+      setFetchedDocs((prev) => [...prev, doc]);
+      useDataStore.getState().setDocuments([...useDataStore.getState().documents, doc]);
+      setQuickForm({ code: '', name: '', remark: '' });
+    } catch {
+      alert('新建图文档失败，请检查编号是否重复');
+    } finally {
+      setQuickCreating(false);
+    }
   };
 
   const handleConfirm = () => {
@@ -266,6 +303,28 @@ export default function DocumentPicker({
             <option value="released">发布</option>
             <option value="obsolete">作废</option>
           </select>
+        </div>
+
+        {/* ---- 快速新建 ---- */}
+        <div className="border rounded-lg overflow-hidden">
+          <button type="button" onClick={() => setQuickOpen(!quickOpen)} className="w-full px-4 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 flex items-center gap-1">
+            <span className="text-xs">{quickOpen ? '▼' : '▶'}</span>
+            快速新建图文档
+          </button>
+          {quickOpen && (
+            <div className="px-4 py-3 border-t space-y-2 bg-gray-50">
+              <div className="flex gap-2">
+                <input value={quickForm.code} onChange={e => setQuickForm({ ...quickForm, code: e.target.value })} placeholder="编号 *" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                <input value={quickForm.name} onChange={e => setQuickForm({ ...quickForm, name: e.target.value })} placeholder="名称 *" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
+              </div>
+              <div className="flex gap-2">
+                <input value={quickForm.remark} onChange={e => setQuickForm({ ...quickForm, remark: e.target.value })} placeholder="备注" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                <button type="button" onClick={handleQuickCreate} disabled={quickCreating} className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 whitespace-nowrap">
+                  {quickCreating ? '创建中...' : '新建并添加'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ---- 3. 可选列表 ---- */}

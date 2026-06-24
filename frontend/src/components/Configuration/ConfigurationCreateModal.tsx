@@ -4,6 +4,7 @@ import { configurationApi, partsApi, assembliesApi } from '../../services/api';
 import AssemblyPartPicker from '../AssemblyPartPicker';
 import VersionSelectModal from '../VersionSelectModal';
 import EntityDocumentSection from '../EntityDocumentSection';
+import EntityEditModal from '../EntityEditModal';
 import type { ConfigurationItem } from '../../types';
 
 interface Props {
@@ -78,6 +79,8 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
   const [quickCreating, setQuickCreating] = useState(false);
   // 嵌套编辑（子项行点击）
   const [nestedEditItem, setNestedEditItem] = useState<ConfigurationItem | null>(null);
+  // 关联零部件行点击 → 编辑零件/部件
+  const [editingPartEntity, setEditingPartEntity] = useState<{ type: 'part' | 'assembly'; id: string } | null>(null);
 
   // 按构型号排序（定义在 useEffect 之前）
   const sortByCode = (items: any[]) =>
@@ -434,43 +437,43 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {parts.map((p, i) => (
-                    <tr key={i} className="hover:bg-gray-50">
-                      <td className="px-3 py-1.5 text-xs">
-                        <span className={`px-1.5 py-0.5 rounded text-xs ${p.part_type === 'assembly' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
-                          {p.part_type === 'assembly' ? '部件' : '零件'}
-                        </span>
-                      </td>
-                      <td className="px-3 py-1.5 text-xs font-mono">{p.part_code}</td>
-                      <td className="px-3 py-1.5 text-xs">{p.part_name}</td>
-                      <td className="px-3 py-1.5 text-xs text-gray-500">{p.part_spec || '-'}</td>
-                      <td className="px-3 py-1.5 text-xs">{p.part_version || '-'}</td>
-                      <td className="px-3 py-1.5 text-xs">
-                        <span className={`px-1.5 py-0.5 rounded text-xs ${p.part_status === 'draft' ? 'bg-blue-100 text-blue-800' : p.part_status === 'frozen' ? 'bg-orange-100 text-orange-800' : p.part_status === 'released' ? 'bg-green-100 text-green-800' : p.part_status === 'obsolete' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>
-                          {p.part_status === 'draft' ? '草稿' : p.part_status === 'frozen' ? '冻结' : p.part_status === 'released' ? '发布' : p.part_status === 'obsolete' ? '作废' : '-'}
-                        </span>
-                      </td>
-                      <td className="px-3 py-1.5 text-center">
-                        <input type="number" min={1} value={p.quantity ?? 1}
-                          onChange={(e) => updatePartQuantity(i, parseInt(e.target.value) || 1)}
-                          className="w-14 text-center text-xs border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary-500" />
-                      </td>
-                      <td className="px-3 py-1.5 text-center">
-                        <button onClick={() => togglePartRequired(i)}
-                          className={`px-2 py-0.5 text-xs rounded ${p.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-                          {p.is_required ? '必选' : '可选'}
-                        </button>
-                      </td>
-                      <td className="px-3 py-1.5 text-center">
-                        <div className="flex gap-1 justify-center">
-                          <button onClick={() => setVersionSelectIdx(i)}
-                            className="text-xs text-blue-600 hover:text-blue-800">选择</button>
-                          <button onClick={() => setParts(prev => prev.filter((_, j) => j !== i))}
-                            className="text-xs text-red-500 hover:text-red-700">移除</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                   {parts.map((p, i) => (
+                     <tr key={i} className="hover:bg-gray-50 cursor-pointer" onClick={() => setEditingPartEntity({ type: p.part_type as 'part' | 'assembly', id: p.part_id })}>
+                       <td className="px-3 py-1.5 text-xs">
+                         <span className={`px-1.5 py-0.5 rounded text-xs ${p.part_type === 'assembly' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
+                           {p.part_type === 'assembly' ? '部件' : '零件'}
+                         </span>
+                       </td>
+                       <td className="px-3 py-1.5 text-xs font-mono">{p.part_code}</td>
+                       <td className="px-3 py-1.5 text-xs">{p.part_name}</td>
+                       <td className="px-3 py-1.5 text-xs text-gray-500">{p.part_spec || '-'}</td>
+                       <td className="px-3 py-1.5 text-xs">{p.part_version || '-'}</td>
+                       <td className="px-3 py-1.5 text-xs">
+                         <span className={`px-1.5 py-0.5 rounded text-xs ${p.part_status === 'draft' ? 'bg-blue-100 text-blue-800' : p.part_status === 'frozen' ? 'bg-orange-100 text-orange-800' : p.part_status === 'released' ? 'bg-green-100 text-green-800' : p.part_status === 'obsolete' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>
+                           {p.part_status === 'draft' ? '草稿' : p.part_status === 'frozen' ? '冻结' : p.part_status === 'released' ? '发布' : p.part_status === 'obsolete' ? '作废' : '-'}
+                         </span>
+                       </td>
+                       <td className="px-3 py-1.5 text-center" onClick={e => e.stopPropagation()}>
+                         <input type="number" min={1} value={p.quantity ?? 1}
+                           onChange={(e) => updatePartQuantity(i, parseInt(e.target.value) || 1)}
+                           className="w-14 text-center text-xs border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                       </td>
+                       <td className="px-3 py-1.5 text-center" onClick={e => e.stopPropagation()}>
+                         <button onClick={() => togglePartRequired(i)}
+                           className={`px-2 py-0.5 text-xs rounded ${p.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                           {p.is_required ? '必选' : '可选'}
+                         </button>
+                       </td>
+                       <td className="px-3 py-1.5 text-center" onClick={e => e.stopPropagation()}>
+                         <div className="flex gap-1 justify-center">
+                           <button onClick={() => setVersionSelectIdx(i)}
+                             className="text-xs text-blue-600 hover:text-blue-800">选择</button>
+                           <button onClick={() => setParts(prev => prev.filter((_, j) => j !== i))}
+                             className="text-xs text-red-500 hover:text-red-700">移除</button>
+                         </div>
+                       </td>
+                     </tr>
+                   ))}
                 </tbody>
               </table>
             </div>
@@ -756,6 +759,31 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
               }
             }
           }
+        }}
+      />
+    )}
+    {/* 关联零部件行点击 → 编辑零件/部件 */}
+    {editingPartEntity && (
+      <EntityEditModal
+        open={!!editingPartEntity}
+        entityType={editingPartEntity.type}
+        entityId={editingPartEntity.id}
+        onClose={() => setEditingPartEntity(null)}
+        onSaved={() => {
+          const target = editingPartEntity;
+          setEditingPartEntity(null);
+          // 刷新对应的零部件信息
+          const api = target.type === 'assembly' ? assembliesApi : partsApi;
+          api.get(target.id).then(r => {
+            setParts(prev => prev.map(p => p.part_type === target.type && p.part_id === target.id ? {
+              ...p,
+              part_code: r.data.code,
+              part_name: r.data.name,
+              part_version: r.data.version || '',
+              part_spec: r.data.spec || '',
+              part_status: r.data.status || '',
+            } : p));
+          }).catch(() => {});
         }}
       />
     )}

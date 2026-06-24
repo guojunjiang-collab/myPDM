@@ -1,12 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
-import { entityDocumentsApi, customFieldsApi, documentsApi, mediaApi } from '../services/api';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { entityDocumentsApi, customFieldsApi, documentsApi, mediaApi, v2UploadApi, CHUNK_THRESHOLD, CHUNK_SIZE } from '../services/api';
 import { previewAttachment } from '../utils/attachmentPreview';
-import type { EntityDocument, CustomFieldDefinition, CustomFieldValue, Document } from '../types';
+import type { EntityDocument, CustomFieldDefinition, CustomFieldValue, Document, DocumentAttachment } from '../types';
 import { canEdit } from '../stores/auth';
 import { useDataStore } from '../stores/data';
 import { Modal } from './Modal';
 import DocumentPicker from './DocumentPicker';
-import DocumentDetailContent from './DocumentDetailContent';
 import VersionSelectModal from './VersionSelectModal';
 import ArchiveTreeModal from './ArchiveTreeModal';
 
@@ -59,10 +58,20 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
   const [docFieldDefs, setDocFieldDefs] = useState<CustomFieldDefinition[]>([]);
   const [docFieldValues, setDocFieldValues] = useState<Record<string, Record<string, unknown>>>({});
 
-  /* 图文档详情弹窗 */
-  const [viewDoc, setViewDoc] = useState<Document | null>(null);
-  const [viewDocCustomDefs, setViewDocCustomDefs] = useState<CustomFieldDefinition[]>([]);
-  const [viewDocCustomValues, setViewDocCustomValues] = useState<Record<string, any>>({});
+  /* 图文档编辑弹窗 */
+  const [editingDoc, setEditingDoc] = useState<Document | null>(null);
+  const [editFormData, setEditFormData] = useState<{ name: string; status: string; remark: string }>({ name: '', status: 'draft', remark: '' });
+  const [editCustomDefs, setEditCustomDefs] = useState<CustomFieldDefinition[]>([]);
+  const [editCustomValues, setEditCustomValues] = useState<Record<string, any>>({});
+  const [editAttachments, setEditAttachments] = useState<DocumentAttachment[]>([]);
+  const [editLoadingAttach, setEditLoadingAttach] = useState(false);
+  const [editUploading, setEditUploading] = useState(false);
+  const [editUploadFileName, setEditUploadFileName] = useState('');
+  const [editUploadProgress, setEditUploadProgress] = useState(0);
+  const [editDeletingAttId, setEditDeletingAttId] = useState<string | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editSaveError, setEditSaveError] = useState<string | null>(null);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
   const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
 
   const load = useCallback(async () => {
@@ -168,29 +177,120 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
     });
   };
 
-  /** 查看图文档详情 */
-  const handleViewDocument = async (ed: EntityDocument) => {
+  /** 编辑图文档 */
+  const handleEditDocument = async (ed: EntityDocument) => {
+    let doc: Document;
     try {
       const res = await documentsApi.get(ed.document_id);
-      setViewDoc(res.data as Document);
+      doc = res.data as Document;
     } catch {
-      // fallback: use the data from the entity document record
-      setViewDoc(ed.document as Document);
+      doc = ed.document as Document;
     }
+    setEditingDoc(doc);
+    setEditFormData({ name: doc.name, status: doc.status, remark: doc.remark || '' });
+    setEditCustomValues({});
+    setEditAttachments([]);
+    setEditSaveError(null);
+    setEditUploading(false);
+    setEditUploadFileName('');
+    setEditUploadProgress(0);
+
     const allDefs = useDataStore.getState().customFieldDefs;
     const docDefs = allDefs.filter((d: CustomFieldDefinition) => d.applies_to?.includes('document'));
-    setViewDocCustomDefs(docDefs);
-    // Use already-loaded custom field values if available
+    setEditCustomDefs(docDefs);
     if (docFieldValues[ed.document_id]) {
-      setViewDocCustomValues(docFieldValues[ed.document_id] as Record<string, any>);
+      setEditCustomValues(docFieldValues[ed.document_id] as Record<string, any>);
     } else {
       try {
         const res = await customFieldsApi.getValues('document', ed.document_id);
         const values: Record<string, any> = {};
         (res.data || []).forEach((v: CustomFieldValue) => { values[v.field_id] = v.value; });
-        setViewDocCustomValues(values);
-      } catch { setViewDocCustomValues({}); }
+        setEditCustomValues(values);
+      } catch { setEditCustomValues({}); }
     }
+    loadEditAttachments(doc.id);
+  };
+
+  const loadEditAttachments = async (docId: string) => {
+    setEditLoadingAttach(true);
+    try {
+      const res = await documentsApi.listAttachments(docId);
+      setEditAttachments(res.data || []);
+    } catch { setEditAttachments([]); }
+    finally { setEditLoadingAttach(false); }
+  };
+
+  const handleEditFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editingDoc) return;
+    const MAX_ALLOWED = 1073741824;
+    if (file.size > MAX_ALLOWED) { alert(`文件大小超过系统限制 1GB`); if (editFileInputRef.current) editFileInputRef.current.value = ''; return; }
+    setEditUploading(true); setEditUploadFileName(file.name); setEditUploadProgress(0);
+    try {
+      if (file.size > CHUNK_THRESHOLD) {
+        await uploadEditLargeFile(file, editingDoc.id);
+      } else {
+        await v2UploadApi.uploadSmallFile(file, 'documents', editingDoc.id, (p) => setEditUploadProgress(p));
+      }
+      await loadEditAttachments(editingDoc.id);
+    } catch { alert('上传失败，请重试'); }
+    finally { setEditUploading(false); setEditUploadFileName(''); setEditUploadProgress(0); if (editFileInputRef.current) editFileInputRef.current.value = ''; }
+  };
+
+  const uploadEditLargeFile = async (file: File, docId: string) => {
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    const initResult = await v2UploadApi.initChunkedUpload(file.name, file.size, 'documents', docId);
+    const uploadId = initResult.upload_id;
+    for (let i = 0; i < totalChunks; i++) {
+      const start = i * CHUNK_SIZE;
+      const end = Math.min(start + CHUNK_SIZE, file.size);
+      await v2UploadApi.uploadChunk(uploadId, i, file.slice(start, end));
+      setEditUploadProgress(Math.round(5 + ((i + 1) / totalChunks) * 90));
+    }
+    await v2UploadApi.completeChunkedUpload(uploadId);
+    setEditUploadProgress(100);
+  };
+
+  const handleEditDeleteAttachment = async (attId: string) => {
+    if (!editingDoc || !confirm('确定要删除该附件吗？')) return;
+    setEditDeletingAttId(attId);
+    try { await documentsApi.deleteAttachment(editingDoc.id, attId); await loadEditAttachments(editingDoc.id); }
+    catch { alert('删除失败，请重试'); }
+    finally { setEditDeletingAttId(null); }
+  };
+
+  const handleEditSave = async () => {
+    if (!editingDoc) return;
+    setEditSaving(true); setEditSaveError(null);
+    try {
+      const data = { name: editFormData.name, status: editFormData.status, remark: editFormData.remark || undefined };
+      const res = await documentsApi.update(editingDoc.id, data);
+      const updated = res.data as Document;
+      useDataStore.getState().setDocuments(
+        useDataStore.getState().documents.map(d => d.id === editingDoc.id ? updated : d)
+      );
+      const fieldValues = editCustomDefs.map(def => ({ field_id: def.id, value: editCustomValues[def.id] ?? null })).filter(fv => fv.value !== null && fv.value !== '');
+      if (fieldValues.length > 0) { await customFieldsApi.setValues('document', editingDoc.id, fieldValues); }
+      setEditingDoc(null);
+      await load();
+    } catch (error: any) {
+      const detail = error.response?.data?.detail;
+      setEditSaveError(typeof detail === 'string' ? detail : '更新失败，请重试');
+    } finally { setEditSaving(false); }
+  };
+
+  const handleEditUpgrade = async () => {
+    if (!editingDoc) return;
+    setEditSaving(true); setEditSaveError(null);
+    try {
+      const res = await documentsApi.upgrade(editingDoc.id);
+      const newDoc = res.data;
+      useDataStore.getState().setDocuments([...useDataStore.getState().documents, newDoc]);
+      setEditingDoc(null);
+    } catch (error: any) {
+      const detail = error.response?.data?.detail;
+      setEditSaveError(typeof detail === 'string' ? detail : '升版失败，请重试');
+    } finally { setEditSaving(false); }
   };
 
   const existingDocIds = new Set(docs.map((d) => d.document_id));
@@ -237,7 +337,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
                 {docs.map((ed) => {
                   const vals = docFieldValues[ed.document_id] || {};
                   return (
-                    <tr key={ed.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleViewDocument(ed)}>
+                    <tr key={ed.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleEditDocument(ed)}>
                       <td className="px-3 py-2 font-medium">{ed.document.code}</td>
                       <td className="px-3 py-2">{ed.document.name}</td>
                       <td className="px-3 py-2 text-gray-500">{ed.document.version}</td>
@@ -315,15 +415,128 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
         docFieldValues={docFieldValues}
       />
 
-      {/* 图文档详情弹窗 */}
-      <Modal open={!!viewDoc} title="图文档详情" onClose={() => setViewDoc(null)} width="full" zIndex={60}>
-        {viewDoc && (
-          <DocumentDetailContent
-            doc={viewDoc}
-            customFieldDefs={viewDocCustomDefs}
-            customFieldValues={viewDocCustomValues}
-            onArchivePreview={(attId, fileName) => setArchivePreview({ attId, fileName })}
-          />
+      {/* 图文档编辑弹窗 */}
+      <Modal open={!!editingDoc} title="编辑图文档" onClose={() => setEditingDoc(null)} width="full" zIndex={60}>
+        {editingDoc && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-gray-500 mb-0.5">编号</label>
+                <input type="text" value={editingDoc.code} disabled className="w-full text-sm px-2 py-1 border border-gray-200 rounded disabled:bg-gray-100 disabled:text-gray-400" />
+              </div>
+              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-gray-500 mb-0.5">名称 <span className="text-red-500">*</span></label>
+                <input type="text" value={editFormData.name} onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              </div>
+              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-gray-500 mb-0.5">版本</label>
+                <input type="text" value={editingDoc.version || ''} disabled className="w-full text-sm px-2 py-1 border border-gray-200 rounded disabled:bg-gray-100 disabled:text-gray-400" />
+              </div>
+              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-gray-500 mb-0.5">状态</label>
+                <select value={editFormData.status} onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500">
+                  <option value="draft">草稿</option>
+                  <option value="frozen">冻结</option>
+                  <option value="released">发布</option>
+                  <option value="obsolete">作废</option>
+                </select>
+              </div>
+              <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-gray-500 mb-0.5">备注</label>
+                <textarea value={editFormData.remark} onChange={(e) => setEditFormData({ ...editFormData, remark: e.target.value })} rows={1} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" />
+              </div>
+            </div>
+
+            {editCustomDefs.length > 0 && (
+              <div className="border-t pt-4">
+                <h4 className="text-sm font-bold text-gray-700 mb-2">自定义字段</h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {editCustomDefs.map(def => (
+                    <div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                      <label className="block text-xs text-gray-500 mb-0.5">{def.name}{def.is_required && <span className="text-red-500 ml-1">*</span>}</label>
+                      {def.field_type === 'select' && def.options?.length ? (
+                        <select value={editCustomValues[def.id] ?? ''} onChange={(e) => setEditCustomValues({ ...editCustomValues, [def.id]: e.target.value })} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500">
+                          <option value="">请选择</option>
+                          {def.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                      ) : def.field_type === 'number' ? (
+                        <input type="number" value={editCustomValues[def.id] ?? ''} onChange={(e) => setEditCustomValues({ ...editCustomValues, [def.id]: e.target.value ? Number(e.target.value) : null })} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                      ) : (
+                        <input type="text" value={editCustomValues[def.id] ?? ''} onChange={(e) => setEditCustomValues({ ...editCustomValues, [def.id]: e.target.value })} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="border-t pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-medium text-gray-700">附件管理</h4>
+                {!editUploading && (
+                  <>
+                    <button type="button" onClick={() => editFileInputRef.current?.click()} className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 上传附件</button>
+                    <input ref={editFileInputRef} type="file" className="hidden" onChange={handleEditFileChange} accept="*/*" />
+                  </>
+                )}
+              </div>
+              {editUploading && (
+                <div className="mb-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-blue-700">正在上传 "{editUploadFileName}"</span>
+                    <span className="text-blue-600 font-medium">{editUploadProgress}%</span>
+                  </div>
+                  <div className="w-full bg-blue-200 rounded-full h-2">
+                    <div className="bg-blue-500 h-2 rounded-full transition-all duration-300" style={{ width: `${editUploadProgress}%` }} />
+                  </div>
+                </div>
+              )}
+              {editLoadingAttach ? (
+                <div className="text-sm text-gray-500">加载中...</div>
+              ) : editAttachments.length === 0 && !editUploading ? (
+                <div className="text-sm text-gray-400 py-4 text-center border border-dashed border-gray-300 rounded-lg">暂无附件</div>
+              ) : (
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-gray-500 font-medium">文件名</th>
+                        <th className="px-3 py-2 text-left text-gray-500 font-medium w-24">大小</th>
+                        <th className="px-3 py-2 text-right text-gray-500 font-medium w-24">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {editAttachments.map(att => (
+                        <tr key={att.id} className="hover:bg-gray-50">
+                          <td className="px-3 py-2"><span className="text-primary-600">{att.file_name}</span></td>
+                          <td className="px-3 py-2 text-gray-500">{att.file_size != null ? (att.file_size < 1024 ? att.file_size + ' B' : att.file_size < 1048576 ? (att.file_size / 1024).toFixed(1) + ' KB' : (att.file_size / 1048576).toFixed(1) + ' MB') : '-'}</td>
+                          <td className="px-3 py-2 text-right">
+                            <button type="button" onClick={() => handleEditDeleteAttachment(att.id)} disabled={editDeletingAttId === att.id} className="text-red-600 hover:text-red-800 disabled:opacity-50 text-xs">
+                              {editDeletingAttId === att.id ? '删除中...' : '删除'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {editSaveError && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">{editSaveError}</div>}
+
+            <div className="flex justify-between items-center gap-2 pt-4 border-t">
+              <div>
+                {editingDoc && (editingDoc.status === 'released' || editingDoc.status === 'obsolete') && (
+                  <button type="button" onClick={handleEditUpgrade} disabled={editSaving} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">升版</button>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setEditingDoc(null)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
+                <button type="button" onClick={handleEditSave} disabled={editSaving} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">{editSaving ? '保存中...' : '保存'}</button>
+              </div>
+            </div>
+          </div>
         )}
       </Modal>
 

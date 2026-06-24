@@ -111,6 +111,8 @@ export default function Documents() {
   const [uploadingFileName, setUploadingFileName] = useState<string>('');
   const [uploadProgress, setUploadProgress] = useState<number>(0); // 上传进度百分比
   const [deletingAttId, setDeletingAttId] = useState<string | null>(null);
+  // 新增模式下暂存的待上传文件（文档创建后随保存上传）
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 导入导出
@@ -273,12 +275,19 @@ export default function Documents() {
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !editingDoc) return;
+    if (!file) return;
 
     // 文件大小限制检查 (1GB)
     const MAX_ALLOWED = 1073741824;
     if (file.size > MAX_ALLOWED) {
       alert(`文件大小 ${formatFileSize(file.size)} 超过系统限制 1GB`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    // 新增模式：尚无文档 ID，先暂存到前端，保存时再上传
+    if (!editingDoc) {
+      setPendingFile(file);
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
@@ -399,6 +408,8 @@ export default function Documents() {
     setEditingDoc(null);
     setFormData(initialFormData);
     setCustomFieldValues({});
+    setAttachments([]);
+    setPendingFile(null);
     loadCustomFields();
     setModalOpen(true);
   };
@@ -443,6 +454,28 @@ export default function Documents() {
         const res = await documentsApi.create(data);
         newDoc = res.data;
         useDataStore.getState().setDocuments([...useDataStore.getState().documents, newDoc!]);
+
+        // 新增模式：文档创建成功后上传暂存的附件
+        if (pendingFile) {
+          setUploading(true);
+          setUploadingFileName(pendingFile.name);
+          setUploadProgress(0);
+          try {
+            if (pendingFile.size > CHUNK_THRESHOLD) {
+              await uploadLargeFile(pendingFile, newDoc!.id, (p) => setUploadProgress(p));
+            } else {
+              await v2UploadApi.uploadSmallFile(pendingFile, 'documents', newDoc!.id, (p) => setUploadProgress(p));
+            }
+          } catch (uploadErr) {
+            console.error('附件上传失败', uploadErr);
+            alert('图文档已创建，但附件上传失败，请在编辑中重新上传');
+          } finally {
+            setUploading(false);
+            setUploadingFileName('');
+            setUploadProgress(0);
+            setPendingFile(null);
+          }
+        }
       }
 
       const fieldValues = customFieldDefs.map(def => ({
@@ -803,12 +836,14 @@ export default function Documents() {
             </div>
           )}
 
-          {/* 附件管理 - 仅编辑时显示，且只能上传一个附件 */}
-          {editingDoc && (
+          {/* 附件管理 - 新增/编辑界面一致，且只能上传一个附件 */}
+          {(() => {
+            const hasAttachment = editingDoc ? attachments.length > 0 : !!pendingFile;
+            return (
             <div className="border-t pt-4">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-sm font-medium text-gray-700">附件管理</h4>
-                {attachments.length === 0 && !uploading && (
+                {!hasAttachment && !uploading && (
                   <>
                     <button
                       type="button"
@@ -850,7 +885,7 @@ export default function Documents() {
 
               {loadingAttachments ? (
                 <div className="text-sm text-gray-500">加载中...</div>
-              ) : attachments.length === 0 && !uploading ? (
+              ) : !hasAttachment && !uploading ? (
                 <div className="text-sm text-gray-400 py-4 text-center border border-dashed border-gray-300 rounded-lg">
                   暂无附件
                 </div>
@@ -866,33 +901,53 @@ export default function Documents() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {attachments.map(att => (
-                        <tr key={att.id} className="hover:bg-gray-50">
+                      {editingDoc ? (
+                        attachments.map(att => (
+                          <tr key={att.id} className="hover:bg-gray-50">
+                            <td className="px-3 py-2">
+                              <span className="text-primary-600">{att.file_name}</span>
+                            </td>
+                            <td className="px-3 py-2 text-gray-500">{formatFileSize(att.file_size || 0)}</td>
+                            <td className="px-3 py-2 text-gray-500">
+                              {att.created_at ? new Date(att.created_at).toLocaleString('zh-CN') : '-'}
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteAttachment(att.id)}
+                                disabled={deletingAttId === att.id}
+                                className="text-red-600 hover:text-red-800 disabled:opacity-50"
+                              >
+                                {deletingAttId === att.id ? '删除中...' : '删除'}
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      ) : pendingFile ? (
+                        <tr className="hover:bg-gray-50">
                           <td className="px-3 py-2">
-                            <span className="text-primary-600">{att.file_name}</span>
+                            <span className="text-primary-600">{pendingFile.name}</span>
                           </td>
-                          <td className="px-3 py-2 text-gray-500">{formatFileSize(att.file_size || 0)}</td>
-                          <td className="px-3 py-2 text-gray-500">
-                            {att.created_at ? new Date(att.created_at).toLocaleString('zh-CN') : '-'}
-                          </td>
+                          <td className="px-3 py-2 text-gray-500">{formatFileSize(pendingFile.size)}</td>
+                          <td className="px-3 py-2 text-gray-400">待保存后上传</td>
                           <td className="px-3 py-2 text-right">
                             <button
                               type="button"
-                              onClick={() => handleDeleteAttachment(att.id)}
-                              disabled={deletingAttId === att.id}
-                              className="text-red-600 hover:text-red-800 disabled:opacity-50"
+                              onClick={() => setPendingFile(null)}
+                              className="text-red-600 hover:text-red-800"
                             >
-                              {deletingAttId === att.id ? '删除中...' : '删除'}
+                              删除
                             </button>
                           </td>
                         </tr>
-                      ))}
+                      ) : null}
                     </tbody>
                   </table>
                 </div>
               )}
             </div>
-          )}
+            );
+          })()}
 
           {saveError && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
