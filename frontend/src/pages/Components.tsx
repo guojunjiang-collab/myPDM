@@ -1330,7 +1330,7 @@ export default function Components() {
 
           {/* 关联图文档（仅编辑已有部件时显示） */}
           {editingAssembly && (
-            <EntityDocumentSection entityType="assembly" entityId={editingAssembly.id} editable />
+            <EntityDocumentSection entityType="assembly" entityId={editingAssembly.id} entityCode={editingAssembly.code} entityName={editingAssembly.name} editable />
           )}
 
           {/* 子项清单（仅编辑时显示） */}

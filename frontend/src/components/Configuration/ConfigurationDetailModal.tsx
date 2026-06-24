@@ -339,7 +339,7 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
           </div>
 
           {/* 关联图文档 */}
-          <EntityDocumentSection entityType="configuration" entityId={data.id} editable={false} />
+          <EntityDocumentSection entityType="configuration" entityId={data.id} entityCode={data.code} entityName={data.name} editable={false} />
         </div>
       )}
     </Modal>

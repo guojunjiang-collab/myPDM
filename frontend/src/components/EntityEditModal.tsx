@@ -12,6 +12,8 @@ interface EntityEditModalProps {
   open: boolean;
   entityType: 'part' | 'assembly';
   entityId: string;
+  entityCode?: string;
+  entityName?: string;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -23,7 +25,7 @@ const STATUS_OPTIONS = [
   { value: 'obsolete', label: '作废' },
 ];
 
-export default function EntityEditModal({ open, entityType, entityId, onClose, onSaved }: EntityEditModalProps) {
+export default function EntityEditModal({ open, entityType, entityId, entityCode, entityName, onClose, onSaved }: EntityEditModalProps) {
   const [formData, setFormData] = useState({ code: '', name: '', spec: '', remark: '', version: '-', status: 'draft' });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -377,7 +379,7 @@ export default function EntityEditModal({ open, entityType, entityId, onClose, o
           )}
 
           {/* 关联图文档 */}
-          <EntityDocumentSection entityType={entityType} entityId={entityId} editable={!locked} />
+          <EntityDocumentSection entityType={entityType} entityId={entityId} entityCode={entityCode} entityName={entityName} editable={!locked} />
 
           {/* 子项清单（仅部件编辑时显示） */}
           {entityType === 'assembly' && (

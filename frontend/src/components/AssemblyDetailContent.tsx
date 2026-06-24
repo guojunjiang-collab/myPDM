@@ -56,7 +56,7 @@ export default function AssemblyDetailContent({ assembly, customFieldDefs, custo
       )}
 
       {/* 关联图文档 */}
-      <EntityDocumentSection entityType="assembly" entityId={assembly.id} editable={false} />
+      <EntityDocumentSection entityType="assembly" entityId={assembly.id} entityCode={assembly.code} entityName={assembly.name} editable={false} />
 
       {/* 子项清单 */}
       <div className="border-t pt-4">

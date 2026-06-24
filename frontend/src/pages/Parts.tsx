@@ -688,7 +688,7 @@ export default function Parts() {
           )}
 
           {editingPart && (
-            <EntityDocumentSection entityType="part" entityId={editingPart.id} editable />
+            <EntityDocumentSection entityType="part" entityId={editingPart.id} entityCode={editingPart.code} entityName={editingPart.name} editable />
           )}          </div>
 
            <div className="flex justify-between items-center gap-2 pt-4 border-t">

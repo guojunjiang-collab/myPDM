@@ -27,6 +27,9 @@ interface DocumentPickerProps {
   existingDocIds?: Set<string>;
   docFieldDefs?: CustomFieldDefinition[];
   docFieldValues?: Record<string, Record<string, unknown>>;
+  entityType?: string;
+  entityCode?: string;
+  entityName?: string;
 }
 
 /* ----------------------------------------------------------------
@@ -65,6 +68,9 @@ export default function DocumentPicker({
   existingDocIds = new Set(),
   docFieldDefs: propFieldDefs,
   docFieldValues: propFieldValues,
+  entityType,
+  entityCode,
+  entityName,
 }: DocumentPickerProps) {
   /* ---- 筛选 ---- */
   const [search, setSearch] = useState('');
@@ -227,10 +233,14 @@ export default function DocumentPicker({
     onClose();
   };
 
+  const entityTypeLabel = entityType === 'part' ? '零件' : entityType === 'assembly' ? '部件' : entityType === 'configuration' ? '构型项' : '';
+  const entityLabel = entityCode && entityTypeLabel ? ` - ${entityTypeLabel} ${entityCode}${entityName ? ` ${entityName}` : ''}` : '';
+  const title = `关联图文档${entityLabel}`;
+
   const selectedList = useMemo(() => Array.from(selected.values()), [selected]);
 
   return (
-    <Modal open={open} title="关联图文档" onClose={handleCancel} width="full" zIndex={60}>
+    <Modal open={open} title={title} onClose={handleCancel} width="full" zIndex={60}>
       <div className="space-y-4 max-h-[75vh] flex flex-col">
         {/* ---- 1. 已选 ---- */}
         <div className="border rounded-lg overflow-hidden">

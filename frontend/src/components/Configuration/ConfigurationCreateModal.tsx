@@ -662,7 +662,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
 
         {/* 关联图文档（仅编辑模式） */}
         {isEdit && item && (
-          <EntityDocumentSection entityType="configuration" entityId={item.id} editable />
+          <EntityDocumentSection entityType="configuration" entityId={item.id} entityCode={item.code} entityName={item.name} editable />
         )}
 
         </div>

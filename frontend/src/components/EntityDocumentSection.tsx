@@ -17,6 +17,8 @@ interface EntityDocumentSectionProps {
   entityType: 'part' | 'assembly' | 'configuration';
   entityId: string;
   editable: boolean;
+  entityCode?: string;
+  entityName?: string;
 }
 
 /* ----------------------------------------------------------------
@@ -49,7 +51,7 @@ const renderFieldValue = (v: unknown) => {
    Component
    ---------------------------------------------------------------- */
 
-export default function EntityDocumentSection({ entityType, entityId, editable }: EntityDocumentSectionProps) {
+export default function EntityDocumentSection({ entityType, entityId, editable, entityCode, entityName }: EntityDocumentSectionProps) {
   const [docs, setDocs] = useState<EntityDocument[]>([]);
   const [loading, setLoading] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -413,6 +415,9 @@ export default function EntityDocumentSection({ entityType, entityId, editable }
         existingDocIds={existingDocIds}
         docFieldDefs={docFieldDefs}
         docFieldValues={docFieldValues}
+        entityType={entityType}
+        entityCode={entityCode}
+        entityName={entityName}
       />
 
       {/* 图文档编辑弹窗 */}

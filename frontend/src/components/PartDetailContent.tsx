@@ -54,7 +54,7 @@ export default function PartDetailContent({ part, customFieldDefs, customFieldVa
       )}
 
       {/* 关联图文档 */}
-      <EntityDocumentSection entityType="part" entityId={part.id} editable={false} />
+      <EntityDocumentSection entityType="part" entityId={part.id} entityCode={part.code} entityName={part.name} editable={false} />
     </div>
   );
 }
