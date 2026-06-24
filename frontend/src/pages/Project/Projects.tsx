@@ -46,7 +46,10 @@ export default function Projects() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
-  const [form, setForm] = useState({ name: '', planned_start: '', planned_end: '', description: '' });
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [form, setForm] = useState({ name: '', planned_start: '', planned_end: '', description: '', status: '进行中' as ProjectStatus });
+  const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // Detail tab state
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -71,16 +74,67 @@ export default function Projects() {
     (!statusFilter || p.status === statusFilter)
   );
 
-  const handleCreate = async () => {
-    if (!form.name.trim()) { toast.error('请填写项目名称'); return; }
+  const handleOpenCreate = () => {
+    setEditingProject(null);
+    setForm({ name: '', planned_start: '', planned_end: '', description: '', status: '进行中' });
+    setCreateOpen(true);
+  };
+
+  const handleOpenEdit = (p: Project, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingProject(p);
+    setForm({
+      name: p.name,
+      planned_start: p.planned_start || '',
+      planned_end: p.planned_end || '',
+      description: p.description || '',
+      status: p.status,
+    });
+    setCreateOpen(true);
+  };
+
+  const handleDeleteClick = (p: Project, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeleteProjectId(p.id);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteProjectId) return;
     try {
-      await projectApi.createProject(form);
-      toast.success('项目已创建');
-      setCreateOpen(false);
-      setForm({ name: '', planned_start: '', planned_end: '', description: '' });
+      await projectApi.deleteProject(deleteProjectId);
+      toast.success('项目已删除');
+      setDeleteProjectId(null);
       loadProjects();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || '创建失败');
+      toast.error(e?.response?.data?.detail || '删除失败');
+    }
+  };
+
+  const handleSave = async () => {
+    if (!form.name.trim()) { toast.error('请填写项目名称'); return; }
+    setSaving(true);
+    try {
+      if (editingProject) {
+        await projectApi.updateProject(editingProject.id, {
+          name: form.name,
+          status: form.status,
+          planned_start: form.planned_start || undefined,
+          planned_end: form.planned_end || undefined,
+          description: form.description || undefined,
+        });
+        toast.success('项目已更新');
+      } else {
+        await projectApi.createProject(form);
+        toast.success('项目已创建');
+      }
+      setCreateOpen(false);
+      setEditingProject(null);
+      setForm({ name: '', planned_start: '', planned_end: '', description: '', status: '进行中' });
+      loadProjects();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || (editingProject ? '更新失败' : '创建失败'));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -210,7 +264,7 @@ export default function Projects() {
               </select>
               <div className="flex-1" />
               {can('project:create') && (
-                <button onClick={() => setCreateOpen(true)}
+                <button onClick={handleOpenCreate}
                         className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">
                   + 新建项目
                 </button>
@@ -227,16 +281,17 @@ export default function Projects() {
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 select-none whitespace-nowrap">状态</th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 select-none whitespace-nowrap">计划起止</th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 select-none whitespace-nowrap">成员</th>
+                    <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 select-none whitespace-nowrap">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {loading ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-gray-500">加载中...</td>
+                      <td colSpan={7} className="px-4 py-8 text-center text-gray-500">加载中...</td>
                     </tr>
                   ) : filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-gray-500">暂无项目</td>
+                      <td colSpan={7} className="px-4 py-8 text-center text-gray-500">暂无项目</td>
                     </tr>
                   ) : (
                     filtered.map((p) => (
@@ -250,6 +305,14 @@ export default function Projects() {
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-500">{p.planned_start || '—'} ~ {p.planned_end || '—'}</td>
                         <td className="px-4 py-3 text-sm text-gray-500">{p.member_count ?? 0}</td>
+                        <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                          {can('project:update') && (
+                            <button onClick={(e) => handleOpenEdit(p, e)} className="text-primary-600 hover:text-primary-800 text-sm mr-3">编辑</button>
+                          )}
+                          {can('project:delete') && (
+                            <button onClick={(e) => handleDeleteClick(p, e)} className="text-red-600 hover:text-red-800 text-sm">删除</button>
+                          )}
+                        </td>
                       </tr>
                     ))
                   )}
@@ -257,7 +320,7 @@ export default function Projects() {
               </table>
             </div>
 
-            <Modal open={createOpen} title="新建项目" onClose={() => setCreateOpen(false)} width="lg">
+            <Modal open={createOpen} title={editingProject ? '编辑项目' : '新建项目'} onClose={() => { setCreateOpen(false); setEditingProject(null); }} width="lg">
               <div className="space-y-4 max-h-[75vh] overflow-y-auto px-1">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
@@ -269,6 +332,18 @@ export default function Projects() {
                       required
                     />
                   </div>
+                  {editingProject && (
+                    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                      <label className="block text-xs text-gray-500 mb-0.5">状态</label>
+                      <select
+                        value={form.status}
+                        onChange={(e) => setForm({ ...form, status: e.target.value as ProjectStatus })}
+                        className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      >
+                        {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  )}
                   <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                     <label className="block text-xs text-gray-500 mb-0.5">计划开始</label>
                     <input
@@ -300,10 +375,23 @@ export default function Projects() {
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-4 border-t mt-4">
-                <button onClick={() => setCreateOpen(false)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-                <button onClick={handleCreate} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">创建</button>
+                <button onClick={() => { setCreateOpen(false); setEditingProject(null); }} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
+                <button onClick={handleSave} disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+                  {saving ? '保存中...' : (editingProject ? '保存' : '创建')}
+                </button>
               </div>
             </Modal>
+
+            <ConfirmModal
+              open={!!deleteProjectId}
+              title="确认删除"
+              content="确定要删除该项目吗？此操作不可撤销。"
+              confirmText="删除"
+              cancelText="取消"
+              type="danger"
+              onConfirm={handleDeleteConfirm}
+              onCancel={() => setDeleteProjectId(null)}
+            />
           </div>
         )}
 
