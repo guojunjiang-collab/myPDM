@@ -10,7 +10,7 @@ from app.models_project import (
 )
 from app.schemas_project import (
     ProjectCreate, ProjectEdit, MemberAdd,
-    TaskCreate, TaskEdit, TaskMove, TaskLinkAdd, CommentAdd,
+    TaskCreate, TaskEdit, TaskMove, TaskReorder, TaskLinkAdd, CommentAdd,
 )
 
 
@@ -173,6 +173,52 @@ def move_task(db: Session, t: ProjectTask, data: TaskMove) -> ProjectTask:
         t.sort_order = data.sort_order
     db.commit(); db.refresh(t)
     return t
+
+
+def reorder_task(db: Session, project_id: uuid.UUID, data: "TaskReorder") -> dict:
+    """将任务移动到新的父节点和位置，自动重排 sort_order。"""
+    task = get_task(db, _uuid(data.task_id))
+    if str(task.project_id) != str(project_id):
+        raise HTTPException(status_code=400, detail="任务不属于该项目")
+
+    old_parent_id = task.parent_id
+    new_parent_id = _uuid(data.new_parent_id) if data.new_parent_id else None
+
+    if new_parent_id:
+        parent = get_task(db, new_parent_id)
+        if str(parent.project_id) != str(project_id):
+            raise HTTPException(status_code=400, detail="目标父任务不属于该项目")
+        # 防止拖到自己或后代身上
+        if new_parent_id == task.id:
+            raise HTTPException(status_code=400, detail="不能拖到自己身上")
+
+    task.parent_id = new_parent_id
+    db.flush()
+
+    # 重新排列目标父节点下所有兄弟
+    siblings = db.query(ProjectTask).filter(
+        ProjectTask.project_id == project_id,
+        ProjectTask.parent_id == new_parent_id,
+        ProjectTask.deleted_at.is_(None),
+        ProjectTask.id != task.id,
+    ).order_by(ProjectTask.sort_order, ProjectTask.created_at).all()
+
+    siblings.insert(min(data.new_sort_order, len(siblings)), task)
+    for i, s in enumerate(siblings):
+        s.sort_order = i
+
+    # 如果原父节点变了，压缩原父节点的 sort_order
+    if old_parent_id != new_parent_id:
+        old_siblings = db.query(ProjectTask).filter(
+            ProjectTask.project_id == project_id,
+            ProjectTask.parent_id == old_parent_id,
+            ProjectTask.deleted_at.is_(None),
+        ).order_by(ProjectTask.sort_order, ProjectTask.created_at).all()
+        for i, s in enumerate(old_siblings):
+            s.sort_order = i
+
+    db.commit()
+    return {"detail": "已重新排序", "task_id": str(task.id), "parent_id": str(task.parent_id) if task.parent_id else None}
 
 
 def delete_task(db: Session, t: ProjectTask):

@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useProjectStore } from '../../stores/project';
 import { projectApi } from '../../services/projectApi';
@@ -62,6 +62,13 @@ export default function Projects() {
   const [editOpen, setEditOpen] = useState(false);
   const [delTask, setDelTask] = useState<ProjectTask | null>(null);
   const [taskStatusFilter, setTaskStatusFilter] = useState('');
+  const [dragTask, setDragTask] = useState<ProjectTask | null>(null);
+  const [dragOver, setDragOver] = useState<{ taskId: string; position: 'above' | 'below' | 'into' } | null>(null);
+  const expandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => { if (expandTimerRef.current) clearTimeout(expandTimerRef.current); };
+  }, []);
 
   useEffect(() => { loadProjects(); }, [loadProjects]);
 
@@ -170,6 +177,99 @@ export default function Projects() {
     setExpanded(next);
   };
 
+  // ---- Drag & Drop ----
+  const expandNode = useCallback((tid: string) => {
+    if (!expanded.has(tid)) {
+      const next = new Set(expanded);
+      next.add(tid);
+      setExpanded(next);
+    }
+  }, [expanded]);
+
+  const handleDragStart = (t: ProjectTask, e: React.DragEvent) => {
+    setDragTask(t);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', t.id);
+    (e.currentTarget as HTMLElement).classList.add('opacity-40');
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    setDragTask(null);
+    setDragOver(null);
+    (e.currentTarget as HTMLElement).classList.remove('opacity-40');
+    if (expandTimerRef.current) { clearTimeout(expandTimerRef.current); expandTimerRef.current = null; }
+  };
+
+  const handleDragOver = (t: ProjectTask, e: React.DragEvent) => {
+    e.preventDefault();
+    if (!dragTask || dragTask.id === t.id) return;
+    e.dataTransfer.dropEffect = 'move';
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const ratio = y / rect.height;
+
+    if (ratio < 0.25) {
+      setDragOver({ taskId: t.id, position: 'above' });
+    } else if (ratio > 0.75) {
+      setDragOver({ taskId: t.id, position: 'below' });
+    } else {
+      setDragOver({ taskId: t.id, position: 'into' });
+      if (expandTimerRef.current) clearTimeout(expandTimerRef.current);
+      expandTimerRef.current = setTimeout(() => expandNode(t.id), 800);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOver(null);
+    if (expandTimerRef.current) { clearTimeout(expandTimerRef.current); expandTimerRef.current = null; }
+  };
+
+  const handleDrop = async (target: ProjectTask, e: React.DragEvent) => {
+    e.preventDefault();
+    if (!dragTask || !selectedProjectId || dragTask.id === target.id) return;
+    if (expandTimerRef.current) { clearTimeout(expandTimerRef.current); expandTimerRef.current = null; }
+
+    const pos = dragOver?.position || 'below';
+    let newParentId: string | null = null;
+    let newSortOrder: number;
+
+    // Flatten visible tasks to compute sort_order
+    const allVisible: ProjectTask[] = [];
+    const flattenVisible = (nodes: ProjectTask[]) => {
+      for (const n of nodes) {
+        allVisible.push(n);
+        if (expanded.has(n.id)) flattenVisible(n.children || []);
+      }
+    };
+    flattenVisible(tasks);
+    const targetIdx = allVisible.findIndex(n => n.id === target.id);
+
+    if (pos === 'above') {
+      newParentId = target.parent_id || null;
+      newSortOrder = target.sort_order;
+    } else if (pos === 'below') {
+      newParentId = target.parent_id || null;
+      newSortOrder = target.sort_order + 1;
+    } else {
+      newParentId = target.id;
+      newSortOrder = (target.children || []).length;
+    }
+
+    try {
+      await projectApi.reorderTask(selectedProjectId, {
+        task_id: dragTask.id,
+        new_parent_id: newParentId,
+        new_sort_order: newSortOrder,
+      });
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || '排序失败');
+    }
+
+    setDragTask(null);
+    setDragOver(null);
+    reload();
+  };
+
   const openCreate = (parentId: string | null) => {
     setEditTask(null); setEditParentId(parentId); setEditOpen(true);
   };
@@ -192,8 +292,21 @@ export default function Projects() {
     const isOpen = expanded.has(t.id);
     const overdue = isOverdue(t);
     const rows: JSX.Element[] = [
-      <tr key={t.id} onClick={() => openEdit(t)}
-          className={`${overdue ? 'bg-red-50' : 'hover:bg-gray-50'} cursor-pointer`}>
+      <tr
+        key={t.id}
+        draggable
+        onDragStart={(e) => handleDragStart(t, e)}
+        onDragEnd={handleDragEnd}
+        onDragOver={(e) => handleDragOver(t, e)}
+        onDragLeave={handleDragLeave}
+        onDrop={(e) => handleDrop(t, e)}
+        onClick={() => openEdit(t)}
+        className={`${overdue ? 'bg-red-50' : 'hover:bg-gray-50'} cursor-pointer transition-colors ${
+          dragOver?.taskId === t.id && dragOver?.position === 'into' ? 'bg-blue-50 ring-2 ring-primary-300 ring-inset' : ''
+        } ${dragOver?.taskId === t.id && dragOver?.position === 'above' ? 'border-t-2 border-primary-500' : ''} ${
+          dragOver?.taskId === t.id && dragOver?.position === 'below' ? 'border-b-2 border-primary-500' : ''
+        } ${dragTask?.id === t.id ? 'opacity-40' : ''}`}
+      >
         <td className="px-4 py-2 text-sm text-gray-500 font-mono whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
           <span style={{ paddingLeft: depth * 20 }} className="inline-flex items-center gap-1">
             {hasChildren ? (

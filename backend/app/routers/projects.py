@@ -8,7 +8,7 @@ from app.models import User
 from app import crud_project
 from app.schemas_project import (
     ProjectCreate, ProjectEdit, MemberAdd,
-    TaskCreate, TaskEdit, TaskStatusUpdate, TaskMove, TaskLinkAdd, CommentAdd,
+    TaskCreate, TaskEdit, TaskStatusUpdate, TaskMove, TaskReorder, TaskLinkAdd, CommentAdd,
 )
 from ..permissions import require_permission, enforce_object_policy
 
@@ -135,6 +135,14 @@ async def move_task(project_id: uuid.UUID, task_id: uuid.UUID, data: TaskMove, d
     enforce_object_policy("project_manager_or_admin", current_user, p)
     t = crud_project.get_active_task(db, task_id, project_id)
     return _task_dict(db, crud_project.move_task(db, t, data))
+
+
+@router.post("/{project_id}/tasks/reorder")
+async def reorder_tasks(project_id: uuid.UUID, data: TaskReorder, db: Session = Depends(get_db),
+                        current_user: User = Depends(require_permission("project.task:update"))):
+    p = crud_project.get_project(db, project_id)
+    enforce_object_policy("project_manager_or_admin", current_user, p)
+    return crud_project.reorder_task(db, project_id, data)
 
 
 @router.delete("/{project_id}/tasks/{task_id}")

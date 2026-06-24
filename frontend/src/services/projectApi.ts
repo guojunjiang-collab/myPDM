@@ -25,6 +25,8 @@ export const projectApi = {
     api.patch(`/${id}/tasks/${taskId}/status`, { status }),
   moveTask: (id: string, taskId: string, data: { parent_id?: string | null; sort_order?: number }) =>
     api.post(`/${id}/tasks/${taskId}/move`, data),
+  reorderTask: (id: string, data: { task_id: string; new_parent_id?: string | null; new_sort_order: number }) =>
+    api.post(`/${id}/tasks/reorder`, data),
   deleteTask: (id: string, taskId: string) => api.delete(`/${id}/tasks/${taskId}`),
   listLinks: (id: string, taskId: string) => api.get(`/${id}/tasks/${taskId}/links`),
   addLink: (id: string, taskId: string, data: { entity_type: string; entity_id: string }) =>

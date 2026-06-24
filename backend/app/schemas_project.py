@@ -70,6 +70,12 @@ class TaskMove(BaseSchema):
     sort_order: Optional[int] = None
 
 
+class TaskReorder(BaseSchema):
+    task_id: str
+    new_parent_id: Optional[str] = None
+    new_sort_order: int
+
+
 # ---- 关联对象 ----
 class TaskLinkAdd(BaseSchema):
     entity_type: Literal["part", "assembly", "config_item", "ec", "document"]
