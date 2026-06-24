@@ -8,6 +8,7 @@ from .routers.attachments_v2 import router as attachments_v2_router
 from .routers.sync import router as sync_router
 from .routers.admin import router as admin_router
 from .routers.assistant import router as assistant_router
+from .routers.projects import router as projects_router
 from .database import SessionLocal
 
 app = FastAPI(
@@ -44,6 +45,7 @@ app.include_router(inventory_router, prefix="/api")
 app.include_router(sync_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 app.include_router(assistant_router, prefix="/api")
+app.include_router(projects_router, prefix="/api")
 
 @app.on_event("startup")
 async def startup_event():
