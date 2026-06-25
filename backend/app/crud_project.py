@@ -1,6 +1,6 @@
 """项目管理 - CRUD"""
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
@@ -188,7 +188,9 @@ def update_task(db: Session, t: ProjectTask, data: TaskEdit) -> ProjectTask:
         t.assignee_id = _uuid(data.assignee_id)
     _enforce_milestone_single_day(t)
     db.commit(); db.refresh(t)
+    auto_schedule(db, t.project_id)   # 前置改期 → 级联后置
     persist_rollup(db, t.project_id)
+    db.refresh(t)
     return t
 
 
@@ -416,6 +418,8 @@ def add_dep(db: Session, project_id: uuid.UUID, data: DepCreate) -> ProjectTaskD
     d = ProjectTaskDep(project_id=project_id, predecessor_id=pred, successor_id=succ,
                        dep_type=data.dep_type, lag_days=data.lag_days)
     db.add(d); db.commit(); db.refresh(d)
+    auto_schedule(db, project_id)   # 新依赖 → 后置任务对齐
+    persist_rollup(db, project_id)
     return d
 
 
@@ -573,6 +577,63 @@ def persist_rollup(db: Session, project_id: uuid.UUID):
                 t.planned_start = rs
                 t.planned_end = re
                 changed = True
+    if changed:
+        db.commit()
+
+
+def auto_schedule(db: Session, project_id: uuid.UUID):
+    """前向自动排期:有前置依赖的任务,其计划起止自动对齐到依赖约束(保留工期),
+    并沿依赖链级联。无前置或无工期的任务保持自身日期。"""
+    tasks = db.query(ProjectTask).filter(
+        ProjectTask.project_id == project_id, ProjectTask.deleted_at.is_(None)
+    ).all()
+    by_id = {t.id: t for t in tasks}
+    deps = list_deps(db, project_id)
+    pred_map = {}; succ_map = {}; indeg = {t.id: 0 for t in tasks}
+    for d in deps:
+        if d.predecessor_id in by_id and d.successor_id in by_id:
+            pred_map.setdefault(d.successor_id, []).append((d.predecessor_id, d.dep_type, d.lag_days))
+            succ_map.setdefault(d.predecessor_id, []).append(d.successor_id)
+            indeg[d.successor_id] += 1
+    # 拓扑序
+    queue = [tid for tid in indeg if indeg[tid] == 0]
+    topo = []; indeg2 = dict(indeg)
+    while queue:
+        n = queue.pop(0); topo.append(n)
+        for s in succ_map.get(n, []):
+            indeg2[s] -= 1
+            if indeg2[s] == 0:
+                queue.append(s)
+    if len(topo) != len(tasks):
+        return  # 异常成环,放弃排期
+    changed = False
+    for tid in topo:
+        preds = pred_map.get(tid)
+        t = by_id[tid]
+        if not preds or not (t.planned_start and t.planned_end):
+            continue
+        d_len = (t.planned_end - t.planned_start).days  # 工期-1(天)
+        best = None
+        for pid, dtype, lag in preds:
+            pr = by_id[pid]
+            if not (pr.planned_start and pr.planned_end):
+                continue
+            if dtype == "SS":
+                cand = pr.planned_start + timedelta(days=lag)
+            elif dtype == "FF":
+                cand = pr.planned_end + timedelta(days=lag) - timedelta(days=d_len)
+            elif dtype == "SF":
+                cand = pr.planned_start + timedelta(days=lag) - timedelta(days=d_len)
+            else:  # FS
+                cand = pr.planned_end + timedelta(days=1 + lag)
+            best = cand if best is None else max(best, cand)
+        if best is None:
+            continue
+        new_end = best + timedelta(days=d_len)
+        if t.planned_start != best or t.planned_end != new_end:
+            t.planned_start = best
+            t.planned_end = new_end
+            changed = True
     if changed:
         db.commit()
 

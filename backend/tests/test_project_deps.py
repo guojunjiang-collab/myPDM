@@ -119,16 +119,33 @@ def test_cpm_parallel_branch_has_slack(db):
     assert crit[str(short.id)] is False
 
 
-def test_gantt_violation_flag(db):
+def test_violation_detection_unit(db):
+    """_violation 纯检测逻辑:后置早于 FS 约束判违规(自动排期会消除真实违规,故单测检测函数)。"""
     owner = _mk_user(db)
     p = crud_project.create_project(db, ProjectCreate(name="V"), owner.id)
     a = crud_project.create_task(db, p, TaskCreate(name="A",
         planned_start=_dt.date(2026, 1, 5), planned_end=_dt.date(2026, 1, 10)))
     b = crud_project.create_task(db, p, TaskCreate(name="B",
         planned_start=_dt.date(2026, 1, 1), planned_end=_dt.date(2026, 1, 3)))
+
+    class _D:
+        predecessor_id = a.id; successor_id = b.id; dep_type = "FS"; lag_days = 0
+    assert crud_project._violation(_D(), {a.id: a, b.id: b}) is True
+
+
+def test_auto_schedule_resolves_violation_on_add_dep(db):
+    """添加依赖后自动排期:后置 B 被移动到 A 之后,不再违规。"""
+    owner = _mk_user(db)
+    p = crud_project.create_project(db, ProjectCreate(name="V2"), owner.id)
+    a = crud_project.create_task(db, p, TaskCreate(name="A",
+        planned_start=_dt.date(2026, 1, 5), planned_end=_dt.date(2026, 1, 10)))
+    b = crud_project.create_task(db, p, TaskCreate(name="B",
+        planned_start=_dt.date(2026, 1, 1), planned_end=_dt.date(2026, 1, 3)))
     crud_project.add_dep(db, p.id, DepCreate(predecessor_id=str(a.id), successor_id=str(b.id)))
     data = crud_project.get_gantt_data(db, p.id)
-    assert data["deps"][0]["is_violation"] is True
+    assert data["deps"][0]["is_violation"] is False
+    db.refresh(b)
+    assert b.planned_start == _dt.date(2026, 1, 11)   # A 结束1/10 + 1
 
 
 def test_gantt_no_dates_no_crash(db):
@@ -183,3 +200,23 @@ def test_milestone_dates_forced_single_day(db):
     assert m.planned_start == _dt.date(2026, 1, 5) and m.planned_end == _dt.date(2026, 1, 5)
     crud_project.update_task(db, m, TaskEdit(planned_start=_dt.date(2026, 2, 1), planned_end=_dt.date(2026, 2, 1)))
     assert m.planned_start == _dt.date(2026, 2, 1) and m.planned_end == _dt.date(2026, 2, 1)
+
+
+def test_auto_schedule_fs_aligns_and_cascades(db):
+    """FS 依赖:后置任务自动对齐到前置完成+1,保留工期;前置移动级联后置。"""
+    from app.schemas_project import TaskEdit
+    owner = _mk_user(db)
+    p = crud_project.create_project(db, ProjectCreate(name="AS"), owner.id)
+    a = crud_project.create_task(db, p, TaskCreate(name="A",
+        planned_start=_dt.date(2026, 1, 1), planned_end=_dt.date(2026, 1, 5)))
+    b = crud_project.create_task(db, p, TaskCreate(name="B",
+        planned_start=_dt.date(2026, 1, 2), planned_end=_dt.date(2026, 1, 4)))  # 工期3天
+    crud_project.add_dep(db, p.id, DepCreate(predecessor_id=str(a.id), successor_id=str(b.id)))  # FS
+    db.refresh(b)
+    assert b.planned_start == _dt.date(2026, 1, 6)   # A 结束1/5 + 1
+    assert b.planned_end == _dt.date(2026, 1, 8)      # 保持3天
+    # 移动前置 A,后置 B 级联
+    crud_project.update_task(db, a, TaskEdit(planned_start=_dt.date(2026, 1, 10), planned_end=_dt.date(2026, 1, 15)))
+    db.refresh(b)
+    assert b.planned_start == _dt.date(2026, 1, 16)
+    assert b.planned_end == _dt.date(2026, 1, 18)
