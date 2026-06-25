@@ -38,4 +38,9 @@ export const projectApi = {
     api.post(`/${id}/tasks/${taskId}/comments`, { content }),
   deleteComment: (id: string, taskId: string, commentId: string) =>
     api.delete(`/${id}/tasks/${taskId}/comments/${commentId}`),
+  getGantt: (id: string) => api.get(`/${id}/gantt`),
+  listDeps: (id: string) => api.get(`/${id}/deps`),
+  addDep: (id: string, data: { predecessor_id: string; successor_id: string; dep_type?: string; lag_days?: number }) =>
+    api.post(`/${id}/deps`, data),
+  removeDep: (id: string, depId: string) => api.delete(`/${id}/deps/${depId}`),
 };

@@ -67,3 +67,37 @@ export interface TaskComment {
   content: string;
   created_at: string;
 }
+
+export type DepType = 'FS' | 'SS' | 'FF' | 'SF';
+
+export interface TaskDependency {
+  id: string;
+  predecessor_id: string;
+  successor_id: string;
+  dep_type: DepType;
+  lag_days: number;
+  is_violation?: boolean;
+}
+
+export interface GanttTask {
+  id: string;
+  parent_id: string | null;
+  code: string;
+  name: string;
+  task_type: TaskType;
+  status: TaskStatus;
+  assignee_name?: string | null;
+  planned_start: string | null;
+  planned_end: string | null;
+  duration_days: number | null;
+  is_critical: boolean;
+  is_overdue: boolean;
+  sort_order: number;
+  depth: number;
+}
+
+export interface GanttData {
+  tasks: GanttTask[];
+  deps: TaskDependency[];
+  range: { min_date: string | null; max_date: string | null };
+}
