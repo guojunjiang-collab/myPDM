@@ -21,11 +21,12 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
   const [loading, setLoading] = useState(false);
   const [drag, setDrag] = useState<{ id: string; mode: 'move' | 'resize-l' | 'resize-r'; startX: number; origStart: Date; origEnd: Date; isMilestone: boolean } | null>(null);
   const [preview, setPreview] = useState<Record<string, { start: string; end: string }>>({});
-  const [createDrag, setCreateDrag] = useState<{ id: string; anchorDay: number; isMilestone: boolean } | null>(null);
+  const [createDrag, setCreateDrag] = useState<{ id: string; anchorDay: number; isMilestone: boolean; startX: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const movedRef = useRef(false);   // 区分点击与拖拽
   const [viewportW, setViewportW] = useState(0);
-  const [pan, setPan] = useState<{ startX: number; startScroll: number } | null>(null);
+  const [pan, setPan] = useState<{ startX: number; startScroll: number; taskId?: string } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -52,12 +53,14 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
     const s = parseDate(t.planned_start); const en = parseDate(t.planned_end);
     if (!s || !en) return;
     e.preventDefault();
+    movedRef.current = false;
     setDrag({ id: t.id, mode, startX: e.clientX, origStart: s, origEnd: en, isMilestone: t.task_type === '里程碑' });
   };
 
   useEffect(() => {
     if (!drag) return;
     const onMove = (e: MouseEvent) => {
+      if (Math.abs(e.clientX - drag.startX) > 4) movedRef.current = true;
       const deltaDays = Math.round((e.clientX - drag.startX) / px);
       let ns = drag.origStart; let ne = drag.origEnd;
       if (drag.mode === 'move') { ns = addDays(drag.origStart, deltaDays); ne = addDays(drag.origEnd, deltaDays); }
@@ -69,6 +72,12 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
     const onUp = async () => {
       const pv = preview[drag.id];
       const d = drag; setDrag(null);
+      if (!movedRef.current) {
+        // 纯点击任务条/里程碑 → 打开任务详情
+        setPreview((p) => { const n = { ...p }; delete n[d.id]; return n; });
+        onRowClick?.(d.id);
+        return;
+      }
       if (pv) {
         try {
           await projectApi.updateTask(projectId, d.id, { planned_start: pv.start, planned_end: pv.end });
@@ -91,7 +100,8 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
     e.preventDefault();
     const rect = svgRef.current.getBoundingClientRect();
     const day = Math.max(0, Math.floor((e.clientX - rect.left) / px));
-    setCreateDrag({ id: t.id, anchorDay: day, isMilestone: t.task_type === '里程碑' });
+    movedRef.current = false;
+    setCreateDrag({ id: t.id, anchorDay: day, isMilestone: t.task_type === '里程碑', startX: e.clientX });
     const d = fmtISO(addDays(range.start, day));
     setPreview((p) => ({ ...p, [t.id]: { start: d, end: d } }));
   };
@@ -99,6 +109,7 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
   useEffect(() => {
     if (!createDrag || !svgRef.current || !range) return;
     const onMove = (e: MouseEvent) => {
+      if (Math.abs(e.clientX - createDrag.startX) > 4) movedRef.current = true;
       const rect = svgRef.current!.getBoundingClientRect();
       const day = Math.max(0, Math.floor((e.clientX - rect.left) / px));
       if (createDrag.isMilestone) {
@@ -116,6 +127,12 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
     const onUp = async () => {
       const id = createDrag.id; const pv = preview[id];
       setCreateDrag(null);
+      if (!movedRef.current) {
+        // 纯点击无日期任务行 → 打开任务详情(不写日期)
+        setPreview((p) => { const n = { ...p }; delete n[id]; return n; });
+        onRowClick?.(id);
+        return;
+      }
       if (pv) {
         try {
           await projectApi.updateTask(projectId, id, { planned_start: pv.start, planned_end: pv.end });
@@ -144,19 +161,25 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
   }, [data]);
 
   // 拖动时间轴空白处左右平移(调整关注区域)
-  const onPanDown = (e: React.MouseEvent) => {
+  const onPanDown = (e: React.MouseEvent, taskId?: string) => {
     if (!scrollRef.current) return;
-    setPan({ startX: e.clientX, startScroll: scrollRef.current.scrollLeft });
+    movedRef.current = false;
+    setPan({ startX: e.clientX, startScroll: scrollRef.current.scrollLeft, taskId });
   };
   useEffect(() => {
     if (!pan) return;
     const onMove = (e: MouseEvent) => {
+      if (Math.abs(e.clientX - pan.startX) > 4) movedRef.current = true;
       if (scrollRef.current) scrollRef.current.scrollLeft = pan.startScroll - (e.clientX - pan.startX);
     };
-    const onUp = () => setPan(null);
+    const onUp = () => {
+      if (!movedRef.current && pan.taskId) onRowClick?.(pan.taskId);
+      setPan(null);
+    };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    /* eslint-disable-next-line */
   }, [pan]);
 
   if (loading && !data) return <div className="p-8 text-center text-gray-400">加载甘特图...</div>;
@@ -254,7 +277,7 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
             {data.tasks.map((t, i) => (
               <rect key={`bg-${t.id}`} x={0} y={i * ROW_H} width={chartW} height={ROW_H}
                 fill={i % 2 ? '#fafafa' : '#fff'}
-                style={{ cursor: pan ? 'grabbing' : 'grab' }} onMouseDown={onPanDown} />
+                style={{ cursor: pan ? 'grabbing' : 'pointer' }} onMouseDown={(e) => onPanDown(e, t.id)} />
             ))}
             {todayX >= 0 && todayX <= chartW && (
               <line x1={todayX} y1={0} x2={todayX} y2={chartH} stroke="#f97316" strokeWidth={1} strokeDasharray="3,3" />
