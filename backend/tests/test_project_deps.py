@@ -84,3 +84,57 @@ def test_delete_task_removes_deps(db):
     crud_project.add_dep(db, p.id, DepCreate(predecessor_id=str(a.id), successor_id=str(b.id)))
     crud_project.delete_task(db, a)
     assert len(crud_project.list_deps(db, p.id)) == 0
+
+
+import datetime as _dt
+
+
+def test_cpm_linear_chain_all_critical(db):
+    owner = _mk_user(db)
+    p = crud_project.create_project(db, ProjectCreate(name="CP"), owner.id)
+    a = crud_project.create_task(db, p, TaskCreate(name="A",
+        planned_start=_dt.date(2026, 1, 1), planned_end=_dt.date(2026, 1, 2)))
+    b = crud_project.create_task(db, p, TaskCreate(name="B",
+        planned_start=_dt.date(2026, 1, 3), planned_end=_dt.date(2026, 1, 4)))
+    crud_project.add_dep(db, p.id, DepCreate(predecessor_id=str(a.id), successor_id=str(b.id)))
+    data = crud_project.get_gantt_data(db, p.id)
+    crit = {t["id"]: t["is_critical"] for t in data["tasks"]}
+    assert crit[str(a.id)] is True and crit[str(b.id)] is True
+
+
+def test_cpm_parallel_branch_has_slack(db):
+    owner = _mk_user(db)
+    p = crud_project.create_project(db, ProjectCreate(name="CP2"), owner.id)
+    a = crud_project.create_task(db, p, TaskCreate(name="A",
+        planned_start=_dt.date(2026, 1, 1), planned_end=_dt.date(2026, 1, 1)))
+    long = crud_project.create_task(db, p, TaskCreate(name="LONG",
+        planned_start=_dt.date(2026, 1, 2), planned_end=_dt.date(2026, 1, 10)))
+    short = crud_project.create_task(db, p, TaskCreate(name="SHORT",
+        planned_start=_dt.date(2026, 1, 2), planned_end=_dt.date(2026, 1, 3)))
+    crud_project.add_dep(db, p.id, DepCreate(predecessor_id=str(a.id), successor_id=str(long.id)))
+    crud_project.add_dep(db, p.id, DepCreate(predecessor_id=str(a.id), successor_id=str(short.id)))
+    data = crud_project.get_gantt_data(db, p.id)
+    crit = {t["id"]: t["is_critical"] for t in data["tasks"]}
+    assert crit[str(long.id)] is True
+    assert crit[str(short.id)] is False
+
+
+def test_gantt_violation_flag(db):
+    owner = _mk_user(db)
+    p = crud_project.create_project(db, ProjectCreate(name="V"), owner.id)
+    a = crud_project.create_task(db, p, TaskCreate(name="A",
+        planned_start=_dt.date(2026, 1, 5), planned_end=_dt.date(2026, 1, 10)))
+    b = crud_project.create_task(db, p, TaskCreate(name="B",
+        planned_start=_dt.date(2026, 1, 1), planned_end=_dt.date(2026, 1, 3)))
+    crud_project.add_dep(db, p.id, DepCreate(predecessor_id=str(a.id), successor_id=str(b.id)))
+    data = crud_project.get_gantt_data(db, p.id)
+    assert data["deps"][0]["is_violation"] is True
+
+
+def test_gantt_no_dates_no_crash(db):
+    owner = _mk_user(db)
+    p = crud_project.create_project(db, ProjectCreate(name="ND"), owner.id)
+    crud_project.create_task(db, p, TaskCreate(name="NoDate"))
+    data = crud_project.get_gantt_data(db, p.id)
+    assert data["tasks"][0]["is_critical"] is False
+    assert data["range"]["min_date"] is None
