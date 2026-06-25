@@ -237,9 +237,13 @@ async def list_deps(project_id: uuid.UUID, db: Session = Depends(get_db),
                     current_user: User = Depends(require_permission("project:read"))):
     crud_project.get_project(db, project_id)
     _require_member(db, project_id, current_user)
+    from app.models_project import ProjectTask
+    tasks_by_id = {t.id: t for t in db.query(ProjectTask).filter(
+        ProjectTask.project_id == project_id, ProjectTask.deleted_at.is_(None)).all()}
     return {"items": [{
         "id": str(d.id), "predecessor_id": str(d.predecessor_id),
         "successor_id": str(d.successor_id), "dep_type": d.dep_type, "lag_days": d.lag_days,
+        "is_violation": crud_project._violation(d, tasks_by_id),
     } for d in crud_project.list_deps(db, project_id)]}
 
 
