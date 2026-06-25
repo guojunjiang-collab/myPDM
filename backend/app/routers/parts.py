@@ -93,6 +93,7 @@ async def get_part(part_id: uuid.UUID, db: Session = Depends(get_db), current_us
         raise HTTPException(status_code=404, detail="零件不存在")
     d = _part_response(db_part)
     d["creator_name"] = _creator_name(db, db_part.creator_id)
+    return d
 
 @router.put("/{part_id}", response_model=schemas.PartResponse)
 async def update_part(part_id: uuid.UUID, part_update: schemas.PartUpdate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("parts:update"))):
