@@ -8,7 +8,7 @@ from app.models import User
 from app import crud_project
 from app.schemas_project import (
     ProjectCreate, ProjectEdit, MemberAdd,
-    TaskCreate, TaskEdit, TaskStatusUpdate, TaskMove, TaskReorder, TaskLinkAdd, CommentAdd,
+    TaskCreate, TaskEdit, TaskStatusUpdate, TaskMove, TaskReorder, TaskLinkAdd, CommentAdd, DepCreate,
 )
 from ..permissions import require_permission, enforce_object_policy
 
@@ -219,6 +219,46 @@ async def delete_comment(project_id: uuid.UUID, task_id: uuid.UUID, comment_id: 
     if not is_mgr and c.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="只能删除本人评论")
     crud_project.delete_comment(db, c)
+    return {"detail": "已删除"}
+
+
+# ──────────── 甘特 ────────────
+@router.get("/{project_id}/gantt")
+async def get_gantt(project_id: uuid.UUID, db: Session = Depends(get_db),
+                    current_user: User = Depends(require_permission("project:read"))):
+    crud_project.get_project(db, project_id)
+    _require_member(db, project_id, current_user)
+    return crud_project.get_gantt_data(db, project_id)
+
+
+# ──────────── 任务依赖 ────────────
+@router.get("/{project_id}/deps")
+async def list_deps(project_id: uuid.UUID, db: Session = Depends(get_db),
+                    current_user: User = Depends(require_permission("project:read"))):
+    crud_project.get_project(db, project_id)
+    _require_member(db, project_id, current_user)
+    return {"items": [{
+        "id": str(d.id), "predecessor_id": str(d.predecessor_id),
+        "successor_id": str(d.successor_id), "dep_type": d.dep_type, "lag_days": d.lag_days,
+    } for d in crud_project.list_deps(db, project_id)]}
+
+
+@router.post("/{project_id}/deps")
+async def add_dep(project_id: uuid.UUID, data: DepCreate, db: Session = Depends(get_db),
+                  current_user: User = Depends(require_permission("project.task:depend"))):
+    p = crud_project.get_project(db, project_id)
+    enforce_object_policy("project_manager_or_admin", current_user, p)
+    d = crud_project.add_dep(db, project_id, data)
+    return {"id": str(d.id), "predecessor_id": str(d.predecessor_id),
+            "successor_id": str(d.successor_id), "dep_type": d.dep_type, "lag_days": d.lag_days}
+
+
+@router.delete("/{project_id}/deps/{dep_id}")
+async def remove_dep(project_id: uuid.UUID, dep_id: uuid.UUID, db: Session = Depends(get_db),
+                     current_user: User = Depends(require_permission("project.task:depend"))):
+    p = crud_project.get_project(db, project_id)
+    enforce_object_policy("project_manager_or_admin", current_user, p)
+    crud_project.remove_dep(db, project_id, dep_id)
     return {"detail": "已删除"}
 
 
