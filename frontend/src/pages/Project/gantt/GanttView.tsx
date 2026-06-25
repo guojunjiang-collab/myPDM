@@ -6,6 +6,7 @@ import {
   DAY_PX, ROW_H, BAR_H, LEFT_W, CODE_W, ASSIGNEE_W, INDENT, parseDate, daysBetween, addDays, fmtISO,
   computeRange, barBox, ticks, STATUS_FILL, depAnchors,
 } from './ganttUtils';
+import { TaskCodeCell, TaskNameCell, TaskAssigneeCell } from '../TaskRowCells';
 
 interface Props {
   projectId: string;
@@ -13,11 +14,19 @@ interface Props {
   onTaskUpdated?: () => void;
   onRowClick?: (taskId: string) => void;
   refreshKey?: number;
+  project?: { code: string; name: string; planned_start?: string | null; planned_end?: string | null; owner_name?: string | null } | null;
+  expanded?: Set<string>;
+  onExpandedChange?: (s: Set<string>) => void;
+  scale?: Scale;
+  onScaleChange?: (s: Scale) => void;
+  autoScheduleKey?: number;
 }
 
-export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClick, refreshKey }: Props) {
+export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClick, refreshKey, project, expanded: extExpanded, onExpandedChange, scale: extScale, onScaleChange, autoScheduleKey }: Props) {
   const [data, setData] = useState<GanttData | null>(null);
-  const [scale, setScale] = useState<Scale>('day');
+  const [intScale, setIntScale] = useState<Scale>('day');
+  const scale = extScale ?? intScale;
+  const setScale = onScaleChange ?? setIntScale;
   const [loading, setLoading] = useState(false);
   const [drag, setDrag] = useState<{ id: string; mode: 'move' | 'resize-l' | 'resize-r'; startX: number; origStart: Date; origEnd: Date; isMilestone: boolean } | null>(null);
   const [preview, setPreview] = useState<Record<string, { start: string; end: string }>>({});
@@ -28,15 +37,30 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
   const [viewportW, setViewportW] = useState(0);
   const [pan, setPan] = useState<{ startX: number; startScroll: number; taskId?: string } | null>(null);
   const [scheduling, setScheduling] = useState(false);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [intExpanded, setIntExpanded] = useState<Set<string>>(new Set());
+
+  const expanded = extExpanded ?? intExpanded;
+  const setExpanded = onExpandedChange ?? setIntExpanded;
 
   const toggleExpand = (taskId: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(taskId)) next.delete(taskId);
-      else next.add(taskId);
-      return next;
-    });
+    const next = new Set(expanded);
+    if (next.has(taskId)) next.delete(taskId);
+    else next.add(taskId);
+    setExpanded(next);
+  };
+
+  const syncProjectDates = async (tasks: { planned_start: string | null; planned_end: string | null }[]) => {
+    if (!project) return;
+    let earliest: string | null = null;
+    let latest: string | null = null;
+    for (const t of tasks) {
+      if (t.planned_start && (!earliest || t.planned_start < earliest)) earliest = t.planned_start;
+      if (t.planned_end && (!latest || t.planned_end > latest)) latest = t.planned_end;
+    }
+    if (earliest && latest) {
+      try { await projectApi.updateProject(projectId, { planned_start: earliest, planned_end: latest }); } catch { /* 静默 */ }
+    }
   };
 
   const load = async () => {
@@ -45,7 +69,8 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
       const res = await projectApi.getGantt(projectId);
       setData(res.data);
       setPreview({});
-      setExpanded(new Set());
+      if (!extExpanded) setIntExpanded(new Set());
+      syncProjectDates(res.data.tasks);
     } finally {
       setLoading(false);
     }
@@ -58,7 +83,8 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
       const res = await projectApi.autoSchedule(projectId);
       setData(res.data);
       setPreview({});
-      setExpanded(new Set());
+      if (!extExpanded) setIntExpanded(new Set());
+      syncProjectDates(res.data.tasks);
       onTaskUpdated?.();
     } catch {
       alert('自动排期失败(需项目经理/管理员权限)');
@@ -67,8 +93,33 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
       setScheduling(false);
     }
   };
+  useEffect(() => { if (autoScheduleKey && autoScheduleKey > 0) runAutoSchedule(); /* eslint-disable-next-line */ }, [autoScheduleKey]);
 
-  const range = useMemo(() => (data ? computeRange(data.tasks) : null), [data]);
+  // 根据所有任务自动计算项目级排期区间
+  const projectDates = useMemo(() => {
+    if (!data) return null;
+    let earliest: string | null = null;
+    let latest: string | null = null;
+    for (const t of data.tasks) {
+      if (t.planned_start && (!earliest || t.planned_start < earliest)) earliest = t.planned_start;
+      if (t.planned_end && (!latest || t.planned_end > latest)) latest = t.planned_end;
+    }
+    return earliest && latest ? { start: earliest, end: latest } : null;
+  }, [data]);
+
+  const range = useMemo(() => {
+    const r = data ? computeRange(data.tasks) : null;
+    if (r && projectDates) {
+      const ps = parseDate(projectDates.start); const pe = parseDate(projectDates.end);
+      if (ps && pe) {
+        if (ps < r.start) r.start = addDays(ps, -2);
+        if (pe > r.end) r.end = addDays(pe, 2);
+      }
+    }
+    return r;
+  }, [data, projectDates]);
+  const hasProject = !!(project?.code);
+  const taskRowOffset = hasProject ? 1 : 0;
   const px = DAY_PX[scale];
 
   // 构建父子映射 + 根据展开状态计算可见任务列表
@@ -242,7 +293,7 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
   const availChartW = Math.max(0, viewportW - LEFT_W);
   const totalDays = Math.max(daysBetween(range.start, range.end) + 1, Math.ceil(availChartW / px));
   const chartW = totalDays * px;
-  const chartH = visibleTasks.length * ROW_H;
+  const chartH = (visibleTasks.length + taskRowOffset) * ROW_H;
   const rowIndex = visRowIndex;
   const tickList = ticks(range.start, addDays(range.start, totalDays - 1), scale);
   const todayX = daysBetween(range.start, new Date()) * px;
@@ -251,7 +302,7 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
     const pt = data.tasks.find((t) => t.id === dep.predecessor_id);
     const st = data.tasks.find((t) => t.id === dep.successor_id);
     if (!pt || !st) return null;
-    const pri = visRowIndex[pt.id]; const sri = visRowIndex[st.id];
+    const pri = visRowIndex[pt.id] + taskRowOffset; const sri = visRowIndex[st.id] + taskRowOffset;
     if (pri === undefined || sri === undefined) return null;
     const pb = barBox(effTask(pt), range.start, scale, pri);
     const sb = barBox(effTask(st), range.start, scale, sri);
@@ -271,71 +322,55 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
 
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200">
-        <span className="text-sm text-gray-500">视图:</span>
-        {(['day', 'week', 'month'] as Scale[]).map((s) => (
-          <button key={s} onClick={() => setScale(s)}
-            className={`px-2 py-1 text-xs rounded ${scale === s ? 'bg-primary-600 text-white' : 'bg-white border border-gray-300 text-gray-600'}`}>
-            {s === 'day' ? '日' : s === 'week' ? '周' : '月'}
-          </button>
-        ))}
-        <button onClick={() => setExpanded(new Set(data.tasks.filter((t) => childMap[t.id]).map((t) => t.id)))}
-          className="px-2 py-1 text-xs rounded bg-white border border-gray-300 text-gray-600" title="展开所有层级">全部展开</button>
-        <button onClick={() => setExpanded(new Set())}
-          className="px-2 py-1 text-xs rounded bg-white border border-gray-300 text-gray-600" title="折叠所有层级">全部折叠</button>
-        {canEdit ? (
-          <button onClick={runAutoSchedule} disabled={scheduling}
-            className="ml-auto px-2 py-1 text-xs rounded bg-primary-600 text-white disabled:opacity-50"
-            title="检查所有排期依赖,自动对齐并更新各任务计划日期">
-            {scheduling ? '排期中…' : '自动排期'}
-          </button>
-        ) : (
-          <button onClick={load} className="ml-auto px-2 py-1 text-xs rounded bg-white border border-gray-300 text-gray-600">刷新</button>
-        )}
-      </div>
-
       <div ref={scrollRef} className="flex overflow-auto" style={{ maxHeight: '70vh' }}>
         <div className="shrink-0 border-r border-gray-200 sticky left-0 z-20 bg-white" style={{ width: LEFT_W }}>
-          <div className="h-8 bg-gray-50 border-b border-gray-200 flex items-center text-xs font-medium text-gray-500">
-            <span className="px-2 shrink-0 truncate" style={{ width: CODE_W }}>任务编号</span>
-            <span className="px-1 flex-1 min-w-0 truncate">任务名称</span>
+          <div className="bg-gray-50 border-b border-gray-200 flex items-center text-sm font-medium text-gray-500" style={{ height: ROW_H }}>
+            <span className="shrink-0 truncate text-left pl-2" style={{ width: CODE_W }}>任务编号</span>
+            <span className="px-1 flex-1 min-w-0 truncate text-left">任务名称</span>
             <span className="px-1 shrink-0 truncate text-center" style={{ width: ASSIGNEE_W }}>负责人</span>
           </div>
+          {hasProject && (
+            <div className="flex items-center border-b border-gray-200 bg-gray-50 text-sm" style={{ height: ROW_H }}>
+              <span className="shrink-0 truncate font-semibold text-gray-700 pl-2" style={{ width: CODE_W }} title={project!.code}>
+                {project!.code}
+              </span>
+              <span className="px-1 flex-1 min-w-0 flex items-center">
+                <span className="text-gray-400 mr-1 shrink-0">📁</span>
+                <span className="font-medium text-gray-700 truncate" title={project!.name}>{project!.name}</span>
+              </span>
+              <span className="px-1 shrink-0 truncate text-xs text-gray-500 text-center" style={{ width: ASSIGNEE_W }} title={project!.owner_name || ''}>
+                {project!.owner_name || '—'}
+              </span>
+            </div>
+          )}
           {visibleTasks.map((t) => {
             const hasChildren = !!childMap[t.id];
             return (
               <div key={t.id}
-                className="flex items-center border-b border-gray-100 text-sm hover:bg-primary-50" style={{ height: ROW_H }}>
-                <span className="shrink-0 truncate text-xs text-gray-500 font-mono" style={{ width: CODE_W, paddingLeft: 8 + t.depth * INDENT }} title={t.code}>
-                  {hasChildren ? (
-                    <span className="inline-block w-4 cursor-pointer select-none text-gray-400 hover:text-gray-700" onClick={(e) => { e.stopPropagation(); toggleExpand(t.id); }}>
-                      {expanded.has(t.id) ? '▾' : '▸'}
-                    </span>
-                  ) : null}
-                  <span onClick={() => onRowClick?.(t.id)} className="cursor-pointer">{t.code}</span>
-                </span>
-                <span className="px-1 flex-1 min-w-0 flex items-center cursor-pointer" onClick={() => onRowClick?.(t.id)}>
-                  <span className="text-gray-400 mr-1 shrink-0">
-                    {t.task_type === '里程碑' ? '🏁' : t.task_type === '评审' ? '🔎' : '📋'}
-                  </span>
-                  <span className={`truncate ${t.is_critical ? 'text-red-600 font-medium' : 'text-gray-700'}`} title={t.name}>
-                    {t.name}
-                  </span>
-                </span>
-                <span className="px-1 shrink-0 truncate text-xs text-gray-500 text-center cursor-pointer" style={{ width: ASSIGNEE_W }} title={t.assignee_name || ''} onClick={() => onRowClick?.(t.id)}>
-                  {t.assignee_name || '—'}
-                </span>
+                className={`flex items-center border-b border-gray-100 text-sm ${hoveredId === t.id ? 'bg-primary-50' : ''}`}
+                style={{ height: ROW_H }}
+                onMouseEnter={() => setHoveredId(t.id)}
+                onMouseLeave={() => setHoveredId(null)}>
+                <TaskCodeCell code={t.code} depth={t.depth} hasChildren={hasChildren}
+                  isExpanded={expanded.has(t.id)}
+                  onToggle={(e) => { e.stopPropagation(); toggleExpand(t.id); }}
+                  onClick={() => onRowClick?.(t.id)} variant="gantt" />
+                <TaskNameCell name={t.name} taskType={t.task_type}
+                  isCritical={t.is_critical} variant="gantt"
+                  onClick={() => onRowClick?.(t.id)} />
+                <TaskAssigneeCell assigneeName={t.assignee_name} variant="gantt"
+                  onClick={() => onRowClick?.(t.id)} />
               </div>
             );
           })}
         </div>
 
         <div className="relative" style={{ width: chartW }}>
-          <div className="sticky top-0 h-8 bg-gray-50 border-b border-gray-200 z-10" style={{ width: chartW, cursor: pan ? 'grabbing' : 'grab' }}
+          <div className="sticky top-0 bg-gray-50 border-b border-gray-200 z-10 flex items-center" style={{ width: chartW, height: ROW_H, cursor: pan ? 'grabbing' : 'grab' }}
             onMouseDown={onPanDown}>
             {tickList.map((tk, i) => (
-              <div key={i} className={`absolute top-0 h-8 text-[10px] flex items-center ${tk.major ? 'text-gray-600' : 'text-gray-300'}`}
-                style={{ left: tk.x, borderLeft: tk.major ? '1px solid #e5e7eb' : 'none', paddingLeft: 2 }}>
+              <div key={i} className={`absolute top-0 text-[10px] flex items-center ${tk.major ? 'text-gray-600' : 'text-gray-300'}`}
+                style={{ left: tk.x, height: ROW_H, borderLeft: tk.major ? '1px solid #e5e7eb' : 'none', paddingLeft: 2 }}>
                 {tk.label}
               </div>
             ))}
@@ -347,17 +382,37 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
                 <path d="M0,0 L6,3 L0,6 Z" fill="#94a3b8" />
               </marker>
             </defs>
+            {hasProject && (
+              <rect x={0} y={0} width={chartW} height={ROW_H}
+                fill="#f9fafb" style={{ cursor: pan ? 'grabbing' : 'pointer' }} onMouseDown={(e) => onPanDown(e)} />
+            )}
             {visibleTasks.map((t, i) => (
-              <rect key={`bg-${t.id}`} x={0} y={i * ROW_H} width={chartW} height={ROW_H}
-                fill={i % 2 ? '#fafafa' : '#fff'}
+              <rect key={`bg-${t.id}`} x={0} y={(i + taskRowOffset) * ROW_H} width={chartW} height={ROW_H}
+                fill={hoveredId === t.id ? '#f0f9ff' : (i % 2 ? '#fafafa' : '#fff')}
+                onMouseEnter={() => setHoveredId(t.id)}
+                onMouseLeave={() => setHoveredId(null)}
                 style={{ cursor: pan ? 'grabbing' : 'pointer' }} onMouseDown={(e) => onPanDown(e, t.id)} />
             ))}
             {todayX >= 0 && todayX <= chartW && (
               <line x1={todayX} y1={0} x2={todayX} y2={chartH} stroke="#f97316" strokeWidth={1} strokeDasharray="3,3" />
             )}
             {depPaths}
+            {/* 项目级行 */}
+            {hasProject && projectDates && (
+              (() => {
+                const ps = parseDate(projectDates.start); const pe = parseDate(projectDates.end);
+                if (!ps || !pe) return null;
+                const x = daysBetween(range.start, ps) * px;
+                const w = Math.max(px, (daysBetween(ps, pe) + 1) * px);
+                const y = (ROW_H - BAR_H) / 2;
+                return (
+                  <rect x={x} y={y} width={w} height={12} rx={3}
+                    fill="#93c5fd" opacity={0.7} />
+                );
+              })()
+            )}
             {visibleTasks.map((t) => {
-              const ri = visRowIndex[t.id];
+              const ri = visRowIndex[t.id] + taskRowOffset;
               const box = barBox(effTask(t), range.start, scale, ri);
               if (!box) return null;
               const isParent = !!childMap[t.id];
@@ -393,12 +448,13 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
               const hasDates = !!(t.planned_start && t.planned_end);
               const isParent = !!childMap[t.id];
               if (hasDates || isParent || preview[t.id]) return null;
+              const ri = i + taskRowOffset;
               return (
                 <g key={`new-${t.id}`}>
-                  <text x={6} y={i * ROW_H + ROW_H / 2 + 3} fontSize={10} fill="#cbd5e1" style={{ pointerEvents: 'none' }}>
+                  <text x={6} y={ri * ROW_H + ROW_H / 2 + 3} fontSize={10} fill="#cbd5e1" style={{ pointerEvents: 'none' }}>
                     ⟵ 拖拽设置计划日期 ⟶
                   </text>
-                  <rect x={0} y={i * ROW_H} width={chartW} height={ROW_H} fill="transparent"
+                  <rect x={0} y={ri * ROW_H} width={chartW} height={ROW_H} fill="transparent"
                     style={{ cursor: 'crosshair' }} onMouseDown={(e) => onCreateDown(e, t)} />
                 </g>
               );

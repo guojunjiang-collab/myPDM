@@ -5,9 +5,9 @@ export type Scale = 'day' | 'week' | 'month';
 export const DAY_PX: Record<Scale, number> = { day: 40, week: 10, month: 4 };
 export const ROW_H = 36;      // 与项目详情任务行高(px-4 py-2 text-sm)一致
 export const BAR_H = 12;      // 任务条高度
-export const CODE_W = 150;    // 左侧:任务编号列宽(含层级缩进)
+export const CODE_W = 200;    // 左侧:任务编号列宽(含层级缩进)
 export const ASSIGNEE_W = 72; // 左侧:负责人列宽
-export const LEFT_W = 460;    // 左侧固定区总宽(编号 + 名称 + 负责人)
+export const LEFT_W = 510;    // 左侧固定区总宽(编号 + 名称 + 负责人)
 export const INDENT = 20;     // 每层级缩进像素(同详情页)
 
 export function parseDate(s: string | null): Date | null {
