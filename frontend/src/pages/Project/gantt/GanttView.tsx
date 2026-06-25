@@ -27,6 +27,7 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
   const movedRef = useRef(false);   // 区分点击与拖拽
   const [viewportW, setViewportW] = useState(0);
   const [pan, setPan] = useState<{ startX: number; startScroll: number; taskId?: string } | null>(null);
+  const [scheduling, setScheduling] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -39,6 +40,21 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
     }
   };
   useEffect(() => { if (projectId) load(); /* eslint-disable-next-line */ }, [projectId, refreshKey]);
+
+  const runAutoSchedule = async () => {
+    setScheduling(true);
+    try {
+      const res = await projectApi.autoSchedule(projectId);
+      setData(res.data);
+      setPreview({});
+      onTaskUpdated?.();
+    } catch {
+      alert('自动排期失败(需项目经理/管理员权限)');
+      await load();
+    } finally {
+      setScheduling(false);
+    }
+  };
 
   const range = useMemo(() => (data ? computeRange(data.tasks) : null), [data]);
   const px = DAY_PX[scale];
@@ -226,7 +242,15 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
             {s === 'day' ? '日' : s === 'week' ? '周' : '月'}
           </button>
         ))}
-        <button onClick={load} className="ml-auto px-2 py-1 text-xs rounded bg-white border border-gray-300 text-gray-600">刷新</button>
+        {canEdit ? (
+          <button onClick={runAutoSchedule} disabled={scheduling}
+            className="ml-auto px-2 py-1 text-xs rounded bg-primary-600 text-white disabled:opacity-50"
+            title="检查所有排期依赖,自动对齐并更新各任务计划日期">
+            {scheduling ? '排期中…' : '自动排期'}
+          </button>
+        ) : (
+          <button onClick={load} className="ml-auto px-2 py-1 text-xs rounded bg-white border border-gray-300 text-gray-600">刷新</button>
+        )}
       </div>
 
       <div ref={scrollRef} className="flex overflow-auto" style={{ maxHeight: '70vh' }}>

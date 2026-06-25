@@ -231,6 +231,16 @@ async def get_gantt(project_id: uuid.UUID, db: Session = Depends(get_db),
     return crud_project.get_gantt_data(db, project_id)
 
 
+@router.post("/{project_id}/auto-schedule")
+async def run_auto_schedule(project_id: uuid.UUID, db: Session = Depends(get_db),
+                            current_user: User = Depends(require_permission("project.task:depend"))):
+    p = crud_project.get_project(db, project_id)
+    enforce_object_policy("project_manager_or_admin", current_user, p)
+    crud_project.auto_schedule(db, project_id)
+    crud_project.persist_rollup(db, project_id)
+    return crud_project.get_gantt_data(db, project_id)
+
+
 # ──────────── 任务依赖 ────────────
 @router.get("/{project_id}/deps")
 async def list_deps(project_id: uuid.UUID, db: Session = Depends(get_db),
