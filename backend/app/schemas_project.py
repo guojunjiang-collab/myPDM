@@ -1,5 +1,5 @@
 """项目管理 - Pydantic Schemas"""
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional, Literal, List
 from datetime import datetime, date
 
@@ -47,6 +47,11 @@ class TaskCreate(BaseSchema):
     actual_end: Optional[date] = None
     description: Optional[str] = None
 
+    @field_validator("planned_start", "planned_end", "actual_start", "actual_end", mode="before")
+    @classmethod
+    def _blank_to_none(cls, v):
+        return None if v == "" else v
+
 
 class TaskEdit(BaseSchema):
     name: Optional[str] = None
@@ -59,6 +64,11 @@ class TaskEdit(BaseSchema):
     actual_start: Optional[date] = None
     actual_end: Optional[date] = None
     description: Optional[str] = None
+
+    @field_validator("planned_start", "planned_end", "actual_start", "actual_end", mode="before")
+    @classmethod
+    def _blank_to_none(cls, v):
+        return None if v == "" else v
 
 
 class TaskStatusUpdate(BaseSchema):

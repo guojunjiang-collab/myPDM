@@ -98,9 +98,16 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
 
   const handleSave = async () => {
     const payload: any = { ...form, parent_id: task ? undefined : parentId };
-    if (task) await projectApi.updateTask(projectId, task.id, payload);
-    else await projectApi.createTask(projectId, payload);
-    onSaved();
+    // 未填日期发送 null 而非空字符串,避免后端日期校验失败
+    if (payload.planned_start === '') payload.planned_start = null;
+    if (payload.planned_end === '') payload.planned_end = null;
+    try {
+      if (task) await projectApi.updateTask(projectId, task.id, payload);
+      else await projectApi.createTask(projectId, payload);
+      onSaved();
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || '保存失败');
+    }
   };
 
   const ensureTaskId = (): string | null => {

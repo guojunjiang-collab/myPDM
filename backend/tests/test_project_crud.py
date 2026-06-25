@@ -147,3 +147,13 @@ def test_task_tree_serializes_dates_as_iso(db):
     tree = crud_project.get_task_tree(db, p.id)
     assert tree[0]["planned_start"] == "2026-01-01"
     assert tree[0]["planned_end"] == "2026-01-05"
+
+
+def test_task_schemas_coerce_blank_dates_to_none():
+    """空字符串日期应被规整为 None(前端未填日期时发送 ''),避免 422。"""
+    from app.schemas_project import TaskEdit, TaskCreate
+    e = TaskEdit(name="x", planned_start="", planned_end="", actual_start="", actual_end="")
+    assert e.planned_start is None and e.planned_end is None
+    assert e.actual_start is None and e.actual_end is None
+    c = TaskCreate(name="x", planned_start="", planned_end="")
+    assert c.planned_start is None and c.planned_end is None
