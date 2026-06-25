@@ -23,6 +23,9 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
   const [preview, setPreview] = useState<Record<string, { start: string; end: string }>>({});
   const [createDrag, setCreateDrag] = useState<{ id: string; anchorDay: number; isMilestone: boolean } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [viewportW, setViewportW] = useState(0);
+  const [pan, setPan] = useState<{ startX: number; startScroll: number } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -129,16 +132,45 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
     /* eslint-disable-next-line */
   }, [createDrag, preview, px, projectId, range]);
 
+  // 测量可视宽度,用于把日历铺满界面
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const measure = () => setViewportW(el.clientWidth);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [data]);
+
+  // 拖动时间轴空白处左右平移(调整关注区域)
+  const onPanDown = (e: React.MouseEvent) => {
+    if (!scrollRef.current) return;
+    setPan({ startX: e.clientX, startScroll: scrollRef.current.scrollLeft });
+  };
+  useEffect(() => {
+    if (!pan) return;
+    const onMove = (e: MouseEvent) => {
+      if (scrollRef.current) scrollRef.current.scrollLeft = pan.startScroll - (e.clientX - pan.startX);
+    };
+    const onUp = () => setPan(null);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  }, [pan]);
+
   if (loading && !data) return <div className="p-8 text-center text-gray-400">加载甘特图...</div>;
   if (!data || !range) return null;
   if (data.tasks.length === 0) return <div className="p-8 text-center text-gray-400">该项目还没有任务,先在"项目详情"中添加任务。</div>;
 
-  const totalDays = daysBetween(range.start, range.end) + 1;
+  // 日历铺满可视宽度:不足时向后补天数填满
+  const availChartW = Math.max(0, viewportW - LEFT_W);
+  const totalDays = Math.max(daysBetween(range.start, range.end) + 1, Math.ceil(availChartW / px));
   const chartW = totalDays * px;
   const chartH = data.tasks.length * ROW_H;
   const rowIndex: Record<string, number> = {};
   data.tasks.forEach((t, i) => { rowIndex[t.id] = i; });
-  const tickList = ticks(range.start, range.end, scale);
+  const tickList = ticks(range.start, addDays(range.start, totalDays - 1), scale);
   const todayX = daysBetween(range.start, new Date()) * px;
 
   const depPaths = data.deps.map((dep) => {
@@ -174,8 +206,8 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
         <button onClick={load} className="ml-auto px-2 py-1 text-xs rounded bg-white border border-gray-300 text-gray-600">刷新</button>
       </div>
 
-      <div className="flex overflow-auto" style={{ maxHeight: '70vh' }}>
-        <div className="shrink-0 border-r border-gray-200" style={{ width: LEFT_W }}>
+      <div ref={scrollRef} className="flex overflow-auto" style={{ maxHeight: '70vh' }}>
+        <div className="shrink-0 border-r border-gray-200 sticky left-0 z-20 bg-white" style={{ width: LEFT_W }}>
           <div className="h-8 bg-gray-50 border-b border-gray-200 flex items-center text-xs font-medium text-gray-500">
             <span className="px-2 shrink-0 truncate" style={{ width: CODE_W }}>任务编号</span>
             <span className="px-1 flex-1 min-w-0 truncate">任务名称</span>
@@ -203,7 +235,8 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
         </div>
 
         <div className="relative" style={{ width: chartW }}>
-          <div className="sticky top-0 h-8 bg-gray-50 border-b border-gray-200 z-10" style={{ width: chartW }}>
+          <div className="sticky top-0 h-8 bg-gray-50 border-b border-gray-200 z-10" style={{ width: chartW, cursor: pan ? 'grabbing' : 'grab' }}
+            onMouseDown={onPanDown}>
             {tickList.map((tk, i) => (
               <div key={i} className={`absolute top-0 h-8 text-[10px] flex items-center ${tk.major ? 'text-gray-600' : 'text-gray-300'}`}
                 style={{ left: tk.x, borderLeft: tk.major ? '1px solid #e5e7eb' : 'none', paddingLeft: 2 }}>
@@ -220,7 +253,8 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
             </defs>
             {data.tasks.map((t, i) => (
               <rect key={`bg-${t.id}`} x={0} y={i * ROW_H} width={chartW} height={ROW_H}
-                fill={i % 2 ? '#fafafa' : '#fff'} />
+                fill={i % 2 ? '#fafafa' : '#fff'}
+                style={{ cursor: pan ? 'grabbing' : 'grab' }} onMouseDown={onPanDown} />
             ))}
             {todayX >= 0 && todayX <= chartW && (
               <line x1={todayX} y1={0} x2={todayX} y2={chartH} stroke="#f97316" strokeWidth={1} strokeDasharray="3,3" />
