@@ -21,6 +21,8 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
   const [loading, setLoading] = useState(false);
   const [drag, setDrag] = useState<{ id: string; mode: 'move' | 'resize-l' | 'resize-r'; startX: number; origStart: Date; origEnd: Date } | null>(null);
   const [preview, setPreview] = useState<Record<string, { start: string; end: string }>>({});
+  const [createDrag, setCreateDrag] = useState<{ id: string; anchorDay: number } | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
 
   const load = async () => {
     setLoading(true);
@@ -78,6 +80,48 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
     /* eslint-disable-next-line */
   }, [drag, preview, px, projectId]);
+
+  // 无日期任务:在时间轴上拖拽快速划出计划起止
+  const onCreateDown = (e: React.MouseEvent, t: GanttTask) => {
+    if (!canEdit || !svgRef.current || !range) return;
+    e.preventDefault();
+    const rect = svgRef.current.getBoundingClientRect();
+    const day = Math.max(0, Math.floor((e.clientX - rect.left) / px));
+    setCreateDrag({ id: t.id, anchorDay: day });
+    const d = fmtISO(addDays(range.start, day));
+    setPreview((p) => ({ ...p, [t.id]: { start: d, end: d } }));
+  };
+
+  useEffect(() => {
+    if (!createDrag || !svgRef.current || !range) return;
+    const onMove = (e: MouseEvent) => {
+      const rect = svgRef.current!.getBoundingClientRect();
+      const day = Math.max(0, Math.floor((e.clientX - rect.left) / px));
+      const s = Math.min(createDrag.anchorDay, day);
+      const en = Math.max(createDrag.anchorDay, day);
+      setPreview((p) => ({
+        ...p,
+        [createDrag.id]: { start: fmtISO(addDays(range.start, s)), end: fmtISO(addDays(range.start, en)) },
+      }));
+    };
+    const onUp = async () => {
+      const id = createDrag.id; const pv = preview[id];
+      setCreateDrag(null);
+      if (pv) {
+        try {
+          await projectApi.updateTask(projectId, id, { planned_start: pv.start, planned_end: pv.end });
+          onTaskUpdated?.();
+          await load();
+        } catch {
+          await load();
+        }
+      }
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    /* eslint-disable-next-line */
+  }, [createDrag, preview, px, projectId, range]);
 
   if (loading && !data) return <div className="p-8 text-center text-gray-400">加载甘特图...</div>;
   if (!data || !range) return null;
@@ -162,7 +206,7 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
             ))}
           </div>
 
-          <svg width={chartW} height={chartH} className="block">
+          <svg ref={svgRef} width={chartW} height={chartH} className="block">
             <defs>
               <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
                 <path d="M0,0 L6,3 L0,6 Z" fill="#94a3b8" />
@@ -202,6 +246,21 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
                         onMouseDown={(e) => onMouseDown(e, t, 'resize-r')} />
                     </>
                   )}
+                </g>
+              );
+            })}
+            {/* 无日期任务:整行透明覆盖层,拖拽划出计划起止 */}
+            {canEdit && data.tasks.map((t, i) => {
+              const hasDates = !!(t.planned_start && t.planned_end);
+              const isParent = data.tasks.some((c) => c.parent_id === t.id);
+              if (hasDates || isParent || preview[t.id]) return null;
+              return (
+                <g key={`new-${t.id}`}>
+                  <text x={6} y={i * ROW_H + ROW_H / 2 + 3} fontSize={10} fill="#cbd5e1" style={{ pointerEvents: 'none' }}>
+                    ⟵ 拖拽设置计划日期 ⟶
+                  </text>
+                  <rect x={0} y={i * ROW_H} width={chartW} height={ROW_H} fill="transparent"
+                    style={{ cursor: 'crosshair' }} onMouseDown={(e) => onCreateDown(e, t)} />
                 </g>
               );
             })}
