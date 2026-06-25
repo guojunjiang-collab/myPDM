@@ -123,6 +123,7 @@
     "project.task:update_status": ["admin", "engineer", "production"],
     "project.task:delete": { "roles": ["admin", "engineer", "production"], "object_policy": "project_manager_or_admin" },
     "project.task:link": ["admin", "engineer", "production"],
+    "project.task:depend": { "roles": ["admin", "engineer", "production"], "object_policy": "project_manager_or_admin" },
     "project.task:comment": ["admin", "engineer", "production", "guest"],
 
     "dashboard:read": ["admin", "engineer", "production", "guest"],

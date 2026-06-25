@@ -1,0 +1,411 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { projectApi } from '../../../services/projectApi';
+import type { GanttData, GanttTask } from '../../../types/project';
+import type { Scale } from './ganttUtils';
+import {
+  DAY_PX, ROW_H, BAR_H, LEFT_W, CODE_W, ASSIGNEE_W, INDENT, parseDate, daysBetween, addDays, fmtISO,
+  computeRange, barBox, ticks, STATUS_FILL, depAnchors,
+} from './ganttUtils';
+
+interface Props {
+  projectId: string;
+  canEdit: boolean;
+  onTaskUpdated?: () => void;
+  onRowClick?: (taskId: string) => void;
+  refreshKey?: number;
+}
+
+export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClick, refreshKey }: Props) {
+  const [data, setData] = useState<GanttData | null>(null);
+  const [scale, setScale] = useState<Scale>('day');
+  const [loading, setLoading] = useState(false);
+  const [drag, setDrag] = useState<{ id: string; mode: 'move' | 'resize-l' | 'resize-r'; startX: number; origStart: Date; origEnd: Date; isMilestone: boolean } | null>(null);
+  const [preview, setPreview] = useState<Record<string, { start: string; end: string }>>({});
+  const [createDrag, setCreateDrag] = useState<{ id: string; anchorDay: number; isMilestone: boolean; startX: number } | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const movedRef = useRef(false);   // 区分点击与拖拽
+  const [viewportW, setViewportW] = useState(0);
+  const [pan, setPan] = useState<{ startX: number; startScroll: number; taskId?: string } | null>(null);
+  const [scheduling, setScheduling] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const toggleExpand = (taskId: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  };
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res = await projectApi.getGantt(projectId);
+      setData(res.data);
+      setPreview({});
+      setExpanded(new Set());
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => { if (projectId) load(); /* eslint-disable-next-line */ }, [projectId, refreshKey]);
+
+  const runAutoSchedule = async () => {
+    setScheduling(true);
+    try {
+      const res = await projectApi.autoSchedule(projectId);
+      setData(res.data);
+      setPreview({});
+      setExpanded(new Set());
+      onTaskUpdated?.();
+    } catch {
+      alert('自动排期失败(需项目经理/管理员权限)');
+      await load();
+    } finally {
+      setScheduling(false);
+    }
+  };
+
+  const range = useMemo(() => (data ? computeRange(data.tasks) : null), [data]);
+  const px = DAY_PX[scale];
+
+  // 构建父子映射 + 根据展开状态计算可见任务列表
+  const { childMap, visibleTasks, visRowIndex } = useMemo(() => {
+    const cm: Record<string, GanttTask[]> = {};
+    const tasks = data?.tasks || [];
+    for (const t of tasks) {
+      const pid = t.parent_id || '__root__';
+      if (!cm[pid]) cm[pid] = [];
+      cm[pid].push(t);
+    }
+    const vis: GanttTask[] = [];
+    const walk = (task: GanttTask) => {
+      vis.push(task);
+      const children = cm[task.id];
+      if (children && expanded.has(task.id)) {
+        for (const ch of children) walk(ch);
+      }
+    };
+    const roots = cm['__root__'] || [];
+    for (const r of roots) walk(r);
+    const ri: Record<string, number> = {};
+    vis.forEach((t, i) => { ri[t.id] = i; });
+    return { childMap: cm, visibleTasks: vis, visRowIndex: ri };
+  }, [data, expanded]);
+
+  const effTask = (t: GanttTask): GanttTask => {
+    const p = preview[t.id];
+    return p ? { ...t, planned_start: p.start, planned_end: p.end } : t;
+  };
+
+  const onMouseDown = (e: React.MouseEvent, t: GanttTask, mode: 'move' | 'resize-l' | 'resize-r') => {
+    if (!canEdit) return;
+    const s = parseDate(t.planned_start); const en = parseDate(t.planned_end);
+    if (!s || !en) return;
+    e.preventDefault();
+    movedRef.current = false;
+    setDrag({ id: t.id, mode, startX: e.clientX, origStart: s, origEnd: en, isMilestone: t.task_type === '里程碑' });
+  };
+
+  useEffect(() => {
+    if (!drag) return;
+    const onMove = (e: MouseEvent) => {
+      if (Math.abs(e.clientX - drag.startX) > 4) movedRef.current = true;
+      const deltaDays = Math.round((e.clientX - drag.startX) / px);
+      let ns = drag.origStart; let ne = drag.origEnd;
+      if (drag.mode === 'move') { ns = addDays(drag.origStart, deltaDays); ne = addDays(drag.origEnd, deltaDays); }
+      else if (drag.mode === 'resize-l') { ns = addDays(drag.origStart, deltaDays); if (ns > ne) ns = ne; }
+      else { ne = addDays(drag.origEnd, deltaDays); if (ne < ns) ne = ns; }
+      if (drag.isMilestone) ne = ns; // 里程碑保持单日
+      setPreview((p) => ({ ...p, [drag.id]: { start: fmtISO(ns), end: fmtISO(ne) } }));
+    };
+    const onUp = async () => {
+      const pv = preview[drag.id];
+      const d = drag; setDrag(null);
+      if (!movedRef.current) {
+        // 纯点击任务条/里程碑 → 打开任务详情
+        setPreview((p) => { const n = { ...p }; delete n[d.id]; return n; });
+        onRowClick?.(d.id);
+        return;
+      }
+      if (pv) {
+        try {
+          await projectApi.updateTask(projectId, d.id, { planned_start: pv.start, planned_end: pv.end });
+          onTaskUpdated?.();
+          await load();
+        } catch {
+          await load();
+        }
+      }
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    /* eslint-disable-next-line */
+  }, [drag, preview, px, projectId]);
+
+  // 无日期任务:在时间轴上拖拽快速划出计划起止
+  const onCreateDown = (e: React.MouseEvent, t: GanttTask) => {
+    if (!canEdit || !svgRef.current || !range) return;
+    e.preventDefault();
+    const rect = svgRef.current.getBoundingClientRect();
+    const day = Math.max(0, Math.floor((e.clientX - rect.left) / px));
+    movedRef.current = false;
+    setCreateDrag({ id: t.id, anchorDay: day, isMilestone: t.task_type === '里程碑', startX: e.clientX });
+    const d = fmtISO(addDays(range.start, day));
+    setPreview((p) => ({ ...p, [t.id]: { start: d, end: d } }));
+  };
+
+  useEffect(() => {
+    if (!createDrag || !svgRef.current || !range) return;
+    const onMove = (e: MouseEvent) => {
+      if (Math.abs(e.clientX - createDrag.startX) > 4) movedRef.current = true;
+      const rect = svgRef.current!.getBoundingClientRect();
+      const day = Math.max(0, Math.floor((e.clientX - rect.left) / px));
+      if (createDrag.isMilestone) {
+        const d = fmtISO(addDays(range.start, day));
+        setPreview((p) => ({ ...p, [createDrag.id]: { start: d, end: d } }));
+        return;
+      }
+      const s = Math.min(createDrag.anchorDay, day);
+      const en = Math.max(createDrag.anchorDay, day);
+      setPreview((p) => ({
+        ...p,
+        [createDrag.id]: { start: fmtISO(addDays(range.start, s)), end: fmtISO(addDays(range.start, en)) },
+      }));
+    };
+    const onUp = async () => {
+      const id = createDrag.id; const pv = preview[id];
+      setCreateDrag(null);
+      if (!movedRef.current) {
+        // 纯点击无日期任务行 → 打开任务详情(不写日期)
+        setPreview((p) => { const n = { ...p }; delete n[id]; return n; });
+        onRowClick?.(id);
+        return;
+      }
+      if (pv) {
+        try {
+          await projectApi.updateTask(projectId, id, { planned_start: pv.start, planned_end: pv.end });
+          onTaskUpdated?.();
+          await load();
+        } catch {
+          await load();
+        }
+      }
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    /* eslint-disable-next-line */
+  }, [createDrag, preview, px, projectId, range]);
+
+  // 测量可视宽度,用于把日历铺满界面
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const measure = () => setViewportW(el.clientWidth);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [data]);
+
+  // 拖动时间轴空白处左右平移(调整关注区域)
+  const onPanDown = (e: React.MouseEvent, taskId?: string) => {
+    if (!scrollRef.current) return;
+    movedRef.current = false;
+    setPan({ startX: e.clientX, startScroll: scrollRef.current.scrollLeft, taskId });
+  };
+  useEffect(() => {
+    if (!pan) return;
+    const onMove = (e: MouseEvent) => {
+      if (Math.abs(e.clientX - pan.startX) > 4) movedRef.current = true;
+      if (scrollRef.current) scrollRef.current.scrollLeft = pan.startScroll - (e.clientX - pan.startX);
+    };
+    const onUp = () => {
+      if (!movedRef.current && pan.taskId) onRowClick?.(pan.taskId);
+      setPan(null);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    /* eslint-disable-next-line */
+  }, [pan]);
+
+  if (loading && !data) return <div className="p-8 text-center text-gray-400">加载甘特图...</div>;
+  if (!data || !range) return null;
+  if (data.tasks.length === 0) return <div className="p-8 text-center text-gray-400">该项目还没有任务,先在"项目详情"中添加任务。</div>;
+
+  // 日历铺满可视宽度:不足时向后补天数填满
+  const availChartW = Math.max(0, viewportW - LEFT_W);
+  const totalDays = Math.max(daysBetween(range.start, range.end) + 1, Math.ceil(availChartW / px));
+  const chartW = totalDays * px;
+  const chartH = visibleTasks.length * ROW_H;
+  const rowIndex = visRowIndex;
+  const tickList = ticks(range.start, addDays(range.start, totalDays - 1), scale);
+  const todayX = daysBetween(range.start, new Date()) * px;
+
+  const depPaths = data.deps.map((dep) => {
+    const pt = data.tasks.find((t) => t.id === dep.predecessor_id);
+    const st = data.tasks.find((t) => t.id === dep.successor_id);
+    if (!pt || !st) return null;
+    const pri = visRowIndex[pt.id]; const sri = visRowIndex[st.id];
+    if (pri === undefined || sri === undefined) return null;
+    const pb = barBox(effTask(pt), range.start, scale, pri);
+    const sb = barBox(effTask(st), range.start, scale, sri);
+    if (!pb || !sb) return null;
+    const a = depAnchors(dep);
+    const x1 = a.from === 'end' ? pb.x + pb.w : pb.x;
+    const y1 = pb.y + BAR_H / 2;
+    const x2 = a.to === 'end' ? sb.x + sb.w : sb.x;
+    const y2 = sb.y + BAR_H / 2;
+    const midX = (x1 + x2) / 2;
+    return (
+      <path key={dep.id} d={`M${x1},${y1} L${midX},${y1} L${midX},${y2} L${x2},${y2}`}
+        fill="none" stroke={dep.is_violation ? '#ef4444' : '#94a3b8'}
+        strokeWidth={dep.is_violation ? 2 : 1.2} markerEnd="url(#arrow)" />
+    );
+  });
+
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200">
+        <span className="text-sm text-gray-500">视图:</span>
+        {(['day', 'week', 'month'] as Scale[]).map((s) => (
+          <button key={s} onClick={() => setScale(s)}
+            className={`px-2 py-1 text-xs rounded ${scale === s ? 'bg-primary-600 text-white' : 'bg-white border border-gray-300 text-gray-600'}`}>
+            {s === 'day' ? '日' : s === 'week' ? '周' : '月'}
+          </button>
+        ))}
+        <button onClick={() => setExpanded(new Set(data.tasks.filter((t) => childMap[t.id]).map((t) => t.id)))}
+          className="px-2 py-1 text-xs rounded bg-white border border-gray-300 text-gray-600" title="展开所有层级">全部展开</button>
+        <button onClick={() => setExpanded(new Set())}
+          className="px-2 py-1 text-xs rounded bg-white border border-gray-300 text-gray-600" title="折叠所有层级">全部折叠</button>
+        {canEdit ? (
+          <button onClick={runAutoSchedule} disabled={scheduling}
+            className="ml-auto px-2 py-1 text-xs rounded bg-primary-600 text-white disabled:opacity-50"
+            title="检查所有排期依赖,自动对齐并更新各任务计划日期">
+            {scheduling ? '排期中…' : '自动排期'}
+          </button>
+        ) : (
+          <button onClick={load} className="ml-auto px-2 py-1 text-xs rounded bg-white border border-gray-300 text-gray-600">刷新</button>
+        )}
+      </div>
+
+      <div ref={scrollRef} className="flex overflow-auto" style={{ maxHeight: '70vh' }}>
+        <div className="shrink-0 border-r border-gray-200 sticky left-0 z-20 bg-white" style={{ width: LEFT_W }}>
+          <div className="h-8 bg-gray-50 border-b border-gray-200 flex items-center text-xs font-medium text-gray-500">
+            <span className="px-2 shrink-0 truncate" style={{ width: CODE_W }}>任务编号</span>
+            <span className="px-1 flex-1 min-w-0 truncate">任务名称</span>
+            <span className="px-1 shrink-0 truncate text-center" style={{ width: ASSIGNEE_W }}>负责人</span>
+          </div>
+          {visibleTasks.map((t) => {
+            const hasChildren = !!childMap[t.id];
+            return (
+              <div key={t.id}
+                className="flex items-center border-b border-gray-100 text-sm hover:bg-primary-50" style={{ height: ROW_H }}>
+                <span className="shrink-0 truncate text-xs text-gray-500 font-mono" style={{ width: CODE_W, paddingLeft: 8 + t.depth * INDENT }} title={t.code}>
+                  {hasChildren ? (
+                    <span className="inline-block w-4 cursor-pointer select-none text-gray-400 hover:text-gray-700" onClick={(e) => { e.stopPropagation(); toggleExpand(t.id); }}>
+                      {expanded.has(t.id) ? '▾' : '▸'}
+                    </span>
+                  ) : null}
+                  <span onClick={() => onRowClick?.(t.id)} className="cursor-pointer">{t.code}</span>
+                </span>
+                <span className="px-1 flex-1 min-w-0 flex items-center cursor-pointer" onClick={() => onRowClick?.(t.id)}>
+                  <span className="text-gray-400 mr-1 shrink-0">
+                    {t.task_type === '里程碑' ? '🏁' : t.task_type === '评审' ? '🔎' : '📋'}
+                  </span>
+                  <span className={`truncate ${t.is_critical ? 'text-red-600 font-medium' : 'text-gray-700'}`} title={t.name}>
+                    {t.name}
+                  </span>
+                </span>
+                <span className="px-1 shrink-0 truncate text-xs text-gray-500 text-center cursor-pointer" style={{ width: ASSIGNEE_W }} title={t.assignee_name || ''} onClick={() => onRowClick?.(t.id)}>
+                  {t.assignee_name || '—'}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="relative" style={{ width: chartW }}>
+          <div className="sticky top-0 h-8 bg-gray-50 border-b border-gray-200 z-10" style={{ width: chartW, cursor: pan ? 'grabbing' : 'grab' }}
+            onMouseDown={onPanDown}>
+            {tickList.map((tk, i) => (
+              <div key={i} className={`absolute top-0 h-8 text-[10px] flex items-center ${tk.major ? 'text-gray-600' : 'text-gray-300'}`}
+                style={{ left: tk.x, borderLeft: tk.major ? '1px solid #e5e7eb' : 'none', paddingLeft: 2 }}>
+                {tk.label}
+              </div>
+            ))}
+          </div>
+
+          <svg ref={svgRef} width={chartW} height={chartH} className="block">
+            <defs>
+              <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                <path d="M0,0 L6,3 L0,6 Z" fill="#94a3b8" />
+              </marker>
+            </defs>
+            {visibleTasks.map((t, i) => (
+              <rect key={`bg-${t.id}`} x={0} y={i * ROW_H} width={chartW} height={ROW_H}
+                fill={i % 2 ? '#fafafa' : '#fff'}
+                style={{ cursor: pan ? 'grabbing' : 'pointer' }} onMouseDown={(e) => onPanDown(e, t.id)} />
+            ))}
+            {todayX >= 0 && todayX <= chartW && (
+              <line x1={todayX} y1={0} x2={todayX} y2={chartH} stroke="#f97316" strokeWidth={1} strokeDasharray="3,3" />
+            )}
+            {depPaths}
+            {visibleTasks.map((t) => {
+              const ri = visRowIndex[t.id];
+              const box = barBox(effTask(t), range.start, scale, ri);
+              if (!box) return null;
+              const isParent = !!childMap[t.id];
+              if (t.task_type === '里程碑') {
+                const cx = box.x; const cy = box.y + 6;
+                return <rect key={t.id} x={cx - 7} y={cy - 7} width={14} height={14}
+                  transform={`rotate(45 ${cx} ${cy})`}
+                  fill={t.is_overdue ? '#ef4444' : '#6366f1'} stroke={t.is_critical ? '#dc2626' : 'none'} strokeWidth={2}
+                  style={{ cursor: canEdit && !isParent ? 'grab' : 'default' }}
+                  onMouseDown={(e) => { if (canEdit && !isParent) onMouseDown(e, t, 'move'); }} />;
+              }
+              const fill = t.is_overdue ? '#ef4444' : STATUS_FILL[t.status] || '#9ca3af';
+              return (
+                <g key={t.id}>
+                  <rect x={box.x} y={box.y} width={box.w} height={12} rx={3}
+                    fill={isParent ? '#cbd5e1' : fill} opacity={isParent ? 0.7 : 1}
+                    stroke={t.is_critical ? '#dc2626' : 'none'} strokeWidth={t.is_critical ? 2 : 0}
+                    style={{ cursor: canEdit && !isParent ? 'grab' : 'default' }}
+                    onMouseDown={(e) => !isParent && onMouseDown(e, t, 'move')} />
+                  {canEdit && !isParent && (
+                    <>
+                      <rect x={box.x - 3} y={box.y} width={6} height={12} fill="transparent" style={{ cursor: 'ew-resize' }}
+                        onMouseDown={(e) => onMouseDown(e, t, 'resize-l')} />
+                      <rect x={box.x + box.w - 3} y={box.y} width={6} height={12} fill="transparent" style={{ cursor: 'ew-resize' }}
+                        onMouseDown={(e) => onMouseDown(e, t, 'resize-r')} />
+                    </>
+                  )}
+                </g>
+              );
+            })}
+            {/* 无日期任务:整行透明覆盖层,拖拽划出计划起止 */}
+            {canEdit && visibleTasks.map((t, i) => {
+              const hasDates = !!(t.planned_start && t.planned_end);
+              const isParent = !!childMap[t.id];
+              if (hasDates || isParent || preview[t.id]) return null;
+              return (
+                <g key={`new-${t.id}`}>
+                  <text x={6} y={i * ROW_H + ROW_H / 2 + 3} fontSize={10} fill="#cbd5e1" style={{ pointerEvents: 'none' }}>
+                    ⟵ 拖拽设置计划日期 ⟶
+                  </text>
+                  <rect x={0} y={i * ROW_H} width={chartW} height={ROW_H} fill="transparent"
+                    style={{ cursor: 'crosshair' }} onMouseDown={(e) => onCreateDown(e, t)} />
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      </div>
+    </div>
+  );
+}

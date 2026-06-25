@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { projectApi } from '../../services/projectApi';
-import { usersApi, partsApi, assembliesApi, documentsApi } from '../../services/api';
+import { usersApi, partsApi, assembliesApi, documentsApi, ecrApi, ecoApi } from '../../services/api';
 import AssemblyPartPicker from '../../components/AssemblyPartPicker';
 import DocumentPicker from '../../components/DocumentPicker';
 import ConfigItemPicker from '../../components/Configuration/ConfigItemPicker';
@@ -10,7 +10,11 @@ import PartDetailContent from '../../components/PartDetailContent';
 import AssemblyDetailContent from '../../components/AssemblyDetailContent';
 import DocumentDetailContent from '../../components/DocumentDetailContent';
 import ConfigurationDetailModal from '../../components/Configuration/ConfigurationDetailModal';
-import type { ProjectTask, TaskType, TaskStatus, TaskPriority, TaskLink, TaskComment } from '../../types/project';
+import ArchiveTreeModal from '../../components/ArchiveTreeModal';
+import { ECRDetailModal } from '../../components/ECR/ECRDetailModal';
+import { ECODetailModal } from '../../components/ECO/ECODetailModal';
+import type { ProjectTask, TaskType, TaskStatus, TaskPriority, TaskLink, TaskComment, TaskDependency, DepType } from '../../types/project';
+import { can } from '../../stores/auth';
 
 interface Props {
   open: boolean;
@@ -44,6 +48,29 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
   const [detailEntityType, setDetailEntityType] = useState<string | null>(null);
   const [detailData, setDetailData] = useState<any>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
+  const [ecView, setEcView] = useState<{ id: string; kind: 'ecr' | 'eco' } | null>(null);
+
+  const canEditDeps = can('project.task:depend');
+  const [deps, setDeps] = useState<TaskDependency[]>([]);
+  const [allTasks, setAllTasks] = useState<{ id: string; code: string; name: string }[]>([]);
+  const [depForm, setDepForm] = useState<{ other: string; role: 'pred' | 'succ'; type: DepType; lag: number }>(
+    { other: '', role: 'pred', type: 'FS', lag: 0 });
+
+  const loadDeps = async () => {
+    if (!projectId || !task?.id) return;
+    const [dRes, tRes] = await Promise.all([
+      projectApi.listDeps(projectId),
+      projectApi.listTasks(projectId),
+    ]);
+    const mine = (dRes.data.items as TaskDependency[]).filter(
+      (d) => d.predecessor_id === task.id || d.successor_id === task.id);
+    setDeps(mine);
+    const flat: { id: string; code: string; name: string }[] = [];
+    const walk = (arr: any[]) => arr.forEach((t) => { if (t.id !== task!.id) flat.push({ id: t.id, code: t.code, name: t.name }); (t.children || []).forEach((c: any) => walk([c])); });
+    walk(tRes.data.items || []);
+    setAllTasks(flat);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -57,9 +84,10 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
       });
       loadLinks(task.id);
       loadComments(task.id);
+      loadDeps();
     } else {
       setForm(empty);
-      setLinks([]); setComments([]);
+      setLinks([]); setComments([]); setDeps([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, task]);
@@ -75,9 +103,16 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
 
   const handleSave = async () => {
     const payload: any = { ...form, parent_id: task ? undefined : parentId };
-    if (task) await projectApi.updateTask(projectId, task.id, payload);
-    else await projectApi.createTask(projectId, payload);
-    onSaved();
+    // 未填日期发送 null 而非空字符串,避免后端日期校验失败
+    if (payload.planned_start === '') payload.planned_start = null;
+    if (payload.planned_end === '') payload.planned_end = null;
+    try {
+      if (task) await projectApi.updateTask(projectId, task.id, payload);
+      else await projectApi.createTask(projectId, payload);
+      onSaved();
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || '保存失败');
+    }
   };
 
   const ensureTaskId = (): string | null => {
@@ -109,10 +144,25 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
   };
 
   const handleViewEntity = async (entityType: string, entityId: string) => {
+    if (entityType === 'ec') {
+      // 关联只存 entity_type='ec',先试 ECR,失败再试 ECO,以打开对应详情弹窗
+      try {
+        await ecrApi.get(entityId);
+        setEcView({ id: entityId, kind: 'ecr' });
+      } catch {
+        try {
+          await ecoApi.detail(entityId);
+          setEcView({ id: entityId, kind: 'eco' });
+        } catch {
+          alert('无法打开该变更单(ECR/ECO 不存在或无权限)');
+        }
+      }
+      return;
+    }
     setDetailEntityId(entityId);
     setDetailEntityType(entityType);
     setDetailData(null);
-    if (entityType === 'config_item' || entityType === 'ec') return;
+    if (entityType === 'config_item') return;
     setDetailLoading(true);
     try {
       let res;
@@ -232,6 +282,64 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
           </div>
         </div>
 
+        {task?.id && (
+          <div className="border-t border-gray-100 pt-3 mt-3">
+            <div className="text-sm font-medium text-gray-700 mb-2">任务依赖</div>
+            <ul className="space-y-1 mb-2">
+              {deps.map((d) => {
+                const isPred = d.predecessor_id === task.id;
+                const otherId = isPred ? d.successor_id : d.predecessor_id;
+                const other = allTasks.find((t) => t.id === otherId);
+                return (
+                  <li key={d.id} className="flex items-center gap-2 text-sm">
+                    <span className={`px-1.5 py-0.5 rounded text-xs ${d.is_violation ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'}`}>{d.dep_type}</span>
+                    <span className="text-gray-500">{isPred ? '后置→' : '←前置'}</span>
+                    <span className="truncate">{other ? `${other.code} ${other.name}` : otherId}</span>
+                    {d.lag_days ? <span className="text-gray-400">lag {d.lag_days}d</span> : null}
+                    {canEditDeps && (
+                      <button className="ml-auto text-xs text-red-500" onClick={async () => { await projectApi.removeDep(projectId, d.id); loadDeps(); }}>删除</button>
+                    )}
+                  </li>
+                );
+              })}
+              {deps.length === 0 && <li className="text-xs text-gray-400">暂无依赖</li>}
+            </ul>
+            {canEditDeps && (
+              <div className="flex flex-wrap items-center gap-2">
+                <select className="border rounded px-2 py-1 text-sm" value={depForm.role}
+                  onChange={(e) => setDepForm({ ...depForm, role: e.target.value as 'pred' | 'succ' })}>
+                  <option value="pred">本任务为前置 →</option>
+                  <option value="succ">本任务为后置 ←</option>
+                </select>
+                <select className="border rounded px-2 py-1 text-sm" value={depForm.other}
+                  onChange={(e) => setDepForm({ ...depForm, other: e.target.value })}>
+                  <option value="">选择关联任务</option>
+                  {allTasks.map((t) => <option key={t.id} value={t.id}>{t.code} {t.name}</option>)}
+                </select>
+                <select className="border rounded px-2 py-1 text-sm" value={depForm.type}
+                  onChange={(e) => setDepForm({ ...depForm, type: e.target.value as DepType })}>
+                  {(['FS', 'SS', 'FF', 'SF'] as DepType[]).map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <input type="number" className="border rounded px-2 py-1 text-sm w-20" placeholder="lag" value={depForm.lag}
+                  onChange={(e) => setDepForm({ ...depForm, lag: Number(e.target.value) })} />
+                <button className="px-2 py-1 text-sm bg-primary-600 text-white rounded"
+                  disabled={!depForm.other}
+                  onClick={async () => {
+                    const pred = depForm.role === 'pred' ? task.id : depForm.other;
+                    const succ = depForm.role === 'pred' ? depForm.other : task.id;
+                    try {
+                      await projectApi.addDep(projectId, { predecessor_id: pred, successor_id: succ, dep_type: depForm.type, lag_days: depForm.lag });
+                      setDepForm({ ...depForm, other: '', lag: 0 });
+                      loadDeps();
+                    } catch (err: any) {
+                      alert(err?.response?.data?.detail || '添加依赖失败');
+                    }
+                  }}>添加依赖</button>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="border-t pt-3">
           <div className="text-sm text-gray-600 mb-2">评论</div>
           <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
@@ -272,6 +380,13 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
         <ConfigurationDetailModal itemId={detailEntityId} onClose={() => { setDetailEntityId(null); setDetailEntityType(null); }} />
       )}
 
+      {ecView?.kind === 'ecr' && (
+        <ECRDetailModal open ecrId={ecView.id} onClose={() => setEcView(null)} onSuccess={() => {}} />
+      )}
+      {ecView?.kind === 'eco' && (
+        <ECODetailModal ecoId={ecView.id} onClose={() => setEcView(null)} onRefresh={() => {}} />
+      )}
+
       {detailEntityId && (detailEntityType === 'part' || detailEntityType === 'assembly' || detailEntityType === 'document') && (
         <Modal
           open={!!detailEntityId}
@@ -284,9 +399,19 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
           ) : detailData ? (
             detailEntityType === 'part' ? <PartDetailContent part={detailData} customFieldDefs={[]} customFieldValues={{}} /> :
             detailEntityType === 'assembly' ? <AssemblyDetailContent assembly={detailData} customFieldDefs={[]} customFieldValues={{}} /> :
-            <DocumentDetailContent doc={detailData} customFieldDefs={[]} customFieldValues={{}} />
+            <DocumentDetailContent doc={detailData} customFieldDefs={[]} customFieldValues={{}}
+              onArchivePreview={(attId, fileName) => setArchivePreview({ attId, fileName })} />
           ) : null}
         </Modal>
+      )}
+
+      {archivePreview && (
+        <ArchiveTreeModal
+          open={!!archivePreview}
+          onClose={() => setArchivePreview(null)}
+          attachmentId={archivePreview.attId}
+          fileName={archivePreview.fileName}
+        />
       )}
 
       {showPartPicker && (

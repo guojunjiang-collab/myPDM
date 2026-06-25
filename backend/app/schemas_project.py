@@ -1,7 +1,7 @@
 """项目管理 - Pydantic Schemas"""
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional, Literal, List
-from datetime import datetime
+from datetime import datetime, date
 
 
 class BaseSchema(BaseModel):
@@ -41,11 +41,16 @@ class TaskCreate(BaseSchema):
     assignee_id: Optional[str] = None
     status: Literal["未开始", "进行中", "已完成", "挂起"] = "未开始"
     priority: Literal["高", "中", "低"] = "中"
-    planned_start: Optional[str] = None
-    planned_end: Optional[str] = None
-    actual_start: Optional[str] = None
-    actual_end: Optional[str] = None
+    planned_start: Optional[date] = None
+    planned_end: Optional[date] = None
+    actual_start: Optional[date] = None
+    actual_end: Optional[date] = None
     description: Optional[str] = None
+
+    @field_validator("planned_start", "planned_end", "actual_start", "actual_end", mode="before")
+    @classmethod
+    def _blank_to_none(cls, v):
+        return None if v == "" else v
 
 
 class TaskEdit(BaseSchema):
@@ -54,11 +59,16 @@ class TaskEdit(BaseSchema):
     assignee_id: Optional[str] = None
     status: Optional[Literal["未开始", "进行中", "已完成", "挂起"]] = None
     priority: Optional[Literal["高", "中", "低"]] = None
-    planned_start: Optional[str] = None
-    planned_end: Optional[str] = None
-    actual_start: Optional[str] = None
-    actual_end: Optional[str] = None
+    planned_start: Optional[date] = None
+    planned_end: Optional[date] = None
+    actual_start: Optional[date] = None
+    actual_end: Optional[date] = None
     description: Optional[str] = None
+
+    @field_validator("planned_start", "planned_end", "actual_start", "actual_end", mode="before")
+    @classmethod
+    def _blank_to_none(cls, v):
+        return None if v == "" else v
 
 
 class TaskStatusUpdate(BaseSchema):
@@ -85,3 +95,11 @@ class TaskLinkAdd(BaseSchema):
 # ---- 评论 ----
 class CommentAdd(BaseSchema):
     content: str = Field(..., min_length=1)
+
+
+# ---- 任务依赖 ----
+class DepCreate(BaseSchema):
+    predecessor_id: str
+    successor_id: str
+    dep_type: Literal["FS", "SS", "FF", "SF"] = "FS"
+    lag_days: int = 0

@@ -500,6 +500,14 @@ async def startup_event():
             # 幂等建表：仅创建尚不存在的表（如库存模块新表）
             Base.metadata.create_all(bind=engine)
 
+            # 项目任务日期列 varchar -> date(Postgres 旧库迁移,幂等)
+            try:
+                from app.migrations_project import migrate_task_dates_to_date
+                migrate_task_dates_to_date(db, engine)
+            except Exception as _de:
+                db.rollback()
+                print(f"⚠ Task date migration skipped: {_de}")
+
             def _col_default_sql(col):
                 sd = getattr(col, "server_default", None)
                 if sd is not None and getattr(sd, "arg", None) is not None:
@@ -541,6 +549,14 @@ async def startup_event():
         except Exception as _e:
             db.rollback()
             print(f"⚠ Auto column reconcile skipped: {_e}")
+
+        # 回填存量数据:父任务计划日期 = 子孙叶包络
+        try:
+            from app import crud_project
+            crud_project.persist_rollup_all(db)
+        except Exception as _re:
+            db.rollback()
+            print(f"⚠ Parent date rollup skipped: {_re}")
 
         print("✓ Database migration completed successfully")
     except Exception as e:

@@ -8,6 +8,7 @@ import { toast } from '../../components/Toast';
 import { useHeaderTabs } from '../../hooks/useHeaderTabs';
 import MemberManageModal from './MemberManageModal';
 import TaskEditModal from './TaskEditModal';
+import GanttView from './gantt/GanttView';
 import type { Project, ProjectStatus, ProjectTask, TaskStatus, TaskLink, TaskComment } from '../../types/project';
 
 const STATUSES: ProjectStatus[] = ['待启动', '进行中', '已完成', '已暂停', '已归档'];
@@ -65,6 +66,7 @@ export default function Projects() {
   const [editTask, setEditTask] = useState<ProjectTask | null>(null);
   const [editParentId, setEditParentId] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [ganttKey, setGanttKey] = useState(0);   // 改任务后强制甘特重载
   const [delTask, setDelTask] = useState<ProjectTask | null>(null);
   const [taskStatusFilter, setTaskStatusFilter] = useState('');
   const [taskSearch, setTaskSearch] = useState('');
@@ -352,6 +354,14 @@ export default function Projects() {
   };
   const openEdit = (t: ProjectTask) => {
     setEditTask(t); setEditParentId(null); setEditOpen(true);
+  };
+  const findTaskById = (list: ProjectTask[], id: string): ProjectTask | null => {
+    for (const t of list) {
+      if (t.id === id) return t;
+      const found = t.children ? findTaskById(t.children, id) : null;
+      if (found) return found;
+    }
+    return null;
   };
 
   const confirmDelete = async () => {
@@ -650,8 +660,23 @@ export default function Projects() {
         )}
 
         {tab === 'view' && (
-          <div className="h-full flex items-center justify-center text-gray-400">
-            项目视图 — 甘特图等功能即将上线
+          <div className="p-4">
+            {!selectedProjectId ? (
+              <div className="text-center text-gray-400 py-12">请从项目汇总中选择一个项目</div>
+            ) : (
+              <>
+                <GanttView
+                  projectId={selectedProjectId}
+                  canEdit={can('project.task:depend')}
+                  refreshKey={ganttKey}
+                  onRowClick={(id) => { const t = findTaskById(tasks, id); if (t) openEdit(t); }}
+                  onTaskUpdated={() => { loadTasks(selectedProjectId); }}
+                />
+                <TaskEditModal open={editOpen} projectId={selectedProjectId} task={editTask} parentId={editParentId}
+                               onClose={() => setEditOpen(false)}
+                               onSaved={() => { setEditOpen(false); loadTasks(selectedProjectId); setGanttKey((k) => k + 1); }} />
+              </>
+            )}
           </div>
         )}
       </div>

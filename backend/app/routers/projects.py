@@ -8,7 +8,7 @@ from app.models import User
 from app import crud_project
 from app.schemas_project import (
     ProjectCreate, ProjectEdit, MemberAdd,
-    TaskCreate, TaskEdit, TaskStatusUpdate, TaskMove, TaskReorder, TaskLinkAdd, CommentAdd,
+    TaskCreate, TaskEdit, TaskStatusUpdate, TaskMove, TaskReorder, TaskLinkAdd, CommentAdd, DepCreate,
 )
 from ..permissions import require_permission, enforce_object_policy
 
@@ -222,6 +222,60 @@ async def delete_comment(project_id: uuid.UUID, task_id: uuid.UUID, comment_id: 
     return {"detail": "已删除"}
 
 
+# ──────────── 甘特 ────────────
+@router.get("/{project_id}/gantt")
+async def get_gantt(project_id: uuid.UUID, db: Session = Depends(get_db),
+                    current_user: User = Depends(require_permission("project:read"))):
+    crud_project.get_project(db, project_id)
+    _require_member(db, project_id, current_user)
+    return crud_project.get_gantt_data(db, project_id)
+
+
+@router.post("/{project_id}/auto-schedule")
+async def run_auto_schedule(project_id: uuid.UUID, db: Session = Depends(get_db),
+                            current_user: User = Depends(require_permission("project.task:depend"))):
+    p = crud_project.get_project(db, project_id)
+    enforce_object_policy("project_manager_or_admin", current_user, p)
+    crud_project.auto_schedule(db, project_id)
+    crud_project.persist_rollup(db, project_id)
+    return crud_project.get_gantt_data(db, project_id)
+
+
+# ──────────── 任务依赖 ────────────
+@router.get("/{project_id}/deps")
+async def list_deps(project_id: uuid.UUID, db: Session = Depends(get_db),
+                    current_user: User = Depends(require_permission("project:read"))):
+    crud_project.get_project(db, project_id)
+    _require_member(db, project_id, current_user)
+    from app.models_project import ProjectTask
+    tasks_by_id = {t.id: t for t in db.query(ProjectTask).filter(
+        ProjectTask.project_id == project_id, ProjectTask.deleted_at.is_(None)).all()}
+    return {"items": [{
+        "id": str(d.id), "predecessor_id": str(d.predecessor_id),
+        "successor_id": str(d.successor_id), "dep_type": d.dep_type, "lag_days": d.lag_days,
+        "is_violation": crud_project._violation(d, tasks_by_id),
+    } for d in crud_project.list_deps(db, project_id)]}
+
+
+@router.post("/{project_id}/deps")
+async def add_dep(project_id: uuid.UUID, data: DepCreate, db: Session = Depends(get_db),
+                  current_user: User = Depends(require_permission("project.task:depend"))):
+    p = crud_project.get_project(db, project_id)
+    enforce_object_policy("project_manager_or_admin", current_user, p)
+    d = crud_project.add_dep(db, project_id, data)
+    return {"id": str(d.id), "predecessor_id": str(d.predecessor_id),
+            "successor_id": str(d.successor_id), "dep_type": d.dep_type, "lag_days": d.lag_days}
+
+
+@router.delete("/{project_id}/deps/{dep_id}")
+async def remove_dep(project_id: uuid.UUID, dep_id: uuid.UUID, db: Session = Depends(get_db),
+                     current_user: User = Depends(require_permission("project.task:depend"))):
+    p = crud_project.get_project(db, project_id)
+    enforce_object_policy("project_manager_or_admin", current_user, p)
+    crud_project.remove_dep(db, project_id, dep_id)
+    return {"detail": "已删除"}
+
+
 # ──────────── 序列化辅助 ────────────
 def _project_brief(db, p):
     owner = db.query(User).filter(User.id == p.owner_id).first()
@@ -252,8 +306,10 @@ def _task_dict(db, t):
             "code": t.code, "name": t.name, "task_type": t.task_type,
             "assignee_id": str(t.assignee_id) if t.assignee_id else None,
             "status": t.status, "priority": t.priority,
-            "planned_start": t.planned_start, "planned_end": t.planned_end,
-            "actual_start": t.actual_start, "actual_end": t.actual_end,
+            "planned_start": crud_project._iso(t.planned_start),
+            "planned_end": crud_project._iso(t.planned_end),
+            "actual_start": crud_project._iso(t.actual_start),
+            "actual_end": crud_project._iso(t.actual_end),
             "sort_order": t.sort_order, "description": t.description}
 
 
