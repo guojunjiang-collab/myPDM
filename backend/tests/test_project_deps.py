@@ -171,3 +171,15 @@ def test_parent_dates_rollup_display_and_persist(db):
     db.refresh(root)
     assert root.planned_start == _dt.date(2026, 1, 5)
     assert root.planned_end == _dt.date(2026, 1, 20)
+
+
+def test_milestone_dates_forced_single_day(db):
+    """里程碑任务计划起止强制为同一天(任何保存路径)。"""
+    from app.schemas_project import TaskEdit
+    owner = _mk_user(db)
+    p = crud_project.create_project(db, ProjectCreate(name="MS"), owner.id)
+    m = crud_project.create_task(db, p, TaskCreate(name="M", task_type="里程碑",
+        planned_start=_dt.date(2026, 1, 5), planned_end=_dt.date(2026, 1, 20)))
+    assert m.planned_start == _dt.date(2026, 1, 5) and m.planned_end == _dt.date(2026, 1, 5)
+    crud_project.update_task(db, m, TaskEdit(planned_start=_dt.date(2026, 2, 1), planned_end=_dt.date(2026, 2, 1)))
+    assert m.planned_start == _dt.date(2026, 2, 1) and m.planned_end == _dt.date(2026, 2, 1)

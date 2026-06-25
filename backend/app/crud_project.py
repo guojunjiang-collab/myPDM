@@ -146,6 +146,15 @@ def get_active_task(db: Session, task_id: uuid.UUID, project_id: uuid.UUID = Non
     return t
 
 
+def _enforce_milestone_single_day(t: ProjectTask):
+    """里程碑为时间点:计划起止强制同一天(以开始日为准,缺开始则用结束)。"""
+    if t.task_type == "里程碑":
+        if t.planned_start:
+            t.planned_end = t.planned_start
+        elif t.planned_end:
+            t.planned_start = t.planned_end
+
+
 def create_task(db: Session, project: Project, data: TaskCreate) -> ProjectTask:
     parent_id = _uuid(data.parent_id)
     if parent_id:
@@ -163,6 +172,7 @@ def create_task(db: Session, project: Project, data: TaskCreate) -> ProjectTask:
         actual_start=data.actual_start, actual_end=data.actual_end,
         description=data.description, sort_order=max_sort,
     )
+    _enforce_milestone_single_day(t)
     db.add(t); db.commit(); db.refresh(t)
     persist_rollup(db, project.id)
     return t
@@ -176,6 +186,7 @@ def update_task(db: Session, t: ProjectTask, data: TaskEdit) -> ProjectTask:
             setattr(t, field, val)
     if data.assignee_id is not None:
         t.assignee_id = _uuid(data.assignee_id)
+    _enforce_milestone_single_day(t)
     db.commit(); db.refresh(t)
     persist_rollup(db, t.project_id)
     return t

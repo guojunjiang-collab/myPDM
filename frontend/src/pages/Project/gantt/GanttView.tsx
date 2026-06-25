@@ -19,9 +19,9 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
   const [data, setData] = useState<GanttData | null>(null);
   const [scale, setScale] = useState<Scale>('day');
   const [loading, setLoading] = useState(false);
-  const [drag, setDrag] = useState<{ id: string; mode: 'move' | 'resize-l' | 'resize-r'; startX: number; origStart: Date; origEnd: Date } | null>(null);
+  const [drag, setDrag] = useState<{ id: string; mode: 'move' | 'resize-l' | 'resize-r'; startX: number; origStart: Date; origEnd: Date; isMilestone: boolean } | null>(null);
   const [preview, setPreview] = useState<Record<string, { start: string; end: string }>>({});
-  const [createDrag, setCreateDrag] = useState<{ id: string; anchorDay: number } | null>(null);
+  const [createDrag, setCreateDrag] = useState<{ id: string; anchorDay: number; isMilestone: boolean } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
   const load = async () => {
@@ -49,7 +49,7 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
     const s = parseDate(t.planned_start); const en = parseDate(t.planned_end);
     if (!s || !en) return;
     e.preventDefault();
-    setDrag({ id: t.id, mode, startX: e.clientX, origStart: s, origEnd: en });
+    setDrag({ id: t.id, mode, startX: e.clientX, origStart: s, origEnd: en, isMilestone: t.task_type === '里程碑' });
   };
 
   useEffect(() => {
@@ -60,6 +60,7 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
       if (drag.mode === 'move') { ns = addDays(drag.origStart, deltaDays); ne = addDays(drag.origEnd, deltaDays); }
       else if (drag.mode === 'resize-l') { ns = addDays(drag.origStart, deltaDays); if (ns > ne) ns = ne; }
       else { ne = addDays(drag.origEnd, deltaDays); if (ne < ns) ne = ns; }
+      if (drag.isMilestone) ne = ns; // 里程碑保持单日
       setPreview((p) => ({ ...p, [drag.id]: { start: fmtISO(ns), end: fmtISO(ne) } }));
     };
     const onUp = async () => {
@@ -87,7 +88,7 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
     e.preventDefault();
     const rect = svgRef.current.getBoundingClientRect();
     const day = Math.max(0, Math.floor((e.clientX - rect.left) / px));
-    setCreateDrag({ id: t.id, anchorDay: day });
+    setCreateDrag({ id: t.id, anchorDay: day, isMilestone: t.task_type === '里程碑' });
     const d = fmtISO(addDays(range.start, day));
     setPreview((p) => ({ ...p, [t.id]: { start: d, end: d } }));
   };
@@ -97,6 +98,11 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
     const onMove = (e: MouseEvent) => {
       const rect = svgRef.current!.getBoundingClientRect();
       const day = Math.max(0, Math.floor((e.clientX - rect.left) / px));
+      if (createDrag.isMilestone) {
+        const d = fmtISO(addDays(range.start, day));
+        setPreview((p) => ({ ...p, [createDrag.id]: { start: d, end: d } }));
+        return;
+      }
       const s = Math.min(createDrag.anchorDay, day);
       const en = Math.max(createDrag.anchorDay, day);
       setPreview((p) => ({
@@ -228,7 +234,9 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
                 const cx = box.x; const cy = box.y + 6;
                 return <rect key={t.id} x={cx - 7} y={cy - 7} width={14} height={14}
                   transform={`rotate(45 ${cx} ${cy})`}
-                  fill={t.is_overdue ? '#ef4444' : '#6366f1'} stroke={t.is_critical ? '#dc2626' : 'none'} strokeWidth={2} />;
+                  fill={t.is_overdue ? '#ef4444' : '#6366f1'} stroke={t.is_critical ? '#dc2626' : 'none'} strokeWidth={2}
+                  style={{ cursor: canEdit && !isParent ? 'grab' : 'default' }}
+                  onMouseDown={(e) => { if (canEdit && !isParent) onMouseDown(e, t, 'move'); }} />;
               }
               const fill = t.is_overdue ? '#ef4444' : STATUS_FILL[t.status] || '#9ca3af';
               return (
