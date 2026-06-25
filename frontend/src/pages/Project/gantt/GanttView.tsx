@@ -11,9 +11,11 @@ interface Props {
   projectId: string;
   canEdit: boolean;
   onTaskUpdated?: () => void;
+  onRowClick?: (taskId: string) => void;
+  refreshKey?: number;
 }
 
-export default function GanttView({ projectId, canEdit, onTaskUpdated }: Props) {
+export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClick, refreshKey }: Props) {
   const [data, setData] = useState<GanttData | null>(null);
   const [scale, setScale] = useState<Scale>('day');
   const [loading, setLoading] = useState(false);
@@ -30,7 +32,7 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated }: Props) 
       setLoading(false);
     }
   };
-  useEffect(() => { if (projectId) load(); /* eslint-disable-next-line */ }, [projectId]);
+  useEffect(() => { if (projectId) load(); /* eslint-disable-next-line */ }, [projectId, refreshKey]);
 
   const range = useMemo(() => (data ? computeRange(data.tasks) : null), [data]);
   const px = DAY_PX[scale];
@@ -130,7 +132,8 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated }: Props) 
             <span className="px-1 shrink-0 truncate text-center" style={{ width: ASSIGNEE_W }}>负责人</span>
           </div>
           {data.tasks.map((t) => (
-            <div key={t.id} className="flex items-center border-b border-gray-100 text-sm" style={{ height: ROW_H }}>
+            <div key={t.id} onClick={() => onRowClick?.(t.id)}
+              className="flex items-center border-b border-gray-100 text-sm cursor-pointer hover:bg-primary-50" style={{ height: ROW_H }}>
               <span className="pr-2 shrink-0 truncate text-xs text-gray-500 font-mono" style={{ width: CODE_W, paddingLeft: 8 + t.depth * INDENT }} title={t.code}>
                 {t.code}
               </span>
