@@ -92,15 +92,23 @@ def can_access_document_content(user, document, group_ids: set[UUID]) -> bool:
 
 ## 5. 后端拦截点
 
-判定必须在**所有能取得文件内容的入口**生效,缺一即可被绕过。
+判定必须在**所有能取得文件内容的入口**生效,缺一即可被绕过。代码核查发现两类入口,鉴权方式不同:
 
-| 文件 | 端点 | 处理 |
-|---|---|---|
-| `routers/documents.py` | `GET /{doc_id}/attachments/{att_id}`(下载附件)、`GET /{doc_id}/attachments/`(列附件) | 直接拿到 `doc_id`,查文档关联组后判定 |
-| `routers/attachments_v2.py` | `/download`、`/stream`、`/preview`、`/office-pdf`、`/gltf`、`/direct-download` | 入口只有 `attachment_id`,经 `att.document_id` 回溯父文档后判定 |
+**A. 直连入口(自带 `current_user`)** — 逐个加判定:
 
-- `attachments_v2` 各入口先用 `att.document_id` 查父文档;若附件不挂任何文档(如有此情况),按"全员可访问"处理。
-- 媒体 token(`media_token.py`)签发前(`/media-token` 端点)也应做一次判定,避免签出可访问受限内容的 token。
+| 文件 | 端点 |
+|---|---|
+| `routers/documents.py` | `GET /{doc_id}/attachments/{att_id}`(下载附件) |
+| `routers/documents.py` | `GET /{doc_id}/attachments/`(列附件) |
+| `routers/attachments_v2.py` | `GET /{attachment_id}`(返回 `file_data`) |
+| `routers/attachments_v2.py` | `GET /{attachment_id}/download` |
+| `routers/attachments_v2.py` | `GET /{attachment_id}/stream` |
+
+**B. 媒体令牌入口(无 `current_user`,靠 `verify_media_token`)** — `preview` / `direct-download` / `gltf` / `office-pdf` / `archive-tree` / `extract-file` 六个端点都不带用户身份,**统一在令牌签发端点 `GET /{attachment_id}/media-token`(`issue_media_token`,自带 `current_user`)处判定**:不可访问则拒签令牌。无令牌即无法访问内容,是这一类的唯一收口点,DRY。
+
+- A/B 两类都先用 `att.document_id` 回溯父文档;`documents.py` 入口直接有 `doc_id`。
+- 若附件不挂任何文档,按"全员可访问"处理。
+- 统一封装一个内容访问判定助手(见 §4),A 类各端点调用、B 类在 `media-token` 端点调用。
 
 ## 6. API 调整
 
@@ -115,10 +123,14 @@ def can_access_document_content(user, document, group_ids: set[UUID]) -> bool:
 
 新增权限 `user_groups:read`(admin)/ `user_groups:manage`(admin),写入 `permissions/permissions.json` 后跑 `tools/gen_permissions.py` 重新生成 `_generated.py`。
 
-### 6.2 用户接口
+### 6.2 用户的组归属
 
-- 用户详情/列表返回 `group_ids`(所属组)。
-- 用户编辑接口接受 `group_ids`,全量更新该用户的组归属。
+为避免改动共享的 `UserResponse` 与创建/更新流程,用户的组归属用专属子资源读写(admin):
+
+- `GET /users/{user_id}/groups` — 该用户所属组 id 列表
+- `PUT /users/{user_id}/groups` — 全量设置该用户所属组(传 group_ids 数组)
+
+这与 §6.1 的 `PUT /user-groups/{id}/members` 一起满足"两边都能改"。
 
 ### 6.3 文档接口
 
@@ -152,7 +164,7 @@ def can_access_document_content(user, document, group_ids: set[UUID]) -> bool:
 ### 9.1 后端 pytest
 
 - 判定函数 4 分支:admin 放行 / 创建者放行 / 未关联组全员放行 / 关联组命中成员放行、非成员拒绝。
-- 全部内容入口的 403 拦截(documents.py 2 个 + attachments_v2 6 个,共 8 个,逐一覆盖)。
+- 内容入口拦截:A 类直连入口 5 个逐一 403;B 类令牌入口在 `media-token` 端点拒签(非成员拿不到令牌)。
 - 用户组 CRUD 与成员设置接口。
 - 回填脚本幂等性(重复执行结果一致)。
 
