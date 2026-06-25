@@ -368,7 +368,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
                   const vals = docFieldValues[ed.document_id] || {};
                   const isAccessible = (ed.document as any).accessible !== false;
                   return (
-                    <tr key={ed.id} className={`hover:bg-gray-50 cursor-pointer ${!isAccessible ? 'opacity-60' : ''}`} onClick={() => handleViewDocument(ed)}>
+                    <tr key={ed.id} className={`hover:bg-gray-50 cursor-pointer ${!isAccessible ? 'opacity-60' : ''}`} onClick={() => { if (hasEditableAction) { handleEditDocument(ed); } else { handleViewDocument(ed); } }}>
                       <td className="px-3 py-2 font-medium">
                         {!isAccessible && <span className="mr-1" title="无权限：需关联用户组成员">🔒</span>}
                         {ed.document.code}
