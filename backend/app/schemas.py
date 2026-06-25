@@ -271,6 +271,7 @@ class DocumentBase(BaseSchema):
 
 class DocumentCreate(DocumentBase):
     id: Optional[uuid.UUID] = None
+    group_ids: Optional[List[uuid.UUID]] = None
 
 class DocumentUpdate(BaseSchema):
     code: Optional[str] = None
@@ -278,6 +279,7 @@ class DocumentUpdate(BaseSchema):
     version: Optional[str] = None
     status: Optional[str] = None
     remark: Optional[str] = None
+    group_ids: Optional[List[uuid.UUID]] = None
 
 class DocumentResponse(DocumentBase):
     id: uuid.UUID
@@ -396,3 +398,21 @@ class VersionItem(BaseSchema):
     status: str
     created_at: Optional[datetime] = None
     revision_parent_id: Optional[uuid.UUID] = None
+
+# ── 用户组 ──
+class UserGroupCreate(BaseSchema):
+    name: str = Field(..., min_length=1, max_length=64)
+    description: Optional[str] = None
+
+
+class UserGroupUpdate(BaseSchema):
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
+class GroupMembersUpdate(BaseSchema):
+    user_ids: List[uuid.UUID] = []
+
+
+class UserGroupsUpdate(BaseSchema):
+    group_ids: List[uuid.UUID] = []

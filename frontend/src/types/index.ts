@@ -50,6 +50,10 @@ export interface Document {
   file_name?: string;
   file_id?: string;
   revision_parent_id?: string;
+  creator_id?: string;
+  creator_name?: string;
+  accessible?: boolean;
+  group_ids?: string[];
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
@@ -720,6 +724,8 @@ export interface DocumentBrief {
   remark?: string;
   file_name?: string;
   file_id?: string;
+  accessible?: boolean;
+  group_ids?: string[];
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
@@ -747,6 +753,8 @@ export interface DocumentBrief {
   remark?: string;
   file_name?: string;
   file_id?: string;
+  accessible?: boolean;
+  group_ids?: string[];
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;

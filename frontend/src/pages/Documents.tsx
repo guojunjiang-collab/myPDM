@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { documentsApi, customFieldsApi, bomApi, v2UploadApi, CHUNK_SIZE, CHUNK_THRESHOLD } from '../services/api';
+import { documentsApi, customFieldsApi, bomApi, v2UploadApi, CHUNK_SIZE, CHUNK_THRESHOLD, userGroupsApi } from '../services/api';
 import type { Document, CustomFieldDefinition, CustomFieldValue, DocumentAttachment } from '../types';
 import { canEdit, isAdmin, canDownload, useAuthStore } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
@@ -69,6 +69,7 @@ export default function Documents() {
   const [searchField, setSearchField] = useState('all');
   const [status, setStatus] = useState('');
   const [showAllVersions, setShowAllVersions] = useState(false);
+  const [showAccessibleOnly, setShowAccessibleOnly] = useState(false);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<Document | null>(null);
@@ -121,6 +122,14 @@ export default function Documents() {
   const [importLoading, setImportLoading] = useState(false);
   const [importing, setImporting] = useState(false);
 
+  // 用户组关联
+  const [allGroups, setAllGroups] = useState<Array<{ id: string; name: string }>>([]);
+  const [formGroupIds, setFormGroupIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    userGroupsApi.list().then((res) => setAllGroups(Array.isArray(res.data) ? res.data : [])).catch(() => {});
+  }, []);
+
   useEffect(() => {
     loadDocuments();
   }, [search, status, storeDocuments]);
@@ -171,15 +180,21 @@ export default function Documents() {
   });
 
   // 仅显示最新版本
-  const displayData = showAllVersions ? filteredData : (() => {
-    const latestMap: Record<string, typeof filteredData[0]> = {};
-    filteredData.forEach(d => {
-      const existing = latestMap[d.code];
-      if (!existing || new Date(d.created_at || 0) > new Date(existing.created_at || 0)) {
-        latestMap[d.code] = d;
-      }
-    });
-    return Object.values(latestMap);
+  const displayData = (() => {
+    let data = showAllVersions ? filteredData : (() => {
+      const latestMap: Record<string, typeof filteredData[0]> = {};
+      filteredData.forEach(d => {
+        const existing = latestMap[d.code];
+        if (!existing || new Date(d.created_at || 0) > new Date(existing.created_at || 0)) {
+          latestMap[d.code] = d;
+        }
+      });
+      return Object.values(latestMap);
+    })();
+    if (showAccessibleOnly) {
+      data = data.filter((d: any) => d.accessible !== false);
+    }
+    return data;
   })();
 
   const loadDocuments = () => {
@@ -410,6 +425,7 @@ export default function Documents() {
     setCustomFieldValues({});
     setAttachments([]);
     setPendingFile(null);
+    setFormGroupIds([]);
     loadCustomFields();
     setModalOpen(true);
   };
@@ -423,9 +439,10 @@ export default function Documents() {
       status: doc.status,
       remark: doc.remark || '',
     });
+    setFormGroupIds(((doc as any).group_ids || []).map(String));
     await loadCustomFields();
     await loadCustomFieldValues(doc.id);
-    await loadAttachments(doc.id); // 加载附件列表
+    await loadAttachments(doc.id);
     setModalOpen(true);
   };
 
@@ -434,12 +451,13 @@ export default function Documents() {
     setSaving(true);
     setSaveError(null);
 
-    const data = {
+    const data: Record<string, unknown> = {
       code: formData.code,
       name: formData.name,
       version: formData.version || undefined,
       status: formData.status,
       remark: formData.remark || undefined,
+      group_ids: formGroupIds,
     };
 
     try {
@@ -688,6 +706,15 @@ export default function Documents() {
           />
           全部版本
         </label>
+        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm whitespace-nowrap">
+          <input
+            type="checkbox"
+            checked={showAccessibleOnly}
+            onChange={(e) => setShowAccessibleOnly(e.target.checked)}
+            className="w-3.5 h-3.5"
+          />
+          可查看
+        </label>
         <div className="flex-1" />
         {canDownload() && (
           <button onClick={handleExportDocuments} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">📥 导出全部</button>
@@ -718,8 +745,9 @@ export default function Documents() {
               <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">无匹配数据</td></tr>
             ) : (
               displayData.map((doc) => (
-                <tr key={doc.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleView(doc)}>
+                <tr key={doc.id} className={`hover:bg-gray-50 cursor-pointer ${(doc as any).accessible === false ? 'opacity-60' : ''}`} onClick={() => handleView(doc)}>
                   <td className="px-4 py-3 text-sm font-medium">
+                    {(doc as any).accessible === false && <span className="mr-1" title="无权限：需关联用户组成员">🔒</span>}
                     {doc.code}
                     {!showAllVersions && (versionCountMap[doc.code] || 0) > 1 && (
                       <span className="ml-1.5 text-xs text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded">
@@ -735,10 +763,18 @@ export default function Documents() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right text-sm" onClick={(e) => e.stopPropagation()}>
-                    {canEdit() && <button onClick={() => handleEdit(doc)} className="text-primary-600 hover:text-primary-800 mr-3">编辑</button>}
-                    {isAdmin() && (
-                      <button onClick={() => setDeleteId(doc.id)} className="text-red-600 hover:text-red-800">删除</button>
-                    )}
+                    {(() => {
+                      const isCreator = (doc as any).creator_id === useAuthStore.getState().user?.id;
+                      const canManage = isAdmin() || isCreator;
+                      return (
+                        <>
+                          {canManage && (doc as any).accessible !== false && <button onClick={() => handleEdit(doc)} className="text-primary-600 hover:text-primary-800 mr-3">编辑</button>}
+                          {canManage && (
+                            <button onClick={() => setDeleteId(doc.id)} className="text-red-600 hover:text-red-800">删除</button>
+                          )}
+                        </>
+                      );
+                    })()}
                   </td>
                 </tr>
               ))
@@ -801,7 +837,7 @@ export default function Documents() {
                 <option value="obsolete">作废</option>
               </select>
             </div>
-            <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">备注</label>
               <textarea
                 ref={remarkRef}
@@ -812,6 +848,12 @@ export default function Documents() {
                 className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none placeholder:text-gray-300"
               />
             </div>
+            {editingDoc && (
+              <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-gray-500 mb-0.5">创建人</label>
+                <div className="text-sm text-gray-700 py-1">{(editingDoc as any).creator_name || '-'}</div>
+              </div>
+            )}
           </div>
 
           {/* Custom Fields */}
@@ -833,6 +875,27 @@ export default function Documents() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* 关联用户组 */}
+          {(isAdmin() || (editingDoc && (editingDoc as any).creator_id === useAuthStore.getState().user?.id)) && (
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">关联用户组（留空=全员可预览/下载）</h4>
+              <div className="max-h-32 overflow-auto border border-gray-200 rounded p-2 grid grid-cols-3 gap-x-2 gap-y-0.5">
+                {allGroups.length === 0 && <span className="text-gray-400 text-sm col-span-3">暂无用户组</span>}
+                {allGroups.map((g) => (
+                  <label key={g.id} className="flex items-center gap-1.5 py-0.5">
+                    <input
+                      type="checkbox"
+                      checked={formGroupIds.includes(String(g.id))}
+                      onChange={(e) => setFormGroupIds((prev) =>
+                        e.target.checked ? [...prev, String(g.id)] : prev.filter((x) => x !== String(g.id)))}
+                    />
+                    <span className="text-sm truncate">{g.name}</span>
+                  </label>
+                ))}
+              </div>
             </div>
           )}
 
@@ -1027,6 +1090,8 @@ export default function Documents() {
                 doc={viewingDoc}
                 customFieldDefs={viewingCustomDefs}
                 customFieldValues={viewingCustomValues}
+                accessible={(viewingDoc as any).accessible ?? true}
+                groupNames={((viewingDoc as any).group_ids || []).map((gid: string) => allGroups.find(g => g.id === gid)?.name || gid).filter(Boolean)}
                 onArchivePreview={(attId, fileName) => setArchivePreview({ attId, fileName })}
               />
             ) : (

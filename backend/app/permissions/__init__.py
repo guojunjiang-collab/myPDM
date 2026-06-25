@@ -2,12 +2,13 @@ from fastapi import Depends, HTTPException
 
 from ..models import User
 from ._generated import PERMISSIONS, ROLES, OBJECT_POLICIES
-from .policies import enforce_object_policy, register_policy  # noqa: F401
+from .policies import enforce_object_policy, register_policy, check_object_policy  # noqa: F401
 
 __all__ = [
     "PERMISSIONS", "ROLES", "OBJECT_POLICIES",
     "require_permission", "has_permission",
     "enforce_object_policy", "register_policy",
+    "check_object_policy",
 ]
 
 

@@ -1,14 +1,14 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { useProjectStore } from '../../stores/project';
 import { projectApi } from '../../services/projectApi';
 import { usersApi } from '../../services/api';
 import { can } from '../../stores/auth';
 import { Modal, ConfirmModal } from '../../components/Modal';
 import { toast } from '../../components/Toast';
+import { useHeaderTabs } from '../../hooks/useHeaderTabs';
 import MemberManageModal from './MemberManageModal';
 import TaskEditModal from './TaskEditModal';
-import type { Project, ProjectStatus, ProjectTask, TaskStatus } from '../../types/project';
+import type { Project, ProjectStatus, ProjectTask, TaskStatus, TaskLink, TaskComment } from '../../types/project';
 
 const STATUSES: ProjectStatus[] = ['待启动', '进行中', '已完成', '已暂停', '已归档'];
 const STATUS_CLASS: Record<ProjectStatus, string> = {
@@ -33,16 +33,21 @@ function isOverdue(t: ProjectTask): boolean {
 
 type TabKey = 'summary' | 'detail' | 'view';
 
+const tabs: { key: TabKey; label: string }[] = [
+  { key: 'summary', label: '项目汇总' },
+  { key: 'detail', label: '项目详情' },
+  { key: 'view', label: '项目视图' },
+];
+
 export default function Projects() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const tab = (searchParams.get('tab') as TabKey) || 'summary';
-  const selectedProjectId = searchParams.get('project');
-  const setTab = (t: TabKey, projectId?: string) => {
-    const params = new URLSearchParams();
-    if (t !== 'summary') params.set('tab', t);
-    if (projectId) params.set('project', projectId);
-    setSearchParams(params, { replace: true });
-  };
+  const [tab, setTabState] = useState<TabKey>('summary');
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+
+  const handleTabChange = useCallback((t: TabKey) => {
+    setTabState(t);
+    if (t === 'summary') setSelectedProjectId(null);
+  }, []);
+  useHeaderTabs(tabs, tab, handleTabChange);
 
   const { projects, currentProject, loadProjects, loadProject, tasks, loadTasks, loading } = useProjectStore();
   const [search, setSearch] = useState('');
@@ -62,6 +67,9 @@ export default function Projects() {
   const [editOpen, setEditOpen] = useState(false);
   const [delTask, setDelTask] = useState<ProjectTask | null>(null);
   const [taskStatusFilter, setTaskStatusFilter] = useState('');
+  const [taskSearch, setTaskSearch] = useState('');
+  const [taskLinks, setTaskLinks] = useState<Record<string, TaskLink[]>>({});
+  const [taskComments, setTaskComments] = useState<Record<string, TaskComment[]>>({});
   const [dragTask, setDragTask] = useState<ProjectTask | null>(null);
   const [dragOver, setDragOver] = useState<{ taskId: string; position: 'above' | 'below' | 'into' } | null>(null);
   const expandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -78,6 +86,75 @@ export default function Projects() {
       loadTasks(selectedProjectId);
     }
   }, [selectedProjectId, tab, loadProject, loadTasks]);
+
+  const collectTaskIds = useCallback((ts: ProjectTask[]): string[] => {
+    const ids: string[] = [];
+    const walk = (t: ProjectTask) => { ids.push(t.id); (t.children || []).forEach(walk); };
+    ts.forEach(walk);
+    return ids;
+  }, []);
+
+  useEffect(() => {
+    if (!selectedProjectId || tasks.length === 0) return;
+    const ids = collectTaskIds(tasks);
+    Promise.all([
+      ...ids.map((tid) =>
+        projectApi.listLinks(selectedProjectId, tid)
+          .then((r) => ({ tid, data: (r.data as any).items || [] }))
+          .catch(() => ({ tid, data: [] }))
+      ),
+      ...ids.map((tid) =>
+        projectApi.listComments(selectedProjectId, tid)
+          .then((r) => ({ tid, data: (r.data as any).items || [] }))
+          .catch(() => ({ tid, data: [] }))
+      ),
+    ]).then((results) => {
+      const links: Record<string, TaskLink[]> = {};
+      const comments: Record<string, TaskComment[]> = {};
+      for (const r of results) {
+        const arr = r.data as any[];
+        if (arr.length > 0 && 'entity_type' in (arr[0] || {})) {
+          links[r.tid] = arr;
+        } else if (arr.length > 0 && 'content' in (arr[0] || {})) {
+          comments[r.tid] = arr;
+        }
+      }
+      setTaskLinks(links);
+      setTaskComments(comments);
+    });
+  }, [tasks, selectedProjectId, collectTaskIds]);
+
+  useEffect(() => {
+    if (!taskSearch) return;
+    const links = taskLinks;
+    const comments = taskComments;
+    const match = (t: ProjectTask): boolean => {
+      if (taskStatusFilter && t.status !== taskStatusFilter) return false;
+      if (t.name.includes(taskSearch) || t.code.includes(taskSearch)) return true;
+      if (t.description && t.description.includes(taskSearch)) return true;
+      const ls = links[t.id] || [];
+      if (ls.some((l: TaskLink) =>
+        (l.entity_code && l.entity_code.includes(taskSearch)) ||
+        (l.entity_name && l.entity_name.includes(taskSearch))
+      )) return true;
+      const cs = comments[t.id] || [];
+      if (cs.some((c: TaskComment) => c.content.includes(taskSearch))) return true;
+      return false;
+    };
+    const collectAncestors = (t: ProjectTask, ids: Set<string>): boolean => {
+      if (match(t)) { ids.add(t.id); return true; }
+      let childMatch = false;
+      for (const c of t.children || []) {
+        if (collectAncestors(c, ids)) { ids.add(t.id); childMatch = true; }
+      }
+      return childMatch;
+    };
+    const ids = new Set<string>();
+    for (const t of tasks) {
+      collectAncestors(t, ids);
+    }
+    setExpanded((prev) => new Set([...prev, ...ids]));
+  }, [taskSearch, taskStatusFilter, tasks, taskLinks, taskComments]);
 
   const filtered = projects.filter((p) =>
     (!search || p.name.includes(search) || p.code.includes(search)) &&
@@ -161,7 +238,8 @@ export default function Projects() {
     setExpanded(new Set());
     setEditTask(null);
     setEditOpen(false);
-    setTab('detail', projectId);
+    setTabState('detail');
+    setSelectedProjectId(projectId);
   };
 
   // ---- Detail tab actions ----
@@ -283,9 +361,34 @@ export default function Projects() {
     reload();
   };
 
+  const taskMatchesSelf = useCallback((t: ProjectTask): boolean => {
+    if (taskStatusFilter && t.status !== taskStatusFilter) return false;
+    if (taskSearch) {
+      if (t.name.includes(taskSearch) || t.code.includes(taskSearch)) return true;
+      if (t.description && t.description.includes(taskSearch)) return true;
+      const links = taskLinks[t.id] || [];
+      if (links.some((l) =>
+        (l.entity_code && l.entity_code.includes(taskSearch)) ||
+        (l.entity_name && l.entity_name.includes(taskSearch))
+      )) return true;
+      const comments = taskComments[t.id] || [];
+      if (comments.some((c) => c.content.includes(taskSearch))) return true;
+      return false;
+    }
+    return true;
+  }, [taskStatusFilter, taskSearch, taskLinks, taskComments]);
+
+  const subtreeHasMatch = useCallback((t: ProjectTask): boolean => {
+    if (taskMatchesSelf(t)) return true;
+    return (t.children || []).some(c => subtreeHasMatch(c));
+  }, [taskMatchesSelf]);
+
   const renderRow = (t: ProjectTask, depth: number): JSX.Element[] => {
     if (taskStatusFilter && t.status !== taskStatusFilter) {
       return (t.children || []).flatMap((c) => renderRow(c, depth));
+    }
+    if (taskSearch && !subtreeHasMatch(t)) {
+      return [];
     }
     const hasChildren = (t.children?.length || 0) > 0;
     const isOpen = expanded.has(t.id);
@@ -370,24 +473,6 @@ export default function Projects() {
   // ---- Render ----
   return (
     <div className="h-full flex flex-col">
-      {/* Tab bar */}
-      <div className="flex items-center gap-1 mb-4 shrink-0 border-b">
-        {(['summary', 'detail', 'view'] as const).map((k) => (
-          <button
-            key={k}
-            onClick={() => setTab(k, k === tab ? selectedProjectId || undefined : selectedProjectId || undefined)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              tab === k
-                ? 'border-primary-600 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {{ summary: '项目汇总', detail: '项目详情', view: '项目视图' }[k]}
-          </button>
-        ))}
-        <div className="flex-1" />
-      </div>
-
       {/* Tab content */}
       <div className="flex-1 min-h-0">
         {tab === 'summary' && (
@@ -465,91 +550,6 @@ export default function Projects() {
                 </tbody>
               </table>
             </div>
-
-            <Modal open={createOpen} title={editingProject ? '编辑项目' : '新建项目'} onClose={() => { setCreateOpen(false); setEditingProject(null); }} width="lg">
-              <div className="space-y-4 max-h-[75vh] overflow-y-auto px-1">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                    <label className="block text-xs text-gray-500 mb-0.5">项目名称 <span className="text-red-500">*</span></label>
-                    <input
-                      value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      required
-                    />
-                  </div>
-                  {editingProject && (
-                    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                      <label className="block text-xs text-gray-500 mb-0.5">状态</label>
-                      <select
-                        value={form.status}
-                        onChange={(e) => setForm({ ...form, status: e.target.value as ProjectStatus })}
-                        className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      >
-                        {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    </div>
-                  )}
-                  {editingProject && (
-                    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                      <label className="block text-xs text-gray-500 mb-0.5">负责人</label>
-                      <select
-                        value={form.owner_id}
-                        onChange={(e) => setForm({ ...form, owner_id: e.target.value })}
-                        className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      >
-                        {allUsers.map((u) => <option key={u.id} value={u.id}>{u.real_name} ({u.username})</option>)}
-                      </select>
-                    </div>
-                  )}
-                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                    <label className="block text-xs text-gray-500 mb-0.5">计划开始</label>
-                    <input
-                      type="date"
-                      value={form.planned_start}
-                      onChange={(e) => setForm({ ...form, planned_start: e.target.value })}
-                      className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    />
-                  </div>
-                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                    <label className="block text-xs text-gray-500 mb-0.5">计划完成</label>
-                    <input
-                      type="date"
-                      value={form.planned_end}
-                      onChange={(e) => setForm({ ...form, planned_end: e.target.value })}
-                      className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    />
-                  </div>
-                  <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                    <label className="block text-xs text-gray-500 mb-0.5">描述</label>
-                    <textarea
-                      value={form.description}
-                      onChange={(e) => setForm({ ...form, description: e.target.value })}
-                      className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
-                      rows={3}
-                      placeholder="可选"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 pt-4 border-t mt-4">
-                <button onClick={() => { setCreateOpen(false); setEditingProject(null); }} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-                <button onClick={handleSave} disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
-                  {saving ? '保存中...' : (editingProject ? '保存' : '创建')}
-                </button>
-              </div>
-            </Modal>
-
-            <ConfirmModal
-              open={!!deleteProjectId}
-              title="确认删除"
-              content="确定要删除该项目吗？此操作不可撤销。"
-              confirmText="删除"
-              cancelText="取消"
-              type="danger"
-              onConfirm={handleDeleteConfirm}
-              onCancel={() => setDeleteProjectId(null)}
-            />
           </div>
         )}
 
@@ -570,14 +570,21 @@ export default function Projects() {
                 </div>
 
                 <div className="flex items-center gap-2 mb-3 shrink-0">
-                  {isManager && (
-                    <button onClick={() => openCreate(null)} className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700">+ 新建顶层任务</button>
-                  )}
-                  <div className="flex-1" />
+                  <input
+                    type="text"
+                    placeholder="搜索任务..."
+                    value={taskSearch}
+                    onChange={(e) => setTaskSearch(e.target.value)}
+                    className="w-44 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
                   <select value={taskStatusFilter} onChange={(e) => setTaskStatusFilter(e.target.value)} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm">
                     <option value="">全部状态</option>
                     {(['未开始', '进行中', '已完成', '挂起'] as TaskStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
+                  <div className="flex-1" />
+                  {isManager && (
+                    <button onClick={() => openCreate(null)} className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700">+ 新建顶层任务</button>
+                  )}
                 </div>
 
                 <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0"
@@ -596,9 +603,37 @@ export default function Projects() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {tasks.flatMap((t) => renderRow(t, 0))}
-                      {tasks.length === 0 && (
-                        <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">暂无任务</td></tr>
+                      {currentProject && (
+                        <>
+                          <tr className="bg-gray-50">
+                            <td className="px-4 py-2 text-sm font-mono whitespace-nowrap">
+                              <span className="font-semibold">{currentProject.code}</span>
+                            </td>
+                            <td className="px-2 py-2">
+                              <span className="inline-flex items-center gap-1">
+                                <span>📁</span>
+                                <span className="font-medium">{currentProject.name}</span>
+                              </span>
+                            </td>
+                            <td className="px-2 py-2 text-sm">{currentProject.owner_name}</td>
+                            <td className="px-2 py-2">
+                              <span className={`px-2 py-0.5 text-xs rounded-full ${STATUS_CLASS[currentProject.status]}`}>{currentProject.status}</span>
+                            </td>
+                            <td className="px-2 py-2 text-sm text-gray-400">—</td>
+                            <td className="px-2 py-2 text-sm text-gray-500">{currentProject.planned_start || '—'}</td>
+                            <td className="px-2 py-2 text-sm text-gray-500">{currentProject.planned_end || '—'}</td>
+                            <td className="px-4 py-2 text-right text-gray-400">
+                              <button onClick={() => setMemberOpen(true)} className="text-primary-600 text-sm mr-2">成员</button>
+                              {can('project:update') && (
+                                <button onClick={(e) => handleOpenEdit(currentProject, e)} className="text-primary-600 text-sm">编辑</button>
+                              )}
+                            </td>
+                          </tr>
+                          {tasks.flatMap((t) => renderRow(t, 1))}
+                          {tasks.length === 0 && (
+                            <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">暂无任务</td></tr>
+                          )}
+                        </>
                       )}
                     </tbody>
                   </table>
@@ -620,6 +655,91 @@ export default function Projects() {
           </div>
         )}
       </div>
+
+      <Modal open={createOpen} title={editingProject ? '编辑项目' : '新建项目'} onClose={() => { setCreateOpen(false); setEditingProject(null); }} width="lg">
+        <div className="space-y-4 max-h-[75vh] overflow-y-auto px-1">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-gray-500 mb-0.5">项目名称 <span className="text-red-500">*</span></label>
+              <input
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                required
+              />
+            </div>
+            {editingProject && (
+              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-gray-500 mb-0.5">状态</label>
+                <select
+                  value={form.status}
+                  onChange={(e) => setForm({ ...form, status: e.target.value as ProjectStatus })}
+                  className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            )}
+            {editingProject && (
+              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-gray-500 mb-0.5">负责人</label>
+                <select
+                  value={form.owner_id}
+                  onChange={(e) => setForm({ ...form, owner_id: e.target.value })}
+                  className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  {allUsers.map((u) => <option key={u.id} value={u.id}>{u.real_name} ({u.username})</option>)}
+                </select>
+              </div>
+            )}
+            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-gray-500 mb-0.5">计划开始</label>
+              <input
+                type="date"
+                value={form.planned_start}
+                onChange={(e) => setForm({ ...form, planned_start: e.target.value })}
+                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-gray-500 mb-0.5">计划完成</label>
+              <input
+                type="date"
+                value={form.planned_end}
+                onChange={(e) => setForm({ ...form, planned_end: e.target.value })}
+                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-gray-500 mb-0.5">描述</label>
+              <textarea
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+                rows={3}
+                placeholder="可选"
+              />
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-4 border-t mt-4">
+          <button onClick={() => { setCreateOpen(false); setEditingProject(null); }} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
+          <button onClick={handleSave} disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+            {saving ? '保存中...' : (editingProject ? '保存' : '创建')}
+          </button>
+        </div>
+      </Modal>
+
+      <ConfirmModal
+        open={!!deleteProjectId}
+        title="确认删除"
+        content="确定要删除该项目吗？此操作不可撤销。"
+        confirmText="删除"
+        cancelText="取消"
+        type="danger"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteProjectId(null)}
+      />
     </div>
   );
 }

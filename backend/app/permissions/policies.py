@@ -12,11 +12,15 @@ def register_policy(name: str):
     return deco
 
 
-def enforce_object_policy(name: str, user: User, obj, **ctx) -> None:
+def check_object_policy(name: str, user: User, obj, **ctx) -> bool:
     fn = _POLICY_FUNCS.get(name)
     if fn is None:
         raise KeyError(f"Unregistered object policy: {name}")
-    if not fn(user, obj, **ctx):
+    return bool(fn(user, obj, **ctx))
+
+
+def enforce_object_policy(name: str, user: User, obj, **ctx) -> None:
+    if not check_object_policy(name, user, obj, **ctx):
         raise HTTPException(status_code=403, detail="无权操作该对象")
 
 
@@ -57,3 +61,14 @@ def _dashboard_folder_editor(user, folder, **_) -> bool:
 @register_policy("project_manager_or_admin")
 def _project_manager_or_admin(user, project, **_) -> bool:
     return _is_admin(user) or getattr(project, "owner_id", None) == user.id
+
+
+@register_policy("document_content_access")
+def _document_content_access(user, document, *, user_group_ids=frozenset(), doc_group_ids=frozenset(), **_) -> bool:
+    if _is_admin(user):
+        return True
+    if getattr(document, "creator_id", None) == user.id:
+        return True
+    if not doc_group_ids:
+        return True
+    return bool(set(user_group_ids) & set(doc_group_ids))

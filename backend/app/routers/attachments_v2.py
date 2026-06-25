@@ -16,6 +16,7 @@ from ..file_storage import file_storage, chunked_uploader, MAX_FILE_SIZE, CHUNK_
 from .auth import get_current_active_user
 from ..permissions import require_permission, has_permission
 from ..media_token import mint_media_token, verify_media_token
+from .. import crud_groups
 from ..stp_converter import is_stp_file, convert_stp_to_gltf, get_gltf_path_for_attachment, delete_glb_cache
 from ..office_converter import (
     is_office_file, convert_office_to_pdf,
@@ -417,6 +418,7 @@ async def get_attachment(
     att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
+    crud_groups.enforce_attachment_content_access(db, current_user, attachment_id)
     
     # 如果有文件路径，从文件系统读取
     if hasattr(att, 'file_path') and att.file_path:
@@ -448,6 +450,7 @@ async def download_attachment(
     att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
+    crud_groups.enforce_attachment_content_access(db, current_user, attachment_id)
     
     # 如果有文件路径，从文件系统读取
     if hasattr(att, 'file_path') and att.file_path:
@@ -479,6 +482,7 @@ async def stream_attachment(
     att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
+    crud_groups.enforce_attachment_content_access(db, current_user, attachment_id)
 
     file_path = None
     if hasattr(att, 'file_path') and att.file_path:
@@ -511,12 +515,14 @@ _ACTION_PERM = {
 
 @router.get("/{attachment_id}/media-token")
 async def issue_media_token(attachment_id: uuid.UUID, action: str,
+                            db: Session = Depends(get_db),
                             current_user: User = Depends(get_current_active_user)):
     perm = _ACTION_PERM.get(action)
     if not perm:
         raise HTTPException(status_code=400, detail="未知媒体操作")
     if not has_permission(current_user, perm):
         raise HTTPException(status_code=403, detail="权限不足")
+    crud_groups.enforce_attachment_content_access(db, current_user, attachment_id)
     return {"token": mint_media_token(str(attachment_id), action, ttl=300)}
 
 

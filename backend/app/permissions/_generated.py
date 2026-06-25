@@ -142,6 +142,8 @@ PERMISSIONS: dict[str, list[str]] = {
     "project:read": ["admin", "engineer", "production", "guest"],
     "project:update": ["admin", "engineer"],
     "sync:read": ["admin", "engineer", "production", "guest"],
+    "user_groups:manage": ["admin"],
+    "user_groups:read": ["admin", "engineer", "production"],
     "users:create": ["admin"],
     "users:delete": ["admin"],
     "users:import_export": ["admin"],

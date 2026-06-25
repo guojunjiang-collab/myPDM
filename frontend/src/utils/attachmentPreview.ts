@@ -12,6 +12,13 @@ export const FRONTEND_OFFICE_EXTS = ['xlsx', 'xls'];
 /** 经后端 LibreOffice 转 PDF 预览的 Office 格式（前端渲染保真度差） */
 export const BACKEND_PDF_OFFICE_EXTS = ['docx', 'doc', 'ppt', 'pptx'];
 
+function _permissionError(e: unknown): boolean {
+  if (e && typeof e === 'object' && 'response' in e) {
+    return (e as any).response?.status === 403;
+  }
+  return false;
+}
+
 /**
  * 统一的附件预览分发。
  * - pdf/图片/文本：媒体令牌 + 新窗口内嵌 /preview
@@ -34,7 +41,7 @@ export async function previewAttachment(
     try {
       const mt = await mediaApi.token(attId, 'preview');
       window.open(`/api/v2/attachments/${attId}/preview?token=${encodeURIComponent(mt)}`, '_blank');
-    } catch { alert('预览失败，请重试'); }
+    } catch (e) { alert(_permissionError(e) ? '无权限访问该附件' : '预览失败，请重试'); }
     return;
   }
 
@@ -47,7 +54,7 @@ export async function previewAttachment(
     try {
       const mt = await mediaApi.token(attId, 'gltf');
       window.open(`/stp-viewer?id=${attId}&token=${encodeURIComponent(mt)}`, '_blank');
-    } catch { alert('预览失败，请重试'); }
+    } catch (e) { alert(_permissionError(e) ? '无权限访问该附件' : '预览失败，请重试'); }
     return;
   }
 
@@ -58,7 +65,7 @@ export async function previewAttachment(
         `/office-reader?id=${attId}&token=${encodeURIComponent(mt)}&name=${encodeURIComponent(fileName)}`,
         '_blank',
       );
-    } catch { alert('预览失败，请重试'); }
+    } catch (e) { alert(_permissionError(e) ? '无权限访问该附件' : '预览失败，请重试'); }
     return;
   }
 
@@ -66,7 +73,7 @@ export async function previewAttachment(
     try {
       const mt = await mediaApi.token(attId, 'office-pdf');
       window.open(`/api/v2/attachments/${attId}/office-pdf?token=${encodeURIComponent(mt)}`, '_blank');
-    } catch { alert('预览失败，请重试'); }
+    } catch (e) { alert(_permissionError(e) ? '无权限访问该附件' : '预览失败，请重试'); }
     return;
   }
 

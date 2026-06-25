@@ -93,6 +93,7 @@ class Document(Base):
     file_id = Column(UUID(as_uuid=True), ForeignKey('document_attachments.id', ondelete='SET NULL'))
     revisions = Column(JSONB, default=[])
     revision_parent_id = Column(UUID(as_uuid=True), nullable=True)
+    creator_id = Column(UUID(as_uuid=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
@@ -175,6 +176,29 @@ class DashboardItem(Base):
     entity_id = Column(UUID(as_uuid=True), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     folder = relationship("DashboardFolder", back_populates="items")
+
+class UserGroup(Base):
+    """用户组"""
+    __tablename__ = "user_groups"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(64), unique=True, nullable=False)
+    description = Column(String(255))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class UserGroupMember(Base):
+    """用户 ↔ 组（多对多）"""
+    __tablename__ = "user_group_members"
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), primary_key=True)
+    group_id = Column(UUID(as_uuid=True), ForeignKey('user_groups.id', ondelete='CASCADE'), primary_key=True)
+
+
+class DocumentGroupLink(Base):
+    """文档 ↔ 组（多对多）"""
+    __tablename__ = "document_group_links"
+    document_id = Column(UUID(as_uuid=True), ForeignKey('documents.id', ondelete='CASCADE'), primary_key=True)
+    group_id = Column(UUID(as_uuid=True), ForeignKey('user_groups.id', ondelete='CASCADE'), primary_key=True)
 
 
 class DashboardFolderShare(Base):

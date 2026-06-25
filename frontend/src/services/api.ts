@@ -161,6 +161,18 @@ export const usersApi = {
   create: (data: unknown) => api.post('/users/', data),
   update: (id: string, data: unknown) => api.put(`/users/${id}`, data),
   delete: (id: string) => api.delete(`/users/${id}`),
+  getGroups: (id: string) => api.get(`/users/${id}/groups`),
+  setGroups: (id: string, groupIds: string[]) => api.put(`/users/${id}/groups`, { group_ids: groupIds }),
+};
+
+// 用户组 API
+export const userGroupsApi = {
+  list: () => api.get('/user-groups/'),
+  create: (data: { name: string; description?: string }) => api.post('/user-groups/', data),
+  update: (id: string, data: { name?: string; description?: string }) => api.put(`/user-groups/${id}`, data),
+  delete: (id: string) => api.delete(`/user-groups/${id}`),
+  getMembers: (id: string) => api.get(`/user-groups/${id}/members`),
+  setMembers: (id: string, userIds: string[]) => api.put(`/user-groups/${id}/members`, { user_ids: userIds }),
 };
 
 // 操作日志 API

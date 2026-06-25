@@ -147,6 +147,9 @@
     "users:reset_password": ["admin"],
     "users:import_export": ["admin"],
 
+    "user_groups:read": ["admin", "engineer", "production"],
+    "user_groups:manage": ["admin"],
+
     "logs:read": ["admin"],
 
     "custom_field.def:read": ["admin"],

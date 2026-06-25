@@ -257,21 +257,34 @@ def _task_dict(db, t):
             "sort_order": t.sort_order, "description": t.description}
 
 
-_ENTITY_TABLE = {"part": "parts", "assembly": "assemblies", "document": "documents"}
+_ENTITY_TABLE = {"part": "parts", "assembly": "assemblies", "document": "documents", "config_item": "configuration_items"}
 
 
 def _link_dict(db, l):
     from sqlalchemy import text
-    code = name = None
+    code = name = spec = remark = None
     table = _ENTITY_TABLE.get(l.entity_type)
     if table:
+        if table == "documents":
+            row = db.execute(
+                text(f"SELECT code, name, NULL AS spec, remark FROM {table} WHERE id = :id"), {"id": str(l.entity_id)}
+            ).fetchone()
+        else:
+            row = db.execute(
+                text(f"SELECT code, name, spec, remark FROM {table} WHERE id = :id"), {"id": str(l.entity_id)}
+            ).fetchone()
+        if row:
+            code, name, spec, remark = row[0], row[1], row[2] if len(row) > 2 else None, row[3] if len(row) > 3 else None
+    elif l.entity_type == "ec":
         row = db.execute(
-            text(f"SELECT code, name FROM {table} WHERE id = :id"), {"id": str(l.entity_id)}
+            text("SELECT ecr_number, title, description FROM ecrs WHERE id = :id UNION ALL SELECT eco_number, title, description FROM ecos WHERE id = :id LIMIT 1"),
+            {"id": str(l.entity_id)}
         ).fetchone()
         if row:
-            code, name = row[0], row[1]
+            code, name, remark = row[0], row[1], row[2] if len(row) > 2 else None
     return {"id": str(l.id), "task_id": str(l.task_id), "entity_type": l.entity_type,
-            "entity_id": str(l.entity_id), "entity_code": code, "entity_name": name}
+            "entity_id": str(l.entity_id), "entity_code": code, "entity_name": name,
+            "entity_spec": spec, "entity_remark": remark}
 
 
 def _comment_dict(db, c):
