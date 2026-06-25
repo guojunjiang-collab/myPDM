@@ -234,6 +234,7 @@ async def get_document(doc_id: uuid.UUID, db: Session = Depends(get_db), current
         "file_name": d.file_name, "file_id": d.file_id,
         "creator_id": d.creator_id,
         "creator_name": creator_name,
+        "accessible": crud_groups.document_is_accessible(db, current_user, d),
         "group_ids": list(gids),
         "group_names": _resolve_group_names(db, gids),
         "created_at": d.created_at, "updated_at": d.updated_at,

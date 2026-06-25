@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { partsApi, customFieldsApi, bomApi } from '../services/api';
 import type { Part, CustomFieldDefinition, CustomFieldValue } from '../types';
-import { canEdit, isAdmin, canDownload, can } from '../stores/auth';
+import { canEdit, isAdmin, canDownload, can, useAuthStore } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
 import PartDetailContent from '../components/PartDetailContent';
 import BOMTraceModal from '../components/BOMTraceModal';
@@ -232,14 +232,19 @@ export default function Parts() {
   };
 
   const handleEdit = async (part: Part) => {
-    setEditingPart(part);
+    let p = part;
+    try {
+      const res = await partsApi.get(part.id);
+      p = { ...part, ...res.data };
+    } catch {}
+    setEditingPart(p);
     setFormData({
-      code: part.code,
-      name: part.name,
-      spec: part.spec || '',
-      version: part.version || 'A',
-      status: part.status,
-      remark: part.remark || '',
+      code: p.code,
+      name: p.name,
+      spec: p.spec || '',
+      version: p.version || 'A',
+      status: p.status,
+      remark: p.remark || '',
     });
     await loadCustomFields();
     await loadCustomFieldValues(part.id);
@@ -560,10 +565,10 @@ export default function Parts() {
                         反查
                       </button>
                     )}
-                    {canEdit() && <button onClick={() => handleEdit(part)} className="text-primary-600 hover:text-primary-800 mr-3">编辑</button>}
-                    {isAdmin() && (
+                    {(() => { const isCreator = (part as any).creator_id === useAuthStore.getState().user?.id; const canManage = isAdmin() || isCreator; return canManage && <button onClick={() => handleEdit(part)} className="text-primary-600 hover:text-primary-800 mr-3">编辑</button>; })()}
+                    {(() => { const isCreator = (part as any).creator_id === useAuthStore.getState().user?.id; const canManage = isAdmin() || isCreator; return canManage && (
                       <button onClick={() => setDeleteId(part.id)} className="text-red-600 hover:text-red-800">删除</button>
-                    )}
+                    ); })()}
                   </td>
                 </tr>
               ))
@@ -626,7 +631,7 @@ export default function Parts() {
                 <option value="obsolete">作废</option>
               </select>
             </div>
-            <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">规格型号</label>
               <textarea
                 ref={specRef}
@@ -641,6 +646,12 @@ export default function Parts() {
                 rows={1}
               />
             </div>
+            {editingPart && (
+              <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-gray-500 mb-0.5">创建人</label>
+                <div className="text-sm text-gray-700 py-1">{(editingPart as any).creator_name || '-'}</div>
+              </div>
+            )}
             <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">备注</label>
               <textarea

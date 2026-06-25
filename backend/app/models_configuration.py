@@ -22,6 +22,7 @@ class ConfigurationItem(Base):
     spec = Column(String(255))
     remark = Column(Text)
     document_links = Column(JSONB, default=[])  # [{id, document_id, category, sort_order}]
+    creator_id = Column(UUID(as_uuid=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)

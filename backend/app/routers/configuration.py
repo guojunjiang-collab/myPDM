@@ -23,6 +23,14 @@ from ..permissions import require_permission
 router = APIRouter(prefix="/configurations", tags=["构型配置"])
 
 
+def _resolve_creator(db: Session, creator_id):
+    if not creator_id:
+        return ""
+    from ..models import User as UModel
+    u = db.query(UModel).filter(UModel.id == creator_id).first()
+    return u.real_name if u else ""
+
+
 # ════════════════════════════════════════════════════════
 # 构型项 CRUD
 # ════════════════════════════════════════════════════════
@@ -70,6 +78,7 @@ async def list_config_items(
             "items": [{
                 "id": str(i.id), "code": i.code, "name": i.name,
                 "spec": i.spec or "",
+                "creator_id": str(i.creator_id) if i.creator_id else None,
                 "updated_at": i.updated_at.isoformat() if i.updated_at else None,
                 "deleted_at": i.deleted_at.isoformat() if i.deleted_at else None,
             } for i in items],
@@ -79,6 +88,7 @@ async def list_config_items(
         "items": [{
             "id": str(i.id), "code": i.code, "name": i.name,
             "spec": i.spec or "", "remark": i.remark or "",
+            "creator_id": str(i.creator_id) if i.creator_id else None,
             "created_at": i.created_at.isoformat() if i.created_at else None,
             "updated_at": i.updated_at.isoformat() if i.updated_at else None,
         } for i in items],
@@ -144,10 +154,12 @@ async def get_config_item(
     return {
         "id": str(item.id), "code": item.code, "name": item.name,
         "spec": item.spec or "", "remark": item.remark or "",
+        "creator_id": str(item.creator_id) if item.creator_id else None,
+        "creator_name": _resolve_creator(db, item.creator_id) if item.creator_id else "",
         "created_at": item.created_at.isoformat() if item.created_at else None,
         "updated_at": item.updated_at.isoformat() if item.updated_at else None,
         "parts": parts_data, "children": children_data,
-        "documents": _get_config_documents(db, item),
+        "documents": _get_config_documents(db, item, current_user),
     }
 
 
@@ -161,10 +173,11 @@ async def create_config_item(
     if existing:
         if existing.deleted_at is None:
             raise HTTPException(status_code=400, detail=f"构型号 {data.code} 已存在")
-        # code 被同名的软删除项占用：复活该项（等价全新创建），支持导入恢复已删除构型项
         item = crud.revive_config_item(db, existing, data)
         return {"id": str(item.id), "code": item.code, "name": item.name}
     item = crud.create_config_item(db, data)
+    item.creator_id = current_user.id
+    db.commit()
     return {"id": str(item.id), "code": item.code, "name": item.name}
 
 
@@ -300,15 +313,43 @@ async def remove_child(
 # 关联图文档
 # ════════════════════════════════════════════════════════
 
-def _get_config_documents(db: Session, item: models.ConfigurationItem) -> list:
+def _get_config_documents(db: Session, item: models.ConfigurationItem, current_user=None) -> list:
     """从 document_links JSONB 读取关联图文档"""
+    from .. import crud_groups
+    from ..models import UserGroup, DocumentGroupLink
     links = item.document_links or []
     result = []
+    doc_ids = [l.get("document_id") for l in links if l.get("document_id")]
+    doc_group_links = db.query(DocumentGroupLink).filter(DocumentGroupLink.document_id.in_(doc_ids)).all() if doc_ids else []
+    doc_groups = {}
+    for dgl in doc_group_links:
+        doc_groups.setdefault(dgl.document_id, set()).add(dgl.group_id)
+    all_gids = set()
+    for gids in doc_groups.values():
+        all_gids.update(gids)
+    group_name_map = {}
+    if all_gids:
+        gs = db.query(UserGroup).filter(UserGroup.id.in_(all_gids)).all()
+        group_name_map = {g.id: g.name for g in gs}
     for link in links:
         doc_id = link.get("document_id")
         doc = db.query(Document).filter(Document.id == doc_id).first()
         if not doc:
             continue
+        gids = doc_groups.get(doc.id, set())
+        doc_data = {
+            "id": str(doc.id),
+            "code": doc.code,
+            "name": doc.name,
+            "version": doc.version,
+            "status": doc.status,
+            "file_name": doc.file_name,
+            "file_id": str(doc.file_id) if doc.file_id else None,
+        }
+        if current_user:
+            doc_data["accessible"] = crud_groups.document_is_accessible(db, current_user, doc)
+            doc_data["group_ids"] = [str(g) for g in gids]
+            doc_data["group_names"] = [group_name_map.get(g, str(g)) for g in gids]
         result.append({
             "id": link.get("id"),
             "entity_type": "configuration",
@@ -317,15 +358,7 @@ def _get_config_documents(db: Session, item: models.ConfigurationItem) -> list:
             "category": link.get("category"),
             "sort_order": link.get("sort_order", 0),
             "created_at": link.get("created_at"),
-            "document": {
-                "id": str(doc.id),
-                "code": doc.code,
-                "name": doc.name,
-                "version": doc.version,
-                "status": doc.status,
-                "file_name": doc.file_name,
-                "file_id": str(doc.file_id) if doc.file_id else None,
-            }
+            "document": doc_data,
         })
     return result
 
@@ -339,7 +372,7 @@ async def get_config_documents(
     item = crud.get_config_item(db, config_id)
     if not item:
         raise HTTPException(status_code=404, detail="构型项不存在")
-    return _get_config_documents(db, item)
+    return _get_config_documents(db, item, current_user)
 
 
 @router.post("/items/{config_id}/documents")

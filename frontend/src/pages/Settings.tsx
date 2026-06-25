@@ -30,6 +30,7 @@ interface FieldFormData {
   options: string;
   is_required: boolean;
   applies_to: string[];
+  sort_order: number;
 }
 
 const defaultFormData: FieldFormData = {
@@ -39,6 +40,7 @@ const defaultFormData: FieldFormData = {
   options: '',
   is_required: false,
   applies_to: ['part'],
+  sort_order: 0,
 };
 
 export default function Settings() {
@@ -51,7 +53,7 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState<TabKey>('password');
 
   const tabs: { key: TabKey; label: string; enabled: boolean; adminOnly: boolean }[] = [
-    { key: 'customFields', label: '自定义字段', enabled: true, adminOnly: true },
+    { key: 'customFields', label: '自定义字段', enabled: true, adminOnly: false },
     { key: 'dataManagement', label: '数据管理', enabled: true, adminOnly: true },
     { key: 'password', label: '修改密码', enabled: true, adminOnly: false },
     { key: 'logs', label: '操作日志', enabled: true, adminOnly: true },
@@ -70,6 +72,7 @@ export default function Settings() {
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [viewingField, setViewingField] = useState<CustomFieldDefinition | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetPassword, setResetPassword] = useState('');
   const [exporting, setExporting] = useState(false);
@@ -162,6 +165,7 @@ export default function Settings() {
       options: (field.options || []).join('\n'),
       is_required: field.is_required,
       applies_to: appliesToArray,
+      sort_order: field.sort_order || 0,
     });
     setFormError('');
     setSaving(false);
@@ -197,6 +201,7 @@ export default function Settings() {
       options: formData.options ? formData.options.split('\n').map(s => s.trim()).filter(Boolean) : [],
       is_required: formData.is_required,
       applies_to: formData.applies_to,
+      sort_order: formData.sort_order,
     };
 
     setSaving(true);
@@ -417,24 +422,26 @@ export default function Settings() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm text-gray-500">自定义字段用于扩展零件、部件、图文档的结构</p>
-            <div className="flex gap-2">
-              <button
-                onClick={handleExportFields}
-                className="px-4 py-2 border border-green-600 text-green-600 rounded-lg hover:bg-green-50"
-              >
-                导出字段
-              </button>
-              <label className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 cursor-pointer">
-                导入
-                <input type="file" accept=".xlsx" onChange={handleImportFields} className="hidden" />
-              </label>
-              <button
-                onClick={openCreateModal}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-              >
-                新增字段
-              </button>
-            </div>
+            {isAdmin() && (
+              <div className="flex gap-2">
+                <button
+                  onClick={handleExportFields}
+                  className="px-4 py-2 border border-green-600 text-green-600 rounded-lg hover:bg-green-50"
+                >
+                  导出字段
+                </button>
+                <label className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 cursor-pointer">
+                  导入
+                  <input type="file" accept=".xlsx" onChange={handleImportFields} className="hidden" />
+                </label>
+                <button
+                  onClick={openCreateModal}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  新增字段
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -463,8 +470,8 @@ export default function Settings() {
                   </tr>
                 ) : (
                   storeCustomFields.map((field) => (
-                    <tr key={field.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm">{field.name}</td>
+                    <tr key={field.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setViewingField(field)}>
+                      <td className="px-4 py-3 text-sm font-medium">{field.name}</td>
                       <td className="px-4 py-3 text-sm font-mono text-gray-600">{field.field_key}</td>
                       <td className="px-4 py-3 text-sm">
                         {FIELD_TYPES.find(t => t.value === field.field_type)?.label || field.field_type}
@@ -482,19 +489,23 @@ export default function Settings() {
                         {field.is_required ? '是' : '否'}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500">{field.sort_order}</td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          className="text-primary-600 hover:text-primary-800 mr-2"
-                          onClick={() => openEditModal(field)}
-                        >
-                          编辑
-                        </button>
-                        <button
-                          className="text-red-600 hover:text-red-800"
-                          onClick={() => handleDelete(field.id)}
-                        >
-                          删除
-                        </button>
+                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                        {isAdmin() && (
+                          <>
+                            <button
+                              className="text-primary-600 hover:text-primary-800 mr-2"
+                              onClick={() => openEditModal(field)}
+                            >
+                              编辑
+                            </button>
+                            <button
+                              className="text-red-600 hover:text-red-800"
+                              onClick={() => handleDelete(field.id)}
+                            >
+                              删除
+                            </button>
+                          </>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -502,6 +513,53 @@ export default function Settings() {
               </tbody>
             </table>
           </div>
+
+          {/* 字段详情弹窗 */}
+          {viewingField && (
+            <Modal open={!!viewingField} title="字段详情" onClose={() => setViewingField(null)} width="md">
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-gray-500 mb-0.5">名称</div>
+                    <div className="text-sm font-medium">{viewingField.name}</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-gray-500 mb-0.5">标识</div>
+                    <div className="text-sm font-mono">{viewingField.field_key}</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-gray-500 mb-0.5">类型</div>
+                    <div className="text-sm">{FIELD_TYPES.find(t => t.value === viewingField.field_type)?.label || viewingField.field_type}</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-gray-500 mb-0.5">排序</div>
+                    <div className="text-sm">{viewingField.sort_order}</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-gray-500 mb-0.5">必填</div>
+                    <div className="text-sm">{viewingField.is_required ? '是' : '否'}</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-gray-500 mb-0.5">适用类型</div>
+                    <div className="text-sm flex gap-1 flex-wrap">
+                      {(Array.isArray(viewingField.applies_to) ? viewingField.applies_to : [viewingField.applies_to]).map((type) => (
+                        <span key={type} className="px-2 py-0.5 text-xs bg-gray-100 rounded">{ENTITY_TYPES.find(e => e.value === type)?.label || type}</span>
+                      ))}
+                    </div>
+                  </div>
+                  {viewingField.options && viewingField.options.length > 0 && (
+                    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 col-span-2">
+                      <div className="text-xs text-gray-500 mb-0.5">选项列表</div>
+                      <div className="text-sm">{viewingField.options.join('、')}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex justify-end pt-4 border-t mt-4">
+                <button type="button" onClick={() => setViewingField(null)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">关闭</button>
+              </div>
+            </Modal>
+          )}
         </div>
       )}
 
@@ -736,75 +794,84 @@ export default function Settings() {
         width="lg"
       >
         <form onSubmit={handleSubmitField} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">字段名称</label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              placeholder="例如：采购周期"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">字段标识</label>
-            <input
-              type="text"
-              value={formData.field_key}
-              onChange={(e) => setFormData({ ...formData, field_key: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
-              placeholder="例如：lead_time（小写字母、数字、下划线）"
-              disabled={!!editingField}
-            />
-            <p className="mt-1 text-xs text-gray-500">创建后不可修改，用于API字段映射</p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">字段类型</label>
-            <select
-              value={formData.field_type}
-              onChange={(e) => setFormData({ ...formData, field_type: e.target.value as 'text' | 'number' | 'select' })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            >
-              {FIELD_TYPES.map((type) => (
-                <option key={type.value} value={type.value}>{type.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {formData.field_type === 'select' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">选项</label>
-              <textarea
-                value={formData.options}
-                onChange={(e) => setFormData({ ...formData, options: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                rows={3}
-                placeholder="每行一个选项"
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-gray-500 mb-0.5">字段名称</label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                placeholder="例如：采购周期"
               />
             </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">适用类型</label>
-            <div className="flex gap-4">
-              {ENTITY_TYPES.map((type) => (
-                <label key={type.value} className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.applies_to.includes(type.value)}
-                    onChange={(e) => {
-                      const newAppliesTo = e.target.checked
-                        ? [...formData.applies_to, type.value]
-                        : formData.applies_to.filter(t => t !== type.value);
-                      setFormData({ ...formData, applies_to: newAppliesTo });
-                    }}
-                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  <span className="text-sm">{type.label}</span>
-                </label>
-              ))}
+            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-gray-500 mb-0.5">字段标识</label>
+              <input
+                type="text"
+                value={formData.field_key}
+                onChange={(e) => setFormData({ ...formData, field_key: e.target.value })}
+                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono"
+                placeholder="lead_time"
+                disabled={!!editingField}
+              />
+              <p className="mt-1 text-xs text-gray-400">创建后不可修改，用于API字段映射</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-gray-500 mb-0.5">字段类型</label>
+              <select
+                value={formData.field_type}
+                onChange={(e) => setFormData({ ...formData, field_type: e.target.value as 'text' | 'number' | 'select' })}
+                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                {FIELD_TYPES.map((type) => (
+                  <option key={type.value} value={type.value}>{type.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-gray-500 mb-0.5">排序序号</label>
+              <input
+                type="number"
+                value={formData.sort_order}
+                onChange={(e) => setFormData({ ...formData, sort_order: Number(e.target.value) })}
+                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                placeholder="0"
+              />
+              <p className="mt-1 text-xs text-gray-400">越小越靠前</p>
+            </div>
+            {formData.field_type === 'select' && (
+              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 col-span-2">
+                <label className="block text-xs text-gray-500 mb-0.5">选项</label>
+                <textarea
+                  value={formData.options}
+                  onChange={(e) => setFormData({ ...formData, options: e.target.value })}
+                  className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+                  rows={3}
+                  placeholder="每行一个选项"
+                />
+              </div>
+            )}
+            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 col-span-2">
+              <label className="block text-xs text-gray-500 mb-1">适用类型</label>
+              <div className="flex gap-4">
+                {ENTITY_TYPES.map((type) => (
+                  <label key={type.value} className="flex items-center gap-1.5 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={formData.applies_to.includes(type.value)}
+                      onChange={(e) => {
+                        const newAppliesTo = e.target.checked
+                          ? [...formData.applies_to, type.value]
+                          : formData.applies_to.filter(t => t !== type.value);
+                        setFormData({ ...formData, applies_to: newAppliesTo });
+                      }}
+                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    {type.label}
+                  </label>
+                ))}
+              </div>
             </div>
           </div>
 

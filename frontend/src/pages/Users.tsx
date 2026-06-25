@@ -748,7 +748,7 @@ export default function Users() {
                         <tr key={u.id}>
                           <td className="px-3 py-2">{u.real_name}</td>
                           <td className="px-3 py-2 text-gray-500">{u.username}</td>
-                          <td className="px-3 py-2 text-gray-500">{u.role}</td>
+                          <td className="px-3 py-2"><span className={`px-2 py-0.5 text-xs rounded-full ${roleTag(u.role).cls}`}>{roleTag(u.role).label}</span></td>
                         </tr>
                       ))}
                     </tbody>

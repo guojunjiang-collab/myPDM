@@ -31,6 +31,7 @@ class Part(Base):
     remark = Column(Text)
     revisions = Column(JSONB, default=[])
     revision_parent_id = Column(UUID(as_uuid=True), nullable=True)
+    creator_id = Column(UUID(as_uuid=True), nullable=True)
     document_links = Column(JSONB, default=[])  # [{id, document_id, category, sort_order}]
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -49,6 +50,7 @@ class Assembly(Base):
     remark = Column(Text)
     revisions = Column(JSONB, default=[])
     revision_parent_id = Column(UUID(as_uuid=True), nullable=True)
+    creator_id = Column(UUID(as_uuid=True), nullable=True)
     document_links = Column(JSONB, default=[])  # [{id, document_id, category, sort_order}]
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -5,15 +5,20 @@ from sqlalchemy.orm.attributes import flag_modified
 import uuid
 
 from ..database import get_db
-from ..models import User, Document
+from ..models import User, Document, DocumentGroupLink, UserGroup, Assembly
 from .. import crud, schemas
 from ..permissions import require_permission
 
 router = APIRouter(prefix="/assemblies", tags=["部件管理"])
 
-def _assembly_response(asm):
-    """将部件模型转为 dict"""
-    return {
+def _creator_name(db, creator_id):
+    if not creator_id:
+        return ""
+    u = db.query(User).filter(User.id == creator_id).first()
+    return u.real_name if u else ""
+
+def _assembly_response(asm, creator_name_map=None):
+    d = {
         "id": asm.id,
         "code": asm.code,
         "name": asm.name,
@@ -22,25 +27,56 @@ def _assembly_response(asm):
         "status": asm.status,
         "remark": asm.remark,
         "revisions": asm.revisions or [],
+        "creator_id": asm.creator_id,
         "created_at": asm.created_at,
         "updated_at": asm.updated_at,
         "deleted_at": asm.deleted_at,
     }
+    if creator_name_map is not None and asm.creator_id:
+        d["creator_name"] = creator_name_map.get(asm.creator_id, "")
+    return d
+
+def _assembly_brief_local(asm, creator_name_map=None):
+    d = {
+        "id": str(asm.id),
+        "code": asm.code,
+        "name": asm.name,
+        "spec": asm.spec,
+        "version": asm.version,
+        "status": asm.status,
+        "remark": asm.remark,
+        "creator_id": str(asm.creator_id) if asm.creator_id else None,
+        "created_at": asm.created_at.isoformat() if asm.created_at else None,
+        "updated_at": asm.updated_at.isoformat() if asm.updated_at else None,
+        "deleted_at": asm.deleted_at.isoformat() if asm.deleted_at else None,
+    }
+    if creator_name_map is not None and asm.creator_id:
+        d["creator_name"] = creator_name_map.get(asm.creator_id, "")
+    return d
 
 @router.get("/")
 async def list_assemblies(skip: int = 0, limit: int = 100, search: str = None, updated_since: float = None, brief: bool = False, top_level: bool = False, db: Session = Depends(get_db), current_user: User = Depends(require_permission("assemblies:read"))):
-    include_deleted = bool(updated_since)  # 增量模式可能包含已删除记录
+    include_deleted = bool(updated_since)
     asms = crud.get_assemblies(db, skip=skip, limit=limit, search=search, updated_since=updated_since, include_deleted=include_deleted, top_level=top_level)
+    creator_ids = {a.creator_id for a in asms if a.creator_id}
+    creator_name_map = {}
+    if creator_ids:
+        users = db.query(User).filter(User.id.in_(creator_ids)).all()
+        creator_name_map = {u.id: u.real_name for u in users}
     if brief:
-        from ..crud import _assembly_brief
-        return JSONResponse(content=[_assembly_brief(a) for a in asms])
-    return [_assembly_response(a) for a in asms]
+        return JSONResponse(content=[_assembly_brief_local(a, creator_name_map) for a in asms])
+    return [_assembly_response(a, creator_name_map) for a in asms]
 
 @router.post("/", response_model=schemas.AssemblyResponse)
 async def create_assembly(assembly: schemas.AssemblyCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("assemblies:create"))):
     if crud.get_assembly_by_code_version(db, assembly.code, assembly.version):
         raise HTTPException(status_code=400, detail="部件编码+版本已存在")
-    db_assembly = crud.create_assembly(db, assembly)
+    data = assembly.model_dump()
+    data["creator_id"] = current_user.id
+    db_assembly = Assembly(**data)
+    db.add(db_assembly)
+    db.commit()
+    db.refresh(db_assembly)
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username, "创建部件", "assembly", str(db_assembly.id), f"编码:{assembly.code}", ip)
     return _assembly_response(db_assembly)
@@ -50,7 +86,9 @@ async def get_assembly(assembly_id: uuid.UUID, db: Session = Depends(get_db), cu
     db_assembly = crud.get_assembly(db, assembly_id)
     if not db_assembly:
         raise HTTPException(status_code=404, detail="部件不存在")
-    return _assembly_response(db_assembly)
+    d = _assembly_response(db_assembly)
+    d["creator_name"] = _creator_name(db, db_assembly.creator_id)
+    return d
 
 @router.put("/{assembly_id}", response_model=schemas.AssemblyResponse)
 async def update_assembly(assembly_id: uuid.UUID, assembly_update: schemas.AssemblyUpdate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("assemblies:update"))):
@@ -199,15 +237,30 @@ async def update_assembly_part(assembly_id: uuid.UUID, item_id: uuid.UUID, item_
 @router.get("/{assembly_id}/documents")
 async def get_assembly_documents(assembly_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("assemblies.doc:read"))):
     """获取部件关联的图文档列表（从 document_links JSONB 读取）"""
+    from .. import crud_groups
     db_assembly = crud.get_assembly(db, assembly_id)
     if not db_assembly:
         raise HTTPException(status_code=404, detail="部件不存在")
     links = db_assembly.document_links or []
     result = []
+    doc_ids = [l.get("document_id") for l in links if l.get("document_id")]
+    user_group_ids = crud_groups.get_user_group_ids(db, current_user.id)
+    doc_group_links = db.query(DocumentGroupLink).filter(DocumentGroupLink.document_id.in_(doc_ids)).all() if doc_ids else []
+    doc_groups = {}
+    for dgl in doc_group_links:
+        doc_groups.setdefault(dgl.document_id, set()).add(dgl.group_id)
+    all_gids = set()
+    for gids in doc_groups.values():
+        all_gids.update(gids)
+    group_name_map = {}
+    if all_gids:
+        gs = db.query(UserGroup).filter(UserGroup.id.in_(all_gids)).all()
+        group_name_map = {g.id: g.name for g in gs}
     for link in links:
         doc = db.query(Document).filter(Document.id == link.get("document_id")).first()
         if not doc:
             continue
+        gids = doc_groups.get(doc.id, set())
         result.append({
             "id": link.get("id"),
             "entity_type": "component",
@@ -224,6 +277,9 @@ async def get_assembly_documents(assembly_id: uuid.UUID, db: Session = Depends(g
                 "status": doc.status,
                 "file_name": doc.file_name,
                 "file_id": doc.file_id,
+                "accessible": crud_groups.document_is_accessible(db, current_user, doc),
+                "group_ids": [str(g) for g in gids],
+                "group_names": [group_name_map.get(g, str(g)) for g in gids],
             }
         })
     return result

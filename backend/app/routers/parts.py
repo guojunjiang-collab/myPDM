@@ -5,15 +5,20 @@ from sqlalchemy.orm.attributes import flag_modified
 import uuid
 
 from ..database import get_db
-from ..models import User, Document
+from ..models import User, Document, DocumentGroupLink, UserGroup, Part
 from .. import crud, schemas
 from ..permissions import require_permission
 
 router = APIRouter(prefix="/parts", tags=["零件管理"])
 
-def _part_response(part):
-    """将零件模型转为 dict"""
-    return {
+def _creator_name(db, creator_id):
+    if not creator_id:
+        return ""
+    u = db.query(User).filter(User.id == creator_id).first()
+    return u.real_name if u else ""
+
+def _part_response(part, creator_name_map=None):
+    d = {
         "id": part.id,
         "code": part.code,
         "name": part.name,
@@ -22,26 +27,61 @@ def _part_response(part):
         "status": part.status,
         "remark": part.remark,
         "revisions": part.revisions or [],
+        "creator_id": part.creator_id,
         "created_at": part.created_at,
         "updated_at": part.updated_at,
         "deleted_at": part.deleted_at,
     }
+    if creator_name_map is not None and part.creator_id:
+        d["creator_name"] = creator_name_map.get(part.creator_id, "")
+    return d
+
+def _part_brief_with_creator(db, part):
+    d = _part_brief_local(part)
+    d["creator_name"] = _creator_name(db, part.creator_id)
+    return d
+
+def _part_brief_local(part, creator_name_map=None):
+    d = {
+        "id": str(part.id),
+        "code": part.code,
+        "name": part.name,
+        "spec": part.spec,
+        "version": part.version,
+        "status": part.status,
+        "remark": part.remark,
+        "creator_id": str(part.creator_id) if part.creator_id else None,
+        "created_at": part.created_at.isoformat() if part.created_at else None,
+        "updated_at": part.updated_at.isoformat() if part.updated_at else None,
+        "deleted_at": part.deleted_at.isoformat() if part.deleted_at else None,
+    }
+    if creator_name_map is not None and part.creator_id:
+        d["creator_name"] = creator_name_map.get(part.creator_id, "")
+    return d
 
 @router.get("/")
 async def list_parts(skip: int = 0, limit: int = 100, search: str = None, updated_since: float = None, brief: bool = False, db: Session = Depends(get_db), current_user: User = Depends(require_permission("parts:read"))):
-    include_deleted = bool(updated_since)  # 增量模式可能包含已删除记录
+    include_deleted = bool(updated_since)
     parts = crud.get_parts(db, skip=skip, limit=limit, search=search, updated_since=updated_since, include_deleted=include_deleted)
+    creator_ids = {p.creator_id for p in parts if p.creator_id}
+    creator_name_map = {}
+    if creator_ids:
+        users = db.query(User).filter(User.id.in_(creator_ids)).all()
+        creator_name_map = {u.id: u.real_name for u in users}
     if brief:
-        from ..crud import _part_brief
-        return JSONResponse(content=[_part_brief(p) for p in parts])
-    return [_part_response(p) for p in parts]
+        return JSONResponse(content=[_part_brief_local(p, creator_name_map) for p in parts])
+    return [_part_response(p, creator_name_map) for p in parts]
 
 @router.post("/", response_model=schemas.PartResponse)
 async def create_part(part: schemas.PartCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("parts:create"))):
-    # 检查 (code, version) 联合唯一
     if crud.get_part_by_code(db, part.code, part.version):
         raise HTTPException(status_code=400, detail="该编码和版本的组合已存在")
-    db_part = crud.create_part(db, part)
+    data = part.model_dump()
+    data["creator_id"] = current_user.id
+    db_part = Part(**data)
+    db.add(db_part)
+    db.commit()
+    db.refresh(db_part)
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username, "创建零件", "part", str(db_part.id), f"编码:{part.code} 版本:{part.version}", ip)
     return _part_response(db_part)
@@ -51,7 +91,8 @@ async def get_part(part_id: uuid.UUID, db: Session = Depends(get_db), current_us
     db_part = crud.get_part(db, part_id)
     if not db_part:
         raise HTTPException(status_code=404, detail="零件不存在")
-    return _part_response(db_part)
+    d = _part_response(db_part)
+    d["creator_name"] = _creator_name(db, db_part.creator_id)
 
 @router.put("/{part_id}", response_model=schemas.PartResponse)
 async def update_part(part_id: uuid.UUID, part_update: schemas.PartUpdate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("parts:update"))):
@@ -152,15 +193,31 @@ async def delete_part(part_id: uuid.UUID, request: Request, db: Session = Depend
 async def get_part_documents(part_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("parts.doc:read"))):
     """获取零件关联的图文档列表（从 document_links JSONB 读取）"""
     from ..models import Part
+    from .. import crud_groups
     part = db.query(Part).filter(Part.id == part_id).first()
     if not part:
         raise HTTPException(status_code=404, detail="零件不存在")
     links = part.document_links or []
     result = []
+    doc_ids = [l.get("document_id") for l in links if l.get("document_id")]
+    user_group_ids = crud_groups.get_user_group_ids(db, current_user.id)
+    doc_group_links = db.query(DocumentGroupLink).filter(DocumentGroupLink.document_id.in_(doc_ids)).all() if doc_ids else []
+    doc_groups = {}
+    for dgl in doc_group_links:
+        doc_groups.setdefault(dgl.document_id, set()).add(dgl.group_id)
+    all_gids = set()
+    for gids in doc_groups.values():
+        all_gids.update(gids)
+    group_name_map = {}
+    if all_gids:
+        from ..models import UserGroup
+        gs = db.query(UserGroup).filter(UserGroup.id.in_(all_gids)).all()
+        group_name_map = {g.id: g.name for g in gs}
     for link in links:
         doc = db.query(Document).filter(Document.id == link.get("document_id")).first()
         if not doc:
             continue
+        gids = doc_groups.get(doc.id, set())
         result.append({
             "id": link.get("id"),
             "entity_type": "part",
@@ -177,6 +234,9 @@ async def get_part_documents(part_id: uuid.UUID, db: Session = Depends(get_db), 
                 "status": doc.status,
                 "file_name": doc.file_name,
                 "file_id": doc.file_id,
+                "accessible": crud_groups.document_is_accessible(db, current_user, doc),
+                "group_ids": [str(g) for g in gids],
+                "group_names": [group_name_map.get(g, str(g)) for g in gids],
             }
         })
     return result
