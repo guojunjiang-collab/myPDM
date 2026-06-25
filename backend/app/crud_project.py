@@ -6,11 +6,11 @@ from fastapi import HTTPException
 
 from app.models import User
 from app.models_project import (
-    Project, ProjectMember, ProjectTask, ProjectTaskLink, ProjectTaskComment,
+    Project, ProjectMember, ProjectTask, ProjectTaskLink, ProjectTaskComment, ProjectTaskDep,
 )
 from app.schemas_project import (
     ProjectCreate, ProjectEdit, MemberAdd,
-    TaskCreate, TaskEdit, TaskMove, TaskReorder, TaskLinkAdd, CommentAdd,
+    TaskCreate, TaskEdit, TaskMove, TaskReorder, TaskLinkAdd, CommentAdd, DepCreate,
 )
 
 
@@ -249,18 +249,25 @@ def reorder_task(db: Session, project_id: uuid.UUID, data: "TaskReorder") -> dic
 
 
 def delete_task(db: Session, t: ProjectTask):
-    """软删任务及其整棵子树。"""
+    """软删任务及其整棵子树,并硬删相关依赖。"""
     now = datetime.now(timezone.utc)
+    deleted_ids = []
     to_delete = [t.id]
     while to_delete:
         current = to_delete.pop()
         task = db.query(ProjectTask).filter(ProjectTask.id == current).first()
         if task and task.deleted_at is None:
             task.deleted_at = now
+            deleted_ids.append(current)
             children = db.query(ProjectTask.id).filter(
                 ProjectTask.parent_id == current, ProjectTask.deleted_at.is_(None)
             ).all()
             to_delete.extend([c[0] for c in children])
+    if deleted_ids:
+        db.query(ProjectTaskDep).filter(
+            (ProjectTaskDep.predecessor_id.in_(deleted_ids)) |
+            (ProjectTaskDep.successor_id.in_(deleted_ids))
+        ).delete(synchronize_session=False)
     db.commit()
 
 
@@ -346,4 +353,58 @@ def get_comment(db: Session, comment_id: uuid.UUID) -> ProjectTaskComment:
 
 def delete_comment(db: Session, c: ProjectTaskComment):
     c.deleted_at = datetime.now(timezone.utc)
+    db.commit()
+
+
+# ════════════════════════ 任务依赖 ════════════════════════
+def list_deps(db: Session, project_id: uuid.UUID) -> list:
+    return db.query(ProjectTaskDep).filter(ProjectTaskDep.project_id == project_id).all()
+
+
+def _would_create_cycle(db: Session, project_id: uuid.UUID, pred_id, succ_id) -> bool:
+    """加入 pred->succ 后是否成环:即 succ 是否已能到达 pred。"""
+    edges = {}
+    for d in list_deps(db, project_id):
+        edges.setdefault(d.predecessor_id, []).append(d.successor_id)
+    edges.setdefault(pred_id, []).append(succ_id)
+    stack = [succ_id]; seen = set()
+    while stack:
+        cur = stack.pop()
+        if cur == pred_id:
+            return True
+        if cur in seen:
+            continue
+        seen.add(cur)
+        stack.extend(edges.get(cur, []))
+    return False
+
+
+def add_dep(db: Session, project_id: uuid.UUID, data: DepCreate) -> ProjectTaskDep:
+    pred = _uuid(data.predecessor_id); succ = _uuid(data.successor_id)
+    if pred == succ:
+        raise HTTPException(status_code=400, detail="任务不能依赖自身")
+    for tid in (pred, succ):
+        t = db.query(ProjectTask).filter(
+            ProjectTask.id == tid, ProjectTask.project_id == project_id,
+            ProjectTask.deleted_at.is_(None)
+        ).first()
+        if not t:
+            raise HTTPException(status_code=404, detail="任务不存在或不属于该项目")
+    exists = db.query(ProjectTaskDep).filter(
+        ProjectTaskDep.predecessor_id == pred, ProjectTaskDep.successor_id == succ
+    ).first()
+    if exists:
+        raise HTTPException(status_code=400, detail="该依赖已存在")
+    if _would_create_cycle(db, project_id, pred, succ):
+        raise HTTPException(status_code=400, detail="依赖会形成循环")
+    d = ProjectTaskDep(project_id=project_id, predecessor_id=pred, successor_id=succ,
+                       dep_type=data.dep_type, lag_days=data.lag_days)
+    db.add(d); db.commit(); db.refresh(d)
+    return d
+
+
+def remove_dep(db: Session, project_id: uuid.UUID, dep_id: uuid.UUID):
+    db.query(ProjectTaskDep).filter(
+        ProjectTaskDep.id == dep_id, ProjectTaskDep.project_id == project_id
+    ).delete()
     db.commit()
