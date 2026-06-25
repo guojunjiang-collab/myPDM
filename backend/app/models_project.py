@@ -4,7 +4,7 @@
 项目容器 / 项目成员 / 任务(自引用树) / 任务关联对象 / 任务评论
 """
 import uuid
-from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey
+from sqlalchemy import Column, String, Integer, Text, DateTime, Date, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from app.database import Base
@@ -45,10 +45,10 @@ class ProjectTask(Base):
     assignee_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     status = Column(String(8), nullable=False, default="未开始")        # 未开始/进行中/已完成/挂起
     priority = Column(String(4), nullable=False, default="中")         # 高/中/低
-    planned_start = Column(String(32), nullable=True)
-    planned_end = Column(String(32), nullable=True)
-    actual_start = Column(String(32), nullable=True)
-    actual_end = Column(String(32), nullable=True)
+    planned_start = Column(Date, nullable=True)
+    planned_end = Column(Date, nullable=True)
+    actual_start = Column(Date, nullable=True)
+    actual_end = Column(Date, nullable=True)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -74,3 +74,14 @@ class ProjectTaskComment(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
+
+
+class ProjectTaskDep(Base):
+    __tablename__ = "project_task_deps"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    predecessor_id = Column(UUID(as_uuid=True), ForeignKey("project_tasks.id", ondelete="CASCADE"), nullable=False)
+    successor_id = Column(UUID(as_uuid=True), ForeignKey("project_tasks.id", ondelete="CASCADE"), nullable=False)
+    dep_type = Column(String(2), nullable=False, default="FS")  # FS/SS/FF/SF
+    lag_days = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
