@@ -20,6 +20,13 @@ def _uuid(v):
     return uuid.UUID(v) if isinstance(v, str) else v
 
 
+def _iso(d):
+    """date -> 'YYYY-MM-DD';None -> None;已是字符串原样返回。"""
+    if d is None:
+        return None
+    return d.isoformat() if hasattr(d, "isoformat") else str(d)
+
+
 # ════════════════════════ 项目 ════════════════════════
 def _next_project_code(db: Session) -> str:
     count = db.query(Project).count()
@@ -276,8 +283,8 @@ def get_task_tree(db: Session, project_id: uuid.UUID) -> list:
             "assignee_id": str(t.assignee_id) if t.assignee_id else None,
             "assignee_name": user_names.get(t.assignee_id) if t.assignee_id else None,
             "status": t.status, "priority": t.priority,
-            "planned_start": t.planned_start, "planned_end": t.planned_end,
-            "actual_start": t.actual_start, "actual_end": t.actual_end,
+            "planned_start": _iso(t.planned_start), "planned_end": _iso(t.planned_end),
+            "actual_start": _iso(t.actual_start), "actual_end": _iso(t.actual_end),
             "sort_order": t.sort_order, "description": t.description,
             "link_count": link_counts.get(t.id, 0),
             "children": [],

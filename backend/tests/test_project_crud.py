@@ -133,3 +133,17 @@ def test_get_active_task_scoped_to_project(db):
     crud_project.delete_task(db, t1)
     with pytest.raises(HTTPException):
         crud_project.get_active_task(db, t1.id, p1.id)
+
+
+import datetime as _dt
+from app.schemas_project import TaskCreate as _TC
+
+
+def test_task_tree_serializes_dates_as_iso(db):
+    owner = _make_user(db)
+    p = crud_project.create_project(db, ProjectCreate(name="DateProj"), owner.id)
+    crud_project.create_task(db, p, _TC(name="T", planned_start=_dt.date(2026, 1, 1),
+                                        planned_end=_dt.date(2026, 1, 5)))
+    tree = crud_project.get_task_tree(db, p.id)
+    assert tree[0]["planned_start"] == "2026-01-01"
+    assert tree[0]["planned_end"] == "2026-01-05"

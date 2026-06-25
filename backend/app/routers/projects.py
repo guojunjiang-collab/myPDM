@@ -252,8 +252,10 @@ def _task_dict(db, t):
             "code": t.code, "name": t.name, "task_type": t.task_type,
             "assignee_id": str(t.assignee_id) if t.assignee_id else None,
             "status": t.status, "priority": t.priority,
-            "planned_start": t.planned_start, "planned_end": t.planned_end,
-            "actual_start": t.actual_start, "actual_end": t.actual_end,
+            "planned_start": crud_project._iso(t.planned_start),
+            "planned_end": crud_project._iso(t.planned_end),
+            "actual_start": crud_project._iso(t.actual_start),
+            "actual_end": crud_project._iso(t.actual_end),
             "sort_order": t.sort_order, "description": t.description}
 
 
