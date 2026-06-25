@@ -8,6 +8,7 @@ import { toast } from '../../components/Toast';
 import { useHeaderTabs } from '../../hooks/useHeaderTabs';
 import MemberManageModal from './MemberManageModal';
 import TaskEditModal from './TaskEditModal';
+import GanttView from './gantt/GanttView';
 import type { Project, ProjectStatus, ProjectTask, TaskStatus, TaskLink, TaskComment } from '../../types/project';
 
 const STATUSES: ProjectStatus[] = ['待启动', '进行中', '已完成', '已暂停', '已归档'];
@@ -650,8 +651,16 @@ export default function Projects() {
         )}
 
         {tab === 'view' && (
-          <div className="h-full flex items-center justify-center text-gray-400">
-            项目视图 — 甘特图等功能即将上线
+          <div className="p-4">
+            {!selectedProjectId ? (
+              <div className="text-center text-gray-400 py-12">请从项目汇总中选择一个项目</div>
+            ) : (
+              <GanttView
+                projectId={selectedProjectId}
+                canEdit={can('project.task:depend')}
+                onTaskUpdated={() => loadTasks(selectedProjectId)}
+              />
+            )}
           </div>
         )}
       </div>
