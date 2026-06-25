@@ -3,7 +3,7 @@ import { projectApi } from '../../../services/projectApi';
 import type { GanttData, GanttTask } from '../../../types/project';
 import type { Scale } from './ganttUtils';
 import {
-  DAY_PX, ROW_H, LEFT_W, CODE_W, ASSIGNEE_W, parseDate, daysBetween, addDays, fmtISO,
+  DAY_PX, ROW_H, BAR_H, LEFT_W, CODE_W, ASSIGNEE_W, INDENT, parseDate, daysBetween, addDays, fmtISO,
   computeRange, barBox, ticks, STATUS_FILL, depAnchors,
 } from './ganttUtils';
 
@@ -98,9 +98,9 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated }: Props) 
     if (!pb || !sb) return null;
     const a = depAnchors(dep);
     const x1 = a.from === 'end' ? pb.x + pb.w : pb.x;
-    const y1 = pb.y + (ROW_H - 12) / 2;
+    const y1 = pb.y + BAR_H / 2;
     const x2 = a.to === 'end' ? sb.x + sb.w : sb.x;
-    const y2 = sb.y + (ROW_H - 12) / 2;
+    const y2 = sb.y + BAR_H / 2;
     const midX = (x1 + x2) / 2;
     return (
       <path key={dep.id} d={`M${x1},${y1} L${midX},${y1} L${midX},${y2} L${x2},${y2}`}
@@ -131,10 +131,10 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated }: Props) 
           </div>
           {data.tasks.map((t) => (
             <div key={t.id} className="flex items-center border-b border-gray-100 text-sm" style={{ height: ROW_H }}>
-              <span className="px-2 shrink-0 truncate text-xs text-gray-500" style={{ width: CODE_W }} title={t.code}>
+              <span className="pr-2 shrink-0 truncate text-xs text-gray-500 font-mono" style={{ width: CODE_W, paddingLeft: 8 + t.depth * INDENT }} title={t.code}>
                 {t.code}
               </span>
-              <span className="px-1 flex-1 min-w-0 flex items-center" style={{ paddingLeft: 4 + t.depth * 16 }}>
+              <span className="px-1 flex-1 min-w-0 flex items-center">
                 <span className="text-gray-400 mr-1 shrink-0">
                   {t.task_type === '里程碑' ? '🏁' : t.task_type === '评审' ? '🔎' : '📋'}
                 </span>
