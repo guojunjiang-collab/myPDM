@@ -519,21 +519,21 @@ def get_gantt_data(db: Session, project_id: uuid.UUID) -> dict:
     user_names = {u.id: u.real_name for u in db.query(User).all()}
     tasks_by_id = {t.id: t for t in tasks}
 
-    depth = {}
-    def _depth(t):
-        if t.id in depth:
-            return depth[t.id]
+    # 与详情树同序:tasks 已按 (sort_order, created_at) 排序;按兄弟序做 DFS 前序遍历,
+    # 保证甘特行序与父子缩进和"项目详情"树完全一致(扁平全局 sort_order 会把不同父级的子任务交错)。
+    children = {}
+    roots = []
+    for t in tasks:
         if t.parent_id and t.parent_id in tasks_by_id:
-            d = _depth(tasks_by_id[t.parent_id]) + 1
+            children.setdefault(t.parent_id, []).append(t)
         else:
-            d = 0
-        depth[t.id] = d
-        return d
+            roots.append(t)
 
     today = datetime.now(timezone.utc).date()
     out_tasks = []
     dates = []
-    for t in tasks:
+
+    def _emit(t, depth):
         ps, pe = t.planned_start, t.planned_end
         if ps:
             dates.append(ps)
@@ -547,8 +547,13 @@ def get_gantt_data(db: Session, project_id: uuid.UUID) -> dict:
             "planned_start": _iso(ps), "planned_end": _iso(pe),
             "duration_days": ((pe - ps).days + 1) if (ps and pe) else None,
             "is_critical": t.id in critical, "is_overdue": is_overdue,
-            "sort_order": t.sort_order, "depth": _depth(t),
+            "sort_order": t.sort_order, "depth": depth,
         })
+        for c in children.get(t.id, []):
+            _emit(c, depth + 1)
+
+    for r in roots:
+        _emit(r, 0)
     out_deps = [{
         "id": str(d.id), "predecessor_id": str(d.predecessor_id),
         "successor_id": str(d.successor_id), "dep_type": d.dep_type,

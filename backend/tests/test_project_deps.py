@@ -138,3 +138,17 @@ def test_gantt_no_dates_no_crash(db):
     data = crud_project.get_gantt_data(db, p.id)
     assert data["tasks"][0]["is_critical"] is False
     assert data["range"]["min_date"] is None
+
+
+def test_gantt_tasks_in_tree_dfs_order(db):
+    """甘特扁平任务必须与详情树同序(DFS 前序),否则子任务可能排在父任务之前。"""
+    owner = _mk_user(db)
+    p = crud_project.create_project(db, ProjectCreate(name="ORD"), owner.id)
+    a = crud_project.create_task(db, p, TaskCreate(name="A"))    # 根, sort 0
+    b = crud_project.create_task(db, p, TaskCreate(name="B"))    # 根, sort 1
+    b1 = crud_project.create_task(db, p, TaskCreate(name="B1", parent_id=str(b.id)))  # B 的子, sort 0
+    data = crud_project.get_gantt_data(db, p.id)
+    order = [t["id"] for t in data["tasks"]]
+    assert order == [str(a.id), str(b.id), str(b1.id)], f"got {order}"
+    depth = {t["id"]: t["depth"] for t in data["tasks"]}
+    assert depth[str(b.id)] == 0 and depth[str(b1.id)] == 1
