@@ -720,22 +720,36 @@ Expected: FAIL,`AttributeError: module 'app.crud_project' has no attribute 'get_
 
 ```python
 # ════════════════════════ 甘特 / CPM ════════════════════════
-_DEP_OK = {
-    # 约束:返回 succ 必须满足的最早(以"天序号"计)。ok = 实际 >= 约束
-    "FS": lambda ps, pe, lag: ("start", pe + lag),   # succ_start >= pred_end + lag
-    "SS": lambda ps, pe, lag: ("start", ps + lag),   # succ_start >= pred_start + lag
-    "FF": lambda ps, pe, lag: ("end", pe + lag),     # succ_end   >= pred_end + lag
-    "SF": lambda ps, pe, lag: ("end", ps + lag),     # succ_end   >= pred_start + lag
-}
-
-
 def _leaf_ids(tasks) -> set:
     parents = {t.parent_id for t in tasks if t.parent_id is not None}
     return {t.id for t in tasks if t.id not in parents}
 
 
+def _es_lower_bound(dep_type, es_pred, ef_pred, dur_succ, lag) -> int:
+    """该依赖对 succ 最早开始(ES,天序号)施加的下界。"""
+    if dep_type == "SS":
+        return es_pred + lag
+    if dep_type == "FF":
+        return ef_pred + lag - dur_succ + 1
+    if dep_type == "SF":
+        return es_pred + lag - dur_succ + 1
+    return ef_pred + 1 + lag  # FS(默认)
+
+
+def _lf_upper_bound(dep_type, ls_succ, lf_succ, dur_pred, lag) -> int:
+    """该依赖对 pred 最晚完成(LF,天序号)施加的上界。"""
+    if dep_type == "SS":
+        return ls_succ - lag + dur_pred - 1
+    if dep_type == "FF":
+        return lf_succ - lag
+    if dep_type == "SF":
+        return lf_succ - lag + dur_pred - 1
+    return ls_succ - 1 - lag  # FS(默认)
+
+
 def compute_schedule(db: Session, project_id: uuid.UUID, tasks=None, deps=None) -> set:
     """经典 CPM:仅对有完整计划日期的叶任务,按依赖+工期算 slack。
+    采用闭区间天序号(EF = ES + 工期 - 1),前后向约束一致。
     返回关键路径任务 id 集合(slack==0)。无法计算时返回空集。"""
     if tasks is None:
         tasks = db.query(ProjectTask).filter(
@@ -754,29 +768,27 @@ def compute_schedule(db: Session, project_id: uuid.UUID, tasks=None, deps=None) 
     edges = [(d.predecessor_id, d.successor_id, d.dep_type, d.lag_days)
              for d in deps if d.predecessor_id in dur and d.successor_id in dur]
     succ_map = {}; pred_map = {}; indeg = {tid: 0 for tid in dur}
-    for pr, su, _ty, _lg in edges:
-        succ_map.setdefault(pr, []).append((su, _ty, _lg))
-        pred_map.setdefault(su, []).append((pr, _ty, _lg))
+    for pr, su, ty, lg in edges:
+        succ_map.setdefault(pr, []).append((su, ty, lg))
+        pred_map.setdefault(su, []).append((pr, ty, lg))
         indeg[su] += 1
     # 拓扑序
-    order = [tid for tid in dur if indeg[tid] == 0]
-    topo = []; idq = list(order)
+    topo = []; queue = [tid for tid in dur if indeg[tid] == 0]
     indeg2 = dict(indeg)
-    while idq:
-        n = idq.pop(0); topo.append(n)
-        for su, _ty, _lg in succ_map.get(n, []):
+    while queue:
+        n = queue.pop(0); topo.append(n)
+        for su, ty, lg in succ_map.get(n, []):
             indeg2[su] -= 1
             if indeg2[su] == 0:
-                idq.append(su)
+                queue.append(su)
     if len(topo) != len(dur):
         return set()  # 异常成环,降级
-    # 前向:ES/EF(以天序号,起点 0)
+    # 前向:ES/EF(闭区间天序号,起点 0)
     ES = {}; EF = {}
     for n in topo:
         es = 0
         for pr, ty, lg in pred_map.get(n, []):
-            kind, bound = _DEP_OK[ty](ES[pr], EF[pr], lg)
-            es = max(es, bound if kind == "start" else bound - dur[n] + 1)
+            es = max(es, _es_lower_bound(ty, ES[pr], EF[pr], dur[n], lg))
         ES[n] = es; EF[n] = es + dur[n] - 1
     project_end = max(EF.values())
     # 后向:LF/LS
@@ -786,16 +798,14 @@ def compute_schedule(db: Session, project_id: uuid.UUID, tasks=None, deps=None) 
         if not succs:
             lf = project_end
         else:
-            lf = min(
-                (LS[su] if ty in ("FS", "SS") else LF[su]) - lg - (0 if ty in ("FF", "SF") else 1)
-                + (1 if ty in ("FF", "SF") else 0)
-                for su, ty, lg in succs
-            )
+            lf = min(_lf_upper_bound(ty, LS[su], LF[su], dur[n], lg)
+                     for su, ty, lg in succs)
         LF[n] = lf; LS[n] = lf - dur[n] + 1
     return {n for n in dur if (LS[n] - ES[n]) == 0}
 
 
 def _violation(dep, tasks_by_id) -> bool:
+    """以实际计划日期(天序号)判断该依赖是否被违反(供前端红色提示)。"""
     pr = tasks_by_id.get(dep.predecessor_id); su = tasks_by_id.get(dep.successor_id)
     if not pr or not su:
         return False
@@ -803,9 +813,14 @@ def _violation(dep, tasks_by_id) -> bool:
         return False
     ps = pr.planned_start.toordinal(); pe = pr.planned_end.toordinal()
     ss = su.planned_start.toordinal(); se = su.planned_end.toordinal()
-    kind, bound = _DEP_OK[dep.dep_type](ps, pe, dep.lag_days)
-    actual = ss if kind == "start" else se
-    return actual < bound
+    lag = dep.lag_days
+    if dep.dep_type == "SS":
+        return ss < ps + lag
+    if dep.dep_type == "FF":
+        return se < pe + lag
+    if dep.dep_type == "SF":
+        return se < ps + lag
+    return ss < pe + 1 + lag  # FS(默认)
 
 
 def get_gantt_data(db: Session, project_id: uuid.UUID) -> dict:
@@ -821,7 +836,10 @@ def get_gantt_data(db: Session, project_id: uuid.UUID) -> dict:
     def _depth(t):
         if t.id in depth:
             return depth[t.id]
-        d = 0 if not t.parent_id else _depth(tasks_by_id[t.parent_id]) + 1 if t.parent_id in tasks_by_id else 0
+        if t.parent_id and t.parent_id in tasks_by_id:
+            d = _depth(tasks_by_id[t.parent_id]) + 1
+        else:
+            d = 0
         depth[t.id] = d
         return d
     today = datetime.now(timezone.utc).date()
