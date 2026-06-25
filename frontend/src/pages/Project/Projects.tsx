@@ -594,6 +594,11 @@ export default function Projects() {
                     setExpanded(ids);
                   }} className="px-2 py-1.5 text-xs rounded bg-white border border-gray-300 text-gray-600 hover:bg-gray-50">全部展开</button>
                   <button onClick={() => setExpanded(new Set())} className="px-2 py-1.5 text-xs rounded bg-white border border-gray-300 text-gray-600 hover:bg-gray-50">全部折叠</button>
+                  {viewMode === 'table' ? (
+                    <button onClick={() => setViewMode('gantt')} className="px-2 py-1.5 text-xs rounded bg-white border border-gray-300 text-gray-600 hover:bg-gray-50">甘特图</button>
+                  ) : (
+                    <button onClick={() => setViewMode('table')} className="px-2 py-1.5 text-xs rounded bg-white border border-gray-300 text-gray-600 hover:bg-gray-50">计划表</button>
+                  )}
                   {viewMode === 'gantt' && (
                     <>
                       <span className="text-sm text-gray-400">视图:</span>
@@ -604,16 +609,11 @@ export default function Projects() {
                         </button>
                       ))}
                       {can('project.task:depend') && (
-                        <button onClick={() => setAutoScheduleKey((k) => k + 1)} className="px-2 py-1.5 text-xs rounded bg-primary-600 text-white hover:bg-primary-700">自动排期</button>
+                        <button onClick={() => setAutoScheduleKey((k) => k + 1)} className="px-2 py-1.5 text-xs rounded bg-primary-600 text-white hover:bg-primary-700">刷新排期</button>
                       )}
                     </>
                   )}
                   <div className="flex-1" />
-                  <select value={viewMode} onChange={(e) => setViewMode(e.target.value as 'table' | 'gantt')}
-                    className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm">
-                    <option value="table">显示: 计划表</option>
-                    <option value="gantt">显示: 甘特图</option>
-                  </select>
                   {isManager && (
                     <button onClick={() => openCreate(null)} className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700">+ 新建顶层任务</button>
                   )}
