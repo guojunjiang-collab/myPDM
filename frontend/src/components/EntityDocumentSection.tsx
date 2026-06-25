@@ -8,6 +8,7 @@ import { Modal } from './Modal';
 import DocumentPicker from './DocumentPicker';
 import VersionSelectModal from './VersionSelectModal';
 import ArchiveTreeModal from './ArchiveTreeModal';
+import DocumentDetailContent from './DocumentDetailContent';
 
 /* ----------------------------------------------------------------
    Types
@@ -62,6 +63,9 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
 
   /* 图文档编辑弹窗 */
   const [editingDoc, setEditingDoc] = useState<Document | null>(null);
+  const [viewingDocDetail, setViewingDocDetail] = useState<Document | null>(null);
+  const [viewingDocCustomDefs, setViewingDocCustomDefs] = useState<CustomFieldDefinition[]>([]);
+  const [viewingDocCustomValues, setViewingDocCustomValues] = useState<Record<string, any>>({});
   const [editFormData, setEditFormData] = useState<{ name: string; status: string; remark: string }>({ name: '', status: 'draft', remark: '' });
   const [editCustomDefs, setEditCustomDefs] = useState<CustomFieldDefinition[]>([]);
   const [editCustomValues, setEditCustomValues] = useState<Record<string, any>>({});
@@ -177,6 +181,30 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
     previewAttachment(fileId, fileName, {
       onArchive: (id, name) => setArchivePreview({ attId: id, fileName: name }),
     });
+  };
+
+  /** 查看图文档详情 */
+  const handleViewDocument = async (ed: EntityDocument) => {
+    let doc: Document;
+    try {
+      const res = await documentsApi.get(ed.document_id);
+      doc = res.data as Document;
+    } catch {
+      doc = ed.document as Document;
+    }
+    setViewingDocDetail(doc);
+    const allDefs = useDataStore.getState().customFieldDefs;
+    setViewingDocCustomDefs(allDefs.filter((d: CustomFieldDefinition) => d.applies_to?.includes('document')));
+    if (docFieldValues[ed.document_id]) {
+      setViewingDocCustomValues(docFieldValues[ed.document_id] as Record<string, any>);
+    } else {
+      try {
+        const res = await customFieldsApi.getValues('document', ed.document_id);
+        const values: Record<string, any> = {};
+        (res.data || []).forEach((v: CustomFieldValue) => { values[v.field_id] = v.value; });
+        setViewingDocCustomValues(values);
+      } catch { setViewingDocCustomValues({}); }
+    }
   };
 
   /** 编辑图文档 */
@@ -338,9 +366,13 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
               <tbody className="divide-y divide-gray-100">
                 {docs.map((ed) => {
                   const vals = docFieldValues[ed.document_id] || {};
+                  const isAccessible = (ed.document as any).accessible !== false;
                   return (
-                    <tr key={ed.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleEditDocument(ed)}>
-                      <td className="px-3 py-2 font-medium">{ed.document.code}</td>
+                    <tr key={ed.id} className={`hover:bg-gray-50 cursor-pointer ${!isAccessible ? 'opacity-60' : ''}`} onClick={() => handleViewDocument(ed)}>
+                      <td className="px-3 py-2 font-medium">
+                        {!isAccessible && <span className="mr-1" title="无权限：需关联用户组成员">🔒</span>}
+                        {ed.document.code}
+                      </td>
                       <td className="px-3 py-2">{ed.document.name}</td>
                       <td className="px-3 py-2 text-gray-500">{ed.document.version}</td>
                       <td className="px-3 py-2">
@@ -377,24 +409,28 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
                             </>
                           ) : (
                             ed.document.file_id && (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); handlePreviewAttachment(ed.document.file_id!, ed.document.file_name!); }}
-                                  className="text-blue-600 hover:text-blue-800 text-xs"
-                                  title="预览"
-                                >
-                                  预览
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); handleDownload(ed.document.file_id!, ed.document.file_name!); }}
-                                  className="text-primary-600 hover:text-primary-800 text-xs"
-                                  title={`下载 ${ed.document.file_name}`}
-                                >
-                                  下载
-                                </button>
-                              </>
+                              isAccessible ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); handlePreviewAttachment(ed.document.file_id!, ed.document.file_name!); }}
+                                    className="text-blue-600 hover:text-blue-800 text-xs"
+                                    title="预览"
+                                  >
+                                    预览
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); handleDownload(ed.document.file_id!, ed.document.file_name!); }}
+                                    className="text-primary-600 hover:text-primary-800 text-xs"
+                                    title={`下载 ${ed.document.file_name}`}
+                                  >
+                                    下载
+                                  </button>
+                                </>
+                              ) : (
+                                <span className="text-gray-400 text-xs" title="无权限：需关联用户组成员">🔒 不可预览/下载</span>
+                              )
                             )
                           )}
                         </span>
@@ -544,6 +580,21 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
           </div>
         )}
       </Modal>
+
+      {/* 图文档详情弹窗 */}
+      {viewingDocDetail && (
+        <Modal open={!!viewingDocDetail} title="图文档详情" onClose={() => setViewingDocDetail(null)} width="full" zIndex={61}>
+          <DocumentDetailContent
+            doc={viewingDocDetail}
+            customFieldDefs={viewingDocCustomDefs}
+            customFieldValues={viewingDocCustomValues}
+            groupNames={(viewingDocDetail as any).group_names || []}
+          />
+          <div className="flex justify-end pt-4 border-t mt-4">
+            <button type="button" onClick={() => setViewingDocDetail(null)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">关闭</button>
+          </div>
+        </Modal>
+      )}
 
       {/* 版本选择弹窗 */}
       <VersionSelectModal

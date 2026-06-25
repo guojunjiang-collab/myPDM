@@ -29,6 +29,7 @@ export default function PartDetailContent({ part, customFieldDefs, customFieldVa
         <StatusItem label="状态" status={part.status} />
         <InfoItem label="规格型号" value={part.spec || '-'} />
         <InfoItem label="备注" value={part.remark || '-'} />
+        <InfoItem label="创建人" value={(part as any).creator_name || '-'} />
         <InfoItem label="创建时间" value={formatDateTime(part.created_at)} />
         <InfoItem label="更新时间" value={formatDateTime(part.updated_at)} />
       </div>

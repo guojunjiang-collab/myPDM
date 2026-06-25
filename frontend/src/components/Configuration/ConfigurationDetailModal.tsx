@@ -291,7 +291,8 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <InfoItem label="构型号" value={data.code} />
             <InfoItem label="中文名称" value={data.name} />
-            <InfoItem label="备注" value={data.remark || '-'} className="col-span-2 md:col-span-2" />
+            <InfoItem label="创建人" value={data.creator_name || '-'} />
+            <InfoItem label="备注" value={data.remark || '-'} className="col-span-2 md:col-span-4" />
           </div>
 
           {/* 关联零部件 */}

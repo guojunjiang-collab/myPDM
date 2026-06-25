@@ -42,6 +42,7 @@ interface ChildEntry {
 export default function ConfigurationCreateModal({ open, item, onClose, onSaved }: Props) {
   const isEdit = !!item;
   const [form, setForm] = useState({ code: '', name: '', spec: '', remark: '' });
+  const [creatorName, setCreatorName] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const remarkRef = useRef<HTMLTextAreaElement>(null);
@@ -97,6 +98,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
         code: item.code, name: item.name, spec: item.spec || '',
         remark: item.remark || '',
       } : { code: '', name: '', spec: '', remark: '' });
+      setCreatorName((item as any)?.creator_name || '');
       setError('');
       setExpandedChild({}); setNoChildren(new Set()); setLoadingChild(null);
       // Load existing parts and children for edit mode
@@ -104,6 +106,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
         configurationApi.getItem(item.id).then(r => {
           const d = r.data;
           setForm({ code: d.code, name: d.name, spec: d.spec || '', remark: d.remark || '' });
+          setCreatorName(d.creator_name || '');
           setParts((r.data.parts || []).map((p: any) => ({
             id: p.id, part_type: p.part_type, part_id: p.part_id,
             part_code: p.part_detail?.code || '', part_name: p.part_detail?.name || '',
@@ -398,7 +401,13 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
               className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300" placeholder="如 A型机翼构型" />
           </div>
-          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 col-span-2">
+          {item && (
+            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-gray-500 mb-0.5">创建人</label>
+              <div className="text-sm text-gray-700 py-1">{creatorName || '-'}</div>
+            </div>
+          )}
+          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 col-span-2 md:col-span-4">
             <label className="block text-xs text-gray-500 mb-0.5">备注</label>
             <textarea ref={remarkRef} value={form.remark} onChange={(e) => setForm({ ...form, remark: e.target.value })} rows={1}
               className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"

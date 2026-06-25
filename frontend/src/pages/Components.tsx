@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { assembliesApi, assemblyPartsApi, customFieldsApi, bomApi, partsApi } from '../services/api';
 import type { Assembly, AssemblyPartItem, CustomFieldDefinition, CustomFieldValue } from '../types';
-import { canEdit, isAdmin, canDownload, can } from '../stores/auth';
+import { canEdit, isAdmin, canDownload, can, useAuthStore } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
 import AssemblyDetailContent from '../components/AssemblyDetailContent';
 import PartDetailContent from '../components/PartDetailContent';
@@ -613,14 +613,19 @@ export default function Components() {
   };
 
   const handleEdit = async (assembly: Assembly) => {
-    setEditingAssembly(assembly);
+    let a = assembly;
+    try {
+      const res = await assembliesApi.get(assembly.id);
+      a = { ...assembly, ...res.data };
+    } catch {}
+    setEditingAssembly(a);
     setFormData({
-      code: assembly.code,
-      name: assembly.name,
-      spec: assembly.spec || '',
-      version: assembly.version || 'A',
-      status: assembly.status,
-      remark: assembly.remark || '',
+      code: a.code,
+      name: a.name,
+      spec: a.spec || '',
+      version: a.version || 'A',
+      status: a.status,
+      remark: a.remark || '',
     });
     // 重置上一次编辑遗留的嵌套展开状态（其 key 按行号索引，会与新部件的行号串台）
     setExpandedParts({});
@@ -1199,22 +1204,22 @@ export default function Components() {
                         导出
                       </button>
                     )}
-                    {canEdit() && (
+                    {(() => { const isCreator = (assembly as any).creator_id === useAuthStore.getState().user?.id; const canManage = isAdmin() || isCreator; return canManage && (
                       <button
                         onClick={() => handleEdit(assembly)}
                         className="text-primary-600 hover:text-primary-800 mr-3"
                       >
                         编辑
                       </button>
-                    )}
-                    {isAdmin() && (
+                    ); })()}
+                    {(() => { const isCreator = (assembly as any).creator_id === useAuthStore.getState().user?.id; const canManage = isAdmin() || isCreator; return canManage && (
                       <button
                         onClick={() => setDeleteId(assembly.id)}
                         className="text-red-600 hover:text-red-800"
                       >
                         删除
                       </button>
-                    )}
+                    ); })()}
                   </td>
                 </tr>
               ))
@@ -1282,7 +1287,7 @@ export default function Components() {
                 <option value="obsolete">作废</option>
               </select>
             </div>
-            <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">规格型号</label>
               <textarea
                 ref={specRef}
@@ -1293,6 +1298,12 @@ export default function Components() {
                 className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none placeholder:text-gray-300"
               />
             </div>
+            {editingAssembly && (
+              <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-gray-500 mb-0.5">创建人</label>
+                <div className="text-sm text-gray-700 py-1">{(editingAssembly as any).creator_name || '-'}</div>
+              </div>
+            )}
             <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">备注</label>
               <textarea
