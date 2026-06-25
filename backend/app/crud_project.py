@@ -164,6 +164,7 @@ def create_task(db: Session, project: Project, data: TaskCreate) -> ProjectTask:
         description=data.description, sort_order=max_sort,
     )
     db.add(t); db.commit(); db.refresh(t)
+    persist_rollup(db, project.id)
     return t
 
 
@@ -176,6 +177,7 @@ def update_task(db: Session, t: ProjectTask, data: TaskEdit) -> ProjectTask:
     if data.assignee_id is not None:
         t.assignee_id = _uuid(data.assignee_id)
     db.commit(); db.refresh(t)
+    persist_rollup(db, t.project_id)
     return t
 
 
@@ -191,6 +193,7 @@ def move_task(db: Session, t: ProjectTask, data: TaskMove) -> ProjectTask:
     if data.sort_order is not None:
         t.sort_order = data.sort_order
     db.commit(); db.refresh(t)
+    persist_rollup(db, t.project_id)
     return t
 
 
@@ -245,6 +248,7 @@ def reorder_task(db: Session, project_id: uuid.UUID, data: "TaskReorder") -> dic
             s.sort_order = i
 
     db.commit()
+    persist_rollup(db, project_id)
     return {"detail": "已重新排序", "task_id": str(task.id), "parent_id": str(task.parent_id) if task.parent_id else None}
 
 
@@ -269,6 +273,7 @@ def delete_task(db: Session, t: ProjectTask):
             (ProjectTaskDep.successor_id.in_(deleted_ids))
         ).delete(synchronize_session=False)
     db.commit()
+    persist_rollup(db, t.project_id)
 
 
 def get_task_tree(db: Session, project_id: uuid.UUID) -> list:
@@ -510,12 +515,74 @@ def _violation(dep, tasks_by_id) -> bool:
     return ss < pe + 1 + lag  # FS(默认)
 
 
+def rollup_dates(tasks) -> dict:
+    """返回 {task_id: (start|None, end|None)};叶任务=自身计划日期,父任务=子孙叶包络。"""
+    by_id = {t.id: t for t in tasks}
+    children = {}
+    for t in tasks:
+        if t.parent_id and t.parent_id in by_id:
+            children.setdefault(t.parent_id, []).append(t)
+    memo = {}
+
+    def _calc(t):
+        if t.id in memo:
+            return memo[t.id]
+        kids = children.get(t.id)
+        if not kids:
+            res = (t.planned_start, t.planned_end)
+        else:
+            starts = []; ends = []
+            for c in kids:
+                cs, ce = _calc(c)
+                if cs:
+                    starts.append(cs)
+                if ce:
+                    ends.append(ce)
+            res = (min(starts) if starts else None, max(ends) if ends else None)
+        memo[t.id] = res
+        return res
+
+    for t in tasks:
+        _calc(t)
+    return memo
+
+
+def persist_rollup(db: Session, project_id: uuid.UUID):
+    """把父任务的存储计划日期更新为子孙包络(仅父任务,叶任务保持自身)。"""
+    tasks = db.query(ProjectTask).filter(
+        ProjectTask.project_id == project_id, ProjectTask.deleted_at.is_(None)
+    ).all()
+    rolled = rollup_dates(tasks)
+    parent_ids = {t.parent_id for t in tasks if t.parent_id is not None}
+    changed = False
+    for t in tasks:
+        if t.id in parent_ids:
+            rs, re = rolled[t.id]
+            if t.planned_start != rs or t.planned_end != re:
+                t.planned_start = rs
+                t.planned_end = re
+                changed = True
+    if changed:
+        db.commit()
+
+
+def persist_rollup_all(db: Session):
+    """对所有未删项目执行一次父任务日期汇总(用于启动时回填存量数据)。"""
+    pids = [r[0] for r in db.query(Project.id).filter(Project.deleted_at.is_(None)).all()]
+    for pid in pids:
+        try:
+            persist_rollup(db, pid)
+        except Exception:
+            db.rollback()
+
+
 def get_gantt_data(db: Session, project_id: uuid.UUID) -> dict:
     tasks = db.query(ProjectTask).filter(
         ProjectTask.project_id == project_id, ProjectTask.deleted_at.is_(None)
     ).order_by(ProjectTask.sort_order, ProjectTask.created_at).all()
     deps = list_deps(db, project_id)
     critical = compute_schedule(db, project_id, tasks, deps)
+    rolled = rollup_dates(tasks)   # 父任务显示为子孙包络
     user_names = {u.id: u.real_name for u in db.query(User).all()}
     tasks_by_id = {t.id: t for t in tasks}
 
@@ -534,7 +601,7 @@ def get_gantt_data(db: Session, project_id: uuid.UUID) -> dict:
     dates = []
 
     def _emit(t, depth):
-        ps, pe = t.planned_start, t.planned_end
+        ps, pe = rolled.get(t.id, (t.planned_start, t.planned_end))
         if ps:
             dates.append(ps)
         if pe:

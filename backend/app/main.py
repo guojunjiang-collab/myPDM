@@ -550,6 +550,14 @@ async def startup_event():
             db.rollback()
             print(f"⚠ Auto column reconcile skipped: {_e}")
 
+        # 回填存量数据:父任务计划日期 = 子孙叶包络
+        try:
+            from app import crud_project
+            crud_project.persist_rollup_all(db)
+        except Exception as _re:
+            db.rollback()
+            print(f"⚠ Parent date rollup skipped: {_re}")
+
         print("✓ Database migration completed successfully")
     except Exception as e:
         print(f"✗ Database migration error: {e}")

@@ -152,3 +152,22 @@ def test_gantt_tasks_in_tree_dfs_order(db):
     assert order == [str(a.id), str(b.id), str(b1.id)], f"got {order}"
     depth = {t["id"]: t["depth"] for t in data["tasks"]}
     assert depth[str(b.id)] == 0 and depth[str(b1.id)] == 1
+
+
+def test_parent_dates_rollup_display_and_persist(db):
+    """父任务起止=子孙叶包络:甘特显示用包络,且写回父任务存储日期。"""
+    owner = _mk_user(db)
+    p = crud_project.create_project(db, ProjectCreate(name="RU"), owner.id)
+    root = crud_project.create_task(db, p, TaskCreate(name="R"))
+    crud_project.create_task(db, p, TaskCreate(name="C1", parent_id=str(root.id),
+        planned_start=_dt.date(2026, 1, 5), planned_end=_dt.date(2026, 1, 10)))
+    crud_project.create_task(db, p, TaskCreate(name="C2", parent_id=str(root.id),
+        planned_start=_dt.date(2026, 1, 8), planned_end=_dt.date(2026, 1, 20)))
+    # 甘特显示包络
+    data = crud_project.get_gantt_data(db, p.id)
+    rootrow = next(t for t in data["tasks"] if t["id"] == str(root.id))
+    assert rootrow["planned_start"] == "2026-01-05" and rootrow["planned_end"] == "2026-01-20"
+    # 写回父任务存储日期
+    db.refresh(root)
+    assert root.planned_start == _dt.date(2026, 1, 5)
+    assert root.planned_end == _dt.date(2026, 1, 20)
