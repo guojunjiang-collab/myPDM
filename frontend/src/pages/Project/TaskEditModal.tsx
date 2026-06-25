@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { projectApi } from '../../services/projectApi';
-import { usersApi, partsApi, assembliesApi, documentsApi } from '../../services/api';
+import { usersApi, partsApi, assembliesApi, documentsApi, ecrApi, ecoApi } from '../../services/api';
 import AssemblyPartPicker from '../../components/AssemblyPartPicker';
 import DocumentPicker from '../../components/DocumentPicker';
 import ConfigItemPicker from '../../components/Configuration/ConfigItemPicker';
@@ -11,6 +11,8 @@ import AssemblyDetailContent from '../../components/AssemblyDetailContent';
 import DocumentDetailContent from '../../components/DocumentDetailContent';
 import ConfigurationDetailModal from '../../components/Configuration/ConfigurationDetailModal';
 import ArchiveTreeModal from '../../components/ArchiveTreeModal';
+import { ECRDetailModal } from '../../components/ECR/ECRDetailModal';
+import { ECODetailModal } from '../../components/ECO/ECODetailModal';
 import type { ProjectTask, TaskType, TaskStatus, TaskPriority, TaskLink, TaskComment, TaskDependency, DepType } from '../../types/project';
 import { can } from '../../stores/auth';
 
@@ -47,6 +49,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
   const [detailData, setDetailData] = useState<any>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
+  const [ecView, setEcView] = useState<{ id: string; kind: 'ecr' | 'eco' } | null>(null);
 
   const canEditDeps = can('project.task:depend');
   const [deps, setDeps] = useState<TaskDependency[]>([]);
@@ -141,10 +144,25 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
   };
 
   const handleViewEntity = async (entityType: string, entityId: string) => {
+    if (entityType === 'ec') {
+      // 关联只存 entity_type='ec',先试 ECR,失败再试 ECO,以打开对应详情弹窗
+      try {
+        await ecrApi.get(entityId);
+        setEcView({ id: entityId, kind: 'ecr' });
+      } catch {
+        try {
+          await ecoApi.detail(entityId);
+          setEcView({ id: entityId, kind: 'eco' });
+        } catch {
+          alert('无法打开该变更单(ECR/ECO 不存在或无权限)');
+        }
+      }
+      return;
+    }
     setDetailEntityId(entityId);
     setDetailEntityType(entityType);
     setDetailData(null);
-    if (entityType === 'config_item' || entityType === 'ec') return;
+    if (entityType === 'config_item') return;
     setDetailLoading(true);
     try {
       let res;
@@ -360,6 +378,13 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
 
       {detailEntityId && detailEntityType === 'config_item' && (
         <ConfigurationDetailModal itemId={detailEntityId} onClose={() => { setDetailEntityId(null); setDetailEntityType(null); }} />
+      )}
+
+      {ecView?.kind === 'ecr' && (
+        <ECRDetailModal open ecrId={ecView.id} onClose={() => setEcView(null)} onSuccess={() => {}} />
+      )}
+      {ecView?.kind === 'eco' && (
+        <ECODetailModal ecoId={ecView.id} onClose={() => setEcView(null)} onRefresh={() => {}} />
       )}
 
       {detailEntityId && (detailEntityType === 'part' || detailEntityType === 'assembly' || detailEntityType === 'document') && (
