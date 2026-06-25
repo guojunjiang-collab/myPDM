@@ -9,6 +9,8 @@ interface DocumentDetailContentProps {
   customFieldDefs: CustomFieldDefinition[];
   customFieldValues: Record<string, any>;
   onArchivePreview?: (attId: string, fileName: string) => void;
+  accessible?: boolean;
+  groupNames?: string[];
 }
 
 /** 文件大小格式化 */
@@ -28,7 +30,7 @@ const statusTag = (s: string) => {
   return tags[s] || { label: s, class: 'bg-gray-100 text-gray-800' };
 };
 
-export default function DocumentDetailContent({ doc, customFieldDefs, customFieldValues, onArchivePreview }: DocumentDetailContentProps) {
+export default function DocumentDetailContent({ doc, customFieldDefs, customFieldValues, onArchivePreview, accessible, groupNames }: DocumentDetailContentProps) {
   const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
 
@@ -60,8 +62,12 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-    } catch {
-      alert('下载失败，请重试');
+    } catch (e: any) {
+      if (e?.response?.status === 403) {
+        alert('无权限访问该附件');
+      } else {
+        alert('下载失败，请重试');
+      }
     }
   };
 
@@ -81,8 +87,12 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
         <InfoItem label="版本" value={doc.version || '-'} />
         <StatusItem label="状态" status={doc.status} />
         <InfoItem label="备注" value={doc.remark || '-'} className="col-span-2 md:col-span-2" />
+        <InfoItem label="创建人" value={doc.creator_name || '-'} />
         <InfoItem label="创建时间" value={formatDateTime(doc.created_at)} />
         <InfoItem label="更新时间" value={formatDateTime(doc.updated_at)} />
+        {groupNames && groupNames.length > 0 && (
+          <InfoItem label="关联用户组" value={groupNames.join('、')} className="col-span-2 md:col-span-2" />
+        )}
       </div>
 
       {/* 自定义字段 - 卡片式 */}
@@ -134,7 +144,13 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
                     </td>
                     <td className="px-3 py-2 text-gray-500">{formatFileSize(att.file_size || 0)}</td>
                     <td className="px-3 py-2 text-gray-500">{formatDateTime(att.created_at)}</td>
-                    <td className="px-3 py-2 text-right">
+                <td className="px-3 py-2 text-right">
+                  {(doc as any).accessible === false ? (
+                    <span className="inline-flex items-center gap-1 text-gray-400" title="无权限：需关联用户组成员">
+                      🔒 <button className="text-gray-300 cursor-not-allowed" disabled>预览</button> <button className="text-gray-300 cursor-not-allowed" disabled>下载</button>
+                    </span>
+                  ) : (
+                    <>
                       <button
                         type="button"
                         onClick={() => handlePreview(att.id, att.file_name || 'preview')}
@@ -149,7 +165,9 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
                       >
                         下载
                       </button>
-                    </td>
+                    </>
+                  )}
+                </td>
                   </tr>
                 ))}
               </tbody>

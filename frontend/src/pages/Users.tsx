@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
-import { usersApi } from '../services/api';
+import { usersApi, userGroupsApi } from '../services/api';
 import type { User } from '../types';
-import { isAdmin } from '../stores/auth';
+import { isAdmin, can } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
 import { useTableSort } from '../hooks/useTableSort';
 import { formatDateTime } from '../utils/date';
@@ -62,6 +62,17 @@ export default function Users() {
   const [importStatus, setImportStatus] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [activeTab, setActiveTab] = useState<'users' | 'groups'>('users');
+  const [groups, setGroups] = useState<Array<{ id: string; name: string; description?: string; member_count: number }>>([]);
+  const [groupModalOpen, setGroupModalOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<{ id: string; name: string; description?: string } | null>(null);
+  const [groupForm, setGroupForm] = useState<{ name: string; description: string }>({ name: '', description: '' });
+  const [memberSelectedIds, setMemberSelectedIds] = useState<string[]>([]);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [userGroupIds, setUserGroupIds] = useState<string[]>([]);
+  const [viewingGroupId, setViewingGroupId] = useState<string | null>(null);
+  const [viewingGroupMembers, setViewingGroupMembers] = useState<string[]>([]);
+
   const { sortedData, handleSort, getSortIcon } = useTableSort<User>(users);
 
   useEffect(() => {
@@ -80,6 +91,15 @@ export default function Users() {
       setLoading(false);
     }
   };
+
+  const loadGroups = async () => {
+    const res = await userGroupsApi.list();
+    setGroups(Array.isArray(res.data) ? res.data : []);
+  };
+
+  useEffect(() => {
+    if (activeTab === 'groups') loadGroups();
+  }, [activeTab]);
 
   const handleExport = async () => {
     setExporting(true);
@@ -162,6 +182,7 @@ export default function Users() {
     setEditingUser(null);
     setFormData(initialFormData);
     setSaveError(null);
+    setUserGroupIds([]);
     setModalOpen(true);
   };
 
@@ -177,6 +198,8 @@ export default function Users() {
       password: '',
     });
     setSaveError(null);
+    usersApi.getGroups(user.id).then((gr) => setUserGroupIds((gr.data?.group_ids || []).map(String))).catch(() => {});
+    loadGroups();
     setModalOpen(true);
   };
 
@@ -186,6 +209,7 @@ export default function Users() {
     setSaveError(null);
 
     try {
+      let savedId = editingUser?.id || '';
       if (editingUser) {
         const data: Record<string, unknown> = {
           real_name: formData.real_name,
@@ -199,7 +223,7 @@ export default function Users() {
         }
         await usersApi.update(editingUser.id, data);
       } else {
-        await usersApi.create({
+        const res = await usersApi.create({
           username: formData.username,
           real_name: formData.real_name,
           role: formData.role,
@@ -208,6 +232,10 @@ export default function Users() {
           status: formData.status,
           password: formData.password,
         });
+        savedId = (res.data as any)?.id || '';
+      }
+      if (savedId) {
+        await usersApi.setGroups(savedId, userGroupIds);
       }
       setModalOpen(false);
       await loadUsers();
@@ -242,6 +270,37 @@ export default function Users() {
     }
   };
 
+  const saveGroup = async () => {
+    let groupId = editingGroup?.id || '';
+    if (editingGroup) {
+      await userGroupsApi.update(editingGroup.id, groupForm);
+    } else {
+      const res = await userGroupsApi.create(groupForm);
+      groupId = (res.data as any)?.id || '';
+    }
+    if (groupId) {
+      await userGroupsApi.setMembers(groupId, memberSelectedIds);
+    }
+    setGroupModalOpen(false);
+    await loadGroups();
+  };
+
+  const removeGroup = async (id: string) => {
+    if (!window.confirm('确定删除该用户组？文档将恢复为全员可访问。')) return;
+    await userGroupsApi.delete(id);
+    await loadGroups();
+  };
+
+  const viewGroupDetail = async (groupId: string) => {
+    setViewingGroupId(groupId);
+    try {
+      const res = await userGroupsApi.getMembers(groupId);
+      setViewingGroupMembers((res.data?.user_ids || []).map(String));
+    } catch {
+      setViewingGroupMembers([]);
+    }
+  };
+
   /* 前端搜索过滤 */
   const displayData = (() => {
     const keyword = search.trim().toLowerCase();
@@ -256,6 +315,23 @@ export default function Users() {
 
   return (
     <div>
+      {/* Tab 切换栏 */}
+      <div className="flex gap-2 mb-4 border-b border-gray-200">
+        <button
+          className={`px-4 py-2 -mb-px border-b-2 ${activeTab === 'users' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-gray-500'}`}
+          onClick={() => setActiveTab('users')}
+        >用户</button>
+        {can('user_groups:read' as any) && (
+          <button
+            className={`px-4 py-2 -mb-px border-b-2 ${activeTab === 'groups' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-gray-500'}`}
+            onClick={() => setActiveTab('groups')}
+          >用户组</button>
+        )}
+      </div>
+
+      {/* 用户 Tab */}
+      {activeTab === 'users' && (
+        <>
       {/* 头部 */}
       <div className="flex items-center justify-between mb-4">
         {/* 导入导出（仅管理员） */}
@@ -338,7 +414,7 @@ export default function Users() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-500">{formatDateTime(user.created_at)}</td>
-                  <td className="px-4 py-3 text-right">
+                <td className="px-4 py-3 text-right">
                     {isAdmin() && (
                       <>
                         <button onClick={() => handleEdit(user)} className="text-primary-600 hover:text-primary-800 mr-2">编辑</button>
@@ -448,6 +524,27 @@ export default function Users() {
             </div>
           )}
 
+          {/* 所属组 */}
+          {isAdmin() && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">所属组</label>
+              <div className="max-h-32 overflow-auto border border-gray-200 rounded p-2">
+                {groups.length === 0 && <span className="text-gray-400 text-sm">暂无用户组</span>}
+                {groups.map((g) => (
+                  <label key={g.id} className="flex items-center gap-2 py-0.5">
+                    <input
+                      type="checkbox"
+                      checked={userGroupIds.includes(String(g.id))}
+                      onChange={(e) => setUserGroupIds((prev) =>
+                        e.target.checked ? [...prev, String(g.id)] : prev.filter((x) => x !== String(g.id)))}
+                    />
+                    <span className="text-sm">{g.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* 密码 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -501,6 +598,170 @@ export default function Users() {
         onConfirm={handleResetPassword}
         onCancel={() => setResetId(null)}
       />
+        </>
+      )}
+
+      {/* 用户组 Tab */}
+      {activeTab === 'groups' && (
+        <div>
+          <div className="flex justify-end mb-3">
+            {isAdmin() && (
+              <button
+                className="px-3 py-1.5 bg-primary-600 text-white rounded hover:bg-primary-700"
+                onClick={() => { setEditingGroup(null); setGroupForm({ name: '', description: '' }); setMemberSelectedIds([]); setMemberSearch(''); setGroupModalOpen(true); }}
+              >新建用户组</button>
+            )}
+          </div>
+          <table className="min-w-full divide-y divide-gray-200 bg-white rounded-lg border border-gray-200">
+            <thead className="bg-gray-50 border-b border-gray-200"><tr>
+              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">名称</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">描述</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">成员数</th>
+              {isAdmin() && <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">操作</th>}
+            </tr></thead>
+            <tbody className="divide-y divide-gray-100">
+              {groups.map((g) => (
+                <tr key={g.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => viewGroupDetail(g.id)}>
+                  <td className="px-4 py-2 text-sm font-medium">{g.name}</td>
+                  <td className="px-4 py-2 text-sm text-gray-600">{g.description || '-'}</td>
+                  <td className="px-4 py-2 text-sm">{g.member_count}</td>
+                  {isAdmin() && (
+                    <td className="px-4 py-2 text-sm space-x-2" onClick={(e) => e.stopPropagation()}>
+                      <button className="text-primary-600 hover:underline" onClick={async () => { setEditingGroup(g); setGroupForm({ name: g.name, description: g.description || '' }); setMemberSearch(''); const res = await userGroupsApi.getMembers(g.id); setMemberSelectedIds((res.data?.user_ids || []).map(String)); setGroupModalOpen(true); }}>编辑</button>
+                      <button className="text-red-600 hover:underline" onClick={() => removeGroup(g.id)}>删除</button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+              {groups.length === 0 && (
+                <tr><td colSpan={isAdmin() ? 4 : 3} className="px-4 py-8 text-center text-gray-500">暂无用户组</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* 组编辑弹窗 */}
+      <Modal open={groupModalOpen} title={editingGroup ? '编辑用户组' : '新建用户组'} onClose={() => setGroupModalOpen(false)} width="lg">
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-gray-500 mb-0.5">名称 <span className="text-red-500">*</span></label>
+              <input
+                type="text"
+                value={groupForm.name}
+                onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })}
+                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                required
+                maxLength={64}
+              />
+            </div>
+            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-gray-500 mb-0.5">描述</label>
+              <input
+                type="text"
+                value={groupForm.description}
+                onChange={(e) => setGroupForm({ ...groupForm, description: e.target.value })}
+                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                maxLength={255}
+              />
+            </div>
+          </div>
+          <div className="border-t pt-3">
+            <h4 className="text-sm font-medium text-gray-700 mb-2">成员</h4>
+            <input
+              type="text"
+              placeholder="搜索用户..."
+              value={memberSearch}
+              onChange={(e) => setMemberSearch(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 mb-2 text-sm"
+            />
+            <div className="max-h-52 overflow-auto border border-gray-200 rounded-lg">
+              {users.filter((u) => {
+                if (!memberSearch.trim()) return true;
+                const kw = memberSearch.trim().toLowerCase();
+                return u.real_name.toLowerCase().includes(kw) || u.username.toLowerCase().includes(kw);
+              }).length === 0 ? (
+                <div className="text-sm text-gray-400 py-4 text-center">无匹配用户</div>
+              ) : (
+                users.filter((u) => {
+                  if (!memberSearch.trim()) return true;
+                  const kw = memberSearch.trim().toLowerCase();
+                  return u.real_name.toLowerCase().includes(kw) || u.username.toLowerCase().includes(kw);
+                }).map((u) => (
+                  <label key={u.id} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={memberSelectedIds.includes(String(u.id))}
+                      onChange={(e) => setMemberSelectedIds((prev) =>
+                        e.target.checked ? [...prev, String(u.id)] : prev.filter((x) => x !== String(u.id)))}
+                    />
+                    <span className="text-sm">{u.real_name}（{u.username}）<span className="text-gray-400 ml-1">{u.role}</span></span>
+                  </label>
+                ))
+              )}
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <button type="button" onClick={() => setGroupModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
+            <button type="button" onClick={saveGroup} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">保存</button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* 用户组详情弹窗 */}
+      {viewingGroupId && (() => {
+        const g = groups.find((g) => g.id === viewingGroupId);
+        const memberUsers = users.filter((u) => viewingGroupMembers.includes(String(u.id)));
+        return (
+          <Modal open={!!viewingGroupId} title="用户组详情" onClose={() => setViewingGroupId(null)} width="md">
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                  <div className="text-xs text-gray-500 mb-0.5">名称</div>
+                  <div className="text-sm font-medium">{g?.name || '-'}</div>
+                </div>
+                <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                  <div className="text-xs text-gray-500 mb-0.5">成员数</div>
+                  <div className="text-sm font-medium">{viewingGroupMembers.length}</div>
+                </div>
+                <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 col-span-2">
+                  <div className="text-xs text-gray-500 mb-0.5">描述</div>
+                  <div className="text-sm">{g?.description || '-'}</div>
+                </div>
+              </div>
+              <div className="border-t pt-3">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">成员列表</h4>
+                {memberUsers.length === 0 ? (
+                  <div className="text-sm text-gray-400 py-4 text-center border border-dashed border-gray-300 rounded-lg">暂无成员</div>
+                ) : (
+                  <table className="w-full text-sm border rounded-lg overflow-hidden">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-gray-500 font-medium">姓名</th>
+                        <th className="px-3 py-2 text-left text-gray-500 font-medium">用户名</th>
+                        <th className="px-3 py-2 text-left text-gray-500 font-medium">角色</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {memberUsers.map((u) => (
+                        <tr key={u.id}>
+                          <td className="px-3 py-2">{u.real_name}</td>
+                          <td className="px-3 py-2 text-gray-500">{u.username}</td>
+                          <td className="px-3 py-2 text-gray-500">{u.role}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end pt-4 border-t mt-4">
+              <button type="button" onClick={() => setViewingGroupId(null)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">关闭</button>
+            </div>
+          </Modal>
+        );
+      })()}
     </div>
   );
 }

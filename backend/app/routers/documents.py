@@ -7,13 +7,21 @@ import uuid
 import base64
 
 from ..database import get_db
-from ..models import User, Document, DocumentAttachment, Part, Assembly
-from .. import crud, schemas
-from ..permissions import require_permission
+from ..models import User, Document, DocumentAttachment, Part, Assembly, DocumentGroupLink, UserGroup
+from .. import crud, schemas, crud_groups
+from ..permissions import require_permission, check_object_policy
 from ..stp_converter import is_stp_file, delete_glb_cache
 from ..office_converter import is_office_file, delete_pdf_cache
 
 router = APIRouter(prefix="/documents", tags=["图文档管理"])
+
+
+def _resolve_group_names(db: Session, gids: set) -> list:
+    if not gids:
+        return []
+    gs = db.query(UserGroup).filter(UserGroup.id.in_(gids)).all()
+    gname_map = {g.id: g.name for g in gs}
+    return [gname_map.get(gid, str(gid)) for gid in gids]
 
 @router.get("/")
 async def list_documents(skip: int = 0, limit: int = 100, keyword: str = None, status: str = None, updated_since: float = None, brief: bool = False, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents:read"))):
@@ -35,12 +43,46 @@ async def list_documents(skip: int = 0, limit: int = 100, keyword: str = None, s
             (Document.deleted_at >= since_dt)
         )
     docs = query.offset(skip).limit(limit).all()
+
+    user_group_ids = crud_groups.get_user_group_ids(db, current_user.id)
+    doc_ids = [d.id for d in docs]
+    links = db.query(DocumentGroupLink).filter(DocumentGroupLink.document_id.in_(doc_ids)).all() if doc_ids else []
+    doc_groups = {}
+    for l in links:
+        doc_groups.setdefault(l.document_id, set()).add(l.group_id)
+
+    creator_ids = {d.creator_id for d in docs if d.creator_id}
+    creator_map = {}
+    if creator_ids:
+        users = db.query(User).filter(User.id.in_(creator_ids)).all()
+        creator_map = {u.id: u.real_name for u in users}
+
+    all_gids = set()
+    for gids in doc_groups.values():
+        all_gids.update(gids)
+    group_name_map = {}
+    if all_gids:
+        gs = db.query(UserGroup).filter(UserGroup.id.in_(all_gids)).all()
+        group_name_map = {g.id: g.name for g in gs}
+
+    def _accessible(d):
+        return check_object_policy(
+            "document_content_access", current_user, d,
+            user_group_ids=user_group_ids,
+            doc_group_ids=doc_groups.get(d.id, set()),
+        )
+
     if brief:
         return JSONResponse(content=[{
             "id": str(d.id), "code": d.code, "name": d.name,
             "version": d.version, "status": d.status, "file_name": d.file_name,
             "file_id": str(d.file_id) if d.file_id else None,
             "remark": d.remark,
+            "accessible": _accessible(d),
+            "group_ids": [str(g) for g in doc_groups.get(d.id, set())],
+            "group_names": [group_name_map.get(g, str(g)) for g in doc_groups.get(d.id, set())],
+            "creator_id": str(d.creator_id) if d.creator_id else None,
+            "creator_name": creator_map.get(d.creator_id, "") if d.creator_id else "",
             "created_at": d.created_at.isoformat() if d.created_at else None,
             "updated_at": d.updated_at.isoformat() if d.updated_at else None,
             "deleted_at": d.deleted_at.isoformat() if d.deleted_at else None,
@@ -50,6 +92,11 @@ async def list_documents(skip: int = 0, limit: int = 100, keyword: str = None, s
         "version": d.version, "status": d.status,
         "remark": d.remark,
         "file_name": d.file_name, "file_id": d.file_id,
+        "creator_id": d.creator_id,
+        "creator_name": creator_map.get(d.creator_id, "") if d.creator_id else "",
+        "accessible": _accessible(d),
+        "group_ids": list(doc_groups.get(d.id, set())),
+        "group_names": [group_name_map.get(g, str(g)) for g in doc_groups.get(d.id, set())],
         "created_at": d.created_at, "updated_at": d.updated_at,
         "deleted_at": d.deleted_at,
     } for d in docs]
@@ -140,7 +187,6 @@ async def get_document_references(doc_id: uuid.UUID, db: Session = Depends(get_d
 
 @router.post("/")
 async def create_document(doc: schemas.DocumentCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents:create"))):
-    # 仅匹配未删除记录：软删除的同编号+版本不应阻止新建（与 uix_doc_code_version 部分唯一索引一致）
     existing = db.query(Document).filter(
         Document.code == doc.code,
         Document.version == doc.version,
@@ -148,10 +194,16 @@ async def create_document(doc: schemas.DocumentCreate, request: Request, db: Ses
     ).first()
     if existing:
         raise HTTPException(status_code=400, detail="该编号和版本的组合已存在")
-    d = Document(**doc.model_dump())
+    data = doc.model_dump()
+    group_ids = data.pop("group_ids", None) or []
+    d = Document(**data, creator_id=current_user.id)
     db.add(d)
     db.commit()
     db.refresh(d)
+    for gid in set(group_ids):
+        db.add(DocumentGroupLink(document_id=d.id, group_id=gid))
+    if group_ids:
+        db.commit()
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username, "创建图文档", "document", str(d.id), f"编号:{d.code}", ip)
     return {
@@ -159,6 +211,9 @@ async def create_document(doc: schemas.DocumentCreate, request: Request, db: Ses
         "version": d.version, "status": d.status,
         "remark": d.remark,
         "file_name": d.file_name, "file_id": d.file_id,
+        "creator_id": d.creator_id,
+        "creator_name": current_user.real_name,
+        "group_ids": list(set(group_ids)),
         "created_at": d.created_at, "updated_at": d.updated_at,
     }
 
@@ -167,11 +222,20 @@ async def get_document(doc_id: uuid.UUID, db: Session = Depends(get_db), current
     d = db.query(Document).filter(Document.id == doc_id).first()
     if not d:
         raise HTTPException(status_code=404, detail="图文档不存在")
+    creator_name = ""
+    if d.creator_id:
+        creator = db.query(User).filter(User.id == d.creator_id).first()
+        creator_name = creator.real_name if creator else ""
+    gids = crud_groups.get_document_group_ids(db, d.id)
     return {
         "id": d.id, "code": d.code, "name": d.name,
         "version": d.version, "status": d.status,
         "remark": d.remark,
         "file_name": d.file_name, "file_id": d.file_id,
+        "creator_id": d.creator_id,
+        "creator_name": creator_name,
+        "group_ids": list(gids),
+        "group_names": _resolve_group_names(db, gids),
         "created_at": d.created_at, "updated_at": d.updated_at,
     }
 
@@ -182,7 +246,6 @@ async def update_document(doc_id: uuid.UUID, body: schemas.DocumentUpdate, reque
         raise HTTPException(status_code=404, detail="图文档不存在")
     # 修改编号后须保证 (编号+版本) 仍唯一（version 不可改，按当前版本校验 code 冲突）
     if body.code and body.code != d.code:
-        # 仅 A 版允许改编号：升版后的版本按编号归集，改编号会丢失版本升级关联
         if d.version != 'A':
             raise HTTPException(status_code=400, detail="仅 A 版允许修改编号，升版后的版本不可修改编号")
         existing = db.query(Document).filter(
@@ -193,17 +256,30 @@ async def update_document(doc_id: uuid.UUID, body: schemas.DocumentUpdate, reque
         ).first()
         if existing:
             raise HTTPException(status_code=400, detail="该编号和版本的组合已存在")
-    for field, value in body.model_dump(exclude_unset=True).items():
+    update_data = body.model_dump(exclude_unset=True)
+    group_ids = update_data.pop("group_ids", None)
+    if group_ids is not None:
+        db.query(DocumentGroupLink).filter(DocumentGroupLink.document_id == doc_id).delete()
+        for gid in set(group_ids):
+            db.add(DocumentGroupLink(document_id=doc_id, group_id=gid))
+    for field, value in update_data.items():
         setattr(d, field, value)
     db.commit()
     db.refresh(d)
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username, "更新图文档", "document", str(doc_id), None, ip)
+    creator_name = ""
+    if d.creator_id:
+        c = db.query(User).filter(User.id == d.creator_id).first()
+        creator_name = c.real_name if c else ""
     return {
         "id": d.id, "code": d.code, "name": d.name,
         "version": d.version, "status": d.status,
         "remark": d.remark,
         "file_name": d.file_name, "file_id": d.file_id,
+        "creator_id": d.creator_id,
+        "creator_name": creator_name,
+        "group_ids": list(crud_groups.get_document_group_ids(db, d.id)),
         "created_at": d.created_at, "updated_at": d.updated_at,
     }
 
@@ -334,6 +410,10 @@ async def download_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, db: Session 
     att = db.query(DocumentAttachment).filter(DocumentAttachment.id == att_id, DocumentAttachment.document_id == doc_id).first()
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
+    
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if doc:
+        crud_groups.enforce_document_content_access(db, current_user, doc)
     
     file_data = None
     if att.file_path:
