@@ -2,7 +2,7 @@ import type { GanttTask, TaskDependency } from '../../../types/project';
 
 export type Scale = 'day' | 'week' | 'month';
 
-export const DAY_PX: Record<Scale, number> = { day: 28, week: 10, month: 4 };
+export const DAY_PX: Record<Scale, number> = { day: 40, week: 10, month: 4 };
 export const ROW_H = 36;      // 与项目详情任务行高(px-4 py-2 text-sm)一致
 export const BAR_H = 12;      // 任务条高度
 export const CODE_W = 150;    // 左侧:任务编号列宽(含层级缩进)
