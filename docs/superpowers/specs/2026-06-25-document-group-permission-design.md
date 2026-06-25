@@ -49,7 +49,13 @@ document_group_links       文档 ↔ 组(多对多)
   PRIMARY KEY (document_id, group_id)
 ```
 
-删除用户组时,两张关联表记录级联清除;受影响文档随即回到"未关联=全员可访问"状态。
+删除用户组时(真 DELETE),两张关联表记录经 FK CASCADE 级联清除;受影响文档随即回到"未关联=全员可访问"状态。
+
+**删除文档的处理**(图文档是软删除):
+
+- 日常删除文档 = 软删除(`documents.py:289` 仅置 `deleted_at`),行仍在表中,FK CASCADE **不触发**。但软删除时附件已被硬删(`documents.py:287`),文档已无任何可预览/下载内容,`document_group_links` 即便残留也是无害悬挂数据。
+- 为保持整洁与一致(附件在软删除时即被硬删),在软删除处理里**显式删除该文档的 `document_group_links`**。
+- admin 物理清理软删除数据时为真 DELETE,FK CASCADE 作为兜底自动清除残留链接。
 
 ### 3.2 documents 表新增列
 
