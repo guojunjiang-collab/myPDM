@@ -3,7 +3,7 @@ import { projectApi } from '../../../services/projectApi';
 import type { GanttData, GanttTask } from '../../../types/project';
 import type { Scale } from './ganttUtils';
 import {
-  DAY_PX, ROW_H, LEFT_W, parseDate, daysBetween, addDays, fmtISO,
+  DAY_PX, ROW_H, LEFT_W, CODE_W, ASSIGNEE_W, parseDate, daysBetween, addDays, fmtISO,
   computeRange, barBox, ticks, STATUS_FILL, depAnchors,
 } from './ganttUtils';
 
@@ -124,15 +124,26 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated }: Props) 
 
       <div className="flex overflow-auto" style={{ maxHeight: '70vh' }}>
         <div className="shrink-0 border-r border-gray-200" style={{ width: LEFT_W }}>
-          <div className="h-8 bg-gray-50 border-b border-gray-200 flex items-center px-2 text-xs font-medium text-gray-500">任务</div>
+          <div className="h-8 bg-gray-50 border-b border-gray-200 flex items-center text-xs font-medium text-gray-500">
+            <span className="px-2 shrink-0 truncate" style={{ width: CODE_W }}>任务编号</span>
+            <span className="px-1 flex-1 min-w-0 truncate">任务名称</span>
+            <span className="px-1 shrink-0 truncate text-center" style={{ width: ASSIGNEE_W }}>负责人</span>
+          </div>
           {data.tasks.map((t) => (
-            <div key={t.id} className="flex items-center border-b border-gray-100 text-sm"
-              style={{ height: ROW_H, paddingLeft: 8 + t.depth * 16 }}>
-              <span className="text-gray-400 mr-1">
-                {t.task_type === '里程碑' ? '🏁' : t.task_type === '评审' ? '🔎' : '📋'}
+            <div key={t.id} className="flex items-center border-b border-gray-100 text-sm" style={{ height: ROW_H }}>
+              <span className="px-2 shrink-0 truncate text-xs text-gray-500" style={{ width: CODE_W }} title={t.code}>
+                {t.code}
               </span>
-              <span className={`truncate ${t.is_critical ? 'text-red-600 font-medium' : 'text-gray-700'}`} title={`${t.code} ${t.name}`}>
-                {t.name}
+              <span className="px-1 flex-1 min-w-0 flex items-center" style={{ paddingLeft: 4 + t.depth * 16 }}>
+                <span className="text-gray-400 mr-1 shrink-0">
+                  {t.task_type === '里程碑' ? '🏁' : t.task_type === '评审' ? '🔎' : '📋'}
+                </span>
+                <span className={`truncate ${t.is_critical ? 'text-red-600 font-medium' : 'text-gray-700'}`} title={t.name}>
+                  {t.name}
+                </span>
+              </span>
+              <span className="px-1 shrink-0 truncate text-xs text-gray-500 text-center" style={{ width: ASSIGNEE_W }} title={t.assignee_name || ''}>
+                {t.assignee_name || '—'}
               </span>
             </div>
           ))}

@@ -4,7 +4,9 @@ export type Scale = 'day' | 'week' | 'month';
 
 export const DAY_PX: Record<Scale, number> = { day: 28, week: 10, month: 4 };
 export const ROW_H = 32;
-export const LEFT_W = 320; // 左侧任务名列宽
+export const CODE_W = 120;    // 左侧:任务编号列宽
+export const ASSIGNEE_W = 72; // 左侧:负责人列宽
+export const LEFT_W = 440;    // 左侧固定区总宽(编号 + 名称 + 负责人)
 
 export function parseDate(s: string | null): Date | null {
   if (!s) return null;
