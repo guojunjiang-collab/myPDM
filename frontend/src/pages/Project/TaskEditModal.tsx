@@ -10,6 +10,7 @@ import PartDetailContent from '../../components/PartDetailContent';
 import AssemblyDetailContent from '../../components/AssemblyDetailContent';
 import DocumentDetailContent from '../../components/DocumentDetailContent';
 import ConfigurationDetailModal from '../../components/Configuration/ConfigurationDetailModal';
+import ArchiveTreeModal from '../../components/ArchiveTreeModal';
 import type { ProjectTask, TaskType, TaskStatus, TaskPriority, TaskLink, TaskComment, TaskDependency, DepType } from '../../types/project';
 import { can } from '../../stores/auth';
 
@@ -45,6 +46,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
   const [detailEntityType, setDetailEntityType] = useState<string | null>(null);
   const [detailData, setDetailData] = useState<any>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
 
   const canEditDeps = can('project.task:depend');
   const [deps, setDeps] = useState<TaskDependency[]>([]);
@@ -372,9 +374,19 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
           ) : detailData ? (
             detailEntityType === 'part' ? <PartDetailContent part={detailData} customFieldDefs={[]} customFieldValues={{}} /> :
             detailEntityType === 'assembly' ? <AssemblyDetailContent assembly={detailData} customFieldDefs={[]} customFieldValues={{}} /> :
-            <DocumentDetailContent doc={detailData} customFieldDefs={[]} customFieldValues={{}} />
+            <DocumentDetailContent doc={detailData} customFieldDefs={[]} customFieldValues={{}}
+              onArchivePreview={(attId, fileName) => setArchivePreview({ attId, fileName })} />
           ) : null}
         </Modal>
+      )}
+
+      {archivePreview && (
+        <ArchiveTreeModal
+          open={!!archivePreview}
+          onClose={() => setArchivePreview(null)}
+          attachmentId={archivePreview.attId}
+          fileName={archivePreview.fileName}
+        />
       )}
 
       {showPartPicker && (
