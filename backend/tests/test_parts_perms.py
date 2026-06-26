@@ -1,7 +1,7 @@
 import uuid
 import pytest
 from fastapi.testclient import TestClient
-from app.models import User, Part
+from app.models import User, Part, Component
 from app.main import app
 from app.database import get_db
 from app.routers.auth import get_current_active_user
@@ -28,7 +28,17 @@ def _make_part(db, code, version="A"):
     part = Part(id=uuid.uuid4(), code=code, name=f"Test {code}",
                 version=version, status="draft")
     db.add(part); db.commit(); db.refresh(part)
+    comp = Component(id=part.id, code=code, name=f"Test {code}",
+                     version=version, status="draft")
+    db.add(comp); db.commit(); db.refresh(comp)
     return part
+
+
+def _make_component(db, code, version="A"):
+    comp = Component(id=uuid.uuid4(), code=code, name=f"Test {code}",
+                     version=version, status="draft")
+    db.add(comp); db.commit(); db.refresh(comp)
+    return comp
 
 
 @pytest.fixture(autouse=True)
@@ -88,3 +98,38 @@ def test_parts_delete_admin_only(db, role, expect):
     c = _make_test_client(db, user)
     r = c.delete(f"/api/parts/{part.id}")
     assert r.status_code in ({expect} if expect == 200 else {expect, 400})
+
+
+@pytest.mark.parametrize("role,expect", [
+    ("admin", 200), ("engineer", 200), ("production", 403), ("guest", 403)
+])
+def test_components_create_role_gate(db, role, expect):
+    user = _make_user(db, role)
+    c = _make_test_client(db, user)
+    r = c.post("/api/components/", json={
+        "code": f"COMP_{role}_{uuid.uuid4().hex[:4]}",
+        "name": "Test", "version": "A"
+    })
+    assert r.status_code == expect
+
+
+@pytest.mark.parametrize("role,expect", [
+    ("admin", 200), ("engineer", 200), ("production", 200), ("guest", 200)
+])
+def test_components_read_role_gate(db, role, expect):
+    user = _make_user(db, role)
+    c = _make_test_client(db, user)
+    r = c.get("/api/components/")
+    assert r.status_code == expect
+
+
+@pytest.mark.parametrize("role,expect", [
+    ("admin", 200), ("engineer", 403), ("production", 403), ("guest", 403)
+])
+def test_components_delete_role_gate(db, role, expect):
+    admin = _make_user(db, "admin")
+    comp = _make_component(db, f"CDEL_{role}_{uuid.uuid4().hex[:4]}")
+    user = _make_user(db, role)
+    c = _make_test_client(db, user)
+    r = c.delete(f"/api/components/{comp.id}")
+    assert r.status_code == expect
