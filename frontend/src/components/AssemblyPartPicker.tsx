@@ -68,7 +68,6 @@ export default function AssemblyPartPicker({
 }: AssemblyPartPickerProps) {
   /* ---- 筛选 ---- */
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState<'' | 'part' | 'component'>('');
   const [statusFilter, setStatusFilter] = useState('');
   const [sortField, setSortField] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -81,7 +80,6 @@ export default function AssemblyPartPicker({
   const [fetchedComponents, setFetchedComponents] = useState<Component[]>([]);
   const [ancestorIds, setAncestorIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'part' | 'component'>('part');
   const [quickOpen, setQuickOpen] = useState(false);
   const [quickForm, setQuickForm] = useState({ code: '', name: '', spec: '', remark: '' });
   const [quickCreating, setQuickCreating] = useState(false);
@@ -180,7 +178,6 @@ export default function AssemblyPartPicker({
   const filtered = useMemo(() => {
     const keyword = search.trim().toLowerCase();
     let result = allCandidates.filter((item) => {
-      if (typeFilter && item.type !== typeFilter) return false;
       if (statusFilter && item.status !== statusFilter) return false;
       if (!keyword) return true;
       return (
@@ -203,7 +200,7 @@ export default function AssemblyPartPicker({
       });
     }
     return result;
-  }, [allCandidates, search, typeFilter, statusFilter, sortField, sortDir]);
+  }, [allCandidates, search, statusFilter, sortField, sortDir]);
 
   /* ---- 操作 ---- */
 
@@ -227,21 +224,19 @@ export default function AssemblyPartPicker({
 
   const handleConfirm = () => {
     const result = Array.from(selected.values()).map((v) => ({
-      child_type: v.type === 'part' ? 'part' : 'assembly',
+      child_type: 'component',
       child_id: v.id,
       quantity: v.quantity,
     }));
     onConfirm(result);
     setSelected(new Map());
     setSearch('');
-    setTypeFilter('');
     setStatusFilter('');
   };
 
   const handleCancel = () => {
     setSelected(new Map());
     setSearch('');
-    setTypeFilter('');
     setStatusFilter('');
     onClose();
   };
@@ -266,7 +261,6 @@ export default function AssemblyPartPicker({
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b sticky top-0">
                   <tr>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">类型</th>
                     <th className="px-3 py-2 text-left text-gray-500 font-medium">件号</th>
                     <th className="px-3 py-2 text-left text-gray-500 font-medium">中文名称</th>
                     <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
@@ -278,13 +272,6 @@ export default function AssemblyPartPicker({
                 <tbody className="divide-y divide-gray-100">
                   {selectedList.map((item) => (
                     <tr key={item.id} className="hover:bg-gray-50">
-                      <td className="px-3 py-2">
-                        <span className={`px-1.5 py-0.5 text-xs rounded ${
-                          item.type === 'part' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'
-                        }`}>
-                          零部件
-                        </span>
-                      </td>
                       <td className="px-3 py-2 font-medium">{item.code}</td>
                       <td className="px-3 py-2">{item.name}</td>
                       <td className="px-3 py-2 text-gray-500">{item.version}</td>
@@ -330,15 +317,6 @@ export default function AssemblyPartPicker({
             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
           />
           <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as '' | 'part' | 'component')}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-          >
-            <option value="">全部类型</option>
-            <option value="part">零部件</option>
-            <option value="component">零部件</option>
-          </select>
-          <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
@@ -359,17 +337,6 @@ export default function AssemblyPartPicker({
           </button>
           {quickOpen && (
             <div className="px-4 py-3 border-t space-y-2 bg-gray-50">
-              {/* Tab 切换 */}
-              <div className="flex gap-0 border rounded-lg overflow-hidden w-fit">
-                <button
-                  onClick={() => setActiveTab('part')}
-                  className={`px-3 py-1 text-xs font-medium ${activeTab === 'part' ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
-                >零件</button>
-                <button
-                  onClick={() => setActiveTab('component')}
-                  className={`px-3 py-1 text-xs font-medium ${activeTab === 'component' ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
-                >部件</button>
-              </div>
               <div className="flex gap-2">
                 <input value={quickForm.code} onChange={e => setQuickForm({ ...quickForm, code: e.target.value })} placeholder="件号 *" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
                 <input value={quickForm.name} onChange={e => setQuickForm({ ...quickForm, name: e.target.value })} placeholder="名称 *" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
@@ -380,11 +347,10 @@ export default function AssemblyPartPicker({
                   if (!quickForm.code.trim() || !quickForm.name.trim()) return;
                   setQuickCreating(true);
                   try {
-                    const r = await componentsApi.create({ type: activeTab === 'part' ? 'part' : 'assembly', code: quickForm.code.trim(), name: quickForm.name.trim(), spec: quickForm.spec || undefined, remark: quickForm.remark || undefined });
-                    const newItem: SelectedItem = { id: r.data.id, code: r.data.code, name: r.data.name, version: r.data.version || '-', status: r.data.status || 'draft', type: activeTab, quantity: 1 };
+                    const r = await componentsApi.create({ code: quickForm.code.trim(), name: quickForm.name.trim(), spec: quickForm.spec || undefined, remark: quickForm.remark || undefined });
+                    const newItem: SelectedItem = { id: r.data.id, code: r.data.code, name: r.data.name, version: r.data.version || '-', status: r.data.status || 'draft', type: 'component', quantity: 1 };
                     setSelected(prev => new Map(prev).set(newItem.id, newItem));
-                    // 同步添加到候选列表，无需重新搜索
-                    const candidate: CandidateItem = { id: newItem.id, code: newItem.code, name: newItem.name, version: newItem.version, status: newItem.status, type: activeTab };
+                    const candidate: CandidateItem = { id: newItem.id, code: newItem.code, name: newItem.name, version: newItem.version, status: newItem.status, type: 'component' };
                     setFetchedComponents(prev => [...prev, candidate as any]);
                     setQuickForm({ code: '', name: '', spec: '', remark: '' });
                   } catch { } finally { setQuickCreating(false); }
@@ -420,11 +386,6 @@ export default function AssemblyPartPicker({
                     return (
                       <tr key={item.id} className="hover:bg-gray-50">
                         <td className="px-3 py-2 font-medium">
-                          <span className={`px-1.5 py-0.5 text-xs rounded mr-1.5 ${
-                            item.type === 'part' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'
-                          }`}>
-                            零部件
-                          </span>
                           {item.code}
                         </td>
                         <td className="px-3 py-2">{item.name}</td>
