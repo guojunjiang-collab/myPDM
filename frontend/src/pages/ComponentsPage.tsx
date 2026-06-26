@@ -149,6 +149,21 @@ export default function Components() {
         parent_id: childId,
       }));
       setExpandedParts(p => ({ ...p, [idx]: children }));
+
+      // 预查孙项
+      const compItems = children.filter((c: any) => (c.childType === 'component' || c.childType === 'assembly') && c.child_detail?.id);
+      if (compItems.length > 0) {
+        const checks = await Promise.allSettled(
+          compItems.map((c: any) => assemblyPartsApi.list(c.child_detail.id))
+        );
+        const noChildSet = new Set(noChildren);
+        checks.forEach((c, i) => {
+          if (c.status === 'fulfilled' && ((c.value.data || []) as any[]).length === 0) {
+            noChildSet.add(compItems[i].child_id);
+          }
+        });
+        setNoChildren(noChildSet);
+      }
     } catch { } finally { setLoadingPart(null); }
   };
 
@@ -400,13 +415,32 @@ export default function Components() {
     setLoadingEditParts(true);
     try {
       const res = await assemblyPartsApi.list(componentId);
-      setEditParts(res.data || []);
+      const items = res.data || [];
+      setEditParts(items);
+
+      // 预查所有 component 类型子项是否有孙项
+      const compItems = items.filter((it: AssemblyPartItem) => it.childType === 'component' && it.child_detail?.id);
+      if (compItems.length > 0) {
+        const checks = await Promise.allSettled(
+          compItems.map((it: AssemblyPartItem) => assemblyPartsApi.list(it.child_detail!.id))
+        );
+        const noChildSet = new Set(noChildren);
+        checks.forEach((c, i) => {
+          if (c.status === 'fulfilled') {
+            const grandchildren = (c.value.data || []) as any[];
+            if (grandchildren.length === 0) {
+              noChildSet.add(compItems[i].id);
+            }
+          }
+        });
+        setNoChildren(noChildSet);
+      }
     } catch {
       setEditParts([]);
     } finally {
       setLoadingEditParts(false);
     }
-  }, []);
+  }, [noChildren]);
 
   /** 递归加载子项树 */
   const loadViewParts = useCallback(async (componentId: string): Promise<TreeNode[]> => {
@@ -964,17 +998,12 @@ export default function Components() {
         <tr key={idx} className="hover:bg-gray-50">
           <td className="px-3 py-2 text-sm text-gray-400 whitespace-nowrap">
             <span>{'-'.repeat(level)}{level}</span>
-            {isAssembly && (
+            {isAssembly && !noChildren.has(part.child_id) && (
               <button type="button" onClick={(e) => { e.stopPropagation(); toggleEditExpand(idx, part.child_id); }}
                 className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
                 {childRows ? '\u25bc' : '\u25b6'}
               </button>
             )}
-          </td>
-          <td className="px-3 py-2 cursor-pointer" onClick={() => setNestedEdit({ type: isAssembly ? 'assembly' : 'part', id: part.child_id })}>
-            <span className={`px-1.5 py-0.5 text-xs rounded ${isAssembly ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
-              {isAssembly ? '部件' : '零件'}
-            </span>
           </td>
           <td className="px-3 py-2 font-medium cursor-pointer hover:text-primary-600" onClick={() => setNestedEdit({ type: isAssembly ? 'assembly' : 'part', id: part.child_id })}>{part.child_detail?.code || '-'}</td>
           <td className="px-3 py-2 cursor-pointer hover:text-primary-600" onClick={() => setNestedEdit({ type: isAssembly ? 'assembly' : 'part', id: part.child_id })}>{part.child_detail?.name || '-'}</td>
