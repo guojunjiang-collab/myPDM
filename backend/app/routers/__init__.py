@@ -15,5 +15,6 @@ from .ecos import router as eco_router
 from .configuration import router as config_router
 
 from .inventory import router as inventory_router
+from .components import router as components_router
 
-__all__ = ["auth_router", "users_router", "parts_router", "assemblies_router", "bom_router", "logs_router", "custom_fields_router", "documents_router", "user_groups_router", "dashboard_router", "ecr_router", "eco_router", "config_router", "inventory_router"]
+__all__ = ["auth_router", "users_router", "parts_router", "assemblies_router", "bom_router", "logs_router", "custom_fields_router", "documents_router", "user_groups_router", "dashboard_router", "ecr_router", "eco_router", "config_router", "inventory_router", "components_router"]

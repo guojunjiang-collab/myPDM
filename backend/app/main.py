@@ -3,13 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 import os
 
-from .routers import auth_router, users_router, parts_router, assemblies_router, bom_router, logs_router, custom_fields_router, documents_router, user_groups_router, dashboard_router, ecr_router, eco_router, config_router, inventory_router
+from .routers import auth_router, users_router, parts_router, assemblies_router, bom_router, logs_router, custom_fields_router, documents_router, user_groups_router, dashboard_router, ecr_router, eco_router, config_router, inventory_router, components_router
 from .routers.attachments_v2 import router as attachments_v2_router
 from .routers.sync import router as sync_router
 from .routers.admin import router as admin_router
 from .routers.assistant import router as assistant_router
 from .routers.projects import router as projects_router
-from .database import SessionLocal
+from .database import SessionLocal, engine
+from .migrations_components import migrate_components
 
 app = FastAPI(
     title="BOM管理系统API",
@@ -33,6 +34,7 @@ app.include_router(users_router, prefix="/api")
 app.include_router(user_groups_router, prefix="/api")
 app.include_router(parts_router, prefix="/api")
 app.include_router(assemblies_router, prefix="/api")
+app.include_router(components_router, prefix="/api")
 app.include_router(bom_router, prefix="/api")
 app.include_router(logs_router, prefix="/api")
 app.include_router(attachments_v2_router, prefix="/api/v2")  # 新版附件API（支持分块上传）
@@ -557,6 +559,14 @@ async def startup_event():
         except Exception as _re:
             db.rollback()
             print(f"⚠ Parent date rollup skipped: {_re}")
+
+        # 零部件统一化迁移：parts + assemblies → components
+        try:
+            migrate_components(db, engine)
+            print("✓ Components unification migration completed")
+        except Exception as _cm:
+            db.rollback()
+            print(f"⚠ Components unification migration skipped: {_cm}")
 
         print("✓ Database migration completed successfully")
     except Exception as e:
