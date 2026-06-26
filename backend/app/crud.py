@@ -136,16 +136,14 @@ def create_part(db, part):
     return db_part
 
 def assert_entity_editable(db, entity_type: str, entity_id, user_role: str):
-    """审批锁定：处于"冻结/发布"状态的零部件，非管理员不可修改。
-
-    entity_type: part | assembly | component（component 视为 assembly）。其它类型（如 document）不在锁定范围。
-    冻结/发布状态本身由 ECO 提交/执行流程通过 ORM 直接设置，不经过本校验，故不受影响。
-    """
+    """审批锁定：处于"冻结/发布"状态的零部件，非管理员不可修改。"""
     if user_role == "admin":
         return
-    if entity_type == "part":
+    if entity_type == "component":
+        ent = get_component(db, entity_id)
+    elif entity_type == "part":
         ent = get_part(db, entity_id)
-    elif entity_type in ("assembly", "component"):
+    elif entity_type in ("assembly",):
         ent = get_assembly(db, entity_id)
     else:
         return
@@ -241,6 +239,77 @@ def get_assemblies(db, skip=0, limit=100, search=None, include_deleted=False, up
         )
         q = q.filter(models.Assembly.id.notin_(parented_child_ids))
     return q.offset(skip).limit(limit).all()
+
+# ===== Component CRUD =====
+
+def get_component(db, component_id):
+    return db.query(models.Component).filter(models.Component.id == component_id).first()
+
+def get_component_by_code_version(db, code, version):
+    return db.query(models.Component).filter(
+        models.Component.code == code,
+        models.Component.version == version,
+        models.Component.deleted_at.is_(None)
+    ).first()
+
+def get_components(db, skip=0, limit=100, search=None, include_deleted=False,
+                   updated_since=None, top_level=False):
+    q = db.query(models.Component)
+    if not include_deleted:
+        q = q.filter(models.Component.deleted_at.is_(None))
+    if search:
+        pattern = f"%{search}%"
+        q = q.filter(
+            (models.Component.code.ilike(pattern)) |
+            (models.Component.name.ilike(pattern))
+        )
+    if updated_since:
+        from datetime import datetime, timezone
+        since_dt = datetime.fromtimestamp(updated_since, tz=timezone.utc)
+        q = q.filter(
+            (models.Component.updated_at >= since_dt) |
+            (models.Component.deleted_at >= since_dt)
+        )
+    if top_level:
+        subq = db.query(models.BOMItem.child_id).filter(
+            models.BOMItem.child_type == 'component',
+            models.BOMItem.deleted_at.is_(None)
+        ).subquery()
+        q = q.filter(~models.Component.id.in_(subq))
+    return q.offset(skip).limit(limit).all()
+
+def create_component(db, component):
+    data = component.model_dump()
+    db_comp = models.Component(**data)
+    db.add(db_comp)
+    db.commit()
+    db.refresh(db_comp)
+    return db_comp
+
+def update_component(db, component_id, component_update):
+    db_comp = get_component(db, component_id)
+    if not db_comp:
+        return None
+    for field, value in component_update.model_dump(exclude_unset=True).items():
+        setattr(db_comp, field, value)
+    from datetime import datetime
+    db_comp.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(db_comp)
+    return db_comp
+
+def delete_component(db, component_id):
+    db.query(models.BOMItem).filter(
+        models.BOMItem.child_type == 'component',
+        models.BOMItem.child_id == component_id,
+        models.BOMItem.deleted_at.is_(None)
+    ).update({"deleted_at": sqlfunc.now()}, synchronize_session=False)
+    db.commit()
+    db_comp = get_component(db, component_id)
+    if db_comp:
+        db_comp.deleted_at = sqlfunc.now()
+        db.commit()
+    return db_comp
 
 def create_assembly(db, assembly):
     db_assembly = models.Assembly(**assembly.model_dump())
