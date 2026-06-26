@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useProjectStore } from '../../stores/project';
 import { projectApi } from '../../services/projectApi';
-import { usersApi } from '../../services/api';
+import { usersApi, logsApi } from '../../services/api';
 import { can } from '../../stores/auth';
 import { Modal, ConfirmModal } from '../../components/Modal';
 import { toast } from '../../components/Toast';
@@ -12,6 +12,7 @@ import GanttView from './gantt/GanttView';
 import { TaskCodeCell, TaskNameCell, TaskAssigneeCell } from './TaskRowCells';
 import { CODE_W, ASSIGNEE_W, LEFT_W } from './gantt/ganttUtils';
 import type { Project, ProjectStatus, ProjectTask, TaskStatus, TaskLink, TaskComment } from '../../types/project';
+import type { OperationLog } from '../../types';
 
 const STATUSES: ProjectStatus[] = ['待启动', '进行中', '已完成', '已暂停', '已归档'];
 const STATUS_CLASS: Record<ProjectStatus, string> = {
@@ -63,6 +64,9 @@ export default function Projects() {
   // Detail tab state
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [memberOpen, setMemberOpen] = useState(false);
+  const [logOpen, setLogOpen] = useState(false);
+  const [logs, setLogs] = useState<OperationLog[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
   const [editTask, setEditTask] = useState<ProjectTask | null>(null);
   const [editParentId, setEditParentId] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
@@ -572,6 +576,15 @@ export default function Projects() {
                   <span className={`px-2 py-0.5 text-xs rounded-full ${STATUS_CLASS[currentProject.status]}`}>{currentProject.status}</span>
                   <span className="text-sm text-gray-500">负责人 {currentProject.owner_name}</span>
                   <div className="flex-1" />
+                  <button onClick={async () => {
+                    setLogOpen(true);
+                    setLogsLoading(true);
+                    try {
+                      const r = await logsApi.list({ target_type: 'project', target_id: selectedProjectId, limit: 200 });
+                      setLogs((r.data as any).items || r.data || []);
+                    } catch { setLogs([]); }
+                    setLogsLoading(false);
+                  }} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-white">操作记录</button>
                   <button onClick={() => setMemberOpen(true)} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-white">成员管理</button>
                 </div>
 
@@ -689,6 +702,43 @@ export default function Projects() {
                   </div>
                 )}
 
+                <Modal open={logOpen} title="操作记录" onClose={() => setLogOpen(false)} width="lg">
+                  <div className="max-h-[70vh] overflow-y-auto">
+                    {logsLoading ? (
+                      <div className="text-center text-gray-400 py-8">加载中...</div>
+                    ) : logs.length === 0 ? (
+                      <div className="text-center text-gray-400 py-8">暂无操作记录</div>
+                    ) : (
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 border-b sticky top-0 z-10">
+                          <tr>
+                            <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">时间</th>
+                            <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">用户</th>
+                            <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">操作</th>
+                            <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">详情</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {logs.map((l) => (
+                            <tr key={l.id}>
+                              <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{l.created_at?.slice(0, 19).replace('T', ' ') || '-'}</td>
+                              <td className="px-3 py-2">{l.username}</td>
+                              <td className="px-3 py-2">
+                                <span className={`px-2 py-0.5 text-xs rounded-full ${
+                                  l.action.includes('创建') ? 'bg-green-100 text-green-800' :
+                                  l.action.includes('删除') ? 'bg-red-100 text-red-800' :
+                                  'bg-gray-100 text-gray-700'
+                                }`}>{l.action}</span>
+                              </td>
+                              <td className="px-3 py-2 text-gray-500">{l.detail || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </Modal>
+
                 <MemberManageModal open={memberOpen} projectId={selectedProjectId!} ownerId={currentProject.owner_id} onClose={() => setMemberOpen(false)} />
                 <TaskEditModal open={editOpen} projectId={selectedProjectId!} task={editTask} parentId={editParentId}
                                onClose={() => setEditOpen(false)} onSaved={() => { setEditOpen(false); reload(); }} />
@@ -701,10 +751,16 @@ export default function Projects() {
 
       </div>
 
-      <Modal open={createOpen} title={editingProject ? '编辑项目' : '新建项目'} onClose={() => { setCreateOpen(false); setEditingProject(null); }} width="lg">
+      <Modal open={createOpen} title={editingProject ? '编辑项目' : '新建项目'} onClose={() => { setCreateOpen(false); setEditingProject(null); }} width="full">
         <div className="space-y-4 max-h-[75vh] overflow-y-auto px-1">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {editingProject && (
+              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-gray-500 mb-0.5">项目编号</label>
+                <div className="text-sm text-gray-700 py-1">{editingProject.code}</div>
+              </div>
+            )}
+            <div className={`${editingProject ? 'col-span-2' : 'col-span-2 md:col-span-4'} bg-gray-50 rounded-lg px-3 py-2 border border-gray-100`}>
               <label className="block text-xs text-gray-500 mb-0.5">项目名称 <span className="text-red-500">*</span></label>
               <input
                 value={form.name}
@@ -713,30 +769,16 @@ export default function Projects() {
                 required
               />
             </div>
-            {editingProject && (
-              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                <label className="block text-xs text-gray-500 mb-0.5">状态</label>
-                <select
-                  value={form.status}
-                  onChange={(e) => setForm({ ...form, status: e.target.value as ProjectStatus })}
-                  className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-                >
-                  {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-            )}
-            {editingProject && (
-              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                <label className="block text-xs text-gray-500 mb-0.5">负责人</label>
-                <select
-                  value={form.owner_id}
-                  onChange={(e) => setForm({ ...form, owner_id: e.target.value })}
-                  className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-                >
-                  {allUsers.map((u) => <option key={u.id} value={u.id}>{u.real_name} ({u.username})</option>)}
-                </select>
-              </div>
-            )}
+            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-gray-500 mb-0.5">状态</label>
+              <select
+                value={form.status}
+                onChange={(e) => setForm({ ...form, status: e.target.value as ProjectStatus })}
+                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">计划开始</label>
               <input
@@ -755,13 +797,31 @@ export default function Projects() {
                 className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
-            <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            {editingProject && (
+              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-gray-500 mb-0.5">负责人</label>
+                <select
+                  value={form.owner_id}
+                  onChange={(e) => setForm({ ...form, owner_id: e.target.value })}
+                  className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  {allUsers.map((u) => <option key={u.id} value={u.id}>{u.real_name} ({u.username})</option>)}
+                </select>
+              </div>
+            )}
+            {editingProject && (
+              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-gray-500 mb-0.5">创建时间</label>
+                <div className="text-sm text-gray-700 py-1">{editingProject.created_at ? new Date(editingProject.created_at).toLocaleDateString('zh-CN') : '-'}</div>
+              </div>
+            )}
+            <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">描述</label>
               <textarea
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
-                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
-                rows={3}
+                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none placeholder:text-gray-300"
+                rows={2}
                 placeholder="可选"
               />
             </div>

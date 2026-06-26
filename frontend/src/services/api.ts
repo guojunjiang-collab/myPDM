@@ -177,7 +177,7 @@ export const userGroupsApi = {
 
 // 操作日志 API
 export const logsApi = {
-  list: (params?: { page?: number; page_size?: number; user_id?: string; start_date?: string; end_date?: string }) =>
+  list: (params?: { page?: number; page_size?: number; user_id?: string; start_date?: string; end_date?: string; target_type?: string; target_id?: string; skip?: number; limit?: number }) =>
     api.get('/logs/', { params }),
 };
 

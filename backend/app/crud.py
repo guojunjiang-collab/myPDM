@@ -376,8 +376,15 @@ def create_log(db, user_id, username, action, target_type=None, target_id=None, 
     db.commit()
     return db_log
 
-def get_logs(db, skip=0, limit=100):
-    return db.query(models.OperationLog).order_by(models.OperationLog.created_at.desc()).offset(skip).limit(limit).all()
+def get_logs(db, skip=0, limit=100, target_type=None, target_id=None):
+    q = db.query(models.OperationLog)
+    if target_type:
+        q = q.filter(models.OperationLog.target_type == target_type)
+    if target_id:
+        q = q.filter(models.OperationLog.target_id == target_id)
+    total = q.count()
+    items = q.order_by(models.OperationLog.created_at.desc()).offset(skip).limit(limit).all()
+    return items, total
 
 # ===== Custom Field Definition CRUD =====
 

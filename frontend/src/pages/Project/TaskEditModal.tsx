@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { projectApi } from '../../services/projectApi';
-import { usersApi, partsApi, assembliesApi, documentsApi, ecrApi, ecoApi } from '../../services/api';
+import { usersApi, partsApi, assembliesApi, documentsApi, ecrApi, ecoApi, logsApi } from '../../services/api';
 import AssemblyPartPicker from '../../components/AssemblyPartPicker';
 import DocumentPicker from '../../components/DocumentPicker';
 import ConfigItemPicker from '../../components/Configuration/ConfigItemPicker';
@@ -14,6 +14,7 @@ import ArchiveTreeModal from '../../components/ArchiveTreeModal';
 import { ECRDetailModal } from '../../components/ECR/ECRDetailModal';
 import { ECODetailModal } from '../../components/ECO/ECODetailModal';
 import type { ProjectTask, TaskType, TaskStatus, TaskPriority, TaskLink, TaskComment, TaskDependency, DepType } from '../../types/project';
+import type { OperationLog } from '../../types';
 import { can } from '../../stores/auth';
 
 interface Props {
@@ -28,14 +29,24 @@ interface Props {
 const TYPES: TaskType[] = ['任务', '里程碑', '评审'];
 const STATUSES: TaskStatus[] = ['未开始', '进行中', '已完成', '挂起'];
 const PRIORITIES: TaskPriority[] = ['高', '中', '低'];
+const STATUS_CLASS: Record<string, string> = {
+  未开始: 'bg-gray-100 text-gray-600',
+  进行中: 'bg-blue-50 text-blue-700',
+  已完成: 'bg-green-50 text-green-700',
+  挂起: 'bg-amber-50 text-amber-700',
+};
 const LINK_LABEL: Record<string, string> = {
   part: '零件', assembly: '部件', config_item: '构型项', ec: 'EC', document: '图文档',
 };
 
 export default function TaskEditModal({ open, projectId, task, parentId, onClose, onSaved }: Props) {
   const empty = { name: '', task_type: '任务' as TaskType, assignee_id: '', status: '未开始' as TaskStatus,
-    priority: '中' as TaskPriority, planned_start: '', planned_end: '', description: '' };
+    priority: '中' as TaskPriority, planned_start: '', planned_end: '', actual_start: '', actual_end: '', description: '' };
   const [form, setForm] = useState(empty);
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [tab, setTab] = useState<'info' | 'logs'>('info');
+  const [taskLogs, setTaskLogs] = useState<OperationLog[]>([]);
+  const [taskLogsLoading, setTaskLogsLoading] = useState(false);
   const [users, setUsers] = useState<{ id: string; real_name: string }[]>([]);
   const [links, setLinks] = useState<TaskLink[]>([]);
   const [comments, setComments] = useState<TaskComment[]>([]);
@@ -80,6 +91,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
         name: task.name, task_type: task.task_type, assignee_id: task.assignee_id || '',
         status: task.status, priority: task.priority,
         planned_start: task.planned_start || '', planned_end: task.planned_end || '',
+        actual_start: task.actual_start || '', actual_end: task.actual_end || '',
         description: task.description || '',
       });
       loadLinks(task.id);
@@ -106,12 +118,38 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
     // 未填日期发送 null 而非空字符串,避免后端日期校验失败
     if (payload.planned_start === '') payload.planned_start = null;
     if (payload.planned_end === '') payload.planned_end = null;
+    if (payload.actual_start === '') payload.actual_start = null;
+    if (payload.actual_end === '') payload.actual_end = null;
     try {
       if (task) await projectApi.updateTask(projectId, task.id, payload);
       else await projectApi.createTask(projectId, payload);
       onSaved();
     } catch (err: any) {
       alert(err?.response?.data?.detail || '保存失败');
+    }
+  };
+
+  const handleStatusAction = async (newStatus: TaskStatus) => {
+    if (!task) return;
+    setStatusSaving(true);
+    const today = new Date().toISOString().slice(0, 10);
+    const payload: any = { status: newStatus };
+    if (newStatus === '进行中' && task.status === '未开始') payload.actual_start = today;
+    if (newStatus === '已完成') payload.actual_end = today;
+    if (newStatus === '进行中' && task.status === '挂起') payload.actual_end = null;
+    try {
+      await projectApi.updateTask(projectId, task.id, payload);
+      setForm({
+        ...form,
+        status: newStatus,
+        actual_start: payload.actual_start ?? form.actual_start,
+        actual_end: payload.actual_end !== undefined ? (payload.actual_end ?? '') : form.actual_end,
+      });
+      onSaved();
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || '操作失败');
+    } finally {
+      setStatusSaving(false);
     }
   };
 
@@ -177,59 +215,104 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
     setDetailLoading(false);
   };
 
+  const loadTaskLogs = async () => {
+    if (!task) return;
+    setTaskLogsLoading(true);
+    try {
+      const r = await logsApi.list({ target_type: 'project_task', target_id: task.id, limit: 100 });
+      setTaskLogs((r.data as any).items || r.data || []);
+    } catch { setTaskLogs([]); }
+    setTaskLogsLoading(false);
+  };
+
+  useEffect(() => {
+    if (tab === 'logs' && task) loadTaskLogs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, task]);
+
   return (
     <Modal open={open} title={task ? `${task.code}_${task.name}` : '新建任务'} onClose={onClose} width="3xl">
+      {task && (
+        <div className="flex gap-1 mb-4 border-b">
+          <button
+            onClick={() => setTab('info')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              tab === 'info' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            任务信息
+          </button>
+          <button
+            onClick={() => setTab('logs')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              tab === 'logs' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            操作记录
+          </button>
+        </div>
+      )}
+      {(!task || tab === 'info') && (
       <div className="space-y-4">
-        <div className="grid grid-cols-3 gap-3">
-          <div className="col-span-2">
-            <label className="block text-sm text-gray-600 mb-1">任务名称 *</label>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-gray-500 mb-0.5">任务名称 <span className="text-red-500">*</span></label>
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-                   className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+                   className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" />
           </div>
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">类型</label>
+          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-gray-500 mb-0.5">类型</label>
             <select value={form.task_type} onChange={(e) => setForm({ ...form, task_type: e.target.value as TaskType })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                    className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500">
               {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">负责人</label>
+          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-gray-500 mb-0.5">状态</label>
+            <span className={`inline-block px-2 py-0.5 text-xs rounded-full ${STATUS_CLASS[form.status]}`}>{form.status}</span>
+          </div>
+          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-gray-500 mb-0.5">负责人</label>
             <select value={form.assignee_id} onChange={(e) => setForm({ ...form, assignee_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                    className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500">
               <option value="">未指派</option>
               {users.map((u) => <option key={u.id} value={u.id}>{u.real_name}</option>)}
             </select>
           </div>
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">状态</label>
-            <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as TaskStatus })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg">
-              {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">优先级</label>
+          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-gray-500 mb-0.5">优先级</label>
             <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as TaskPriority })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                    className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500">
               {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">计划开始</label>
+          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-gray-500 mb-0.5">计划开始</label>
             <input type="date" value={form.planned_start} onChange={(e) => setForm({ ...form, planned_start: e.target.value })}
-                   className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+                   className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" />
           </div>
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">计划完成</label>
+          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-gray-500 mb-0.5">计划完成</label>
             <input type="date" value={form.planned_end} onChange={(e) => setForm({ ...form, planned_end: e.target.value })}
-                   className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+                   className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" />
           </div>
-        </div>
-        <div>
-          <label className="block text-sm text-gray-600 mb-1">描述</label>
-          <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg" rows={2} />
+          <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-gray-500 mb-0.5">描述</label>
+            <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
+                      className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none placeholder:text-gray-300" rows={2} placeholder="可选" />
+          </div>
+          {task && (
+            <>
+              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-gray-500 mb-0.5">实际开始</label>
+                <div className="text-sm text-gray-700 py-1">{form.actual_start || '—'}</div>
+              </div>
+              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-gray-500 mb-0.5">实际完成</label>
+                <div className="text-sm text-gray-700 py-1">{form.actual_end || '—'}</div>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="border-t pt-3">
@@ -273,13 +356,6 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
           ) : (
             <div className="text-xs text-gray-400">暂无关联</div>
           )}
-        </div>
-
-        <div className="border-t pt-3">
-          <div className="text-sm text-gray-600 mb-1">任务附件 <span className="text-gray-400">(生产人员在此传产出)</span></div>
-          <div className="text-xs text-gray-400 border border-dashed border-gray-300 rounded-lg px-3 py-3">
-            接入现有附件上传组件(entity_type='project_task', entity_id=任务 id)
-          </div>
         </div>
 
         {task?.id && (
@@ -370,11 +446,82 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 border-t pt-3">
-          <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-          <button onClick={handleSave} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">保存</button>
+        <div className="flex justify-between gap-2 border-t pt-3">
+          <div className="flex gap-2">
+            {task && form.status === '未开始' && (
+              <button onClick={() => handleStatusAction('进行中')} disabled={statusSaving}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm">
+                {statusSaving ? '...' : '▶ 开始任务'}
+              </button>
+            )}
+            {task && form.status === '进行中' && (
+              <>
+                <button onClick={() => handleStatusAction('挂起')} disabled={statusSaving}
+                        className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 text-sm">
+                  {statusSaving ? '...' : '⏸ 暂停任务'}
+                </button>
+                <button onClick={() => handleStatusAction('已完成')} disabled={statusSaving}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm">
+                  {statusSaving ? '...' : '✓ 完成任务'}
+                </button>
+              </>
+            )}
+            {task && form.status === '挂起' && (
+              <>
+                <button onClick={() => handleStatusAction('进行中')} disabled={statusSaving}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm">
+                  {statusSaving ? '...' : '▶ 恢复任务'}
+                </button>
+                <button onClick={() => handleStatusAction('已完成')} disabled={statusSaving}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm">
+                  {statusSaving ? '...' : '✓ 完成任务'}
+                </button>
+              </>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
+            <button onClick={handleSave} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">保存</button>
+          </div>
         </div>
       </div>
+      )}
+      {task && tab === 'logs' && (
+        <div className="max-h-[65vh] overflow-y-auto">
+          {taskLogsLoading ? (
+            <div className="text-center text-gray-400 py-8">加载中...</div>
+          ) : taskLogs.length === 0 ? (
+            <div className="text-center text-gray-400 py-8">暂无操作记录</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b sticky top-0 z-10">
+                <tr>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">时间</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">用户</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">操作</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">详情</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {taskLogs.map((l) => (
+                  <tr key={l.id}>
+                    <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{l.created_at?.slice(0, 19).replace('T', ' ') || '-'}</td>
+                    <td className="px-3 py-2">{l.username}</td>
+                    <td className="px-3 py-2">
+                      <span className={`px-2 py-0.5 text-xs rounded-full ${
+                        l.action.includes('创建') ? 'bg-green-100 text-green-800' :
+                        l.action.includes('删除') ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>{l.action}</span>
+                    </td>
+                    <td className="px-3 py-2 text-gray-500">{l.detail || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
 
       {detailEntityId && detailEntityType === 'config_item' && (
         <ConfigurationDetailModal itemId={detailEntityId} onClose={() => { setDetailEntityId(null); setDetailEntityType(null); }} />
