@@ -451,7 +451,7 @@ export default function Components() {
     }
   }, [expandedIds, noChildren]);
 
-  /** 递归展开子部件的子项 */
+  /** 递归展开子部件的子项（含预查孙项） */
   const expandChildren = useCallback(async (node: TreeNode): Promise<TreeNode> => {
     if (node.item.childType !== 'component' || !node.item.child_detail) {
       return node;
@@ -466,11 +466,33 @@ export default function Components() {
         hasChildren: false,
         expanded: expandedIds.has(ci.id),
       }));
+
+      // 预查孙项
+      const compItems = childItems.filter((it) => it.childType === 'component' && it.child_detail?.id);
+      if (compItems.length > 0) {
+        const checks = await Promise.allSettled(
+          compItems.map((it) => assemblyPartsApi.list(it.child_detail!.id))
+        );
+        const noChildSet = new Set(noChildren);
+        checks.forEach((c, i) => {
+          if (c.status === 'fulfilled') {
+            const grandchildren = (c.value.data || []) as any[];
+            if (grandchildren.length > 0) {
+              const cn = children.find((n) => n.item.id === compItems[i].id);
+              if (cn) cn.hasChildren = true;
+            } else {
+              noChildSet.add(compItems[i].id);
+            }
+          }
+        });
+        setNoChildren(noChildSet);
+      }
+
       return { ...node, children, hasChildren: childItems.length > 0 };
     } catch {
       return node;
     }
-  }, [expandedIds]);
+  }, [expandedIds, noChildren]);
 
   /* ==============================================================
      子项操作

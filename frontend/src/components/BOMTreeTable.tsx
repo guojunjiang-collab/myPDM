@@ -37,78 +37,70 @@ export default function BOMTreeTable({ assemblyId, assemblyCode, assemblyName, m
   const [viewSortField, setViewSortField] = useState<string | null>(null);
   const [viewSortDir, setViewSortDir] = useState<'asc' | 'desc' | null>(null);
 
-  /** 加载子项树 */
+  /** 预查子项是否有孙项：并行请求，返回 nodes 和无子项 id 列表 */
+  const preCheckChildren = useCallback(async (items: AssemblyPartItem[], level: number): Promise<{ nodes: TreeNode[]; noChildIds: string[] }> => {
+    const nodes: TreeNode[] = items.map((item) => ({
+      item, level, children: [], hasChildren: false, expanded: false,
+    }));
+    const compItems = items.filter((it) => it.childType === 'component' && it.child_detail?.id);
+    if (compItems.length === 0) return { nodes, noChildIds: [] };
+    const checks = await Promise.allSettled(
+      compItems.map((it) => assemblyPartsApi.list(it.child_detail!.id))
+    );
+    const noChildIds: string[] = [];
+    checks.forEach((c, i) => {
+      if (c.status === 'fulfilled') {
+        const grandchildren = (c.value.data || []) as any[];
+        if (grandchildren.length > 0) {
+          const node = nodes.find((n) => n.item.id === compItems[i].id);
+          if (node) node.hasChildren = true;
+        } else {
+          noChildIds.push(compItems[i].id);
+        }
+      }
+    });
+    return { nodes, noChildIds };
+  }, []);
+
+  /** 加载子项树（含预查） */
   const loadViewParts = useCallback(async () => {
     setLoadingViewParts(true);
     try {
       const res = await assemblyPartsApi.list(assemblyId);
       const items: AssemblyPartItem[] = res.data || [];
-      const nodes: TreeNode[] = items.map((item) => ({
-        item,
-        level: 0,
-        children: [],
-        hasChildren: false,
-        expanded: false,
-      }));
-
-      // 预查所有 component 类型子项是否有孙项
-      const compItems = items.filter((it) => it.childType === 'component' && it.child_detail?.id);
-      if (compItems.length > 0) {
-        const checks = await Promise.allSettled(
-          compItems.map((it) => assemblyPartsApi.list(it.child_detail!.id))
-        );
-        const noChildSet = new Set<string>();
-        checks.forEach((c, i) => {
-          if (c.status === 'fulfilled') {
-            const children = c.value.data || [];
-            if (children.length > 0) {
-              const node = nodes.find((n) => n.item.id === compItems[i].id);
-              if (node) node.hasChildren = true;
-            } else {
-              noChildSet.add(compItems[i].id);
-            }
-          }
-        });
-        setNoChildren(noChildSet);
+      const { nodes, noChildIds } = await preCheckChildren(items, 0);
+      if (noChildIds.length > 0) {
+        setNoChildren(prev => { const s = new Set(prev); noChildIds.forEach(id => s.add(id)); return s; });
       }
-
       setViewParts(nodes);
     } catch {
       setViewParts([]);
     } finally {
       setLoadingViewParts(false);
     }
-  }, [assemblyId]);
+  }, [assemblyId, preCheckChildren]);
 
-  useEffect(() => {
-    loadViewParts();
-  }, [loadViewParts]);
+  useEffect(() => { loadViewParts(); }, [loadViewParts]);
 
-  /** 递归展开子部件的子项 */
+  /** 递归展开子项（含预查孙项） */
   const expandChildren = useCallback(async (node: TreeNode): Promise<TreeNode> => {
-    if (node.item.childType !== 'component' || !node.item.child_detail) {
-      return node;
-    }
+    if (node.item.childType !== 'component' || !node.item.child_detail) return node;
     try {
       const res = await assemblyPartsApi.list(node.item.child_detail.id);
       const childItems: AssemblyPartItem[] = res.data || [];
-      const children: TreeNode[] = childItems.map((ci) => ({
-        item: ci,
-        level: node.level + 1,
-        children: [],
-        hasChildren: false,
-        expanded: false,
-      }));
-      return { ...node, children, hasChildren: childItems.length > 0 };
+      const { nodes, noChildIds } = await preCheckChildren(childItems, node.level + 1);
+      if (noChildIds.length > 0) {
+        setNoChildren(prev => { const s = new Set(prev); noChildIds.forEach(id => s.add(id)); return s; });
+      }
+      return { ...node, children: nodes, hasChildren: nodes.length > 0 };
     } catch {
       return node;
     }
-  }, []);
+  }, [preCheckChildren]);
 
   /** 展开/收起 */
   const toggleExpand = async (node: TreeNode) => {
     if (node.item.childType !== 'component') return;
-
     const nextExpanded = new Set(expandedIds);
     if (nextExpanded.has(node.item.id)) {
       nextExpanded.delete(node.item.id);
@@ -116,7 +108,6 @@ export default function BOMTreeTable({ assemblyId, assemblyCode, assemblyName, m
       nextExpanded.add(node.item.id);
     }
     setExpandedIds(nextExpanded);
-
     if (nextExpanded.has(node.item.id)) {
       const expandedNode = await expandChildren(node);
       if (expandedNode.children.length === 0) {
@@ -131,38 +122,29 @@ export default function BOMTreeTable({ assemblyId, assemblyCode, assemblyName, m
   const replaceNode = (nodes: TreeNode[], targetId: string, replacement: TreeNode): TreeNode[] => {
     return nodes.map((n) => {
       if (n.item.id === targetId) return replacement;
-      if (n.children.length > 0) {
-        return { ...n, children: replaceNode(n.children, targetId, replacement) };
-      }
+      if (n.children.length > 0) return { ...n, children: replaceNode(n.children, targetId, replacement) };
       return n;
     });
   };
 
-  /** 渲染扁平化的树行 */
   const flattenTree = (nodes: TreeNode[]): TreeNode[] => {
     const result: TreeNode[] = [];
     const walk = (list: TreeNode[]) => {
       for (const n of list) {
         result.push(n);
-        if (n.children.length > 0) {
-          walk(n.children);
-        }
+        if (n.children.length > 0) walk(n.children);
       }
     };
     walk(nodes);
     return result;
   };
 
-  /** 详情子项排序 */
   const sortViewParts = useCallback((nodes: TreeNode[]): TreeNode[] => {
     if (!viewSortField || !viewSortDir) return nodes;
     return [...nodes].sort((a, b) => {
-      let aVal: string = '';
-      let bVal: string = '';
-      const ad = a.item.child_detail;
-      const bd = b.item.child_detail;
-      if (viewSortField === 'type') { aVal = a.item.childType; bVal = b.item.childType; }
-      else if (viewSortField === 'code') { aVal = ad?.code || ''; bVal = bd?.code || ''; }
+      let aVal = '', bVal = '';
+      const ad = a.item.child_detail, bd = b.item.child_detail;
+      if (viewSortField === 'code') { aVal = ad?.code || ''; bVal = bd?.code || ''; }
       else if (viewSortField === 'version') { aVal = ad?.version || ''; bVal = bd?.version || ''; }
       else if (viewSortField === 'status') { aVal = ad?.status || ''; bVal = bd?.status || ''; }
       const cmp = aVal.localeCompare(bVal, 'zh-CN');
@@ -174,34 +156,28 @@ export default function BOMTreeTable({ assemblyId, assemblyCode, assemblyName, m
     if (viewSortField === field) {
       if (viewSortDir === 'asc') setViewSortDir('desc');
       else if (viewSortDir === 'desc') { setViewSortField(null); setViewSortDir(null); }
-    } else {
-      setViewSortField(field);
-      setViewSortDir('asc');
-    }
+    } else { setViewSortField(field); setViewSortDir('asc'); }
   };
 
   const getViewSortIcon = (field: string): string => {
-    if (viewSortField !== field) return '↕';
-    if (viewSortDir === 'asc') return '↑';
-    return '↓';
+    if (viewSortField !== field) return '\u2195';
+    return viewSortDir === 'asc' ? '\u2191' : '\u2193';
   };
 
-  /** 渲染一行树节点 */
   const renderViewTreeNode = (node: TreeNode) => {
     const { item, level, children, hasChildren } = node;
     const rowClick = onRowClick ? () => onRowClick(item) : undefined;
     const dataCellCls = onRowClick ? 'cursor-pointer' : '';
-
     return (
       <tr key={item.id} className="hover:bg-gray-50">
         <td className="px-3 py-2 text-gray-400 whitespace-nowrap">
           <span className="text-xs text-gray-400">{'-'.repeat(level + 1)}{level + 1}</span>
           {hasChildren && !noChildren.has(item.id) && (
-              <button
-                onClick={(e) => { e.stopPropagation(); toggleExpand(node); }}
-                className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1"
-              >
-              {children.length > 0 ? '▼' : '▶'}
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleExpand(node); }}
+              className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1"
+            >
+              {children.length > 0 ? '\u25BC' : '\u25B6'}
             </button>
           )}
         </td>
@@ -219,7 +195,6 @@ export default function BOMTreeTable({ assemblyId, assemblyCode, assemblyName, m
     );
   };
 
-  /** 渲染子项表格 */
   const renderViewPartsTable = () => {
     const sorted = sortViewParts(viewParts);
     const flatRows = flattenTree(sorted);
@@ -266,7 +241,7 @@ export default function BOMTreeTable({ assemblyId, assemblyCode, assemblyName, m
                       {flatRows.length > 0 && (
                         <button onClick={(e) => { e.stopPropagation(); toggleAll(); }}
                           className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
-                          {allExpanded ? '▼' : '▶'}
+                          {allExpanded ? '\u25BC' : '\u25B6'}
                         </button>
                       )}
                     </td>
@@ -279,7 +254,7 @@ export default function BOMTreeTable({ assemblyId, assemblyCode, assemblyName, m
                   </tr>
                 )}
                 {flatRows.length === 0 && !loadingViewParts && (
-                  <tr><td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-400">暂无子项</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-400">暂无子项</td></tr>
                 )}
                 {flatRows.map(renderViewTreeNode)}
               </tbody>
@@ -290,9 +265,5 @@ export default function BOMTreeTable({ assemblyId, assemblyCode, assemblyName, m
     );
   };
 
-  return (
-    <div>
-      {renderViewPartsTable()}
-    </div>
-  );
+  return <div>{renderViewPartsTable()}</div>;
 }
