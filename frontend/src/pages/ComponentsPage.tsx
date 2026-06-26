@@ -169,9 +169,6 @@ export default function Components() {
 
   // 刷新指定父级的展开子项
   const refreshParentParts = async (parentId: string) => {
-    // 父级现在有子项了，移除 noChildren 标记
-    setNoChildren(prev => { const s = new Set(prev); s.delete(parentId); return s; });
-
     for (const [key, rows] of Object.entries(expandedParts)) {
       if (rows.length > 0 && rows[0]?.parent_id === parentId) {
         const res = await assemblyPartsApi.list(parentId);
@@ -180,20 +177,26 @@ export default function Components() {
         }));
         setExpandedParts(p => ({ ...p, [key]: fresh }));
 
-        // 预查孙项
-        const compItems = fresh.filter((c: any) => (c.childType === 'component' || c.childType === 'assembly') && c.child_detail?.id);
-        if (compItems.length > 0) {
-          const checks = await Promise.allSettled(
-            compItems.map((c: any) => assemblyPartsApi.list(c.child_detail.id))
-          );
-          const noChildSet = new Set(noChildren);
-          checks.forEach((c, i) => {
-            if (c.status === 'fulfilled' && ((c.value.data || []) as any[]).length === 0) {
-              noChildSet.add(compItems[i].child_id);
-            }
-          });
-          setNoChildren(noChildSet);
+        // 根据刷新后的子项数量更新 noChildren
+        const noChildSet = new Set(noChildren);
+        if (fresh.length === 0) {
+          noChildSet.add(parentId);
+        } else {
+          noChildSet.delete(parentId);
+          // 预查孙项
+          const compItems = fresh.filter((c: any) => (c.childType === 'component' || c.childType === 'assembly') && c.child_detail?.id);
+          if (compItems.length > 0) {
+            const checks = await Promise.allSettled(
+              compItems.map((c: any) => assemblyPartsApi.list(c.child_detail.id))
+            );
+            checks.forEach((c, i) => {
+              if (c.status === 'fulfilled' && ((c.value.data || []) as any[]).length === 0) {
+                noChildSet.add(compItems[i].child_id);
+              }
+            });
+          }
         }
+        setNoChildren(noChildSet);
         return;
       }
     }
