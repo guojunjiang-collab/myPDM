@@ -1,5 +1,5 @@
 ﻿import { useState, useRef } from 'react';
-import { assembliesApi } from '../../services/api';
+import { componentsApi } from '../../services/api';
 import BOMTreeTable from '../../components/BOMTreeTable';
 import type { SelectOption } from './types';
 
@@ -29,7 +29,7 @@ export default function BOMTreePanel({ assemblies: _assemblies, onViewEntity }: 
       setTreeSearchLoading(true);
       setLoading(true);
       try {
-        const response = await assembliesApi.list({ search: query.trim() });
+        const response = await componentsApi.list({ search: query.trim() });
         const items = Array.isArray(response.data)
           ? response.data
           : (response.data.items || []);

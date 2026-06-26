@@ -1,5 +1,5 @@
 ﻿import { useState, useCallback, useEffect, useRef } from 'react';
-import { bomApi, assembliesApi } from '../../services/api';
+import { bomApi, componentsApi } from '../../services/api';
 import type { BOMCompareNode, BOMCompareResponse } from '../../types';
 import {
   getChangedFields,
@@ -42,7 +42,7 @@ export default function BOMComparePanel({ onViewEntity }: BOMComparePanelProps) 
     cmpLeftDebounceRef.current = setTimeout(async () => {
       setCompareLeftSearchLoading(true);
       try {
-        const response = await assembliesApi.list({ search: query.trim() });
+        const response = await componentsApi.list({ search: query.trim() });
         const items = Array.isArray(response.data) ? response.data : (response.data.items || []);
         setCompareLeftResults(items.slice(0, 20));
       } catch { setCompareLeftResults([]); }
@@ -58,7 +58,7 @@ export default function BOMComparePanel({ onViewEntity }: BOMComparePanelProps) 
     cmpRightDebounceRef.current = setTimeout(async () => {
       setCompareRightSearchLoading(true);
       try {
-        const response = await assembliesApi.list({ search: query.trim() });
+        const response = await componentsApi.list({ search: query.trim() });
         const items = Array.isArray(response.data) ? response.data : (response.data.items || []);
         setCompareRightResults(items.slice(0, 20));
       } catch { setCompareRightResults([]); }

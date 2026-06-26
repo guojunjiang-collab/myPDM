@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { ecrApi, partsApi, assembliesApi, ecoApi, componentsApi } from '../../services/api';
+import { ecrApi, ecoApi, componentsApi } from '../../services/api';
 import type { BomImpactNode } from '../../types';
 import { ECOActionBadge } from './ECOStatusBadge';
 import AssemblyPartPicker from '../AssemblyPartPicker';
@@ -632,7 +632,7 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
       promises.push(
         Promise.allSettled(
           partCodes.map(async ({ entity_id, entity_code }) => {
-            const list = await partsApi.list({ search: entity_code, page_size: 100 });
+            const list = await componentsApi.list({ search: entity_code, page_size: 100 });
             const items = list.data?.items || list.data || [];
             const newVersion = items.find((item: any) => item.code === entity_code && item.id !== entity_id);
             if (newVersion) return { entity_id, status: newVersion.status, newId: newVersion.id };
@@ -646,7 +646,7 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
       promises.push(
         Promise.allSettled(
           assemblyCodes.map(async ({ entity_id, entity_code }) => {
-            const list = await assembliesApi.list({ search: entity_code, page_size: 100 });
+            const list = await componentsApi.list({ search: entity_code, page_size: 100 });
             const items = list.data?.items || list.data || [];
             const newVersion = items.find((item: any) => item.code === entity_code && item.id !== entity_id);
             if (newVersion) return { entity_id, status: newVersion.status, newId: newVersion.id };

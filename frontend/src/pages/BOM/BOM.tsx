@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useDataStore } from '../../stores/data';
-import { assembliesApi, partsApi, customFieldsApi } from '../../services/api';
+import { componentsApi, customFieldsApi } from '../../services/api';
 import type { CustomFieldDefinition, CustomFieldValue } from '../../types';
 import { Modal } from '../../components/Modal';
 import PartDetailContent from '../../components/PartDetailContent';
@@ -43,7 +43,7 @@ export default function BOM() {
 
   const loadAssemblies = async () => {
     try {
-      const response = await assembliesApi.list();
+      const response = await componentsApi.list();
       const items = Array.isArray(response.data) ? response.data : (response.data.items || []);
       const filtered = items.filter((a: { status?: string }) => a.status !== 'obsolete');
       setAssemblies(filtered.map((a: { id: string; code: string; name: string }) => ({
@@ -61,7 +61,7 @@ export default function BOM() {
     setDetailCustomDefs([]);
     setDetailCustomValues({});
     try {
-      const api = type === 'part' ? partsApi : assembliesApi;
+      const api = componentsApi;
       const res = await api.get(id);
       setDetailData(res.data);
 

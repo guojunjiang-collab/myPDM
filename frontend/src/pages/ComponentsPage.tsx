@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
-import { assembliesApi, assemblyPartsApi, componentsApi, customFieldsApi, bomApi, partsApi } from '../services/api';
+import { assemblyPartsApi, componentsApi, customFieldsApi, bomApi } from '../services/api';
 import type { Component, AssemblyPartItem, CustomFieldDefinition, CustomFieldValue } from '../types';
 import { canEdit, isAdmin, canDownload, can, useAuthStore } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
@@ -719,7 +719,7 @@ export default function Components() {
     setSaving(true);
     setSaveError(null);
     try {
-      const res = await assembliesApi.upgrade(editingComponent.id);
+      const res = await componentsApi.upgrade(editingComponent.id);
       const newComponent = res.data;
       useDataStore.getState().setComponents([...useDataStore.getState().components, newComponent]);
       setModalOpen(false);
@@ -752,7 +752,7 @@ export default function Components() {
     setNestedCustomDefs([]);
     setNestedCustomValues({});
     try {
-      const api = type === 'part' ? partsApi : componentsApi;
+      const api = componentsApi;
       const res = await api.get(id);
       if (reqId !== nestedReqId.current) return; // 忽略过期请求
       setNestedData(res.data);

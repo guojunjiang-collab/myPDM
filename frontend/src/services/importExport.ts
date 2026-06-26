@@ -30,8 +30,7 @@ declare global {
   }
 }
 import api, {
-  partsApi,
-  assembliesApi,
+  componentsApi,
   documentsApi,
   entityDocumentsApi,
   assemblyPartsApi,
@@ -673,7 +672,7 @@ export async function executePartsImport(preview: ImportPreview): Promise<void> 
                   c.type !== 'assembly' && c.code === row.code && (c.version || '') === row.version,
               );
             if (existing) {
-              const res = await partsApi.update(existing.id, data);
+              const res = await componentsApi.update(existing.id, data);
               const updated = res.data;
               // 保存自定义字段
               if (row._customFields && Object.keys(row._customFields).length > 0) {
@@ -691,7 +690,7 @@ export async function executePartsImport(preview: ImportPreview): Promise<void> 
               return updated;
             }
           } else {
-            const res = await partsApi.create(data);
+            const res = await componentsApi.create(data);
             const created = res.data;
             // 自定义字段
             if (row._customFields && Object.keys(row._customFields).length > 0) {
@@ -1252,7 +1251,7 @@ export async function executeAssembliesImport(
             (c) => c.type === 'assembly' && c.code === row.code && (c.version || '') === row.version,
           );
         if (existing) {
-          const res = await assembliesApi.update(existing.id, data);
+          const res = await componentsApi.update(existing.id, data);
           codeVersionToId.set(key, existing.id);
           codeVersionToNew.set(key, false);
 
@@ -1267,7 +1266,7 @@ export async function executeAssembliesImport(
           }
         }
       } else {
-        const res = await assembliesApi.create(data);
+        const res = await componentsApi.create(data);
         const created = res.data;
         codeVersionToId.set(key, created.id);
         codeVersionToNew.set(key, true);
@@ -1339,7 +1338,7 @@ export async function executeAssembliesImport(
         // 3. 如果是零件且未找到，自动创建草稿零件
         if (!childId && isPart) {
           try {
-            const res = await partsApi.create({
+            const res = await componentsApi.create({
               code: childCode,
               name: String(bomRow['中文名称'] || childCode),
               spec: String(bomRow['规格型号'] || ''),

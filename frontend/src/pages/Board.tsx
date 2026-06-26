@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { boardApi, usersApi, partsApi, assembliesApi, componentsApi, documentsApi, customFieldsApi, configurationApi } from '../services/api';
+import { boardApi, usersApi, componentsApi, documentsApi, customFieldsApi, configurationApi } from '../services/api';
 import { useDataStore } from '../stores/data';
 import { Modal, ConfirmModal } from '../components/Modal';
 import PartDetailContent from '../components/PartDetailContent';
@@ -281,7 +281,7 @@ export default function Board() {
     setDetailLoading(true);
     try {
       let res;
-      if (item.entity_type === 'part') res = await partsApi.get(item.entity_id);
+      if (item.entity_type === 'part') res = await componentsApi.get(item.entity_id);
       else if (item.entity_type === 'assembly' || item.entity_type === 'component') res = await componentsApi.get(item.entity_id);
       else if (item.entity_type === 'document') res = await documentsApi.get(item.entity_id);
       else res = await configurationApi.getItem(item.entity_id);
@@ -722,8 +722,8 @@ function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) 
     setDataWarning(null);
     (async () => {
       const [p, a, d, c] = await Promise.allSettled([
-        partsApi.list({ page_size: 10000, brief: true }),
-        assembliesApi.list({ page_size: 10000, brief: true }),
+        componentsApi.list({ page_size: 10000, brief: true }),
+        componentsApi.list({ page_size: 10000, brief: true }),
         documentsApi.list({ page_size: 10000, brief: true }),
         configurationApi.listItems({ page_size: 10000, brief: true }),
       ]);
