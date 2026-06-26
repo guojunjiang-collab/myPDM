@@ -247,7 +247,7 @@ export default function Components() {
   const [nestedCustomDefs, setNestedCustomDefs] = useState<CustomFieldDefinition[]>([]);
   const [nestedCustomValues, setNestedCustomValues] = useState<Record<string, any>>({});
   // 嵌套编辑
-  const [nestedEdit, setNestedEdit] = useState<{ type: 'part' | 'assembly'; id: string } | null>(null);
+  const [nestedEdit, setNestedEdit] = useState<{ type: 'component'; id: string } | null>(null);
   const nestedReqId = useRef(0);
   // Tree state now managed by AssemblyDetailContent - kept for backward compat only
   const [viewParts, setViewPartsState] = useState<TreeNode[]>([]);
@@ -1025,11 +1025,11 @@ export default function Components() {
               </button>
             )}
           </td>
-          <td className="px-3 py-2 font-medium cursor-pointer hover:text-primary-600" onClick={() => setNestedEdit({ type: isAssembly ? 'assembly' : 'part', id: part.child_id })}>{part.child_detail?.code || '-'}</td>
-          <td className="px-3 py-2 cursor-pointer hover:text-primary-600" onClick={() => setNestedEdit({ type: isAssembly ? 'assembly' : 'part', id: part.child_id })}>{part.child_detail?.name || '-'}</td>
-          <td className="px-3 py-2 text-gray-500 cursor-pointer hover:text-primary-600" onClick={() => setNestedEdit({ type: isAssembly ? 'assembly' : 'part', id: part.child_id })}>{part.child_detail?.spec || '-'}</td>
-          <td className="px-3 py-2 text-gray-500 cursor-pointer hover:text-primary-600" onClick={() => setNestedEdit({ type: isAssembly ? 'assembly' : 'part', id: part.child_id })}>{part.child_detail?.version || '-'}</td>
-          <td className="px-3 py-2 cursor-pointer" onClick={() => setNestedEdit({ type: isAssembly ? 'assembly' : 'part', id: part.child_id })}>
+          <td className="px-3 py-2 font-medium cursor-pointer hover:text-primary-600" onClick={() => setNestedEdit({ type: 'component', id: part.child_id })}>{part.child_detail?.code || '-'}</td>
+          <td className="px-3 py-2 cursor-pointer hover:text-primary-600" onClick={() => setNestedEdit({ type: 'component', id: part.child_id })}>{part.child_detail?.name || '-'}</td>
+          <td className="px-3 py-2 text-gray-500 cursor-pointer hover:text-primary-600" onClick={() => setNestedEdit({ type: 'component', id: part.child_id })}>{part.child_detail?.spec || '-'}</td>
+          <td className="px-3 py-2 text-gray-500 cursor-pointer hover:text-primary-600" onClick={() => setNestedEdit({ type: 'component', id: part.child_id })}>{part.child_detail?.version || '-'}</td>
+          <td className="px-3 py-2 cursor-pointer" onClick={() => setNestedEdit({ type: 'component', id: part.child_id })}>
             <span className={`px-1.5 py-0.5 text-xs rounded-full ${statusTag(part.child_detail?.status || 'draft').cls}`}>
               {statusTag(part.child_detail?.status || 'draft').label}
             </span>
@@ -1521,7 +1521,7 @@ export default function Components() {
       {/* 行点击 → 嵌套编辑弹窗 */}
       <EntityEditModal
         open={!!nestedEdit}
-        entityType={nestedEdit?.type || 'part'}
+        entityType="component"
         entityId={nestedEdit?.id || ''}
         onClose={() => setNestedEdit(null)}
         onSaved={() => {
