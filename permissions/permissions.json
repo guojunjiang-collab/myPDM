@@ -22,6 +22,17 @@
     "assemblies.doc:link": ["admin", "engineer"],
     "assemblies.doc:unlink": ["admin", "engineer"],
 
+    "components:create": ["admin", "engineer"],
+    "components:delete": ["admin"],
+    "components:read": ["admin", "engineer", "production", "guest"],
+    "components:update": ["admin", "engineer"],
+    "components.doc:link": ["admin", "engineer"],
+    "components.doc:read": ["admin", "engineer", "production", "guest"],
+    "components.doc:unlink": ["admin", "engineer"],
+    "components.bom:manage": ["admin", "engineer"],
+    "components.bom:export_single": ["admin", "engineer", "production"],
+    "components.bom:import_export_all": ["admin"],
+
     "documents:read": ["admin", "engineer", "production", "guest"],
     "documents:read_refs": ["admin", "engineer", "production", "guest"],
     "documents:create": ["admin", "engineer"],
