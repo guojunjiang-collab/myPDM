@@ -761,9 +761,9 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
           for (const item of items) {
             let code = ''; let name = ''; let ver = '';
             if (item.child_type === 'part' || item.child_type === 'component') {
-              try { const r = await partsApi.get(item.child_id); code = r.data.code; name = r.data.name; ver = r.data.version || 'A'; } catch {}
+              try { const r = await componentsApi.get(item.child_id); code = r.data.code; name = r.data.name; ver = r.data.version || 'A'; } catch {}
             } else {
-              try { const r = await assembliesApi.get(item.child_id); code = r.data.code; name = r.data.name; ver = r.data.version || 'A'; } catch {}
+              try { const r = await componentsApi.get(item.child_id); code = r.data.code; name = r.data.name; ver = r.data.version || 'A'; } catch {}
             }
             const parentAffected = localAffected.find(a => a.entity_id === pickerParentId || a.entity_code === pickerParentId);
             setLocalDown(prev => [...prev, { entity_type: item.child_type === 'assembly' || item.child_type === 'component' ? 'assembly' : 'part', entity_id: item.child_id, entity_code: code, entity_name: name, entity_version: ver, quantity: 0, action: 'add_existing', parent_entity_id: pickerParentId || undefined, _targetQty: item.quantity || 1, _affectedCode: (parentAffected as any)?.entity_code, _affectedName: (parentAffected as any)?.entity_name } as any]);

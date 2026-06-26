@@ -6,7 +6,7 @@ import PartDetailContent from '../PartDetailContent';
 import AssemblyDetailContent from '../AssemblyDetailContent';
 import ProfileStatusBadge from './ProfileStatusBadge';
 import ProfileReviewPanel from './ProfileReviewPanel';
-import { configurationApi, configurationProfileApi, partsApi, assembliesApi, usersApi } from '../../services/api';
+import { configurationApi, configurationProfileApi, partsApi, assembliesApi, componentsApi, usersApi } from '../../services/api';
 import { exportProfilePdf, exportProfileExcel } from '../../services/configProfilePdfExport';
 import { isAdmin } from '../../stores/auth';
 import { useAuthStore } from '../../stores/auth';
@@ -147,9 +147,9 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         const r = await partsApi.get(itemId);
         setDetailData(r.data as Part);
       } catch { setDetailData(null); }
-    } else if (itemType === 'assembly') {
+    } else if (itemType === 'assembly' || itemType === 'component') {
       try {
-        const r = await assembliesApi.get(itemId);
+        const r = await componentsApi.get(itemId);
         setDetailData(r.data as Assembly);
       } catch { setDetailData(null); }
     } else {

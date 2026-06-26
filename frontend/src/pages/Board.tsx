@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { boardApi, usersApi, partsApi, assembliesApi, documentsApi, customFieldsApi, configurationApi } from '../services/api';
+import { boardApi, usersApi, partsApi, assembliesApi, componentsApi, documentsApi, customFieldsApi, configurationApi } from '../services/api';
 import { useDataStore } from '../stores/data';
 import { Modal, ConfirmModal } from '../components/Modal';
 import PartDetailContent from '../components/PartDetailContent';
@@ -16,7 +16,7 @@ import type { CustomFieldDefinition, CustomFieldValue } from '../types';
 
 interface DashboardItem {
   id: string;
-  entity_type: 'part' | 'assembly' | 'document' | 'configuration';
+  entity_type: 'part' | 'assembly' | 'component' | 'document' | 'configuration';
   entity_id: string;
   code: string;
   name: string;
@@ -44,8 +44,8 @@ interface ShareRecord {
 
 type FilterTab = 'all' | 'part' | 'assembly' | 'document' | 'configuration';
 
-const ENTITY_LABEL: Record<string, string> = { part: '零件', assembly: '部件', document: '图文档', configuration: '构型项' };
-const ENTITY_ICON: Record<string, string> = { part: '🔧', assembly: '📦', document: '📄', configuration: '⚙️' };
+const ENTITY_LABEL: Record<string, string> = { part: '零件', assembly: '部件', component: '零部件', document: '图文档', configuration: '构型项' };
+const ENTITY_ICON: Record<string, string> = { part: '🔧', assembly: '📦', component: '📦', document: '📄', configuration: '⚙️' };
 
 const STATUS_TAG: Record<string, { label: string; cls: string }> = {
   draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
@@ -282,7 +282,7 @@ export default function Board() {
     try {
       let res;
       if (item.entity_type === 'part') res = await partsApi.get(item.entity_id);
-      else if (item.entity_type === 'assembly') res = await assembliesApi.get(item.entity_id);
+      else if (item.entity_type === 'assembly' || item.entity_type === 'component') res = await componentsApi.get(item.entity_id);
       else if (item.entity_type === 'document') res = await documentsApi.get(item.entity_id);
       else res = await configurationApi.getItem(item.entity_id);
       

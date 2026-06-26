@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { projectApi } from '../../services/projectApi';
-import { usersApi, partsApi, assembliesApi, documentsApi, ecrApi, ecoApi, logsApi } from '../../services/api';
+import { usersApi, partsApi, assembliesApi, componentsApi, documentsApi, ecrApi, ecoApi, logsApi } from '../../services/api';
 import AssemblyPartPicker from '../../components/AssemblyPartPicker';
 import DocumentPicker from '../../components/DocumentPicker';
 import ConfigItemPicker from '../../components/Configuration/ConfigItemPicker';
@@ -226,7 +226,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
     try {
       let res;
       if (entityType === 'part') res = await partsApi.get(entityId);
-      else if (entityType === 'assembly') res = await assembliesApi.get(entityId);
+      else if (entityType === 'assembly' || entityType === 'component') res = await componentsApi.get(entityId);
       else if (entityType === 'document') res = await documentsApi.get(entityId);
       if (res) setDetailData(res.data);
     } catch {

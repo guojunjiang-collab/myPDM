@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { Modal } from '../Modal';
-import { configurationApi, assemblyPartsApi, partsApi, assembliesApi, customFieldsApi } from '../../services/api';
+import { configurationApi, assemblyPartsApi, partsApi, assembliesApi, componentsApi, customFieldsApi } from '../../services/api';
 import type { ConfigPartItem, ConfigChildItem, CustomFieldDefinition, CustomFieldValue } from '../../types';
 import EntityDocumentSection from '../EntityDocumentSection';
 import PartDetailContent from '../PartDetailContent';
@@ -107,7 +107,7 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
     setNestedCustomDefs([]);
     setNestedCustomValues({});
     try {
-      const api = type === 'part' ? partsApi : assembliesApi;
+      const api = type === 'part' ? partsApi : componentsApi;
       const res = await api.get(id);
       if (reqId !== nestedReqId.current) return;
       setNestedData(res.data);
