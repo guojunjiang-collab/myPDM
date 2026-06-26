@@ -7,7 +7,7 @@ from typing import List
 import uuid
 
 from ..database import get_db
-from ..models import User
+from ..models import User, Component
 from .. import crud, models, schemas
 from ..bom import compare
 from ..permissions import require_permission
@@ -27,7 +27,7 @@ async def check_references(
     references = []
 
     # 1. 检查 BOM 子项引用（零件/部件作为子项被引用）
-    if entity_type in ("part", "assembly"):
+    if entity_type in ("component", "part", "assembly"):
         # 兼容 'assembly' 和 'component' 两种 child_type 值
         child_types = [entity_type]
         if entity_type == "assembly":
@@ -38,32 +38,24 @@ async def check_references(
             models.BOMItem.deleted_at.is_(None),  # 排除已软删除的 BOM 关系
         ).all()
         for item in bom_items:
-            # 检查父实体是否未被软删除
-            if item.parent_type == "part":
-                p = crud.get_part(db, item.parent_id)
+            if item.parent_type in ("part", "component", "assembly"):
+                p = crud.get_component(db, item.parent_id)
                 if p and p.deleted_at is None:
-                    references.append({"type": "bom_child", "parent_id": str(item.parent_id), "label": f"零件 {p.code}"})
-            elif item.parent_type == "assembly":
-                a = crud.get_assembly(db, item.parent_id)
-                if a and a.deleted_at is None:
-                    references.append({"type": "bom_child", "parent_id": str(item.parent_id), "label": f"部件 {a.code}"})
+                    references.append({"type": "bom_child", "parent_id": str(item.parent_id), "label": f"零部件 {p.code}"})
 
     # 2. 检查 document_links 引用（图文档被关联到零件/部件）
     if entity_type == "document":
-        from ..models import Part, Assembly
+        from ..models import Component
         doc_id_str = str(entity_id)
-        # 扫描零件
-        # 扫描零件的 document_links（精确匹配）
-        for p in db.query(Part).all():
+        for p in db.query(Component).all():
             for link in (p.document_links or []):
                 if link.get("document_id") == doc_id_str:
-                    references.append({"type": "entity_document", "parent_id": str(p.id), "label": f"零件 {p.code}"})
+                    references.append({"type": "entity_document", "parent_id": str(p.id), "label": f"零部件 {p.code}"})
                     break
-        # 扫描部件的 document_links（精确匹配）
-        for a in db.query(Assembly).all():
+        for a in db.query(Component).all():
             for link in (a.document_links or []):
                 if link.get("document_id") == doc_id_str:
-                    references.append({"type": "entity_document", "parent_id": str(a.id), "label": f"部件 {a.code}"})
+                    references.append({"type": "entity_document", "parent_id": str(a.id), "label": f"零部件 {a.code}"})
                     break
 
     return references
@@ -92,20 +84,15 @@ async def get_all_bom_items_route(updated_since: float = None, db: Session = Dep
 
 @router.get("/tree/{item_type}/{item_id}")
 async def get_bom_tree(item_type: str, item_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("bom:tree"))):
-    if item_type not in ["part", "assembly"]:
+    if item_type not in ["component", "part", "assembly"]:
         raise HTTPException(status_code=400, detail="无效的类型")
     items = crud.get_bom_items(db, item_type, item_id)
     result = []
     for item in items:
+        child = crud.get_component(db, item.child_id)
         child_detail = None
-        if item.child_type == "part":
-            child = crud.get_part(db, item.child_id)
-            if child:
-                child_detail = {"id": str(child.id), "code": child.code, "name": child.name, "spec": child.spec, "type": "part"}
-        else:
-            child = crud.get_assembly(db, item.child_id)
-            if child:
-                child_detail = {"id": str(child.id), "code": child.code, "name": child.name, "spec": child.spec, "type": "assembly"}
+        if child:
+            child_detail = {"id": str(child.id), "code": child.code, "name": child.name, "spec": child.spec, "type": "component"}
         result.append({
             "id": str(item.id),
             "child_type": item.child_type,
@@ -123,7 +110,7 @@ async def get_bom_trace(
     current_user: User = Depends(require_permission("bom:trace")),
 ):
     """递归反查：查找使用该零件/部件的所有父装配体（向上追溯最多10层）"""
-    if entity_type not in ("part", "assembly"):
+    if entity_type not in ("component", "part", "assembly"):
         raise HTTPException(status_code=400, detail="无效的类型，仅支持 part 或 assembly")
 
     # 递归 CTE：向上追溯父级（忽略软删除的 BOM 关系）
@@ -150,43 +137,33 @@ async def get_bom_trace(
 
     result = []
     for row in rows:
-        # 父装配体详情
-        parent_assembly = None
-        parent_part = None
-        if row.parent_type == "assembly":
-            a = crud.get_assembly(db, row.parent_id)
+        parent_entity = None
+        if row.parent_type in ("assembly", "component"):
+            a = crud.get_component(db, row.parent_id)
             if a:
-                parent_assembly = {
+                parent_entity = {
                     "id": str(a.id), "code": a.code, "name": a.name,
                     "spec": a.spec, "version": a.version, "status": a.status,
                 }
         elif row.parent_type == "part":
             p = crud.get_part(db, row.parent_id)
             if p:
-                parent_part = {
+                parent_entity = {
                     "id": str(p.id), "code": p.code, "name": p.name,
                     "spec": p.spec, "version": p.version, "status": p.status,
                 }
 
-        # 子实体详情
+        child_type = "component"
+        c = crud.get_component(db, row.child_id)
         child_entity = None
-        child_type = row.child_type
-        if child_type == "component":
-            child_type = "assembly"
-        if child_type == "part":
-            c = crud.get_part(db, row.child_id)
-            if c:
-                child_entity = {"id": str(c.id), "code": c.code, "name": c.name, "type": "part"}
-        else:
-            c = crud.get_assembly(db, row.child_id)
-            if c:
-                child_entity = {"id": str(c.id), "code": c.code, "name": c.name, "type": "assembly"}
+        if c:
+            child_entity = {"id": str(c.id), "code": c.code, "name": c.name, "type": "component"}
 
         result.append({
             "level": row.level,
             "bom_item_id": str(row.id),
-            "parent_assembly": parent_assembly,
-            "parent_part": parent_part,
+            "parent_assembly": parent_entity if row.parent_type in ("assembly", "component") else None,
+            "parent_part": parent_entity if row.parent_type == "part" else None,
             "child_entity": child_entity,
             "quantity": int(row.quantity) if row.quantity else 1,
         })
@@ -258,7 +235,7 @@ async def export_bom_csv(
     current_user: User = Depends(require_permission("bom:export")),
 ):
     """导出零件/部件 BOM 为 CSV（供 AI 助手与前端下载）。"""
-    if item_type not in ("part", "assembly"):
+    if item_type not in ("component", "part", "assembly"):
         raise HTTPException(status_code=400, detail="无效的类型")
     nodes = compare.get_bom_tree_recursive(db, item_id) if item_type == "assembly" else []
     buf = io.StringIO()
