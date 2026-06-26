@@ -106,19 +106,27 @@ def migrate_components(db, engine):
         WHERE entity_type IN ('part', 'assembly')
     """))
 
-    # 8. inventory_documents: ref_entity_type → 'component'
-    db.execute(text("""
-        UPDATE inventory_documents
-        SET ref_entity_type = 'component'
-        WHERE ref_entity_type IN ('part', 'assembly')
-    """))
+    # 8. inventory_documents: ref_entity_type → 'component'（若列存在）
+    try:
+        db.execute(text("""
+            UPDATE inventory_documents
+            SET ref_entity_type = 'component'
+            WHERE ref_entity_type IN ('part', 'assembly')
+        """))
+    except Exception:
+        db.rollback()
+        pass
 
-    # 9. project_tasks: entity_type → 'component'
-    db.execute(text("""
-        UPDATE project_tasks
-        SET entity_type = 'component'
-        WHERE entity_type IN ('part', 'assembly')
-    """))
+    # 9. project_tasks: entity_type → 'component'（若表/列存在）
+    try:
+        db.execute(text("""
+            UPDATE project_tasks
+            SET entity_type = 'component'
+            WHERE entity_type IN ('part', 'assembly')
+        """))
+    except Exception:
+        db.rollback()
+        pass
 
     # operation_logs 的 target_type 保留历史值，前端展示时做映射
 
