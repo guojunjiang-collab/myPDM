@@ -558,7 +558,23 @@ export default function Components() {
       const targetId = pickerTargetId || editingComponent.id;
       await Promise.all(items.map((it) => assemblyPartsApi.add(targetId, it)));
       if (pickerTargetId) {
-        refreshParentParts(pickerTargetId);
+        // 为尚未展开的父级自动加载并展开
+        const alreadyExpanded = Object.keys(expandedParts).some(
+          key => expandedParts[key]?.length > 0 && expandedParts[key][0]?.parent_id === pickerTargetId
+        );
+        if (alreadyExpanded) {
+          refreshParentParts(pickerTargetId);
+        } else {
+          const res = await assemblyPartsApi.list(pickerTargetId);
+          const children = (res.data || []).map((c: any) => ({
+            ...c,
+            childType: c.childType === 'component' ? 'assembly' : c.childType,
+            parent_id: pickerTargetId,
+          }));
+          const idx = `${pickerTargetId}-${Date.now()}`;
+          setExpandedParts(p => ({ ...p, [idx]: children }));
+          setNoChildren(prev => { const s = new Set(prev); s.delete(pickerTargetId); return s; });
+        }
       } else {
         await loadEditParts(editingComponent.id);
       }
