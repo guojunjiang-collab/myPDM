@@ -311,6 +311,42 @@ def delete_component(db, component_id):
         db.commit()
     return db_comp
 
+def get_component_children(db, component_id):
+    """获取零部件的子项列表，包含详细信息（返回本地格式）"""
+    items = db.query(models.BOMItem).filter(
+        models.BOMItem.parent_type == "component",
+        models.BOMItem.parent_id == component_id,
+        models.BOMItem.deleted_at.is_(None),
+    ).all()
+    
+    result = []
+    for item in items:
+        child_type_local = "component"
+        
+        item_dict = {
+            "id": item.id,
+            "childType": child_type_local,
+            "child_type": item.child_type,
+            "child_id": item.child_id,
+            "quantity": int(item.quantity),
+            "created_at": item.created_at
+        }
+        item_dict["componentId"] = item.child_id
+        item_dict["partId"] = None
+        
+        child = get_component(db, item.child_id)
+        if child:
+            item_dict["child_detail"] = {
+                "id": child.id,
+                "code": child.code,
+                "name": child.name,
+                "spec": child.spec,
+                "version": child.version,
+                "status": child.status,
+            }
+        result.append(item_dict)
+    return result
+
 def create_assembly(db, assembly):
     db_assembly = models.Assembly(**assembly.model_dump())
     db.add(db_assembly)
@@ -843,6 +879,51 @@ def upgrade_assembly(db, assembly_id, user: str = None):
     db.commit()
     db.refresh(new_assembly)
     return new_assembly, None
+
+
+def upgrade_component(db, component_id, user: str = None):
+    """零部件升版：创建新版本零部件，复制自定义字段"""
+    from datetime import datetime, timezone
+    source = db.query(models.Component).filter(models.Component.id == component_id).first()
+    if not source:
+        return None, "零部件不存在"
+    if source.status not in ('released', 'obsolete'):
+        return None, "仅发布或作废状态的零部件允许升版"
+
+    new_version = _get_next_version(db, models.Component, source.code)
+    new_comp = models.Component(
+        code=source.code,
+        name=source.name,
+        spec=source.spec,
+        version=new_version,
+        status='draft',
+        remark=source.remark,
+        document_links=source.document_links or [],
+        revision_parent_id=source.id,
+        revisions=[{
+            'version': new_version,
+            'parent_version': source.version,
+            'action': 'upgraded_from',
+            'user': user,
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+        }],
+    )
+    db.add(new_comp)
+    db.flush()
+    _copy_custom_field_values(db, 'component', source.id, new_comp.id)
+    db.commit()
+    db.refresh(new_comp)
+    return new_comp, None
+
+
+def get_component_versions(db, component_id):
+    """获取指定零部件的所有版本（同编码）"""
+    comp = db.query(models.Component).filter(models.Component.id == component_id).first()
+    if not comp:
+        return []
+    return db.query(models.Component).filter(
+        models.Component.code == comp.code
+    ).order_by(models.Component.created_at).all()
 
 
 def upgrade_document(db, doc_id, user: str = None):
