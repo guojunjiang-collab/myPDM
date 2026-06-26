@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useDataStore } from '../stores/data';
 import { componentsApi, bomApi } from '../services/api';
 import { Modal } from './Modal';
-import type { Part, Assembly } from '../types';
+import type { Component } from '../types';
 
 /* ----------------------------------------------------------------
    Types
@@ -77,10 +77,8 @@ export default function AssemblyPartPicker({
   const [selected, setSelected] = useState<Map<string, SelectedItem>>(new Map());
 
   /* ---- 数据源 ---- */
-  const storeParts = useDataStore((s) => s.parts);
-  const storeAssemblies = useDataStore((s) => s.assemblies);
-  const [fetchedParts, setFetchedParts] = useState<Part[]>([]);
-  const [fetchedAssemblies, setFetchedAssemblies] = useState<Assembly[]>([]);
+  const storeComponents = useDataStore((s) => s.components);
+  const [fetchedComponents, setFetchedComponents] = useState<Component[]>([]);
   const [ancestorIds, setAncestorIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'part' | 'component'>('part');
@@ -94,7 +92,7 @@ export default function AssemblyPartPicker({
     setQuickForm({ code: '', name: '', spec: '', remark: '' });
     setQuickOpen(false);
     setQuickCreating(false);
-    if (storeParts.length > 0 && storeAssemblies.length > 0 && !currentAssemblyId) {
+    if (storeComponents.length > 0 && !currentAssemblyId) {
       setAncestorIds(new Set());
       return;
     }
@@ -107,17 +105,7 @@ export default function AssemblyPartPicker({
       componentsApi.list({ page_size: 10000 })
         .then((r) => {
           const items = Array.isArray(r.data) ? r.data : (r.data as any)?.items || [];
-          const parts: Part[] = [];
-          const assemblies: Assembly[] = [];
-          for (const item of items) {
-            if (item.type === 'assembly') {
-              assemblies.push(item);
-            } else {
-              parts.push(item);
-            }
-          }
-          if (storeParts.length === 0) setFetchedParts(parts);
-          if (storeAssemblies.length === 0) setFetchedAssemblies(assemblies);
+          if (storeComponents.length === 0) setFetchedComponents(items);
         })
         .catch(() => {}),
     );
@@ -158,10 +146,9 @@ export default function AssemblyPartPicker({
     }
 
     Promise.all(promises).finally(() => setLoading(false));
-  }, [open, storeParts, storeAssemblies, currentAssemblyId]);
+  }, [open, storeComponents, currentAssemblyId]);
 
-  const partsList = storeParts.length > 0 ? storeParts : fetchedParts;
-  const assembliesList = storeAssemblies.length > 0 ? storeAssemblies : fetchedAssemblies;
+  const componentsList = storeComponents.length > 0 ? storeComponents : fetchedComponents;
 
   /* 合并所有零件+部件为一个列表 */
   const allCandidates = useMemo<CandidateItem[]>(() => {
@@ -172,18 +159,14 @@ export default function AssemblyPartPicker({
     ]);
     const result: CandidateItem[] = [];
 
-    for (const p of partsList) {
-      if (!excludeIds.has(p.id)) {
-        result.push({ id: p.id, code: p.code, name: p.name, version: p.version || 'A', status: p.status, spec: p.spec, type: 'part' });
-      }
-    }
-    for (const a of assembliesList) {
-      if (!excludeIds.has(a.id)) {
-        result.push({ id: a.id, code: a.code, name: a.name, version: a.version || 'V1.0', status: a.status, spec: a.spec, type: 'component' });
+    for (const c of componentsList) {
+      if (!excludeIds.has(c.id)) {
+        const isAssembly = c.type === 'assembly';
+        result.push({ id: c.id, code: c.code, name: c.name, version: c.version || (isAssembly ? 'V1.0' : 'A'), status: c.status, spec: c.spec, type: isAssembly ? 'component' : 'part' });
       }
     }
     return result;
-  }, [partsList, assembliesList, existingChildIds, currentAssemblyId]);
+  }, [componentsList, existingChildIds, currentAssemblyId]);
 
   /* 搜索 + 筛选 + 排序 */
   const handlePickerSort = (field: string) => {
@@ -402,11 +385,7 @@ export default function AssemblyPartPicker({
                     setSelected(prev => new Map(prev).set(newItem.id, newItem));
                     // 同步添加到候选列表，无需重新搜索
                     const candidate: CandidateItem = { id: newItem.id, code: newItem.code, name: newItem.name, version: newItem.version, status: newItem.status, type: activeTab };
-                    if (activeTab === 'part') {
-                      setFetchedParts(prev => [...prev, candidate as any]);
-                    } else {
-                      setFetchedAssemblies(prev => [...prev, candidate as any]);
-                    }
+                    setFetchedComponents(prev => [...prev, candidate as any]);
                     setQuickForm({ code: '', name: '', spec: '', remark: '' });
                   } catch { } finally { setQuickCreating(false); }
                 }} disabled={quickCreating} className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 whitespace-nowrap">

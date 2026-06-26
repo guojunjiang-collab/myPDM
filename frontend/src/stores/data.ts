@@ -1,19 +1,16 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Part, PartBrief, Assembly, AssemblyBrief, Document, DocumentBrief, CustomFieldDefinition, BOMItemBrief, ECRBrief, ECOBrief, ConfigItemBrief } from '../types';
-import { partsApi, assembliesApi, documentsApi, customFieldsApi, configurationApi } from '../services/api';
+import type { Component, Document, DocumentBrief, CustomFieldDefinition, BOMItemBrief, ECRBrief, ECOBrief, ConfigItemBrief } from '../types';
+import { componentsApi, documentsApi, customFieldsApi, configurationApi } from '../services/api';
 
 function extractData<T>(response: any): T[] {
   return Array.isArray(response) ? response : (response?.items || []);
 }
 
 interface DataState {
-  // 列表字段 (brief, 同步用)
-  parts: PartBrief[];
-  assemblies: AssemblyBrief[];
+  components: Component[];
   documents: DocumentBrief[];
   customFieldDefs: CustomFieldDefinition[];
-  // 新增实体
   bomItems: BOMItemBrief[];
   ecrs: ECRBrief[];
   ecos: ECOBrief[];
@@ -24,9 +21,7 @@ interface DataState {
   syncError: string | null;
   autoSyncEnabled: boolean;
 
-  // Setters
-  setParts: (parts: PartBrief[]) => void;
-  setAssemblies: (assemblies: AssemblyBrief[]) => void;
+  setComponents: (components: Component[]) => void;
   setDocuments: (documents: DocumentBrief[]) => void;
   setCustomFieldDefs: (defs: CustomFieldDefinition[]) => void;
   setBomItems: (items: BOMItemBrief[]) => void;
@@ -34,12 +29,9 @@ interface DataState {
   setEcos: (ecos: ECOBrief[]) => void;
   setConfigItems: (items: ConfigItemBrief[]) => void;
 
-  // 更新方法（按需加载完整字段后更新 store）
-  updatePart: (id: string, data: Partial<Part>) => void;
-  updateAssembly: (id: string, data: Partial<Assembly>) => void;
+  updateComponent: (id: string, data: Partial<Component>) => void;
   updateDocument: (id: string, data: Partial<Document>) => void;
 
-  // Sync 控制
   setSyncing: (syncing: boolean) => void;
   setSyncError: (error: string | null) => void;
   setLastSyncTime: (time: number) => void;
@@ -51,8 +43,7 @@ interface DataState {
 export const useDataStore = create<DataState>()(
   persist(
     (set) => ({
-      parts: [],
-      assemblies: [],
+      components: [],
       documents: [],
       customFieldDefs: [],
       bomItems: [],
@@ -64,8 +55,7 @@ export const useDataStore = create<DataState>()(
       syncError: null,
       autoSyncEnabled: true,
 
-      setParts: (parts) => set({ parts }),
-      setAssemblies: (assemblies) => set({ assemblies }),
+      setComponents: (components) => set({ components }),
       setDocuments: (documents) => set({ documents }),
       setCustomFieldDefs: (defs) => set({ customFieldDefs: defs }),
       setBomItems: (bomItems) => set({ bomItems }),
@@ -73,16 +63,10 @@ export const useDataStore = create<DataState>()(
       setEcos: (ecos) => set({ ecos }),
       setConfigItems: (configItems) => set({ configItems }),
 
-      updatePart: (id, data) =>
+      updateComponent: (id, data) =>
         set((state) => ({
-          parts: state.parts.map((p) =>
-            p.id === id ? { ...p, ...data } : p
-          ),
-        })),
-      updateAssembly: (id, data) =>
-        set((state) => ({
-          assemblies: state.assemblies.map((a) =>
-            a.id === id ? { ...a, ...data } : a
+          components: state.components.map((c) =>
+            c.id === id ? { ...c, ...data } : c
           ),
         })),
       updateDocument: (id, data) =>
@@ -99,8 +83,7 @@ export const useDataStore = create<DataState>()(
 
       clearCache: () =>
         set({
-          parts: [],
-          assemblies: [],
+          components: [],
           documents: [],
           customFieldDefs: [],
           bomItems: [],
@@ -113,17 +96,15 @@ export const useDataStore = create<DataState>()(
       syncAll: async () => {
         set({ isSyncing: true, syncError: null });
         try {
-          const [partsRes, assembliesRes, documentsRes, fieldsRes, configRes] = await Promise.allSettled([
-            partsApi.list({ page_size: 10000, brief: true }),
-            assembliesApi.list({ page_size: 10000, brief: true }),
+          const [componentsRes, documentsRes, fieldsRes, configRes] = await Promise.allSettled([
+            componentsApi.list({ page_size: 10000, brief: true }),
             documentsApi.list({ page_size: 10000, brief: true }),
             customFieldsApi.listDefinitions(),
             configurationApi.listItems({ page_size: 10000 }),
           ]);
 
           set({
-            parts: partsRes.status === 'fulfilled' ? extractData<PartBrief>(partsRes.value.data) : [],
-            assemblies: assembliesRes.status === 'fulfilled' ? extractData<AssemblyBrief>(assembliesRes.value.data) : [],
+            components: componentsRes.status === 'fulfilled' ? extractData<Component>(componentsRes.value.data) : [],
             documents: documentsRes.status === 'fulfilled' ? extractData<DocumentBrief>(documentsRes.value.data) : [],
             customFieldDefs: fieldsRes.status === 'fulfilled' ? extractData<CustomFieldDefinition>(fieldsRes.value.data) : [],
             configItems: configRes.status === 'fulfilled' ? extractData<ConfigItemBrief>(configRes.value.data) : [],
@@ -138,8 +119,7 @@ export const useDataStore = create<DataState>()(
     {
       name: 'data-storage',
       partialize: (state) => ({
-        parts: state.parts,
-        assemblies: state.assemblies,
+        components: state.components,
         documents: state.documents,
         customFieldDefs: state.customFieldDefs,
         bomItems: state.bomItems,

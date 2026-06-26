@@ -28,6 +28,7 @@ export interface Part {
 
 export interface Component {
   id: string;
+  type?: 'part' | 'assembly';
   code: string;
   name: string;
   spec?: string;
@@ -851,8 +852,7 @@ export interface ConfigItemBrief {
 
 // ===== Sync status =====
 export interface SyncStatus {
-  parts: number;
-  assemblies: number;
+  components: number;
   documents: number;
   bom_items: number;
   ecrs: number;

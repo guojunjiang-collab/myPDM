@@ -237,7 +237,7 @@ export default function Components() {
   // 自定义字段值映射：{ entityId: { fieldId: value } }
   const [customFieldValuesMap, setCustomFieldValuesMap] = useState<Record<string, Record<string, unknown>>>({});
 
-  const storeComponents = useDataStore((s) => s.assemblies);
+  const storeComponents = useDataStore((s) => s.components);
 
   /* ==============================================================
      Data Loading
@@ -337,7 +337,7 @@ export default function Components() {
   }, [location.search, components]);
 
   const loadComponents = () => {
-    const localComponents = useDataStore.getState().assemblies;
+    const localComponents = useDataStore.getState().components;
     setComponents(localComponents);
     setLoading(false);
     // 加载自定义字段定义
@@ -655,13 +655,13 @@ export default function Components() {
       if (editingComponent) {
         const res = await componentsApi.update(editingComponent.id, data);
         newComponent = res.data;
-        useDataStore.getState().setAssemblies(
-          useDataStore.getState().assemblies.map((a) => (a.id === editingComponent.id ? newComponent! : a)),
+        useDataStore.getState().setComponents(
+          useDataStore.getState().components.map((a) => (a.id === editingComponent.id ? newComponent! : a)),
         );
       } else {
         const res = await componentsApi.create(data);
         newComponent = res.data;
-        useDataStore.getState().setAssemblies([...useDataStore.getState().assemblies, newComponent!]);
+        useDataStore.getState().setComponents([...useDataStore.getState().components, newComponent!]);
       }
 
       const fieldValues = customFieldDefs
@@ -706,8 +706,8 @@ export default function Components() {
       }
       await componentsApi.delete(deleteId);
       setDeleteId(null);
-      useDataStore.getState().setAssemblies(
-        useDataStore.getState().assemblies.filter((a) => a.id !== deleteId),
+      useDataStore.getState().setComponents(
+        useDataStore.getState().components.filter((a) => a.id !== deleteId),
       );
     } catch {
       alert('删除失败');
@@ -721,7 +721,7 @@ export default function Components() {
     try {
       const res = await assembliesApi.upgrade(editingComponent.id);
       const newComponent = res.data;
-      useDataStore.getState().setAssemblies([...useDataStore.getState().assemblies, newComponent]);
+      useDataStore.getState().setComponents([...useDataStore.getState().components, newComponent]);
       setModalOpen(false);
     } catch (error: unknown) {
       const err = error as { response?: { data?: { detail?: unknown } } };

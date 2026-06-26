@@ -95,8 +95,9 @@ function useUserList(): User[] {
 }
 
 export default function Dashboard() {
-  const parts = useDataStore((s) => s.parts);
-  const assemblies = useDataStore((s) => s.assemblies);
+  const components = useDataStore((s) => s.components);
+  const parts = useMemo(() => components.filter(c => c.type !== 'assembly'), [components]);
+  const assemblies = useMemo(() => components.filter(c => c.type === 'assembly'), [components]);
   const documents = useDataStore((s) => s.documents);
 
   const users = useUserList();
@@ -106,7 +107,7 @@ export default function Dashboard() {
   const documentsCounts = useMemo(() => countByStatus(documents), [documents]);
   const usersCounts = useMemo(() => countByRole(users), [users]);
 
-  const hasData = parts.length > 0 || assemblies.length > 0 || documents.length > 0;
+  const hasData = components.length > 0 || documents.length > 0;
 
   return (
     <div>

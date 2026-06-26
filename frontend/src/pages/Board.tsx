@@ -735,8 +735,8 @@ function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) 
         console.error(`[ItemPicker] 加载${label}失败：`, r.reason);
         return fallback;
       };
-      setSrcParts(pick(p, cache.parts, '零件'));
-      setSrcAssemblies(pick(a, cache.assemblies, '部件'));
+      setSrcParts(pick(p, cache.components.filter((c: any) => c.type !== 'assembly'), '零件'));
+      setSrcAssemblies(pick(a, cache.components.filter((c: any) => c.type === 'assembly'), '部件'));
       setSrcDocuments(pick(d, cache.documents, '图文档'));
       setSrcConfigItems(pick(c, cache.configItems, '构型项'));
       const failed = [p, a, d, c].some((r) => r.status === 'rejected');

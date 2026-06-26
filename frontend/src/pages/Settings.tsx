@@ -331,8 +331,7 @@ export default function Settings() {
       // 清空本地缓存
       localStorage.removeItem('data-storage');
       // 清空本地 store 中的业务数据
-      useDataStore.getState().setParts([]);
-      useDataStore.getState().setAssemblies([]);
+      useDataStore.getState().setComponents([]);
       useDataStore.getState().setDocuments([]);
       useDataStore.getState().setCustomFieldDefs([]);
       setShowResetConfirm(false);

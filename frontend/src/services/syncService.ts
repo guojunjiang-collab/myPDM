@@ -1,7 +1,7 @@
 import { useDataStore } from '../stores/data';
 import { syncApi } from './syncApi';
-import { partsApi, assembliesApi, documentsApi, bomApi, configurationApi } from './api';
-import type { SyncStatus, Part, Assembly, Document, BOMItem, ConfigItemBrief } from '../types';
+import { componentsApi, documentsApi, bomApi, configurationApi } from './api';
+import type { SyncStatus, Component, Document, BOMItem, ConfigItemBrief } from '../types';
 
 interface SyncEntity {
   name: string;
@@ -20,10 +20,10 @@ interface SyncEntity {
 function buildEntities(): SyncEntity[] {
   return [
     {
-      name: 'parts',
-      key: 'parts',
+      name: 'components',
+      key: 'components',
       fetch: async (since: number) => {
-        const res = await partsApi.list({
+        const res = await componentsApi.list({
           updated_since: since,
           page_size: 10000,
           brief: true,
@@ -32,31 +32,11 @@ function buildEntities(): SyncEntity[] {
           ? res.data
           : res.data?.items || [];
       },
-      merge: (items: Part[]) => {
+      merge: (items: Component[]) => {
         const store = useDataStore.getState();
-        const current = [...store.parts];
+        const current = [...store.components];
         mergeItems(current, items as any[]);
-        store.setParts(current);
-      },
-    },
-    {
-      name: 'assemblies',
-      key: 'assemblies',
-      fetch: async (since: number) => {
-        const res = await assembliesApi.list({
-          updated_since: since,
-          page_size: 10000,
-          brief: true,
-        } as any);
-        return Array.isArray(res.data)
-          ? res.data
-          : res.data?.items || [];
-      },
-      merge: (items: Assembly[]) => {
-        const store = useDataStore.getState();
-        const current = [...store.assemblies];
-        mergeItems(current, items as any[]);
-        store.setAssemblies(current);
+        store.setComponents(current);
       },
     },
     {
@@ -143,8 +123,7 @@ class SyncService {
 
   /** Per-entity last-sync timestamps (server max timestamps) */
   private lastSync: SyncStatus = {
-    parts: 0,
-    assemblies: 0,
+    components: 0,
     documents: 0,
     bom_items: 0,
     ecrs: 0,
@@ -157,8 +136,7 @@ class SyncService {
 
     // Trigger initial full pull if store is empty or configItems not yet synced (migration)
     const needsInitialSync =
-      (store.parts.length === 0 &&
-       store.assemblies.length === 0 &&
+      (store.components.length === 0 &&
        store.documents.length === 0) ||
       store.configItems.length === 0;
     if (needsInitialSync) {

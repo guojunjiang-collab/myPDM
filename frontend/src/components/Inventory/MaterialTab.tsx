@@ -62,14 +62,13 @@ export default function MaterialTab() {
   };
 
   // PDM 零件/部件来自全局 DataStore（已全量预加载），客户端即时过滤
-  const storeParts = useDataStore((s) => s.parts);
-  const storeAssemblies = useDataStore((s) => s.assemblies);
+  const storeComponents = useDataStore((s) => s.components);
   const syncAll = useDataStore((s) => s.syncAll);
 
   // 正在编辑的物料是否来自 PDM，及其关联零部件（用于编辑弹窗体现来源）
   const editingIsPdm = !!editing && !!editing.source_type && editing.source_type !== 'standalone';
   const editingPdm = editingIsPdm && editing!.ref_entity_id
-    ? (editing!.source_type === 'part' ? storeParts : storeAssemblies).find((e: any) => e.id === editing!.ref_entity_id)
+    ? storeComponents.find((c: any) => c.id === editing!.ref_entity_id)
     : null;
 
   const reload = async (s?: string) => {
@@ -92,10 +91,10 @@ export default function MaterialTab() {
 
   // 打开「从 PDM 启用」时，若 store 尚未加载则拉一次
   useEffect(() => {
-    if (pdmMode && storeParts.length === 0 && storeAssemblies.length === 0) {
+    if (pdmMode && storeComponents.length === 0) {
       syncAll();
     }
-  }, [pdmMode, storeParts.length, storeAssemblies.length, syncAll]);
+  }, [pdmMode, storeComponents.length, syncAll]);
 
   const saveStandalone = async () => {
     if (!editing) return;
@@ -115,10 +114,11 @@ export default function MaterialTab() {
     const pick = (x: any, entity_type: 'part' | 'assembly') => ({
       id: x.id, code: x.code, name: x.name, spec: x.spec, version: x.version, status: x.status, entity_type,
     });
-    const parts = storeParts.filter(match).slice(0, 50).map((x: any) => pick(x, 'part'));
-    const asms = storeAssemblies.filter(match).slice(0, 50).map((x: any) => pick(x, 'assembly'));
-    return [...parts, ...asms];
-  }, [pdmKeyword, storeParts, storeAssemblies]);
+    return storeComponents
+      .filter(match)
+      .slice(0, 50)
+      .map((x: any) => pick(x, x.type === 'assembly' ? 'assembly' : 'part'));
+  }, [pdmKeyword, storeComponents]);
 
   const enablePdm = async (r: { id: string; entity_type: string }) => {
     try {

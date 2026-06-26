@@ -34,19 +34,18 @@ export default function MaterialDetail({ material, onClose, onViewEntity }: Prop
   const m = material;
   const hasPdmRef = m.source_type !== 'standalone' && !!m.ref_entity_id;
 
-  const storeParts = useDataStore((s) => s.parts);
-  const storeAssemblies = useDataStore((s) => s.assemblies);
+  const storeComponents = useDataStore((s) => s.components);
   const syncAll = useDataStore((s) => s.syncAll);
 
   // 关联零部件（取自全局 DataStore 的 brief）
   const pdmEntity = hasPdmRef
-    ? (m.ref_entity_type === 'part' ? storeParts : storeAssemblies).find((e: any) => e.id === m.ref_entity_id)
+    ? storeComponents.find((c: any) => c.id === m.ref_entity_id)
     : null;
 
   // store 未加载时拉一次
   useEffect(() => {
-    if (hasPdmRef && storeParts.length === 0 && storeAssemblies.length === 0) syncAll();
-  }, [hasPdmRef, storeParts.length, storeAssemblies.length, syncAll]);
+    if (hasPdmRef && storeComponents.length === 0) syncAll();
+  }, [hasPdmRef, storeComponents.length, syncAll]);
 
   return (
     <Modal open={true} title="物料详情" onClose={onClose} width="3xl">
