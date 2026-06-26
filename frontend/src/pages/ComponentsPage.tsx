@@ -417,7 +417,7 @@ export default function Components() {
         item,
         level: 0,
         children: [],
-        hasChildren: item.childType === 'component',
+        hasChildren: false,
         expanded: expandedIds.has(item.id),
       }));
     } catch {
@@ -439,10 +439,10 @@ export default function Components() {
         item: ci,
         level: node.level + 1,
         children: [],
-        hasChildren: ci.childType === 'component',
+        hasChildren: false,
         expanded: expandedIds.has(ci.id),
       }));
-      return { ...node, children };
+      return { ...node, children, hasChildren: childItems.length > 0 };
     } catch {
       return node;
     }
