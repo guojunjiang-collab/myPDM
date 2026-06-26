@@ -164,7 +164,7 @@ export default function AssemblyPartPicker({
       }
     }
     return result;
-  }, [componentsList, existingChildIds, currentAssemblyId]);
+  }, [componentsList, existingChildIds, currentAssemblyId, ancestorIds]);
 
   /* 搜索 + 筛选 + 排序 */
   const handlePickerSort = (field: string) => {
