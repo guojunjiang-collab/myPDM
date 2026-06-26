@@ -43,13 +43,36 @@ export default function BOMTreeTable({ assemblyId, assemblyCode, assemblyName, m
     try {
       const res = await assemblyPartsApi.list(assemblyId);
       const items: AssemblyPartItem[] = res.data || [];
-      setViewParts(items.map((item) => ({
+      const nodes: TreeNode[] = items.map((item) => ({
         item,
         level: 0,
         children: [],
-        hasChildren: item.childType === 'component',
-        expanded: expandedIds.has(item.id),
-      })));
+        hasChildren: false,
+        expanded: false,
+      }));
+
+      // 预查所有 component 类型子项是否有孙项
+      const compItems = items.filter((it) => it.childType === 'component' && it.child_detail?.id);
+      if (compItems.length > 0) {
+        const checks = await Promise.allSettled(
+          compItems.map((it) => assemblyPartsApi.list(it.child_detail!.id))
+        );
+        const noChildSet = new Set<string>();
+        checks.forEach((c, i) => {
+          if (c.status === 'fulfilled') {
+            const children = c.value.data || [];
+            if (children.length > 0) {
+              const node = nodes.find((n) => n.item.id === compItems[i].id);
+              if (node) node.hasChildren = true;
+            } else {
+              noChildSet.add(compItems[i].id);
+            }
+          }
+        });
+        setNoChildren(noChildSet);
+      }
+
+      setViewParts(nodes);
     } catch {
       setViewParts([]);
     } finally {
