@@ -26,6 +26,23 @@ export interface Part {
   deleted_at?: string | null;
 }
 
+export interface Component {
+  id: string;
+  code: string;
+  name: string;
+  spec?: string;
+  version?: string;
+  status: 'draft' | 'frozen' | 'released' | 'obsolete';
+  remark?: string;
+  revisions?: any[];
+  creator_id?: string;
+  creator_name?: string;
+  revision_parent_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
 export interface Assembly {
   id: string;
   code: string;

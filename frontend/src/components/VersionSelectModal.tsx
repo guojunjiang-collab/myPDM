@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { partsApi, assembliesApi, documentsApi } from '../services/api';
+import { partsApi, assembliesApi, componentsApi, documentsApi } from '../services/api';
 import { formatDateTime } from '../utils/date';
 import { Modal } from './Modal';
 
@@ -14,7 +14,7 @@ interface VersionItem {
 
 interface VersionSelectModalProps {
   open: boolean;
-  entityType: 'part' | 'assembly' | 'document';
+  entityType: 'part' | 'assembly' | 'component' | 'document';
   entityId: string;
   entityName?: string;
   currentVersionId?: string;
@@ -47,7 +47,7 @@ export default function VersionSelectModal({
   useEffect(() => {
     if (open && entityId) {
       setLoading(true);
-      const apiMap: Record<string, any> = { part: partsApi, assembly: assembliesApi, document: documentsApi };
+      const apiMap: Record<string, any> = { part: partsApi, assembly: assembliesApi, component: componentsApi, document: documentsApi };
       const api = apiMap[entityType];
       api.versions(entityId)
         .then((res: any) => setVersions(res.data || []))

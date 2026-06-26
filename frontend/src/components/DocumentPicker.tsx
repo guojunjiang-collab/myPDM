@@ -233,7 +233,7 @@ export default function DocumentPicker({
     onClose();
   };
 
-  const entityTypeLabel = entityType === 'part' ? '零件' : entityType === 'assembly' ? '部件' : entityType === 'configuration' ? '构型项' : '';
+  const entityTypeLabel = entityType === 'part' ? '零件' : entityType === 'assembly' ? '部件' : entityType === 'component' ? '零部件' : entityType === 'configuration' ? '构型项' : '';
   const entityLabel = entityCode && entityTypeLabel ? ` - ${entityTypeLabel} ${entityCode}${entityName ? ` ${entityName}` : ''}` : '';
   const title = `关联图文档${entityLabel}`;
 

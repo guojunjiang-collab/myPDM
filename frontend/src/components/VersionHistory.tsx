@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { partsApi, assembliesApi, documentsApi } from '../services/api';
+import { partsApi, assembliesApi, componentsApi, documentsApi } from '../services/api';
 import { formatDateTime } from '../utils/date';
 
 interface VersionItem {
@@ -12,7 +12,7 @@ interface VersionItem {
 }
 
 interface VersionHistoryProps {
-  entityType: 'part' | 'assembly' | 'document';
+  entityType: 'part' | 'assembly' | 'component' | 'document';
   entityId: string;
   onViewVersion?: (id: string) => void;
 }
@@ -38,7 +38,7 @@ export default function VersionHistory({ entityType, entityId, onViewVersion }: 
   const loadVersions = async () => {
     setLoading(true);
     try {
-      const apiMap: Record<string, any> = { part: partsApi, assembly: assembliesApi, document: documentsApi };
+      const apiMap: Record<string, any> = { part: partsApi, assembly: assembliesApi, component: componentsApi, document: documentsApi };
       const api = apiMap[entityType];
       const res = await api.versions(entityId);
       setVersions(res.data || []);

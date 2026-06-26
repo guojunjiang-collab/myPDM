@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Modal } from './Modal';
-import { customFieldsApi, partsApi, assembliesApi, assemblyPartsApi } from '../services/api';
+import { customFieldsApi, partsApi, assembliesApi, componentsApi, assemblyPartsApi } from '../services/api';
 import { useDataStore } from '../stores/data';
 import { isAdmin } from '../stores/auth';
 import EntityDocumentSection from './EntityDocumentSection';
@@ -10,7 +10,7 @@ import type { CustomFieldDefinition, AssemblyPartItem } from '../types';
 
 interface EntityEditModalProps {
   open: boolean;
-  entityType: 'part' | 'assembly';
+  entityType: 'part' | 'assembly' | 'component';
   entityId: string;
   entityCode?: string;
   entityName?: string;
@@ -49,8 +49,8 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
   // 选择器目标（null=当前部件, string=子部件ID）
   const [pickerTargetId, setPickerTargetId] = useState<string | null>(null);
 
-  const api = entityType === 'assembly' ? assembliesApi : partsApi;
-  const cfType = entityType === 'assembly' ? 'component' : 'part';
+  const api = entityType === 'component' ? componentsApi : entityType === 'assembly' ? assembliesApi : partsApi;
+  const cfType = entityType === 'component' ? 'component' : entityType === 'assembly' ? 'component' : 'part';
 
   const loadEditParts = useCallback(async (assemblyId: string) => {
     setLoadingEditParts(true);
@@ -88,7 +88,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
     }).catch(() => {}).finally(() => setLoadingCustomFields(false));
 
     // 加载子项清单（部件专用）
-    if (entityType === 'assembly') {
+    if (entityType === 'assembly' || entityType === 'component') {
       loadEditParts(entityId);
     }
   }, [open, entityId, entityType]);
@@ -313,7 +313,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
     return <input type="text" value={value} onChange={e => onChange(e.target.value)} disabled={locked} className={baseClass} />;
   };
 
-  const title = entityType === 'assembly' ? '编辑部件' : '编辑零件';
+  const title = entityType === 'component' ? '编辑零部件' : entityType === 'assembly' ? '编辑部件' : '编辑零件';
 
   return (
     <>

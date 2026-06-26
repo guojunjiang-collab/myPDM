@@ -116,6 +116,28 @@ export const assembliesApi = {
     api.get(`/assemblies/${id}/bom/export`, { responseType: 'blob' }),
 };
 
+// 零部件 API (v2 统一接口)
+export const componentsApi = {
+  list: (params?: Record<string, any>) =>
+    api.get('/components/', { params }),
+  get: (id: string) =>
+    api.get(`/components/${id}`),
+  create: (data: Record<string, any>) =>
+    api.post('/components/', data),
+  update: (id: string, data: Record<string, any>) =>
+    api.put(`/components/${id}`, data),
+  delete: (id: string) =>
+    api.delete(`/components/${id}`),
+  upgrade: (id: string, note?: string) =>
+    api.post(`/components/${id}/upgrade`, { note }),
+  versions: (id: string) =>
+    api.get(`/components/${id}/versions`),
+  updateDocumentLinks: (id: string, documentLinks: any[]) =>
+    api.post(`/components/${id}/document-links`, { document_links: documentLinks }),
+  exportBOM: (id: string) =>
+    api.get(`/components/${id}/bom/export`, { responseType: 'blob' }),
+};
+
 // 图文档 API
 export const documentsApi = {
   list: (params?: { page?: number; page_size?: number; keyword?: string; status?: string; brief?: boolean; updated_since?: number }) =>
@@ -235,20 +257,20 @@ export const dashboardApi = {
 
 // 实体-图文档关联 API
 export const entityDocumentsApi = {
-  list: (entityType: 'part' | 'assembly' | 'configuration', entityId: string) => {
-    const base = entityType === 'part' ? 'parts' : entityType === 'assembly' ? 'assemblies' : 'configurations/items';
+  list: (entityType: 'part' | 'assembly' | 'component' | 'configuration', entityId: string) => {
+    const base = entityType === 'part' ? 'parts' : entityType === 'assembly' ? 'assemblies' : entityType === 'component' ? 'components' : 'configurations/items';
     return api.get(`/${base}/${entityId}/documents`);
   },
-  add: (entityType: 'part' | 'assembly' | 'configuration', entityId: string, data: { document_id: string; category?: string; sort_order?: number }) => {
-    const base = entityType === 'part' ? 'parts' : entityType === 'assembly' ? 'assemblies' : 'configurations/items';
+  add: (entityType: 'part' | 'assembly' | 'component' | 'configuration', entityId: string, data: { document_id: string; category?: string; sort_order?: number }) => {
+    const base = entityType === 'part' ? 'parts' : entityType === 'assembly' ? 'assemblies' : entityType === 'component' ? 'components' : 'configurations/items';
     return api.post(`/${base}/${entityId}/documents`, data);
   },
-  update: (entityType: 'part' | 'assembly' | 'configuration', entityId: string, edocId: string, data: { category?: string; sort_order?: number }) => {
-    const base = entityType === 'part' ? 'parts' : entityType === 'assembly' ? 'assemblies' : 'configurations/items';
+  update: (entityType: 'part' | 'assembly' | 'component' | 'configuration', entityId: string, edocId: string, data: { category?: string; sort_order?: number }) => {
+    const base = entityType === 'part' ? 'parts' : entityType === 'assembly' ? 'assemblies' : entityType === 'component' ? 'components' : 'configurations/items';
     return api.put(`/${base}/${entityId}/documents/${edocId}`, data);
   },
-  remove: (entityType: 'part' | 'assembly' | 'configuration', entityId: string, edocId: string) => {
-    const base = entityType === 'part' ? 'parts' : entityType === 'assembly' ? 'assemblies' : 'configurations/items';
+  remove: (entityType: 'part' | 'assembly' | 'component' | 'configuration', entityId: string, edocId: string) => {
+    const base = entityType === 'part' ? 'parts' : entityType === 'assembly' ? 'assemblies' : entityType === 'component' ? 'components' : 'configurations/items';
     return api.delete(`/${base}/${entityId}/documents/${edocId}`);
   },
 };
