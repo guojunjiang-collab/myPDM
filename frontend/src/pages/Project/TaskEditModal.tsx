@@ -36,7 +36,7 @@ const STATUS_CLASS: Record<string, string> = {
   挂起: 'bg-amber-50 text-amber-700',
 };
 const LINK_LABEL: Record<string, string> = {
-  part: '零件', assembly: '部件', component: '零部件', config_item: '构型项', ec: 'EC', document: '图文档',
+  part: '零部件', assembly: '零部件', component: '零部件', config_item: '构型项', ec: 'EC', document: '图文档',
 };
 const LINK_COLOR: Record<string, string> = {
   part: 'bg-primary-50 text-primary-700',
