@@ -37,11 +37,12 @@ const STATUS_CLASS: Record<string, string> = {
   挂起: 'bg-amber-50 text-amber-700',
 };
 const LINK_LABEL: Record<string, string> = {
-  part: '零件', assembly: '部件', config_item: '构型项', ec: 'EC', document: '图文档',
+  part: '零件', assembly: '部件', component: '零部件', config_item: '构型项', ec: 'EC', document: '图文档',
 };
 const LINK_COLOR: Record<string, string> = {
   part: 'bg-primary-50 text-primary-700',
   assembly: 'bg-primary-50 text-primary-700',
+  component: 'bg-primary-50 text-primary-700',
   config_item: 'bg-teal-50 text-teal-700',
   ec: 'bg-amber-50 text-amber-700',
   document: 'bg-blue-50 text-blue-700',
@@ -603,7 +604,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
         <ECODetailModal ecoId={ecView.id} onClose={() => setEcView(null)} onRefresh={() => {}} />
       )}
 
-      {detailEntityId && (detailEntityType === 'part' || detailEntityType === 'assembly' || detailEntityType === 'document') && (
+      {detailEntityId && (detailEntityType === 'part' || detailEntityType === 'assembly' || detailEntityType === 'component' || detailEntityType === 'document') && (
         <Modal
           open={!!detailEntityId}
           title={detailEntityType === 'part' ? '零件详情' : detailEntityType === 'assembly' ? '部件详情' : '图文档详情'}
