@@ -1,15 +1,15 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Modal } from '../Modal';
 import { toast } from '../Toast';
-import { partsApi, assembliesApi } from '../../services/api';
+import { componentsApi } from '../../services/api';
 import { useTableSort } from '../../hooks/useTableSort';
 import type { Part, Assembly } from '../../types';
 
 // ─── Types ───────────────────────────────────────────────────────
-type EntityType = 'all' | 'part' | 'assembly';
+type EntityType = 'all' | 'component';
 
 interface ItemRow {
-  entity_type: 'part' | 'assembly';
+  entity_type: 'component';
   entity_id: string;
   entity_code: string;
   entity_name: string;
@@ -26,8 +26,7 @@ interface ECRAffectedItemPickerProps {
 // ─── Constants ───────────────────────────────────────────────────
 const TYPE_TABS: { value: EntityType; label: string }[] = [
   { value: 'all', label: '全部' },
-  { value: 'part', label: '零件' },
-  { value: 'assembly', label: '部件' },
+  { value: 'component', label: '零部件' },
 ];
 
 function normalizeItems<T>(data: unknown): T[] {
@@ -63,44 +62,29 @@ export function ECRAffectedItemPicker({
     let cancelled = false;
     setLoading(true);
 
-    const loadParts = activeTab === 'all' || activeTab === 'part';
-    const loadAssemblies = activeTab === 'all' || activeTab === 'assembly';
-
-    const promises: Promise<unknown>[] = [];
-
-    if (loadParts) {
-      promises.push(
-        partsApi
-          .list({ page_size: 10000, search: search || undefined })
-          .then((r) => {
-            if (!cancelled) setParts(normalizeItems<Part>(r.data));
-          })
-          .catch(() => {
-            if (!cancelled) toast.error('加载零件列表失败');
-          }),
-      );
-    } else {
-      setParts([]);
-    }
-
-    if (loadAssemblies) {
-      promises.push(
-        assembliesApi
-          .list({ page_size: 10000, search: search || undefined })
-          .then((r) => {
-            if (!cancelled) setAssemblies(normalizeItems<Assembly>(r.data));
-          })
-          .catch(() => {
-            if (!cancelled) toast.error('加载部件列表失败');
-          }),
-      );
-    } else {
-      setAssemblies([]);
-    }
-
-    Promise.all(promises).finally(() => {
-      if (!cancelled) setLoading(false);
-    });
+    componentsApi
+      .list({ page_size: 10000, search: search || undefined })
+      .then((r) => {
+        if (cancelled) return;
+        const items = normalizeItems<any>(r.data);
+        const parts: Part[] = [];
+        const assemblies: Assembly[] = [];
+        for (const item of items) {
+          if (item.type === 'assembly') {
+            assemblies.push(item);
+          } else {
+            parts.push(item);
+          }
+        }
+        setParts(parts);
+        setAssemblies(assemblies);
+      })
+      .catch(() => {
+        if (!cancelled) toast.error('加载零部件列表失败');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
     return () => {
       cancelled = true;
@@ -119,24 +103,22 @@ export function ECRAffectedItemPicker({
   const rows = useMemo<ItemRow[]>(() => {
     const result: ItemRow[] = [];
 
-    if (activeTab === 'all' || activeTab === 'part') {
+    if (activeTab === 'all' || activeTab === 'component') {
       for (const p of parts) {
         if (alreadySelected.includes(p.id)) continue;
         result.push({
-          entity_type: 'part',
+          entity_type: 'component',
           entity_id: p.id,
           entity_code: p.code,
           entity_name: p.name,
           entity_version: p.version || '—',
         });
       }
-    }
 
-    if (activeTab === 'all' || activeTab === 'assembly') {
       for (const a of assemblies) {
         if (alreadySelected.includes(a.id)) continue;
         result.push({
-          entity_type: 'assembly',
+          entity_type: 'component',
           entity_id: a.id,
           entity_code: a.code,
           entity_name: a.name,
@@ -281,14 +263,8 @@ export function ECRAffectedItemPicker({
                       />
                     </td>
                     <td className="px-2 py-1.5">
-                      <span
-                        className={`px-1.5 py-0.5 text-xs rounded ${
-                          row.entity_type === 'part'
-                            ? 'bg-blue-50 text-blue-700'
-                            : 'bg-emerald-50 text-emerald-700'
-                        }`}
-                      >
-                        {row.entity_type === 'part' ? '零件' : '部件'}
+                      <span className="px-1.5 py-0.5 text-xs rounded bg-purple-50 text-purple-700">
+                        零部件
                       </span>
                     </td>
                     <td className="px-2 py-1.5 text-xs font-mono text-gray-700">{row.entity_code}</td>

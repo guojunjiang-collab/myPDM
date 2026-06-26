@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { ecrApi, partsApi, assembliesApi, ecoApi } from '../../services/api';
+import { ecrApi, partsApi, assembliesApi, ecoApi, componentsApi } from '../../services/api';
 import type { BomImpactNode } from '../../types';
 import { ECOActionBadge } from './ECOStatusBadge';
 import AssemblyPartPicker from '../AssemblyPartPicker';
@@ -264,7 +264,7 @@ function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade, o
           const r = resultRow(n, true);
           const exec = getExec(n.entity_id || '');
           const entityId = exec?.new_entity_id || n.entity_id || '';
-          const entityType = n.entity_type || 'part';
+          const entityType = n.entity_type || 'component';
           const unchanged = isUnchanged(n, true);
           const handleRowClick = () => {
             if (!canExec || unchanged || !exec?.new_entity_status) return;
@@ -308,7 +308,7 @@ function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade, o
                           className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
                       ) : !exec?.new_entity_status ? (
                         // 未执行：升版
-                        <button onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || '', { entity_type: n.entity_type || 'part', entity_id: n.entity_id, entity_code: n.entity_code || '', entity_name: n.entity_name || '', action: n.action || 'upgrade' }); }}
+                        <button onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || '', { entity_type: n.entity_type || 'component', entity_id: n.entity_id, entity_code: n.entity_code || '', entity_name: n.entity_name || '', action: n.action || 'upgrade' }); }}
                           className="px-1.5 py-0.5 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">升版</button>
                       ) : null
                     ) : ecoStatus === 'executing' ? (
@@ -347,7 +347,7 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade,
           const autoUpgraded = isAutoUpgraded(n) && !exec?.new_entity_status;
           const effStatus = autoUpgraded ? 'draft' : exec?.new_entity_status;
           const entityId = exec?.new_entity_id || n.entity_id || '';
-          const entityType = n.entity_type || 'part';
+          const entityType = n.entity_type || 'component';
           const handleRowClick = () => {
             if (!canExec || unchanged || !effStatus) return;
             if (effStatus === 'released' || effStatus === 'frozen') {
@@ -374,7 +374,7 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade,
                             e.stopPropagation();
                             let itemId = exec?.id || '';
                             if (!itemId && ecoId) {
-                              const created = await ecoApi.addExecutionItem(ecoId, { entity_type: n.entity_type || 'part', entity_id: n.entity_id, entity_code: n.entity_code, entity_name: n.entity_name, action: 'add_existing', source: 'manual' });
+                              const created = await ecoApi.addExecutionItem(ecoId, { entity_type: n.entity_type || 'component', entity_id: n.entity_id, entity_code: n.entity_code, entity_name: n.entity_name, action: 'add_existing', source: 'manual' });
                               itemId = created.data?.id;
                             }
                             onFreeze?.(itemId, n.entity_id);
@@ -385,7 +385,7 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade,
                               e.stopPropagation();
                               let itemId = exec?.id || '';
                               if (!itemId && ecoId) {
-                                const created = await ecoApi.addExecutionItem(ecoId, { entity_type: n.entity_type || 'part', entity_id: n.entity_id, entity_code: n.entity_code, entity_name: n.entity_name, action: 'add_existing', source: 'manual' });
+                                const created = await ecoApi.addExecutionItem(ecoId, { entity_type: n.entity_type || 'component', entity_id: n.entity_id, entity_code: n.entity_code, entity_name: n.entity_name, action: 'add_existing', source: 'manual' });
                                 itemId = created.data?.id;
                               }
                               onRelease?.(itemId, n.entity_id);
@@ -394,7 +394,7 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade,
                               e.stopPropagation();
                               let itemId = exec?.id || '';
                               if (!itemId && ecoId) {
-                                const created = await ecoApi.addExecutionItem(ecoId, { entity_type: n.entity_type || 'part', entity_id: n.entity_id, entity_code: n.entity_code, entity_name: n.entity_name, action: 'add_existing', source: 'manual' });
+                                const created = await ecoApi.addExecutionItem(ecoId, { entity_type: n.entity_type || 'component', entity_id: n.entity_id, entity_code: n.entity_code, entity_name: n.entity_name, action: 'add_existing', source: 'manual' });
                                 itemId = created.data?.id;
                               }
                               onFreeze?.(itemId, n.entity_id);
@@ -405,7 +405,7 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade,
                         <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
                           className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
                       ) : !effStatus ? (
-                        <button onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || '', { entity_type: n.entity_type || 'part', entity_id: n.entity_id, entity_code: n.entity_code || '', entity_name: n.entity_name || '', action: n.action || 'upgrade' }); }}
+                        <button onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || '', { entity_type: n.entity_type || 'component', entity_id: n.entity_id, entity_code: n.entity_code || '', entity_name: n.entity_name || '', action: n.action || 'upgrade' }); }}
                           className="px-1.5 py-0.5 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">升版</button>
                       ) : null
                     ) : ecoStatus === 'executing' ? (
@@ -440,7 +440,7 @@ function AffectedTable({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade, on
           const exec = getExec(n.entity_id || '');
           const effStatus = exec?.new_entity_status;
           const entityId = exec?.new_entity_id || n.entity_id || '';
-          const entityType = n.entity_type || 'part';
+          const entityType = n.entity_type || 'component';
           const handleRowClick = () => {
             if (!canExec || !effStatus) return;
             if (effStatus === 'released' || effStatus === 'frozen') {
@@ -474,7 +474,7 @@ function AffectedTable({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade, on
                         <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
                           className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
                       ) : !effStatus ? (
-                        <button onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || '', { entity_type: n.entity_type || 'part', entity_id: n.entity_id, entity_code: n.entity_code || '', entity_name: n.entity_name || '', action: 'upgrade' }); }}
+                        <button onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || '', { entity_type: n.entity_type || 'component', entity_id: n.entity_id, entity_code: n.entity_code || '', entity_name: n.entity_name || '', action: 'upgrade' }); }}
                           className="px-1.5 py-0.5 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">升版</button>
                       ) : null
                     ) : ecoStatus === 'executing' ? (
@@ -580,7 +580,7 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
         const compKey = key + '|' + affCode;
         if (!allKeys.has(compKey) && (ei.action === 'add_existing' || ei.action === 'add_new')) {
           const parentAff = ecrData.affected_items?.find((a: any) => a.entity_id === ei.parent_entity_id);
-          down.push({ entity_type: ei.entity_type || 'part', entity_id: ei.entity_id || '', entity_code: ei.entity_code || '', entity_name: ei.entity_name || '', entity_version: ei.entity_version || 'A', quantity: 0, _targetQty: ei.detail?._targetQty || 1, action: 'add_existing', _desc: ei.detail?._desc || '', parent_entity_id: ei.parent_entity_id || undefined, level: 1, _affectedCode: parentAff?.entity_code || ei.detail?._affectedCode, _affectedName: parentAff?.entity_name || ei._affectedName } as any);
+          down.push({ entity_type: ei.entity_type || 'component', entity_id: ei.entity_id || '', entity_code: ei.entity_code || '', entity_name: ei.entity_name || '', entity_version: ei.entity_version || 'A', quantity: 0, _targetQty: ei.detail?._targetQty || 1, action: 'add_existing', _desc: ei.detail?._desc || '', parent_entity_id: ei.parent_entity_id || undefined, level: 1, _affectedCode: parentAff?.entity_code || ei.detail?._affectedCode, _affectedName: parentAff?.entity_name || ei._affectedName } as any);
         }
       });
     }
@@ -623,8 +623,8 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
       }
     });
 
-    const partCodes = Array.from(codeMap.values()).filter(e => e.entity_type === 'part');
-    const assemblyCodes = Array.from(codeMap.values()).filter(e => e.entity_type === 'assembly');
+    const partCodes = Array.from(codeMap.values()).filter(e => e.entity_type === 'part' || e.entity_type === 'component');
+    const assemblyCodes = Array.from(codeMap.values()).filter(e => e.entity_type === 'assembly' || e.entity_type === 'component');
 
     const promises: Promise<any>[] = [];
 
@@ -731,7 +731,7 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
               </>)}
 
               {/* Downward items */}
-              {ai.entity_type === 'assembly' && (<>
+              {(ai.entity_type === 'assembly' || ai.entity_type === 'component') && (<>
                 <div className="text-xs font-semibold text-gray-600 mt-3 mb-1">📋 向下子项</div>
                 <div className="grid grid-cols-2 gap-4">
                   {readOnly ? (<>
@@ -766,7 +766,7 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
               try { const r = await assembliesApi.get(item.child_id); code = r.data.code; name = r.data.name; ver = r.data.version || 'A'; } catch {}
             }
             const parentAffected = localAffected.find(a => a.entity_id === pickerParentId || a.entity_code === pickerParentId);
-            setLocalDown(prev => [...prev, { entity_type: item.child_type === 'assembly' ? 'assembly' : 'part', entity_id: item.child_id, entity_code: code, entity_name: name, entity_version: ver, quantity: 0, action: 'add_existing', parent_entity_id: pickerParentId || undefined, _targetQty: item.quantity || 1, _affectedCode: (parentAffected as any)?.entity_code, _affectedName: (parentAffected as any)?.entity_name } as any]);
+            setLocalDown(prev => [...prev, { entity_type: item.child_type === 'assembly' || item.child_type === 'component' ? 'assembly' : 'part', entity_id: item.child_id, entity_code: code, entity_name: name, entity_version: ver, quantity: 0, action: 'add_existing', parent_entity_id: pickerParentId || undefined, _targetQty: item.quantity || 1, _affectedCode: (parentAffected as any)?.entity_code, _affectedName: (parentAffected as any)?.entity_name } as any]);
           }
           setPickerOpen(false);
           toast.success(`已添加 ${items.length} 项`);

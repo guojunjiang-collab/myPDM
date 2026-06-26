@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useDataStore } from '../stores/data';
-import { partsApi, assembliesApi } from '../services/api';
-import { bomApi } from '../services/api';
+import { componentsApi, bomApi } from '../services/api';
 import { Modal } from './Modal';
 import type { Part, Assembly } from '../types';
 
@@ -95,18 +94,33 @@ export default function AssemblyPartPicker({
     setQuickForm({ code: '', name: '', spec: '', remark: '' });
     setQuickOpen(false);
     setQuickCreating(false);
-    const needParts = storeParts.length === 0;
-    const needAssemblies = storeAssemblies.length === 0;
-    if (!needParts && !needAssemblies && !currentAssemblyId) {
+    if (storeParts.length > 0 && storeAssemblies.length > 0 && !currentAssemblyId) {
       setAncestorIds(new Set());
       return;
     }
 
     setLoading(true);
-    const promises: Promise<unknown>[] = [
-      needParts ? partsApi.list({ page_size: 10000 }).then((r) => r.data) : Promise.resolve(storeParts),
-      needAssemblies ? assembliesApi.list({ page_size: 10000 }).then((r) => r.data) : Promise.resolve(storeAssemblies),
-    ];
+    const promises: Promise<unknown>[] = [];
+
+    // 从统一 components API 加载
+    promises.push(
+      componentsApi.list({ page_size: 10000 })
+        .then((r) => {
+          const items = Array.isArray(r.data) ? r.data : (r.data as any)?.items || [];
+          const parts: Part[] = [];
+          const assemblies: Assembly[] = [];
+          for (const item of items) {
+            if (item.type === 'assembly') {
+              assemblies.push(item);
+            } else {
+              parts.push(item);
+            }
+          }
+          if (storeParts.length === 0) setFetchedParts(parts);
+          if (storeAssemblies.length === 0) setFetchedAssemblies(assemblies);
+        })
+        .catch(() => {}),
+    );
 
     // 计算祖先链：向上查找所有包含当前部件的父部件
     if (currentAssemblyId) {
@@ -143,13 +157,7 @@ export default function AssemblyPartPicker({
       );
     }
 
-    Promise.all(promises.slice(0, 2))
-      .then(([parts, assemblies]) => {
-        setFetchedParts(Array.isArray(parts) ? parts : (parts as any)?.items || []);
-        setFetchedAssemblies(Array.isArray(assemblies) ? assemblies : (assemblies as any)?.items || []);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    Promise.all(promises).finally(() => setLoading(false));
   }, [open, storeParts, storeAssemblies, currentAssemblyId]);
 
   const partsList = storeParts.length > 0 ? storeParts : fetchedParts;
@@ -201,7 +209,7 @@ export default function AssemblyPartPicker({
       result = [...result].sort((a, b) => {
         let va = ''; let vb = '';
         switch (sortField) {
-          case 'type': va = a.type === 'part' ? '0零件' : '1部件'; vb = b.type === 'part' ? '0零件' : '1部件'; break;
+          case 'type': va = '零部件'; vb = '零部件'; break;
           case 'code': va = a.code; vb = b.code; break;
           case 'name': va = a.name; vb = b.name; break;
           case 'version': va = a.version; vb = b.version; break;
@@ -291,7 +299,7 @@ export default function AssemblyPartPicker({
                         <span className={`px-1.5 py-0.5 text-xs rounded ${
                           item.type === 'part' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'
                         }`}>
-                          {item.type === 'part' ? '零件' : '部件'}
+                          零部件
                         </span>
                       </td>
                       <td className="px-3 py-2 font-medium">{item.code}</td>
@@ -344,8 +352,8 @@ export default function AssemblyPartPicker({
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
           >
             <option value="">全部类型</option>
-            <option value="part">零件</option>
-            <option value="component">部件</option>
+            <option value="part">零部件</option>
+            <option value="component">零部件</option>
           </select>
           <select
             value={statusFilter}
@@ -389,8 +397,7 @@ export default function AssemblyPartPicker({
                   if (!quickForm.code.trim() || !quickForm.name.trim()) return;
                   setQuickCreating(true);
                   try {
-                    const api = activeTab === 'part' ? partsApi : assembliesApi;
-                    const r = await api.create({ code: quickForm.code.trim(), name: quickForm.name.trim(), spec: quickForm.spec || undefined, remark: quickForm.remark || undefined });
+                    const r = await componentsApi.create({ type: activeTab === 'part' ? 'part' : 'assembly', code: quickForm.code.trim(), name: quickForm.name.trim(), spec: quickForm.spec || undefined, remark: quickForm.remark || undefined });
                     const newItem: SelectedItem = { id: r.data.id, code: r.data.code, name: r.data.name, version: r.data.version || '-', status: r.data.status || 'draft', type: activeTab, quantity: 1 };
                     setSelected(prev => new Map(prev).set(newItem.id, newItem));
                     // 同步添加到候选列表，无需重新搜索
@@ -437,7 +444,7 @@ export default function AssemblyPartPicker({
                           <span className={`px-1.5 py-0.5 text-xs rounded mr-1.5 ${
                             item.type === 'part' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'
                           }`}>
-                            {item.type === 'part' ? '零件' : '部件'}
+                            零部件
                           </span>
                           {item.code}
                         </td>

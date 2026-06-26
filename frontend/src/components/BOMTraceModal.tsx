@@ -9,7 +9,7 @@ import PartDetailContent from './PartDetailContent';
 import AssemblyDetailContent from './AssemblyDetailContent';
 
 interface BOMTraceModalProps {
-  entity: { type: 'part' | 'assembly'; id: string; code: string; name: string; version?: string } | null;
+  entity: { type: 'part' | 'assembly' | 'component'; id: string; code: string; name: string; version?: string } | null;
   onClose: () => void;
 }
 
@@ -27,7 +27,7 @@ export default function BOMTraceModal({ entity, onClose }: BOMTraceModalProps) {
   const [error, setError] = useState('');
 
   // 内置详情弹窗（点击父项时叠加在反查之上）
-  const [detailEntity, setDetailEntity] = useState<{ type: 'part' | 'assembly'; id: string } | null>(null);
+  const [detailEntity, setDetailEntity] = useState<{ type: 'part' | 'assembly' | 'component'; id: string } | null>(null);
   const [detailData, setDetailData] = useState<any>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailCustomDefs, setDetailCustomDefs] = useState<CustomFieldDefinition[]>([]);
@@ -51,7 +51,7 @@ export default function BOMTraceModal({ entity, onClose }: BOMTraceModalProps) {
       setError('');
       setTraceResult([]);
       try {
-        const res = await bomApi.trace(entity.type, entity.id);
+        const res = await bomApi.trace('component', entity.id);
         if (!cancelled) setTraceResult(res.data || []);
       } catch {
         if (!cancelled) { setError('反查失败，请稍后重试'); setTraceResult([]); }
@@ -78,18 +78,18 @@ export default function BOMTraceModal({ entity, onClose }: BOMTraceModalProps) {
     });
   };
 
-  const handleViewEntity = async (type: 'part' | 'assembly', id: string) => {
+  const handleViewEntity = async (type: 'part' | 'assembly' | 'component', id: string) => {
     setDetailEntity({ type, id });
     setDetailData(null);
     setDetailLoading(true);
     setDetailCustomDefs([]);
     setDetailCustomValues({});
     try {
-      const api = type === 'part' ? partsApi : assembliesApi;
+      const api = type === 'assembly' ? assembliesApi : partsApi;
       const res = await api.get(id);
       setDetailData(res.data);
       const allDefs = useDataStore.getState().customFieldDefs;
-      const entityType = type === 'part' ? 'part' : 'component';
+      const entityType = type === 'assembly' ? 'component' : 'part';
       const defs = allDefs.filter((d: CustomFieldDefinition) => d.applies_to?.includes(entityType));
       setDetailCustomDefs(defs);
       if (defs.length > 0) {
@@ -141,8 +141,8 @@ export default function BOMTraceModal({ entity, onClose }: BOMTraceModalProps) {
                   {flattenTraceTree(traceTree).map((node, idx) => {
                     const item = node.item;
                     const parent = item.parent_assembly || item.parent_part;
-                    const parentType = item.parent_assembly ? '部件' : '零件';
-                    const parentTypeCls = item.parent_assembly ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700';
+                    const parentType = '零部件';
+                    const parentTypeCls = 'bg-purple-50 text-purple-700';
                     const st = STATUS_MAP[parent?.status || ''] || { label: parent?.status || '-', cls: 'bg-gray-100 text-gray-800' };
                     const hasChildren = node.children.length > 0;
                     return (
@@ -151,7 +151,7 @@ export default function BOMTraceModal({ entity, onClose }: BOMTraceModalProps) {
                         className="hover:bg-gray-50 cursor-pointer"
                         onClick={() => {
                           if (!parent) return;
-                          const type: 'part' | 'assembly' = item.parent_assembly ? 'assembly' : 'part';
+                          const type: 'part' | 'assembly' | 'component' = item.parent_assembly ? 'assembly' : (item.parent_part ? 'part' : 'component');
                           handleViewEntity(type, parent.id);
                         }}
                       >
@@ -190,7 +190,7 @@ export default function BOMTraceModal({ entity, onClose }: BOMTraceModalProps) {
       {/* 内置详情弹窗（叠加在反查之上） */}
       <Modal
         open={!!detailEntity}
-        title={detailEntity ? (detailEntity.type === 'part' ? '零件详情' : '部件详情') : ''}
+          title={detailEntity ? '零部件详情' : ''}
         onClose={() => setDetailEntity(null)}
         width="full"
         zIndex={60}
@@ -199,15 +199,15 @@ export default function BOMTraceModal({ entity, onClose }: BOMTraceModalProps) {
           <div className="py-8 text-center text-sm text-gray-400">加载中...</div>
         ) : !detailData ? (
           <div className="py-8 text-center text-sm text-gray-400">加载失败</div>
-        ) : detailEntity?.type === 'part' ? (
-          <PartDetailContent part={detailData} customFieldDefs={detailCustomDefs} customFieldValues={detailCustomValues} />
-        ) : (
+        ) : detailEntity?.type === 'assembly' ? (
           <AssemblyDetailContent
             assembly={detailData}
             customFieldDefs={detailCustomDefs}
             customFieldValues={detailCustomValues}
-            onSubItemClick={(item: AssemblyPartItem) => handleViewEntity(item.childType === 'part' ? 'part' : 'assembly', item.child_id)}
+            onSubItemClick={(item: AssemblyPartItem) => handleViewEntity(item.childType === 'part' || item.childType === 'component' ? 'component' : 'assembly', item.child_id)}
           />
+        ) : (
+          <PartDetailContent part={detailData} customFieldDefs={detailCustomDefs} customFieldValues={detailCustomValues} />
         )}
       </Modal>
     </>

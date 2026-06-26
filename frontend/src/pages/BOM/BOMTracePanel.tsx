@@ -5,12 +5,12 @@ import { buildTraceTree, flattenTraceTree } from './helpers';
 import type { TraceTreeNode } from './types';
 
 interface BOMTracePanelProps {
-  onViewEntity: (type: 'part' | 'assembly', id: string) => void;
+  onViewEntity: (type: 'part' | 'assembly' | 'component', id: string) => void;
 }
 
 export default function BOMTracePanel({ onViewEntity }: BOMTracePanelProps) {
   // BOM 反查模式 — 全部状态归本组件管理
-  const [traceType, setTraceType] = useState<'part' | 'assembly'>('part');
+  const [traceType, setTraceType] = useState<'part' | 'assembly' | 'component'>('component');
   const [traceSearch, setTraceSearch] = useState('');
   const [traceSearchResults, setTraceSearchResults] = useState<any[]>([]);
   const [traceSearchLoading, setTraceSearchLoading] = useState(false);
@@ -33,7 +33,7 @@ export default function BOMTracePanel({ onViewEntity }: BOMTracePanelProps) {
     traceDebounceRef.current = setTimeout(async () => {
       setTraceSearchLoading(true);
       try {
-        const api = traceType === 'part' ? partsApi : assembliesApi;
+        const api = traceType === 'assembly' ? assembliesApi : partsApi;
         const response = await api.list({ search: query.trim() });
         const items = Array.isArray(response.data)
           ? response.data
@@ -58,7 +58,7 @@ export default function BOMTracePanel({ onViewEntity }: BOMTracePanelProps) {
     setTraceResult([]);
     setTraceSearched(false);
     try {
-      const response = await bomApi.trace(traceType, entity.id);
+      const response = await bomApi.trace('component', entity.id);
       setTraceResult(response.data || []);
       setTraceSearched(true);
     } catch (error) {
@@ -129,16 +129,17 @@ export default function BOMTracePanel({ onViewEntity }: BOMTracePanelProps) {
         <div className="flex gap-2 items-center mb-2">
           <select
             value={traceType}
-            onChange={(e) => setTraceType(e.target.value as 'part' | 'assembly')}
+            onChange={(e) => setTraceType(e.target.value as 'part' | 'assembly' | 'component')}
             className="px-3 py-2 border border-gray-300 rounded-lg"
           >
+            <option value="component">零部件</option>
             <option value="part">零件</option>
             <option value="assembly">部件</option>
           </select>
           <div className="relative flex-1">
             <input
               type="text"
-              placeholder={traceType === 'part' ? '输入零件件号或名称搜索...' : '输入部件件号或名称搜索...'}
+              placeholder={traceType === 'assembly' ? '输入部件件号或名称搜索...' : traceType === 'part' ? '输入零件件号或名称搜索...' : '输入零部件件号或名称搜索...'}
               value={traceSearch}
               onChange={(e) => handleTraceSearch(e.target.value)}
               className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -211,7 +212,7 @@ export default function BOMTracePanel({ onViewEntity }: BOMTracePanelProps) {
       {/* 空状态：尚未搜索 */}
       {!traceSearched && !traceError && traceResult.length === 0 && (
         <div className="text-center py-8 text-gray-400 bg-white rounded-lg border border-gray-200">
-          请通过件号或名称搜索并选择要反查的{traceType === 'part' ? '零件' : '部件'}
+          请通过件号或名称搜索并选择要反查的零部件
         </div>
       )}
 
@@ -263,8 +264,8 @@ export default function BOMTracePanel({ onViewEntity }: BOMTracePanelProps) {
                       </span>
                     </td>
                     <td className="px-3 py-2">
-                      <span className={`px-1.5 py-0.5 text-xs rounded ${traceType === 'part' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>
-                        {traceType === 'part' ? '零件' : '部件'}
+                      <span className="px-1.5 py-0.5 text-xs rounded bg-purple-50 text-purple-700">
+                        零部件
                       </span>
                     </td>
                     <td className="px-3 py-2 font-medium">{selectedTraceEntity.code}</td>
@@ -277,11 +278,9 @@ export default function BOMTracePanel({ onViewEntity }: BOMTracePanelProps) {
                 )}
                 {flattenTraceTree(traceTree).map((node, idx) => {
                   const item = node.item;
-                  const parent = item.parent_assembly || item.parent_part;
-                  const parentType = item.parent_assembly ? '部件' : '零件';
-                  const parentTypeCls = item.parent_assembly
-                    ? 'bg-green-50 text-green-700'
-                    : 'bg-blue-50 text-blue-700';
+                    const parent = item.parent_assembly || item.parent_part;
+                    const parentType = '零部件';
+                    const parentTypeCls = 'bg-purple-50 text-purple-700';
                   const statusMap: Record<string, { label: string; cls: string }> = {
                     draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
                     frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
@@ -298,7 +297,7 @@ export default function BOMTracePanel({ onViewEntity }: BOMTracePanelProps) {
                       onClick={() => {
                         const parent = item.parent_assembly || item.parent_part;
                         if (!parent) return;
-                        const type: 'part' | 'assembly' = item.parent_assembly ? 'assembly' : 'part';
+                        const type: 'part' | 'assembly' | 'component' = item.parent_assembly ? 'assembly' : (item.parent_part ? 'part' : 'component');
                         onViewEntity(type, parent.id);
                       }}
                     >

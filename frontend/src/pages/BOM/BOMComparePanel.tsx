@@ -12,7 +12,7 @@ import {
 
 interface BOMComparePanelProps {
   assemblies: SelectOption[];
-  onViewEntity: (type: 'part' | 'assembly', id: string) => void;
+  onViewEntity: (type: 'part' | 'assembly' | 'component', id: string) => void;
 }
 
 export default function BOMComparePanel({ onViewEntity }: BOMComparePanelProps) {
@@ -329,7 +329,7 @@ export default function BOMComparePanel({ onViewEntity }: BOMComparePanelProps) 
                       onClick={() => {
                         const side = node.left || node.right;
                         if (!side) return;
-                        const type: 'part' | 'assembly' = side.child_type === 'part' ? 'part' : 'assembly';
+                        const type: 'part' | 'assembly' | 'component' = side.child_type === 'part' || side.child_type === 'component' ? 'component' : 'assembly';
                         onViewEntity(type, side.child_id);
                       }}
                     >
@@ -341,8 +341,8 @@ export default function BOMComparePanel({ onViewEntity }: BOMComparePanelProps) 
                       </td>
                       <td className="px-2 py-1">
                         {node.left ? (
-                          <span className={'px-1.5 py-0.5 text-xs rounded ' + (node.left.child_type === 'component' || node.left.child_type === 'assembly' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800')}>
-                            {node.left.child_type === 'component' || node.left.child_type === 'assembly' ? '部件' : '零件'}
+                          <span className={'px-1.5 py-0.5 text-xs rounded ' + (node.left.child_type === 'component' || node.left.child_type === 'assembly' ? 'bg-purple-50 text-purple-700' : 'bg-blue-100 text-blue-800')}>
+                            {node.left.child_type === 'component' || node.left.child_type === 'assembly' ? '零部件' : '零件'}
                           </span>
                         ) : '-'}
                       </td>
@@ -357,8 +357,8 @@ export default function BOMComparePanel({ onViewEntity }: BOMComparePanelProps) 
 
                       <td className="px-2 py-1">
                         {node.right ? (
-                          <span className={'px-1.5 py-0.5 text-xs rounded ' + (node.right.child_type === 'component' || node.right.child_type === 'assembly' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800')}>
-                            {node.right.child_type === 'component' || node.right.child_type === 'assembly' ? '部件' : '零件'}
+                          <span className={'px-1.5 py-0.5 text-xs rounded ' + (node.right.child_type === 'component' || node.right.child_type === 'assembly' ? 'bg-purple-50 text-purple-700' : 'bg-blue-100 text-blue-800')}>
+                            {node.right.child_type === 'component' || node.right.child_type === 'assembly' ? '零部件' : '零件'}
                           </span>
                         ) : '-'}
                       </td>

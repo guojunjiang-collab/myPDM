@@ -30,7 +30,7 @@ export default function BOM() {
   const [assemblies, setAssemblies] = useState<SelectOption[]>([]);
 
   // 行点击详情弹窗
-  const [detailEntity, setDetailEntity] = useState<{ type: 'part' | 'assembly'; id: string } | null>(null);
+  const [detailEntity, setDetailEntity] = useState<{ type: 'part' | 'assembly' | 'component'; id: string } | null>(null);
   const [detailData, setDetailData] = useState<any>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailCustomDefs, setDetailCustomDefs] = useState<CustomFieldDefinition[]>([]);
@@ -54,7 +54,7 @@ export default function BOM() {
     }
   };
 
-  const handleViewEntity = async (type: 'part' | 'assembly', id: string) => {
+  const handleViewEntity = async (type: 'part' | 'assembly' | 'component', id: string) => {
     setDetailEntity({ type, id });
     setDetailData(null);
     setDetailLoading(true);
@@ -93,7 +93,7 @@ export default function BOM() {
       {/* 行点击详情弹窗 */}
       <Modal
         open={!!detailEntity}
-        title={detailEntity ? (detailEntity.type === 'part' ? '零件详情' : '部件详情') : ''}
+        title={detailEntity ? (detailEntity.type === 'assembly' ? '部件详情' : '零件详情') : ''}
         onClose={() => setDetailEntity(null)}
         width="full"
       >
@@ -101,10 +101,10 @@ export default function BOM() {
           <div className="py-8 text-center text-sm text-gray-400">加载中...</div>
         ) : !detailData ? (
           <div className="py-8 text-center text-sm text-gray-400">加载失败</div>
-        ) : detailEntity?.type === 'part' ? (
-          <PartDetailContent part={detailData} customFieldDefs={detailCustomDefs} customFieldValues={detailCustomValues} />
+        ) : detailEntity?.type === 'assembly' ? (
+          <AssemblyDetailContent assembly={detailData} customFieldDefs={detailCustomDefs} customFieldValues={detailCustomValues} onSubItemClick={(item) => handleViewEntity(item.childType === 'part' || item.childType === 'component' ? 'component' : 'assembly', item.child_id)} />
         ) : (
-          <AssemblyDetailContent assembly={detailData} customFieldDefs={detailCustomDefs} customFieldValues={detailCustomValues} onSubItemClick={(item) => handleViewEntity(item.childType === 'part' ? 'part' : 'assembly', item.child_id)} />
+          <PartDetailContent part={detailData} customFieldDefs={detailCustomDefs} customFieldValues={detailCustomValues} />
         )}
       </Modal>
     </div>

@@ -18,8 +18,7 @@ const FIELD_TYPES = [
 ] as const;
 
 const ENTITY_TYPES = [
-  { value: 'part', label: '零件' },
-  { value: 'component', label: '部件' },
+  { value: 'component', label: '零部件' },
   { value: 'document', label: '图文档' },
 ] as const;
 
@@ -39,7 +38,7 @@ const defaultFormData: FieldFormData = {
   field_type: 'text',
   options: '',
   is_required: false,
-  applies_to: ['part'],
+  applies_to: ['component'],
   sort_order: 0,
 };
 
@@ -421,7 +420,7 @@ export default function Settings() {
       {activeTab === 'customFields' && (
         <div>
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm text-gray-500">自定义字段用于扩展零件、部件、图文档的结构</p>
+            <p className="text-sm text-gray-500">自定义字段用于扩展零部件、图文档的结构</p>
             {isAdmin() && (
               <div className="flex gap-2">
                 <button

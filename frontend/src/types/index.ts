@@ -301,7 +301,7 @@ export interface ECRReviewRecord {
 
 export interface BomImpactNode {
   level?: number;
-  entity_type: 'part' | 'assembly';
+  entity_type: 'part' | 'assembly' | 'component';
   entity_id: string;
   entity_code: string;
   entity_name: string;
@@ -328,7 +328,7 @@ export interface BomImpactNode {
 
 export interface ECRAffectedItem {
   id: string;
-  entity_type: 'part' | 'assembly';
+  entity_type: 'part' | 'assembly' | 'component';
   entity_id: string;
   entity_code: string;
   entity_name: string;
@@ -429,7 +429,7 @@ export interface ECOExecutionItem {
   eco_id?: string;
   source: 'ecr' | 'manual';
   affected_item_id?: string;
-  entity_type: 'part' | 'assembly';
+  entity_type: 'part' | 'assembly' | 'component';
   entity_id?: string;
   entity_code?: string;
   entity_name: string;
@@ -496,7 +496,7 @@ export interface ECOReviewer {
 export interface ECOExecutionItem {
   id: string;
   source: 'ecr' | 'manual';
-  entity_type: 'part' | 'assembly';
+  entity_type: 'part' | 'assembly' | 'component';
   entity_id?: string;
   entity_code?: string;
   entity_name: string;

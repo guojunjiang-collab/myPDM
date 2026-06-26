@@ -5,7 +5,7 @@ import type { SelectOption } from './types';
 
 interface BOMTreePanelProps {
   assemblies: SelectOption[];
-  onViewEntity: (type: 'part' | 'assembly', id: string) => void;
+  onViewEntity: (type: 'part' | 'assembly' | 'component', id: string) => void;
 }
 
 export default function BOMTreePanel({ assemblies: _assemblies, onViewEntity }: BOMTreePanelProps) {
@@ -100,7 +100,7 @@ export default function BOMTreePanel({ assemblies: _assemblies, onViewEntity }: 
           assemblyId={selectedAssembly}
           assemblyCode={selectedAssemblyCode}
           assemblyName={selectedAssemblyName}
-          onRowClick={(item) => onViewEntity(item.childType === 'part' ? 'part' : 'assembly', item.child_id)}
+          onRowClick={(item) => onViewEntity(item.childType === 'part' || item.childType === 'component' ? 'component' : 'assembly', item.child_id)}
         />
       ) : (
         <div className="text-center py-8 text-gray-400 bg-white rounded-lg border border-gray-200">
