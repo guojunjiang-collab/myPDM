@@ -168,15 +168,32 @@ export default function Components() {
   };
 
   // 刷新指定父级的展开子项
-  const refreshParentParts = (parentId: string) => {
+  const refreshParentParts = async (parentId: string) => {
+    // 父级现在有子项了，移除 noChildren 标记
+    setNoChildren(prev => { const s = new Set(prev); s.delete(parentId); return s; });
+
     for (const [key, rows] of Object.entries(expandedParts)) {
       if (rows.length > 0 && rows[0]?.parent_id === parentId) {
-        assemblyPartsApi.list(parentId).then(res => {
-          const fresh = (res.data || []).map((c: any) => ({
-            ...c, childType: c.childType === 'component' ? 'assembly' : c.childType, parent_id: parentId,
-          }));
-          setExpandedParts(p => ({ ...p, [key]: fresh }));
-        }).catch(() => {});
+        const res = await assemblyPartsApi.list(parentId);
+        const fresh = (res.data || []).map((c: any) => ({
+          ...c, childType: c.childType === 'component' ? 'assembly' : c.childType, parent_id: parentId,
+        }));
+        setExpandedParts(p => ({ ...p, [key]: fresh }));
+
+        // 预查孙项
+        const compItems = fresh.filter((c: any) => (c.childType === 'component' || c.childType === 'assembly') && c.child_detail?.id);
+        if (compItems.length > 0) {
+          const checks = await Promise.allSettled(
+            compItems.map((c: any) => assemblyPartsApi.list(c.child_detail.id))
+          );
+          const noChildSet = new Set(noChildren);
+          checks.forEach((c, i) => {
+            if (c.status === 'fulfilled' && ((c.value.data || []) as any[]).length === 0) {
+              noChildSet.add(compItems[i].child_id);
+            }
+          });
+          setNoChildren(noChildSet);
+        }
         return;
       }
     }
