@@ -1,6 +1,8 @@
+import { useState, useEffect } from 'react';
 import BOMTreeTable from './BOMTreeTable';
 import type { Assembly, AssemblyPartItem, CustomFieldDefinition } from '../types';
 import { formatDateTime } from '../utils/date';
+import { assemblyPartsApi } from '../services/api';
 import EntityDocumentSection from './EntityDocumentSection';
 
 interface AssemblyDetailContentProps {
@@ -21,9 +23,23 @@ const statusTag = (s: string) => {
 };
 
 export default function AssemblyDetailContent({ assembly, customFieldDefs, customFieldValues, onSubItemClick }: AssemblyDetailContentProps) {
+  const [hasSubItems, setHasSubItems] = useState<boolean | null>(null);
+  const docLinks = (assembly as any).document_links;
+  const hasDocuments = Array.isArray(docLinks) && docLinks.length > 0;
+
+  useEffect(() => {
+    let cancelled = false;
+    assemblyPartsApi.list(assembly.id).then(res => {
+      if (!cancelled) setHasSubItems(((res.data || []) as any[]).length > 0);
+    }).catch(() => {
+      if (!cancelled) setHasSubItems(false);
+    });
+    return () => { cancelled = true; };
+  }, [assembly.id]);
+
   return (
     <div className="space-y-4">
-      {/* 基本属性 - 卡片式 */}
+      {/* 基本属性 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <InfoItem label="件号" value={assembly.code} />
         <InfoItem label="中文名称" value={assembly.name} />
@@ -36,7 +52,7 @@ export default function AssemblyDetailContent({ assembly, customFieldDefs, custo
         <InfoItem label="更新时间" value={formatDateTime(assembly.updated_at)} />
       </div>
 
-      {/* 自定义字段 - 卡片式 */}
+      {/* 自定义字段 */}
       {customFieldDefs.length > 0 && (
         <div className="border-t pt-4">
           <h4 className="text-sm font-bold text-gray-700 mb-2">自定义字段</h4>
@@ -57,13 +73,17 @@ export default function AssemblyDetailContent({ assembly, customFieldDefs, custo
       )}
 
       {/* 关联图文档 */}
-      <EntityDocumentSection entityType="assembly" entityId={assembly.id} entityCode={assembly.code} entityName={assembly.name} editable={false} />
+      {hasDocuments && (
+        <EntityDocumentSection entityType="component" entityId={assembly.id} entityCode={assembly.code} entityName={assembly.name} editable={false} />
+      )}
 
       {/* 子项清单 */}
-      <div className="border-t pt-4">
-        <h4 className="text-sm font-bold text-gray-700 mb-2">子项清单</h4>
-        <BOMTreeTable assemblyId={assembly.id} onRowClick={onSubItemClick} />
-      </div>
+      {hasSubItems && (
+        <div className="border-t pt-4">
+          <h4 className="text-sm font-bold text-gray-700 mb-2">子项清单</h4>
+          <BOMTreeTable assemblyId={assembly.id} onRowClick={onSubItemClick} />
+        </div>
+      )}
     </div>
   );
 }
