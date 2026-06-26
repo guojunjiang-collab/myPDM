@@ -6,7 +6,6 @@ import AssemblyPartPicker from '../../components/AssemblyPartPicker';
 import DocumentPicker from '../../components/DocumentPicker';
 import ConfigItemPicker from '../../components/Configuration/ConfigItemPicker';
 import ECPicker from '../../components/ECPicker';
-import PartDetailContent from '../../components/PartDetailContent';
 import AssemblyDetailContent from '../../components/AssemblyDetailContent';
 import DocumentDetailContent from '../../components/DocumentDetailContent';
 import ConfigurationDetailModal from '../../components/Configuration/ConfigurationDetailModal';
@@ -607,15 +606,14 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
       {detailEntityId && (detailEntityType === 'part' || detailEntityType === 'assembly' || detailEntityType === 'component' || detailEntityType === 'document') && (
         <Modal
           open={!!detailEntityId}
-          title={detailEntityType === 'part' ? '零件详情' : detailEntityType === 'assembly' ? '部件详情' : '图文档详情'}
+          title={detailEntityType === 'part' ? '零部件详情' : detailEntityType === 'assembly' ? '零部件详情' : detailEntityType === 'component' ? '零部件详情' : '图文档详情'}
           onClose={() => { setDetailEntityId(null); setDetailEntityType(null); setDetailData(null); }}
           width="full"
         >
           {detailLoading ? (
             <div className="flex items-center justify-center py-8 text-gray-400">加载中...</div>
           ) : detailData ? (
-            detailEntityType === 'part' ? <PartDetailContent part={detailData} customFieldDefs={[]} customFieldValues={{}} /> :
-            detailEntityType === 'assembly' ? <AssemblyDetailContent assembly={detailData} customFieldDefs={[]} customFieldValues={{}} /> :
+            (detailEntityType === 'part' || detailEntityType === 'assembly' || detailEntityType === 'component') ? <AssemblyDetailContent assembly={detailData} customFieldDefs={[]} customFieldValues={{}} /> :
             <DocumentDetailContent doc={detailData} customFieldDefs={[]} customFieldValues={{}}
               onArchivePreview={(attId, fileName) => setArchivePreview({ attId, fileName })} />
           ) : null}
@@ -636,7 +634,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
           open={showPartPicker}
           onClose={() => setShowPartPicker(false)}
           onConfirm={(items) => {
-            addLinks(items.map((it) => ({ entity_type: it.child_type === 'part' ? 'part' : 'assembly', entity_id: it.child_id })));
+            addLinks(items.map((it) => ({ entity_type: 'component', entity_id: it.child_id })));
             setShowPartPicker(false);
           }}
         />
