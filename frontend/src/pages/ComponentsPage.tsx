@@ -429,7 +429,7 @@ export default function Components() {
           if (c.status === 'fulfilled') {
             const grandchildren = (c.value.data || []) as any[];
             if (grandchildren.length === 0) {
-              noChildSet.add(compItems[i].id);
+              noChildSet.add(compItems[i].child_id);
             }
           }
         });
@@ -467,10 +467,10 @@ export default function Components() {
           if (c.status === 'fulfilled') {
             const children = c.value.data || [];
             if (children.length > 0) {
-              const node = nodes.find((n) => n.item.id === compItems[i].id);
+              const node = nodes.find((n) => n.item.id === compItems[i].child_id);
               if (node) node.hasChildren = true;
             } else {
-              noChildSet.add(compItems[i].id);
+              noChildSet.add(compItems[i].child_id);
             }
           }
         });
@@ -512,10 +512,10 @@ export default function Components() {
           if (c.status === 'fulfilled') {
             const grandchildren = (c.value.data || []) as any[];
             if (grandchildren.length > 0) {
-              const cn = children.find((n) => n.item.id === compItems[i].id);
+              const cn = children.find((n) => n.item.id === compItems[i].child_id);
               if (cn) cn.hasChildren = true;
             } else {
-              noChildSet.add(compItems[i].id);
+              noChildSet.add(compItems[i].child_id);
             }
           }
         });
