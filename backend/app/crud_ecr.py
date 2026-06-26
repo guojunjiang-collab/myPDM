@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 from app.database import SessionLocal
 from app.models_ecr import ECR, ECRAffectedItem, ECRReviewRecord, ECRStatusLog
-from app.models import User, Part, Assembly, BOMItem
+from app.models import User, Part, Assembly, BOMItem, Component
 from app.schemas_ecr import ECRCreate, ECREdit, ECRListParams, AffectedItemCreate
 
 # ─────────────────────────────────────────────────────
@@ -359,7 +359,13 @@ def add_affected_item(
     entity_name = ""
     entity_version = ""
 
-    if data.entity_type == "part":
+    if data.entity_type == "component":
+        entity = db.query(Component).filter(Component.id == entity_id).first()
+        if entity:
+            entity_code = entity.code or ""
+            entity_name = entity.name or ""
+            entity_version = entity.version or ""
+    elif data.entity_type == "part":
         entity = db.query(Part).filter(Part.id == entity_id).first()
         if entity:
             entity_code = entity.code or ""
@@ -464,7 +470,9 @@ def _get_upward_trace(db: Session, entity_type: str, entity_id: uuid.UUID) -> li
             parent_meta[pk] = {"child_id": ck, "quantity": float(row.quantity), "_cte_level": row.level}
 
     # 获取变更对象详情
-    if entity_type == "part":
+    if entity_type == "component":
+        obj = db.query(Component).filter(Component.id == entity_id).first()
+    elif entity_type == "part":
         obj = db.query(Part).filter(Part.id == entity_id).first()
     else:
         obj = db.query(Assembly).filter(Assembly.id == entity_id).first()

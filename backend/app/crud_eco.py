@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 from app.database import SessionLocal
 from app.models_eco import ECO, ECOExecutionItem, ECOReviewRecord, ECOStatusLog
-from app.models import User, Part, Assembly, BOMItem
+from app.models import User, Part, Assembly, BOMItem, Component
 from app.schemas_eco import ECOCreate, ECOEdit, ECOListParams, ECOExecutionItemCreate, ECOExecutionItemEdit
 from app.crud import _get_next_version
 
@@ -365,7 +365,7 @@ def collect_release_tree_entities(db: Session, release_items: list) -> list:
     返回 [(entity_type, entity), ...]（entity 为 Part / Assembly ORM 对象）。
     一键发布、发布状态校验、提交冻结共用同一遍历，确保对"树"的定义完全一致。
     """
-    from app.models import Part, Assembly, BOMItem
+    from app.models import Part, Assembly, BOMItem, Component
     visited: set = set()
     entities: list = []
     stack: list = []
@@ -386,7 +386,12 @@ def collect_release_tree_entities(db: Session, release_items: list) -> list:
             continue
         visited.add(key)
 
-        model = Part if entity_type == "part" else Assembly
+        if entity_type == "component":
+            model = Component
+        elif entity_type == "part":
+            model = Part
+        else:
+            model = Assembly
         entity = db.query(model).filter(
             model.id == entity_id, model.deleted_at.is_(None)
         ).first()
@@ -396,7 +401,7 @@ def collect_release_tree_entities(db: Session, release_items: list) -> list:
 
         if entity_type != "part":
             children = db.query(BOMItem).filter(
-                BOMItem.parent_type == "assembly",
+                BOMItem.parent_type.in_(("assembly", "component")),
                 BOMItem.parent_id == entity_id,
                 BOMItem.deleted_at.is_(None),
             ).all()
@@ -426,7 +431,7 @@ def unfreeze_release_tree(db: Session, eco: ECO) -> int:
 
     仅当实体当前仍为"冻结"时才恢复，避免覆盖审批期间发生的其它状态变化。不在此提交，由调用方统一提交。
     """
-    from app.models import Part, Assembly
+    from app.models import Part, Assembly, Component
     count = 0
     for rec in (eco.frozen_entities or []):
         et = rec.get("entity_type")
@@ -437,7 +442,12 @@ def unfreeze_release_tree(db: Session, eco: ECO) -> int:
             uid = uuid.UUID(str(eid))
         except (ValueError, AttributeError):
             continue
-        model = Part if et == "part" else Assembly
+        if et == "component":
+            model = Component
+        elif et == "part":
+            model = Part
+        else:
+            model = Assembly
         entity = db.query(model).filter(model.id == uid, model.deleted_at.is_(None)).first()
         if entity and entity.status == "frozen":
             entity.status = "draft"
@@ -688,10 +698,30 @@ def _clone_entity(db: Session, entity, entity_type: str) -> uuid.UUID:
     """克隆实体创建新版本，返回新实体 ID。
     零件：基础字段+自定义字段沿用，关联图文档清空。
     部件：基础字段+自定义字段+子项列表沿用，关联图文档清空。"""
-    new_version = _get_next_version(db, Part if entity_type == "part" else Assembly, entity.code)
+    if entity_type == "component":
+        get_next_model = Component
+    elif entity_type == "part":
+        get_next_model = Part
+    else:
+        get_next_model = Assembly
+    new_version = _get_next_version(db, get_next_model, entity.code)
     revisions = list(entity.revisions or [])
 
-    if entity_type == "part":
+    if entity_type == "component":
+        new_entity = Component(
+            code=entity.code,
+            name=entity.name,
+            spec=entity.spec,
+            version=new_version,
+            status="draft",
+            remark=entity.remark,
+            revisions=revisions,
+            revision_parent_id=entity.id,
+            document_links=[],
+        )
+        db.add(new_entity)
+        db.flush()
+    elif entity_type == "part":
         new_entity = Part(
             code=entity.code,
             name=entity.name,
@@ -727,7 +757,7 @@ def _clone_entity(db: Session, entity, entity_type: str) -> uuid.UUID:
         ).all()
         for bom in old_bom:
             new_bom = BOMItem(
-                parent_type="assembly",
+                parent_type="component",
                 parent_id=new_entity.id,
                 child_type=bom.child_type,
                 child_id=bom.child_id,
@@ -761,7 +791,9 @@ def _execute_create(db: Session, item: ECOExecutionItem) -> dict:
         "version": "A",
         "status": "released",
     }
-    if item.entity_type == "part":
+    if item.entity_type == "component":
+        new_entity = Component(**entity_data)
+    elif item.entity_type == "part":
         new_entity = Part(**entity_data)
     else:
         new_entity = Assembly(**entity_data)
@@ -771,7 +803,7 @@ def _execute_create(db: Session, item: ECOExecutionItem) -> dict:
     # 如果指定了父项，创建 BOM 关系（新零件不影响已有结构，不做 BOM 影响分析）
     if item.parent_entity_id:
         bom = BOMItem(
-            parent_type="assembly",
+            parent_type="component",
             parent_id=item.parent_entity_id,
             child_type=item.entity_type,
             child_id=new_entity.id,
@@ -787,7 +819,12 @@ def _execute_upgrade(db: Session, item: ECOExecutionItem, ecr_affected_items) ->
     entity_id = item.entity_id
     entity_type = item.entity_type
 
-    model = Part if entity_type == "part" else Assembly
+    if entity_type == "component":
+        model = Component
+    elif entity_type == "part":
+        model = Part
+    else:
+        model = Assembly
     entity = db.query(model).filter(model.id == entity_id).first()
     if not entity:
         raise HTTPException(status_code=404, detail=f"实体 {entity_id} 不存在")
@@ -808,7 +845,12 @@ def _execute_upgrade(db: Session, item: ECOExecutionItem, ecr_affected_items) ->
         parent_id_str = parent_node.get("entity_id")
         if parent_id_str:
             parent_id = uuid.UUID(parent_id_str)
-            parent_model = Part if parent_type == "part" else Assembly
+            if parent_type == "component":
+                parent_model = Component
+            elif parent_type == "part":
+                parent_model = Part
+            else:
+                parent_model = Assembly
             parent = db.query(parent_model).filter(parent_model.id == parent_id).first()
             if parent:
                 pnew_id, _ = _clone_entity(db, parent, parent_type)
@@ -838,7 +880,7 @@ def _execute_qty_change(db: Session, item: ECOExecutionItem, ecr_affected_items)
 
     for bom in old_bom_items:
         new_bom = BOMItem(
-            parent_type="assembly",
+            parent_type="component",
             parent_id=new_parent_id,
             child_type=bom.child_type,
             child_id=bom.child_id,
@@ -897,7 +939,7 @@ def _execute_delete(db: Session, item: ECOExecutionItem, ecr_affected_items) -> 
         if str(bom.child_id) == str(entity_id):
             continue  # 跳过被删除项
         new_bom = BOMItem(
-            parent_type="assembly",
+            parent_type="component",
             parent_id=new_parent_id,
             child_type=bom.child_type,
             child_id=bom.child_id,
