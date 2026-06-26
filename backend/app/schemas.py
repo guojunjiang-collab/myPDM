@@ -59,58 +59,6 @@ class UserResponse(UserBase):
     created_at: datetime
     updated_at: datetime
 
-class PartBase(BaseSchema):
-    code: str = Field(..., min_length=1, max_length=64)
-    name: str = Field(..., min_length=1, max_length=255)
-    spec: Optional[str] = None
-    version: str = "A"
-    status: str = "draft"
-    remark: Optional[str] = None
-    revisions: Optional[List[Any]] = None
-
-class PartCreate(PartBase):
-    id: Optional[uuid.UUID] = None
-
-class PartUpdate(BaseSchema):
-    code: Optional[str] = None
-    name: Optional[str] = None
-    spec: Optional[str] = None
-    version: Optional[str] = None
-    status: Optional[str] = None
-    remark: Optional[str] = None
-    revisions: Optional[List[Any]] = None
-
-class PartResponse(PartBase):
-    id: uuid.UUID
-    created_at: datetime
-    updated_at: datetime
-
-class AssemblyBase(BaseSchema):
-    code: str = Field(..., min_length=1, max_length=64)
-    name: str = Field(..., min_length=1, max_length=255)
-    spec: Optional[str] = None
-    version: str = "A"
-    status: str = "draft"
-    remark: Optional[str] = None
-    revisions: Optional[List[Any]] = None
-
-class AssemblyCreate(AssemblyBase):
-    id: Optional[uuid.UUID] = None
-
-class AssemblyUpdate(BaseSchema):
-    code: Optional[str] = None
-    name: Optional[str] = None
-    spec: Optional[str] = None
-    version: Optional[str] = None
-    status: Optional[str] = None
-    remark: Optional[str] = None
-    revisions: Optional[List[Any]] = None
-
-class AssemblyResponse(AssemblyBase):
-    id: uuid.UUID
-    created_at: datetime
-    updated_at: datetime
-
 class ComponentBase(BaseSchema):
     code: str = Field(..., min_length=1, max_length=64)
     name: str = Field(..., min_length=1, max_length=255)

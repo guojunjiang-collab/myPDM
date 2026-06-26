@@ -95,7 +95,7 @@ async def startup_event():
             print("✓ Added column file_hash to document_attachments table")
 
         # 检查并添加 revision_parent_id 列（版本控制）
-        for table_name in ['parts', 'assemblies', 'documents']:
+        for table_name in ['parts', 'assemblies', 'documents', 'components']:
             result = db.execute(text(f"""
                 SELECT column_name 
                 FROM information_schema.columns 
@@ -442,7 +442,7 @@ async def startup_event():
             print(f"✓ Added column {col} to {tbl} table")
 
         # ── 软删除列迁移 ──
-        for tbl in ["parts", "assemblies", "documents", "bom_items", "ecrs", "ecos", "configuration_items"]:
+        for tbl in ["parts", "assemblies", "documents", "components", "bom_items", "ecrs", "ecos", "configuration_items"]:
             result = db.execute(text(f"""
                 SELECT column_name FROM information_schema.columns
                 WHERE table_name = '{tbl}' AND column_name = 'deleted_at'
@@ -463,8 +463,8 @@ async def startup_event():
             print("✓ Added column updated_at to bom_items table")
 
         # ── 软删除 → 唯一约束改为 partial index ──
-        for tbl in ["parts", "assemblies", "documents"]:
-            idx_name = {"parts": "uix_part_code_version", "assemblies": "uix_assembly_code_version", "documents": "uix_doc_code_version"}[tbl]
+        for tbl in ["parts", "assemblies", "documents", "components"]:
+            idx_name = {"parts": "uix_part_code_version", "assemblies": "uix_assembly_code_version", "documents": "uix_doc_code_version", "components": "uix_component_code_version"}[tbl]
             try:
                 # 检查是否已经是 partial index
                 result = db.execute(text(f"""

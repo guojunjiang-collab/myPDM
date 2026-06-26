@@ -10,7 +10,7 @@ def _emit_collector():
 
 
 def _make_part(db, code, name):
-    p = models.Part(id=uuid.uuid4(), code=code, name=name, status="active")
+    p = models.Component(id=uuid.uuid4(), code=code, name=name, status="active")
     db.add(p); db.commit(); db.refresh(p)
     return p
 

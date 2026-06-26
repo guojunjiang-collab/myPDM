@@ -7,7 +7,7 @@ import uuid
 import base64
 
 from ..database import get_db
-from ..models import User, Document, DocumentAttachment, Part, Assembly, DocumentGroupLink, UserGroup
+from ..models import User, Document, DocumentAttachment, Component, DocumentGroupLink, UserGroup
 from .. import crud, schemas, crud_groups
 from ..permissions import require_permission, check_object_policy
 from ..stp_converter import is_stp_file, delete_glb_cache
@@ -110,7 +110,7 @@ async def get_document_references(doc_id: uuid.UUID, db: Session = Depends(get_d
     doc_id_str = str(doc_id)
 
     # 扫描零件的 document_links
-    parts = db.query(Part).all()
+    parts = db.query(Component).all()
     references = []
     for p in parts:
         links = p.document_links or []
@@ -128,7 +128,7 @@ async def get_document_references(doc_id: uuid.UUID, db: Session = Depends(get_d
                 break
 
     # 扫描部件的 document_links
-    assemblies = db.query(Assembly).all()
+    assemblies = db.query(Component).all()
     for a in assemblies:
         links = a.document_links or []
         for link in links:
@@ -288,7 +288,7 @@ def _find_doc_refs(db, doc_id_str):
     """精确扫描 document_links JSONB，找出引用指定图文档的零件和部件"""
     references = []
     # 扫描零件
-    for p in db.query(Part).all():
+    for p in db.query(Component).all():
         for link in (p.document_links or []):
             if link.get("document_id") == doc_id_str:
                 references.append({
@@ -305,7 +305,7 @@ def _find_doc_refs(db, doc_id_str):
                 })
                 break
     # 扫描部件
-    for a in db.query(Assembly).all():
+    for a in db.query(Component).all():
         for link in (a.document_links or []):
             if link.get("document_id") == doc_id_str:
                 references.append({

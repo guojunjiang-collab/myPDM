@@ -18,44 +18,6 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-class Part(Base):
-    __tablename__ = "parts"
-    # Unique constraint managed by DB partial index: uix_part_code_version WHERE deleted_at IS NULL
-    __table_args__ = ()
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    code = Column(String(64), nullable=False)
-    name = Column(String(255), nullable=False)
-    spec = Column(String(255))
-    version = Column(String(32), default="A")
-    status = Column(String(32), nullable=False, default="draft")
-    remark = Column(Text)
-    revisions = Column(JSONB, default=[])
-    revision_parent_id = Column(UUID(as_uuid=True), nullable=True)
-    creator_id = Column(UUID(as_uuid=True), nullable=True)
-    document_links = Column(JSONB, default=[])  # [{id, document_id, category, sort_order}]
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
-
-class Assembly(Base):
-    __tablename__ = "assemblies"
-    # Unique constraint managed by DB partial index: uix_assembly_code_version WHERE deleted_at IS NULL
-    __table_args__ = ()
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    code = Column(String(64), nullable=False)
-    name = Column(String(255), nullable=False)
-    spec = Column(String(255))
-    version = Column(String(32), default="A")
-    status = Column(String(32), nullable=False, default="draft")
-    remark = Column(Text)
-    revisions = Column(JSONB, default=[])
-    revision_parent_id = Column(UUID(as_uuid=True), nullable=True)
-    creator_id = Column(UUID(as_uuid=True), nullable=True)
-    document_links = Column(JSONB, default=[])  # [{id, document_id, category, sort_order}]
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
-
 class Component(Base):
     __tablename__ = "components"
     __table_args__ = ()

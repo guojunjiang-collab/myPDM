@@ -4,7 +4,7 @@ import uuid
 
 from ..database import get_db
 from ..models import (
-    User, Part, Assembly, Document, UserDashboard, DashboardFolder,
+    User, Component, Document, UserDashboard, DashboardFolder,
     DashboardItem, DashboardFolderShare
 )
 from ..models_configuration import ConfigurationItem
@@ -37,7 +37,7 @@ def _folder_to_dict(folder, db: Session, include_items=False, include_children=F
         for item in items:
             entity = None
             if item.entity_type == "part":
-                entity = db.query(Part).filter(Part.id == item.entity_id).first()
+                entity = db.query(Component).filter(Component.id == item.entity_id).first()
                 if entity:
                     item_list.append({
                         "id": item.id,
@@ -49,7 +49,7 @@ def _folder_to_dict(folder, db: Session, include_items=False, include_children=F
                         "status": entity.status,
                     })
             elif item.entity_type == "assembly":
-                entity = db.query(Assembly).filter(Assembly.id == item.entity_id).first()
+                entity = db.query(Component).filter(Component.id == item.entity_id).first()
                 if entity:
                     item_list.append({
                         "id": item.id,
@@ -420,9 +420,9 @@ async def add_items(data: dict, request: Request, db: Session = Depends(get_db),
         # 验证实体存在
         entity = None
         if entity_type == "part":
-            entity = db.query(Part).filter(Part.id == entity_id).first()
+            entity = db.query(Component).filter(Component.id == entity_id).first()
         elif entity_type == "assembly":
-            entity = db.query(Assembly).filter(Assembly.id == entity_id).first()
+            entity = db.query(Component).filter(Component.id == entity_id).first()
         elif entity_type == "document":
             entity = db.query(Document).filter(Document.id == entity_id).first()
         elif entity_type == "configuration":
@@ -787,11 +787,11 @@ async def export_all_dashboards(
 
         part_map = {}
         if part_ids:
-            parts = db.query(Part).filter(Part.id.in_(part_ids)).all()
+            parts = db.query(Component).filter(Component.id.in_(part_ids)).all()
             part_map = {str(p.id): p for p in parts}
         asm_map = {}
         if asm_ids:
-            asms = db.query(Assembly).filter(Assembly.id.in_(asm_ids)).all()
+            asms = db.query(Component).filter(Component.id.in_(asm_ids)).all()
             asm_map = {str(a.id): a for a in asms}
         doc_map = {}
         if doc_ids:
@@ -996,9 +996,9 @@ async def import_all_dashboards(
                 # 先尝试按 ID 查找实体是否存在
                 exists = False
                 if entity_type == "part":
-                    exists = db.query(Part).filter(Part.id == entity_id).first() is not None
+                    exists = db.query(Component).filter(Component.id == entity_id).first() is not None
                 elif entity_type == "assembly":
-                    exists = db.query(Assembly).filter(Assembly.id == entity_id).first() is not None
+                    exists = db.query(Component).filter(Component.id == entity_id).first() is not None
                 elif entity_type == "document":
                     exists = db.query(Document).filter(Document.id == entity_id).first() is not None
                 elif entity_type == "configuration":
@@ -1012,9 +1012,9 @@ async def import_all_dashboards(
             # 如果按 ID 找不到，且有 entity_code，则按编码查找
             if not resolved_entity_id and entity_code:
                 if entity_type == "part":
-                    e = db.query(Part).filter(Part.code == entity_code).first()
+                    e = db.query(Component).filter(Component.code == entity_code).first()
                 elif entity_type == "assembly":
-                    e = db.query(Assembly).filter(Assembly.code == entity_code).first()
+                    e = db.query(Component).filter(Component.code == entity_code).first()
                 elif entity_type == "document":
                     e = db.query(Document).filter(Document.code == entity_code).first()
                 elif entity_type == "configuration":

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.database import get_db
-from app.models import Part, Assembly, Document
+from app.models import Component, Document
 from app import models_configuration as models
 from app import schemas_configuration as schemas
 from app import schemas as core_schemas
@@ -118,8 +118,7 @@ async def get_config_item(
     # 关联零部件
     parts_data = []
     for p in crud.get_config_parts(db, config_id):
-        entity = db.query(Part).filter(Part.id == p.part_id).first() if p.part_type == "part" \
-            else db.query(Assembly).filter(Assembly.id == p.part_id).first()
+        entity = db.query(Component).filter(Component.id == p.part_id).first()
         parts_data.append({
             "id": str(p.id), "part_type": p.part_type, "part_id": str(p.part_id),
             "is_required": p.is_required, "quantity": p.quantity, "sort_order": p.sort_order,
@@ -888,7 +887,7 @@ def _format_profile_item(item, entity_map: dict = None) -> dict:
 
 def _build_entity_map(db: Session, items: list) -> dict:
     """批量查找零部件版本和状态"""
-    from app.models import Part, Assembly
+    from app.models import Component
     part_ids = []
     assembly_ids = []
     for item in items:
@@ -898,10 +897,10 @@ def _build_entity_map(db: Session, items: list) -> dict:
             assembly_ids.append(item.item_id)
     entity_map = {}
     if part_ids:
-        for p in db.query(Part).filter(Part.id.in_(part_ids)).all():
+        for p in db.query(Component).filter(Component.id.in_(part_ids)).all():
             entity_map[str(p.id)] = p
     if assembly_ids:
-        for a in db.query(Assembly).filter(Assembly.id.in_(assembly_ids)).all():
+        for a in db.query(Component).filter(Component.id.in_(assembly_ids)).all():
             entity_map[str(a.id)] = a
     return entity_map
 

@@ -10,13 +10,13 @@ from app import crud_eco
 
 
 def _part(db, status="draft"):
-    p = models.Part(id=uuid.uuid4(), code=f"P-{uuid.uuid4().hex[:6]}", name="part", status=status)
+    p = models.Component(id=uuid.uuid4(), code=f"P-{uuid.uuid4().hex[:6]}", name="part", status=status)
     db.add(p); db.commit(); db.refresh(p)
     return p
 
 
 def _assembly(db, status="draft"):
-    a = models.Assembly(id=uuid.uuid4(), code=f"A-{uuid.uuid4().hex[:6]}", name="asm", status=status)
+    a = models.Component(id=uuid.uuid4(), code=f"A-{uuid.uuid4().hex[:6]}", name="asm", status=status)
     db.add(a); db.commit(); db.refresh(a)
     return a
 
@@ -121,7 +121,7 @@ def test_edit_lock_for_engineer(db, status, should_block):
     p = _part(db, status=status)
     if should_block:
         with pytest.raises(HTTPException) as ei:
-            crud.assert_entity_editable(db, "part", p.id, "engineer")
+            crud.assert_entity_editable(db, "component", p.id, "engineer")
         assert ei.value.status_code == 403
     else:
         crud.assert_entity_editable(db, "part", p.id, "engineer")  # 不抛即通过
@@ -129,6 +129,6 @@ def test_edit_lock_for_engineer(db, status, should_block):
 
 def test_edit_lock_admin_bypass(db):
     p = _part(db, status="frozen")
-    crud.assert_entity_editable(db, "part", p.id, "admin")  # 管理员可改，不抛
+    crud.assert_entity_editable(db, "component", p.id, "admin")  # 管理员可改，不抛
     a = _assembly(db, status="released")
-    crud.assert_entity_editable(db, "assembly", a.id, "admin")
+    crud.assert_entity_editable(db, "component", a.id, "admin")

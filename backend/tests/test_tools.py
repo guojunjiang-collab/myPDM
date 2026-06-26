@@ -4,7 +4,7 @@ from app import models
 
 
 def _make_part(db, code, name):
-    p = models.Part(id=uuid.uuid4(), code=code, name=name, status="active")
+    p = models.Component(id=uuid.uuid4(), code=code, name=name, status="active")
     db.add(p); db.commit(); db.refresh(p)
     return p
 
@@ -12,7 +12,7 @@ def _make_part(db, code, name):
 def test_search_entity_matches_part_by_code(db, engineer_user):
     _make_part(db, "P-100", "螺钉")
     out = tools.REGISTRY["search_entity"]["execute"](db, engineer_user, keyword="P-100")
-    assert any(r["code"] == "P-100" and r["type"] == "part" for r in out["results"])
+    assert any(r["code"] == "P-100" and r["type"] == "component" for r in out["results"])
 
 
 def test_search_entity_empty_keyword_returns_empty(db, engineer_user):
@@ -29,7 +29,7 @@ def test_registry_specs_have_required_openai_shape():
 
 
 def _make_assembly(db, code, name):
-    a = models.Assembly(id=uuid.uuid4(), code=code, name=name, status="active")
+    a = models.Component(id=uuid.uuid4(), code=code, name=name, status="active")
     db.add(a); db.commit(); db.refresh(a)
     return a
 
@@ -74,11 +74,11 @@ def test_diff_bom_large_returns_preprocessed_diff(db, engineer_user, monkeypatch
 def test_trace_bom_returns_parents(db, engineer_user):
     parent = _make_assembly(db, "A-P", "父")
     child = _make_part(db, "P-C", "子")
-    bi = models.BOMItem(id=uuid.uuid4(), parent_type="assembly", parent_id=parent.id,
-                        child_type="part", child_id=child.id, quantity=2)
+    bi = models.BOMItem(id=uuid.uuid4(), parent_type="component", parent_id=parent.id,
+                        child_type="component", child_id=child.id, quantity=2)
     db.add(bi); db.commit()
     out = tools.REGISTRY["trace_bom"]["execute"](
-        db, engineer_user, entity_type="part", entity_id=str(child.id))
+        db, engineer_user, entity_type="component", entity_id=str(child.id))
     assert isinstance(out["parents"], list)
 
 
@@ -110,7 +110,7 @@ def test_list_api_endpoints_registered_and_returns_endpoints(db, engineer_user):
     assert "endpoints" in out
     paths = {e["path"] for e in out["endpoints"]}
     # 至少包含零件列表，且不含用户接口
-    assert any(p.startswith("/api/parts") for p in paths)
+    assert any(p.startswith("/api/components") for p in paths)
     assert not any(p.startswith("/api/users") for p in paths)
 
 

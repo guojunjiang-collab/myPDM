@@ -63,7 +63,7 @@ const CHANGE_TYPE_OPTIONS = [
 
 interface AffectedItemForm {
   id?: string;
-  entity_type: 'part' | 'assembly';
+  entity_type: 'part' | 'assembly' | 'component';
   entity_id: string;
   entity_code: string;
   entity_name: string;
@@ -221,7 +221,7 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
   };
 
   // Affected item management
-  const addAffectedItems = (items: { entity_type: 'part' | 'assembly'; entity_id: string; entity_code: string; entity_name: string; entity_version: string }[]) => {
+  const addAffectedItems = (items: { entity_type: 'part' | 'assembly' | 'component'; entity_id: string; entity_code: string; entity_name: string; entity_version: string }[]) => {
     const existing = new Set(affectedItems.map((a) => `${a.entity_type}:${a.entity_id}`));
     const newItems: AffectedItemForm[] = items
       .filter((item) => !existing.has(`${item.entity_type}:${item.entity_id}`))

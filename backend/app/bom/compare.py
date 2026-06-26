@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text, and_, or_
 import json
 
-from ..models import Assembly, Part, BOMItem
+from ..models import Component, BOMItem
 from .. import schemas
 
 
@@ -389,8 +389,8 @@ def compare_assemblies(
     ignore_quantity = options.get("ignore_quantity", False)
     
     # 获取装配体基本信息
-    left_assembly = db.query(Assembly).filter(Assembly.id == left_assembly_id).first()
-    right_assembly = db.query(Assembly).filter(Assembly.id == right_assembly_id).first()
+    left_assembly = db.query(Component).filter(Component.id == left_assembly_id).first()
+    right_assembly = db.query(Component).filter(Component.id == right_assembly_id).first()
     
     if not left_assembly:
         raise ValueError(f"左侧装配体不存在: {left_assembly_id}")

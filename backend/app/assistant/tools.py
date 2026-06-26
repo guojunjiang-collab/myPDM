@@ -36,27 +36,24 @@ def search_entity(db: Session, user: User, keyword: str, type: Optional[str] = N
     if not keyword:
         return {"results": []}
     results = []
-    if type in (None, "part"):
-        for p in crud.get_parts(db, search=keyword, limit=10):
-            results.append(_entity_brief(p, "part"))
-    if type in (None, "assembly"):
-        for a in crud.get_assemblies(db, search=keyword, limit=10):
-            results.append(_entity_brief(a, "assembly"))
+    if type in (None, "part", "component", "assembly"):
+        for p in crud.get_components(db, search=keyword, limit=10):
+            results.append(_entity_brief(p, "component"))
     return {"results": results}
 
 
 def get_part_detail(db: Session, user: User, part_id: str):
-    p = crud.get_part(db, uuid.UUID(part_id))
+    p = crud.get_component(db, uuid.UUID(part_id))
     if not p:
-        return {"error": "零件不存在"}
-    return {"detail": _entity_brief(p, "part")}
+        return {"error": "零部件不存在"}
+    return {"detail": _entity_brief(p, "component")}
 
 
 def get_assembly_detail(db: Session, user: User, assembly_id: str):
-    a = crud.get_assembly(db, uuid.UUID(assembly_id))
+    a = crud.get_component(db, uuid.UUID(assembly_id))
     if not a:
-        return {"error": "部件不存在"}
-    return {"detail": _entity_brief(a, "assembly")}
+        return {"error": "零部件不存在"}
+    return {"detail": _entity_brief(a, "component")}
 
 
 def get_bom_tree(db: Session, user: User, type: str, id: str):
@@ -65,10 +62,7 @@ def get_bom_tree(db: Session, user: User, type: str, id: str):
     items = crud.get_bom_items(db, type, uuid.UUID(id))
     rows = []
     for it in items:
-        if it.child_type == "part":
-            child = crud.get_part(db, it.child_id)
-        else:
-            child = crud.get_assembly(db, it.child_id)
+        child = crud.get_component(db, it.child_id)
         rows.append({
             "child_type": it.child_type,
             "child_code": getattr(child, "code", None),
@@ -129,7 +123,7 @@ def diff_bom(db: Session, user: User, left_id: str, right_id: str,
 
 def trace_bom(db: Session, user: User, entity_type: str, entity_id: str, max_level: int = 10):
     from ..models import BOMItem
-    if entity_type not in ("part", "assembly"):
+    if entity_type not in ("component", "part", "assembly"):
         return {"error": "无效类型"}
     parents = []
     frontier = [uuid.UUID(entity_id)]
@@ -146,7 +140,7 @@ def trace_bom(db: Session, user: User, entity_type: str, entity_id: str, max_lev
             if r.parent_id in seen:
                 continue
             seen.add(r.parent_id)
-            pa = crud.get_assembly(db, r.parent_id) if r.parent_type == "assembly" else crud.get_part(db, r.parent_id)
+            pa = crud.get_component(db, r.parent_id)
             if pa:
                 parents.append({"level": level, "parent_type": r.parent_type,
                                 "code": pa.code, "name": pa.name})

@@ -11,13 +11,13 @@ from app.routers.ecos import publish_all_release_items, get_release_items_publis
 
 
 def _part(db, status="draft"):
-    p = models.Part(id=uuid.uuid4(), code=f"P-{uuid.uuid4().hex[:6]}", name="part", status=status)
+    p = models.Component(id=uuid.uuid4(), code=f"P-{uuid.uuid4().hex[:6]}", name="part", status=status)
     db.add(p); db.commit(); db.refresh(p)
     return p
 
 
 def _assembly(db, status="draft"):
-    a = models.Assembly(id=uuid.uuid4(), code=f"A-{uuid.uuid4().hex[:6]}", name="asm", status=status)
+    a = models.Component(id=uuid.uuid4(), code=f"A-{uuid.uuid4().hex[:6]}", name="asm", status=status)
     db.add(a); db.commit(); db.refresh(a)
     return a
 

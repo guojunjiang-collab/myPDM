@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func as sqlfunc
 from fastapi import HTTPException
 
-from app.models import User, Part, Assembly, Component
+from app.models import User, Component
 from app.models_inventory import (
     Warehouse, InventoryMaterial, InventoryStock, InventoryLedger,
     InventoryDocument, InventoryDocumentLine, InventoryReviewRecord, InventoryStatusLog,
@@ -97,12 +97,7 @@ def create_material(db: Session, data: MaterialCreate) -> InventoryMaterial:
 
 
 def enable_material_from_pdm(db: Session, data: MaterialEnableFromPDM) -> InventoryMaterial:
-    if data.entity_type == "component":
-        model = Component
-    elif data.entity_type == "part":
-        model = Part
-    else:
-        model = Assembly
+    model = Component
     entity = db.query(model).filter(model.id == _uuid(data.entity_id)).first()
     if not entity:
         raise HTTPException(status_code=404, detail="PDM 实体不存在")

@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 from app.database import SessionLocal
 from app.models_ecr import ECR, ECRAffectedItem, ECRReviewRecord, ECRStatusLog
-from app.models import User, Part, Assembly, BOMItem, Component
+from app.models import User, Component, BOMItem
 from app.schemas_ecr import ECRCreate, ECREdit, ECRListParams, AffectedItemCreate
 
 # ─────────────────────────────────────────────────────
@@ -366,13 +366,13 @@ def add_affected_item(
             entity_name = entity.name or ""
             entity_version = entity.version or ""
     elif data.entity_type == "part":
-        entity = db.query(Part).filter(Part.id == entity_id).first()
+        entity = db.query(Component).filter(Component.id == entity_id).first()
         if entity:
             entity_code = entity.code or ""
             entity_name = entity.name or ""
             entity_version = entity.version or ""
     elif data.entity_type == "assembly":
-        entity = db.query(Assembly).filter(Assembly.id == entity_id).first()
+        entity = db.query(Component).filter(Component.id == entity_id).first()
         if entity:
             entity_code = entity.code or ""
             entity_name = entity.name or ""
@@ -444,10 +444,7 @@ def _get_upward_trace(db: Session, entity_type: str, entity_id: uuid.UUID) -> li
     for row in rows:
         pk = str(row.parent_id)
         if pk not in nodes_by_id:
-            if row.parent_type == "assembly":
-                p = db.query(Assembly).filter(Assembly.id == row.parent_id).first()
-            else:
-                p = db.query(Part).filter(Part.id == row.parent_id).first()
+            p = db.query(Component).filter(Component.id == row.parent_id).first()
             if p:
                 nodes_by_id[pk] = {
                     "entity_type": row.parent_type,
@@ -473,9 +470,9 @@ def _get_upward_trace(db: Session, entity_type: str, entity_id: uuid.UUID) -> li
     if entity_type == "component":
         obj = db.query(Component).filter(Component.id == entity_id).first()
     elif entity_type == "part":
-        obj = db.query(Part).filter(Part.id == entity_id).first()
+        obj = db.query(Component).filter(Component.id == entity_id).first()
     else:
-        obj = db.query(Assembly).filter(Assembly.id == entity_id).first()
+        obj = db.query(Component).filter(Component.id == entity_id).first()
     if not obj:
         return []
 
@@ -601,9 +598,9 @@ def _get_downward_trace(db: Session, entity_type: str, entity_id: uuid.UUID) -> 
             if child_type_db == "component":
                 child_type_db = "assembly"
             if child_type_db == "part":
-                c = db.query(Part).filter(Part.id == child.child_id).first()
+                c = db.query(Component).filter(Component.id == child.child_id).first()
             else:
-                c = db.query(Assembly).filter(Assembly.id == child.child_id).first()
+                c = db.query(Component).filter(Component.id == child.child_id).first()
             if c:
                 child_code = c.code
                 child_name = c.name

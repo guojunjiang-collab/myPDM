@@ -1,7 +1,7 @@
 import uuid
 import pytest
 from fastapi.testclient import TestClient
-from app.models import User, Part, Component
+from app.models import User, Component
 from app.main import app
 from app.database import get_db
 from app.routers.auth import get_current_active_user
@@ -25,12 +25,9 @@ def _make_user(db, role):
 
 
 def _make_part(db, code, version="A"):
-    part = Part(id=uuid.uuid4(), code=code, name=f"Test {code}",
-                version=version, status="draft")
-    db.add(part); db.commit(); db.refresh(part)
-    comp = Component(id=part.id, code=code, name=f"Test {code}",
+    part = Component(id=uuid.uuid4(), code=code, name=f"Test {code}",
                      version=version, status="draft")
-    db.add(comp); db.commit(); db.refresh(comp)
+    db.add(part); db.commit(); db.refresh(part)
     return part
 
 
@@ -53,7 +50,7 @@ def _clear_overrides():
 def test_parts_create_role_gate(db, role, expect):
     user = _make_user(db, role)
     c = _make_test_client(db, user)
-    r = c.post("/api/parts/", json={"code": f"PERM_{role}_{uuid.uuid4().hex[:4]}", "name": "Test", "version": "A"})
+    r = c.post("/api/components/", json={"code": f"PERM_{role}_{uuid.uuid4().hex[:4]}", "name": "Test", "version": "A"})
     assert r.status_code == expect
 
 
@@ -63,7 +60,7 @@ def test_parts_create_role_gate(db, role, expect):
 def test_parts_read_role_gate(db, role, expect):
     user = _make_user(db, role)
     c = _make_test_client(db, user)
-    r = c.get("/api/parts/")
+    r = c.get("/api/components/")
     assert r.status_code == expect
 
 
@@ -74,7 +71,7 @@ def test_parts_get_by_id(db, role, expect):
     user = _make_user(db, role)
     part = _make_part(db, f"GET_{role}", "A")
     c = _make_test_client(db, user)
-    r = c.get(f"/api/parts/{part.id}")
+    r = c.get(f"/api/components/{part.id}")
     assert r.status_code == expect
 
 
@@ -85,7 +82,7 @@ def test_parts_update_role_gate(db, role, expect):
     user = _make_user(db, role)
     part = _make_part(db, f"UPD_{role}", "A")
     c = _make_test_client(db, user)
-    r = c.put(f"/api/parts/{part.id}", json={"name": "Updated"})
+    r = c.put(f"/api/components/{part.id}", json={"name": "Updated"})
     assert r.status_code == expect
 
 
@@ -96,7 +93,7 @@ def test_parts_delete_admin_only(db, role, expect):
     user = _make_user(db, role)
     part = _make_part(db, f"DEL_{role}", "A")
     c = _make_test_client(db, user)
-    r = c.delete(f"/api/parts/{part.id}")
+    r = c.delete(f"/api/components/{part.id}")
     assert r.status_code in ({expect} if expect == 200 else {expect, 400})
 
 

@@ -5,8 +5,9 @@ from .. import models, models_ecr, models_eco, models_configuration
 from .knowledge_glossary import GLOSSARY, OVERVIEW
 
 ENTITY_MODELS = {
-    "part": models.Part,
-    "assembly": models.Assembly,
+    "component": models.Component,
+    "part": models.Component,
+    "assembly": models.Component,
     "bom_item": models.BOMItem,
     "document": models.Document,
     "attachment": models.DocumentAttachment,
