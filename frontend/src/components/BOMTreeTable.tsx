@@ -178,13 +178,6 @@ export default function BOMTreeTable({ assemblyId, assemblyCode, assemblyName, m
             </button>
           )}
         </td>
-        <td className={`px-3 py-2 ${dataCellCls}`} onClick={rowClick}>
-          <span className={`px-1.5 py-0.5 text-xs rounded ${
-            item.childType === 'part' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'
-          }`}>
-            {item.childType === 'part' ? '零件' : '部件'}
-          </span>
-        </td>
         <td className={`px-3 py-2 font-medium ${dataCellCls}`} onClick={rowClick}>{item.child_detail?.code || '-'}</td>
         <td className={`px-3 py-2 ${dataCellCls}`} onClick={rowClick}>{item.child_detail?.name || '-'}</td>
         <td className={`px-3 py-2 text-gray-500 ${dataCellCls}`} onClick={rowClick}>{item.child_detail?.spec || '-'}</td>
@@ -225,7 +218,6 @@ export default function BOMTreeTable({ assemblyId, assemblyCode, assemblyName, m
               <thead className="bg-gray-50 border-b sticky top-0 z-10">
                 <tr>
                   <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">层级</th>
-                  <th onClick={() => handleViewSort('type')} className="px-3 py-2 text-left text-gray-500 font-medium w-24 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">类型 {getViewSortIcon('type')}</th>
                   <th onClick={() => handleViewSort('code')} className="px-3 py-2 text-left text-gray-500 font-medium cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">件号 {getViewSortIcon('code')}</th>
                   <th className="px-3 py-2 text-left text-gray-500 font-medium">中文名称</th>
                   <th className="px-3 py-2 text-left text-gray-500 font-medium">规格型号</th>
@@ -250,9 +242,6 @@ export default function BOMTreeTable({ assemblyId, assemblyCode, assemblyName, m
                           {allExpanded ? '▼' : '▶'}
                         </button>
                       )}
-                    </td>
-                    <td className="px-3 py-2">
-                      <span className="px-1.5 py-0.5 text-xs rounded bg-purple-50 text-purple-700">部件</span>
                     </td>
                     <td className="px-3 py-2 font-medium">{assemblyCode}</td>
                     <td className="px-3 py-2">{assemblyName || '-'}</td>

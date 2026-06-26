@@ -184,7 +184,6 @@ export default function Components() {
       const getVal = (p: AssemblyPartItem) => {
         const d = p.child_detail;
         switch (editSortField) {
-          case 'type': return p.childType === 'part' ? '0零件' : '1部件';
           case 'code': return d?.code || '';
           case 'name': return d?.name || '';
           case 'spec': return d?.spec || '';
@@ -984,7 +983,6 @@ export default function Components() {
             <thead className="bg-gray-50 border-b sticky top-0">
               <tr>
                 <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">层级</th>
-                <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">类型</th>
                 <th className="px-3 py-2 text-left text-gray-500 font-medium">件号</th>
                 <th className="px-3 py-2 text-left text-gray-500 font-medium">中文名称</th>
                 <th className="px-3 py-2 text-left text-gray-500 font-medium">规格型号</th>
@@ -1020,14 +1018,6 @@ export default function Components() {
               {children.length > 0 ? '▼' : '▶'}
             </button>
           )}
-        </td>
-        {/* 类型 */}
-        <td className="px-3 py-2">
-          <span className={`px-1.5 py-0.5 text-xs rounded ${
-            item.childType === 'part' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'
-          }`}>
-            {item.childType === 'part' ? '零件' : '部件'}
-          </span>
         </td>
         {/* 件号 */}
         <td className="px-3 py-2 font-medium">
