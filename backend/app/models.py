@@ -56,6 +56,24 @@ class Assembly(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
 
+class Component(Base):
+    __tablename__ = "components"
+    __table_args__ = ()
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    code = Column(String(64), nullable=False)
+    name = Column(String(255), nullable=False)
+    spec = Column(String(255))
+    version = Column(String(32), default="A")
+    status = Column(String(32), nullable=False, default="draft")
+    remark = Column(Text)
+    revisions = Column(JSONB, default=[])
+    revision_parent_id = Column(UUID(as_uuid=True), nullable=True)
+    creator_id = Column(UUID(as_uuid=True), nullable=True)
+    document_links = Column(JSONB, default=[])
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
+
 class BOMItem(Base):
     __tablename__ = "bom_items"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

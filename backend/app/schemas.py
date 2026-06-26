@@ -111,6 +111,32 @@ class AssemblyResponse(AssemblyBase):
     created_at: datetime
     updated_at: datetime
 
+class ComponentBase(BaseSchema):
+    code: str = Field(..., min_length=1, max_length=64)
+    name: str = Field(..., min_length=1, max_length=255)
+    spec: Optional[str] = None
+    version: str = "A"
+    status: str = "draft"
+    remark: Optional[str] = None
+    revisions: Optional[List[Any]] = None
+
+class ComponentCreate(ComponentBase):
+    id: Optional[uuid.UUID] = None
+
+class ComponentUpdate(BaseSchema):
+    code: Optional[str] = None
+    name: Optional[str] = None
+    spec: Optional[str] = None
+    version: Optional[str] = None
+    status: Optional[str] = None
+    remark: Optional[str] = None
+    revisions: Optional[List[Any]] = None
+
+class ComponentResponse(ComponentBase):
+    id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
 class BOMItemBase(BaseSchema):
     parent_type: str = "assembly"   # 后端接口会覆盖此字段
     parent_id: Optional[uuid.UUID] = None  # 后端接口会覆盖此字段
