@@ -997,7 +997,7 @@ export default function Components() {
       <>
         <tr key={idx} className="hover:bg-gray-50">
           <td className="px-3 py-2 text-sm text-gray-400 whitespace-nowrap">
-            <span>{'-'.repeat(level)}{level}</span>
+            <span className="text-xs text-gray-400">{'-'.repeat(level + 1)}{level + 1}</span>
             {isAssembly && !noChildren.has(part.child_id) && (
               <button type="button" onClick={(e) => { e.stopPropagation(); toggleEditExpand(idx, part.child_id); }}
                 className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
