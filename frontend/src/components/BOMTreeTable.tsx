@@ -32,6 +32,7 @@ const statusTag = (s: string) => {
 export default function BOMTreeTable({ assemblyId, assemblyCode, assemblyName, maxHeight = 'max-h-[calc(100vh-300px)]', onRowClick }: BOMTreeTableProps) {
   const [viewParts, setViewParts] = useState<TreeNode[]>([]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [noChildren, setNoChildren] = useState<Set<string>>(new Set());
   const [loadingViewParts, setLoadingViewParts] = useState(false);
   const [viewSortField, setViewSortField] = useState<string | null>(null);
   const [viewSortDir, setViewSortDir] = useState<'asc' | 'desc' | null>(null);
@@ -46,7 +47,7 @@ export default function BOMTreeTable({ assemblyId, assemblyCode, assemblyName, m
         item,
         level: 0,
         children: [],
-        hasChildren: false,
+        hasChildren: item.childType === 'component',
         expanded: expandedIds.has(item.id),
       })));
     } catch {
@@ -95,6 +96,9 @@ export default function BOMTreeTable({ assemblyId, assemblyCode, assemblyName, m
 
     if (nextExpanded.has(node.item.id)) {
       const expandedNode = await expandChildren(node);
+      if (expandedNode.children.length === 0) {
+        setNoChildren(prev => new Set(prev).add(node.item.id));
+      }
       setViewParts((prev) => replaceNode(prev, node.item.id, expandedNode));
     } else {
       setViewParts((prev) => replaceNode(prev, node.item.id, { ...node, children: [] }));
@@ -169,7 +173,7 @@ export default function BOMTreeTable({ assemblyId, assemblyCode, assemblyName, m
       <tr key={item.id} className="hover:bg-gray-50">
         <td className="px-3 py-2 text-gray-400 whitespace-nowrap">
           <span className="text-xs text-gray-400">{'-'.repeat(level + 1)}{level + 1}</span>
-          {hasChildren && (
+          {hasChildren && !noChildren.has(item.id) && (
               <button
                 onClick={(e) => { e.stopPropagation(); toggleExpand(node); }}
                 className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1"

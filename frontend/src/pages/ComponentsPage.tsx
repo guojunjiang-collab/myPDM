@@ -217,6 +217,7 @@ export default function Components() {
   // Tree state now managed by AssemblyDetailContent - kept for backward compat only
   const [viewParts, setViewPartsState] = useState<TreeNode[]>([]);
   const [expandedIds, setExpandedIdsState] = useState<Set<string>>(new Set());
+  const [noChildren, setNoChildren] = useState<Set<string>>(new Set());
   const [loadingViewParts, setLoadingPartsState] = useState(false);
   const [viewSortField, setViewSortFieldState] = useState<string | null>(null);
   const [viewSortDir, setViewSortDirState] = useState<'asc' | 'desc' | null>(null);
@@ -417,7 +418,7 @@ export default function Components() {
         item,
         level: 0,
         children: [],
-        hasChildren: false,
+        hasChildren: item.childType === 'component',
         expanded: expandedIds.has(item.id),
       }));
     } catch {
@@ -529,8 +530,10 @@ export default function Components() {
     setExpandedIds(nextExpanded);
 
     if (nextExpanded.has(node.item.id)) {
-      // 展开：递归加载子项
       const expandedNode = await expandChildren(node);
+      if (expandedNode.children.length === 0) {
+        setNoChildren(prev => new Set(prev).add(node.item.id));
+      }
       setViewParts((prev) => replaceNode(prev, node.item.id, expandedNode));
     } else {
       // 收起
@@ -1010,7 +1013,7 @@ export default function Components() {
         {/* 层级 */}
         <td className="px-3 py-2 text-gray-400 whitespace-nowrap">
           <span className="text-xs text-gray-400">L{level + 1}</span>
-          {hasChildren && (
+          {hasChildren && !noChildren.has(item.id) && (
             <button
               onClick={() => toggleExpand(node)}
               className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1"
