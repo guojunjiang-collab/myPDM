@@ -88,7 +88,7 @@ export interface OperationLog {
   target_id: string;
   detail?: string;
   ip?: string;
-  created: string;
+  created_at: string;
 }
 
 export interface CustomFieldDefinition {

@@ -1,11 +1,11 @@
 """项目管理 - API Router"""
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User
-from app import crud_project
+from app import crud_project, crud
 from app.schemas_project import (
     ProjectCreate, ProjectEdit, MemberAdd,
     TaskCreate, TaskEdit, TaskStatusUpdate, TaskMove, TaskReorder, TaskLinkAdd, CommentAdd, DepCreate,
@@ -13,6 +13,23 @@ from app.schemas_project import (
 from ..permissions import require_permission, enforce_object_policy
 
 router = APIRouter(prefix="/projects", tags=["项目管理"])
+
+PROJECT_FIELD_LABELS = {
+    "name": "项目名", "status": "状态", "planned_start": "计划开始",
+    "planned_end": "计划结束", "description": "描述", "owner_id": "负责人",
+}
+TASK_FIELD_LABELS = {
+    "name": "任务名", "status": "状态", "assignee_id": "负责人",
+    "planned_start": "计划开始", "planned_end": "计划完成",
+    "actual_start": "实际开始", "actual_end": "实际完成",
+    "priority": "优先级", "description": "描述", "task_type": "类型",
+}
+ACTION_COLOR_MAP = {
+    "创建项目": "green", "删除项目": "red", "更新项目": "gray",
+    "添加成员": "purple", "移除成员": "orange",
+    "创建任务": "green", "删除任务": "red", "更新任务": "gray",
+    "任务状态变更": "blue",
+}
 
 
 def _require_member(db, project_id, user):
@@ -30,8 +47,11 @@ async def list_projects(db: Session = Depends(get_db),
 
 @router.post("")
 async def create_project(data: ProjectCreate, db: Session = Depends(get_db),
-                         current_user: User = Depends(require_permission("project:create"))):
+                         current_user: User = Depends(require_permission("project:create")),
+                         request: Request = None):
     p = crud_project.create_project(db, data, current_user.id)
+    ip = request.client.host if request and request.client else None
+    crud.create_log(db, current_user.id, current_user.username, "创建项目", "project", str(p.id), f"名称:{p.name}", ip)
     return _project_detail(db, p)
 
 
@@ -45,17 +65,37 @@ async def get_project(project_id: uuid.UUID, db: Session = Depends(get_db),
 
 @router.put("/{project_id}")
 async def update_project(project_id: uuid.UUID, data: ProjectEdit, db: Session = Depends(get_db),
-                         current_user: User = Depends(require_permission("project:update"))):
+                         current_user: User = Depends(require_permission("project:update")),
+                         request: Request = None):
     p = crud_project.get_project(db, project_id)
     enforce_object_policy("project_manager_or_admin", current_user, p)
-    return _project_detail(db, crud_project.update_project(db, p, data))
+    changed = data.model_dump(exclude_unset=True, exclude_none=True)
+    def _norm(v):
+        if v == '' or v is None:
+            return None
+        return str(v)
+    old_vals = {k: getattr(p, k, None) for k in changed}
+    result = _project_detail(db, crud_project.update_project(db, p, data))
+    ip = request.client.host if request and request.client else None
+    parts = []
+    for k, new_val in changed.items():
+        old_val = old_vals[k]
+        if _norm(old_val) != _norm(new_val):
+            label = PROJECT_FIELD_LABELS.get(k, k)
+            parts.append(f"{label}：{old_val or '-'}->{new_val or '-'}")
+    detail = '; '.join(parts) if parts else None
+    crud.create_log(db, current_user.id, current_user.username, "更新项目", "project", str(project_id), detail, ip)
+    return result
 
 
 @router.delete("/{project_id}")
 async def delete_project(project_id: uuid.UUID, db: Session = Depends(get_db),
-                         current_user: User = Depends(require_permission("project:delete"))):
+                         current_user: User = Depends(require_permission("project:delete")),
+                         request: Request = None):
     p = crud_project.get_project(db, project_id)
     enforce_object_policy("project_manager_or_admin", current_user, p)
+    ip = request.client.host if request and request.client else None
+    crud.create_log(db, current_user.id, current_user.username, "删除项目", "project", str(project_id), f"名称:{p.name}", ip)
     crud_project.delete_project(db, p)
     return {"detail": "已删除"}
 
@@ -71,20 +111,31 @@ async def list_members(project_id: uuid.UUID, db: Session = Depends(get_db),
 
 @router.post("/{project_id}/members")
 async def add_member(project_id: uuid.UUID, data: MemberAdd, db: Session = Depends(get_db),
-                     current_user: User = Depends(require_permission("project.member:manage"))):
+                     current_user: User = Depends(require_permission("project.member:manage")),
+                     request: Request = None):
     p = crud_project.get_project(db, project_id)
     enforce_object_policy("project_manager_or_admin", current_user, p)
-    return _member_dict(db, crud_project.add_member(db, project_id, data))
+    result = _member_dict(db, crud_project.add_member(db, project_id, data))
+    ip = request.client.host if request and request.client else None
+    added_user = crud.get_user(db, data.user_id)
+    added_name = added_user.real_name or added_user.username if added_user else str(data.user_id)
+    crud.create_log(db, current_user.id, current_user.username, "添加成员", "project", str(project_id), f"成员:{added_name}", ip)
+    return result
 
 
 @router.delete("/{project_id}/members/{user_id}")
 async def remove_member(project_id: uuid.UUID, user_id: uuid.UUID, db: Session = Depends(get_db),
-                        current_user: User = Depends(require_permission("project.member:manage"))):
+                        current_user: User = Depends(require_permission("project.member:manage")),
+                        request: Request = None):
     p = crud_project.get_project(db, project_id)
     enforce_object_policy("project_manager_or_admin", current_user, p)
     if user_id == p.owner_id:
         raise HTTPException(status_code=400, detail="不能移除项目负责人")
+    removed_user = crud.get_user(db, user_id)
+    removed_name = removed_user.real_name or removed_user.username if removed_user else str(user_id)
     crud_project.remove_member(db, project_id, user_id)
+    ip = request.client.host if request and request.client else None
+    crud.create_log(db, current_user.id, current_user.username, "移除成员", "project", str(project_id), f"成员:{removed_name}", ip)
     return {"detail": "已移除"}
 
 
@@ -99,25 +150,49 @@ async def list_tasks(project_id: uuid.UUID, db: Session = Depends(get_db),
 
 @router.post("/{project_id}/tasks")
 async def create_task(project_id: uuid.UUID, data: TaskCreate, db: Session = Depends(get_db),
-                      current_user: User = Depends(require_permission("project.task:create"))):
+                      current_user: User = Depends(require_permission("project.task:create")),
+                      request: Request = None):
     p = crud_project.get_project(db, project_id)
     enforce_object_policy("project_manager_or_admin", current_user, p)
-    return _task_dict(db, crud_project.create_task(db, p, data))
+    t = crud_project.create_task(db, p, data)
+    ip = request.client.host if request and request.client else None
+    crud.create_log(db, current_user.id, current_user.username, "创建任务", "project_task", str(t.id), f"名称:{t.name}", ip)
+    crud.create_log(db, current_user.id, current_user.username, "新增任务", "project", str(project_id), f"{t.code} {t.name}", ip)
+    return _task_dict(db, t)
 
 
 @router.put("/{project_id}/tasks/{task_id}")
 async def update_task(project_id: uuid.UUID, task_id: uuid.UUID, data: TaskEdit, db: Session = Depends(get_db),
-                      current_user: User = Depends(require_permission("project.task:update"))):
+                      current_user: User = Depends(require_permission("project.task:update")),
+                      request: Request = None):
     p = crud_project.get_project(db, project_id)
     enforce_object_policy("project_manager_or_admin", current_user, p)
     t = crud_project.get_active_task(db, task_id, project_id)
-    return _task_dict(db, crud_project.update_task(db, t, data))
+    changed = data.model_dump(exclude_unset=True, exclude_none=True)
+    def _norm(v):
+        if v == '' or v is None:
+            return None
+        return str(v)
+    # 必须在 update_task 之前读旧值，update 后 SQLAlchemy 对象已被修改
+    old_vals = {k: getattr(t, k, None) for k in changed}
+    result = _task_dict(db, crud_project.update_task(db, t, data))
+    ip = request.client.host if request and request.client else None
+    parts = []
+    for k, new_val in changed.items():
+        old_val = old_vals[k]
+        if _norm(old_val) != _norm(new_val):
+            label = TASK_FIELD_LABELS.get(k, k)
+            parts.append(f"{label}：{old_val or '-'}->{new_val or '-'}")
+    detail = '; '.join(parts) if parts else None
+    crud.create_log(db, current_user.id, current_user.username, "更新任务", "project_task", str(task_id), detail, ip)
+    return result
 
 
 @router.patch("/{project_id}/tasks/{task_id}/status")
 async def update_task_status(project_id: uuid.UUID, task_id: uuid.UUID, data: TaskStatusUpdate,
                              db: Session = Depends(get_db),
-                             current_user: User = Depends(require_permission("project.task:update_status"))):
+                             current_user: User = Depends(require_permission("project.task:update_status")),
+                             request: Request = None):
     p = crud_project.get_project(db, project_id)
     t = crud_project.get_active_task(db, task_id, project_id)
     is_mgr = current_user.role == "admin" or p.owner_id == current_user.id
@@ -125,7 +200,10 @@ async def update_task_status(project_id: uuid.UUID, task_id: uuid.UUID, data: Ta
         raise HTTPException(status_code=403, detail="仅项目经理或任务负责人可更新状态")
     if not is_mgr:
         _require_member(db, project_id, current_user)
-    return _task_dict(db, crud_project.update_task_status(db, t, data.status))
+    result = _task_dict(db, crud_project.update_task_status(db, t, data.status))
+    ip = request.client.host if request and request.client else None
+    crud.create_log(db, current_user.id, current_user.username, "任务状态变更", "project_task", str(task_id), f"状态→{data.status}", ip)
+    return result
 
 
 @router.post("/{project_id}/tasks/{task_id}/move")
@@ -147,10 +225,15 @@ async def reorder_tasks(project_id: uuid.UUID, data: TaskReorder, db: Session = 
 
 @router.delete("/{project_id}/tasks/{task_id}")
 async def delete_task(project_id: uuid.UUID, task_id: uuid.UUID, db: Session = Depends(get_db),
-                      current_user: User = Depends(require_permission("project.task:delete"))):
+                      current_user: User = Depends(require_permission("project.task:delete")),
+                      request: Request = None):
     p = crud_project.get_project(db, project_id)
     enforce_object_policy("project_manager_or_admin", current_user, p)
-    crud_project.delete_task(db, crud_project.get_active_task(db, task_id, project_id))
+    t = crud_project.get_active_task(db, task_id, project_id)
+    ip = request.client.host if request and request.client else None
+    crud.create_log(db, current_user.id, current_user.username, "删除任务", "project_task", str(t.id), f"任务:{t.code} {t.name}", ip)
+    crud.create_log(db, current_user.id, current_user.username, "删除任务", "project", str(project_id), f"{t.code} {t.name}", ip)
+    crud_project.delete_task(db, t)
     return {"detail": "已删除"}
 
 

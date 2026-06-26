@@ -9,7 +9,16 @@
 **Tech Stack:** FastAPI + SQLAlchemy 2.0 + Pydantic 2 + PostgreSQL(测试用 SQLite);React 18 + TypeScript + Vite + Tailwind + Axios。
 
 参考设计文档:`docs/superpowers/specs/2026-06-25-project-management-phase2-3-design.md`
-前置:第 2 期(甘特)已合并;"项目视图"tab 已存在甘特子视图(本期加"工时统计"子切换)。本期不依赖甘特逻辑,仅复用 tab 容器。
+**前置状态(第 2 期已在 dev 实现,本期基于其基础)**:
+- `project_tasks` 四个日期列已是 `Date`;`crud_project._iso(d)` 日期序列化辅助已存在(worklog 日期序列化复用)。
+- `schemas_project.py` 的 `TaskCreate/TaskEdit` 已有 `date` 字段 + `_blank_to_none` 校验器;`models_project.py` 已 import `Date`(本期再加 `Numeric`)。
+- `crud_project.py` 模型导入含 `ProjectTaskDep`,`update_task` 字段循环为 `(name, task_type, status, priority, planned_start, planned_end, actual_start, actual_end, description)` 且其后调用 `_enforce_milestone_single_day` / `auto_schedule` / `persist_rollup`(本期仅在循环里加 `estimated_hours`,不动其余)。
+- `routers/projects.py` 已有 `/gantt`、`/auto-schedule`、`/deps` 端点与 `_task_dict`(用 `crud_project._iso`)。
+- 「项目视图」tab 当前**仅渲染 `GanttView` + 共享 `TaskEditModal`**(带 `refreshKey=ganttKey`、`onRowClick=findTaskById→openEdit`);本期在其外层加「甘特图 / 工时统计」子切换。
+- `TaskEditModal.tsx` 区块顺序:基本字段 → 关联对象 → 任务附件 → **依赖区** → 评论;本期「工时区」插在依赖区与评论之间。`can` 从 `../../stores/auth` 导入。
+- `projectApi.ts` 已有 `getGantt/autoSchedule/listDeps/addDep/removeDep`(本期追加 worklog 方法)。
+
+本期工时逻辑不依赖甘特,仅复用 tab 容器与任务弹窗。
 
 ---
 
@@ -480,7 +489,7 @@ def worklog_stats(db: Session, project_id: uuid.UUID, group_by: str,
     }
 ```
 
-> 顶部确保已 `from sqlalchemy import func`(第 1 期 crud 多处用 func;若无则补 import)。
+> 注意:`crud_project.py` 当前**未**导入 `func`(顶部只有 `from sqlalchemy.orm import Session`),本任务需新增 `from sqlalchemy import func`。`_f` 辅助若已存在(本期内多处用)避免重复定义。
 
 - [ ] **Step 4: 运行确认通过**
 
@@ -767,7 +776,9 @@ import { useAuthStore } from '../../stores/auth';
         )}
 ```
 
-> `canManage` 复用本文件已有的经理/admin 判定变量(若命名不同按实际)。
+> `canManage` 现有弹窗里没有,需新增一个可选 prop:在 `TaskEditModal` 的 `interface Props` 加 `canManage?: boolean`,并在 `Projects.tsx` 渲染该弹窗的**两处**(项目详情 tab 约 644 行、项目视图 tab 见 Task 10)都传入:
+> `canManage={(useAuthStore.getState().user?.role === 'admin') || currentProject?.owner_id === useAuthStore.getState().user?.id}`。
+> 前端仅控制删除按钮显隐;后端 `update/delete worklog` 已按「本人或项目经理/admin」强校验。
 
 - [ ] **Step 4: 构建验证**
 
@@ -947,16 +958,27 @@ import WorklogStatsView from './WorklogStatsView';
                   <button onClick={() => setViewSub('worklog')}
                     className={`px-3 py-1 text-sm rounded ${viewSub === 'worklog' ? 'bg-primary-600 text-white' : 'bg-white border border-gray-300 text-gray-600'}`}>工时统计</button>
                 </div>
-                {viewSub === 'gantt'
-                  ? <GanttView projectId={selectedProjectId} canEdit={can('project.task:depend')} onTaskUpdated={() => loadTasks(selectedProjectId)} />
-                  : <WorklogStatsView projectId={selectedProjectId} />}
+                {viewSub === 'gantt' ? (
+                  <GanttView
+                    projectId={selectedProjectId}
+                    canEdit={can('project.task:depend')}
+                    refreshKey={ganttKey}
+                    onRowClick={(id) => { const t = findTaskById(tasks, id); if (t) openEdit(t); }}
+                    onTaskUpdated={() => { loadTasks(selectedProjectId); }}
+                  />
+                ) : (
+                  <WorklogStatsView projectId={selectedProjectId} />
+                )}
+                <TaskEditModal open={editOpen} projectId={selectedProjectId} task={editTask} parentId={editParentId}
+                               onClose={() => setEditOpen(false)}
+                               onSaved={() => { setEditOpen(false); loadTasks(selectedProjectId); setGanttKey((k) => k + 1); }} />
               </>
             )}
           </div>
         )}
 ```
 
-> 若第 2 期已把 `tab === 'view'` 写为仅渲染 `GanttView`,此处替换为含子切换的版本。
+> 现状:`tab === 'view'` 块已含 `GanttView`(带 `refreshKey/onRowClick`)+ `TaskEditModal`(第 2 期接入)。本步在其外层包一层「甘特图 / 工时统计」子切换,GanttView 的现有 props 与 TaskEditModal **保持不变**,仅在 worklog 子视图时渲染 `WorklogStatsView`。`viewSub` 状态、`WorklogStatsView` import 照 Step 1 加入。
 
 - [ ] **Step 2: 构建验证**
 
