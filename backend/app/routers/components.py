@@ -162,3 +162,216 @@ async def update_document_links(
     crud.create_log(db, current_user.id, current_user.username,
                     "更新图文档关联", "component", str(component_id), None, ip)
     return {"ok": True, "document_links": comp.document_links}
+
+
+# ===== BOM 子项管理 =====
+
+@router.get("/{component_id}/parts")
+async def get_component_children(
+    component_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("components.bom:manage"))
+):
+    comp = crud.get_component(db, component_id)
+    if not comp:
+        raise HTTPException(status_code=404, detail="零部件不存在")
+    return crud.get_component_children(db, component_id)
+
+
+@router.post("/{component_id}/parts")
+async def add_component_child(
+    component_id: uuid.UUID, item: schemas.BOMItemCreate, request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("components.bom:manage"))
+):
+    comp = crud.get_component(db, component_id)
+    if not comp:
+        raise HTTPException(status_code=404, detail="零部件不存在")
+    crud.assert_entity_editable(db, "component", component_id, current_user.role)
+    item.parent_type = "component"
+    item.parent_id = component_id
+    db_item = crud.create_bom_item(db, item)
+    ip = request.client.host if request.client else None
+    crud.create_log(db, current_user.id, current_user.username,
+                    "添加子项", "component", str(component_id),
+                    f"子项:{item.child_type}:{item.child_id}", ip)
+    return db_item
+
+
+@router.put("/{component_id}/parts/{item_id}")
+async def update_component_child(
+    component_id: uuid.UUID, item_id: uuid.UUID, item_update: schemas.BOMItemUpdate, request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("components.bom:manage"))
+):
+    comp = crud.get_component(db, component_id)
+    if not comp:
+        raise HTTPException(status_code=404, detail="零部件不存在")
+    crud.assert_entity_editable(db, "component", component_id, current_user.role)
+    db_item = crud.get_bom_item(db, item_id)
+    if not db_item:
+        raise HTTPException(status_code=404, detail="子项不存在")
+    if item_update.quantity is not None:
+        db_item.quantity = item_update.quantity
+    db.commit()
+    db.refresh(db_item)
+    ip = request.client.host if request.client else None
+    crud.create_log(db, current_user.id, current_user.username,
+                    "更新子项", "component", str(component_id),
+                    f"子项ID:{item_id}, 数量:{item_update.quantity}", ip)
+    return db_item
+
+
+@router.delete("/{component_id}/parts/{item_id}")
+async def remove_component_child(
+    component_id: uuid.UUID, item_id: uuid.UUID, request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("components.bom:manage"))
+):
+    comp = crud.get_component(db, component_id)
+    if not comp:
+        raise HTTPException(status_code=404, detail="零部件不存在")
+    crud.assert_entity_editable(db, "component", component_id, current_user.role)
+    crud.delete_bom_item(db, item_id)
+    ip = request.client.host if request.client else None
+    crud.create_log(db, current_user.id, current_user.username,
+                    "删除子项", "component", str(component_id),
+                    f"子项ID:{item_id}", ip)
+    return {"message": "子项已删除"}
+
+
+# ===== 文档关联 =====
+
+@router.get("/{component_id}/documents")
+async def get_component_documents(
+    component_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("components.doc:read"))
+):
+    from .. import crud_groups
+    comp = crud.get_component(db, component_id)
+    if not comp:
+        raise HTTPException(status_code=404, detail="零部件不存在")
+    links = comp.document_links or []
+    result = []
+    doc_ids = [l.get("document_id") for l in links if l.get("document_id")]
+    user_group_ids = crud_groups.get_user_group_ids(db, current_user.id)
+    doc_group_links = db.query(DocumentGroupLink).filter(DocumentGroupLink.document_id.in_(doc_ids)).all() if doc_ids else []
+    doc_groups = {}
+    for dgl in doc_group_links:
+        doc_groups.setdefault(dgl.document_id, set()).add(dgl.group_id)
+    all_gids = set()
+    for gids in doc_groups.values():
+        all_gids.update(gids)
+    group_name_map = {}
+    if all_gids:
+        gs = db.query(UserGroup).filter(UserGroup.id.in_(all_gids)).all()
+        group_name_map = {g.id: g.name for g in gs}
+    for link in links:
+        doc = db.query(Document).filter(Document.id == link.get("document_id")).first()
+        if not doc:
+            continue
+        gids = doc_groups.get(doc.id, set())
+        result.append({
+            "id": link.get("id"),
+            "entity_type": "component",
+            "entity_id": str(comp.id),
+            "document_id": doc.id,
+            "category": link.get("category"),
+            "sort_order": link.get("sort_order", 0),
+            "created_at": link.get("created_at"),
+            "document": {
+                "id": doc.id,
+                "code": doc.code,
+                "name": doc.name,
+                "version": doc.version,
+                "status": doc.status,
+                "file_name": doc.file_name,
+                "file_id": doc.file_id,
+                "accessible": crud_groups.document_is_accessible(db, current_user, doc),
+                "group_ids": [str(g) for g in gids],
+                "group_names": [group_name_map.get(g, str(g)) for g in gids],
+            }
+        })
+    return result
+
+
+@router.post("/{component_id}/documents")
+async def add_component_document(
+    component_id: uuid.UUID, body: schemas.EntityDocumentCreate, request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("components.doc:link"))
+):
+    doc = db.query(Document).filter(Document.id == body.document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="图文档不存在")
+    comp = crud.get_component(db, component_id)
+    if not comp:
+        raise HTTPException(status_code=404, detail="零部件不存在")
+    from datetime import datetime, timezone
+    link_id = str(body.id) if body.id else str(uuid.uuid4())
+    link = {
+        "id": link_id,
+        "document_id": str(body.document_id),
+        "category": body.category,
+        "sort_order": body.sort_order,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    links = comp.document_links or []
+    links.append(link)
+    comp.document_links = links
+    flag_modified(comp, 'document_links')
+    db.commit()
+    ip = request.client.host if request.client else None
+    crud.create_log(db, current_user.id, current_user.username,
+                    "关联图文档", "component", str(component_id),
+                    f"文档:{doc.code}", ip)
+    return {"id": link_id, "message": "图文档关联成功"}
+
+
+@router.put("/{component_id}/documents/{link_id}")
+async def update_component_document(
+    component_id: uuid.UUID, link_id: uuid.UUID, body: schemas.EntityDocumentUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("components.doc:link"))
+):
+    comp = crud.get_component(db, component_id)
+    if not comp:
+        raise HTTPException(status_code=404, detail="零部件不存在")
+    links = comp.document_links or []
+    link_id_str = str(link_id)
+    found = False
+    for link in links:
+        if link.get("id") == link_id_str:
+            if body.category is not None:
+                link["category"] = body.category
+            if body.sort_order is not None:
+                link["sort_order"] = body.sort_order
+            found = True
+            break
+    if not found:
+        raise HTTPException(status_code=404, detail="关联不存在")
+    comp.document_links = links
+    flag_modified(comp, 'document_links')
+    db.commit()
+    return {"message": "关联已更新"}
+
+
+@router.delete("/{component_id}/documents/{link_id}")
+async def delete_component_document(
+    component_id: uuid.UUID, link_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("components.doc:unlink"))
+):
+    comp = crud.get_component(db, component_id)
+    if not comp:
+        raise HTTPException(status_code=404, detail="零部件不存在")
+    links = comp.document_links or []
+    link_id_str = str(link_id)
+    new_links = [l for l in links if l.get("id") != link_id_str]
+    if len(new_links) == len(links):
+        raise HTTPException(status_code=404, detail="关联不存在")
+    comp.document_links = new_links
+    flag_modified(comp, 'document_links')
+    db.commit()
+    return {"message": "关联已移除"}
