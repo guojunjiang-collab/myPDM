@@ -6,6 +6,7 @@ import { can } from '../../stores/auth';
 import { Modal, ConfirmModal } from '../../components/Modal';
 import { toast } from '../../components/Toast';
 import { useHeaderTabs } from '../../hooks/useHeaderTabs';
+import { formatDateTime } from '../../utils/date';
 import MemberManageModal from './MemberManageModal';
 import TaskEditModal from './TaskEditModal';
 import GanttView from './gantt/GanttView';
@@ -721,12 +722,14 @@ export default function Projects() {
                         <tbody className="divide-y divide-gray-100">
                           {logs.map((l) => (
                             <tr key={l.id}>
-                              <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{l.created_at?.slice(0, 19).replace('T', ' ') || '-'}</td>
+                              <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{formatDateTime(l.created_at)}</td>
                               <td className="px-3 py-2">{l.username}</td>
                               <td className="px-3 py-2">
                                 <span className={`px-2 py-0.5 text-xs rounded-full ${
-                                  l.action.includes('创建') ? 'bg-green-100 text-green-800' :
-                                  l.action.includes('删除') ? 'bg-red-100 text-red-800' :
+                                  l.action === '创建项目' || l.action === '新增任务' ? 'bg-green-100 text-green-800' :
+                                  l.action === '删除项目' || l.action === '删除任务' ? 'bg-red-100 text-red-800' :
+                                  l.action === '添加成员' ? 'bg-purple-100 text-purple-800' :
+                                  l.action === '移除成员' ? 'bg-orange-100 text-orange-800' :
                                   'bg-gray-100 text-gray-700'
                                 }`}>{l.action}</span>
                               </td>

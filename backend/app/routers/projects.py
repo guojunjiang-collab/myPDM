@@ -14,6 +14,23 @@ from ..permissions import require_permission, enforce_object_policy
 
 router = APIRouter(prefix="/projects", tags=["项目管理"])
 
+PROJECT_FIELD_LABELS = {
+    "name": "项目名", "status": "状态", "planned_start": "计划开始",
+    "planned_end": "计划结束", "description": "描述", "owner_id": "负责人",
+}
+TASK_FIELD_LABELS = {
+    "name": "任务名", "status": "状态", "assignee_id": "负责人",
+    "planned_start": "计划开始", "planned_end": "计划完成",
+    "actual_start": "实际开始", "actual_end": "实际完成",
+    "priority": "优先级", "description": "描述", "task_type": "类型",
+}
+ACTION_COLOR_MAP = {
+    "创建项目": "green", "删除项目": "red", "更新项目": "gray",
+    "添加成员": "purple", "移除成员": "orange",
+    "创建任务": "green", "删除任务": "red", "更新任务": "gray",
+    "任务状态变更": "blue",
+}
+
 
 def _require_member(db, project_id, user):
     if user.role != "admin" and not crud_project.is_member(db, project_id, user.id):
@@ -52,19 +69,20 @@ async def update_project(project_id: uuid.UUID, data: ProjectEdit, db: Session =
                          request: Request = None):
     p = crud_project.get_project(db, project_id)
     enforce_object_policy("project_manager_or_admin", current_user, p)
+    changed = data.model_dump(exclude_unset=True, exclude_none=True)
+    def _norm(v):
+        if v == '' or v is None:
+            return None
+        return str(v)
+    old_vals = {k: getattr(p, k, None) for k in changed}
     result = _project_detail(db, crud_project.update_project(db, p, data))
     ip = request.client.host if request and request.client else None
-    changed = data.model_dump(exclude_unset=True, exclude_none=True)
     parts = []
     for k, new_val in changed.items():
-        old_val = getattr(p, k, None)
-        # normalize: treat '' and None as equivalent
-        def _norm(v):
-            if v == '' or v is None:
-                return None
-            return str(v)
+        old_val = old_vals[k]
         if _norm(old_val) != _norm(new_val):
-            parts.append(f"{k}: {old_val or '-'}→{new_val or '-'}")
+            label = PROJECT_FIELD_LABELS.get(k, k)
+            parts.append(f"{label}：{old_val or '-'}->{new_val or '-'}")
     detail = '; '.join(parts) if parts else None
     crud.create_log(db, current_user.id, current_user.username, "更新项目", "project", str(project_id), detail, ip)
     return result
@@ -99,7 +117,9 @@ async def add_member(project_id: uuid.UUID, data: MemberAdd, db: Session = Depen
     enforce_object_policy("project_manager_or_admin", current_user, p)
     result = _member_dict(db, crud_project.add_member(db, project_id, data))
     ip = request.client.host if request and request.client else None
-    crud.create_log(db, current_user.id, current_user.username, "添加成员", "project", str(project_id), f"用户ID:{data.user_id}", ip)
+    added_user = crud.get_user(db, data.user_id)
+    added_name = added_user.real_name or added_user.username if added_user else str(data.user_id)
+    crud.create_log(db, current_user.id, current_user.username, "添加成员", "project", str(project_id), f"成员:{added_name}", ip)
     return result
 
 
@@ -111,9 +131,11 @@ async def remove_member(project_id: uuid.UUID, user_id: uuid.UUID, db: Session =
     enforce_object_policy("project_manager_or_admin", current_user, p)
     if user_id == p.owner_id:
         raise HTTPException(status_code=400, detail="不能移除项目负责人")
+    removed_user = crud.get_user(db, user_id)
+    removed_name = removed_user.real_name or removed_user.username if removed_user else str(user_id)
     crud_project.remove_member(db, project_id, user_id)
     ip = request.client.host if request and request.client else None
-    crud.create_log(db, current_user.id, current_user.username, "移除成员", "project", str(project_id), f"用户ID:{user_id}", ip)
+    crud.create_log(db, current_user.id, current_user.username, "移除成员", "project", str(project_id), f"成员:{removed_name}", ip)
     return {"detail": "已移除"}
 
 
@@ -135,6 +157,7 @@ async def create_task(project_id: uuid.UUID, data: TaskCreate, db: Session = Dep
     t = crud_project.create_task(db, p, data)
     ip = request.client.host if request and request.client else None
     crud.create_log(db, current_user.id, current_user.username, "创建任务", "project_task", str(t.id), f"名称:{t.name}", ip)
+    crud.create_log(db, current_user.id, current_user.username, "新增任务", "project", str(project_id), f"{t.code} {t.name}", ip)
     return _task_dict(db, t)
 
 
@@ -145,18 +168,21 @@ async def update_task(project_id: uuid.UUID, task_id: uuid.UUID, data: TaskEdit,
     p = crud_project.get_project(db, project_id)
     enforce_object_policy("project_manager_or_admin", current_user, p)
     t = crud_project.get_active_task(db, task_id, project_id)
+    changed = data.model_dump(exclude_unset=True, exclude_none=True)
+    def _norm(v):
+        if v == '' or v is None:
+            return None
+        return str(v)
+    # 必须在 update_task 之前读旧值，update 后 SQLAlchemy 对象已被修改
+    old_vals = {k: getattr(t, k, None) for k in changed}
     result = _task_dict(db, crud_project.update_task(db, t, data))
     ip = request.client.host if request and request.client else None
-    changed = data.model_dump(exclude_unset=True, exclude_none=True)
     parts = []
     for k, new_val in changed.items():
-        old_val = getattr(t, k, None)
-        def _norm(v):
-            if v == '' or v is None:
-                return None
-            return str(v)
+        old_val = old_vals[k]
         if _norm(old_val) != _norm(new_val):
-            parts.append(f"{k}: {old_val or '-'}→{new_val or '-'}")
+            label = TASK_FIELD_LABELS.get(k, k)
+            parts.append(f"{label}：{old_val or '-'}->{new_val or '-'}")
     detail = '; '.join(parts) if parts else None
     crud.create_log(db, current_user.id, current_user.username, "更新任务", "project_task", str(task_id), detail, ip)
     return result
@@ -205,7 +231,8 @@ async def delete_task(project_id: uuid.UUID, task_id: uuid.UUID, db: Session = D
     enforce_object_policy("project_manager_or_admin", current_user, p)
     t = crud_project.get_active_task(db, task_id, project_id)
     ip = request.client.host if request and request.client else None
-    crud.create_log(db, current_user.id, current_user.username, "删除任务", "project", str(project_id), f"任务:{t.code} {t.name}", ip)
+    crud.create_log(db, current_user.id, current_user.username, "删除任务", "project_task", str(t.id), f"任务:{t.code} {t.name}", ip)
+    crud.create_log(db, current_user.id, current_user.username, "删除任务", "project", str(project_id), f"{t.code} {t.name}", ip)
     crud_project.delete_task(db, t)
     return {"detail": "已删除"}
 

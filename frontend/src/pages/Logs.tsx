@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { logsApi } from '../services/api';
 import type { OperationLog } from '../types';
+import { formatDateTime } from '../utils/date';
 
 const PAGE_SIZE = 20;
 
@@ -185,7 +186,7 @@ export default function Logs() {
               logs.map((log) => (
                 <tr key={log.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
-                    {log.created_at?.slice(0, 19).replace('T', ' ') || '-'}
+                    {formatDateTime(log.created_at)}
                   </td>
                   <td className="px-4 py-3 text-sm">{log.username}</td>
                   <td className="px-4 py-3 text-sm">
