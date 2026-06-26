@@ -122,4 +122,13 @@ def migrate_components(db, engine):
 
     # operation_logs 的 target_type 保留历史值，前端展示时做映射
 
+    # 10. 安全删除旧表（确认 components 表数据完整后）
+    parts_count = db.execute(text("SELECT COUNT(*) FROM parts")).scalar()
+    asms_count = db.execute(text("SELECT COUNT(*) FROM assemblies")).scalar()
+    comps_count = db.execute(text("SELECT COUNT(*) FROM components")).scalar()
+    if comps_count >= parts_count + asms_count and parts_count + asms_count > 0:
+        db.execute(text("DROP TABLE IF EXISTS parts"))
+        db.execute(text("DROP TABLE IF EXISTS assemblies"))
+        print("✓ Dropped old parts and assemblies tables")
+
     db.commit()
