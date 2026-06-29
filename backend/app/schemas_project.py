@@ -88,7 +88,7 @@ class TaskReorder(BaseSchema):
 
 # ---- 关联对象 ----
 class TaskLinkAdd(BaseSchema):
-    entity_type: Literal["part", "assembly", "config_item", "ec", "document"]
+    entity_type: Literal["part", "assembly", "component", "config_item", "ec", "document"]
     entity_id: str
 
 
