@@ -954,6 +954,7 @@ export async function exportAssembliesToFolder(dirHandle?: FileSystemDirectoryHa
   }
 
   // ===== 3. 下载 CAD附件 / 生产附件 文件 =====
+  const attDirHandle = await handle.getDirectoryHandle('attachments', { create: true });
   for (const a of allComps) {
     for (const cat of ['cad' as const, 'production' as const]) {
       const atts = (cat === 'cad' ? cadAttMap : prodAttMap).get(a.id) || [];
@@ -965,7 +966,7 @@ export async function exportAssembliesToFolder(dirHandle?: FileSystemDirectoryHa
           const blob = await resp.blob();
           const prefix = cat === 'cad' ? 'CAD' : 'PRODUCTION';
           const filename = `${prefix}#${a.code}#${a.version || 'A'}#${att.file_name}`;
-          await writeBlobToDirectory(handle, filename, blob);
+          await writeBlobToDirectory(attDirHandle, filename, blob);
         } catch { /* skip failed download */ }
       }
     }
@@ -1477,38 +1478,42 @@ export async function executeAssembliesImport(
 
   // ===== 阶段4: 上传 CAD附件 / 生产附件（仅新建零部件） =====
   if (dirHandle) {
-    const allFiles = await listFilesInDirectory(dirHandle);
-    for (const fn of allFiles) {
-      const parts = fn.split('#');
-      if (parts.length < 4) continue;
-      const [prefix, code, version, ...restParts] = parts;
-      const attFileName = restParts.join('#');
-      const cat = prefix === 'CAD' ? 'cad' : prefix === 'PRODUCTION' ? 'production' : null;
-      if (!cat) continue;
+    let attDirHandle: FileSystemDirectoryHandle | null = null;
+    try { attDirHandle = await dirHandle.getDirectoryHandle('attachments'); } catch { /* no attachments folder */ }
+    if (attDirHandle) {
+      const allFiles = await listFilesInDirectory(attDirHandle);
+      for (const fn of allFiles) {
+        const parts = fn.split('#');
+        if (parts.length < 4) continue;
+        const [prefix, code, version, ...restParts] = parts;
+        const attFileName = restParts.join('#');
+        const cat = prefix === 'CAD' ? 'cad' : prefix === 'PRODUCTION' ? 'production' : null;
+        if (!cat) continue;
 
-      const key = `${code}|${version}`;
-      if (!codeVersionToNew.get(key)) continue;
-      const compId = codeVersionToId.get(key);
-      if (!compId) continue;
+        const key = `${code}|${version}`;
+        if (!codeVersionToNew.get(key)) continue;
+        const compId = codeVersionToId.get(key);
+        if (!compId) continue;
 
-      try {
-        const buf = await readFileAsBuffer(dirHandle, fn);
-        if (!buf) continue;
-        const file = new File([buf], attFileName);
-        if (file.size > 10 * 1024 * 1024) {
-          const init = await v2UploadApi.initChunkedUpload(attFileName, file.size, 'components', compId, cat);
-          const CHUNK_SIZE = 5 * 1024 * 1024;
-          const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-          for (let i = 0; i < totalChunks; i++) {
-            const start = i * CHUNK_SIZE;
-            await v2UploadApi.uploadChunk(init.upload_id, i, file.slice(start, Math.min(start + CHUNK_SIZE, file.size)));
+        try {
+          const buf = await readFileAsBuffer(attDirHandle, fn);
+          if (!buf) continue;
+          const file = new File([buf], attFileName);
+          if (file.size > 10 * 1024 * 1024) {
+            const init = await v2UploadApi.initChunkedUpload(attFileName, file.size, 'components', compId, cat);
+            const CHUNK_SIZE = 5 * 1024 * 1024;
+            const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+            for (let i = 0; i < totalChunks; i++) {
+              const start = i * CHUNK_SIZE;
+              await v2UploadApi.uploadChunk(init.upload_id, i, file.slice(start, Math.min(start + CHUNK_SIZE, file.size)));
+            }
+            await v2UploadApi.completeChunkedUpload(init.upload_id);
+          } else {
+            await v2UploadApi.uploadSmallFile(file, 'components', compId, undefined, cat);
           }
-          await v2UploadApi.completeChunkedUpload(init.upload_id);
-        } else {
-          await v2UploadApi.uploadSmallFile(file, 'components', compId, undefined, cat);
+        } catch (err) {
+          console.error(`上传附件失败: ${fn}`, err);
         }
-      } catch (err) {
-        console.error(`上传附件失败: ${fn}`, err);
       }
     }
   }
