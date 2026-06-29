@@ -31,6 +31,7 @@ def _comp_brief(comp, creator_name_map=None):
         "version": comp.version,
         "status": comp.status,
         "remark": comp.remark,
+        "document_links": comp.document_links or [],
         "creator_id": str(comp.creator_id) if comp.creator_id else None,
         "created_at": comp.created_at.isoformat() if comp.created_at else None,
         "updated_at": comp.updated_at.isoformat() if comp.updated_at else None,
