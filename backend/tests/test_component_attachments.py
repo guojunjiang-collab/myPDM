@@ -131,3 +131,26 @@ def test_list_and_delete_component_attachments(db, tmp_path, monkeypatch):
     d = c.delete(f"/api/components/{comp.id}/attachments/{att_id}")
     assert d.status_code == 200, d.text
     assert db.query(ComponentAttachment).filter(ComponentAttachment.id == uuid.UUID(att_id)).first() is None
+
+
+def test_delete_component_cleans_attachment_files(db, tmp_path, monkeypatch):
+    from app import file_storage as fsm
+    store = fsm.FileStorage(base_dir=str(tmp_path))
+    monkeypatch.setattr(fsm, "file_storage", store)
+    monkeypatch.setattr("app.routers.attachments_v2.file_storage", store)
+    monkeypatch.setattr("app.routers.components.file_storage", store)
+
+    comp = _component(db)
+    admin = _user(db, "admin")
+    c = _client(db, admin)
+
+    up = c.post("/api/v2/attachments/upload",
+                files={"file": ("z.pdf", b"%PDF-1.4 z", "application/pdf")},
+                data={"entity_type": "component", "entity_id": str(comp.id), "category": "cad"})
+    att = db.query(ComponentAttachment).filter(ComponentAttachment.id == uuid.UUID(up.json()["id"])).first()
+    disk_path = store.base_dir / att.file_path
+    assert disk_path.exists()
+
+    d = c.delete(f"/api/components/{comp.id}")
+    assert d.status_code == 200, d.text
+    assert not disk_path.exists()

@@ -141,6 +141,19 @@ async def delete_component(
     db_comp = crud.get_component(db, component_id)
     if not db_comp:
         raise HTTPException(status_code=404, detail="零部件不存在")
+    # 清理零部件附件的磁盘文件与转换缓存（DB 行由 CASCADE 处理）
+    catts = db.query(ComponentAttachment).filter(
+        ComponentAttachment.component_id == component_id).all()
+    for att in catts:
+        try:
+            if att.file_path:
+                file_storage.delete_file(att.file_path)
+            if att.file_name and is_stp_file(att.file_name):
+                delete_glb_cache(str(att.id), att.file_path)
+            if att.file_name and is_office_file(att.file_name):
+                delete_pdf_cache(str(att.id), att.file_path)
+        except FileNotFoundError:
+            pass
     crud.delete_component(db, component_id)
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username,
