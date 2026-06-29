@@ -51,3 +51,8 @@ def test_component_attachment_model_persists(db):
 def test_file_storage_allows_component_entity():
     assert "component" in fs_mod.ALLOWED_ENTITY_TYPES
     assert fs_mod.ENTITY_TYPE_ALIASES.get("components") == "component"
+
+
+def test_migrate_components_is_noop_on_sqlite(db):
+    from app.migrations_components import migrate_components
+    assert migrate_components(db, db.get_bind()) is None

@@ -36,6 +36,24 @@ def migrate_components(db, engine):
         WHERE deleted_at IS NULL
     """))
 
+    # 1b. 创建 component_attachments 表（照抄 document_attachments，若已存在跳过）
+    db.execute(text("""
+        CREATE TABLE IF NOT EXISTS component_attachments (
+            id UUID PRIMARY KEY,
+            component_id UUID NOT NULL REFERENCES components(id) ON DELETE CASCADE,
+            category VARCHAR(32) NOT NULL,
+            file_name VARCHAR(255),
+            file_size INTEGER,
+            file_path VARCHAR(512),
+            file_hash VARCHAR(64),
+            created_at TIMESTAMPTZ DEFAULT now()
+        )
+    """))
+    db.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_component_attachments_comp_cat
+        ON component_attachments (component_id, category)
+    """))
+
     # 2. 迁移 parts（跳过 id 已存在的行）
     db.execute(text("""
         INSERT INTO components
