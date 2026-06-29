@@ -101,3 +101,33 @@ def test_component_attachment_stream_and_token(db, tmp_path, monkeypatch):
     s = c.get(f"/api/v2/attachments/{att_id}/stream")
     assert s.status_code == 200, s.text
     assert s.content == b"%PDF-1.4 body"
+
+
+def test_list_and_delete_component_attachments(db, tmp_path, monkeypatch):
+    from app import file_storage as fsm
+    store = fsm.FileStorage(base_dir=str(tmp_path))
+    monkeypatch.setattr(fsm, "file_storage", store)
+    monkeypatch.setattr("app.routers.attachments_v2.file_storage", store)
+    monkeypatch.setattr("app.routers.components.file_storage", store)
+
+    comp = _component(db)
+    user = _user(db, "engineer")
+    c = _client(db, user)
+
+    for cat, fn in [("cad", "a.pdf"), ("production", "b.pdf")]:
+        c.post("/api/v2/attachments/upload",
+               files={"file": (fn, b"%PDF-1.4 x", "application/pdf")},
+               data={"entity_type": "component", "entity_id": str(comp.id), "category": cat})
+
+    r = c.get(f"/api/components/{comp.id}/attachments")
+    assert r.status_code == 200, r.text
+    assert len(r.json()) == 2
+
+    r_cad = c.get(f"/api/components/{comp.id}/attachments", params={"category": "cad"})
+    assert len(r_cad.json()) == 1
+    assert r_cad.json()[0]["category"] == "cad"
+
+    att_id = r_cad.json()[0]["id"]
+    d = c.delete(f"/api/components/{comp.id}/attachments/{att_id}")
+    assert d.status_code == 200, d.text
+    assert db.query(ComponentAttachment).filter(ComponentAttachment.id == uuid.UUID(att_id)).first() is None

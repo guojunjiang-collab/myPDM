@@ -5,9 +5,12 @@ from sqlalchemy.orm.attributes import flag_modified
 import uuid
 
 from ..database import get_db
-from ..models import User, Document, DocumentGroupLink, UserGroup, Component
+from ..models import User, Document, DocumentGroupLink, UserGroup, Component, ComponentAttachment
 from .. import crud, schemas
 from ..permissions import require_permission
+from ..file_storage import file_storage
+from ..stp_converter import is_stp_file, delete_glb_cache
+from ..office_converter import is_office_file, delete_pdf_cache
 
 router = APIRouter(prefix="/components", tags=["零部件管理"])
 
@@ -375,3 +378,59 @@ async def delete_component_document(
     flag_modified(comp, 'document_links')
     db.commit()
     return {"message": "关联已移除"}
+
+
+# ===== 零部件附件（CAD / 生产）=====
+
+def _comp_att_response(att):
+    return {
+        "id": str(att.id),
+        "component_id": str(att.component_id),
+        "category": att.category,
+        "file_name": att.file_name,
+        "file_size": att.file_size,
+        "created_at": att.created_at.isoformat() if att.created_at else None,
+    }
+
+
+@router.get("/{component_id}/attachments")
+async def list_component_attachments(
+    component_id: uuid.UUID, category: str = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("components:read"))
+):
+    comp = crud.get_component(db, component_id)
+    if not comp:
+        raise HTTPException(status_code=404, detail="零部件不存在")
+    q = db.query(ComponentAttachment).filter(ComponentAttachment.component_id == component_id)
+    if category:
+        q = q.filter(ComponentAttachment.category == category)
+    rows = q.order_by(ComponentAttachment.created_at.asc()).all()
+    return [_comp_att_response(a) for a in rows]
+
+
+@router.delete("/{component_id}/attachments/{attachment_id}")
+async def delete_component_attachment(
+    component_id: uuid.UUID, attachment_id: uuid.UUID, request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("attachments:delete"))
+):
+    att = db.query(ComponentAttachment).filter(
+        ComponentAttachment.id == attachment_id,
+        ComponentAttachment.component_id == component_id,
+    ).first()
+    if not att:
+        raise HTTPException(status_code=404, detail="附件不存在")
+    if att.file_path:
+        file_storage.delete_file(att.file_path)
+    if att.file_name and is_stp_file(att.file_name):
+        delete_glb_cache(str(attachment_id), att.file_path)
+    if att.file_name and is_office_file(att.file_name):
+        delete_pdf_cache(str(attachment_id), att.file_path)
+    db.delete(att)
+    db.commit()
+    ip = request.client.host if request.client else None
+    crud.create_log(db, current_user.id, current_user.username,
+                    "删除零部件附件", "component", str(component_id),
+                    f"附件:{att.file_name} 分类:{att.category}", ip)
+    return {"message": "附件已删除"}
