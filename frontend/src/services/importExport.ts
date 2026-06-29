@@ -410,7 +410,7 @@ function getCustomFieldColumnNames(entityType: string): string[] {
 
 /** 批量加载实体的关联图文档 */
 async function loadEntityDocuments(
-  entityType: 'part' | 'assembly',
+  entityType: 'part' | 'assembly' | 'component',
   entityIds: string[],
 ): Promise<Map<string, any[]>> {
   const map = new Map<string, any[]>();
@@ -647,7 +647,7 @@ async function linkPartDocuments(
     );
     if (doc) {
       try {
-        await entityDocumentsApi.add('part', partId, { document_id: doc.id });
+        await entityDocumentsApi.add('component', partId, { document_id: doc.id });
       } catch {
         // 跳过重复关联
       }
@@ -808,7 +808,7 @@ export async function exportAssembliesToFolder(dirHandle?: FileSystemDirectoryHa
     defs.length > 0
       ? loadCustomFieldValues('component', asmIds)
       : Promise.resolve(new Map()),
-    loadEntityDocuments('assembly', asmIds),
+    loadEntityDocuments('component', asmIds),
   ]);
 
   // ===== 1. 部件清单.xlsx =====
@@ -925,7 +925,7 @@ export async function exportSingleAssemblyBOM(assemblyId: string): Promise<void>
   const asmDefs = getCustomFieldDefs('component');
   const [cfValuesMap, docMap, bomResult] = await Promise.all([
     asmDefs.length > 0 ? loadCustomFieldValues('component', [asm.id]) : Promise.resolve(new Map()),
-    loadEntityDocuments('assembly', [asm.id]),
+    loadEntityDocuments('component', [asm.id]),
     gatherBOMTree(asm.id),
   ]);
   const bomRows = bomResult.rows;
@@ -1365,7 +1365,7 @@ export async function executeAssembliesImport(
 
           // 5. 添加子项
           await assemblyPartsApi.add(parentId, {
-            child_type: isPart ? 'part' : 'component',
+            child_type: 'component',
             child_id: childId,
             quantity,
           });
@@ -1390,7 +1390,7 @@ export async function executeAssembliesImport(
       );
       if (doc) {
         try {
-          await entityDocumentsApi.add('assembly', asmId, {
+          await entityDocumentsApi.add('component', asmId, {
             document_id: doc.id,
           });
         } catch {

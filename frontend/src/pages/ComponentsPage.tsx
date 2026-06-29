@@ -1229,10 +1229,10 @@ export default function Components() {
           仅顶层部件
         </label>
         <div className="flex-1" />
-        {isAdmin() && (
+        {can('components.bom:import_export_all') && (
           <button onClick={handleExportComponents} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">📥 导出全部</button>
         )}
-        {canEdit() && (
+        {can('components.bom:import_export_all') && (
           <>
             <button onClick={handleImportComponentsClick} disabled={importLoading} className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm disabled:opacity-50">{importLoading ? '解析中...' : '📤 导入'}</button>
           </>
@@ -1300,7 +1300,7 @@ export default function Components() {
                         反查
                       </button>
                     )}
-                    {canDownload() && (
+                    {can('components.bom:export_single') && (
                       <button
                         onClick={() => handleExportSingleBOM(component.id)}
                         className="text-green-600 hover:text-green-800 mr-3"

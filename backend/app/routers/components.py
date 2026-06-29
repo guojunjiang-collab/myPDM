@@ -22,7 +22,16 @@ def _creator_name(db, creator_id):
     return u.real_name if u else ""
 
 
-def _comp_brief(comp, creator_name_map=None):
+def _is_assembly(db, comp_id):
+    from ..models import BOMItem
+    return db.query(BOMItem.parent_id).filter(
+        BOMItem.parent_type == 'component',
+        BOMItem.parent_id == comp_id,
+        BOMItem.deleted_at.is_(None),
+    ).first() is not None
+
+
+def _comp_brief(comp, creator_name_map=None, assembly_ids=None):
     d = {
         "id": str(comp.id),
         "code": comp.code,
@@ -31,6 +40,7 @@ def _comp_brief(comp, creator_name_map=None):
         "version": comp.version,
         "status": comp.status,
         "remark": comp.remark,
+        "type": "assembly" if (assembly_ids is not None and comp.id in assembly_ids) else "part",
         "document_links": comp.document_links or [],
         "creator_id": str(comp.creator_id) if comp.creator_id else None,
         "created_at": comp.created_at.isoformat() if comp.created_at else None,
@@ -42,7 +52,7 @@ def _comp_brief(comp, creator_name_map=None):
     return d
 
 
-def _comp_response(comp, creator_name_map=None):
+def _comp_response(comp, creator_name_map=None, assembly_ids=None):
     d = {
         "id": comp.id,
         "code": comp.code,
@@ -51,6 +61,7 @@ def _comp_response(comp, creator_name_map=None):
         "version": comp.version,
         "status": comp.status,
         "remark": comp.remark,
+        "type": "assembly" if (assembly_ids is not None and comp.id in assembly_ids) else "part",
         "revisions": comp.revisions or [],
         "document_links": comp.document_links or [],
         "creator_id": comp.creator_id,
@@ -79,9 +90,20 @@ async def list_components(
     if creator_ids:
         users = db.query(User).filter(User.id.in_(creator_ids)).all()
         creator_name_map = {u.id: u.real_name for u in users}
+    # 批量判定 type：在 bom_items 中作为父项出现的是 assembly，否则为 part
+    comp_ids = [c.id for c in comps]
+    assembly_ids = set()
+    if comp_ids:
+        from ..models import BOMItem
+        rows = db.query(BOMItem.parent_id).filter(
+            BOMItem.parent_type == 'component',
+            BOMItem.parent_id.in_(comp_ids),
+            BOMItem.deleted_at.is_(None),
+        ).distinct().all()
+        assembly_ids = {row[0] for row in rows}
     if brief:
-        return JSONResponse(content=[_comp_brief(c, creator_name_map) for c in comps])
-    return [_comp_response(c, creator_name_map) for c in comps]
+        return JSONResponse(content=[_comp_brief(c, creator_name_map, assembly_ids) for c in comps])
+    return [_comp_response(c, creator_name_map, assembly_ids) for c in comps]
 
 
 @router.post("/", response_model=schemas.ComponentResponse)
@@ -102,7 +124,7 @@ async def create_component(
     crud.create_log(db, current_user.id, current_user.username,
                     "创建零部件", "component", str(db_comp.id),
                     f"编码:{db_comp.code} 版本:{db_comp.version}", ip)
-    return _comp_response(db_comp)
+    return _comp_response(db_comp, assembly_ids=set())
 
 
 @router.get("/{component_id}")
@@ -114,7 +136,8 @@ async def get_component(
     comp = crud.get_component(db, component_id)
     if not comp:
         raise HTTPException(status_code=404, detail="零部件不存在")
-    return _comp_response(comp, {comp.creator_id: _creator_name(db, comp.creator_id)})
+    assembly_ids = {comp.id} if _is_assembly(db, comp.id) else set()
+    return _comp_response(comp, {comp.creator_id: _creator_name(db, comp.creator_id)}, assembly_ids)
 
 
 @router.put("/{component_id}", response_model=schemas.ComponentResponse)
@@ -131,7 +154,8 @@ async def update_component(
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username,
                     "更新零部件", "component", str(component_id), None, ip)
-    return _comp_response(updated)
+    assembly_ids = {updated.id} if _is_assembly(db, updated.id) else set()
+    return _comp_response(updated, assembly_ids=assembly_ids)
 
 
 @router.delete("/{component_id}")
