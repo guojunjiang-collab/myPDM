@@ -55,6 +55,17 @@ def _attachment_response(att):
     }
 
 
+def _resolve_attachment(db, attachment_id):
+    from ..models import ComponentAttachment
+    att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
+    if att:
+        return att, "document"
+    catt = db.query(ComponentAttachment).filter(ComponentAttachment.id == attachment_id).first()
+    if catt:
+        return catt, "component"
+    return None, None
+
+
 @router.get("/")
 async def list_attachments(
     db: Session = Depends(get_db),
@@ -466,7 +477,7 @@ async def get_attachment(
     current_user: User = Depends(require_permission("attachments:list"))
 ):
     """获取单个附件信息"""
-    att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
+    att, _att_source = _resolve_attachment(db, attachment_id)
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
     crud_groups.enforce_attachment_content_access(db, current_user, attachment_id)
@@ -498,7 +509,7 @@ async def download_attachment(
     """下载附件"""
     import base64
     
-    att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
+    att, _att_source = _resolve_attachment(db, attachment_id)
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
     crud_groups.enforce_attachment_content_access(db, current_user, attachment_id)
@@ -530,7 +541,7 @@ async def stream_attachment(
     current_user: User = Depends(require_permission("attachments:download"))
 ):
     """流式下载附件（直接返回二进制文件，比 base64 更快）"""
-    att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
+    att, _att_source = _resolve_attachment(db, attachment_id)
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
     crud_groups.enforce_attachment_content_access(db, current_user, attachment_id)
@@ -590,7 +601,7 @@ async def direct_download_attachment(
     verify_media_token(token, str(attachment_id), "direct-download")
 
     # 获取附件
-    att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
+    att, _att_source = _resolve_attachment(db, attachment_id)
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
 
@@ -634,7 +645,7 @@ async def preview_attachment(
     verify_media_token(token, str(attachment_id), "preview")
 
     # 获取附件
-    att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
+    att, _att_source = _resolve_attachment(db, attachment_id)
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
 
@@ -680,7 +691,7 @@ async def get_gltf(
     """
     verify_media_token(token, str(attachment_id), "gltf")
 
-    att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
+    att, _att_source = _resolve_attachment(db, attachment_id)
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
 
@@ -728,7 +739,7 @@ async def get_office_pdf(
     """
     verify_media_token(token, str(attachment_id), "office-pdf")
 
-    att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
+    att, _att_source = _resolve_attachment(db, attachment_id)
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
 
@@ -766,7 +777,7 @@ async def delete_attachment(
     current_user: User = Depends(require_permission("attachments:delete"))
 ):
     """删除附件"""
-    att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
+    att, _att_source = _resolve_attachment(db, attachment_id)
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
     
@@ -856,7 +867,7 @@ async def extract_archive_file(
     """从压缩包中提取单个文件并返回"""
     verify_media_token(token, str(attachment_id), "extract-file")
 
-    att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
+    att, _att_source = _resolve_attachment(db, attachment_id)
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
 

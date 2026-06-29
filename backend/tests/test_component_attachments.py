@@ -78,3 +78,26 @@ def test_upload_small_file_to_component(db, tmp_path, monkeypatch):
     assert len(rows) == 1
     assert rows[0].category == "cad"
     assert rows[0].file_name == "part.pdf"
+
+
+def test_component_attachment_stream_and_token(db, tmp_path, monkeypatch):
+    from app import file_storage as fsm
+    store = fsm.FileStorage(base_dir=str(tmp_path))
+    monkeypatch.setattr(fsm, "file_storage", store)
+    monkeypatch.setattr("app.routers.attachments_v2.file_storage", store)
+
+    comp = _component(db)
+    user = _user(db, "engineer")
+    c = _client(db, user)
+
+    files = {"file": ("m.pdf", b"%PDF-1.4 body", "application/pdf")}
+    data = {"entity_type": "component", "entity_id": str(comp.id), "category": "production"}
+    up = c.post("/api/v2/attachments/upload", files=files, data=data)
+    att_id = up.json()["id"]
+
+    tok = c.get(f"/api/v2/attachments/{att_id}/media-token", params={"action": "preview"})
+    assert tok.status_code == 200, tok.text
+
+    s = c.get(f"/api/v2/attachments/{att_id}/stream")
+    assert s.status_code == 200, s.text
+    assert s.content == b"%PDF-1.4 body"
