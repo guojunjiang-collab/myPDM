@@ -275,6 +275,23 @@ export const entityDocumentsApi = {
   },
 };
 
+// 零部件附件（CAD / 生产）
+export interface ComponentAttachment {
+  id: string;
+  component_id: string;
+  category: 'cad' | 'production';
+  file_name: string;
+  file_size: number | null;
+  created_at: string | null;
+}
+
+export const componentAttachmentsApi = {
+  list: (componentId: string, category?: 'cad' | 'production') =>
+    api.get<ComponentAttachment[]>(`/components/${componentId}/attachments`, { params: category ? { category } : {} }),
+  remove: (componentId: string, attachmentId: string) =>
+    api.delete(`/components/${componentId}/attachments/${attachmentId}`),
+};
+
 // 附件下载
 export const attachmentApi = {
   download: (id: string) => api.get(`/v2/attachments/${id}/download`, { responseType: 'blob' }),
@@ -320,12 +337,14 @@ export const v2UploadApi = {
     file: File,
     entityType: string = 'documents',
     entityId: string,
-    onProgress?: (percent: number) => void
+    onProgress?: (percent: number) => void,
+    category?: string
   ): Promise<{ id: string; file_name: string; file_size: number; file_path: string }> => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('entity_type', entityType);
     formData.append('entity_id', entityId);
+    if (category) formData.append('category', category);
 
     return uploadAxios.post('/v2/attachments/upload', formData, {
       onUploadProgress: (progressEvent) => {
@@ -345,7 +364,8 @@ export const v2UploadApi = {
     filename: string,
     fileSize: number,
     entityType: string = 'documents',
-    entityId: string
+    entityId: string,
+    category?: string
   ): Promise<{
     upload_id: string;
     total_chunks: number;
@@ -356,6 +376,7 @@ export const v2UploadApi = {
     formData.append('file_size', String(fileSize));
     formData.append('entity_type', entityType);
     formData.append('entity_id', entityId);
+    if (category) formData.append('category', category);
 
     return uploadAxios.post('/v2/attachments/chunk/init', formData)
       .then(res => res.data);
