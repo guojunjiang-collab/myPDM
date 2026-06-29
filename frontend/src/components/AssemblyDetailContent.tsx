@@ -78,9 +78,9 @@ export default function AssemblyDetailContent({ assembly, customFieldDefs, custo
         <EntityDocumentSection entityType="component" entityId={assembly.id} entityCode={assembly.code} entityName={assembly.name} editable={false} />
       )}
 
-      {/* CAD附件 / 生产附件（只读） */}
-      <ComponentAttachmentBucket componentId={assembly.id} category="cad" label="CAD附件" editable={false} />
-      <ComponentAttachmentBucket componentId={assembly.id} category="production" label="生产附件" editable={false} />
+      {/* CAD附件 / 生产附件（只读，无附件时隐藏） */}
+      <ComponentAttachmentBucket componentId={assembly.id} category="cad" label="CAD附件" editable={false} hideWhenEmpty />
+      <ComponentAttachmentBucket componentId={assembly.id} category="production" label="生产附件" editable={false} hideWhenEmpty />
 
       {/* 子项清单 */}
       {hasSubItems && (

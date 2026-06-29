@@ -9,12 +9,13 @@ interface Props {
   category: 'cad' | 'production';
   label: string;
   editable: boolean;
+  hideWhenEmpty?: boolean;
 }
 
 const fmtSize = (n: number | null) =>
   n == null ? '-' : n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`;
 
-export default function ComponentAttachmentBucket({ componentId, category, label, editable }: Props) {
+export default function ComponentAttachmentBucket({ componentId, category, label, editable, hideWhenEmpty }: Props) {
   const [items, setItems] = useState<ComponentAttachment[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -92,6 +93,8 @@ export default function ComponentAttachmentBucket({ componentId, category, label
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
     } catch { alert('下载失败，请重试'); }
   };
+
+  if (hideWhenEmpty && !loading && !uploading && items.length === 0) return null;
 
   return (
     <div className="border-t pt-4">
