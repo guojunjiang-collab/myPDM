@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { projectApi } from '../../services/projectApi';
-import { usersApi, componentsApi, documentsApi, ecrApi, ecoApi, logsApi } from '../../services/api';
+import { usersApi, componentsApi, documentsApi, ecrApi, ecoApi, logsApi, customFieldsApi } from '../../services/api';
+import { useDataStore } from '../../stores/data';
+import type { CustomFieldDefinition, CustomFieldValue } from '../../types';
 import AssemblyPartPicker from '../../components/AssemblyPartPicker';
 import DocumentPicker from '../../components/DocumentPicker';
 import ConfigItemPicker from '../../components/Configuration/ConfigItemPicker';
@@ -67,6 +69,8 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
   const [detailEntityType, setDetailEntityType] = useState<string | null>(null);
   const [detailData, setDetailData] = useState<any>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailCustomDefs, setDetailCustomDefs] = useState<CustomFieldDefinition[]>([]);
+  const [detailCustomValues, setDetailCustomValues] = useState<Record<string, unknown>>({});
   const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
   const [ecView, setEcView] = useState<{ id: string; kind: 'ecr' | 'eco' } | null>(null);
 
@@ -221,14 +225,25 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
     setDetailEntityId(entityId);
     setDetailEntityType(entityType);
     setDetailData(null);
+    setDetailCustomDefs([]);
+    setDetailCustomValues({});
     if (entityType === 'config_item') return;
     setDetailLoading(true);
     try {
       let res;
-      if (entityType === 'part') res = await componentsApi.get(entityId);
-      else if (entityType === 'assembly' || entityType === 'component') res = await componentsApi.get(entityId);
+      const isComponent = entityType === 'part' || entityType === 'assembly' || entityType === 'component';
+      if (isComponent) res = await componentsApi.get(entityId);
       else if (entityType === 'document') res = await documentsApi.get(entityId);
       if (res) setDetailData(res.data);
+
+      // 加载自定义字段定义和值
+      const cfEntityType = isComponent ? 'component' : entityType;
+      const allDefs: CustomFieldDefinition[] = useDataStore.getState().customFieldDefs;
+      setDetailCustomDefs(allDefs.filter((d) => d.applies_to?.includes(cfEntityType)));
+      const valRes = await customFieldsApi.getValues(cfEntityType, entityId);
+      const vals: Record<string, unknown> = {};
+      (valRes.data || []).forEach((v: CustomFieldValue) => { vals[v.field_id] = v.value; });
+      setDetailCustomValues(vals);
     } catch {
       setDetailEntityId(null);
       setDetailEntityType(null);
@@ -607,14 +622,14 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
         <Modal
           open={!!detailEntityId}
           title={detailEntityType === 'part' ? '零部件详情' : detailEntityType === 'assembly' ? '零部件详情' : detailEntityType === 'component' ? '零部件详情' : '图文档详情'}
-          onClose={() => { setDetailEntityId(null); setDetailEntityType(null); setDetailData(null); }}
+          onClose={() => { setDetailEntityId(null); setDetailEntityType(null); setDetailData(null); setDetailCustomDefs([]); setDetailCustomValues({}); }}
           width="full"
         >
           {detailLoading ? (
             <div className="flex items-center justify-center py-8 text-gray-400">加载中...</div>
           ) : detailData ? (
-            (detailEntityType === 'part' || detailEntityType === 'assembly' || detailEntityType === 'component') ? <AssemblyDetailContent assembly={detailData} customFieldDefs={[]} customFieldValues={{}} /> :
-            <DocumentDetailContent doc={detailData} customFieldDefs={[]} customFieldValues={{}}
+            (detailEntityType === 'part' || detailEntityType === 'assembly' || detailEntityType === 'component') ? <AssemblyDetailContent assembly={detailData} customFieldDefs={detailCustomDefs} customFieldValues={detailCustomValues} /> :
+            <DocumentDetailContent doc={detailData} customFieldDefs={detailCustomDefs} customFieldValues={detailCustomValues}
               onArchivePreview={(attId, fileName) => setArchivePreview({ attId, fileName })} />
           ) : null}
         </Modal>
