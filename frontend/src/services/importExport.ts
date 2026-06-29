@@ -1450,11 +1450,12 @@ export async function executeAssembliesImport(
     }
   }
 
-  // ===== 阶段3: 建立关联图文档 =====
+  // ===== 阶段3: 建立关联图文档（仅新建零部件） =====
   const allDocs = useDataStore.getState().documents;
   for (const row of validRows) {
     if (!row._docRelations || row._docRelations.length === 0) continue;
     const key = `${row.code}|${row.version}`;
+    if (!codeVersionToNew.get(key)) continue;
     const asmId = codeVersionToId.get(key);
     if (!asmId) continue;
 
@@ -1474,7 +1475,7 @@ export async function executeAssembliesImport(
     }
   }
 
-  // ===== 阶段4: 上传 CAD附件 / 生产附件 =====
+  // ===== 阶段4: 上传 CAD附件 / 生产附件（仅新建零部件） =====
   if (dirHandle) {
     const allFiles = await listFilesInDirectory(dirHandle);
     for (const fn of allFiles) {
@@ -1486,6 +1487,7 @@ export async function executeAssembliesImport(
       if (!cat) continue;
 
       const key = `${code}|${version}`;
+      if (!codeVersionToNew.get(key)) continue;
       const compId = codeVersionToId.get(key);
       if (!compId) continue;
 
