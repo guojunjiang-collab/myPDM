@@ -56,3 +56,25 @@ def test_file_storage_allows_component_entity():
 def test_migrate_components_is_noop_on_sqlite(db):
     from app.migrations_components import migrate_components
     assert migrate_components(db, db.get_bind()) is None
+
+
+def test_upload_small_file_to_component(db, tmp_path, monkeypatch):
+    from app import file_storage as fsm
+    store = fsm.FileStorage(base_dir=str(tmp_path))
+    monkeypatch.setattr(fsm, "file_storage", store)
+    monkeypatch.setattr("app.routers.attachments_v2.file_storage", store)
+
+    comp = _component(db)
+    user = _user(db, "engineer")
+    c = _client(db, user)
+
+    files = {"file": ("part.pdf", b"%PDF-1.4 test", "application/pdf")}
+    data = {"entity_type": "component", "entity_id": str(comp.id), "category": "cad"}
+    r = c.post("/api/v2/attachments/upload", files=files, data=data)
+    assert r.status_code == 200, r.text
+
+    rows = db.query(ComponentAttachment).filter(
+        ComponentAttachment.component_id == comp.id).all()
+    assert len(rows) == 1
+    assert rows[0].category == "cad"
+    assert rows[0].file_name == "part.pdf"

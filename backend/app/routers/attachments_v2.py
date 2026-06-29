@@ -70,6 +70,7 @@ async def upload_file(
     file: UploadFile = File(...),
     entity_type: str = Form("document"),
     entity_id: str = Form(...),
+    category: str = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("attachments:upload"))
 ):
@@ -119,7 +120,31 @@ async def upload_file(
             file.filename or "unnamed",
             folder_name=folder_name,
         )
-        
+
+        # 零部件附件：写入独立表 component_attachments
+        if entity_type in ("component", "components"):
+            from ..models import ComponentAttachment
+            catt_id = uuid.uuid4()
+            new_catt = ComponentAttachment(
+                id=catt_id,
+                component_id=uuid.UUID(entity_id),
+                category=category or "cad",
+                file_name=result["filename"],
+                file_size=result["file_size"],
+                file_path=result["file_path"],
+                file_hash=result.get("file_hash", ""),
+            )
+            db.add(new_catt)
+            db.commit()
+            db.refresh(new_catt)
+            return {
+                "id": new_catt.id,
+                "file_name": result["filename"],
+                "file_size": result["file_size"],
+                "file_path": result["file_path"],
+                "message": "文件上传成功",
+            }
+
         # 创建数据库记录
         att_id = str(uuid.uuid4())
         new_att = DocumentAttachment(
@@ -170,6 +195,7 @@ async def init_chunked_upload(
     file_size: int = Form(...),
     entity_type: str = Form("document"),
     entity_id: str = Form(...),
+    category: str = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("attachments:upload"))
 ):
@@ -202,6 +228,7 @@ async def init_chunked_upload(
             entity_id,
             total_chunks,
             folder_name=folder_name,
+            category=category,
         )
         
         return {
@@ -274,7 +301,31 @@ async def complete_chunked_upload(
     try:
         result = chunked_uploader.complete_upload(upload_id)
         file_info = result["file_info"]
-        
+
+        if file_info["entity_type"] in ("component", "components"):
+            from ..models import ComponentAttachment
+            catt_id = uuid.uuid4()
+            new_catt = ComponentAttachment(
+                id=catt_id,
+                component_id=uuid.UUID(file_info["entity_id"]),
+                category=file_info.get("category") or "cad",
+                file_name=file_info["filename"],
+                file_size=file_info["file_size"],
+                file_path=file_info["file_path"],
+                file_hash=file_info.get("file_hash", ""),
+            )
+            db.add(new_catt)
+            db.commit()
+            db.refresh(new_catt)
+            return {
+                "id": new_catt.id,
+                "file_name": file_info["filename"],
+                "file_size": file_info["file_size"],
+                "file_path": file_info["file_path"],
+                "status": "completed",
+                "message": "文件上传完成",
+            }
+
         # 创建数据库记录
         att_id = str(uuid.uuid4())
         new_att = DocumentAttachment(

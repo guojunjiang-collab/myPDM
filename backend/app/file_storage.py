@@ -206,8 +206,9 @@ class ChunkedUploader:
         """获取分块文件路径"""
         return self.chunk_dir / f"{upload_id}_{chunk_index}.chunk"
     
-    def init_upload(self, filename: str, file_size: int, entity_type: str, 
-                    entity_id: str, total_chunks: int, folder_name: str = None) -> Dict[str, Any]:
+    def init_upload(self, filename: str, file_size: int, entity_type: str,
+                    entity_id: str, total_chunks: int, folder_name: str = None,
+                    category: str = None) -> Dict[str, Any]:
         """
         初始化分块上传
         
@@ -237,6 +238,7 @@ class ChunkedUploader:
             "entity_type": entity_type,
             "entity_id": entity_id,
             "folder_name": folder_name,
+            "category": category,
             "total_chunks": total_chunks,
             "uploaded_chunks": [],
             "created_at": datetime.now().isoformat(),
@@ -343,6 +345,8 @@ class ChunkedUploader:
         
         meta_path.unlink()
         
+        result["category"] = meta.get("category")
+
         # 更新元数据状态
         meta["status"] = "completed"
         meta["result"] = result
