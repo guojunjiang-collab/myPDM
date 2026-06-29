@@ -12,6 +12,7 @@ import VersionSelectModal from '../components/VersionSelectModal';
 import AssemblyPartPicker from '../components/AssemblyPartPicker';
 import EntityEditModal from '../components/EntityEditModal';
 import EntityDocumentSection from '../components/EntityDocumentSection';
+import ComponentAttachmentBucket from '../components/ComponentAttachmentBucket';
 import { useDataStore } from '../stores/data';
 import { useTableSort } from '../hooks/useTableSort';
 import {
@@ -1445,6 +1446,14 @@ export default function Components() {
           {/* 关联图文档（仅编辑已有部件时显示） */}
           {editingComponent && (
             <EntityDocumentSection entityType="component" entityId={editingComponent.id} entityCode={editingComponent.code} entityName={editingComponent.name} editable />
+          )}
+
+          {/* CAD附件 / 生产附件（仅编辑已有部件时显示） */}
+          {editingComponent && (
+            <>
+              <ComponentAttachmentBucket componentId={editingComponent.id} category="cad" label="CAD附件" editable />
+              <ComponentAttachmentBucket componentId={editingComponent.id} category="production" label="生产附件" editable />
+            </>
           )}
 
           {/* 子项清单（仅编辑时显示） */}
