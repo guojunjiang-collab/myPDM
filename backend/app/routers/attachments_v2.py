@@ -11,7 +11,7 @@ import asyncio
 from pathlib import Path
 
 from ..database import get_db
-from ..models import User, DocumentAttachment, Document
+from ..models import User, DocumentAttachment, Document, Component
 from ..file_storage import file_storage, chunked_uploader, MAX_FILE_SIZE, CHUNK_SIZE
 from .auth import get_current_active_user
 from ..permissions import require_permission, has_permission
@@ -124,6 +124,11 @@ async def upload_file(
             doc = db.query(Document).filter(Document.id == uuid.UUID(entity_id)).first()
             if doc:
                 folder_name = f"{doc.code}_{doc.version}"
+        elif entity_type in ("component", "components"):
+            from ..models import Component
+            comp = db.query(Component).filter(Component.id == uuid.UUID(entity_id)).first()
+            if comp:
+                folder_name = f"{comp.code}_{comp.version}"
         result = file_storage.save_file(
             file_data,
             entity_type,
@@ -232,6 +237,11 @@ async def init_chunked_upload(
             doc = db.query(Document).filter(Document.id == uuid.UUID(entity_id)).first()
             if doc:
                 folder_name = f"{doc.code}_{doc.version}"
+        elif entity_type in ("component", "components"):
+            from ..models import Component
+            comp = db.query(Component).filter(Component.id == uuid.UUID(entity_id)).first()
+            if comp:
+                folder_name = f"{comp.code}_{comp.version}"
         meta = chunked_uploader.init_upload(
             filename,
             file_size,

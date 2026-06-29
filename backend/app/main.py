@@ -206,6 +206,31 @@ async def startup_event():
             db.commit()
             print("✓ Created table configuration_working_items")
 
+        # 检查 component_attachments 表是否存在
+        result = db.execute(text("""
+            SELECT table_name FROM information_schema.tables 
+            WHERE table_name = 'component_attachments'
+        """))
+        if not result.fetchone():
+            db.execute(text("""
+                CREATE TABLE component_attachments (
+                    id UUID PRIMARY KEY,
+                    component_id UUID NOT NULL REFERENCES components(id) ON DELETE CASCADE,
+                    category VARCHAR(32) NOT NULL,
+                    file_name VARCHAR(255),
+                    file_size INTEGER,
+                    file_path VARCHAR(512),
+                    file_hash VARCHAR(64),
+                    created_at TIMESTAMPTZ DEFAULT now()
+                )
+            """))
+            db.execute(text("""
+                CREATE INDEX IF NOT EXISTS ix_component_attachments_comp_cat
+                ON component_attachments (component_id, category)
+            """))
+            db.commit()
+            print("✓ Created table component_attachments")
+
         # 审批流新增列 + 表
         for col_def in [
             ("reviewers", "JSONB NOT NULL DEFAULT '[]'"),
