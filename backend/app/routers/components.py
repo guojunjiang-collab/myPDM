@@ -51,6 +51,7 @@ def _comp_response(comp, creator_name_map=None):
         "status": comp.status,
         "remark": comp.remark,
         "revisions": comp.revisions or [],
+        "document_links": comp.document_links or [],
         "creator_id": comp.creator_id,
         "created_at": comp.created_at,
         "updated_at": comp.updated_at,
