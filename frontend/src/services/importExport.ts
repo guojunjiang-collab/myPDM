@@ -509,6 +509,24 @@ async function _buildPartsWorkbook(): Promise<XLSX.WorkBook> {
     XLSX.utils.book_append_sheet(wb, s2, '关联图文档');
   }
 
+  // CAD附件 / 生产附件 Sheets
+  const cadAttMap = new Map<string, ComponentAttachment[]>();
+  const prodAttMap = new Map<string, ComponentAttachment[]>();
+  for (const p of parts) {
+    try { const r = await componentAttachmentsApi.list(p.id, 'cad'); if (r.data?.length) cadAttMap.set(p.id, r.data); } catch { /* skip */ }
+    try { const r = await componentAttachmentsApi.list(p.id, 'production'); if (r.data?.length) prodAttMap.set(p.id, r.data); } catch { /* skip */ }
+  }
+  const cadRows: Record<string, unknown>[] = [];
+  for (const p of parts) {
+    for (const att of cadAttMap.get(p.id) || []) cadRows.push({ 件号: p.code, 版本: p.version || '', 文件名: att.file_name, 大小: att.file_size ?? '' });
+  }
+  if (cadRows.length > 0) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cadRows), 'CAD附件');
+  const prodRows: Record<string, unknown>[] = [];
+  for (const p of parts) {
+    for (const att of prodAttMap.get(p.id) || []) prodRows.push({ 件号: p.code, 版本: p.version || '', 文件名: att.file_name, 大小: att.file_size ?? '' });
+  }
+  if (prodRows.length > 0) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(prodRows), '生产附件');
+
   return wb;
 }
 
@@ -723,6 +741,55 @@ export async function executePartsImport(preview: ImportPreview): Promise<void> 
   const errors = results.filter((r) => r.status === 'rejected');
   if (errors.length > 0) {
     throw new Error(`导入完成，但有 ${errors.length} 条记录导入失败（请查看控制台日志）`);
+  }
+
+  // ===== 上传 CAD附件 / 生产附件（仅新建零件） =====
+  if (_importDirHandle) {
+    let attDirHandle: FileSystemDirectoryHandle | null = null;
+    try { attDirHandle = await _importDirHandle.getDirectoryHandle('attachments'); } catch { /* no attachments folder */ }
+    if (attDirHandle) {
+      const allFiles = await listFilesInDirectory(attDirHandle);
+      const codeVersionToNewFromPreview = new Map<string, boolean>();
+      for (const row of preview.rows) {
+        if (row.status === '新增') codeVersionToNewFromPreview.set(`${row.code}|${row.version}`, true);
+      }
+      for (const fn of allFiles) {
+        const parts = fn.split('#');
+        if (parts.length < 4) continue;
+        const [prefix, code, version, ...restParts] = parts;
+        const attFileName = restParts.join('#');
+        const cat = prefix === 'CAD' ? 'cad' : prefix === 'PRODUCTION' ? 'production' : null;
+        if (!cat) continue;
+
+        const key = `${code}|${version}`;
+        if (!codeVersionToNewFromPreview.get(key)) continue;
+
+        const comp = useDataStore.getState().components.find(
+          (c) => c.code === code && (c.version || '') === version,
+        );
+        if (!comp) continue;
+
+        try {
+          const buf = await readFileAsBuffer(attDirHandle, fn);
+          if (!buf) continue;
+          const file = new File([buf], attFileName);
+          if (file.size > 10 * 1024 * 1024) {
+            const init = await v2UploadApi.initChunkedUpload(attFileName, file.size, 'components', comp.id, cat);
+            const CHUNK_SIZE = 5 * 1024 * 1024;
+            const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+            for (let i = 0; i < totalChunks; i++) {
+              const start = i * CHUNK_SIZE;
+              await v2UploadApi.uploadChunk(init.upload_id, i, file.slice(start, Math.min(start + CHUNK_SIZE, file.size)));
+            }
+            await v2UploadApi.completeChunkedUpload(init.upload_id);
+          } else {
+            await v2UploadApi.uploadSmallFile(file, 'components', comp.id, undefined, cat);
+          }
+        } catch (err) {
+          console.error(`上传附件失败: ${fn}`, err);
+        }
+      }
+    }
   }
 
   // 刷新 store
@@ -2901,6 +2968,34 @@ async function exportPartsToDir(dirHandle: FileSystemDirectoryHandle): Promise<v
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     }),
   );
+
+  // 下载 CAD附件 / 生产附件 到 attachments/ 子文件夹
+  const cadAttMap = new Map<string, ComponentAttachment[]>();
+  const prodAttMap = new Map<string, ComponentAttachment[]>();
+  for (const p of parts) {
+    try { const r = await componentAttachmentsApi.list(p.id, 'cad'); if (r.data?.length) cadAttMap.set(p.id, r.data); } catch { /* skip */ }
+    try { const r = await componentAttachmentsApi.list(p.id, 'production'); if (r.data?.length) prodAttMap.set(p.id, r.data); } catch { /* skip */ }
+  }
+  const hasAny = [...cadAttMap.values(), ...prodAttMap.values()].some(arr => arr.length > 0);
+  if (hasAny) {
+    const attDirHandle = await dirHandle.getDirectoryHandle('attachments', { create: true });
+    for (const p of parts) {
+      for (const cat of ['cad' as const, 'production' as const]) {
+        const atts = (cat === 'cad' ? cadAttMap : prodAttMap).get(p.id) || [];
+        for (const att of atts) {
+          try {
+            const token = await mediaApi.token(att.id, 'direct-download');
+            const resp = await fetch(`/api/v2/attachments/${att.id}/direct-download?token=${encodeURIComponent(token)}`);
+            if (!resp.ok) continue;
+            const blob = await resp.blob();
+            const prefix = cat === 'cad' ? 'CAD' : 'PRODUCTION';
+            const fn = `${prefix}#${p.code}#${p.version || 'A'}#${att.file_name}`;
+            await writeBlobToDirectory(attDirHandle, fn, blob);
+          } catch { /* skip */ }
+        }
+      }
+    }
+  }
 }
 
 export type ExportProgressCallback = (message: string) => void;
