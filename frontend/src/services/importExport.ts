@@ -797,9 +797,9 @@ export async function exportAssembliesToFolder(dirHandle?: FileSystemDirectoryHa
     throw new Error('您的浏览器不支持文件夹操作，请使用 Chrome 86+ 或 Edge 86+');
   }
 
-  const assemblies = useDataStore.getState().components.filter(c => c.type === 'assembly');
-  if (assemblies.length === 0) {
-    throw new Error('没有可导出的部件数据');
+  const allComps = useDataStore.getState().components;
+  if (allComps.length === 0) {
+    throw new Error('没有可导出的零部件数据');
   }
 
   const handle = dirHandle || await window.showDirectoryPicker({
@@ -808,18 +808,18 @@ export async function exportAssembliesToFolder(dirHandle?: FileSystemDirectoryHa
   });
 
   const defs = getCustomFieldDefs('component');
-  const asmIds = assemblies.map((a) => a.id);
+  const compIds = allComps.map((a) => a.id);
   const [cfValuesMap, docMap] = await Promise.all([
     defs.length > 0
-      ? loadCustomFieldValues('component', asmIds)
+      ? loadCustomFieldValues('component', compIds)
       : Promise.resolve(new Map()),
-    loadEntityDocuments('component', asmIds),
+    loadEntityDocuments('component', compIds),
   ]);
 
   // 加载 CAD附件 / 生产附件
   const cadAttMap = new Map<string, ComponentAttachment[]>();
   const prodAttMap = new Map<string, ComponentAttachment[]>();
-  for (const a of assemblies) {
+  for (const a of allComps) {
     try {
       const cadRes = await componentAttachmentsApi.list(a.id, 'cad');
       if (cadRes.data?.length) cadAttMap.set(a.id, cadRes.data);
@@ -831,7 +831,7 @@ export async function exportAssembliesToFolder(dirHandle?: FileSystemDirectoryHa
   }
 
   // ===== 1. 部件清单.xlsx =====
-  const sheet1Rows = assemblies.map((a) => {
+  const sheet1Rows = allComps.map((a) => {
     const row: Record<string, unknown> = {
       件号: a.code,
       中文名称: a.name,
@@ -852,7 +852,7 @@ export async function exportAssembliesToFolder(dirHandle?: FileSystemDirectoryHa
   });
 
   const sheet2Rows: Record<string, unknown>[] = [];
-  for (const asm of assemblies) {
+  for (const asm of allComps) {
     const docs = docMap.get(asm.id) || [];
     if (docs.length > 0) {
       for (const ed of docs) {
@@ -885,7 +885,7 @@ export async function exportAssembliesToFolder(dirHandle?: FileSystemDirectoryHa
 
   // CAD附件 Sheet
   const cadSheetRows: Record<string, unknown>[] = [];
-  for (const a of assemblies) {
+  for (const a of allComps) {
     const atts = cadAttMap.get(a.id) || [];
     for (const att of atts) {
       cadSheetRows.push({ 件号: a.code, 版本: a.version || '', 文件名: att.file_name, 大小: att.file_size ?? '' });
@@ -897,7 +897,7 @@ export async function exportAssembliesToFolder(dirHandle?: FileSystemDirectoryHa
 
   // 生产附件 Sheet
   const prodSheetRows: Record<string, unknown>[] = [];
-  for (const a of assemblies) {
+  for (const a of allComps) {
     const atts = prodAttMap.get(a.id) || [];
     for (const att of atts) {
       prodSheetRows.push({ 件号: a.code, 版本: a.version || '', 文件名: att.file_name, 大小: att.file_size ?? '' });
@@ -917,7 +917,7 @@ export async function exportAssembliesToFolder(dirHandle?: FileSystemDirectoryHa
   );
 
   // ===== 2. 每个部件的 BOM_xxx.xlsx =====
-  for (const asm of assemblies) {
+  for (const asm of allComps) {
     const { rows: bomRows } = await gatherBOMTree(asm.id);
     // 加上自身行（层级0）
     const allRows: BOMRow[] = [
@@ -954,7 +954,7 @@ export async function exportAssembliesToFolder(dirHandle?: FileSystemDirectoryHa
   }
 
   // ===== 3. 下载 CAD附件 / 生产附件 文件 =====
-  for (const a of assemblies) {
+  for (const a of allComps) {
     for (const cat of ['cad' as const, 'production' as const]) {
       const atts = (cat === 'cad' ? cadAttMap : prodAttMap).get(a.id) || [];
       for (const att of atts) {
@@ -977,8 +977,8 @@ export async function exportAssembliesToFolder(dirHandle?: FileSystemDirectoryHa
  * 包含 Sheet1: 部件信息(含自定义字段), Sheet2: BOM(含自定义字段), Sheet3: 关联图文档
  */
 export async function exportSingleAssemblyBOM(assemblyId: string): Promise<void> {
-  const assemblies = useDataStore.getState().components.filter(c => c.type === 'assembly');
-  const asm = assemblies.find((a) => a.id === assemblyId);
+  const allComps = useDataStore.getState().components;
+  const asm = allComps.find((a) => a.id === assemblyId);
   if (!asm) {
     throw new Error('未找到该部件');
   }
@@ -1172,8 +1172,7 @@ export async function previewAssembliesImport(dirHandle?: FileSystemDirectoryHan
   });
   _importDirHandle = handle;
 
-  const existingAssemblies = useDataStore.getState().components.filter(c => c.type === 'assembly');
-  const existingParts = useDataStore.getState().components.filter(c => c.type !== 'assembly');
+  const existingComps = useDataStore.getState().components;
 
   // 读取部件清单.xlsx
   const manifestBuf = await readFileAsBuffer(handle, '部件清单.xlsx');
@@ -1190,7 +1189,7 @@ export async function previewAssembliesImport(dirHandle?: FileSystemDirectoryHan
 
   // 已存在映射
   const existingMap = new Map<string, Assembly>();
-  for (const a of existingAssemblies) {
+  for (const a of existingComps) {
     existingMap.set(`${a.code}|${a.version || ''}`, a);
   }
 
@@ -1323,7 +1322,7 @@ export async function executeAssembliesImport(
         const existing = useDataStore
           .getState()
           .components.find(
-            (c) => c.type === 'assembly' && c.code === row.code && (c.version || '') === row.version,
+            (c) => c.code === row.code && (c.version || '') === row.version,
           );
         if (existing) {
           const res = await componentsApi.update(existing.id, data);
