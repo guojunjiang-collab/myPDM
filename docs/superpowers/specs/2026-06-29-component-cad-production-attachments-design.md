@@ -17,51 +17,51 @@
 
 ## 2. 现状关键事实
 
-- 附件表 `document_attachments` 当前与图文档强绑定：`document_id` 为 `NOT NULL` 且外键指向 `documents`。因此附件目前只能挂在图文档上。
+- 图文档存储形态：`documents`（父实体）⟵ `document_attachments`（子附件表，`document_id` 外键 `NOT NULL`，含 `file_name/file_size/file_path/file_hash`）。
 - 文件存储层 `file_storage.py` 已支持 `document` / `part` / `assembly` 目录布局，但**尚未支持** `component`。
-- 通用上传端点 `/attachments/upload` 与 `/attachments/chunk/*` 已接收 `entity_type` 参数，但建库记录时仅对 `document` 类型写入关联；非 document 类型会因 `document_id NOT NULL` 约束而失败。
-- 前端已有可复用件：
+- 通用上传端点 `/attachments/upload` 与 `/attachments/chunk/*` 已接收 `entity_type` 参数，但建库记录时仅对 `document` 类型写入 `document_attachments`。
+- 媒体端点（预览/下载/流式/3D/Office-PDF/压缩包/media-token）均以 `db.query(DocumentAttachment).filter(id==...)` 定位附件，仅需 `file_path` / `file_name` / `id`。
+- 前端可复用件：
   - `v2UploadApi`（小文件 + 分块上传）
-  - `previewAttachment`、`mediaApi.token`、`ArchiveTreeModal`（预览/3D/压缩包/下载，均以附件 id 为入口）
+  - `previewAttachment`、`mediaApi.token`、`ArchiveTreeModal`（预览/3D/压缩包/下载，均以附件 id 为入口，命中 `/attachments/{id}/*`）
   - `EntityDocumentSection` 内的附件子表是 UI 模板
 - 组件统一（component-unification）已将 parts/assemblies 合并为 components。
 
-> 代码已为"通用化附件"铺好了一半路（upload 接收 entity_type、file_storage 支持多实体目录），本设计沿该方向落地。
-
 ## 3. 架构决策
 
-采用**通用化共享附件表**方案（已评审通过），而非新建独立表或把文件包装成图文档：
+**照抄图文档及其附件的存储形态**：新建独立的 `component_attachments` 子表，结构与 `document_attachments` 一致，父实体为 `components`（已评审确定）。
 
-- 直接复用 `document_attachments` 表与现有上传/预览/3D/下载管线，使 STP 3D、Office 预览等能力对零部件附件"零成本可用"。
-- 改动为**追加式、向后兼容**：现有图文档附件行不受影响。
+- 图文档附件链路（`documents` / `document_attachments`）**完全不动**，零回归风险。
+- 为同时满足"借用附件模组功能"，媒体端点改为**跨表解析**附件 id：新增一个解析器，先查 `document_attachments`、再查 `component_attachments`，返回统一的 `(file_path, file_name, source)`。前端 `previewAttachment` / `mediaApi.token` / `ArchiveTreeModal` 命中的 `/attachments/{id}/*` 路由因此对两类附件**同时生效，前端零改动**。
+- 文件落盘、STP→glb 转换、Office→PDF 转换、缓存删除等均以 `attachment_id + file_path` 为参数，对新表附件天然可用。
+
+> 取舍：相比"同表加列"，独立表对图文档侧零侵入，代价是媒体端点需要一处跨表解析改造（集中、可控）。
 
 ## 4. 数据模型
 
-### 4.1 `document_attachments` 表变更
+### 4.1 新增 `component_attachments` 表（照抄 `document_attachments`）
 
-| 列 | 变更 |
+| 列 | 说明 |
 |---|---|
-| `document_id` | `NOT NULL` → **可空** |
-| `entity_type` | **新增** `VARCHAR(32) NOT NULL DEFAULT 'document'` |
-| `entity_id` | **新增** `UUID` |
-| `category` | **新增** `VARCHAR(32)`，取值 `'cad'` / `'production'`；图文档附件为 `NULL` |
+| `id` | UUID 主键 |
+| `component_id` | UUID 外键 → `components.id`，`ON DELETE CASCADE`，`NOT NULL` |
+| `category` | `VARCHAR(32) NOT NULL`，取值 `'cad'` / `'production'` |
+| `file_name` | `VARCHAR(255)` |
+| `file_size` | `Integer` |
+| `file_path` | `VARCHAR(512)`，文件系统路径 |
+| `file_hash` | `VARCHAR(64)` |
+| `created_at` | 带时区时间戳，默认 now() |
+
+索引：`(component_id, category)`。
 
 ### 4.2 迁移（migration）
 
-- 修改 `document_id` 为可空。
-- 新增 `entity_type` / `entity_id` / `category` 三列。
-- 回填存量行：`entity_type='document'`，`entity_id = document_id`，`category = NULL`。
-- 新增索引 `(entity_type, entity_id, category)`。
-- 保留 `documents.file_id` 外键与"删除图文档级联删除附件"行为不变。
-
-回填后语义：
-- 图文档附件：`entity_type='document'`，`entity_id=document_id`，`document_id` 保留原值，`category=NULL`。
-- 零部件 CAD 附件：`entity_type='component'`，`entity_id=<component_id>`，`document_id=NULL`，`category='cad'`。
-- 零部件生产附件：同上但 `category='production'`。
+- 仅**新建**表 `component_attachments`，幂等（`IF NOT EXISTS`）。
+- `document_attachments` / `documents` **不变**。
 
 ### 4.3 模型 (`models.py`)
 
-`DocumentAttachment` 增加 `entity_type` / `entity_id` / `category` 三个字段，`document_id` 改为 `nullable=True`。
+新增 `ComponentAttachment(Base)`，字段同上；`DocumentAttachment` 不变。
 
 ## 5. 文件存储
 
@@ -73,50 +73,63 @@
 
 ## 6. API 设计
 
-### 6.1 上传（复用并扩展现有通用端点）
+### 6.1 上传（复用通用端点的文件机制，按 entity_type 分流建库）
 
 `/attachments/upload`、`/attachments/chunk/init`、`/attachments/chunk/complete`：
 
 - 新增可选表单字段 `category`（`cad` / `production`）。
-- 建库逻辑扩展：
-  - `entity_type` 为 `document/documents` 时：维持现有行为（写 `document_id`、更新 `documents.file_name/file_id`），`entity_type='document'`，`entity_id=document_id`，`category=NULL`。
-  - `entity_type` 为 `component/components` 时：写 `entity_type='component'`、`entity_id=<entity_id>`、`category=<category>`、`document_id=NULL`。
-- 分块流程：`chunked_uploader.init_upload` 的 meta 增加 `category`，`complete` 端点从 meta 读取并写入。
+- 文件保存逻辑（file_storage / chunked_uploader）保持复用。
+- 建库分流：
+  - `entity_type=document/documents`：维持现有行为，写 `document_attachments` 并更新 `documents.file_name/file_id`。
+  - `entity_type=component/components`：写一行 `component_attachments`（`component_id=entity_id`、`category=category`）。
+- 分块流程：`chunked_uploader.init_upload` 的 meta 增加 `category`，`complete` 端点据 `entity_type` 决定写入哪张表。
 
 ### 6.2 列表（新增，挂在 components 路由）
 
 `GET /components/{component_id}/attachments?category=cad`
 
-- 返回该零部件指定分类的附件行列表（id / file_name / file_size / created_at 等）。
+- 查询 `component_attachments`，返回该零部件指定分类的附件行（id / file_name / file_size / created_at）。
+- `category` 可选；不传返回全部，前端按分类分桶。
 - 权限：`components:read`。
-- `category` 可选；不传则返回该零部件全部附件（前端可一次取回再按分类分桶，减少请求）。
 
-### 6.3 删除 / 预览 / 下载 / 3D / 压缩包
+### 6.3 删除（新增，挂在 components 路由）
 
-全部复用现有 `/attachments/{attachment_id}` 系列端点，**无需改动**。
+`DELETE /components/{component_id}/attachments/{attachment_id}`
 
-### 6.4 权限
+- 删除 `component_attachments` 行 + 磁盘文件 + STP/Office 缓存（镜像 `document_attachments` 的删除清理逻辑）。
+- 权限：`attachments:delete`（或 `components:update`，实现时择一并保持一致）。
 
-- 文件上传/预览/下载/删除：复用现有 `attachments:upload` / `attachments:preview` / `attachments:download` / `attachments:delete`。
-- 零部件维度的附件列表：`components:read`。
+### 6.4 媒体端点（跨表解析复用）
+
+`attachments_v2.py` 中 preview / download / stream / gltf / office-pdf / archive-tree / extract-file / media-token：
+
+- 新增解析器 `resolve_attachment(db, attachment_id)`：先查 `DocumentAttachment`，再查 `ComponentAttachment`，返回统一对象 `{id, file_name, file_path, source}`。
+- 各端点把原 `db.query(DocumentAttachment)...` 替换为解析器调用。
+- `crud_groups.enforce_attachment_content_access`（图文档用户组权限）仅对 `source='document'` 执行；`source='component'` 视为可访问（零部件无用户组维度权限）。
+
+### 6.5 权限
+
+- 文件上传/预览/下载：复用现有 `attachments:upload` / `attachments:preview` / `attachments:download`。
+- 零部件附件列表：`components:read`；删除：`attachments:delete`（与 6.3 一致）。
 
 ## 7. 前端设计
 
 ### 7.1 新增可复用组件 `ComponentAttachmentBucket`
 
-Props：`{ entityType: 'component'; entityId: string; category: 'cad' | 'production'; label: string; editable: boolean }`
+Props：`{ componentId: string; category: 'cad' | 'production'; label: string; editable: boolean }`
 
 渲染一个带标题的附件桶：
 
-- `editable=true`：显示"+ 上传附件"按钮（小文件走 `v2UploadApi.uploadSmallFile`，超阈值走分块 `initChunkedUpload/uploadChunk/completeChunkedUpload`，`entity_type='components'`，带 `category`），上传进度条，文件表（文件名 / 大小），每行"删除"。
-- 预览 / 下载 / 3D / 压缩包浏览：复用 `previewAttachment`、`mediaApi.token`、`ArchiveTreeModal`，与 `EntityDocumentSection` 的附件子表一致。
-- `editable=false`（详情只读）：仅显示预览 / 下载，无上传/删除。
+- `editable=true`：显示"+ 上传附件"按钮（小文件走 `v2UploadApi.uploadSmallFile`，超阈值走分块，`entity_type='components'`，带 `category`），上传进度条，文件表（文件名 / 大小），每行"删除"（调 6.3 端点）。
+- 预览 / 下载 / 3D / 压缩包浏览：复用 `previewAttachment`、`mediaApi.token`、`ArchiveTreeModal`，与 `EntityDocumentSection` 的附件子表一致（命中 `/attachments/{id}/*`，由 6.4 跨表解析支撑）。
+- `editable=false`（详情只读）：仅显示预览 / 下载。
+- 列表数据来自 6.2 端点。
 
 样式遵循现有"构型管理 / 图文档"区风格：`primary-*` 配色、共享 `Modal`、统一表格与工具栏（符合项目 UI 一致性约束）。
 
 ### 7.2 接入位置
 
-在零部件的**编辑弹窗**与**详情（只读）视图**中各放置两个实例：
+零部件**编辑弹窗**与**详情（只读）视图**中各放置两个实例：
 
 - CAD附件：`category='cad'`，`label='CAD附件'`
 - 生产附件：`category='production'`，`label='生产附件'`
@@ -125,25 +138,26 @@ Props：`{ entityType: 'component'; entityId: string; category: 'cad' | 'product
 
 ### 7.3 API 客户端
 
-`services/api.ts` 增加 `componentAttachmentsApi.list(componentId, category?)`，并确保 `v2UploadApi` 上传支持透传 `category`。
+`services/api.ts` 增加 `componentAttachmentsApi.list(componentId, category?)` 与 `componentAttachmentsApi.remove(componentId, attachmentId)`；确保 `v2UploadApi` 上传透传 `category`。
 
 ## 8. 边界情况
 
-- **删除零部件**：清理其名下附件行与磁盘文件（镜像现有图文档删除时的附件清理逻辑）。
-- **大文件**：自动走现有分块上传路径（超过阈值）。
-- **STP 文件**：任一桶内的 STP 自动获得按需 3D 查看能力（复用 `gltf` 端点）。
+- **删除零部件**：`component_attachments.component_id` 的 `ON DELETE CASCADE` 清掉行；磁盘文件与 STP/Office 缓存需在删除零部件时一并清理（镜像图文档删除清理）。
+- **大文件**：自动走现有分块上传路径（超阈值）。
+- **STP 文件**：任一桶内 STP 自动获得按需 3D 查看（复用 `gltf` 端点 + 跨表解析）。
 - **Office / 文本 / 图片**：复用现有预览管线。
+- **ID 跨表**：两表均 UUID，解析器按"先 document 后 component"顺序匹配，碰撞概率可忽略。
 - **空桶**：显示"暂无附件"占位。
-- **向后兼容**：迁移与端点改动均为追加式，存量图文档附件行为不变。
+- **向后兼容**：新增表 + 端点跨表解析，图文档附件行为完全不变。
 
 ## 9. 验证
 
-- 后端：迁移可重复执行（幂等）；上传/列表/删除单测覆盖 `component` 类型与 `category` 分桶；存量图文档附件回归测试。
+- 后端：迁移幂等；上传/列表/删除单测覆盖 `component_attachments` 与 `category` 分桶；跨表解析器单测（document/component 两源 + 不存在）；图文档附件回归。
 - 前端：`build` 通过；编辑视图可上传/删除、详情视图可预览/下载两类附件。
 - 手测：Docker 环境上传 .stp 验证 3D、.pdf 验证预览、大文件验证分块、删除零部件验证文件清理。
 
 ## 10. 不做（YAGNI）
 
 - 不做图文档关联（已有独立功能）。
-- 不做附件审批/版本/状态流转（原始文件桶，非图文档）。
-- 不新增独立 `component_attachments` 表。
+- 不做附件审批/版本/状态流转（原始文件桶）。
+- 不改动 `document_attachments` / `documents` 表结构。
