@@ -92,6 +92,18 @@ class DocumentAttachment(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class ComponentAttachment(Base):
+    """零部件独立附件表（照抄 document_attachments，文件存储在文件系统）"""
+    __tablename__ = "component_attachments"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    component_id = Column(UUID(as_uuid=True), ForeignKey('components.id', ondelete='CASCADE'), nullable=False)
+    category = Column(String(32), nullable=False)  # 'cad' / 'production'
+    file_name = Column(String(255))
+    file_size = Column(Integer)
+    file_path = Column(String(512))  # 文件系统路径
+    file_hash = Column(String(64))   # 文件哈希值
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
 
 class CustomFieldDefinition(Base):
     """自定义字段定义表"""

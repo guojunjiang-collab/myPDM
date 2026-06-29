@@ -16,10 +16,10 @@ MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE", 100 * 1024 * 1024))  # 默认 100
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", 5 * 1024 * 1024))  # 默认 5MB 每块
 
 # 安全白名单
-ALLOWED_ENTITY_TYPES = {"document", "part", "assembly"}
+ALLOWED_ENTITY_TYPES = {"document", "part", "assembly", "component"}
 # 历史代码中实体类型存在单复数混用（如 "documents"），统一归一到单数规范，
-# 避免白名单校验把合法上传判为“无效的实体类型”而返回 500。
-ENTITY_TYPE_ALIASES = {"documents": "document", "parts": "part", "assemblies": "assembly"}
+# 避免白名单校验把合法上传判为"无效的实体类型"而返回 500。
+ENTITY_TYPE_ALIASES = {"documents": "document", "parts": "part", "assemblies": "assembly", "components": "component"}
 ALLOWED_EXTENSIONS = {
     '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
     '.dwg', '.dxf', '.stp', '.step', '.igs', '.iges',
