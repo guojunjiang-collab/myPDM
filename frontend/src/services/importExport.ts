@@ -40,7 +40,11 @@ import api, {
   configurationProfileApi,
   ecrApi,
   ecoApi,
+  componentAttachmentsApi,
+  mediaApi,
+  v2UploadApi,
 } from './api';
+import type { ComponentAttachment } from './api';
 import { useDataStore } from '../stores/data';
 import type {
   Part,
@@ -683,6 +687,7 @@ export async function executePartsImport(preview: ImportPreview): Promise<void> 
                   await customFieldsApi.setValues('part', existing.id, fieldValues);
                 }
               }
+
               // 关联图文档
               if (row._docRelations && row._docRelations.length > 0) {
                 await linkPartDocuments(existing.id, row._docRelations);
@@ -811,6 +816,20 @@ export async function exportAssembliesToFolder(dirHandle?: FileSystemDirectoryHa
     loadEntityDocuments('component', asmIds),
   ]);
 
+  // 加载 CAD附件 / 生产附件
+  const cadAttMap = new Map<string, ComponentAttachment[]>();
+  const prodAttMap = new Map<string, ComponentAttachment[]>();
+  for (const a of assemblies) {
+    try {
+      const cadRes = await componentAttachmentsApi.list(a.id, 'cad');
+      if (cadRes.data?.length) cadAttMap.set(a.id, cadRes.data);
+    } catch { /* skip */ }
+    try {
+      const prodRes = await componentAttachmentsApi.list(a.id, 'production');
+      if (prodRes.data?.length) prodAttMap.set(a.id, prodRes.data);
+    } catch { /* skip */ }
+  }
+
   // ===== 1. 部件清单.xlsx =====
   const sheet1Rows = assemblies.map((a) => {
     const row: Record<string, unknown> = {
@@ -864,6 +883,30 @@ export async function exportAssembliesToFolder(dirHandle?: FileSystemDirectoryHa
     XLSX.utils.book_append_sheet(wb1, s2, '关联图文档');
   }
 
+  // CAD附件 Sheet
+  const cadSheetRows: Record<string, unknown>[] = [];
+  for (const a of assemblies) {
+    const atts = cadAttMap.get(a.id) || [];
+    for (const att of atts) {
+      cadSheetRows.push({ 件号: a.code, 版本: a.version || '', 文件名: att.file_name, 大小: att.file_size ?? '' });
+    }
+  }
+  if (cadSheetRows.length > 0) {
+    XLSX.utils.book_append_sheet(wb1, XLSX.utils.json_to_sheet(cadSheetRows), 'CAD附件');
+  }
+
+  // 生产附件 Sheet
+  const prodSheetRows: Record<string, unknown>[] = [];
+  for (const a of assemblies) {
+    const atts = prodAttMap.get(a.id) || [];
+    for (const att of atts) {
+      prodSheetRows.push({ 件号: a.code, 版本: a.version || '', 文件名: att.file_name, 大小: att.file_size ?? '' });
+    }
+  }
+  if (prodSheetRows.length > 0) {
+    XLSX.utils.book_append_sheet(wb1, XLSX.utils.json_to_sheet(prodSheetRows), '生产附件');
+  }
+
   const buf1 = XLSX.write(wb1, { bookType: 'xlsx', type: 'array' });
   await writeBlobToDirectory(
     handle,
@@ -908,6 +951,24 @@ export async function exportAssembliesToFolder(dirHandle?: FileSystemDirectoryHa
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       }),
     );
+  }
+
+  // ===== 3. 下载 CAD附件 / 生产附件 文件 =====
+  for (const a of assemblies) {
+    for (const cat of ['cad' as const, 'production' as const]) {
+      const atts = (cat === 'cad' ? cadAttMap : prodAttMap).get(a.id) || [];
+      for (const att of atts) {
+        try {
+          const token = await mediaApi.token(att.id, 'direct-download');
+          const resp = await fetch(`/api/v2/attachments/${att.id}/direct-download?token=${encodeURIComponent(token)}`);
+          if (!resp.ok) continue;
+          const blob = await resp.blob();
+          const prefix = cat === 'cad' ? 'CAD' : 'PRODUCTION';
+          const filename = `${prefix}#${a.code}#${a.version || 'A'}#${att.file_name}`;
+          await writeBlobToDirectory(handle, filename, blob);
+        } catch { /* skip failed download */ }
+      }
+    }
   }
 }
 
@@ -1068,6 +1129,20 @@ export async function exportSingleAssemblyBOM(assemblyId: string): Promise<void>
     ];
     XLSX.utils.book_append_sheet(wb, s3, '关联图文档');
   }
+
+  // Sheet 4/5: CAD附件 / 生产附件
+  const cadRows: Record<string, unknown>[] = [];
+  const prodRows: Record<string, unknown>[] = [];
+  try {
+    const cadRes = await componentAttachmentsApi.list(asm.id, 'cad');
+    for (const att of cadRes.data || []) cadRows.push({ 文件名: att.file_name, 大小: att.file_size ?? '' });
+  } catch { /* skip */ }
+  try {
+    const prodRes = await componentAttachmentsApi.list(asm.id, 'production');
+    for (const att of prodRes.data || []) prodRows.push({ 文件名: att.file_name, 大小: att.file_size ?? '' });
+  } catch { /* skip */ }
+  if (cadRows.length > 0) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cadRows), 'CAD附件');
+  if (prodRows.length > 0) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(prodRows), '生产附件');
 
   const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
   const filename = `BOM_${asm.code}_${asm.version || 'A'}.xlsx`;
@@ -1396,6 +1471,43 @@ export async function executeAssembliesImport(
         } catch {
           // 跳过重复
         }
+      }
+    }
+  }
+
+  // ===== 阶段4: 上传 CAD附件 / 生产附件 =====
+  if (dirHandle) {
+    const allFiles = await listFilesInDirectory(dirHandle);
+    for (const fn of allFiles) {
+      const parts = fn.split('#');
+      if (parts.length < 4) continue;
+      const [prefix, code, version, ...restParts] = parts;
+      const attFileName = restParts.join('#');
+      const cat = prefix === 'CAD' ? 'cad' : prefix === 'PRODUCTION' ? 'production' : null;
+      if (!cat) continue;
+
+      const key = `${code}|${version}`;
+      const compId = codeVersionToId.get(key);
+      if (!compId) continue;
+
+      try {
+        const buf = await readFileAsBuffer(dirHandle, fn);
+        if (!buf) continue;
+        const file = new File([buf], attFileName);
+        if (file.size > 10 * 1024 * 1024) {
+          const init = await v2UploadApi.initChunkedUpload(attFileName, file.size, 'components', compId, cat);
+          const CHUNK_SIZE = 5 * 1024 * 1024;
+          const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+          for (let i = 0; i < totalChunks; i++) {
+            const start = i * CHUNK_SIZE;
+            await v2UploadApi.uploadChunk(init.upload_id, i, file.slice(start, Math.min(start + CHUNK_SIZE, file.size)));
+          }
+          await v2UploadApi.completeChunkedUpload(init.upload_id);
+        } else {
+          await v2UploadApi.uploadSmallFile(file, 'components', compId, undefined, cat);
+        }
+      } catch (err) {
+        console.error(`上传附件失败: ${fn}`, err);
       }
     }
   }
