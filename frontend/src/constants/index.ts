@@ -1,5 +1,5 @@
 // 应用版本
-export const APP_VERSION = 'v1.6.1';
+export const APP_VERSION = 'v2.0.0';
 
 // 状态选项
 export const STATUS_OPTIONS = [

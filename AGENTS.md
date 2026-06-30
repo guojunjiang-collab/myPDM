@@ -14,7 +14,7 @@
 | ------ | ------------------------------------ |
 | 项目名称   | 网页版 BOM 管理工具 (PDM 系统)                |
 | 项目类型   | 前后端分离 Web 应用                         |
-| 版本     | v1.5.1                               |
+| 版本     | v1.6.1                               |
 | 架构     | React SPA + RESTful API (Docker 部署)  |
 | 语言     | TypeScript + Python                   |
 
@@ -22,18 +22,21 @@
 
 - **零件管理**: 物料清单全生命周期管理（版本、自定义字段、软删除）
 - **部件管理**: 部件层级管理（树形 BOM、BOM 导出）
-- **图文档管理**: 图纸文档与附件管理
+- **零件/部件合并**: 零件与部件统一为「零部件」管理（Components 表，type 字段区分）
+- **图文档管理**: 图纸文档与附件管理（Office 文档在线预览）
 - **BOM 管理**: BOM 树、BOM 对比、BOM 反查、图文档反查、BOM 导出
 - **ECR/ECO 变更管理**: 工程变更请求/变更单全生命周期（创建→提交→审批→执行→关闭）
 - **配置管理**: 配置项与配置概要管理（BOM 配置对比、PDF 导出）
 - **库存管理**: 仓库/物料/库存/单据管理（入库/出库/盘点）
+- **项目管理**: 项目任务管理（甘特图、任务依赖关系、日期自动汇总）
+- **用户组管理**: 用户组与文档共享权限
 - **用户看板**: 用户自定义文件夹式数据看板（支持共享）
-- **附件管理**: 上传/下载/PDF 预览/STP 三维预览/压缩包浏览
+- **附件管理**: 上传/下载/PDF 预览/STP 三维预览/Office 预览/压缩包浏览
 - **AI 助手**: DeepSeek 驱动的自然语言交互（SSE 流式、工具编排、文档生成）
-- **数据导入导出**: 零件/部件/文档 Excel 批量导入导出
+- **数据导入导出**: 零部件/文档 Excel 批量导入导出
 - **数据同步**: 跨环境数据同步 API
 - **操作日志**: 全量操作审计追踪（仅管理员可见）
-- **版本管理**: 零件/部件/文档版本升级（A→B→...→ZZ 序列）
+- **版本管理**: 零部件/文档版本升级（A→B→...→ZZ 序列，24 进制不含 I/O）
 
 ---
 
@@ -52,6 +55,7 @@
 | 缓存       | Redis 7                                   |
 | 文件存储     | 本地文件系统 (`./uploads/`)                    |
 | 3D 转换    | MayoConv (STP → glTF/glb via AppImage)    |
+| Office 转换 | LibreOffice (Office → PDF 在线预览)           |
 | AI 模型   | DeepSeek (OpenAI 兼容接口)                    |
 | 文档生成     | python-docx, openpyxl, pypdf              |
 | 测试       | pytest                                    |
@@ -100,12 +104,13 @@ D:\OpenCode\myPDM\
 │   │   ├── components/           # 可复用组件
 │   │   │   ├── Layout.tsx        # 导航布局（侧边栏+顶栏）
 │   │   │   ├── Modal.tsx / Toast.tsx / Loading.tsx
-│   │   │   ├── BOMTreeTable.tsx / ArchiveTreeModal.tsx
+│   │   │   ├── BOMTreeTable.tsx / ArchiveTreeModal.tsx / BOMTraceModal.tsx
 │   │   │   ├── EntityEditModal.tsx / EntityDocumentSection.tsx
 │   │   │   ├── ImportPreviewModal.tsx
 │   │   │   ├── VersionHistory.tsx / VersionSelectModal.tsx
 │   │   │   ├── PartDetailContent.tsx / AssemblyDetailContent.tsx / DocumentDetailContent.tsx
-│   │   │   ├── AssemblyPartPicker.tsx / DocumentPicker.tsx
+│   │   │   ├── AssemblyPartPicker.tsx / DocumentPicker.tsx / ECPicker.tsx
+│   │   │   ├── ComponentAttachmentBucket.tsx
 │   │   │   ├── assistant/       # AI 助手组件
 │   │   │   │   ├── FloatingAssistant.tsx / ChatInput.tsx / MessageList.tsx / Markdown.tsx
 │   │   │   │   └── cards/       # 消息卡片（TextCard/MarkdownCard/TableCard/LinkCard/DownloadCard）
@@ -119,25 +124,31 @@ D:\OpenCode\myPDM\
 │   │   │       ├── MeasureTool.tsx / SectionPlanes.tsx / ExplodeView.tsx
 │   │   │       ├── PartHighlighter.tsx / ViewCube.tsx / AxisGizmo.tsx
 │   │   │       ├── GLTFErrorBoundary.tsx
-│   │   │       └── buildModelTree.ts + test / treeTypes.ts
+│   │   │       ├── buildModelTree.ts + test / autoColor.ts + test / treeTypes.ts
 │   │   ├── pages/               # 页面组件
 │   │   │   ├── Login.tsx
 │   │   │   ├── Dashboard.tsx / Board.tsx
-│   │   │   ├── Parts.tsx / Components.tsx / Documents.tsx
+│   │   │   ├── ComponentsPage.tsx / Documents.tsx
 │   │   │   ├── Configuration.tsx
-│   │   │   ├── EC.tsx           # ECR/ECO 工程变更
+│   │   │   ├── EC.tsx / ECN.tsx     # ECR/ECO 工程变更
 │   │   │   ├── Inventory.tsx    # 库存管理
-│   │   │   ├── Business.tsx / DataManagement.tsx
+│   │   │   ├── DataManagement.tsx
 │   │   │   ├── Users.tsx / Logs.tsx / Settings.tsx
-│   │   │   ├── STPViewer.tsx    # 3D 查看器（懒加载）
-│   │   │   └── BOM/             # BOM 工具页面
-│   │   │       ├── BOM.tsx / BOMTreePanel.tsx / BOMComparePanel.tsx
-│   │   │       ├── BOMTracePanel.tsx / DocTracePanel.tsx
-│   │   │       └── helpers.ts / types.ts
+│   │   │   ├── STPViewer.tsx / OfficeReader.tsx    # 3D 查看器与 Office 阅读器（懒加载）
+│   │   │   ├── BOM/             # BOM 工具页面
+│   │   │   │   ├── BOM.tsx / BOMTreePanel.tsx / BOMComparePanel.tsx
+│   │   │   │   ├── BOMTracePanel.tsx / DocTracePanel.tsx
+│   │   │   │   └── helpers.ts / types.ts
+│   │   │   └── Project/         # 项目管理页面
+│   │   │       ├── Projects.tsx / MemberManageModal.tsx
+│   │   │       ├── TaskEditModal.tsx / TaskRowCells.tsx
+│   │   │       └── gantt/       # 甘特图
+│   │   │           ├── GanttView.tsx / ganttUtils.ts
 │   │   ├── services/            # API 客户端
 │   │   │   ├── api.ts           # 主 API 客户端
 │   │   │   ├── assistantApi.ts  # AI 助手 API
 │   │   │   ├── inventoryApi.ts  # 库存 API
+│   │   │   ├── projectApi.ts    # 项目 API
 │   │   │   ├── syncApi.ts / syncService.ts
 │   │   │   ├── importExport.ts  # 导入导出
 │   │   │   ├── ecPdfExport.ts / ecMarkdownExport.ts
@@ -145,20 +156,22 @@ D:\OpenCode\myPDM\
 │   │   ├── stores/              # Zustand 状态管理
 │   │   │   ├── auth.ts          # 认证状态（persist 持久化）
 │   │   │   ├── data.ts / assistant.ts / inventory.ts
+│   │   │   ├── project.ts / pageHeader.ts
 │   │   │   └── viewerStore.ts   # 3D 查看器状态
 │   │   ├── hooks/               # 自定义 Hooks
 │   │   │   ├── useAssistantChat.ts / useCommon.ts
-│   │   │   └── useResizable.ts / useTableSort.ts
+│   │   │   └── useResizable.ts / useTableSort.ts / useHeaderTabs.tsx
 │   │   ├── types/               # TypeScript 类型
 │   │   │   ├── index.ts         # 全体类型定义
-│   │   │   └── assistant.ts
+│   │   │   ├── assistant.ts
+│   │   │   └── project.ts
 │   │   ├── constants/           # 常量
-│   │   │   ├── index.ts         # APP_VERSION=v1.5.1 / 状态/角色/分页/文件限制
+│   │   │   ├── index.ts         # APP_VERSION=v1.6.1 / 状态/角色/分页/文件限制
 │   │   │   └── permissions.generated.ts  # 自动生成的权限矩阵
 │   │   ├── lib/                 # 工具库
 │   │   │   ├── date.ts / file.ts / utils.ts
 │   │   └── utils/               # 工具函数
-│   │       └── date.ts
+│   │       └── date.ts / attachmentPreview.ts
 │   ├── public/draco/            # Draco 解压 (glTF 压缩)
 │   ├── index.html               # 入口 HTML (lang=zh-CN)
 │   ├── vite.config.ts           # Vite + Vitest 配置 (路径别名 @, proxy)
@@ -169,28 +182,30 @@ D:\OpenCode\myPDM\
 │   ├── app/
 │   │   ├── main.py              # FastAPI 入口（启动自动建表/迁移）
 │   │   ├── database.py          # 数据库 + Redis 连接
-│   │   ├── models.py            # 核心模型（User/Part/Assembly/BOMItem/Document/Dashboard/CustomField）
+│   │   ├── models.py            # 核心模型（User/Component/BOMItem/Document/Dashboard/UserGroup/CustomField）
 │   │   ├── models_ecr.py        # ECR 模型
 │   │   ├── models_eco.py        # ECO 模型
 │   │   ├── models_configuration.py  # 配置管理模型
 │   │   ├── models_inventory.py      # 库存管理模型
+│   │   ├── models_project.py        # 项目管理模型
 │   │   ├── schemas.py           # 核心 Pydantic Schema
-│   │   ├── schemas_ecr.py / schemas_eco.py / schemas_configuration.py / schemas_inventory.py
+│   │   ├── schemas_ecr.py / schemas_eco.py / schemas_configuration.py / schemas_inventory.py / schemas_project.py
 │   │   ├── crud.py              # 核心数据库操作（含版本升级/软删除恢复）
-│   │   ├── crud_ecr.py / crud_eco.py / crud_configuration.py / crud_inventory.py
+│   │   ├── crud_ecr.py / crud_eco.py / crud_configuration.py / crud_inventory.py / crud_project.py / crud_groups.py
 │   │   ├── file_storage.py      # 文件存储服务（分块上传 5MB/块）
 │   │   ├── stp_converter.py     # STP → glTF 转换服务
 │   │   ├── stp_to_gltf.py       # 替代 STP→glTF 流水线
+│   │   ├── office_converter.py  # Office 文档转 PDF
 │   │   ├── media_token.py       # 媒体访问令牌
 │   │   ├── permissions/         # 权限系统
 │   │   │   ├── __init__.py      # require_permission / has_permission / enforce_object_policy
 │   │   │   ├── _generated.py    # 自动生成（from permissions.json）
 │   │   │   └── policies.py      # 对象级策略（owner/approver/admin）
-│   │   ├── routers/             # API 路由（17 个文件，16 个活动路由）
+│   │   ├── routers/             # API 路由（18 个文件，17 个活动路由）
 │   │   │   ├── auth.py          # JWT 认证（登录/令牌/修改密码/当前用户）
 │   │   │   ├── users.py         # 用户管理（仅 admin）
-│   │   │   ├── parts.py         # 零件 CRUD + 导入导出 + 版本
-│   │   │   ├── assemblies.py    # 部件 CRUD + BOM 导出
+│   │   │   ├── user_groups.py   # 用户组管理
+│   │   │   ├── components.py    # 零部件 CRUD + 导入导出 + 版本（零件+部件统一）
 │   │   │   ├── bom.py           # BOM 树/对比/反查/关系
 │   │   │   ├── documents.py     # 图文档 CRUD + 附件
 │   │   │   ├── attachments_v2.py# V2 附件（multipart/分块/预览/stream）
@@ -200,6 +215,7 @@ D:\OpenCode\myPDM\
 │   │   │   ├── ecos.py          # ECO（工程变更单）
 │   │   │   ├── configuration.py # 配置项与配置概要
 │   │   │   ├── inventory.py     # 库存管理
+│   │   │   ├── projects.py      # 项目管理
 │   │   │   ├── sync.py          # 数据同步
 │   │   │   ├── admin.py         # 管理工具（软删除清理等）
 │   │   │   ├── assistant.py     # AI 助手（SSE 聊天 + 产物下载）
@@ -213,7 +229,7 @@ D:\OpenCode\myPDM\
 │   │   │   ├── attachment_reader.py / document_builder.py
 │   │   │   ├── skills_loader.py / sanitizer.py
 │   │   │   ├── system_prompt.md
-│   │   │   └── skills/          # 技能定义（bom_change_impact 等）
+│   │   │   └── skills/          # 技能定义（bom_change_impact/bom_compare_report/part_where_used/project_summary_report）
 │   │   └── bom/                 # BOM 工具
 │   │       ├── compare.py       # BOM 对比算法
 │   │       └── archive_reader.py # 压缩包读取
@@ -261,7 +277,7 @@ D:\OpenCode\myPDM\
 - **Pydantic**: 用于 API 请求/响应验证
 - **SQLAlchemy 2.0**: 使用新版 Declarative API
 - **异常处理**: 使用 `HTTPException` 而非裸 raise
-- **模型文件**: 核心模型在 `models.py`，领域模块独立文件（`models_ecr.py` / `models_eco.py` / `models_configuration.py` / `models_inventory.py`），Schema 和 CRUD 同理
+- **模型文件**: 核心模型在 `models.py`，领域模块独立文件（`models_ecr.py` / `models_eco.py` / `models_configuration.py` / `models_inventory.py` / `models_project.py`），Schema 和 CRUD 同理
 
 ### 前端 (React + TypeScript)
 
@@ -513,21 +529,15 @@ UPLOADS_HOST_PATH=D:/data/uploads
 - `GET /api/auth/me` - 当前用户
 - `POST /api/auth/change-password` - 修改密码
 
-### 零件管理
+### 零部件（零件/部件）管理
 
-- `GET/POST /api/parts/` - 列表/创建
-- `GET/PUT/DELETE /api/parts/{part_id}` - 详情/更新/软删除
-- `POST /api/parts/import` - 批量导入
-- `GET /api/parts/export` - 批量导出
-- `GET /api/parts/{part_id}/versions` - 版本历史
-- `POST /api/parts/{part_id}/upgrade` - 版本升级
-
-### 部件管理
-
-- `GET/POST /api/assemblies/` - 列表/创建
-- `GET/PUT/DELETE /api/assemblies/{id}` - 详情/更新/软删除
-- `GET /api/assemblies/{id}/bom/export` - BOM 导出
-- `POST /api/assemblies/{id}/upgrade` - 版本升级
+- `GET/POST /api/components/` - 列表/创建（类型筛选：part/assembly）
+- `GET/PUT/DELETE /api/components/{id}` - 详情/更新/软删除
+- `POST /api/components/import` - 批量导入
+- `GET /api/components/export` - 批量导出
+- `GET /api/components/{id}/versions` - 版本历史
+- `POST /api/components/{id}/upgrade` - 版本升级
+- `GET /api/components/{id}/bom/export` - BOM 导出（仅部件）
 
 ### BOM 管理
 
@@ -602,12 +612,27 @@ UPLOADS_HOST_PATH=D:/data/uploads
 - `GET/PUT/DELETE /api/inventory/documents/{id}` - 单据详情/更新/删除
 - `POST /api/inventory/documents/{id}/submit` / `approve` / `post` - 单据流程
 
+### 项目管理
+
+- `GET/POST /api/projects/` - 项目列表/创建
+- `GET/PUT/DELETE /api/projects/{id}` - 项目详情/更新/删除
+- `GET/POST /api/projects/{id}/members` - 项目成员管理
+- `GET/POST /api/projects/{id}/tasks` - 项目任务管理
+- `POST /api/projects/{id}/tasks/rollup` - 任务日期汇总
+
 ### 用户管理（仅 admin）
 
 - `GET/POST /api/users/` - 用户列表/创建
 - `GET/PUT/DELETE /api/users/{user_id}` - 用户 CRUD
 - `POST /api/users/{user_id}/reset-password` - 重置密码
 - `POST /api/users/import` / `export` - 导入/导出
+
+### 用户组管理
+
+- `GET/POST /api/user-groups/` - 用户组列表/创建
+- `GET/PUT/DELETE /api/user-groups/{id}` - 详情/更新/删除
+- `POST /api/user-groups/{id}/members` - 添加成员
+- `DELETE /api/user-groups/{id}/members/{user_id}` - 移除成员
 
 ### 用户看板
 
@@ -659,9 +684,16 @@ UPLOADS_HOST_PATH=D:/data/uploads
 
 ### 软删除
 
-- Part/Assembly/Document/BOMItem/ECR/ECO 等核心实体均支持软删除（`deleted_at` 列）
+- Component/Document/BOMItem/ECR/ECO 等核心实体均支持软删除（`deleted_at` 列）
 - 唯一约束使用部分索引（`WHERE deleted_at IS NULL`）避免冲突
 - admin 可通过 `/api/admin/soft-deletes` 查看和清理软删除数据
+
+### 零部件统一管理
+
+- 零件（Part）和部件（Assembly）统一为「零部件」（Component）
+- 数据库使用单一 `components` 表，通过 `component_type` 字段区分（`part` / `assembly`）
+- API 路由合并为 `/api/components/`，前端页面合并为 `ComponentsPage`
+- 自动迁移在启动时执行（`migrations_components.py`）
 
 ### 自动迁移
 
@@ -680,7 +712,7 @@ UPLOADS_HOST_PATH=D:/data/uploads
 
 - 后端通过 OpenAI 兼容接口调用 DeepSeek
 - SSE 流式返回，支持工具编排（查询 BOM/零件/ECR 等内部 API）
-- 技能系统：加载 Markdown 定义的 domain 技能（BOM 对比报告、变更影响分析等）
+- 技能系统：加载 Markdown 定义的 domain 技能（BOM 变更影响分析、BOM 对比报告、零部件反查、项目总结报告）
 - 配置通过 `.env`：`DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL`, `ASSISTANT_MAX_ITERS` 等
 
 ### STP 3D 查看器
@@ -711,4 +743,4 @@ UPLOADS_HOST_PATH=D:/data/uploads
 
 ---
 
-*最后更新: 2026-06-18*
+*最后更新: 2026-06-30*
