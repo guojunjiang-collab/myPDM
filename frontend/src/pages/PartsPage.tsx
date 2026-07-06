@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { partsApi } from '../services/api';
 import { useAuthStore } from '../stores/auth';
 import type { PartListItem } from '../types';
 import { toast } from '../components/Toast';
-import { ConfirmModal } from '../components/Modal';
+import { Modal, ConfirmModal } from '../components/Modal';
 import { useTableSort } from '../hooks/useTableSort';
 import PartDetailModal from '../components/PartDetailModal';
 
@@ -19,7 +18,6 @@ const statusTag = (s: string) => {
 };
 
 export default function PartsPage() {
-  const navigate = useNavigate();
   const { user } = useAuthStore();
 
   const [items, setItems] = useState<PartListItem[]>([]);
@@ -35,6 +33,10 @@ export default function PartsPage() {
   const [detailRevisionId, setDetailRevisionId] = useState<string | null>(null);
 
   const [deleteTarget, setDeleteTarget] = useState<PartListItem | null>(null);
+
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newPart, setNewPart] = useState({ code: '', name: '', spec: '', type: 'part' as 'part' | 'assembly' });
+  const [createSaving, setCreateSaving] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -119,6 +121,29 @@ export default function PartsPage() {
     setDeleteTarget(null);
   };
 
+  const handleCreate = async () => {
+    if (!newPart.code || !newPart.name) {
+      toast.error('件号和名称不能为空');
+      return;
+    }
+    setCreateSaving(true);
+    try {
+      const created = await partsApi.create(newPart);
+      toast.success('创建成功');
+      setShowCreateModal(false);
+      setNewPart({ code: '', name: '', spec: '', type: 'part' });
+      loadData();
+      if (created.latest_revision?.id) {
+        setDetailMasterId(created.id);
+        setDetailRevisionId(created.latest_revision.id);
+      }
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || '创建失败');
+    } finally {
+      setCreateSaving(false);
+    }
+  };
+
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center gap-2 mb-4 shrink-0">
@@ -170,7 +195,7 @@ export default function PartsPage() {
         </label>
         <div className="flex-1" />
         <button
-          onClick={() => navigate('/parts/new')}
+          onClick={() => setShowCreateModal(true)}
           className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm"
         >
           + 新增零件
@@ -273,6 +298,46 @@ export default function PartsPage() {
           </tbody>
         </table>
       </div>
+
+      <Modal open={showCreateModal} onClose={() => setShowCreateModal(false)} title="新建零件" width="md">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">件号 <span className="text-red-500">*</span></label>
+            <input type="text" value={newPart.code}
+              onChange={(e) => setNewPart(p => ({...p, code: e.target.value}))}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">名称 <span className="text-red-500">*</span></label>
+            <input type="text" value={newPart.name}
+              onChange={(e) => setNewPart(p => ({...p, name: e.target.value}))}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">规格型号</label>
+            <input type="text" value={newPart.spec}
+              onChange={(e) => setNewPart(p => ({...p, spec: e.target.value}))}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">类型</label>
+            <select value={newPart.type}
+              onChange={(e) => setNewPart(p => ({...p, type: e.target.value as 'part' | 'assembly'}))}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+              <option value="part">零件</option>
+              <option value="assembly">部件</option>
+            </select>
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <button onClick={() => setShowCreateModal(false)}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">取消</button>
+            <button onClick={handleCreate} disabled={createSaving}
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
+              {createSaving ? '创建中...' : '创建'}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       <PartDetailModal
         masterId={detailMasterId || ''}
