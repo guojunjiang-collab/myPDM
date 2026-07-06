@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useProjectStore } from '../../stores/project';
 import { projectApi } from '../../services/projectApi';
 import { usersApi } from '../../services/api';
-import { can } from '../../stores/auth';
+import { can, useAuthStore } from '../../stores/auth';
 import { Modal, ConfirmModal } from '../../components/Modal';
 import { toast } from '../../components/Toast';
 import { useHeaderTabs } from '../../hooks/useHeaderTabs';
@@ -75,6 +75,8 @@ export default function Projects() {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [delTask, setDelTask] = useState<ProjectTask | null>(null);
   const [taskStatusFilter, setTaskStatusFilter] = useState('');
+  const [onlyMine, setOnlyMine] = useState(false);
+  const myId = useAuthStore((s) => s.user?.id ?? null);
   const [taskSearch, setTaskSearch] = useState('');
   const [taskLinks, setTaskLinks] = useState<Record<string, TaskLink[]>>({});
   const [taskComments, setTaskComments] = useState<Record<string, TaskComment[]>>({});
@@ -291,9 +293,10 @@ export default function Projects() {
   // 将树形任务扁平化为 GanttTask[]，供 SharedLeftPanel 统一使用
   // 筛选匹配的任务ID集合(含匹配任务的祖先链,保持树结构完整)
   const filteredTaskIds = useMemo(() => {
-    if (!taskStatusFilter && !taskSearch) return new Set<string>();
+    if (!taskStatusFilter && !taskSearch && !onlyMine) return new Set<string>();
     const ids = new Set<string>();
     const match = (t: ProjectTask): boolean => {
+      if (onlyMine && t.assignee_id !== myId) return false;
       if (taskStatusFilter && t.status !== taskStatusFilter) return false;
       if (!taskSearch) return true;
       if (t.name.includes(taskSearch) || t.code.includes(taskSearch)) return true;
@@ -317,7 +320,7 @@ export default function Projects() {
     };
     for (const t of tasks) collectAncestors(t);
     return ids;
-  }, [taskStatusFilter, taskSearch, tasks, taskLinks, taskComments]);
+  }, [taskStatusFilter, taskSearch, onlyMine, myId, tasks, taskLinks, taskComments]);
 
   const { flatTasks, childMap, visibleLeftTasks } = useMemo(() => {
     const flat: GanttTask[] = [];
@@ -339,7 +342,7 @@ export default function Projects() {
       }
     };
     walk(tasks, null, 0);
-    const hasFilter = !!(taskStatusFilter || taskSearch);
+    const hasFilter = !!(taskStatusFilter || taskSearch || onlyMine);
     const vis: GanttTask[] = [];
     const walkVis = (task: GanttTask) => {
       // 有筛选时只显示匹配的任务(含祖先链),无筛选时按 expanded 展开
@@ -356,7 +359,7 @@ export default function Projects() {
     };
     (cm['__root__'] || []).forEach(walkVis);
     return { flatTasks: flat, childMap: cm, visibleLeftTasks: vis };
-  }, [tasks, expanded, taskStatusFilter, taskSearch, filteredTaskIds]);
+  }, [tasks, expanded, taskStatusFilter, taskSearch, onlyMine, filteredTaskIds]);
 
   // ProjectTask id → 对象映射,供右侧表格行渲染时查找
   const taskById = useMemo(() => {
@@ -481,6 +484,7 @@ export default function Projects() {
   };
 
   const taskMatchesSelf = useCallback((t: ProjectTask): boolean => {
+    if (onlyMine && t.assignee_id !== myId) return false;
     if (taskStatusFilter && t.status !== taskStatusFilter) return false;
     if (taskSearch) {
       if (t.name.includes(taskSearch) || t.code.includes(taskSearch)) return true;
@@ -495,7 +499,7 @@ export default function Projects() {
       return false;
     }
     return true;
-  }, [taskStatusFilter, taskSearch, taskLinks, taskComments]);
+  }, [taskStatusFilter, taskSearch, onlyMine, myId, taskLinks, taskComments]);
 
   const subtreeHasMatch = useCallback((t: ProjectTask): boolean => {
     if (taskMatchesSelf(t)) return true;
@@ -615,6 +619,11 @@ export default function Projects() {
                     <option value="">全部状态</option>
                     {(['未开始', '进行中', '已完成', '挂起'] as TaskStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
+                  <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none whitespace-nowrap">
+                    <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)}
+                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                    只看我的任务
+                  </label>
                   {(() => {
                     // 合并展开/折叠为一个切换按钮:全部已展开时显示"全部折叠",否则显示"全部展开"
                     const allIds: string[] = [];
