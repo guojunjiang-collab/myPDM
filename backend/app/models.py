@@ -39,9 +39,14 @@ class Component(Base):
 class BOMItem(Base):
     __tablename__ = "bom_items"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    iteration_id = Column(UUID(as_uuid=True), ForeignKey("part_iterations.id", ondelete="CASCADE"), nullable=False)
-    parent_revision_id = Column(UUID(as_uuid=True), ForeignKey("part_revisions.id", ondelete="CASCADE"), nullable=False)
-    child_revision_id = Column(UUID(as_uuid=True), ForeignKey("part_revisions.id", ondelete="CASCADE"), nullable=False)
+    iteration_id = Column(UUID(as_uuid=True), ForeignKey("part_iterations.id", ondelete="CASCADE"), nullable=True)
+    parent_revision_id = Column(UUID(as_uuid=True), ForeignKey("part_revisions.id", ondelete="CASCADE"), nullable=True)
+    child_revision_id = Column(UUID(as_uuid=True), ForeignKey("part_revisions.id", ondelete="CASCADE"), nullable=True)
+    # 旧字段兼容（保留直到所有引用迁移完毕）
+    parent_type = Column(String(16), nullable=True)
+    parent_id = Column(UUID(as_uuid=True), nullable=True)
+    child_type = Column(String(16), nullable=True)
+    child_id = Column(UUID(as_uuid=True), nullable=True)
     quantity = Column(Integer, nullable=False, default=1)
     sort_order = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

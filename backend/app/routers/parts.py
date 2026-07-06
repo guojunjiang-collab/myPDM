@@ -11,7 +11,7 @@ from .. import crud_parts
 from .. import schemas_parts
 from ..permissions import require_permission
 
-router = APIRouter(prefix="/api/parts", tags=["parts"])
+router = APIRouter(prefix="/parts", tags=["parts"])
 
 
 # ===== PartMaster =====
