@@ -217,9 +217,7 @@ async def assign_keeper(doc_id: uuid.UUID, data: AssignKeeperAction, db: Session
 async def post_document(doc_id: uuid.UUID, data: PostAction = None, db: Session = Depends(get_db),
                         current_user: User = Depends(require_permission("inventory.doc:post"))):
     doc = crud_inventory.get_document(db, doc_id)
-    # 仅指定库管员或管理员可过账
-    if current_user.role != "admin" and doc.keeper_id != current_user.id:
-        raise HTTPException(status_code=403, detail="仅指定库管员可过账")
+    # 仅指定库管员或管理员可过账（由 inventory_keeper_or_admin 策略统一门控）
     enforce_object_policy("inventory_keeper_or_admin", current_user, doc)
     # 盘点单：先写入各行实盘数
     if data and data.counts:
@@ -270,10 +268,25 @@ def _doc_brief(db, d):
 def _doc_detail(db, d):
     base = _doc_brief(db, d)
     lines = crud_inventory.get_document_lines(db, d.id)
+
+    def _book_qty(line):
+        # 已冻结的账面量（过账后固化）直接返回；未过账的盘点单实时查询当前库存作为账面量
+        if line.book_quantity is not None:
+            return float(line.book_quantity)
+        if d.doc_type == "stocktake" and d.status != "posted":
+            stock = db.query(InventoryStock).filter(
+                InventoryStock.material_id == line.material_id,
+                InventoryStock.warehouse_id == d.warehouse_id,
+                InventoryStock.batch_no == (line.batch_no or ""),
+            ).first()
+            if stock and stock.quantity is not None:
+                return float(stock.quantity)
+        return None
+
     base["lines"] = [{
         "id": str(l.id), "material_id": str(l.material_id), "batch_no": l.batch_no,
         "quantity": float(l.quantity), "direction": l.direction,
-        "book_quantity": float(l.book_quantity) if l.book_quantity is not None else None,
+        "book_quantity": _book_qty(l),
         "counted_quantity": float(l.counted_quantity) if l.counted_quantity is not None else None,
         "remark": l.remark, "sort_order": l.sort_order,
     } for l in lines]

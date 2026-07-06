@@ -23,6 +23,7 @@ export default function StockDetail({ materialId, rows, whName, onClose, onViewD
   onClose: () => void;
   onViewDoc: (docId: string) => void;
 }) {
+  const [tab, setTab] = useState<'info' | 'ledger'>('info');
   const [ledger, setLedger] = useState<any[]>([]);
   useEffect(() => {
     inventoryApi.listLedger({ material_id: materialId }).then((r) => setLedger(r.data.items)).catch(() => {});
@@ -33,53 +34,71 @@ export default function StockDetail({ materialId, rows, whName, onClose, onViewD
 
   return (
     <Modal open title="物料库存详情" onClose={onClose} width="3xl">
-      <div className="space-y-6 max-h-[72vh] overflow-y-auto pr-1">
-        {/* 物料信息 */}
-        {first && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <InfoItem label="编码" value={first.material_code} />
-            <InfoItem label="名称" value={first.material_name} />
-            <InfoItem label="单位" value={first.unit || '-'} />
-            <InfoItem label="总库存" value={`${total}${first.unit || ''}`} />
-            <InfoItem label="安全库存" value={first.safety_stock != null ? String(first.safety_stock) : '-'} />
-          </div>
-        )}
+      {/* TAB 切换 */}
+      <div className="flex border-b border-gray-200 mb-4">
+        <button
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'info' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+          onClick={() => setTab('info')}
+        >
+          基础信息
+        </button>
+        <button
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'ledger' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+          onClick={() => setTab('ledger')}
+        >
+          库存流水
+        </button>
+      </div>
 
-        {/* 各仓库 / 批次库存 */}
-        <div>
-          <h4 className="text-sm font-semibold text-gray-700 mb-2">📦 各仓库 / 批次库存</h4>
-          <div className="rounded-lg border border-gray-200 overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">仓库</th>
-                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">批次</th>
-                  <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">数量</th>
-                  <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">安全库存</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {rows.length === 0 ? (
-                  <tr><td colSpan={4} className="px-3 py-6 text-center text-sm text-gray-400">暂无库存</td></tr>
-                ) : rows.map((r, i) => (
-                  <tr key={i} className={r.is_low ? 'bg-red-50' : ''}>
-                    <td className="px-3 py-2 text-sm">{whName(r.warehouse_id)}</td>
-                    <td className="px-3 py-2 text-sm text-gray-500">{r.batch_no || '-'}</td>
-                    <td className={`px-3 py-2 text-sm text-right font-medium ${r.is_low ? 'text-red-600' : ''}`}>{r.quantity}</td>
-                    <td className="px-3 py-2 text-sm text-right text-gray-500">{r.safety_stock ?? '-'}</td>
+      {/* TAB 1: 基础信息 + 各仓库/批次库存 */}
+      {tab === 'info' && (
+        <div className="space-y-6">
+          {first && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <InfoItem label="编码" value={first.material_code} />
+              <InfoItem label="名称" value={first.material_name} />
+              <InfoItem label="单位" value={first.unit || '-'} />
+              <InfoItem label="总库存" value={`${total}${first.unit || ''}`} />
+              <InfoItem label="安全库存" value={first.safety_stock != null ? String(first.safety_stock) : '-'} />
+            </div>
+          )}
+
+          <div>
+            <h4 className="text-sm font-semibold text-gray-700 mb-2">各仓库 / 批次库存</h4>
+            <div className="rounded-lg border border-gray-200 overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">仓库</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">批次</th>
+                    <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">数量</th>
+                    <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">安全库存</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {rows.length === 0 ? (
+                    <tr><td colSpan={4} className="px-3 py-6 text-center text-sm text-gray-400">暂无库存</td></tr>
+                  ) : rows.map((r, i) => (
+                    <tr key={i} className={r.is_low ? 'bg-red-50' : ''}>
+                      <td className="px-3 py-2 text-sm">{whName(r.warehouse_id)}</td>
+                      <td className="px-3 py-2 text-sm text-gray-500">{r.batch_no || '-'}</td>
+                      <td className={`px-3 py-2 text-sm text-right font-medium ${r.is_low ? 'text-red-600' : ''}`}>{r.quantity}</td>
+                      <td className="px-3 py-2 text-sm text-right text-gray-500">{r.safety_stock ?? '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
+      )}
 
-        {/* 库存流水 */}
+      {/* TAB 2: 库存流水（滚动容器） */}
+      {tab === 'ledger' && (
         <div>
-          <h4 className="text-sm font-semibold text-gray-700 mb-2">🕒 库存流水</h4>
-          <div className="rounded-lg border border-gray-200 overflow-hidden">
+          <div className="rounded-lg border border-gray-200 overflow-hidden max-h-[60vh] overflow-y-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
                 <tr>
                   <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">单据</th>
                   <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">类型</th>
@@ -111,11 +130,7 @@ export default function StockDetail({ materialId, rows, whName, onClose, onViewD
             </table>
           </div>
         </div>
-
-        <div className="flex justify-end border-t border-gray-200 pt-4">
-          <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">关闭</button>
-        </div>
-      </div>
+      )}
     </Modal>
   );
 }
