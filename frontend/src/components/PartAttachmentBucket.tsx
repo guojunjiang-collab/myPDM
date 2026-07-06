@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { partsApi, mediaApi, v2UploadApi, CHUNK_THRESHOLD, CHUNK_SIZE } from '../services/api';
-import { previewAttachment } from '../utils/attachmentPreview';
-import ArchiveTreeModal from './ArchiveTreeModal';
+import api, { partsApi } from '../services/api';
 
 interface PartAttachmentItem {
   id: string;
@@ -30,9 +28,7 @@ export default function PartAttachmentBucket({ revisionId, category, label, edit
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadName, setUploadName] = useState('');
-  const [progress, setProgress] = useState(0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -49,44 +45,24 @@ export default function PartAttachmentBucket({ revisionId, category, label, edit
 
   useEffect(() => { load(); }, [load]);
 
-  const uploadLarge = async (file: File) => {
-    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-    const init = await v2UploadApi.initChunkedUpload(file.name, file.size, 'parts', revisionId, category);
-    for (let i = 0; i < totalChunks; i++) {
-      const start = i * CHUNK_SIZE;
-      await v2UploadApi.uploadChunk(init.upload_id, i, file.slice(start, Math.min(start + CHUNK_SIZE, file.size)));
-      setProgress(Math.round(5 + ((i + 1) / totalChunks) * 90));
-    }
-    const result = await v2UploadApi.completeChunkedUpload(init.upload_id);
-    setProgress(100);
-    return result;
-  };
-
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const MAX_ALLOWED = 1073741824;
     if (file.size > MAX_ALLOWED) { alert('文件大小超过系统限制 1GB'); if (fileInputRef.current) fileInputRef.current.value = ''; return; }
-    setUploading(true); setUploadName(file.name); setProgress(0);
+    setUploading(true); setUploadName(file.name);
     try {
-      let uploadResult: { file_name: string; file_size: number; file_path: string; file_hash?: string };
-      if (file.size > CHUNK_THRESHOLD) {
-        uploadResult = await uploadLarge(file);
-      } else {
-        uploadResult = await v2UploadApi.uploadSmallFile(file, 'parts', revisionId, (p) => setProgress(p), category);
-      }
-      await partsApi.addAttachment(revisionId, {
-        category,
-        file_name: uploadResult.file_name,
-        file_size: uploadResult.file_size,
-        file_path: uploadResult.file_path,
-        file_hash: (uploadResult as any).file_hash || '',
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('category', category);
+      await api.post(`/parts/revisions/${revisionId}/attachments`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
       await load();
     } catch {
       alert('上传失败，请重试');
     } finally {
-      setUploading(false); setUploadName(''); setProgress(0);
+      setUploading(false); setUploadName('');
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -99,17 +75,23 @@ export default function PartAttachmentBucket({ revisionId, category, label, edit
     finally { setDeletingId(null); }
   };
 
-  const handlePreview = (attId: string, fileName: string) => {
-    previewAttachment(attId, fileName, { onArchive: (id, name) => setArchivePreview({ attId: id, fileName: name }) });
+  const handlePreview = async (att: PartAttachmentItem) => {
+    try {
+      const response = await api.get(`/parts/revisions/${revisionId}/attachments/${att.id}/file`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      window.open(url, '_blank');
+    } catch { alert('预览失败'); }
   };
 
-  const handleDownload = async (attId: string, fileName: string) => {
+  const handleDownload = async (att: PartAttachmentItem) => {
     try {
-      const mt = await mediaApi.token(attId, 'direct-download');
+      const response = await api.get(`/parts/revisions/${revisionId}/attachments/${att.id}/file`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
       const a = document.createElement('a');
-      a.href = `/api/v2/attachments/${attId}/direct-download?token=${encodeURIComponent(mt)}`;
-      a.download = fileName || 'download';
+      a.href = url;
+      a.download = att.file_name || 'download';
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
     } catch { alert('下载失败，请重试'); }
   };
 
@@ -129,13 +111,7 @@ export default function PartAttachmentBucket({ revisionId, category, label, edit
 
       {uploading && (
         <div className="mb-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-blue-700">正在上传 "{uploadName}"</span>
-            <span className="text-blue-600 font-medium">{progress}%</span>
-          </div>
-          <div className="w-full bg-blue-200 rounded-full h-2">
-            <div className="bg-blue-500 h-2 rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
-          </div>
+          <span className="text-blue-700">正在上传 "{uploadName}"</span>
         </div>
       )}
 
@@ -160,8 +136,8 @@ export default function PartAttachmentBucket({ revisionId, category, label, edit
                   <td className="px-3 py-2 text-gray-500">{fmtSize(att.file_size)}</td>
                   <td className="px-3 py-2 text-center whitespace-nowrap">
                     <span className="inline-flex items-center gap-2">
-                      <button type="button" onClick={() => handlePreview(att.id, att.file_name)} className="text-blue-600 hover:text-blue-800 text-xs">预览</button>
-                      <button type="button" onClick={() => handleDownload(att.id, att.file_name)} className="text-primary-600 hover:text-primary-800 text-xs">下载</button>
+                      <button type="button" onClick={() => handlePreview(att)} className="text-blue-600 hover:text-blue-800 text-xs">预览</button>
+                      <button type="button" onClick={() => handleDownload(att)} className="text-primary-600 hover:text-primary-800 text-xs">下载</button>
                       {editable && (
                         <button type="button" onClick={() => handleDelete(att.id)} disabled={deletingId === att.id} className="text-red-500 hover:text-red-700 disabled:opacity-50 text-xs">
                           {deletingId === att.id ? '删除中...' : '删除'}
@@ -176,9 +152,6 @@ export default function PartAttachmentBucket({ revisionId, category, label, edit
         )}
       </div>
 
-      {archivePreview && (
-        <ArchiveTreeModal open={!!archivePreview} onClose={() => setArchivePreview(null)} attachmentId={archivePreview.attId} fileName={archivePreview.fileName} />
-      )}
     </div>
   );
 }

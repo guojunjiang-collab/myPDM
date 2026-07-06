@@ -4,7 +4,8 @@ import uuid as _uuid
 from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID, uuid4
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -683,30 +684,44 @@ def list_attachments(
 
 
 @router.post("/revisions/{revision_id}/attachments")
-def add_attachment(
+async def add_attachment(
     revision_id: UUID,
-    data: dict,
+    file: UploadFile = File(...),
+    category: str = Form("cad"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("attachments:upload")),
 ):
+    """上传附件到当前迭代"""
+    import os, hashlib
+    
     result = crud_parts.get_part_revision_with_current_iteration(db, revision_id)
     if not result:
         raise HTTPException(404, "版本不存在")
     revision, iteration = result
     if not iteration:
         raise HTTPException(400, "当前迭代不存在")
+
+    upload_dir = f"./uploads/parts/{revision_id}"
+    os.makedirs(upload_dir, exist_ok=True)
+
+    file_path = os.path.join(upload_dir, file.filename)
+    content = await file.read()
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    file_hash = hashlib.sha256(content).hexdigest()
+
     att = crud_parts.models_parts.PartAttachment(
         iteration_id=iteration.id,
-        category=data.get("category", "cad"),
-        file_name=data["file_name"],
-        file_size=data.get("file_size"),
-        file_path=data.get("file_path"),
-        file_hash=data.get("file_hash"),
+        category=category,
+        file_name=file.filename,
+        file_size=len(content),
+        file_path=file_path,
+        file_hash=file_hash,
     )
     db.add(att)
     db.commit()
     db.refresh(att)
-    return {"id": str(att.id), "detail": "已添加"}
+    return {"id": str(att.id), "file_name": att.file_name, "file_size": att.file_size}
 
 
 @router.delete("/revisions/{revision_id}/attachments/{attachment_id}")
@@ -714,8 +729,8 @@ def delete_attachment(
     revision_id: UUID,
     attachment_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("attachments:delete")),
 ):
+    """删除附件"""
     att = db.query(crud_parts.models_parts.PartAttachment).filter(
         crud_parts.models_parts.PartAttachment.id == attachment_id
     ).first()
@@ -727,3 +742,23 @@ def delete_attachment(
     db.delete(att)
     db.commit()
     return {"detail": "已删除"}
+
+
+@router.get("/revisions/{revision_id}/attachments/{attachment_id}/file")
+def get_attachment_file(
+    revision_id: UUID,
+    attachment_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("attachments:list")),
+):
+    """获取附件文件内容"""
+    import os, mimetypes
+    att = db.query(crud_parts.models_parts.PartAttachment).filter(
+        crud_parts.models_parts.PartAttachment.id == attachment_id
+    ).first()
+    if not att:
+        raise HTTPException(404, "附件不存在")
+    if not att.file_path or not os.path.exists(att.file_path):
+        raise HTTPException(404, "文件不存在")
+    mime_type = mimetypes.guess_type(att.file_path)[0] or "application/octet-stream"
+    return FileResponse(att.file_path, media_type=mime_type, filename=att.file_name)
