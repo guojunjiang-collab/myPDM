@@ -1,7 +1,7 @@
 """
 STP 三维模型转换服务
 - 上传 STP 后自动转换为 glTF (.glb)
-- glb 文件存放到同 STP 文件相同的文件夹（uploads/documents/{图文档编号_版本}/）
+- glb 文件存放到 glb 缓存目录（uploads/glb_cache/{图文档编号_版本}/）
 - 删除 STP 附件时同步清理对应的 glb 文件
 - 使用 Semaphore 限制并发 Mayo 进程，防止 CPU/内存过载
 """
@@ -42,8 +42,8 @@ def get_glb_cache_path(attachment_id: str, file_path: str = None) -> Path:
     
     Args:
         attachment_id: 附件 UUID
-        file_path: 可选的 STP 文件路径（如 documents/test-STP-GD40_A/file.stp）
-                   如果提供，glb 将存放到 gltf_cache/{图文档文件夹}/ 下
+        file_path: 可选的 STP 文件路径（如 document/test-STP-GD40_A/file.stp）
+                   如果提供，glb 将存放到 glb_cache/{图文档文件夹}/ 下
     
     Returns:
         glb 文件路径
@@ -70,8 +70,8 @@ def convert_stp_to_gltf(stp_path: str, attachment_id: str, file_path: str = None
     Args:
         stp_path: STP 文件绝对路径
         attachment_id: 附件 UUID
-        file_path: 可选的 STP 文件相对路径（如 documents/test-STP-GD40_A/file.stp）
-                   如果提供，glb 将存放到同文件夹
+        file_path: 可选的 STP 文件相对路径（如 document/test-STP-GD40_A/file.stp）
+                   如果提供，glb 将存放到 glb_cache/{图文档文件夹}/ 下
 
     Returns:
         glb 文件路径，失败返回 None
