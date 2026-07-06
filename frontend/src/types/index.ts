@@ -129,6 +129,12 @@ export interface PartListItem {
   check_out_date?: string | null;
   latest_iteration: number;
   created_at?: string;
+  /** @deprecated 旧系统兼容 */
+  id?: string;
+  /** @deprecated 旧系统兼容 */
+  remark?: string;
+  /** @deprecated 旧系统兼容 */
+  updated_at?: string;
 }
 
 export interface PartAttachment {

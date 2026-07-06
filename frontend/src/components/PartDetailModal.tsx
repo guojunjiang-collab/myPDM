@@ -107,7 +107,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
       const m = await partsApi.get(masterId);
       setMaster(m);
       setEditMaster({ code: m.code || '', name: m.name || '', spec: m.spec || '' });
-      const revId = propRevisionId || internalRevisionId || (m.latest_revision?.id);
+      const revId = internalRevisionId || propRevisionId || (m.latest_revision?.id);
       if (revId) {
         if (!internalRevisionId) setInternalRevisionId(revId);
         const rev = await partsApi.getRevision(revId);
@@ -341,42 +341,55 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
           <div className="text-gray-400 text-sm py-8 text-center">加载失败</div>
         ) : (
           <>
-            <div className="bg-white rounded-lg border border-gray-200 p-4 shrink-0 mb-4">
-              <div className="grid grid-cols-4 gap-4 text-sm">
-                {canEdit ? (
-                  <>
-                    <div>
-                      <label className="text-xs text-gray-500">件号</label>
-                      <input type="text" value={editMaster.code}
-                        onChange={(e) => { setEditMaster(p => ({...p, code: e.target.value})); autoSaveMaster({code: e.target.value}); }}
-                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm font-mono" />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500">名称</label>
-                      <input type="text" value={editMaster.name}
-                        onChange={(e) => { setEditMaster(p => ({...p, name: e.target.value})); autoSaveMaster({name: e.target.value}); }}
-                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm" />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500">规格</label>
-                      <input type="text" value={editMaster.spec}
-                        onChange={(e) => { setEditMaster(p => ({...p, spec: e.target.value})); autoSaveMaster({spec: e.target.value}); }}
-                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm" />
-                    </div>
-                    <div><span className="text-gray-500">类型：</span> {hasBomChildren ? '部件' : '零件'}</div>
-                  </>
-                ) : (
-                  <>
-                    <div><span className="text-gray-500">件号：</span> <span className="font-mono font-medium">{master?.code}</span></div>
-                    <div><span className="text-gray-500">名称：</span> {master?.name}</div>
-                    <div><span className="text-gray-500">规格：</span> {master?.spec || '—'}</div>
-                    <div><span className="text-gray-500">类型：</span> {hasBomChildren ? '部件' : '零件'}</div>
-                  </>
-                )}
-              </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0 mb-3">
+              {canEdit ? (
+                <>
+                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-gray-500 mb-0.5">件号</div>
+                    <input type="text" value={editMaster.code}
+                      onChange={(e) => { setEditMaster(p => ({...p, code: e.target.value})); autoSaveMaster({code: e.target.value}); }}
+                      className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono" />
+                  </div>
+                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-gray-500 mb-0.5">名称</div>
+                    <input type="text" value={editMaster.name}
+                      onChange={(e) => { setEditMaster(p => ({...p, name: e.target.value})); autoSaveMaster({name: e.target.value}); }}
+                      className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                  </div>
+                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-gray-500 mb-0.5">规格</div>
+                    <input type="text" value={editMaster.spec}
+                      onChange={(e) => { setEditMaster(p => ({...p, spec: e.target.value})); autoSaveMaster({spec: e.target.value}); }}
+                      className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                  </div>
+                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-gray-500 mb-0.5">类型</div>
+                    <div className="text-sm text-gray-900 font-medium">{hasBomChildren ? '部件' : '零件'}</div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-gray-500 mb-0.5">件号</div>
+                    <div className="text-sm text-gray-900 font-medium font-mono">{master?.code}</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-gray-500 mb-0.5">名称</div>
+                    <div className="text-sm text-gray-900 font-medium">{master?.name}</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-gray-500 mb-0.5">规格</div>
+                    <div className="text-sm text-gray-900 font-medium">{master?.spec || '—'}</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-gray-500 mb-0.5">类型</div>
+                    <div className="text-sm text-gray-900 font-medium">{hasBomChildren ? '部件' : '零件'}</div>
+                  </div>
+                </>
+              )}
             </div>
 
-            <div className="bg-white rounded-lg border border-gray-200 p-4 shrink-0 mb-4">
+            <div className="bg-white rounded-lg border border-gray-200 p-3 shrink-0 mb-3">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-3">
                   <span className="font-semibold text-sm">版本：{revision?.version}</span>
@@ -429,7 +442,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
             </div>
 
             {viewingIterationId && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 shrink-0 mb-4 text-sm flex items-center justify-between">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1.5 shrink-0 mb-3 text-sm flex items-center justify-between">
                 <span>正在查看 Iteration #{viewingIteration?.iteration} 的历史数据（只读）</span>
                 <button onClick={() => { setViewingIterationId(null); setViewingIteration(null); }}
                   className="text-primary-600 hover:text-primary-800 hover:underline text-xs">返回当前迭代</button>
@@ -478,7 +491,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                                     <label className="text-xs text-gray-500">{def.name}</label>
                                     {def.field_type === 'select' ? (
                                       <select
-                                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm mt-0.5 bg-white"
+                                        className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 mt-0.5 bg-white"
                                         value={val}
                                         onChange={(e) => handleChange(e.target.value)}
                                       >
@@ -492,14 +505,14 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                                     ) : def.field_type === 'number' ? (
                                       <input
                                         type="number"
-                                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm mt-0.5"
+                                        className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 mt-0.5"
                                         value={val}
                                         onChange={(e) => handleChange(e.target.value)}
                                       />
                                     ) : (
                                       <input
                                         type="text"
-                                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm mt-0.5"
+                                        className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 mt-0.5"
                                         value={val}
                                         onChange={(e) => handleChange(e.target.value)}
                                       />
@@ -513,7 +526,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                         <div>
                           <h4 className="text-sm font-semibold mb-1">备注</h4>
                           <textarea
-                            className="w-full border border-gray-300 rounded px-3 py-2 text-sm mt-1"
+                            className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 mt-1 resize-none"
                             rows={3}
                             value={editData.remark}
                             onChange={(e) => {

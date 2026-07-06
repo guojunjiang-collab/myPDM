@@ -2973,8 +2973,9 @@ async function exportPartsToDir(dirHandle: FileSystemDirectoryHandle): Promise<v
   const cadAttMap = new Map<string, ComponentAttachment[]>();
   const prodAttMap = new Map<string, ComponentAttachment[]>();
   for (const p of parts) {
-    try { const r = await componentAttachmentsApi.list(p.id, 'cad'); if (r.data?.length) cadAttMap.set(p.id, r.data); } catch { /* skip */ }
-    try { const r = await componentAttachmentsApi.list(p.id, 'production'); if (r.data?.length) prodAttMap.set(p.id, r.data); } catch { /* skip */ }
+    const part: any = p;
+    try { const r = await componentAttachmentsApi.list(part.id, 'cad'); if (r.data?.length) cadAttMap.set(part.id, r.data); } catch { /* skip */ }
+    try { const r = await componentAttachmentsApi.list(part.id, 'production'); if (r.data?.length) prodAttMap.set(part.id, r.data); } catch { /* skip */ }
   }
   const hasAny = [...cadAttMap.values(), ...prodAttMap.values()].some(arr => arr.length > 0);
   if (hasAny) {
@@ -3576,7 +3577,7 @@ export async function executeConfigurationItemsImport(preview: ImportPreview): P
         }
         partsToAdd.push({
           part_type: p.part_type as string || 'part',
-          part_id: entity.id,
+          part_id: entity.revision_id,
           is_required: p.is_required as boolean,
           quantity: (p.quantity as number) || 1,
         });

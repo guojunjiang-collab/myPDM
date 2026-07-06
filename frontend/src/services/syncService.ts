@@ -1,7 +1,7 @@
 import { useDataStore } from '../stores/data';
 import { syncApi } from './syncApi';
-import { componentsApi, documentsApi, bomApi, configurationApi } from './api';
-import type { SyncStatus, Component, Document, BOMItem, ConfigItemBrief } from '../types';
+import { partsApi, documentsApi, bomApi, configurationApi } from './api';
+import type { SyncStatus, PartListItem, Document, BOMItem, ConfigItemBrief } from '../types';
 
 interface SyncEntity {
   name: string;
@@ -23,18 +23,17 @@ function buildEntities(): SyncEntity[] {
       name: 'components',
       key: 'components',
       fetch: async (since: number) => {
-        const res = await componentsApi.list({
-          updated_since: since,
+        const res = await partsApi.list({
           page_size: 10000,
-          brief: true,
+          show_all_versions: true,
         } as any);
-        return Array.isArray(res.data)
-          ? res.data
-          : res.data?.items || [];
+        return Array.isArray(res)
+          ? res
+          : res?.items || [];
       },
-      merge: (items: Component[]) => {
+      merge: (items: PartListItem[]) => {
         const store = useDataStore.getState();
-        const current = [...store.components];
+        const current = [...store.components] as any[];
         mergeItems(current, items as any[]);
         store.setComponents(current);
       },

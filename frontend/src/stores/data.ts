@@ -1,14 +1,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Component, Document, DocumentBrief, CustomFieldDefinition, BOMItemBrief, ECRBrief, ECOBrief, ConfigItemBrief } from '../types';
-import { componentsApi, documentsApi, customFieldsApi, configurationApi } from '../services/api';
+import type { PartListItem, Document, DocumentBrief, CustomFieldDefinition, BOMItemBrief, ECRBrief, ECOBrief, ConfigItemBrief } from '../types';
+import { partsApi, documentsApi, customFieldsApi, configurationApi } from '../services/api';
 
 function extractData<T>(response: any): T[] {
   return Array.isArray(response) ? response : (response?.items || []);
 }
 
 interface DataState {
-  components: Component[];
+  components: any[];
   documents: DocumentBrief[];
   customFieldDefs: CustomFieldDefinition[];
   bomItems: BOMItemBrief[];
@@ -21,7 +21,7 @@ interface DataState {
   syncError: string | null;
   autoSyncEnabled: boolean;
 
-  setComponents: (components: Component[]) => void;
+  setComponents: (components: any[]) => void;
   setDocuments: (documents: DocumentBrief[]) => void;
   setCustomFieldDefs: (defs: CustomFieldDefinition[]) => void;
   setBomItems: (items: BOMItemBrief[]) => void;
@@ -29,7 +29,7 @@ interface DataState {
   setEcos: (ecos: ECOBrief[]) => void;
   setConfigItems: (items: ConfigItemBrief[]) => void;
 
-  updateComponent: (id: string, data: Partial<Component>) => void;
+  updateComponent: (id: string, data: any) => void;
   updateDocument: (id: string, data: Partial<Document>) => void;
 
   setSyncing: (syncing: boolean) => void;
@@ -66,7 +66,7 @@ export const useDataStore = create<DataState>()(
       updateComponent: (id, data) =>
         set((state) => ({
           components: state.components.map((c) =>
-            c.id === id ? { ...c, ...data } : c
+            c.revision_id === id ? { ...c, ...data } : c
           ),
         })),
       updateDocument: (id, data) =>
@@ -97,14 +97,14 @@ export const useDataStore = create<DataState>()(
         set({ isSyncing: true, syncError: null });
         try {
           const [componentsRes, documentsRes, fieldsRes, configRes] = await Promise.allSettled([
-            componentsApi.list({ page_size: 10000, brief: true }),
+            partsApi.list({ page_size: 10000, show_all_versions: true }),
             documentsApi.list({ page_size: 10000, brief: true }),
             customFieldsApi.listDefinitions(),
             configurationApi.listItems({ page_size: 10000 }),
           ]);
 
           set({
-            components: componentsRes.status === 'fulfilled' ? extractData<Component>(componentsRes.value.data) : [],
+            components: componentsRes.status === 'fulfilled' ? extractData<PartListItem>(componentsRes.value.data) : [],
             documents: documentsRes.status === 'fulfilled' ? extractData<DocumentBrief>(documentsRes.value.data) : [],
             customFieldDefs: fieldsRes.status === 'fulfilled' ? extractData<CustomFieldDefinition>(fieldsRes.value.data) : [],
             configItems: configRes.status === 'fulfilled' ? extractData<ConfigItemBrief>(configRes.value.data) : [],

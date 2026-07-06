@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { greeting, statusDistribution, type Distribution } from './lib/aggregate';
 import type { RecentDisplay, Activity } from './hooks';
 import type { FavItem } from './lib/aggregate';
-import type { Component, DocumentBrief, ConfigItemBrief } from '../../types';
+import type { DocumentBrief, ConfigItemBrief } from '../../types';
 
 // myPDM 统一 components：part/assembly/component 均落到 /components
 const ENTITY_ICON: Record<string, string> = { part: '🔧', assembly: '📦', component: '🔧', document: '📄', configuration: '⚙️' };
@@ -76,7 +76,7 @@ function DistRow({ label, dist }: { label: string; dist: Distribution }) {
 }
 
 export function StatusDistributionTile({ partsMasters, documents, configItems }: {
-  partsMasters: Component[];
+  partsMasters: any[];
   documents: DocumentBrief[];
   configItems: ConfigItemBrief[];
 }) {
