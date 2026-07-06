@@ -170,6 +170,8 @@ export const partsApi = {
     api.get(`/parts/revisions/${revisionId}/iterations`).then((r) => r.data),
   getIteration: (revisionId: string, iterationId: string) =>
     api.get(`/parts/revisions/${revisionId}/iterations/${iterationId}`).then((r) => r.data),
+  updateIteration: (revisionId: string, data: Record<string, any>) =>
+    api.put(`/parts/revisions/${revisionId}/iterations/current`, data).then((r) => r.data),
 
   // 级联
   cascadeCheckout: (revisionId: string) =>

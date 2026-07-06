@@ -274,6 +274,34 @@ def list_iterations(
     ]
 
 
+@router.put("/revisions/{revision_id}/iterations/current")
+def update_current_iteration(
+    revision_id: UUID,
+    data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("components:update")),
+):
+    """更新当前迭代的可变数据（custom_fields, remark）"""
+    result = crud_parts.get_part_revision_with_current_iteration(db, revision_id)
+    if not result:
+        raise HTTPException(404, "版本不存在")
+    revision, iteration = result
+    if not iteration:
+        raise HTTPException(400, "当前迭代不存在")
+    if str(revision.check_out_user_id) != str(current_user.id):
+        raise HTTPException(400, "请先签出后再编辑")
+
+    updated = {}
+    allowed = {"custom_fields", "remark"}
+    for key in allowed:
+        if key in data and data[key] is not None:
+            setattr(iteration, key, data[key])
+            updated[key] = data[key]
+    if updated:
+        db.commit()
+    return {"detail": "已保存", "updated": updated}
+
+
 @router.get("/revisions/{revision_id}/iterations/{iteration_id}")
 def get_iteration(
     revision_id: UUID,

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { partsApi, customFieldsApi } from '../services/api';
 import { useAuthStore } from '../stores/auth';
 import type { PartMaster, PartRevision, PartIteration, PartStatus, CascadeResult } from '../types';
@@ -43,6 +43,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const [iterationsList, setIterationsList] = useState<any[]>([]);
 
   const [cfDefs, setCfDefs] = useState<any[]>([]);
+  const [editData, setEditData] = useState<{ custom_fields: Record<string, any>; remark: string }>({ custom_fields: {}, remark: '' });
 
   useEffect(() => {
     if (open) {
@@ -68,6 +69,15 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
 
   const revisionId = internalRevisionId || revision?.id;
 
+  const saveTimer = useRef<ReturnType<typeof setTimeout>>();
+  const autoSave = useCallback((data: Record<string, any>) => {
+    if (!revisionId) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      partsApi.updateIteration(revisionId, data).catch(console.error);
+    }, 500);
+  }, [revisionId]);
+
   const loadDetail = useCallback(async () => {
     if (!masterId) return;
     setDetailLoading(true);
@@ -81,6 +91,10 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
         setRevision(rev);
         if (rev.current_iteration) {
           setIteration(rev.current_iteration);
+          setEditData({
+            custom_fields: rev.current_iteration.custom_fields || {},
+            remark: rev.current_iteration.remark || '',
+          });
         }
       }
     } catch (e) { console.error(e); } finally { setDetailLoading(false); }
@@ -109,6 +123,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const isCheckedOutByMe = isCheckedOut && revision?.check_out_user_id === user?.id;
   const isDraft = revision?.status === 'draft';
   const isAdminUser = user?.role === 'admin';
+  const canEdit = isCheckedOutByMe && isDraft;
   const canCheckout = isDraft && !isCheckedOut;
   const canCheckin = isDraft && isCheckedOutByMe;
   const canUndo = isDraft && isCheckedOutByMe && (revision?.latest_iteration || 0) > 1;
@@ -271,28 +286,74 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                       Iteration #{currentDisplay.iteration}
                       {currentDisplay.check_in_note && <span className="ml-2">签入说明：{currentDisplay.check_in_note}</span>}
                     </div>
-                    <div>
-                      <h4 className="text-sm font-semibold mb-2">自定义字段</h4>
-                      <div className="grid grid-cols-3 gap-3">
-                        {cfDefs.length === 0 ? (
-                          <div className="text-gray-400 text-sm col-span-3">无</div>
-                        ) : (
-                          cfDefs.map((def: any) => {
-                            const val = (currentDisplay.custom_fields || {})[def.name];
-                            return (
-                              <div key={def.id}>
-                                <label className="text-xs text-gray-500">{def.name}</label>
-                                <div className="text-sm">{val !== undefined && val !== null ? String(val) : '—'}</div>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-semibold mb-1">备注</h4>
-                      <div className="text-sm text-gray-600">{currentDisplay.remark || '—'}</div>
-                    </div>
+                    {!viewingIterationId && canEdit ? (
+                      <>
+                        <div>
+                          <h4 className="text-sm font-semibold mb-2">自定义字段</h4>
+                          <div className="grid grid-cols-3 gap-3">
+                            {cfDefs.length === 0 ? (
+                              <div className="text-gray-400 text-sm col-span-3">无</div>
+                            ) : (
+                              cfDefs.map((def: any) => {
+                                const key = def.name;
+                                return (
+                                  <div key={def.id}>
+                                    <label className="text-xs text-gray-500">{def.name}</label>
+                                    <input
+                                      type="text"
+                                      className="w-full border border-gray-300 rounded px-2 py-1 text-sm mt-0.5"
+                                      value={editData.custom_fields[key] || ''}
+                                      onChange={(e) => {
+                                        const newCf = { ...editData.custom_fields, [key]: e.target.value };
+                                        setEditData(prev => ({ ...prev, custom_fields: newCf }));
+                                        autoSave({ custom_fields: newCf });
+                                      }}
+                                    />
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-semibold mb-1">备注</h4>
+                          <textarea
+                            className="w-full border border-gray-300 rounded px-3 py-2 text-sm mt-1"
+                            rows={3}
+                            value={editData.remark}
+                            onChange={(e) => {
+                              setEditData(prev => ({ ...prev, remark: e.target.value }));
+                              autoSave({ remark: e.target.value });
+                            }}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div>
+                          <h4 className="text-sm font-semibold mb-2">自定义字段</h4>
+                          <div className="grid grid-cols-3 gap-3">
+                            {cfDefs.length === 0 ? (
+                              <div className="text-gray-400 text-sm col-span-3">无</div>
+                            ) : (
+                              cfDefs.map((def: any) => {
+                                const val = (currentDisplay.custom_fields || {})[def.name];
+                                return (
+                                  <div key={def.id}>
+                                    <label className="text-xs text-gray-500">{def.name}</label>
+                                    <div className="text-sm">{val !== undefined && val !== null ? String(val) : '—'}</div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-semibold mb-1">备注</h4>
+                          <div className="text-sm text-gray-600">{currentDisplay.remark || '—'}</div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 
