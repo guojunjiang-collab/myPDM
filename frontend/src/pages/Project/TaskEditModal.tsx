@@ -56,7 +56,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
     priority: '中' as TaskPriority, planned_start: '', planned_end: '', actual_start: '', actual_end: '', description: '' };
   const [form, setForm] = useState(empty);
   const [statusSaving, setStatusSaving] = useState(false);
-  const [tab, setTab] = useState<'info' | 'logs'>('info');
+  const [tab, setTab] = useState<'info' | 'links' | 'logs'>('info');
   const [taskLogs, setTaskLogs] = useState<OperationLog[]>([]);
   const [taskLogsLoading, setTaskLogsLoading] = useState(false);
   const [users, setUsers] = useState<{ id: string; real_name: string }[]>([]);
@@ -274,22 +274,17 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
     <Modal open={open} title={task ? `${task.code}_${task.name}` : '新建任务'} onClose={onClose} width="3xl">
       {task && (
         <div className="flex gap-1 mb-4 border-b">
-          <button
-            onClick={() => setTab('info')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              tab === 'info' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            任务信息
-          </button>
-          <button
-            onClick={() => setTab('logs')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              tab === 'logs' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            操作记录
-          </button>
+          {([['info', '任务信息'], ['links', '关联对象'], ['logs', '操作记录']] as ['info' | 'links' | 'logs', string][]).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                tab === key ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       )}
       {(!task || tab === 'info') && (
@@ -356,7 +351,13 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
           )}
         </div>
 
-        <div className="border-t pt-3">
+      </div>
+      )}
+
+      {/* ───────────── 关联对象 ───────────── */}
+      {task && tab === 'links' && (
+      <div className="space-y-4">
+        <div className="pt-1">
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <h4 className="text-sm font-bold text-gray-700">关联对象</h4>
             <div className="ml-auto flex items-center gap-2">
@@ -400,7 +401,12 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
             <div className="text-xs text-gray-400">暂无关联</div>
           )}
         </div>
+      </div>
+      )}
 
+      {/* ───────────── 任务依赖 + 评论 ───────────── */}
+      {(!task || tab === 'info') && (
+      <div className="space-y-4">
         {task?.id && (
           <div className="border-t border-gray-100 pt-3 mt-3">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -533,44 +539,6 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
           </div>
         </div>
 
-        <div className="flex justify-between gap-2 border-t pt-3">
-          <div className="flex gap-2">
-            {task && form.status === '未开始' && (
-              <button onClick={() => handleStatusAction('进行中')} disabled={statusSaving}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm">
-                {statusSaving ? '...' : '▶ 开始任务'}
-              </button>
-            )}
-            {task && form.status === '进行中' && (
-              <>
-                <button onClick={() => handleStatusAction('挂起')} disabled={statusSaving}
-                        className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 text-sm">
-                  {statusSaving ? '...' : '⏸ 暂停任务'}
-                </button>
-                <button onClick={() => handleStatusAction('已完成')} disabled={statusSaving}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm">
-                  {statusSaving ? '...' : '✓ 完成任务'}
-                </button>
-              </>
-            )}
-            {task && form.status === '挂起' && (
-              <button onClick={() => handleStatusAction('进行中')} disabled={statusSaving}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm">
-                {statusSaving ? '...' : '▶ 恢复任务'}
-              </button>
-            )}
-            {task && form.status === '已完成' && (
-              <button onClick={() => handleStatusAction('进行中')} disabled={statusSaving}
-                      className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 text-sm">
-                {statusSaving ? '...' : '↩ 退回'}
-              </button>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-            <button onClick={handleSave} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">保存</button>
-          </div>
-        </div>
       </div>
       )}
       {task && tab === 'logs' && (
@@ -610,6 +578,46 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
           )}
         </div>
       )}
+
+      {/* 常驻底部：状态动作 + 取消/保存，切到任意 TAB 都可见 */}
+      <div className="flex justify-between gap-2 border-t pt-3 mt-3">
+        <div className="flex gap-2">
+          {task && form.status === '未开始' && (
+            <button onClick={() => handleStatusAction('进行中')} disabled={statusSaving}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm">
+              {statusSaving ? '...' : '▶ 开始任务'}
+            </button>
+          )}
+          {task && form.status === '进行中' && (
+            <>
+              <button onClick={() => handleStatusAction('挂起')} disabled={statusSaving}
+                      className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 text-sm">
+                {statusSaving ? '...' : '⏸ 暂停任务'}
+              </button>
+              <button onClick={() => handleStatusAction('已完成')} disabled={statusSaving}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm">
+                {statusSaving ? '...' : '✓ 完成任务'}
+              </button>
+            </>
+          )}
+          {task && form.status === '挂起' && (
+            <button onClick={() => handleStatusAction('进行中')} disabled={statusSaving}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm">
+              {statusSaving ? '...' : '▶ 恢复任务'}
+            </button>
+          )}
+          {task && form.status === '已完成' && (
+            <button onClick={() => handleStatusAction('进行中')} disabled={statusSaving}
+                    className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 text-sm">
+              {statusSaving ? '...' : '↩ 退回'}
+            </button>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
+          <button onClick={handleSave} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">保存</button>
+        </div>
+      </div>
 
       {detailEntityId && detailEntityType === 'config_item' && (
         <ConfigurationDetailModal itemId={detailEntityId} onClose={() => { setDetailEntityId(null); setDetailEntityType(null); }} />
