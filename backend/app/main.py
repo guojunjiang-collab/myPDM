@@ -600,6 +600,24 @@ async def startup_event():
     finally:
         db.close()
 
+    # 独立迁移块：bom_items 旧字段去除 NOT NULL 约束（幂等，使用独立 session）。
+    # 必须独立于上面的大 try——旧库中 parts/assemblies 表已被删除，会导致大 try 提前抛错
+    # 而跳过后续所有迁移。新的零部件 BOM 模型只写 *_revision_id，旧列
+    # parent_type/parent_id/child_type/child_id 保留兼容但必须可空，否则插入新 BOM 子项报 500。
+    try:
+        _db2 = SessionLocal()
+        for _legacy_col in ("parent_type", "parent_id", "child_type", "child_id"):
+            _db2.execute(text(f"ALTER TABLE bom_items ALTER COLUMN {_legacy_col} DROP NOT NULL"))
+        _db2.commit()
+        print("✓ Dropped NOT NULL on legacy bom_items columns")
+    except Exception as _be:
+        print(f"⚠ bom_items NOT NULL drop skipped: {_be}")
+    finally:
+        try:
+            _db2.close()
+        except Exception:
+            pass
+
 @app.get("/")
 async def root():
     return {"message": "BOM管理系统API服务运行中"}

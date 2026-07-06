@@ -68,6 +68,11 @@ BEGIN
         ALTER TABLE bom_items ADD COLUMN IF NOT EXISTS parent_revision_id UUID;
         ALTER TABLE bom_items ADD COLUMN IF NOT EXISTS child_revision_id UUID;
         ALTER TABLE bom_items ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+        -- 旧列保留兼容但去除 NOT NULL，否则新模型（仅写 *_revision_id）插入会报 500
+        ALTER TABLE bom_items ALTER COLUMN parent_type DROP NOT NULL;
+        ALTER TABLE bom_items ALTER COLUMN parent_id DROP NOT NULL;
+        ALTER TABLE bom_items ALTER COLUMN child_type DROP NOT NULL;
+        ALTER TABLE bom_items ALTER COLUMN child_id DROP NOT NULL;
     END IF;
 END $$;
 

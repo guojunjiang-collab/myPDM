@@ -623,14 +623,20 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
         onClose={() => setBomPickerOpen(false)}
         onConfirm={async (items) => {
           if (!revisionId) return;
+          let failed = 0;
           for (const item of items) {
             try {
               await partsApi.addBOMItem(revisionId, { child_revision_id: item.child_id, quantity: item.quantity || 1 });
-            } catch (e) { console.error(e); }
+            } catch (e: any) {
+              failed++;
+              console.error(e);
+              toast.error(e?.response?.data?.detail || '添加子项失败');
+            }
           }
           setBomPickerOpen(false);
           loadTabs();
           setHasBomChildren(true);
+          if (failed === 0) toast.success(`已添加 ${items.length} 个子项`);
         }}
         currentAssemblyId={revisionId}
         dataMode="parts"

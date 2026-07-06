@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useDataStore } from '../stores/data';
 import { componentsApi, bomApi, partsApi } from '../services/api';
 import { Modal } from './Modal';
+import { toast } from './Toast';
 import type { Component } from '../types';
 
 /* ----------------------------------------------------------------
@@ -96,7 +97,7 @@ export default function AssemblyPartPicker({
 
     if (dataMode === 'parts') {
       setLoading(true);
-      partsApi.list({ page_size: 10000, show_all_versions: true })
+      partsApi.list({ page_size: 200, show_all_versions: true })
         .then((r: any) => {
           const items = r.items || r || [];
           const transformed = items.map((p: any) => ({
@@ -375,13 +376,27 @@ export default function AssemblyPartPicker({
                   if (!quickForm.code.trim() || !quickForm.name.trim()) return;
                   setQuickCreating(true);
                   try {
-                    const r = await componentsApi.create({ code: quickForm.code.trim(), name: quickForm.name.trim(), spec: quickForm.spec || undefined, remark: quickForm.remark || undefined });
-                    const newItem: SelectedItem = { id: r.data.id, code: r.data.code, name: r.data.name, version: r.data.version || '-', status: r.data.status || 'draft', type: 'component', quantity: 1 };
-                    setSelected(prev => new Map(prev).set(newItem.id, newItem));
-                    const candidate: CandidateItem = { id: newItem.id, code: newItem.code, name: newItem.name, version: newItem.version, status: newItem.status, type: 'component' };
-                    setFetchedComponents(prev => [...prev, candidate as any]);
+                    if (dataMode === 'parts') {
+                      const created = await partsApi.create({ code: quickForm.code.trim(), name: quickForm.name.trim(), spec: quickForm.spec || undefined });
+                      const revId = created.latest_revision?.id;
+                      if (!revId) throw new Error('创建的零部件缺少版本信息');
+                      const version = created.latest_revision?.version || '-';
+                      const status = created.latest_revision?.status || 'draft';
+                      const newItem: SelectedItem = { id: revId, code: created.code, name: created.name, version, status, type: 'part', quantity: 1 };
+                      setSelected(prev => new Map(prev).set(newItem.id, newItem));
+                      const candidate: CandidateItem = { id: revId, code: created.code, name: created.name, spec: created.spec, version, status, type: 'part' };
+                      setFetchedParts(prev => [...prev, candidate as any]);
+                    } else {
+                      const r = await componentsApi.create({ code: quickForm.code.trim(), name: quickForm.name.trim(), spec: quickForm.spec || undefined, remark: quickForm.remark || undefined });
+                      const newItem: SelectedItem = { id: r.data.id, code: r.data.code, name: r.data.name, version: r.data.version || '-', status: r.data.status || 'draft', type: 'component', quantity: 1 };
+                      setSelected(prev => new Map(prev).set(newItem.id, newItem));
+                      const candidate: CandidateItem = { id: newItem.id, code: newItem.code, name: newItem.name, version: newItem.version, status: newItem.status, type: 'component' };
+                      setFetchedComponents(prev => [...prev, candidate as any]);
+                    }
                     setQuickForm({ code: '', name: '', spec: '', remark: '' });
-                  } catch { } finally { setQuickCreating(false); }
+                  } catch (e: any) {
+                    toast.error(e?.response?.data?.detail || e?.message || '创建失败');
+                  } finally { setQuickCreating(false); }
                 }} disabled={quickCreating} className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 whitespace-nowrap">
                   {quickCreating ? '创建中...' : '新建并添加'}
                 </button>
