@@ -7,7 +7,7 @@ from app.database import get_db
 from app.models import User
 from app import crud_project, crud
 from app.schemas_project import (
-    ProjectCreate, ProjectEdit, MemberAdd,
+    ProjectCreate, ProjectEdit, MemberAdd, MemberRoleUpdate,
     TaskCreate, TaskEdit, TaskStatusUpdate, TaskMove, TaskReorder, TaskLinkAdd, CommentAdd, DepCreate,
 )
 from ..permissions import require_permission, enforce_object_policy
@@ -35,6 +35,25 @@ ACTION_COLOR_MAP = {
 def _require_member(db, project_id, user):
     if user.role != "admin" and not crud_project.is_member(db, project_id, user.id):
         raise HTTPException(status_code=403, detail="非项目成员")
+
+
+def _project_manager_ids(db, project) -> set:
+    """项目管理者集合 = owner + 角色为"经理"的成员。"""
+    ids = {project.owner_id}
+    for m in crud_project.list_members(db, project.id):
+        if m.role_in_project == "经理":
+            ids.add(m.user_id)
+    return ids
+
+
+def _enforce_manager(db, user, project):
+    """项目级管理者门禁:admin / owner / 经理成员。"""
+    enforce_object_policy("project_manager_or_admin", user, project,
+                          manager_ids=_project_manager_ids(db, project))
+
+
+def _is_manager(db, user, project) -> bool:
+    return user.role == "admin" or user.id in _project_manager_ids(db, project)
 
 
 # ──────────── 项目 ────────────
@@ -68,7 +87,7 @@ async def update_project(project_id: uuid.UUID, data: ProjectEdit, db: Session =
                          current_user: User = Depends(require_permission("project:update")),
                          request: Request = None):
     p = crud_project.get_project(db, project_id)
-    enforce_object_policy("project_manager_or_admin", current_user, p)
+    _enforce_manager(db, current_user, p)
     changed = data.model_dump(exclude_unset=True, exclude_none=True)
     def _norm(v):
         if v == '' or v is None:
@@ -84,7 +103,9 @@ async def update_project(project_id: uuid.UUID, data: ProjectEdit, db: Session =
             label = PROJECT_FIELD_LABELS.get(k, k)
             parts.append(f"{label}：{old_val or '-'}->{new_val or '-'}")
     detail = '; '.join(parts) if parts else None
-    crud.create_log(db, current_user.id, current_user.username, "更新项目", "project", str(project_id), detail, ip)
+    # 无实际字段变更（如甘特图同步项目日期时的空操作）不记日志，避免空详情记录
+    if detail:
+        crud.create_log(db, current_user.id, current_user.username, "更新项目", "project", str(project_id), detail, ip)
     return result
 
 
@@ -93,7 +114,7 @@ async def delete_project(project_id: uuid.UUID, db: Session = Depends(get_db),
                          current_user: User = Depends(require_permission("project:delete")),
                          request: Request = None):
     p = crud_project.get_project(db, project_id)
-    enforce_object_policy("project_manager_or_admin", current_user, p)
+    _enforce_manager(db, current_user, p)
     ip = request.client.host if request and request.client else None
     crud.create_log(db, current_user.id, current_user.username, "删除项目", "project", str(project_id), f"名称:{p.name}", ip)
     crud_project.delete_project(db, p)
@@ -114,7 +135,7 @@ async def add_member(project_id: uuid.UUID, data: MemberAdd, db: Session = Depen
                      current_user: User = Depends(require_permission("project.member:manage")),
                      request: Request = None):
     p = crud_project.get_project(db, project_id)
-    enforce_object_policy("project_manager_or_admin", current_user, p)
+    _enforce_manager(db, current_user, p)
     result = _member_dict(db, crud_project.add_member(db, project_id, data))
     ip = request.client.host if request and request.client else None
     added_user = crud.get_user(db, data.user_id)
@@ -128,7 +149,7 @@ async def remove_member(project_id: uuid.UUID, user_id: uuid.UUID, db: Session =
                         current_user: User = Depends(require_permission("project.member:manage")),
                         request: Request = None):
     p = crud_project.get_project(db, project_id)
-    enforce_object_policy("project_manager_or_admin", current_user, p)
+    _enforce_manager(db, current_user, p)
     if user_id == p.owner_id:
         raise HTTPException(status_code=400, detail="不能移除项目负责人")
     removed_user = crud.get_user(db, user_id)
@@ -137,6 +158,25 @@ async def remove_member(project_id: uuid.UUID, user_id: uuid.UUID, db: Session =
     ip = request.client.host if request and request.client else None
     crud.create_log(db, current_user.id, current_user.username, "移除成员", "project", str(project_id), f"成员:{removed_name}", ip)
     return {"detail": "已移除"}
+
+
+@router.patch("/{project_id}/members/{user_id}")
+async def update_member_role(project_id: uuid.UUID, user_id: uuid.UUID, data: MemberRoleUpdate,
+                             db: Session = Depends(get_db),
+                             current_user: User = Depends(require_permission("project.member:manage")),
+                             request: Request = None):
+    p = crud_project.get_project(db, project_id)
+    _enforce_manager(db, current_user, p)
+    # owner 恒为管理者（经理），其成员角色不允许下调，避免出现"项目负责人却非经理"的歧义
+    if user_id == p.owner_id and data.role_in_project != "经理":
+        raise HTTPException(status_code=400, detail="项目负责人角色不可修改")
+    m = crud_project.set_member_role(db, project_id, user_id, data.role_in_project)
+    ip = request.client.host if request and request.client else None
+    changed_user = crud.get_user(db, user_id)
+    changed_name = changed_user.real_name or changed_user.username if changed_user else str(user_id)
+    crud.create_log(db, current_user.id, current_user.username, "调整成员角色", "project", str(project_id),
+                    f"成员:{changed_name} → {data.role_in_project}", ip)
+    return _member_dict(db, m)
 
 
 # ──────────── 任务 ────────────
@@ -153,7 +193,7 @@ async def create_task(project_id: uuid.UUID, data: TaskCreate, db: Session = Dep
                       current_user: User = Depends(require_permission("project.task:create")),
                       request: Request = None):
     p = crud_project.get_project(db, project_id)
-    enforce_object_policy("project_manager_or_admin", current_user, p)
+    _enforce_manager(db, current_user, p)
     t = crud_project.create_task(db, p, data)
     ip = request.client.host if request and request.client else None
     crud.create_log(db, current_user.id, current_user.username, "创建任务", "project_task", str(t.id), f"名称:{t.name}", ip)
@@ -166,7 +206,7 @@ async def update_task(project_id: uuid.UUID, task_id: uuid.UUID, data: TaskEdit,
                       current_user: User = Depends(require_permission("project.task:update")),
                       request: Request = None):
     p = crud_project.get_project(db, project_id)
-    enforce_object_policy("project_manager_or_admin", current_user, p)
+    _enforce_manager(db, current_user, p)
     t = crud_project.get_active_task(db, task_id, project_id)
     changed = data.model_dump(exclude_unset=True, exclude_none=True)
     def _norm(v):
@@ -175,8 +215,10 @@ async def update_task(project_id: uuid.UUID, task_id: uuid.UUID, data: TaskEdit,
         return str(v)
     # 必须在 update_task 之前读旧值，update 后 SQLAlchemy 对象已被修改
     old_vals = {k: getattr(t, k, None) for k in changed}
-    result = _task_dict(db, crud_project.update_task(db, t, data))
     ip = request.client.host if request and request.client else None
+    # 传入 actor：级联改期的后置任务由 auto_schedule 单独写操作记录
+    actor = {"user_id": current_user.id, "username": current_user.username, "ip": ip}
+    result = _task_dict(db, crud_project.update_task(db, t, data, actor=actor))
     parts = []
     for k, new_val in changed.items():
         old_val = old_vals[k]
@@ -184,7 +226,9 @@ async def update_task(project_id: uuid.UUID, task_id: uuid.UUID, data: TaskEdit,
             label = TASK_FIELD_LABELS.get(k, k)
             parts.append(f"{label}：{old_val or '-'}->{new_val or '-'}")
     detail = '; '.join(parts) if parts else None
-    crud.create_log(db, current_user.id, current_user.username, "更新任务", "project_task", str(task_id), detail, ip)
+    # 无实际字段变更不记日志，避免空详情记录
+    if detail:
+        crud.create_log(db, current_user.id, current_user.username, "更新任务", "project_task", str(task_id), detail, ip)
     return result
 
 
@@ -195,7 +239,7 @@ async def update_task_status(project_id: uuid.UUID, task_id: uuid.UUID, data: Ta
                              request: Request = None):
     p = crud_project.get_project(db, project_id)
     t = crud_project.get_active_task(db, task_id, project_id)
-    is_mgr = current_user.role == "admin" or p.owner_id == current_user.id
+    is_mgr = _is_manager(db, current_user, p)
     if not is_mgr and t.assignee_id != current_user.id:
         raise HTTPException(status_code=403, detail="仅项目经理或任务负责人可更新状态")
     if not is_mgr:
@@ -206,11 +250,22 @@ async def update_task_status(project_id: uuid.UUID, task_id: uuid.UUID, data: Ta
     return result
 
 
+@router.get("/{project_id}/tasks/{task_id}/logs")
+async def list_task_logs(project_id: uuid.UUID, task_id: uuid.UUID, db: Session = Depends(get_db),
+                         current_user: User = Depends(require_permission("project:read"))):
+    # 任务操作记录:走项目成员门禁,项目成员即可查看(通用 /logs 是 admin-only,非管理员看不到)
+    crud_project.get_project(db, project_id)
+    _require_member(db, project_id, current_user)
+    crud_project.get_active_task(db, task_id, project_id)  # 校验任务属于本项目,防跨项目越权
+    items, total = crud.get_logs(db, limit=200, target_type="project_task", target_id=str(task_id))
+    return {"items": items, "total": total}
+
+
 @router.post("/{project_id}/tasks/{task_id}/move")
 async def move_task(project_id: uuid.UUID, task_id: uuid.UUID, data: TaskMove, db: Session = Depends(get_db),
                     current_user: User = Depends(require_permission("project.task:update"))):
     p = crud_project.get_project(db, project_id)
-    enforce_object_policy("project_manager_or_admin", current_user, p)
+    _enforce_manager(db, current_user, p)
     t = crud_project.get_active_task(db, task_id, project_id)
     return _task_dict(db, crud_project.move_task(db, t, data))
 
@@ -219,7 +274,7 @@ async def move_task(project_id: uuid.UUID, task_id: uuid.UUID, data: TaskMove, d
 async def reorder_tasks(project_id: uuid.UUID, data: TaskReorder, db: Session = Depends(get_db),
                         current_user: User = Depends(require_permission("project.task:update"))):
     p = crud_project.get_project(db, project_id)
-    enforce_object_policy("project_manager_or_admin", current_user, p)
+    _enforce_manager(db, current_user, p)
     return crud_project.reorder_task(db, project_id, data)
 
 
@@ -228,7 +283,7 @@ async def delete_task(project_id: uuid.UUID, task_id: uuid.UUID, db: Session = D
                       current_user: User = Depends(require_permission("project.task:delete")),
                       request: Request = None):
     p = crud_project.get_project(db, project_id)
-    enforce_object_policy("project_manager_or_admin", current_user, p)
+    _enforce_manager(db, current_user, p)
     t = crud_project.get_active_task(db, task_id, project_id)
     ip = request.client.host if request and request.client else None
     crud.create_log(db, current_user.id, current_user.username, "删除任务", "project_task", str(t.id), f"任务:{t.code} {t.name}", ip)
@@ -298,7 +353,7 @@ async def delete_comment(project_id: uuid.UUID, task_id: uuid.UUID, comment_id: 
     c = crud_project.get_comment(db, comment_id)
     if c.task_id != task_id:
         raise HTTPException(status_code=404, detail="评论不存在")
-    is_mgr = current_user.role == "admin" or p.owner_id == current_user.id
+    is_mgr = _is_manager(db, current_user, p)
     if not is_mgr and c.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="只能删除本人评论")
     crud_project.delete_comment(db, c)
@@ -316,10 +371,13 @@ async def get_gantt(project_id: uuid.UUID, db: Session = Depends(get_db),
 
 @router.post("/{project_id}/auto-schedule")
 async def run_auto_schedule(project_id: uuid.UUID, db: Session = Depends(get_db),
-                            current_user: User = Depends(require_permission("project.task:depend"))):
+                            current_user: User = Depends(require_permission("project.task:depend")),
+                            request: Request = None):
     p = crud_project.get_project(db, project_id)
-    enforce_object_policy("project_manager_or_admin", current_user, p)
-    crud_project.auto_schedule(db, project_id)
+    _enforce_manager(db, current_user, p)
+    ip = request.client.host if request and request.client else None
+    actor = {"user_id": current_user.id, "username": current_user.username, "ip": ip}
+    crud_project.auto_schedule(db, project_id, actor=actor)
     crud_project.persist_rollup(db, project_id)
     return crud_project.get_gantt_data(db, project_id)
 
@@ -342,10 +400,13 @@ async def list_deps(project_id: uuid.UUID, db: Session = Depends(get_db),
 
 @router.post("/{project_id}/deps")
 async def add_dep(project_id: uuid.UUID, data: DepCreate, db: Session = Depends(get_db),
-                  current_user: User = Depends(require_permission("project.task:depend"))):
+                  current_user: User = Depends(require_permission("project.task:depend")),
+                  request: Request = None):
     p = crud_project.get_project(db, project_id)
-    enforce_object_policy("project_manager_or_admin", current_user, p)
-    d = crud_project.add_dep(db, project_id, data)
+    _enforce_manager(db, current_user, p)
+    ip = request.client.host if request and request.client else None
+    actor = {"user_id": current_user.id, "username": current_user.username, "ip": ip}
+    d = crud_project.add_dep(db, project_id, data, actor=actor)
     return {"id": str(d.id), "predecessor_id": str(d.predecessor_id),
             "successor_id": str(d.successor_id), "dep_type": d.dep_type, "lag_days": d.lag_days}
 
@@ -354,7 +415,7 @@ async def add_dep(project_id: uuid.UUID, data: DepCreate, db: Session = Depends(
 async def remove_dep(project_id: uuid.UUID, dep_id: uuid.UUID, db: Session = Depends(get_db),
                      current_user: User = Depends(require_permission("project.task:depend"))):
     p = crud_project.get_project(db, project_id)
-    enforce_object_policy("project_manager_or_admin", current_user, p)
+    _enforce_manager(db, current_user, p)
     crud_project.remove_dep(db, project_id, dep_id)
     return {"detail": "已删除"}
 
@@ -366,6 +427,7 @@ def _project_brief(db, p):
     return {"id": str(p.id), "code": p.code, "name": p.name, "status": p.status,
             "owner_id": str(p.owner_id), "owner_name": owner.real_name if owner else "",
             "planned_start": p.planned_start, "planned_end": p.planned_end,
+            "description": p.description,
             "member_count": member_count, "created_at": p.created_at}
 
 

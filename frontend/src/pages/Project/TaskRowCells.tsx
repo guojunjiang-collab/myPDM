@@ -95,7 +95,7 @@ export function TaskAssigneeCell({ assigneeName, onClick, variant }: AssigneeCel
   return (
     <span
       className={variant === 'gantt'
-        ? `px-1 shrink-0 truncate text-xs text-gray-500 text-center${onClick ? ' cursor-pointer' : ''}`
+        ? `px-1 shrink-0 truncate text-sm text-center${onClick ? ' cursor-pointer' : ''}`
         : 'text-sm'}
       style={variant === 'gantt' ? { width: ASSIGNEE_W } : undefined}
       title={assigneeName || undefined}

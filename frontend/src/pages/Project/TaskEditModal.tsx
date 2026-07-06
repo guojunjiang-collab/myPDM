@@ -26,6 +26,8 @@ interface Props {
   parentId: string | null;
   onClose: () => void;
   onSaved: () => void;
+  /** 刷新父级数据但不关闭弹窗（状态动作按钮用）。当前弹窗暂未使用，接受以兼容新版 Projects 调用。 */
+  onRefresh?: () => void;
 }
 
 const TYPES: TaskType[] = ['任务', '里程碑', '评审'];
@@ -49,7 +51,7 @@ const LINK_COLOR: Record<string, string> = {
   document: 'bg-blue-50 text-blue-700',
 };
 
-export default function TaskEditModal({ open, projectId, task, parentId, onClose, onSaved }: Props) {
+export default function TaskEditModal({ open, projectId, task, parentId, onClose, onSaved, onRefresh }: Props) {
   const empty = { name: '', task_type: '任务' as TaskType, assignee_id: '', status: '未开始' as TaskStatus,
     priority: '中' as TaskPriority, planned_start: '', planned_end: '', actual_start: '', actual_end: '', description: '' };
   const [form, setForm] = useState(empty);
@@ -171,6 +173,8 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
         actual_start: payload.actual_start ?? form.actual_start,
         actual_end: payload.actual_end !== undefined ? (payload.actual_end ?? '') : form.actual_end,
       });
+      // 刷新父级（甘特/计划表）但不关闭弹窗，便于连续操作
+      onRefresh?.();
     } catch (err: any) {
       alert(err?.response?.data?.detail || '操作失败');
     } finally {

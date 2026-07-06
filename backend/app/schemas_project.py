@@ -33,6 +33,10 @@ class MemberAdd(BaseSchema):
     role_in_project: Literal["经理", "成员"] = "成员"
 
 
+class MemberRoleUpdate(BaseSchema):
+    role_in_project: Literal["经理", "成员"]
+
+
 # ---- 任务 ----
 class TaskCreate(BaseSchema):
     name: str = Field(..., max_length=255)

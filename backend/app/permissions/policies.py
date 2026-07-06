@@ -59,8 +59,14 @@ def _dashboard_folder_editor(user, folder, **_) -> bool:
 
 
 @register_policy("project_manager_or_admin")
-def _project_manager_or_admin(user, project, **_) -> bool:
-    return _is_admin(user) or getattr(project, "owner_id", None) == user.id
+def _project_manager_or_admin(user, project, *, manager_ids=None, **_) -> bool:
+    # 项目管理者 = admin / owner / 角色为"经理"的成员。
+    # manager_ids 由 router 传入（owner + 经理成员），未传时退回仅 owner 判定（向后兼容）。
+    if _is_admin(user):
+        return True
+    if manager_ids is not None:
+        return user.id in manager_ids
+    return getattr(project, "owner_id", None) == user.id
 
 
 @register_policy("document_content_access")
