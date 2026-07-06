@@ -102,7 +102,6 @@ def list_part_masters(
     query = (
         db.query(models_parts.PartMaster)
         .filter(models_parts.PartMaster.deleted_at.is_(None))
-        .options(joinedload(models_parts.PartMaster.revisions))
     )
     if search:
         query = query.filter(

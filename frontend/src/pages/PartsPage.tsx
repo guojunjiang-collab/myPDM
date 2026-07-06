@@ -6,6 +6,7 @@ import type { PartListItem, PartMaster, PartRevision, PartIteration, PartStatus,
 import { Loading } from '../components/Loading';
 import { toast } from '../components/Toast';
 import { Modal } from '../components/Modal';
+import EntityDocumentSection from '../components/EntityDocumentSection';
 import { useTableSort } from '../hooks/useTableSort';
 
 const STATUS_LABELS: Record<PartStatus, string> = {
@@ -182,7 +183,7 @@ function PartList() {
               <th onClick={() => handleSort('version' as keyof PartListItem)} className="w-16 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
                 版本 {getSortIcon('version' as keyof PartListItem)}
               </th>
-              <th onClick={() => handleSort('type' as keyof PartListItem)} className="w-16 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+              <th onClick={() => handleSort('type' as keyof PartListItem)} className="w-20 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
                 类型 {getSortIcon('type' as keyof PartListItem)}
               </th>
               <th onClick={() => handleSort('status' as keyof PartListItem)} className="w-20 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
@@ -211,7 +212,7 @@ function PartList() {
               </tr>
             ) : (
               sortedData.map((item) => (
-                <tr key={item.revision_id} className="hover:bg-gray-50">
+                <tr key={item.revision_id} className="hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/parts/${item.master_id}?revision=${item.revision_id}`)}>
                   <td className="px-4 py-3 text-sm font-medium">
                     {item.code}
                     {!showAllVersions && (versionCountMap[item.code] || 0) > 1 && (
@@ -239,12 +240,6 @@ function PartList() {
                     ) : <span className="text-gray-400">—</span>}
                   </td>
                   <td className="px-4 py-3 text-right text-sm" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => navigate(`/parts/${item.master_id}?revision=${item.revision_id}`)}
-                      className="text-primary-600 hover:text-primary-800 mr-3"
-                    >
-                      详情
-                    </button>
                     {showCheckoutButton(item) && (
                       <button
                         onClick={() => handleCheckout(item.revision_id)}
@@ -541,16 +536,14 @@ function PartDetailPanel({ masterId }: { masterId: string }) {
             </div>
           )}
 
-          {activeTab === 'docs' && currentDisplay && (
-            <div>
-              {(currentDisplay.document_links || []).length === 0 ? (
-                <div className="text-gray-400 text-sm">无关联文档</div>
-              ) : (
-                (currentDisplay.document_links || []).map((doc: any, idx: number) => (
-                  <div key={idx} className="text-sm py-1">{doc.document_id} {doc.category && `[${doc.category}]`}</div>
-                ))
-              )}
-            </div>
+          {activeTab === 'docs' && revisionId && (
+            <EntityDocumentSection
+              entityType="part"
+              entityId={revisionId}
+              editable={isCheckedOutByMe && isDraft}
+              entityCode={master?.code}
+              entityName={master?.name}
+            />
           )}
 
           {activeTab === 'attachments' && (

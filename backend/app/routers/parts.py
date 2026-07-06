@@ -1,7 +1,9 @@
 """零部件签入检出 API 路由"""
 from __future__ import annotations
+import uuid as _uuid
+from datetime import datetime, timezone
 from typing import Optional
-from uuid import UUID
+from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -456,3 +458,133 @@ def _build_revision_response(db: Session, revision, iteration) -> dict:
             "created_at": iteration.created_at.isoformat() if iteration.created_at else None,
         }
     return resp
+
+
+# ===== 关联图文档 =====
+
+def _get_doc_iteration(db: Session, revision_id: UUID):
+    result = crud_parts.get_part_revision_with_current_iteration(db, revision_id)
+    if not result:
+        raise HTTPException(404, "版本不存在")
+    revision, iteration = result
+    if not iteration:
+        raise HTTPException(400, "当前迭代不存在")
+    return revision, iteration
+
+
+def _list_docs(db: Session, revision_id: UUID):
+    _, iteration = _get_doc_iteration(db, revision_id)
+    docs = []
+    for link in (iteration.document_links or []):
+        doc_id = link.get("document_id")
+        if not doc_id:
+            continue
+        try:
+            doc_uuid = _uuid.UUID(str(doc_id))
+        except (ValueError, AttributeError):
+            continue
+        from ..models import Document as DocModel
+        doc = db.query(DocModel).filter(DocModel.id == doc_uuid).first()
+        docs.append({
+            "id": link.get("id", str(uuid4())),
+            "document_id": str(doc_id),
+            "category": link.get("category"),
+            "sort_order": link.get("sort_order", 0),
+            "created_at": link.get("created_at"),
+            "document": {
+                "id": str(doc.id) if doc else str(doc_id),
+                "code": doc.code if doc else "未知",
+                "name": doc.name if doc else "未知文档",
+                "version": doc.version if doc else "",
+                "status": doc.status if doc else "draft",
+                "file_id": str(doc.file_id) if doc and doc.file_id else None,
+                "file_name": doc.file_name if doc else None,
+            } if doc else None,
+        })
+    return docs
+
+
+def _add_doc(db: Session, revision_id: UUID, data: dict):
+    _, iteration = _get_doc_iteration(db, revision_id)
+    links = list(iteration.document_links or [])
+    new_link = {
+        "id": str(uuid4()),
+        "document_id": data.get("document_id"),
+        "category": data.get("category"),
+        "sort_order": data.get("sort_order", 0),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    links.append(new_link)
+    iteration.document_links = links
+    db.commit()
+    return new_link
+
+
+def _update_doc(db: Session, revision_id: UUID, link_id: str, data: dict):
+    _, iteration = _get_doc_iteration(db, revision_id)
+    links = list(iteration.document_links or [])
+    for link in links:
+        if link.get("id") == link_id:
+            if "category" in data:
+                link["category"] = data["category"]
+            if "sort_order" in data:
+                link["sort_order"] = data["sort_order"]
+            iteration.document_links = links
+            db.commit()
+            return link
+    raise HTTPException(404, "关联文档不存在")
+
+
+def _remove_doc(db: Session, revision_id: UUID, link_id: str):
+    _, iteration = _get_doc_iteration(db, revision_id)
+    links = list(iteration.document_links or [])
+    new_links = [l for l in links if l.get("id") != link_id]
+    if len(new_links) == len(links):
+        raise HTTPException(404, "关联文档不存在")
+    iteration.document_links = new_links
+    db.commit()
+    return {"detail": "已移除"}
+
+
+# EntityDocumentSection 调用路径: /parts/{id}/documents
+@router.get("/{revision_id}/documents")
+def list_docs_alt(revision_id: UUID, db: Session = Depends(get_db),
+                  current_user: User = Depends(require_permission("components.doc:read"))):
+    return _list_docs(db, revision_id)
+
+@router.post("/{revision_id}/documents")
+def add_doc_alt(revision_id: UUID, data: dict, db: Session = Depends(get_db),
+                current_user: User = Depends(require_permission("components.doc:link"))):
+    return _add_doc(db, revision_id, data)
+
+@router.put("/{revision_id}/documents/{link_id}")
+def update_doc_alt(revision_id: UUID, link_id: str, data: dict, db: Session = Depends(get_db),
+                   current_user: User = Depends(require_permission("components.doc:link"))):
+    return _update_doc(db, revision_id, link_id, data)
+
+@router.delete("/{revision_id}/documents/{link_id}")
+def remove_doc_alt(revision_id: UUID, link_id: str, db: Session = Depends(get_db),
+                   current_user: User = Depends(require_permission("components.doc:unlink"))):
+    return _remove_doc(db, revision_id, link_id)
+
+
+# 旧路径: /parts/revisions/{id}/documents（兼容）
+@router.get("/revisions/{revision_id}/documents")
+def list_docs(revision_id: UUID, db: Session = Depends(get_db),
+              current_user: User = Depends(require_permission("components.doc:read"))):
+    return _list_docs(db, revision_id)
+
+@router.post("/revisions/{revision_id}/documents")
+def add_doc(revision_id: UUID, data: dict, db: Session = Depends(get_db),
+            current_user: User = Depends(require_permission("components.doc:link"))):
+    return _add_doc(db, revision_id, data)
+
+@router.put("/revisions/{revision_id}/documents/{link_id}")
+def update_doc(revision_id: UUID, link_id: str, data: dict, db: Session = Depends(get_db),
+               current_user: User = Depends(require_permission("components.doc:link"))):
+    return _update_doc(db, revision_id, link_id, data)
+
+@router.delete("/revisions/{revision_id}/documents/{link_id}")
+def remove_doc(revision_id: UUID, link_id: str, db: Session = Depends(get_db),
+               current_user: User = Depends(require_permission("components.doc:unlink"))):
+    return _remove_doc(db, revision_id, link_id)
