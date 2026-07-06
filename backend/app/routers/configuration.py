@@ -13,7 +13,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.database import get_db
 from app.models import Document
-from app.models_parts import PartMaster
+from app.models_parts import PartMaster, PartRevision
 from app import models_configuration as models
 from app import schemas_configuration as schemas
 from app import schemas as core_schemas
@@ -120,14 +120,28 @@ async def get_config_item(
     parts_data = []
     for p in crud.get_config_parts(db, config_id):
         entity = db.query(PartMaster).filter(PartMaster.id == p.part_id).first()
-        parts_data.append({
-            "id": str(p.id), "part_type": p.part_type, "part_id": str(p.part_id),
-            "is_required": p.is_required, "quantity": p.quantity, "sort_order": p.sort_order,
-            "part_detail": {
-                "id": str(entity.id), "code": entity.code, "name": entity.name,
-                "version": entity.version, "spec": entity.spec or "", "status": entity.status,
-            } if entity else {},
-        })
+        if entity:
+            rev = db.query(PartRevision).filter(
+                PartRevision.master_id == entity.id,
+                PartRevision.deleted_at.is_(None)
+            ).order_by(PartRevision.created_at.desc()).first()
+            parts_data.append({
+                "id": str(p.id), "part_type": p.part_type, "part_id": str(p.part_id),
+                "is_required": p.is_required, "quantity": p.quantity, "sort_order": p.sort_order,
+                "part_detail": {
+                    "id": str(entity.id), "code": entity.code, "name": entity.name,
+                    "version": rev.version if rev else "",
+                    "revision_id": str(rev.id) if rev else "",
+                    "spec": entity.spec or "",
+                    "status": rev.status if rev else "draft",
+                },
+            })
+        else:
+            parts_data.append({
+                "id": str(p.id), "part_type": p.part_type, "part_id": str(p.part_id),
+                "is_required": p.is_required, "quantity": p.quantity, "sort_order": p.sort_order,
+                "part_detail": {},
+            })
 
     # 子构型项
     children_data = []
@@ -888,7 +902,6 @@ def _format_profile_item(item, entity_map: dict = None) -> dict:
 
 def _build_entity_map(db: Session, items: list) -> dict:
     """批量查找零部件版本和状态"""
-    from app.models_parts import PartMaster
     part_ids = []
     assembly_ids = []
     for item in items:

@@ -57,21 +57,27 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
       .finally(() => setLoading(false));
   }, [itemId]);
 
-  const togglePart = async (idx: string, entityId: string, entityType: string) => {
+  const togglePart = async (idx: string, entityId: string, revisionId: string) => {
     if (expandedParts[idx]) { setExpandedParts(p => { const n = { ...p }; delete n[idx]; return n; }); return; }
-    if (entityType !== 'assembly') return;
+    if (!revisionId) return;
     setLoadingPart(idx);
     try {
-      const r = await assemblyPartsApi.list(entityId);
-      const children = (r.data || []).map((c: any) => ({
-        entity_type: c.childType === 'component' || c.childType === 'assembly' ? 'assembly' : 'part',
-        entity_id: c.child_id,
-        entity_code: c.child_detail?.code || '',
-        entity_name: c.child_detail?.name || '',
-        entity_version: c.child_detail?.version || '',
-        spec: c.child_detail?.spec || '',
-        status: c.child_detail?.status || '',
+      const items = await partsApi.getBOM(revisionId);
+      const children = (items || []).map((c: any) => ({
+        entity_type: c.child_type || 'part',
+        entity_id: c.child_revision_id || '',
+        entity_code: c.child_code || '',
+        entity_name: c.child_name || '',
+        entity_version: c.child_version || '',
+        status: c.child_status || '',
         quantity: c.quantity || 1,
+        part_detail: {
+          id: c.child_master_id || '',
+          code: c.child_code || '',
+          name: c.child_name || '',
+          version: c.child_version || '',
+          status: c.child_status || '',
+        },
       }));
       setExpandedParts(p => ({ ...p, [idx]: children }));
     } catch { } finally { setLoadingPart(null); }
@@ -155,8 +161,8 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
         <tr key={idx} className={`hover:bg-gray-50 ${rowCls}`}>
           <td className="px-3 py-2 text-sm text-gray-400 whitespace-nowrap">
             <span>{'-'.repeat(level)}{level}</span>
-            {isAssembly && (
-              <button onClick={(e) => { e.stopPropagation(); togglePart(idx, entityId, entityType); }}
+            {entityId && (
+              <button onClick={(e) => { e.stopPropagation(); togglePart(idx, entityId, p.part_detail?.revision_id || ''); }}
                 className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
                 {childRows ? '▼' : '▶'}
               </button>
@@ -198,15 +204,18 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
     const name = p.part_detail?.name || p.entity_name || '-';
     const version = p.part_detail?.version || p.entity_version || '-';
     const status = p.part_detail?.status || p.status || '';
-    const onClickRow = entityId ? () => handleNestedView(entityType === 'assembly' ? 'assembly' : 'part', entityId) : undefined;
+    const onClickRow = p.part_detail?.id ? () => {
+      setPartDetailMasterId(p.part_detail?.id);
+      setPartDetailRevisionId(null);
+    } : undefined;
     const rowCls = onClickRow ? 'cursor-pointer' : '';
     return (
       <>
         <tr key={idx} className={`hover:bg-gray-50 ${rowCls}`}>
           <td className="px-3 py-2 text-sm text-gray-400 whitespace-nowrap">
             <span>{'-'.repeat(level)}</span>
-            {isAssembly && (
-              <button onClick={(e) => { e.stopPropagation(); togglePart(idx, entityId, entityType); }}
+            {entityId && (
+              <button onClick={(e) => { e.stopPropagation(); togglePart(idx, entityId, p.part_detail?.revision_id || ''); }}
                 className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
                 {childRows ? '▼' : '▶'}
               </button>

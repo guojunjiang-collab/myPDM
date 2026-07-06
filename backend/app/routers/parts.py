@@ -81,6 +81,16 @@ def delete_revision(
     rev = crud_parts.get_part_revision(db, revision_id)
     if not rev:
         raise HTTPException(404, "版本不存在")
+    # 检查是否为其他零部件的BOM子项
+    used_as_child = db.query(crud_parts.models.BOMItem).filter(
+        crud_parts.models.BOMItem.child_revision_id == revision_id,
+        crud_parts.models.BOMItem.deleted_at.is_(None),
+    ).first()
+    if used_as_child:
+        parent_rev = crud_parts.get_part_revision(db, used_as_child.parent_revision_id)
+        parent_master = crud_parts.get_part_master(db, parent_rev.master_id) if parent_rev else None
+        parent_info = f"{parent_master.code} {parent_master.name}" if parent_master else "其他零部件"
+        raise HTTPException(400, f"该零部件是「{parent_info}」的BOM子项，请先在父部件中移除此子项后再删除")
     rev.deleted_at = datetime.now(timezone.utc)
     db.commit()
     return {"detail": "已删除"}
