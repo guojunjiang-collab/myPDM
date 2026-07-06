@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { useAuthStore } from '../stores/auth';
-import type { ECRListParams, ECRCreateData } from '../types';
+import type { ECRListParams, ECRCreateData, PartMaster } from '../types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -88,20 +88,6 @@ export const authApi = {
     }),
 };
 
-// 零件 API
-export const partsApi = {
-  list: (params?: { page?: number; page_size?: number; search?: string; status?: string; brief?: boolean; updated_since?: number }) =>
-    api.get('/parts/', { params }),
-  get: (id: string) => api.get(`/parts/${id}`),
-  create: (data: unknown) => api.post('/parts/', data),
-  update: (id: string, data: unknown) => api.put(`/parts/${id}`, data),
-  delete: (id: string) => api.delete(`/parts/${id}`),
-  upgrade: (id: string, note?: string) => api.post(`/parts/${id}/upgrade`, { note }),
-  versions: (id: string) => api.get(`/parts/${id}/versions`),
-  exportExcel: (params?: { status?: string }) =>
-    api.get('/parts/export', { params, responseType: 'blob' }),
-};
-
 // 部件 API
 export const assembliesApi = {
   list: (params?: { page?: number; page_size?: number; search?: string; status?: string; brief?: boolean; updated_since?: number; top_level?: boolean }) =>
@@ -136,6 +122,72 @@ export const componentsApi = {
     api.post(`/components/${id}/document-links`, { document_links: documentLinks }),
   exportBOM: (id: string) =>
     api.get(`/components/${id}/bom/export`, { responseType: 'blob' }),
+};
+
+export const partsApi = {
+  // PartMaster
+  list: (params?: Record<string, any>) =>
+    api.get('/parts/', { params }).then((r) => r.data),
+  get: (masterId: string) =>
+    api.get(`/parts/${masterId}`).then((r) => r.data),
+  create: (data: Partial<PartMaster>) =>
+    api.post('/parts/', data).then((r) => r.data),
+  update: (masterId: string, data: Partial<PartMaster>) =>
+    api.put(`/parts/${masterId}`, data).then((r) => r.data),
+  delete: (masterId: string) =>
+    api.delete(`/parts/${masterId}`).then((r) => r.data),
+
+  // PartRevision
+  revisions: (masterId: string) =>
+    api.get(`/parts/${masterId}/revisions`).then((r) => r.data),
+  getRevision: (revisionId: string) =>
+    api.get(`/parts/revisions/${revisionId}`).then((r) => r.data),
+
+  // 签出/签入
+  checkout: (revisionId: string) =>
+    api.post(`/parts/revisions/${revisionId}/checkout`).then((r) => r.data),
+  checkin: (revisionId: string, note?: string) =>
+    api.post(`/parts/revisions/${revisionId}/checkin`, { check_in_note: note }).then((r) => r.data),
+  undocheckout: (revisionId: string) =>
+    api.post(`/parts/revisions/${revisionId}/undocheckout`).then((r) => r.data),
+  forceCheckin: (revisionId: string) =>
+    api.post(`/parts/revisions/${revisionId}/force-checkin`).then((r) => r.data),
+
+  // 状态变更
+  release: (revisionId: string) =>
+    api.post(`/parts/revisions/${revisionId}/release`).then((r) => r.data),
+  freeze: (revisionId: string) =>
+    api.post(`/parts/revisions/${revisionId}/freeze`).then((r) => r.data),
+  unfreeze: (revisionId: string) =>
+    api.post(`/parts/revisions/${revisionId}/unfreeze`).then((r) => r.data),
+  obsolete: (revisionId: string) =>
+    api.post(`/parts/revisions/${revisionId}/obsolete`).then((r) => r.data),
+  upgrade: (revisionId: string) =>
+    api.post(`/parts/revisions/${revisionId}/upgrade`).then((r) => r.data),
+
+  // 迭代
+  iterations: (revisionId: string) =>
+    api.get(`/parts/revisions/${revisionId}/iterations`).then((r) => r.data),
+  getIteration: (revisionId: string, iterationId: string) =>
+    api.get(`/parts/revisions/${revisionId}/iterations/${iterationId}`).then((r) => r.data),
+
+  // 级联
+  cascadeCheckout: (revisionId: string) =>
+    api.post(`/parts/revisions/${revisionId}/cascade-checkout`).then((r) => r.data),
+  cascadeCheckin: (revisionId: string) =>
+    api.post(`/parts/revisions/${revisionId}/cascade-checkin`).then((r) => r.data),
+  cascadeUndocheckout: (revisionId: string) =>
+    api.post(`/parts/revisions/${revisionId}/cascade-undocheckout`).then((r) => r.data),
+
+  // BOM
+  getBOM: (revisionId: string) =>
+    api.get(`/parts/revisions/${revisionId}/bom`).then((r) => r.data),
+  addBOMItem: (revisionId: string, data: { child_revision_id: string; quantity?: number; sort_order?: number }) =>
+    api.post(`/parts/revisions/${revisionId}/bom/items`, data).then((r) => r.data),
+  updateBOMItem: (revisionId: string, itemId: string, data: { quantity?: number; sort_order?: number }) =>
+    api.put(`/parts/revisions/${revisionId}/bom/items/${itemId}`, data).then((r) => r.data),
+  deleteBOMItem: (revisionId: string, itemId: string) =>
+    api.delete(`/parts/revisions/${revisionId}/bom/items/${itemId}`).then((r) => r.data),
 };
 
 // 图文档 API

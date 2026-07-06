@@ -58,6 +58,96 @@ export interface Assembly {
   deleted_at?: string | null;
 }
 
+// ===== 零部件三层模型类型 =====
+
+export interface PartMaster {
+  id: string;
+  code: string;
+  name: string;
+  spec?: string;
+  type: 'part' | 'assembly';
+  status?: string;
+  remark?: string;
+  creator_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  latest_revision?: PartRevisionBrief | null;
+}
+
+export interface PartRevisionBrief {
+  id: string;
+  version: string;
+  status: PartStatus;
+  latest_iteration: number;
+  check_out_user_id?: string | null;
+  check_out_user_name?: string | null;
+  check_out_date?: string | null;
+  created_at?: string;
+}
+
+export interface PartRevision extends PartRevisionBrief {
+  master_id: string;
+  revision_note?: string;
+  revision_parent_id?: string | null;
+  creator_id?: string;
+  updated_at?: string;
+  current_iteration?: PartIteration | null;
+}
+
+export type PartStatus = 'draft' | 'frozen' | 'released' | 'obsolete';
+
+export interface PartIteration {
+  id: string;
+  revision_id: string;
+  iteration: number;
+  check_in_date?: string | null;
+  check_in_note?: string;
+  custom_fields: Record<string, any>;
+  document_links: DocumentLink[];
+  remark?: string;
+  created_at?: string;
+}
+
+export interface DocumentLink {
+  id: string;
+  document_id: string;
+  category: string;
+  sort_order: number;
+}
+
+export interface PartListItem {
+  master_id: string;
+  code: string;
+  name: string;
+  spec?: string;
+  type: 'part' | 'assembly';
+  revision_id: string;
+  version: string;
+  status: PartStatus;
+  check_out_user_id?: string | null;
+  check_out_user_name?: string | null;
+  check_out_date?: string | null;
+  latest_iteration: number;
+  created_at?: string;
+}
+
+export interface PartAttachment {
+  id: string;
+  iteration_id: string;
+  category: 'cad' | 'production';
+  file_name: string;
+  file_size?: number;
+  file_path?: string;
+  file_hash?: string;
+  created_at?: string;
+}
+
+export interface CascadeResult {
+  succeed_count: number;
+  failed_count: number;
+  failed_items: { revision_id: string; version?: string; reason: string }[];
+}
+
 export interface Document {
   id: string;
   code: string;
