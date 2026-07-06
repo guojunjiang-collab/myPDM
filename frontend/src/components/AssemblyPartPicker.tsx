@@ -87,12 +87,35 @@ export default function AssemblyPartPicker({
   const [quickForm, setQuickForm] = useState({ code: '', name: '', spec: '', remark: '' });
   const [quickCreating, setQuickCreating] = useState(false);
 
-  /* 加载数据：store 为空时从 API 拉取；同时计算祖先链 */
+  /* 加载数据 */
   useEffect(() => {
     if (!open) return;
     setQuickForm({ code: '', name: '', spec: '', remark: '' });
     setQuickOpen(false);
     setQuickCreating(false);
+
+    if (dataMode === 'parts') {
+      setLoading(true);
+      partsApi.list({ page_size: 10000, show_all_versions: true })
+        .then((r: any) => {
+          const items = r.items || r || [];
+          const transformed = items.map((p: any) => ({
+            id: p.revision_id,
+            code: p.code,
+            name: p.name,
+            spec: p.spec,
+            version: p.version,
+            status: p.status,
+            type: p.type || 'part',
+            component_type: p.type || 'part',
+          }));
+          setFetchedParts(transformed);
+        })
+        .catch(() => setFetchedParts([]))
+        .finally(() => setLoading(false));
+      return;
+    }
+
     if (storeComponents.length > 0 && !currentAssemblyId) {
       setAncestorIds(new Set());
       return;
@@ -101,35 +124,15 @@ export default function AssemblyPartPicker({
     setLoading(true);
     const promises: Promise<unknown>[] = [];
 
-    if (dataMode === 'parts') {
-      promises.push(
-        partsApi.list({ page_size: 10000, show_all_versions: true })
-          .then((r: any) => {
-            const items = r.items || r || [];
-            const transformed = items.map((p: any) => ({
-              id: p.revision_id,
-              code: p.code,
-              name: p.name,
-              spec: p.spec,
-              version: p.version,
-              status: p.status,
-              type: p.type || 'part',
-              component_type: p.type || 'part',
-            }));
-            setFetchedParts(transformed);
-          })
-          .catch(() => {}),
-      );
-    } else {
-      promises.push(
-        componentsApi.list({ page_size: 10000 })
-          .then((r) => {
-            const items = Array.isArray(r.data) ? r.data : (r.data as any)?.items || [];
-            if (storeComponents.length === 0) setFetchedComponents(items);
-          })
-          .catch(() => {}),
-      );
-    }
+    promises.push(
+      componentsApi.list({ page_size: 10000 })
+        .then((r: unknown) => {
+          const data = (r as any).data;
+          const items = Array.isArray(data) ? data : data?.items || [];
+          if (storeComponents.length === 0) setFetchedComponents(items);
+        })
+        .catch(() => {}),
+    );
 
     // 计算祖先链：向上查找所有包含当前部件的父部件
     if (currentAssemblyId) {
