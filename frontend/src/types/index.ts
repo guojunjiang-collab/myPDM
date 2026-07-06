@@ -850,6 +850,33 @@ export interface ConfigItemBrief {
   deleted_at?: string | null;
 }
 
+// ===== Dashboard 个人工作区 =====
+export interface MyTaskItem {
+  project_id: string;
+  project_code: string;
+  project_name: string;
+  task_id: string;
+  code: string;
+  name: string;
+  task_type: string;
+  status: string;
+  priority: string;
+  planned_start: string | null;
+  planned_end: string | null;
+  description: string | null;
+}
+
+export interface MyTodoItem {
+  type: string;   // 'ecr' | 'eco'
+  kind: string;   // 'review' | 'rejected'
+  id: string;
+  number: string;
+  title: string;
+  priority: string;
+  status: string;
+  updated_at: string | null;
+}
+
 // ===== Sync status =====
 export interface SyncStatus {
   components: number;

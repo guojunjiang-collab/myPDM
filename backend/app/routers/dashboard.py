@@ -171,6 +171,13 @@ def _ensure_dashboard(db: Session, user_id: uuid.UUID) -> UserDashboard:
 
 # ===== 看板 =====
 
+@router.get("/my-todos")
+async def my_todos(db: Session = Depends(get_db), current_user: User = Depends(require_permission("dashboard:read"))):
+    """待我处理：ECR/ECO 待我审批 + 我发起被驳回。只读。"""
+    from app.crud_dashboard import get_my_todos
+    return {"items": get_my_todos(db, current_user.id)}
+
+
 @router.get("/")
 async def get_dashboard(db: Session = Depends(get_db), current_user: User = Depends(require_permission("dashboard:read"))):
     """获取当前用户看板（含完整文件夹树 + 关联项 + 共享文件夹）"""

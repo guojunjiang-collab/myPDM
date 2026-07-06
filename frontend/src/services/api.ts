@@ -253,6 +253,7 @@ export const boardApi = {
 // 仪表盘 API
 export const dashboardApi = {
   getStats: () => api.get('/dashboard/stats'),
+  getMyTodos: () => api.get('/dashboard/my-todos'),
 };
 
 // 实体-图文档关联 API

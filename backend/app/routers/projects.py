@@ -74,6 +74,14 @@ async def create_project(data: ProjectCreate, db: Session = Depends(get_db),
     return _project_detail(db, p)
 
 
+@router.get("/my-tasks")
+async def my_tasks(db: Session = Depends(get_db),
+                   current_user: User = Depends(require_permission("project:read"))):
+    """我的任务：指派给我且未完成的项目任务。只读。必须注册在 /{project_id} 之前。"""
+    from app.crud_dashboard import get_my_tasks
+    return {"items": get_my_tasks(db, current_user.id)}
+
+
 @router.get("/{project_id}")
 async def get_project(project_id: uuid.UUID, db: Session = Depends(get_db),
                       current_user: User = Depends(require_permission("project:read"))):
