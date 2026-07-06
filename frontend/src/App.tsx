@@ -68,7 +68,6 @@ export default function App() {
           <Route path="board" element={<Board />} />
           <Route path="components" element={<ComponentsPage />} />
           <Route path="parts" element={<PartsPage />} />
-          <Route path="parts/:masterId" element={<PartsPage />} />
           <Route path="documents" element={<Documents />} />
           <Route path="configuration" element={<Configuration />} />
           <Route path="bom" element={<BOM />} />
