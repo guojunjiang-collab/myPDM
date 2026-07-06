@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Board from './pages/Board';
 import ComponentsPage from './pages/ComponentsPage';
+import PartsPage from './pages/PartsPage';
 import Documents from './pages/Documents';
 import BOM from './pages/BOM/BOM';
 import Users from './pages/Users';
@@ -66,6 +67,8 @@ export default function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="board" element={<Board />} />
           <Route path="components" element={<ComponentsPage />} />
+          <Route path="parts" element={<PartsPage />} />
+          <Route path="parts/:masterId" element={<PartsPage />} />
           <Route path="documents" element={<Documents />} />
           <Route path="configuration" element={<Configuration />} />
           <Route path="bom" element={<BOM />} />
