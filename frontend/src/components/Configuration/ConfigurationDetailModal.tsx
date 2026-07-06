@@ -5,6 +5,7 @@ import type { ConfigPartItem, ConfigChildItem, CustomFieldDefinition, CustomFiel
 import EntityDocumentSection from '../EntityDocumentSection';
 import PartDetailContent from '../PartDetailContent';
 import AssemblyDetailContent from '../AssemblyDetailContent';
+import PartDetailModal from '../PartDetailModal';
 import { useDataStore } from '../../stores/data';
 
 interface Props {
@@ -22,6 +23,10 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
   const [expandedChild, setExpandedChild] = useState<Record<string, { parts: any[]; children: any[] }>>({});
   const [noChildren, setNoChildren] = useState<Set<string>>(new Set());
   const [loadingChild, setLoadingChild] = useState<string | null>(null);
+
+  // PartDetailModal 状态（点击关联零部件行弹出）
+  const [partDetailMasterId, setPartDetailMasterId] = useState<string | null>(null);
+  const [partDetailRevisionId, setPartDetailRevisionId] = useState<string | null>(null);
 
   // 嵌套详情弹窗（点击行查看零件/部件详情）
   const [nestedEntity, setNestedEntity] = useState<{ type: 'part' | 'assembly'; id: string } | null>(null);
@@ -140,10 +145,10 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
     const childRows = expandedParts[idx];
     const entityId = p.part_id || p.entity_id;
     const entityType = (p.part_type || p.entity_type || 'part');
-    const onClickRow = entityId ? () => handleNestedView(
-      entityType === 'assembly' ? 'assembly' : 'part',
-      entityId
-    ) : undefined;
+    const onClickRow = p.part_detail?.id ? () => {
+      setPartDetailMasterId(p.part_detail?.id);
+      setPartDetailRevisionId(null);
+    } : undefined;
     const rowCls = onClickRow ? 'cursor-pointer' : '';
     return (
       <>
@@ -375,6 +380,15 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
       itemId={nestedConfigId}
       onClose={() => setNestedConfigId(null)}
     />
+
+    {/* ========== PartDetailModal（点击关联零部件行弹出） ========== */}
+    {partDetailMasterId && (
+      <PartDetailModal
+        masterId={partDetailMasterId}
+        open={!!partDetailMasterId}
+        onClose={() => { setPartDetailMasterId(null); setPartDetailRevisionId(null); }}
+      />
+    )}
     </>
   );
 }
