@@ -47,6 +47,21 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const [editData, setEditData] = useState<{ custom_fields: Record<string, any>; remark: string }>({ custom_fields: {}, remark: '' });
   const [editMaster, setEditMaster] = useState({ code: '', name: '', spec: '' });
   const [hasBomChildren, setHasBomChildren] = useState(false);
+  const [bomPickerOpen, setBomPickerOpen] = useState(false);
+  const [pickerParts, setPickerParts] = useState<any[]>([]);
+  const [pickerSearch, setPickerSearch] = useState('');
+  const [pickerLoading, setPickerLoading] = useState(false);
+
+  useEffect(() => {
+    if (bomPickerOpen) {
+      setPickerLoading(true);
+      setPickerSearch('');
+      partsApi.list({ page_size: 200, show_all_versions: true })
+        .then((r: any) => setPickerParts(r.items || r || []))
+        .catch(() => setPickerParts([]))
+        .finally(() => setPickerLoading(false));
+    }
+  }, [bomPickerOpen]);
 
   useEffect(() => {
     if (open) {
@@ -197,12 +212,12 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
 
   const tabs = useMemo(() => [
     { key: 'info' as const, label: '基本信息', show: !!currentDisplay },
-    { key: 'bom' as const, label: 'BOM结构', show: hasBomChildren || (master?.type === 'assembly') },
+    { key: 'bom' as const, label: 'BOM结构', show: hasBomChildren || canEdit },
     { key: 'docs' as const, label: '关联文档', show: !!currentDisplay },
     { key: 'attachments' as const, label: '附件', show: true },
     { key: 'versions' as const, label: '版本历史', show: true },
     { key: 'iterations' as const, label: '迭代历史', show: true },
-  ].filter(t => t.show), [currentDisplay, master?.type, hasBomChildren]);
+  ].filter(t => t.show), [currentDisplay, hasBomChildren, canEdit]);
 
   if (!open) return null;
 
@@ -428,43 +443,82 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
 
                 {activeTab === 'bom' && (
                   <div>
-                    <div className="flex gap-2 mb-3">
-                      <button onClick={() => handleCascade('checkout')}
-                        className="px-3 py-1.5 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">级联签出</button>
-                      <button onClick={() => handleCascade('checkin')}
-                        className="px-3 py-1.5 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">级联检入</button>
-                      <button onClick={() => handleCascade('undo')}
-                        className="px-3 py-1.5 bg-gray-500 text-white rounded text-xs hover:bg-gray-600">级联撤销</button>
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-bold text-gray-700">子项清单</h4>
+                      <div className="flex gap-2">
+                        {canEdit && (
+                          <button onClick={() => setBomPickerOpen(true)}
+                            className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700">
+                            + 添加子项
+                          </button>
+                        )}
+                        <button onClick={() => handleCascade('checkout')}
+                          className="px-3 py-1.5 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">级联签出</button>
+                        <button onClick={() => handleCascade('checkin')}
+                          className="px-3 py-1.5 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">级联检入</button>
+                        <button onClick={() => handleCascade('undo')}
+                          className="px-3 py-1.5 bg-gray-500 text-white rounded text-xs hover:bg-gray-600">级联撤销</button>
+                      </div>
                     </div>
                     {bomItems.length === 0 ? (
-                      <div className="text-gray-400 text-sm">无BOM子项</div>
+                      <div className="text-gray-400 text-sm py-4 text-center">暂无子项</div>
                     ) : (
+                      <div className="border rounded-lg overflow-hidden">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="bg-gray-50 border-b border-gray-200">
+                            <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">类型</th>
                             <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">件号</th>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">名称</th>
+                            <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">中文名称</th>
                             <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">版本</th>
-                            <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">数量</th>
                             <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">状态</th>
+                            <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">数量</th>
+                            {canEdit && (
+                              <th className="text-center px-4 py-3 text-sm font-medium text-gray-500">操作</th>
+                            )}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
                           {bomItems.map((item: any, idx: number) => (
                             <tr key={idx} className="hover:bg-gray-50">
+                              <td className="px-4 py-3">
+                                <span className={`px-1.5 py-0.5 rounded text-xs ${item.child_type === 'assembly' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                                  {item.child_type === 'assembly' ? '部件' : '零件'}
+                                </span>
+                              </td>
                               <td className="px-4 py-3 font-mono">{item.child_code}</td>
                               <td className="px-4 py-3">{item.child_name}</td>
                               <td className="px-4 py-3">{item.child_version}</td>
-                              <td className="px-4 py-3">{item.quantity}</td>
                               <td className="px-4 py-3">
                                 <span className={`px-2 py-1 text-xs rounded-full ${statusTag(item.child_status || 'draft').cls}`}>
                                   {statusTag(item.child_status || 'draft').label}
                                 </span>
                               </td>
+                              <td className="px-4 py-3">{item.quantity}</td>
+                              {canEdit && (
+                                <td className="px-4 py-3 text-center">
+                                  <button
+                                    onClick={async () => {
+                                      if (!revisionId) return;
+                                      try {
+                                        await partsApi.deleteBOMItem(revisionId, item.id);
+                                        toast.success('已删除子项');
+                                        loadTabs();
+                                      } catch (e: any) {
+                                        toast.error(e?.response?.data?.detail || '删除失败');
+                                      }
+                                    }}
+                                    className="text-red-500 hover:text-red-700 text-xs"
+                                  >
+                                    删除
+                                  </button>
+                                </td>
+                              )}
                             </tr>
                           ))}
                         </tbody>
                       </table>
+                      </div>
                     )}
                   </div>
                 )}
@@ -569,6 +623,59 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
               }} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm disabled:opacity-50" disabled={saving}>
                 {saving ? '保存中...' : '确认签入'}
               </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+      {bomPickerOpen && (
+        <Modal open={bomPickerOpen} onClose={() => setBomPickerOpen(false)} title="选择零部件" width="lg">
+          <div className="p-4 flex flex-col h-[60vh]">
+            <input type="text" placeholder="搜索件号或名称..." value={pickerSearch}
+              onChange={(e) => setPickerSearch(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3" />
+            <div className="flex-1 overflow-y-auto border rounded-lg">
+              {pickerLoading ? (
+                <div className="py-8 text-center text-gray-400 text-sm">加载中...</div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b sticky top-0">
+                    <tr>
+                      <th className="text-left px-4 py-2 text-gray-500 font-medium">件号</th>
+                      <th className="text-left px-4 py-2 text-gray-500 font-medium">名称</th>
+                      <th className="text-left px-4 py-2 text-gray-500 font-medium">版本</th>
+                      <th className="text-left px-4 py-2 text-gray-500 font-medium">状态</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {pickerParts
+                      .filter((p: any) => {
+                        if (!pickerSearch) return true;
+                        const kw = pickerSearch.toLowerCase();
+                        return (p.code || '').toLowerCase().includes(kw) || (p.name || '').toLowerCase().includes(kw);
+                      })
+                      .map((p: any) => (
+                        <tr key={p.revision_id} className="hover:bg-gray-50 cursor-pointer"
+                          onClick={async () => {
+                            if (!revisionId) return;
+                            try {
+                              await partsApi.addBOMItem(revisionId, { child_revision_id: p.revision_id, quantity: 1 });
+                              toast.success('已添加');
+                              setBomPickerOpen(false);
+                              loadTabs();
+                              setHasBomChildren(true);
+                            } catch (e: any) {
+                              toast.error(e?.response?.data?.detail || '添加失败');
+                            }
+                          }}>
+                          <td className="px-4 py-2 font-mono">{p.code}</td>
+                          <td className="px-4 py-2">{p.name}</td>
+                          <td className="px-4 py-2">{p.version}</td>
+                          <td className="px-4 py-2">{p.status}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         </Modal>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useDataStore } from '../stores/data';
-import { componentsApi, bomApi } from '../services/api';
+import { componentsApi, bomApi, partsApi } from '../services/api';
 import { Modal } from './Modal';
 import type { Component } from '../types';
 
@@ -34,6 +34,7 @@ interface AssemblyPartPickerProps {
   onConfirm: (items: { child_type: string; child_id: string; quantity: number }[]) => void;
   currentAssemblyId?: string;
   existingChildIds?: Set<string>;
+  dataMode?: 'components' | 'parts';
 }
 
 /* ----------------------------------------------------------------
@@ -65,6 +66,7 @@ export default function AssemblyPartPicker({
   onConfirm,
   currentAssemblyId,
   existingChildIds = new Set(),
+  dataMode = 'components',
 }: AssemblyPartPickerProps) {
   /* ---- 筛选 ---- */
   const [search, setSearch] = useState('');
@@ -78,6 +80,7 @@ export default function AssemblyPartPicker({
   /* ---- 数据源 ---- */
   const storeComponents = useDataStore((s) => s.components);
   const [fetchedComponents, setFetchedComponents] = useState<Component[]>([]);
+  const [fetchedParts, setFetchedParts] = useState<any[]>([]);
   const [ancestorIds, setAncestorIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
@@ -98,15 +101,35 @@ export default function AssemblyPartPicker({
     setLoading(true);
     const promises: Promise<unknown>[] = [];
 
-    // 从统一 components API 加载
-    promises.push(
-      componentsApi.list({ page_size: 10000 })
-        .then((r) => {
-          const items = Array.isArray(r.data) ? r.data : (r.data as any)?.items || [];
-          if (storeComponents.length === 0) setFetchedComponents(items);
-        })
-        .catch(() => {}),
-    );
+    if (dataMode === 'parts') {
+      promises.push(
+        partsApi.list({ page_size: 10000, show_all_versions: true })
+          .then((r: any) => {
+            const items = r.items || r || [];
+            const transformed = items.map((p: any) => ({
+              id: p.revision_id,
+              code: p.code,
+              name: p.name,
+              spec: p.spec,
+              version: p.version,
+              status: p.status,
+              type: p.type || 'part',
+              component_type: p.type || 'part',
+            }));
+            setFetchedParts(transformed);
+          })
+          .catch(() => {}),
+      );
+    } else {
+      promises.push(
+        componentsApi.list({ page_size: 10000 })
+          .then((r) => {
+            const items = Array.isArray(r.data) ? r.data : (r.data as any)?.items || [];
+            if (storeComponents.length === 0) setFetchedComponents(items);
+          })
+          .catch(() => {}),
+      );
+    }
 
     // 计算祖先链：向上查找所有包含当前部件的父部件
     if (currentAssemblyId) {
@@ -144,9 +167,11 @@ export default function AssemblyPartPicker({
     }
 
     Promise.all(promises).finally(() => setLoading(false));
-  }, [open, storeComponents, currentAssemblyId]);
+  }, [open, storeComponents, currentAssemblyId, dataMode]);
 
-  const componentsList = storeComponents.length > 0 ? storeComponents : fetchedComponents;
+  const componentsList = dataMode === 'parts'
+    ? fetchedParts
+    : (storeComponents.length > 0 ? storeComponents : fetchedComponents);
 
   /* 合并所有零件+部件为一个列表 */
   const allCandidates = useMemo<CandidateItem[]>(() => {
