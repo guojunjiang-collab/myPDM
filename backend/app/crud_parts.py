@@ -723,6 +723,11 @@ def get_bom_tree(db: Session, revision_id: UUID) -> List[Dict]:
                     "child_name": master.name if master else "",
                     "child_version": child_rev.version,
                     "child_status": child_rev.status,
+                    "child_check_out_user_id": str(child_rev.check_out_user_id) if child_rev.check_out_user_id else None,
+                    "child_check_out_user_name": (
+                        db.query(models.User).filter(models.User.id == child_rev.check_out_user_id).first().real_name
+                        if child_rev.check_out_user_id else None
+                    ),
                     "child_type": "assembly" if (
                         db.query(models.BOMItem)
                         .filter(
@@ -731,6 +736,14 @@ def get_bom_tree(db: Session, revision_id: UUID) -> List[Dict]:
                         )
                         .count() > 0
                     ) else "part",
+                    "has_children": (
+                        db.query(models.BOMItem)
+                        .filter(
+                            models.BOMItem.parent_revision_id == child_rev.id,
+                            models.BOMItem.deleted_at.is_(None),
+                        )
+                        .count() > 0
+                    ),
                     "quantity": item.quantity,
                     "sort_order": item.sort_order,
                 }
@@ -773,7 +786,7 @@ def update_bom_item(db: Session, item_id: UUID, data: dict) -> Tuple[Optional[mo
     item = db.query(models.BOMItem).filter(models.BOMItem.id == item_id, models.BOMItem.deleted_at.is_(None)).first()
     if not item:
         return None, "BOM项不存在"
-    for field in ("quantity", "sort_order"):
+    for field in ("quantity", "sort_order", "child_revision_id"):
         if field in data and data[field] is not None:
             setattr(item, field, data[field])
     db.commit()

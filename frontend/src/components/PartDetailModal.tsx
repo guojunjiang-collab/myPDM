@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { partsApi, customFieldsApi } from '../services/api';
 import { useAuthStore } from '../stores/auth';
 import type { PartMaster, PartRevision, PartIteration, PartStatus, CascadeResult } from '../types';
@@ -49,6 +49,12 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const [editMaster, setEditMaster] = useState({ code: '', name: '', spec: '' });
   const [hasBomChildren, setHasBomChildren] = useState(false);
   const [bomPickerOpen, setBomPickerOpen] = useState(false);
+  const [nestedPickerRevId, setNestedPickerRevId] = useState<string | null>(null);
+  const [expandedBom, setExpandedBom] = useState<Record<string, any[]>>({});
+  const [loadingBom, setLoadingBom] = useState<Record<string, boolean>>({});
+  const [versionSelectItem, setVersionSelectItem] = useState<any>(null);
+  const [versionSelectRevisions, setVersionSelectRevisions] = useState<any[]>([]);
+  const [versionSelectLoading, setVersionSelectLoading] = useState(false);
   const [nestedMasterId, setNestedMasterId] = useState<string | null>(null);
   const [nestedRevisionId, setNestedRevisionId] = useState<string | null>(null);
 
@@ -101,7 +107,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
       const m = await partsApi.get(masterId);
       setMaster(m);
       setEditMaster({ code: m.code || '', name: m.name || '', spec: m.spec || '' });
-      const revId = internalRevisionId || (m.latest_revision?.id);
+      const revId = propRevisionId || internalRevisionId || (m.latest_revision?.id);
       if (revId) {
         if (!internalRevisionId) setInternalRevisionId(revId);
         const rev = await partsApi.getRevision(revId);
@@ -156,6 +162,105 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const canUpgrade = revision?.status === 'released' || revision?.status === 'obsolete';
   const canObsolete = revision?.status === 'released';
   const canForceCheckin = isCheckedOut && isAdminUser;
+
+  const toggleBomExpand = useCallback(async (revId: string) => {
+    if (expandedBom[revId]) {
+      setExpandedBom(prev => { const n = {...prev}; delete n[revId]; return n; });
+      return;
+    }
+    setLoadingBom(prev => ({...prev, [revId]: true}));
+    try {
+      const children = await partsApi.getBOM(revId);
+      setExpandedBom(prev => ({...prev, [revId]: children || []}));
+    } catch { setExpandedBom(prev => ({...prev, [revId]: []})); }
+    finally { setLoadingBom(prev => { const n = {...prev}; delete n[revId]; return n; }); }
+  }, [expandedBom]);
+
+  const renderBomRow = useCallback((item: any, level: number): React.ReactNode => {
+    const hasChildren = item.has_children;
+    const children = expandedBom[item.child_revision_id];
+    const isLoading = loadingBom[item.child_revision_id];
+    const rowClick = () => {
+      if (item.child_master_id) {
+        setNestedMasterId(item.child_master_id);
+        setNestedRevisionId(item.child_revision_id);
+      }
+    };
+    const checkoutName = item.child_check_out_user_name;
+    return (
+      <React.Fragment key={item.child_revision_id}>
+        <tr className="hover:bg-gray-50 cursor-pointer" onClick={rowClick}>
+          <td className="px-3 py-2 text-gray-400 text-xs whitespace-nowrap">
+            <span>{'-'.repeat(level + 1)}{level + 1}</span>
+            {hasChildren && (
+              <button type="button" onClick={(e) => { e.stopPropagation(); toggleBomExpand(item.child_revision_id); }}
+                className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
+                {children ? '\u25BC' : '\u25B6'}
+              </button>
+            )}
+          </td>
+          <td className="px-3 py-2 font-medium">{item.child_code}</td>
+          <td className="px-3 py-2">{item.child_name}</td>
+          <td className="px-3 py-2 text-gray-500">{item.child_version}</td>
+          <td className="px-3 py-2">
+            <span className={`px-1.5 py-0.5 text-xs rounded ${statusTag(item.child_status || 'draft').cls}`}>
+              {statusTag(item.child_status || 'draft').label}
+            </span>
+          </td>
+          <td className="px-3 py-2 text-xs">
+            {checkoutName ? (
+              <span className="text-orange-600">{checkoutName}</span>
+            ) : <span className="text-gray-400">—</span>}
+          </td>
+          <td className="px-3 py-2">
+            {canEdit ? (
+              <input type="number" min={1} defaultValue={item.quantity}
+                onBlur={async (e) => {
+                  const v = parseInt(e.target.value);
+                  if (v > 0 && v !== item.quantity && revisionId) {
+                    try { await partsApi.updateBOMItem(revisionId, item.id, { quantity: v }); loadTabs(); } catch {}
+                  }
+                }}
+                className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-1 focus:ring-primary-500" />
+            ) : item.quantity}
+          </td>
+          {canEdit && (
+            <td className="px-3 py-2 text-right whitespace-nowrap">
+              <span className="inline-flex items-center gap-1">
+                <button type="button" onClick={(e) => {
+                  e.stopPropagation();
+                  setVersionSelectItem(item);
+                  setVersionSelectLoading(true);
+                  partsApi.revisions(item.child_master_id)
+                    .then((revs: any[]) => setVersionSelectRevisions(revs || []))
+                    .catch(() => setVersionSelectRevisions([]))
+                    .finally(() => setVersionSelectLoading(false));
+                }}
+                  className="text-primary-600 hover:text-primary-800 text-xs">选择</button>
+                {hasChildren && (
+                  <button type="button" onClick={(e) => { e.stopPropagation(); setNestedPickerRevId(item.child_revision_id); }}
+                    className="text-primary-600 hover:text-primary-800 text-xs">+子项</button>
+                )}
+                <button type="button" onClick={async (e) => {
+                  e.stopPropagation();
+                  if (!revisionId) return;
+                  try {
+                    await partsApi.deleteBOMItem(revisionId, item.id);
+                    toast.success('已删除');
+                    loadTabs();
+                    setHasBomChildren(false);
+                  } catch (e2: any) { toast.error(e2?.response?.data?.detail || '删除失败'); }
+                }}
+                  className="text-red-500 hover:text-red-700 text-xs">移除</button>
+              </span>
+            </td>
+          )}
+        </tr>
+        {isLoading && <tr><td colSpan={9} className="px-3 py-2 text-sm text-gray-400 text-center">加载中...</td></tr>}
+        {children && children.map((child: any) => renderBomRow(child, level + 1))}
+      </React.Fragment>
+    );
+  }, [canEdit, expandedBom, loadingBom, toggleBomExpand, revisionId, loadTabs, toast]);
 
   const doAction = async (action: () => Promise<any>, msg: string) => {
     try {
@@ -461,52 +566,15 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                             <th className="px-3 py-2 text-left text-gray-500 font-medium">中文名称</th>
                             <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
                             <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">状态</th>
+                            <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">签出状态</th>
                             <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">用量</th>
                             {canEdit && (
-                              <th className="px-3 py-2 text-center text-gray-500 font-medium w-16">操作</th>
+                              <th className="px-3 py-2 text-right text-gray-500 font-medium w-36">操作</th>
                             )}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                          {bomItems.map((item: any, idx: number) => (
-                            <tr key={idx} className="hover:bg-gray-50 cursor-pointer"
-                              onClick={canEdit ? undefined : () => {
-                                if (item.child_master_id) {
-                                  setNestedMasterId(item.child_master_id);
-                                  setNestedRevisionId(item.child_revision_id);
-                                }
-                              }}>
-                              <td className="px-3 py-2 text-gray-400 text-xs">{'-'.repeat(1)}1</td>
-                              <td className="px-3 py-2 font-medium">{item.child_code}</td>
-                              <td className="px-3 py-2">{item.child_name}</td>
-                              <td className="px-3 py-2 text-gray-500">{item.child_version}</td>
-                              <td className="px-3 py-2">
-                                <span className={`px-1.5 py-0.5 text-xs rounded ${statusTag(item.child_status || 'draft').cls}`}>
-                                  {statusTag(item.child_status || 'draft').label}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2">{item.quantity}</td>
-                              {canEdit && (
-                                <td className="px-3 py-2 text-center">
-                                  <button
-                                    onClick={async () => {
-                                      if (!revisionId) return;
-                                      try {
-                                        await partsApi.deleteBOMItem(revisionId, item.id);
-                                        toast.success('已删除子项');
-                                        loadTabs();
-                                      } catch (e: any) {
-                                        toast.error(e?.response?.data?.detail || '删除失败');
-                                      }
-                                    }}
-                                    className="text-red-500 hover:text-red-700 text-xs"
-                                  >
-                                    删除
-                                  </button>
-                                </td>
-                              )}
-                            </tr>
-                          ))}
+                          {bomItems.map((item: any) => renderBomRow(item, 0))}
                         </tbody>
                       </table>
                       </div>
@@ -641,6 +709,70 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
         currentAssemblyId={revisionId}
         dataMode="parts"
       />
+      {versionSelectItem && (
+        <Modal open={!!versionSelectItem} onClose={() => setVersionSelectItem(null)} title={`选择版本 - ${versionSelectItem.child_code}`} width="md">
+          <div className="p-4 max-h-60 overflow-y-auto">
+            {versionSelectLoading ? (
+              <div className="text-gray-400 text-sm py-4 text-center">加载中...</div>
+            ) : versionSelectRevisions.length === 0 ? (
+              <div className="text-gray-400 text-sm py-4 text-center">无可用版本</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="text-left px-3 py-2 text-gray-500 font-medium">版本</th>
+                    <th className="text-left px-3 py-2 text-gray-500 font-medium">状态</th>
+                    <th className="text-left px-3 py-2 text-gray-500 font-medium">创建时间</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {versionSelectRevisions.map((v: any) => (
+                    <tr key={v.id} className={`hover:bg-gray-50 cursor-pointer ${v.id === versionSelectItem.child_revision_id ? 'bg-blue-50' : ''}`}
+                      onClick={async () => {
+                        if (v.id === versionSelectItem.child_revision_id) { setVersionSelectItem(null); return; }
+                        if (!revisionId) return;
+                        try {
+                          await partsApi.updateBOMItem(revisionId, versionSelectItem.id, { child_revision_id: v.id });
+                          toast.success('版本已更新');
+                          setExpandedBom({});
+                          loadTabs();
+                        } catch (e: any) { toast.error(e?.response?.data?.detail || '更新失败'); }
+                        setVersionSelectItem(null);
+                      }}>
+                      <td className="px-3 py-2 font-medium">{v.version}</td>
+                      <td className="px-3 py-2">
+                        <span className={`px-1.5 py-0.5 text-xs rounded ${statusTag(v.status || 'draft').cls}`}>
+                          {statusTag(v.status || 'draft').label}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-gray-500">{v.created_at ? new Date(v.created_at).toLocaleDateString('zh-CN') : ''}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </Modal>
+      )}
+      {nestedPickerRevId && (
+        <AssemblyPartPicker
+          open={!!nestedPickerRevId}
+          onClose={() => setNestedPickerRevId(null)}
+          onConfirm={async (items) => {
+            if (!nestedPickerRevId) return;
+            for (const item of items) {
+              try {
+                await partsApi.addBOMItem(nestedPickerRevId, { child_revision_id: item.child_id, quantity: item.quantity || 1 });
+              } catch (e: any) { console.error(e); }
+            }
+            setNestedPickerRevId(null);
+            loadTabs();
+            setHasBomChildren(true);
+          }}
+          currentAssemblyId={nestedPickerRevId}
+          dataMode="parts"
+        />
+      )}
       {nestedMasterId && (
         <PartDetailModal
           masterId={nestedMasterId}

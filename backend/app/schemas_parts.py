@@ -117,6 +117,7 @@ class BOMItemCreate(BaseModel):
 class BOMItemUpdate(BaseModel):
     quantity: Optional[int] = None
     sort_order: Optional[int] = None
+    child_revision_id: Optional[str] = None
 
 
 class BOMItemResponse(BaseModel):
