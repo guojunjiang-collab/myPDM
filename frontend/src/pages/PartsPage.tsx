@@ -4,6 +4,7 @@ import { partsApi } from '../services/api';
 import { useAuthStore } from '../stores/auth';
 import type { PartListItem } from '../types';
 import { toast } from '../components/Toast';
+import { ConfirmModal } from '../components/Modal';
 import { useTableSort } from '../hooks/useTableSort';
 import PartDetailModal from '../components/PartDetailModal';
 
@@ -33,10 +34,12 @@ export default function PartsPage() {
   const [detailMasterId, setDetailMasterId] = useState<string | null>(null);
   const [detailRevisionId, setDetailRevisionId] = useState<string | null>(null);
 
+  const [deleteTarget, setDeleteTarget] = useState<PartListItem | null>(null);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, any> = { page_size: 200 };
+      const params: Record<string, any> = { page_size: 200, show_all_versions: true };
       if (statusFilter) params.status = statusFilter;
       if (typeFilter) params.type = typeFilter;
       if (search && searchField === 'all') params.search = search;
@@ -102,6 +105,18 @@ export default function PartsPage() {
   const openDetail = (masterId: string, revisionId: string) => {
     setDetailMasterId(masterId);
     setDetailRevisionId(revisionId);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await partsApi.delete(deleteTarget.master_id);
+      toast.success('已删除');
+      loadData();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || '删除失败');
+    }
+    setDeleteTarget(null);
   };
 
   return (
@@ -238,9 +253,17 @@ export default function PartsPage() {
                     {showCheckoutButton(item) && (
                       <button
                         onClick={() => handleCheckout(item.revision_id)}
-                        className="text-primary-600 hover:text-primary-800"
+                        className="text-primary-600 hover:text-primary-800 mr-3"
                       >
                         签出
+                      </button>
+                    )}
+                    {user?.role === 'admin' && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); }}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        删除
                       </button>
                     )}
                   </td>
@@ -257,6 +280,16 @@ export default function PartsPage() {
         open={!!detailMasterId}
         onClose={() => { setDetailMasterId(null); setDetailRevisionId(null); }}
       />
+
+      {deleteTarget && (
+        <ConfirmModal
+          open={!!deleteTarget}
+          title="确认删除"
+          content={`确定要删除零件「${deleteTarget.code} ${deleteTarget.name}」吗？此操作不可恢复。`}
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { partsApi } from '../services/api';
+import { partsApi, customFieldsApi } from '../services/api';
 import { useAuthStore } from '../stores/auth';
 import type { PartMaster, PartRevision, PartIteration, PartStatus, CascadeResult } from '../types';
 import { Loading } from './Loading';
@@ -42,6 +42,8 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const [versions, setVersions] = useState<any[]>([]);
   const [iterationsList, setIterationsList] = useState<any[]>([]);
 
+  const [cfDefs, setCfDefs] = useState<any[]>([]);
+
   useEffect(() => {
     if (open) {
       setMaster(null);
@@ -51,6 +53,16 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
       setActiveTab('info');
       setViewingIterationId(null);
       setViewingIteration(null);
+      customFieldsApi.listDefinitions().then((res: any) => {
+        const defs = (res.data || res || []).filter((d: any) => {
+          const applies: string[] = d.applies_to || [];
+          return applies.includes('parts');
+        });
+        setCfDefs(defs);
+      }).catch((e: any) => {
+        console.error('Failed to load custom field definitions', e);
+        setCfDefs([]);
+      });
     }
   }, [open, masterId, propRevisionId]);
 
@@ -162,14 +174,14 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
 
   return (
     <Modal open={open} title="零部件详情" onClose={handleClose} width="full">
-      <div className="max-h-[70vh] overflow-y-auto">
+      <div className="h-[50vh] flex flex-col">
         {detailLoading && !master ? (
           <Loading />
         ) : !master ? (
           <div className="text-gray-400 text-sm py-8 text-center">加载失败</div>
         ) : (
           <>
-            <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
+            <div className="bg-white rounded-lg border border-gray-200 p-4 shrink-0 mb-4">
               <div className="grid grid-cols-4 gap-4 text-sm">
                 <div><span className="text-gray-500">件号：</span> <span className="font-mono font-medium">{master?.code}</span></div>
                 <div><span className="text-gray-500">名称：</span> {master?.name}</div>
@@ -178,7 +190,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
               </div>
             </div>
 
-            <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
+            <div className="bg-white rounded-lg border border-gray-200 p-4 shrink-0 mb-4">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-3">
                   <span className="font-semibold text-sm">版本：{revision?.version}</span>
@@ -231,17 +243,17 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
             </div>
 
             {viewingIterationId && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 mb-4 text-sm flex items-center justify-between">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 shrink-0 mb-4 text-sm flex items-center justify-between">
                 <span>正在查看 Iteration #{viewingIteration?.iteration} 的历史数据（只读）</span>
                 <button onClick={() => { setViewingIterationId(null); setViewingIteration(null); }}
                   className="text-primary-600 hover:text-primary-800 hover:underline text-xs">返回当前迭代</button>
               </div>
             )}
 
-            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-              <div className="flex border-b border-gray-200">
-                {tabs.map(t => (
-                  <button key={t.key} onClick={() => setActiveTab(t.key)}
+            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
+              <div className="flex border-b border-gray-200 shrink-0">
+                {tabs.map((t: { key: string; label: string }) => (
+                  <button key={t.key} onClick={() => setActiveTab(t.key as any)}
                     className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                       activeTab === t.key
                         ? 'border-primary-600 text-primary-600'
@@ -252,7 +264,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                 ))}
               </div>
 
-              <div className="p-4">
+              <div className="p-4 overflow-y-auto flex-1">
                 {activeTab === 'info' && currentDisplay && (
                   <div className="space-y-4">
                     <div className="text-xs text-gray-500">
@@ -262,14 +274,18 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                     <div>
                       <h4 className="text-sm font-semibold mb-2">自定义字段</h4>
                       <div className="grid grid-cols-3 gap-3">
-                        {Object.entries(currentDisplay.custom_fields || {}).map(([k, v]) => (
-                          <div key={k}>
-                            <label className="text-xs text-gray-500">{k}</label>
-                            <div className="text-sm">{String(v)}</div>
-                          </div>
-                        ))}
-                        {Object.keys(currentDisplay.custom_fields || {}).length === 0 && (
-                          <div className="text-gray-400 text-sm">无</div>
+                        {cfDefs.length === 0 ? (
+                          <div className="text-gray-400 text-sm col-span-3">无</div>
+                        ) : (
+                          cfDefs.map((def: any) => {
+                            const val = (currentDisplay.custom_fields || {})[def.name];
+                            return (
+                              <div key={def.id}>
+                                <label className="text-xs text-gray-500">{def.name}</label>
+                                <div className="text-sm">{val !== undefined && val !== null ? String(val) : '—'}</div>
+                              </div>
+                            );
+                          })
                         )}
                       </div>
                     </div>
