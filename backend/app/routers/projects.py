@@ -466,15 +466,22 @@ def _task_dict(db, t):
             "sort_order": t.sort_order, "description": t.description}
 
 
-_ENTITY_TABLE = {"part": "components", "assembly": "components", "component": "components", "document": "documents", "config_item": "configuration_items"}
+_ENTITY_TABLE = {"part": "part_masters", "assembly": "part_masters", "component": "part_masters", "document": "documents", "config_item": "configuration_items"}
 
 
 def _link_dict(db, l):
     from sqlalchemy import text
-    code = name = spec = remark = None
+    code = name = spec = remark = master_id = None
     table = _ENTITY_TABLE.get(l.entity_type)
     if table:
-        if table == "documents":
+        if table == "part_masters":
+            row = db.execute(
+                text("SELECT pm.code, pm.name, pm.spec, pi.remark, pm.id as master_id FROM part_masters pm JOIN part_revisions pr ON pr.master_id = pm.id LEFT JOIN part_iterations pi ON pi.revision_id = pr.id AND pi.iteration = pr.latest_iteration WHERE pr.id = :id"),
+                {"id": str(l.entity_id)}
+            ).fetchone()
+            if row:
+                code, name, spec, remark, master_id = row[0], row[1], row[2] if len(row) > 2 else None, row[3] if len(row) > 3 else None, row[4] if len(row) > 4 else None
+        elif table == "documents":
             row = db.execute(
                 text(f"SELECT code, name, NULL AS spec, remark FROM {table} WHERE id = :id"), {"id": str(l.entity_id)}
             ).fetchone()
@@ -493,7 +500,7 @@ def _link_dict(db, l):
             code, name, remark = row[0], row[1], row[2] if len(row) > 2 else None
     return {"id": str(l.id), "task_id": str(l.task_id), "entity_type": l.entity_type,
             "entity_id": str(l.entity_id), "entity_code": code, "entity_name": name,
-            "entity_spec": spec, "entity_remark": remark}
+            "entity_spec": spec, "entity_remark": remark, "entity_master_id": str(master_id) if master_id else None}
 
 
 def _comment_dict(db, c):

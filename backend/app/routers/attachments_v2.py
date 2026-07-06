@@ -57,13 +57,16 @@ def _attachment_response(att):
 
 
 def _resolve_attachment(db, attachment_id):
-    from ..models import ComponentAttachment
     att = db.query(DocumentAttachment).filter(DocumentAttachment.id == attachment_id).first()
     if att:
         return att, "document"
-    catt = db.query(ComponentAttachment).filter(ComponentAttachment.id == attachment_id).first()
-    if catt:
-        return catt, "component"
+    try:
+        from ..models_parts import PartAttachment
+        catt = db.query(PartAttachment).filter(PartAttachment.id == attachment_id).first()
+        if catt:
+            return catt, "component"
+    except Exception:
+        pass
     return None, None
 
 
@@ -138,29 +141,8 @@ async def upload_file(
             folder_name=folder_name,
         )
 
-        # 零部件附件：写入独立表 component_attachments
-        if entity_type in ("component", "components"):
-            from ..models_parts import PartMasterAttachment
-            catt_id = uuid.uuid4()
-            new_catt = ComponentAttachment(
-                id=catt_id,
-                component_id=uuid.UUID(entity_id),
-                category=category or "cad",
-                file_name=result["filename"],
-                file_size=result["file_size"],
-                file_path=result["file_path"],
-                file_hash=result.get("file_hash", ""),
-            )
-            db.add(new_catt)
-            db.commit()
-            db.refresh(new_catt)
-            return {
-                "id": new_catt.id,
-                "file_name": result["filename"],
-                "file_size": result["file_size"],
-                "file_path": result["file_path"],
-                "message": "文件上传成功",
-            }
+        # 零部件附件：改用 PartAttachment 直传，不再在此处创建
+        # （component_attachments 表已删除）
 
         # 创建数据库记录
         att_id = str(uuid.uuid4())
@@ -323,30 +305,6 @@ async def complete_chunked_upload(
     try:
         result = chunked_uploader.complete_upload(upload_id)
         file_info = result["file_info"]
-
-        if file_info["entity_type"] in ("component", "components"):
-            from ..models_parts import PartMasterAttachment
-            catt_id = uuid.uuid4()
-            new_catt = ComponentAttachment(
-                id=catt_id,
-                component_id=uuid.UUID(file_info["entity_id"]),
-                category=file_info.get("category") or "cad",
-                file_name=file_info["filename"],
-                file_size=file_info["file_size"],
-                file_path=file_info["file_path"],
-                file_hash=file_info.get("file_hash", ""),
-            )
-            db.add(new_catt)
-            db.commit()
-            db.refresh(new_catt)
-            return {
-                "id": new_catt.id,
-                "file_name": file_info["filename"],
-                "file_size": file_info["file_size"],
-                "file_path": file_info["file_path"],
-                "status": "completed",
-                "message": "文件上传完成",
-            }
 
         # 创建数据库记录
         att_id = str(uuid.uuid4())

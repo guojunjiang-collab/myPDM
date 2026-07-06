@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { projectApi } from '../../services/projectApi';
-import { usersApi, componentsApi, documentsApi, ecrApi, ecoApi, logsApi, customFieldsApi } from '../../services/api';
+import { usersApi, partsApi, documentsApi, ecrApi, ecoApi, logsApi, customFieldsApi } from '../../services/api';
 import { useDataStore } from '../../stores/data';
 import type { CustomFieldDefinition, CustomFieldValue } from '../../types';
 import AssemblyPartPicker from '../../components/AssemblyPartPicker';
 import DocumentPicker from '../../components/DocumentPicker';
 import ConfigItemPicker from '../../components/Configuration/ConfigItemPicker';
 import ECPicker from '../../components/ECPicker';
-import AssemblyDetailContent from '../../components/AssemblyDetailContent';
+import PartDetailModal from '../../components/PartDetailModal';
 import DocumentDetailContent from '../../components/DocumentDetailContent';
 import ConfigurationDetailModal from '../../components/Configuration/ConfigurationDetailModal';
 import ArchiveTreeModal from '../../components/ArchiveTreeModal';
@@ -235,13 +235,13 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
     setDetailLoading(true);
     try {
       let res;
-      const isComponent = entityType === 'part' || entityType === 'assembly' || entityType === 'component';
-      if (isComponent) res = await componentsApi.get(entityId);
+      const isPart = entityType === 'part' || entityType === 'assembly';
+      if (isPart) res = await partsApi.getRevision(entityId);
       else if (entityType === 'document') res = await documentsApi.get(entityId);
-      if (res) setDetailData(res.data);
+      if (res) setDetailData(res);
 
       // 加载自定义字段定义和值
-      const cfEntityType = isComponent ? 'component' : entityType;
+      const cfEntityType = isPart ? 'parts' : entityType;
       const allDefs: CustomFieldDefinition[] = useDataStore.getState().customFieldDefs;
       setDetailCustomDefs(allDefs.filter((d) => d.applies_to?.includes(cfEntityType)));
       const valRes = await customFieldsApi.getValues(cfEntityType, entityId);
@@ -382,7 +382,15 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                 <tbody className="divide-y divide-gray-100">
                   {links.map((l) => (
                     <tr key={l.id} className="hover:bg-gray-50 cursor-pointer"
-                        onClick={() => handleViewEntity(l.entity_type, l.entity_id)}>
+                        onClick={() => {
+                          if (l.entity_type === 'part' || l.entity_type === 'assembly') {
+                            setDetailEntityId(l.entity_id);
+                            setDetailEntityType(l.entity_type);
+                            setDetailData({ master_id: (l as any).entity_master_id || '' });
+                          } else {
+                            handleViewEntity(l.entity_type, l.entity_id);
+                          }
+                        }}>
                       <td className="px-3 py-2 whitespace-nowrap">
                         <span className={`text-xs px-1.5 py-0.5 rounded ${LINK_COLOR[l.entity_type] ?? 'bg-gray-100 text-gray-600'}`}>{LINK_LABEL[l.entity_type]}</span>
                       </td>
@@ -630,17 +638,24 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
         <ECODetailModal ecoId={ecView.id} onClose={() => setEcView(null)} onRefresh={() => {}} />
       )}
 
-      {detailEntityId && (detailEntityType === 'part' || detailEntityType === 'assembly' || detailEntityType === 'component' || detailEntityType === 'document') && (
+      {detailEntityId && (detailEntityType === 'part' || detailEntityType === 'assembly') && (
+        <PartDetailModal
+          masterId={detailData?.master_id || ''}
+          revisionId={detailEntityId}
+          open={!!detailEntityId}
+          onClose={() => { setDetailEntityId(null); setDetailEntityType(null); setDetailData(null); }}
+        />
+      )}
+      {detailEntityId && detailEntityType === 'document' && (
         <Modal
           open={!!detailEntityId}
-          title={detailEntityType === 'part' ? '零部件详情' : detailEntityType === 'assembly' ? '零部件详情' : detailEntityType === 'component' ? '零部件详情' : '图文档详情'}
+          title="图文档详情"
           onClose={() => { setDetailEntityId(null); setDetailEntityType(null); setDetailData(null); setDetailCustomDefs([]); setDetailCustomValues({}); }}
           width="full"
         >
           {detailLoading ? (
             <div className="flex items-center justify-center py-8 text-gray-400">加载中...</div>
           ) : detailData ? (
-            (detailEntityType === 'part' || detailEntityType === 'assembly' || detailEntityType === 'component') ? <AssemblyDetailContent assembly={detailData} customFieldDefs={detailCustomDefs} customFieldValues={detailCustomValues} /> :
             <DocumentDetailContent doc={detailData} customFieldDefs={detailCustomDefs} customFieldValues={detailCustomValues}
               onArchivePreview={(attId, fileName) => setArchivePreview({ attId, fileName })} />
           ) : null}
@@ -660,8 +675,9 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
         <AssemblyPartPicker
           open={showPartPicker}
           onClose={() => setShowPartPicker(false)}
+          dataMode="parts"
           onConfirm={(items) => {
-            addLinks(items.map((it) => ({ entity_type: 'component', entity_id: it.child_id })));
+            addLinks(items.map((it) => ({ entity_type: 'part', entity_id: it.child_id })));
             setShowPartPicker(false);
           }}
         />
