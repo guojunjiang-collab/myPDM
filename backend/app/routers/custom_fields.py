@@ -87,9 +87,23 @@ async def update_definition(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("custom_field.def:write"))
 ):
+    old_name = crud.get_custom_field_definition(db, field_id).name if crud.get_custom_field_definition(db, field_id) else None
     db_field = crud.update_custom_field_definition(db, field_id, field_update)
     if not db_field:
         raise HTTPException(status_code=404, detail="字段定义不存在")
+    # 如果字段名称变更，迁移 PartIteration.custom_fields 中的键名
+    new_name = db_field.name
+    if old_name and old_name != new_name:
+        from .. import models_parts
+        iterations = db.query(models_parts.PartIteration).filter(
+            models_parts.PartIteration.custom_fields.has_key(old_name)
+        ).all()
+        for it in iterations:
+            cf = dict(it.custom_fields or {})
+            if old_name in cf:
+                cf[new_name] = cf.pop(old_name)
+                it.custom_fields = cf
+        db.commit()
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username, "更新自定义字段", "custom_field", str(field_id), None, ip)
     return _def_response(db_field)

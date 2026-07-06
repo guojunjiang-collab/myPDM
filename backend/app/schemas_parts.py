@@ -12,7 +12,6 @@ class PartMasterBase(BaseModel):
     code: str
     name: str
     spec: Optional[str] = None
-    type: str = "part"  # 'part' / 'assembly'
 
 
 class PartMasterCreate(PartMasterBase):
@@ -23,7 +22,6 @@ class PartMasterUpdate(BaseModel):
     code: Optional[str] = None
     name: Optional[str] = None
     spec: Optional[str] = None
-    type: Optional[str] = None
 
 
 class PartMasterResponse(PartMasterBase):
@@ -32,6 +30,7 @@ class PartMasterResponse(PartMasterBase):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     latest_revision: Optional["PartRevisionBrief"] = None
+    type: Optional[str] = None  # 动态计算，非数据库字段
 
     class Config:
         from_attributes = True
@@ -139,7 +138,6 @@ class BOMItemResponse(BaseModel):
 class PartListQuery(BaseModel):
     search: Optional[str] = None
     status: Optional[str] = None
-    type: Optional[str] = None
     check_out_user_id: Optional[UUID] = None
     show_all_versions: bool = False
     page: int = 1

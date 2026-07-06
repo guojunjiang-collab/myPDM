@@ -51,7 +51,6 @@ def create_part_master(db: Session, data: dict, user_id: UUID) -> models_parts.P
         code=data["code"],
         name=data["name"],
         spec=data.get("spec"),
-        type=data.get("type", "part"),
         creator_id=user_id,
     )
     db.add(master)
@@ -63,6 +62,8 @@ def create_part_master(db: Session, data: dict, user_id: UUID) -> models_parts.P
         status="draft",
         latest_iteration=1,
         creator_id=user_id,
+        check_out_user_id=user_id,
+        check_out_date=datetime.now(timezone.utc),
     )
     db.add(revision)
     db.flush()
@@ -92,7 +93,6 @@ def list_part_masters(
     db: Session,
     search: Optional[str] = None,
     status: Optional[str] = None,
-    type_: Optional[str] = None,
     check_out_user_id: Optional[UUID] = None,
     show_all_versions: bool = False,
     page: int = 1,
@@ -108,8 +108,6 @@ def list_part_masters(
             models_parts.PartMaster.code.ilike(f"%{search}%")
             | models_parts.PartMaster.name.ilike(f"%{search}%")
         )
-    if type_:
-        query = query.filter(models_parts.PartMaster.type == type_)
 
     total = query.count()
     masters = query.offset((page - 1) * page_size).limit(page_size).all()
@@ -140,13 +138,22 @@ def list_part_masters(
                 user = db.query(models.User).filter(models.User.id == rev.check_out_user_id).first()
                 if user:
                     checkout_user_name = user.real_name
+            child_count = (
+                db.query(models.BOMItem)
+                .filter(
+                    models.BOMItem.parent_revision_id == rev.id,
+                    models.BOMItem.deleted_at.is_(None),
+                )
+                .count()
+            )
+            item_type = "assembly" if child_count > 0 else "part"
             items.append(
                 {
                     "master_id": master.id,
                     "code": master.code,
                     "name": master.name,
                     "spec": master.spec,
-                    "type": master.type,
+                    "type": item_type,
                     "revision_id": rev.id,
                     "version": rev.version,
                     "status": rev.status,
@@ -164,7 +171,7 @@ def update_part_master(db: Session, master_id: UUID, data: dict) -> Optional[mod
     master = get_part_master(db, master_id)
     if not master:
         return None
-    for field in ("code", "name", "spec", "type"):
+    for field in ("code", "name", "spec"):
         if field in data and data[field] is not None:
             setattr(master, field, data[field])
     db.commit()
@@ -249,18 +256,39 @@ def list_iterations_by_revision(db: Session, revision_id: UUID) -> List[models_p
 
 def _copy_iteration_data(db: Session, source_iter: models_parts.PartIteration, new_iter: models_parts.PartIteration):
     """复制上一迭代的全部数据到新迭代"""
+    import os, shutil
     new_iter.custom_fields = source_iter.custom_fields or {}
     new_iter.document_links = source_iter.document_links or []
     new_iter.remark = source_iter.remark
     db.flush()
 
+    # 复制附件引用，并复制文件到新迭代目录
     for att in source_iter.attachments:
+        new_file_path = None
+        if att.file_path:
+            revision = db.query(models_parts.PartRevision).filter(
+                models_parts.PartRevision.id == new_iter.revision_id
+            ).first()
+            if revision:
+                master = db.query(models_parts.PartMaster).filter(
+                    models_parts.PartMaster.id == revision.master_id
+                ).first()
+                if master:
+                    dest_dir = os.path.join("uploads", "parts", master.code, revision.version, str(new_iter.iteration))
+                    os.makedirs(dest_dir, exist_ok=True)
+                    dest_path = os.path.join(dest_dir, att.file_name)
+                    try:
+                        shutil.copy2(att.file_path, dest_path)
+                        new_file_path = dest_path
+                    except Exception:
+                        pass
+
         new_att = models_parts.PartAttachment(
             iteration_id=new_iter.id,
             category=att.category,
             file_name=att.file_name,
             file_size=att.file_size,
-            file_path=att.file_path,
+            file_path=new_file_path or att.file_path,
             file_hash=att.file_hash,
         )
         db.add(new_att)
@@ -694,7 +722,14 @@ def get_bom_tree(db: Session, revision_id: UUID) -> List[Dict]:
                     "child_name": master.name if master else "",
                     "child_version": child_rev.version,
                     "child_status": child_rev.status,
-                    "child_type": master.type if master else "part",
+                    "child_type": "assembly" if (
+                        db.query(models.BOMItem)
+                        .filter(
+                            models.BOMItem.parent_revision_id == child_rev.id,
+                            models.BOMItem.deleted_at.is_(None),
+                        )
+                        .count() > 0
+                    ) else "part",
                     "quantity": item.quantity,
                     "sort_order": item.sort_order,
                 }

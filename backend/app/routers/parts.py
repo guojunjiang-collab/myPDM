@@ -6,6 +6,7 @@ from typing import Optional
 from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -23,7 +24,6 @@ router = APIRouter(prefix="/parts", tags=["parts"])
 def list_parts(
     search: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
-    type: Optional[str] = Query(None, alias="type"),
     check_out_user_id: Optional[UUID] = Query(None),
     show_all_versions: bool = Query(False),
     page: int = Query(1, ge=1),
@@ -32,7 +32,7 @@ def list_parts(
     current_user: User = Depends(require_permission("components:read")),
 ):
     items, total = crud_parts.list_part_masters(
-        db, search, status, type, check_out_user_id, show_all_versions, page, page_size
+        db, search, status, check_out_user_id, show_all_versions, page, page_size
     )
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
@@ -443,12 +443,20 @@ def _build_master_response(db: Session, master) -> dict:
         if user:
             checkout_user_name = user.real_name
 
+    child_count = 0
+    if latest_revision:
+        child_count = db.query(crud_parts.models.BOMItem).filter(
+            crud_parts.models.BOMItem.parent_revision_id == latest_revision.id,
+            crud_parts.models.BOMItem.deleted_at.is_(None),
+        ).count()
+    dynamic_type = "assembly" if child_count > 0 else "part"
+
     return {
         "id": str(master.id),
         "code": master.code,
         "name": master.name,
         "spec": master.spec,
-        "type": master.type,
+        "type": dynamic_type,
         "creator_id": str(master.creator_id) if master.creator_id else None,
         "created_at": master.created_at.isoformat() if master.created_at else None,
         "updated_at": master.updated_at.isoformat() if master.updated_at else None,
@@ -700,7 +708,13 @@ async def add_attachment(
     if not iteration:
         raise HTTPException(400, "当前迭代不存在")
 
-    upload_dir = f"./uploads/parts/{revision_id}"
+    master = db.query(crud_parts.models_parts.PartMaster).filter(
+        crud_parts.models_parts.PartMaster.id == revision.master_id
+    ).first()
+    if not master:
+        raise HTTPException(404, "主数据不存在")
+
+    upload_dir = f"./uploads/parts/{master.code}/{revision.version}/{iteration.iteration}"
     os.makedirs(upload_dir, exist_ok=True)
 
     file_path = os.path.join(upload_dir, file.filename)

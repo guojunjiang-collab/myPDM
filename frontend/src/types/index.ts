@@ -65,7 +65,7 @@ export interface PartMaster {
   code: string;
   name: string;
   spec?: string;
-  type: 'part' | 'assembly';
+  type?: 'part' | 'assembly';
   status?: string;
   remark?: string;
   creator_id?: string;
@@ -120,7 +120,7 @@ export interface PartListItem {
   code: string;
   name: string;
   spec?: string;
-  type: 'part' | 'assembly';
+  type?: 'part' | 'assembly';
   revision_id: string;
   version: string;
   status: PartStatus;

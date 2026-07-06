@@ -25,7 +25,6 @@ export default function PartsPage() {
   const [search, setSearch] = useState('');
   const [searchField, setSearchField] = useState('all');
   const [statusFilter, setStatusFilter] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
   const [showAllVersions, setShowAllVersions] = useState(false);
   const [allData, setAllData] = useState<PartListItem[]>([]);
 
@@ -35,7 +34,7 @@ export default function PartsPage() {
   const [deleteTarget, setDeleteTarget] = useState<PartListItem | null>(null);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newPart, setNewPart] = useState({ code: '', name: '', spec: '', type: 'part' as 'part' | 'assembly' });
+  const [newPart, setNewPart] = useState({ code: '', name: '', spec: '' });
   const [createSaving, setCreateSaving] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -43,7 +42,6 @@ export default function PartsPage() {
     try {
       const params: Record<string, any> = { page_size: 200, show_all_versions: true };
       if (statusFilter) params.status = statusFilter;
-      if (typeFilter) params.type = typeFilter;
       if (search && searchField === 'all') params.search = search;
       else if (searchField === 'code') params.search = search;
       else if (searchField === 'name') params.search = search;
@@ -77,7 +75,7 @@ export default function PartsPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, searchField, statusFilter, typeFilter, showAllVersions]);
+  }, [search, searchField, statusFilter, showAllVersions]);
 
   useEffect(() => {
     loadData();
@@ -112,7 +110,7 @@ export default function PartsPage() {
   const handleDelete = async () => {
     if (!deleteTarget) return;
     try {
-      await partsApi.delete(deleteTarget.master_id);
+      await partsApi.deleteRevision(deleteTarget.revision_id);
       toast.success('已删除');
       loadData();
     } catch (e: any) {
@@ -131,7 +129,7 @@ export default function PartsPage() {
       const created = await partsApi.create(newPart);
       toast.success('创建成功');
       setShowCreateModal(false);
-      setNewPart({ code: '', name: '', spec: '', type: 'part' });
+      setNewPart({ code: '', name: '', spec: '' });
       loadData();
       if (created.latest_revision?.id) {
         setDetailMasterId(created.id);
@@ -174,15 +172,6 @@ export default function PartsPage() {
           <option value="frozen">冻结</option>
           <option value="released">发布</option>
           <option value="obsolete">作废</option>
-        </select>
-        <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
-        >
-          <option value="">全部类型</option>
-          <option value="part">零件</option>
-          <option value="assembly">部件</option>
         </select>
         <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm whitespace-nowrap">
           <input
@@ -319,15 +308,6 @@ export default function PartsPage() {
               onChange={(e) => setNewPart(p => ({...p, spec: e.target.value}))}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">类型</label>
-            <select value={newPart.type}
-              onChange={(e) => setNewPart(p => ({...p, type: e.target.value as 'part' | 'assembly'}))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
-              <option value="part">零件</option>
-              <option value="assembly">部件</option>
-            </select>
-          </div>
           <div className="flex justify-end gap-3 pt-2">
             <button onClick={() => setShowCreateModal(false)}
               className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">取消</button>
@@ -350,7 +330,7 @@ export default function PartsPage() {
         <ConfirmModal
           open={!!deleteTarget}
           title="确认删除"
-          content={`确定要删除零件「${deleteTarget.code} ${deleteTarget.name}」吗？此操作不可恢复。`}
+          content={`确定要删除「${deleteTarget.code} ${deleteTarget.name}」版本 ${deleteTarget.version} 吗？此操作不可恢复。`}
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
         />

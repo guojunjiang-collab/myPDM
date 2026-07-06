@@ -46,6 +46,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const [cfDefs, setCfDefs] = useState<any[]>([]);
   const [editData, setEditData] = useState<{ custom_fields: Record<string, any>; remark: string }>({ custom_fields: {}, remark: '' });
   const [editMaster, setEditMaster] = useState({ code: '', name: '', spec: '' });
+  const [hasBomChildren, setHasBomChildren] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -108,6 +109,10 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
             remark: rev.current_iteration.remark || '',
           });
         }
+        try {
+          const bomData = await partsApi.getBOM(revId);
+          setHasBomChildren(bomData.length > 0);
+        } catch { setHasBomChildren(false); }
       }
     } catch (e) { console.error(e); } finally { setDetailLoading(false); }
   }, [masterId, internalRevisionId]);
@@ -117,8 +122,10 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const loadTabs = useCallback(async () => {
     if (!revisionId || !masterId) return;
     try {
-      if (activeTab === 'bom' && master?.type === 'assembly') {
-        setBomItems(await partsApi.getBOM(revisionId));
+      if (activeTab === 'bom') {
+        const bomData = await partsApi.getBOM(revisionId);
+        setBomItems(bomData);
+        setHasBomChildren(bomData.length > 0);
       }
       if (activeTab === 'versions') {
         setVersions(await partsApi.revisions(masterId));
@@ -127,7 +134,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
         setIterationsList(await partsApi.iterations(revisionId));
       }
     } catch (e) { console.error(e); }
-  }, [revisionId, activeTab, master?.type, masterId]);
+  }, [revisionId, activeTab, masterId]);
 
   useEffect(() => { loadTabs(); }, [loadTabs]);
 
@@ -190,12 +197,12 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
 
   const tabs = useMemo(() => [
     { key: 'info' as const, label: '基本信息', show: !!currentDisplay },
-    { key: 'bom' as const, label: 'BOM结构', show: master?.type === 'assembly' },
+    { key: 'bom' as const, label: 'BOM结构', show: hasBomChildren || (master?.type === 'assembly') },
     { key: 'docs' as const, label: '关联文档', show: !!currentDisplay },
     { key: 'attachments' as const, label: '附件', show: true },
     { key: 'versions' as const, label: '版本历史', show: true },
     { key: 'iterations' as const, label: '迭代历史', show: true },
-  ].filter(t => t.show), [currentDisplay, master?.type]);
+  ].filter(t => t.show), [currentDisplay, master?.type, hasBomChildren]);
 
   if (!open) return null;
 
@@ -230,14 +237,14 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                         onChange={(e) => { setEditMaster(p => ({...p, spec: e.target.value})); autoSaveMaster({spec: e.target.value}); }}
                         className="w-full border border-gray-300 rounded px-2 py-1 text-sm" />
                     </div>
-                    <div><span className="text-gray-500">类型：</span> {master?.type === 'assembly' ? '部件' : '零件'}</div>
+                    <div><span className="text-gray-500">类型：</span> {hasBomChildren ? '部件' : '零件'}</div>
                   </>
                 ) : (
                   <>
                     <div><span className="text-gray-500">件号：</span> <span className="font-mono font-medium">{master?.code}</span></div>
                     <div><span className="text-gray-500">名称：</span> {master?.name}</div>
                     <div><span className="text-gray-500">规格：</span> {master?.spec || '—'}</div>
-                    <div><span className="text-gray-500">类型：</span> {master?.type === 'assembly' ? '部件' : '零件'}</div>
+                    <div><span className="text-gray-500">类型：</span> {hasBomChildren ? '部件' : '零件'}</div>
                   </>
                 )}
               </div>
@@ -419,7 +426,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                   </div>
                 )}
 
-                {activeTab === 'bom' && master?.type === 'assembly' && (
+                {activeTab === 'bom' && (
                   <div>
                     <div className="flex gap-2 mb-3">
                       <button onClick={() => handleCascade('checkout')}
