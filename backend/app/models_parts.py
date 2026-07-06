@@ -50,6 +50,7 @@ class PartRevision(Base):
 
 class PartIteration(Base):
     __tablename__ = "part_iterations"
+    __table_args__ = ()
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     revision_id = Column(UUID(as_uuid=True), ForeignKey("part_revisions.id", ondelete="CASCADE"), nullable=False)
     iteration = Column(Integer, nullable=False, default=1)
@@ -66,6 +67,7 @@ class PartIteration(Base):
 
 class PartAttachment(Base):
     __tablename__ = "part_attachments"
+    __table_args__ = ()
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     iteration_id = Column(UUID(as_uuid=True), ForeignKey("part_iterations.id", ondelete="CASCADE"), nullable=False)
     category = Column(String(32), nullable=False)  # 'cad' / 'production'
