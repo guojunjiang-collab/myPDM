@@ -39,11 +39,11 @@ class Component(Base):
 class BOMItem(Base):
     __tablename__ = "bom_items"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    parent_type = Column(String(16), nullable=False)
-    parent_id = Column(UUID(as_uuid=True), nullable=False)
-    child_type = Column(String(16), nullable=False)
-    child_id = Column(UUID(as_uuid=True), nullable=False)
+    iteration_id = Column(UUID(as_uuid=True), ForeignKey("part_iterations.id", ondelete="CASCADE"), nullable=False)
+    parent_revision_id = Column(UUID(as_uuid=True), ForeignKey("part_revisions.id", ondelete="CASCADE"), nullable=False)
+    child_revision_id = Column(UUID(as_uuid=True), ForeignKey("part_revisions.id", ondelete="CASCADE"), nullable=False)
     quantity = Column(Integer, nullable=False, default=1)
+    sort_order = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
