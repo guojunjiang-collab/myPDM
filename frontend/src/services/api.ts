@@ -136,6 +136,8 @@ export const partsApi = {
     api.put(`/parts/${masterId}`, data).then((r) => r.data),
   delete: (masterId: string) =>
     api.delete(`/parts/${masterId}`).then((r) => r.data),
+  deleteRevision: (revisionId: string) =>
+    api.delete(`/parts/revisions/${revisionId}`).then((r) => r.data),
 
   // PartRevision
   revisions: (masterId: string) =>
@@ -190,6 +192,14 @@ export const partsApi = {
     api.put(`/parts/revisions/${revisionId}/bom/items/${itemId}`, data).then((r) => r.data),
   deleteBOMItem: (revisionId: string, itemId: string) =>
     api.delete(`/parts/revisions/${revisionId}/bom/items/${itemId}`).then((r) => r.data),
+
+  // 附件
+  listAttachments: (revisionId: string, category?: string) =>
+    api.get(`/parts/revisions/${revisionId}/attachments`, { params: category ? { category } : {} }).then((r) => r.data),
+  addAttachment: (revisionId: string, data: { category: string; file_name: string; file_size: number; file_path: string; file_hash: string }) =>
+    api.post(`/parts/revisions/${revisionId}/attachments`, data).then((r) => r.data),
+  deleteAttachment: (revisionId: string, attachmentId: string) =>
+    api.delete(`/parts/revisions/${revisionId}/attachments/${attachmentId}`).then((r) => r.data),
 };
 
 // 图文档 API
@@ -312,8 +322,21 @@ export const dashboardApi = {
 
 // 实体-图文档关联 API
 export const entityDocumentsApi = {
+  _resolveParts: (entityId: string) => {
+    const idx = entityId.indexOf('?');
+    const id = idx >= 0 ? entityId.substring(0, idx) : entityId;
+    const params: Record<string, string> = {};
+    if (idx >= 0) {
+      new URLSearchParams(entityId.substring(idx + 1)).forEach((v, k) => { params[k] = v; });
+    }
+    return { id, params };
+  },
   list: (entityType: 'part' | 'assembly' | 'component' | 'configuration', entityId: string) => {
     const base = entityType === 'part' ? 'parts' : (entityType === 'assembly' || entityType === 'component') ? 'components' : 'configurations/items';
+    if (entityType === 'part') {
+      const { id, params } = entityDocumentsApi._resolveParts(entityId);
+      return api.get(`/${base}/${id}/documents`, { params });
+    }
     return api.get(`/${base}/${entityId}/documents`);
   },
   add: (entityType: 'part' | 'assembly' | 'component' | 'configuration', entityId: string, data: { document_id: string; category?: string; sort_order?: number }) => {

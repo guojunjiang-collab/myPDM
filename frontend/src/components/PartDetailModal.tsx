@@ -6,6 +6,7 @@ import { Loading } from './Loading';
 import { toast } from './Toast';
 import { Modal } from './Modal';
 import EntityDocumentSection from './EntityDocumentSection';
+import PartAttachmentBucket from './PartAttachmentBucket';
 
 const statusTag = (s: string) => {
   const map: Record<string, { label: string; cls: string }> = {
@@ -44,6 +45,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
 
   const [cfDefs, setCfDefs] = useState<any[]>([]);
   const [editData, setEditData] = useState<{ custom_fields: Record<string, any>; remark: string }>({ custom_fields: {}, remark: '' });
+  const [editMaster, setEditMaster] = useState({ code: '', name: '', spec: '' });
 
   useEffect(() => {
     if (open) {
@@ -78,12 +80,22 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
     }, 500);
   }, [revisionId]);
 
+  const masterTimer = useRef<ReturnType<typeof setTimeout>>();
+  const autoSaveMaster = useCallback((data: Record<string, any>) => {
+    if (!masterId) return;
+    if (masterTimer.current) clearTimeout(masterTimer.current);
+    masterTimer.current = setTimeout(() => {
+      partsApi.update(masterId, data).catch(console.error);
+    }, 500);
+  }, [masterId]);
+
   const loadDetail = useCallback(async () => {
     if (!masterId) return;
     setDetailLoading(true);
     try {
       const m = await partsApi.get(masterId);
       setMaster(m);
+      setEditMaster({ code: m.code || '', name: m.name || '', spec: m.spec || '' });
       const revId = internalRevisionId || (m.latest_revision?.id);
       if (revId) {
         if (!internalRevisionId) setInternalRevisionId(revId);
@@ -198,10 +210,36 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
           <>
             <div className="bg-white rounded-lg border border-gray-200 p-4 shrink-0 mb-4">
               <div className="grid grid-cols-4 gap-4 text-sm">
-                <div><span className="text-gray-500">件号：</span> <span className="font-mono font-medium">{master?.code}</span></div>
-                <div><span className="text-gray-500">名称：</span> {master?.name}</div>
-                <div><span className="text-gray-500">规格：</span> {master?.spec || '—'}</div>
-                <div><span className="text-gray-500">类型：</span> {master?.type === 'assembly' ? '部件' : '零件'}</div>
+                {canEdit ? (
+                  <>
+                    <div>
+                      <label className="text-xs text-gray-500">件号</label>
+                      <input type="text" value={editMaster.code}
+                        onChange={(e) => { setEditMaster(p => ({...p, code: e.target.value})); autoSaveMaster({code: e.target.value}); }}
+                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm font-mono" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500">名称</label>
+                      <input type="text" value={editMaster.name}
+                        onChange={(e) => { setEditMaster(p => ({...p, name: e.target.value})); autoSaveMaster({name: e.target.value}); }}
+                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500">规格</label>
+                      <input type="text" value={editMaster.spec}
+                        onChange={(e) => { setEditMaster(p => ({...p, spec: e.target.value})); autoSaveMaster({spec: e.target.value}); }}
+                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm" />
+                    </div>
+                    <div><span className="text-gray-500">类型：</span> {master?.type === 'assembly' ? '部件' : '零件'}</div>
+                  </>
+                ) : (
+                  <>
+                    <div><span className="text-gray-500">件号：</span> <span className="font-mono font-medium">{master?.code}</span></div>
+                    <div><span className="text-gray-500">名称：</span> {master?.name}</div>
+                    <div><span className="text-gray-500">规格：</span> {master?.spec || '—'}</div>
+                    <div><span className="text-gray-500">类型：</span> {master?.type === 'assembly' ? '部件' : '零件'}</div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -296,19 +334,43 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                             ) : (
                               cfDefs.map((def: any) => {
                                 const key = def.name;
+                                const val = editData.custom_fields[key] || '';
+                                const handleChange = (newVal: string) => {
+                                  const newCf = { ...editData.custom_fields, [key]: newVal };
+                                  setEditData(prev => ({ ...prev, custom_fields: newCf }));
+                                  autoSave({ custom_fields: newCf });
+                                };
                                 return (
                                   <div key={def.id}>
                                     <label className="text-xs text-gray-500">{def.name}</label>
-                                    <input
-                                      type="text"
-                                      className="w-full border border-gray-300 rounded px-2 py-1 text-sm mt-0.5"
-                                      value={editData.custom_fields[key] || ''}
-                                      onChange={(e) => {
-                                        const newCf = { ...editData.custom_fields, [key]: e.target.value };
-                                        setEditData(prev => ({ ...prev, custom_fields: newCf }));
-                                        autoSave({ custom_fields: newCf });
-                                      }}
-                                    />
+                                    {def.field_type === 'select' ? (
+                                      <select
+                                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm mt-0.5 bg-white"
+                                        value={val}
+                                        onChange={(e) => handleChange(e.target.value)}
+                                      >
+                                        <option value="">—</option>
+                                        {(def.options || []).map((opt: any) => {
+                                          const label = typeof opt === 'string' ? opt : (opt.label || opt.value || opt);
+                                          const value = typeof opt === 'string' ? opt : (opt.value || opt.label || opt);
+                                          return <option key={value} value={value}>{label}</option>;
+                                        })}
+                                      </select>
+                                    ) : def.field_type === 'number' ? (
+                                      <input
+                                        type="number"
+                                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm mt-0.5"
+                                        value={val}
+                                        onChange={(e) => handleChange(e.target.value)}
+                                      />
+                                    ) : (
+                                      <input
+                                        type="text"
+                                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm mt-0.5"
+                                        value={val}
+                                        onChange={(e) => handleChange(e.target.value)}
+                                      />
+                                    )}
                                   </div>
                                 );
                               })
@@ -401,17 +463,20 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                 )}
 
                 {activeTab === 'docs' && revisionId && (
-                  <EntityDocumentSection
-                    entityType="part"
-                    entityId={revisionId}
-                    editable={isCheckedOutByMe && isDraft}
-                    entityCode={master?.code}
-                    entityName={master?.name}
-                  />
+                    <EntityDocumentSection
+                      entityType="part"
+                      entityId={viewingIterationId ? `${revisionId}?iteration_id=${viewingIterationId}` : revisionId}
+                      editable={isCheckedOutByMe && isDraft && !viewingIterationId}
+                      entityCode={master?.code}
+                      entityName={master?.name}
+                    />
                 )}
 
-                {activeTab === 'attachments' && (
-                  <div className="text-gray-400 text-sm">附件功能待实现</div>
+                {activeTab === 'attachments' && revisionId && (
+                  <div className="space-y-4">
+                    <PartAttachmentBucket revisionId={revisionId} category="cad" label="CAD 附件" editable={isCheckedOutByMe && isDraft && !viewingIterationId} />
+                    <PartAttachmentBucket revisionId={revisionId} category="production" label="生产附件" editable={isCheckedOutByMe && isDraft && !viewingIterationId} />
+                  </div>
                 )}
 
                 {activeTab === 'versions' && (

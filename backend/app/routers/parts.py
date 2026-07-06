@@ -71,6 +71,20 @@ def update_part(
     return _build_master_response(db, master)
 
 
+@router.delete("/revisions/{revision_id}")
+def delete_revision(
+    revision_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("components:delete")),
+):
+    rev = crud_parts.get_part_revision(db, revision_id)
+    if not rev:
+        raise HTTPException(404, "版本不存在")
+    rev.deleted_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"detail": "已删除"}
+
+
 @router.delete("/{master_id}")
 def delete_part(
     master_id: UUID,
@@ -500,10 +514,21 @@ def _get_doc_iteration(db: Session, revision_id: UUID):
     return revision, iteration
 
 
-def _list_docs(db: Session, revision_id: UUID):
-    _, iteration = _get_doc_iteration(db, revision_id)
+def _list_docs(db: Session, revision_id: UUID, iteration_id: Optional[UUID] = None):
+    from ..models import Document as DocModel
+    if iteration_id:
+        iteration = db.query(crud_parts.models_parts.PartIteration).filter(
+            crud_parts.models_parts.PartIteration.id == iteration_id
+        ).first()
+        if not iteration:
+            return []
+        links = iteration.document_links or []
+    else:
+        _, iteration = _get_doc_iteration(db, revision_id)
+        links = iteration.document_links or []
+    
     docs = []
-    for link in (iteration.document_links or []):
+    for link in (links or []):
         doc_id = link.get("document_id")
         if not doc_id:
             continue
@@ -576,9 +601,10 @@ def _remove_doc(db: Session, revision_id: UUID, link_id: str):
 
 # EntityDocumentSection 调用路径: /parts/{id}/documents
 @router.get("/{revision_id}/documents")
-def list_docs_alt(revision_id: UUID, db: Session = Depends(get_db),
+def list_docs_alt(revision_id: UUID, iteration_id: Optional[UUID] = Query(None),
+                  db: Session = Depends(get_db),
                   current_user: User = Depends(require_permission("components.doc:read"))):
-    return _list_docs(db, revision_id)
+    return _list_docs(db, revision_id, iteration_id)
 
 @router.post("/{revision_id}/documents")
 def add_doc_alt(revision_id: UUID, data: dict, db: Session = Depends(get_db),
@@ -598,9 +624,10 @@ def remove_doc_alt(revision_id: UUID, link_id: str, db: Session = Depends(get_db
 
 # 旧路径: /parts/revisions/{id}/documents（兼容）
 @router.get("/revisions/{revision_id}/documents")
-def list_docs(revision_id: UUID, db: Session = Depends(get_db),
+def list_docs(revision_id: UUID, iteration_id: Optional[UUID] = Query(None),
+              db: Session = Depends(get_db),
               current_user: User = Depends(require_permission("components.doc:read"))):
-    return _list_docs(db, revision_id)
+    return _list_docs(db, revision_id, iteration_id)
 
 @router.post("/revisions/{revision_id}/documents")
 def add_doc(revision_id: UUID, data: dict, db: Session = Depends(get_db),
@@ -616,3 +643,87 @@ def update_doc(revision_id: UUID, link_id: str, data: dict, db: Session = Depend
 def remove_doc(revision_id: UUID, link_id: str, db: Session = Depends(get_db),
                current_user: User = Depends(require_permission("components.doc:unlink"))):
     return _remove_doc(db, revision_id, link_id)
+
+
+# ===== 附件管理 =====
+
+@router.get("/revisions/{revision_id}/attachments")
+def list_attachments(
+    revision_id: UUID,
+    category: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("attachments:list")),
+):
+    result = crud_parts.get_part_revision_with_current_iteration(db, revision_id)
+    if not result:
+        raise HTTPException(404, "版本不存在")
+    revision, iteration = result
+    if not iteration:
+        return []
+
+    query = db.query(crud_parts.models_parts.PartAttachment).filter(
+        crud_parts.models_parts.PartAttachment.iteration_id == iteration.id
+    )
+    if category:
+        query = query.filter(crud_parts.models_parts.PartAttachment.category == category)
+
+    return [
+        {
+            "id": str(att.id),
+            "iteration_id": str(att.iteration_id),
+            "category": att.category,
+            "file_name": att.file_name,
+            "file_size": att.file_size,
+            "file_path": att.file_path,
+            "file_hash": att.file_hash,
+            "created_at": att.created_at.isoformat() if att.created_at else None,
+        }
+        for att in query.all()
+    ]
+
+
+@router.post("/revisions/{revision_id}/attachments")
+def add_attachment(
+    revision_id: UUID,
+    data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("attachments:upload")),
+):
+    result = crud_parts.get_part_revision_with_current_iteration(db, revision_id)
+    if not result:
+        raise HTTPException(404, "版本不存在")
+    revision, iteration = result
+    if not iteration:
+        raise HTTPException(400, "当前迭代不存在")
+    att = crud_parts.models_parts.PartAttachment(
+        iteration_id=iteration.id,
+        category=data.get("category", "cad"),
+        file_name=data["file_name"],
+        file_size=data.get("file_size"),
+        file_path=data.get("file_path"),
+        file_hash=data.get("file_hash"),
+    )
+    db.add(att)
+    db.commit()
+    db.refresh(att)
+    return {"id": str(att.id), "detail": "已添加"}
+
+
+@router.delete("/revisions/{revision_id}/attachments/{attachment_id}")
+def delete_attachment(
+    revision_id: UUID,
+    attachment_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("attachments:delete")),
+):
+    att = db.query(crud_parts.models_parts.PartAttachment).filter(
+        crud_parts.models_parts.PartAttachment.id == attachment_id
+    ).first()
+    if not att:
+        raise HTTPException(404, "附件不存在")
+    import os
+    if att.file_path and os.path.exists(att.file_path):
+        os.remove(att.file_path)
+    db.delete(att)
+    db.commit()
+    return {"detail": "已删除"}
