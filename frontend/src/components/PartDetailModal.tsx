@@ -157,7 +157,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const canCheckin = isDraft && isCheckedOutByMe;
   const canUndo = isDraft && isCheckedOutByMe && (revision?.latest_iteration || 0) > 1;
   const canRelease = (revision?.status === 'draft' || revision?.status === 'frozen') && !isCheckedOut;
-  const canFreeze = revision?.status === 'draft';
+  const canFreeze = revision?.status === 'draft' && !isCheckedOut;
   const canUnfreeze = revision?.status === 'frozen' && isAdminUser;
   const canUpgrade = revision?.status === 'released' || revision?.status === 'obsolete';
   const canObsolete = revision?.status === 'released';
@@ -190,7 +190,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
     return (
       <React.Fragment key={item.child_revision_id}>
         <tr className="hover:bg-gray-50 cursor-pointer" onClick={rowClick}>
-          <td className="px-3 py-2 text-gray-400 text-xs whitespace-nowrap">
+          <td className="px-3 py-2 text-gray-400 text-xs whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
             <span>{'-'.repeat(level + 1)}{level + 1}</span>
             {hasChildren && (
               <button type="button" onClick={(e) => { e.stopPropagation(); toggleBomExpand(item.child_revision_id); }}
@@ -212,7 +212,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
               <span className="text-orange-600">{checkoutName}</span>
             ) : <span className="text-gray-400">—</span>}
           </td>
-          <td className="px-3 py-2">
+          <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
             {canEdit ? (
               <input type="number" min={1} defaultValue={item.quantity}
                 onBlur={async (e) => {
@@ -225,7 +225,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
             ) : item.quantity}
           </td>
           {canEdit && (
-            <td className="px-3 py-2 text-right whitespace-nowrap">
+            <td className="px-3 py-2 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
               <span className="inline-flex items-center gap-1">
                 <button type="button" onClick={(e) => {
                   e.stopPropagation();
@@ -261,6 +261,23 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
       </React.Fragment>
     );
   }, [canEdit, expandedBom, loadingBom, toggleBomExpand, revisionId, loadTabs, toast]);
+
+  const updateBomItemVersion = useCallback((items: any[], itemId: string, newRevisionId: string, newVersion: string) => {
+    const update = (list: any[]): boolean => {
+      for (let i = 0; i < list.length; i++) {
+        if (list[i].id === itemId) {
+          list[i] = { ...list[i], child_revision_id: newRevisionId, child_version: newVersion };
+          return true;
+        }
+        const children = expandedBom[list[i].child_revision_id];
+        if (children && update(children)) return true;
+      }
+      return false;
+    };
+    const newItems = [...items];
+    update(newItems);
+    return newItems;
+  }, [expandedBom]);
 
   const doAction = async (action: () => Promise<any>, msg: string) => {
     try {
@@ -734,8 +751,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                         try {
                           await partsApi.updateBOMItem(revisionId, versionSelectItem.id, { child_revision_id: v.id });
                           toast.success('版本已更新');
-                          setExpandedBom({});
-                          loadTabs();
+                          setBomItems(updateBomItemVersion(bomItems, versionSelectItem.id, v.id, v.version));
                         } catch (e: any) { toast.error(e?.response?.data?.detail || '更新失败'); }
                         setVersionSelectItem(null);
                       }}>
