@@ -18,23 +18,7 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-class Component(Base):
-    __tablename__ = "components"
-    __table_args__ = ()
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    code = Column(String(64), nullable=False)
-    name = Column(String(255), nullable=False)
-    spec = Column(String(255))
-    version = Column(String(32), default="A")
-    status = Column(String(32), nullable=False, default="draft")
-    remark = Column(Text)
-    revisions = Column(JSONB, default=[])
-    revision_parent_id = Column(UUID(as_uuid=True), nullable=True)
-    creator_id = Column(UUID(as_uuid=True), nullable=True)
-    document_links = Column(JSONB, default=[])
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
+# [REMOVED: old Component model]
 
 class BOMItem(Base):
     __tablename__ = "bom_items"
@@ -42,11 +26,6 @@ class BOMItem(Base):
     iteration_id = Column(UUID(as_uuid=True), ForeignKey("part_iterations.id", ondelete="CASCADE"), nullable=True)
     parent_revision_id = Column(UUID(as_uuid=True), ForeignKey("part_revisions.id", ondelete="CASCADE"), nullable=True)
     child_revision_id = Column(UUID(as_uuid=True), ForeignKey("part_revisions.id", ondelete="CASCADE"), nullable=True)
-    # 旧字段兼容（保留直到所有引用迁移完毕）
-    parent_type = Column(String(16), nullable=True)
-    parent_id = Column(UUID(as_uuid=True), nullable=True)
-    child_type = Column(String(16), nullable=True)
-    child_id = Column(UUID(as_uuid=True), nullable=True)
     quantity = Column(Integer, nullable=False, default=1)
     sort_order = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -97,17 +76,7 @@ class DocumentAttachment(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
-class ComponentAttachment(Base):
-    """零部件独立附件表（照抄 document_attachments，文件存储在文件系统）"""
-    __tablename__ = "component_attachments"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    component_id = Column(UUID(as_uuid=True), ForeignKey('components.id', ondelete='CASCADE'), nullable=False)
-    category = Column(String(32), nullable=False)  # 'cad' / 'production'
-    file_name = Column(String(255))
-    file_size = Column(Integer)
-    file_path = Column(String(512))  # 文件系统路径
-    file_hash = Column(String(64))   # 文件哈希值
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+# [REMOVED: old ComponentAttachment model]
 
 
 class CustomFieldDefinition(Base):

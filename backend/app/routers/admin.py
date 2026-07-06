@@ -22,7 +22,7 @@ async def get_soft_deleted_stats(
     current_user: User = Depends(require_permission("admin.soft_delete:read"))
 ):
     """获取各表软删除记录统计"""
-    tables = ["components", "documents", "bom_items", "ecrs", "ecos", "configuration_items"]
+    tables = ["documents", "bom_items", "ecrs", "ecos", "configuration_items"]
     stats = {}
 
     for tbl in tables:
@@ -67,7 +67,7 @@ async def purge_soft_deleted(
     if not tables:
         raise HTTPException(status_code=400, detail="请指定要清理的表")
 
-    allowed_tables = {"components", "documents", "bom_items", "ecrs", "ecos", "configuration_items"}
+    allowed_tables = {"documents", "bom_items", "ecrs", "ecos", "configuration_items"}
     for tbl in tables:
         if tbl not in allowed_tables:
             raise HTTPException(status_code=400, detail=f"无效的表名: {tbl}")
@@ -77,7 +77,7 @@ async def purge_soft_deleted(
     # 按依赖顺序删除：被引用的父表放在引用它的子表之后，
     # 否则同批清理（如同时选 ecrs + ecos）会因外键顺序失败。
     # 目前唯一的可清理表内依赖：ecos.ecr_id -> ecrs。
-    purge_order = ["bom_items", "ecos", "ecrs", "configuration_items", "documents", "components"]
+    purge_order = ["bom_items", "ecos", "ecrs", "configuration_items", "documents"]
     ordered = [t for t in purge_order if t in tables]
 
     deleted_counts = {}

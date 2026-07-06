@@ -3,14 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 import os
 
-from .routers import auth_router, users_router, bom_router, logs_router, custom_fields_router, documents_router, user_groups_router, dashboard_router, ecr_router, eco_router, config_router, inventory_router, components_router, parts_router
+from .routers import auth_router, users_router, bom_router, logs_router, custom_fields_router, documents_router, user_groups_router, dashboard_router, ecr_router, eco_router, config_router, inventory_router, parts_router
 from .routers.attachments_v2 import router as attachments_v2_router
 from .routers.sync import router as sync_router
 from .routers.admin import router as admin_router
 from .routers.assistant import router as assistant_router
 from .routers.projects import router as projects_router
 from .database import SessionLocal, engine
-from .migrations_components import migrate_components
+
 
 app = FastAPI(
     title="BOM管理系统API",
@@ -32,7 +32,6 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/api")
 app.include_router(users_router, prefix="/api")
 app.include_router(user_groups_router, prefix="/api")
-app.include_router(components_router, prefix="/api")
 app.include_router(parts_router, prefix="/api")
 app.include_router(bom_router, prefix="/api")
 app.include_router(logs_router, prefix="/api")
@@ -96,7 +95,7 @@ async def startup_event():
             print("✓ Added column file_hash to document_attachments table")
 
         # 检查并添加 revision_parent_id 列（版本控制）
-        for table_name in ['parts', 'assemblies', 'documents', 'components']:
+        for table_name in ['parts', 'assemblies', 'documents']:
             result = db.execute(text(f"""
                 SELECT column_name 
                 FROM information_schema.columns 
@@ -207,30 +206,7 @@ async def startup_event():
             db.commit()
             print("✓ Created table configuration_working_items")
 
-        # 检查 component_attachments 表是否存在
-        result = db.execute(text("""
-            SELECT table_name FROM information_schema.tables 
-            WHERE table_name = 'component_attachments'
-        """))
-        if not result.fetchone():
-            db.execute(text("""
-                CREATE TABLE component_attachments (
-                    id UUID PRIMARY KEY,
-                    component_id UUID NOT NULL REFERENCES components(id) ON DELETE CASCADE,
-                    category VARCHAR(32) NOT NULL,
-                    file_name VARCHAR(255),
-                    file_size INTEGER,
-                    file_path VARCHAR(512),
-                    file_hash VARCHAR(64),
-                    created_at TIMESTAMPTZ DEFAULT now()
-                )
-            """))
-            db.execute(text("""
-                CREATE INDEX IF NOT EXISTS ix_component_attachments_comp_cat
-                ON component_attachments (component_id, category)
-            """))
-            db.commit()
-            print("✓ Created table component_attachments")
+
 
         # 审批流新增列 + 表
         for col_def in [
@@ -468,7 +444,7 @@ async def startup_event():
             print(f"✓ Added column {col} to {tbl} table")
 
         # ── 软删除列迁移 ──
-        for tbl in ["parts", "assemblies", "documents", "components", "bom_items", "ecrs", "ecos", "configuration_items"]:
+        for tbl in ["parts", "assemblies", "documents", "bom_items", "ecrs", "ecos", "configuration_items"]:
             result = db.execute(text(f"""
                 SELECT column_name FROM information_schema.columns
                 WHERE table_name = '{tbl}' AND column_name = 'deleted_at'
@@ -489,8 +465,8 @@ async def startup_event():
             print("✓ Added column updated_at to bom_items table")
 
         # ── 软删除 → 唯一约束改为 partial index ──
-        for tbl in ["parts", "assemblies", "documents", "components"]:
-            idx_name = {"parts": "uix_part_code_version", "assemblies": "uix_assembly_code_version", "documents": "uix_doc_code_version", "components": "uix_component_code_version"}[tbl]
+        for tbl in ["parts", "assemblies", "documents"]:
+            idx_name = {"parts": "uix_part_code_version", "assemblies": "uix_assembly_code_version", "documents": "uix_doc_code_version"}[tbl]
             try:
                 # 检查是否已经是 partial index
                 result = db.execute(text(f"""
@@ -585,13 +561,7 @@ async def startup_event():
             db.rollback()
             print(f"⚠ Parent date rollup skipped: {_re}")
 
-        # 零部件统一化迁移：parts + assemblies → components
-        try:
-            migrate_components(db, engine)
-            print("✓ Components unification migration completed")
-        except Exception as _cm:
-            db.rollback()
-            print(f"⚠ Components unification migration skipped: {_cm}")
+
 
         print("✓ Database migration completed successfully")
     except Exception as e:

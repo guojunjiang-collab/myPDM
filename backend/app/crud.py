@@ -78,17 +78,7 @@ def authenticate_user(db, username, password):
         return False
     return user
 
-def assert_entity_editable(db, entity_type: str, entity_id, user_role: str):
-    """审批锁定：处于"冻结/发布"状态的零部件，非管理员不可修改。"""
-    if user_role == "admin":
-        return
-    if entity_type != "component":
-        return
-    ent = get_component(db, entity_id)
-    if ent and ent.status in ("frozen", "released"):
-        from fastapi import HTTPException
-        label = "已冻结" if ent.status == "frozen" else "已发布"
-        raise HTTPException(status_code=403, detail=f"该零部件{label}，审批/发布期间不可修改（仅管理员可修改）")
+# [REMOVED: old assert_entity_editable for component system]
 
 
 def get_all_bom_items(db, include_deleted=False, updated_since=None):
@@ -105,124 +95,20 @@ def get_all_bom_items(db, include_deleted=False, updated_since=None):
         )
     return q.all()
 
-# ===== Component CRUD =====
-
-def get_component(db, component_id):
-    return db.query(models.Component).filter(models.Component.id == component_id).first()
-
-def get_component_by_code_version(db, code, version):
-    return db.query(models.Component).filter(
-        models.Component.code == code,
-        models.Component.version == version,
-        models.Component.deleted_at.is_(None)
-    ).first()
-
-def get_components(db, skip=0, limit=100, search=None, include_deleted=False,
-                   updated_since=None, top_level=False):
-    q = db.query(models.Component)
-    if not include_deleted:
-        q = q.filter(models.Component.deleted_at.is_(None))
-    if search:
-        pattern = f"%{search}%"
-        q = q.filter(
-            (models.Component.code.ilike(pattern)) |
-            (models.Component.name.ilike(pattern))
-        )
-    if updated_since:
-        from datetime import datetime, timezone
-        since_dt = datetime.fromtimestamp(updated_since, tz=timezone.utc)
-        q = q.filter(
-            (models.Component.updated_at >= since_dt) |
-            (models.Component.deleted_at >= since_dt)
-        )
-    if top_level:
-        subq = db.query(models.BOMItem.child_id).filter(
-            models.BOMItem.child_type == 'component',
-            models.BOMItem.deleted_at.is_(None)
-        ).subquery()
-        q = q.filter(~models.Component.id.in_(subq))
-    return q.offset(skip).limit(limit).all()
-
-def create_component(db, component):
-    data = component.model_dump()
-    db_comp = models.Component(**data)
-    db.add(db_comp)
-    db.commit()
-    db.refresh(db_comp)
-    return db_comp
-
-def update_component(db, component_id, component_update):
-    db_comp = get_component(db, component_id)
-    if not db_comp:
-        return None
-    for field, value in component_update.model_dump(exclude_unset=True).items():
-        setattr(db_comp, field, value)
-    from datetime import datetime
-    db_comp.updated_at = datetime.utcnow()
-    db.commit()
-    db.refresh(db_comp)
-    return db_comp
-
-def delete_component(db, component_id):
-    db.query(models.BOMItem).filter(
-        models.BOMItem.child_type == 'component',
-        models.BOMItem.child_id == component_id,
-        models.BOMItem.deleted_at.is_(None)
-    ).update({"deleted_at": sqlfunc.now()}, synchronize_session=False)
-    db.commit()
-    db_comp = get_component(db, component_id)
-    if db_comp:
-        db_comp.deleted_at = sqlfunc.now()
-        db.commit()
-    return db_comp
-
-def get_component_children(db, component_id):
-    """获取零部件的子项列表，包含详细信息（返回本地格式）"""
-    items = db.query(models.BOMItem).filter(
-        models.BOMItem.parent_type == "component",
-        models.BOMItem.parent_id == component_id,
-        models.BOMItem.deleted_at.is_(None),
-    ).all()
-    
-    result = []
-    for item in items:
-        child_type_local = "component"
-        
-        item_dict = {
-            "id": item.id,
-            "childType": child_type_local,
-            "child_type": item.child_type,
-            "child_id": item.child_id,
-            "quantity": int(item.quantity),
-            "created_at": item.created_at
-        }
-        item_dict["componentId"] = item.child_id
-        item_dict["partId"] = None
-        
-        child = get_component(db, item.child_id)
-        if child:
-            item_dict["child_detail"] = {
-                "id": child.id,
-                "code": child.code,
-                "name": child.name,
-                "spec": child.spec,
-                "version": child.version,
-                "status": child.status,
-            }
-        result.append(item_dict)
-    return result
+# [REMOVED: old Component CRUD functions]
 
 def get_bom_items(db, parent_type, parent_id, include_deleted=False):
+    """获取 BOM 子项（兼容旧的 parent_type/parent_id 参数，使用 parent_revision_id）"""
     q = db.query(models.BOMItem).filter(
-        models.BOMItem.parent_type == parent_type,
-        models.BOMItem.parent_id == parent_id,
+        models.BOMItem.parent_revision_id == parent_id,
     )
     if not include_deleted:
         q = q.filter(models.BOMItem.deleted_at.is_(None))
     return q.all()
 
 def create_bom_item(db, item):
-    db_item = models.BOMItem(**item.model_dump())
+    data = item.model_dump(exclude={'parent_type', 'parent_id', 'child_type', 'child_id'}, exclude_none=True)
+    db_item = models.BOMItem(**data)
     db.add(db_item)
     db.commit()
     db.refresh(db_item)
@@ -379,7 +265,6 @@ def reset_business_data(db):
 
     db.query(models.DocumentAttachment).delete()
     db.query(models.Document).delete()
-    db.query(models.Component).delete()
     db.query(models.CustomFieldDefinition).delete()
     db.query(models.OperationLog).delete()
 
@@ -562,49 +447,7 @@ def _copy_custom_field_values(db, entity_type: str, old_entity_id, new_entity_id
         db.flush()
 
 
-def upgrade_component(db, component_id, user: str = None):
-    """零部件升版：创建新版本零部件，复制自定义字段"""
-    from datetime import datetime, timezone
-    source = db.query(models.Component).filter(models.Component.id == component_id).first()
-    if not source:
-        return None, "零部件不存在"
-    if source.status not in ('released', 'obsolete'):
-        return None, "仅发布或作废状态的零部件允许升版"
-
-    new_version = _get_next_version(db, models.Component, source.code)
-    new_comp = models.Component(
-        code=source.code,
-        name=source.name,
-        spec=source.spec,
-        version=new_version,
-        status='draft',
-        remark=source.remark,
-        document_links=source.document_links or [],
-        revision_parent_id=source.id,
-        revisions=[{
-            'version': new_version,
-            'parent_version': source.version,
-            'action': 'upgraded_from',
-            'user': user,
-            'timestamp': datetime.now(timezone.utc).isoformat(),
-        }],
-    )
-    db.add(new_comp)
-    db.flush()
-    _copy_custom_field_values(db, 'component', source.id, new_comp.id)
-    db.commit()
-    db.refresh(new_comp)
-    return new_comp, None
-
-
-def get_component_versions(db, component_id):
-    """获取指定零部件的所有版本（同编码）"""
-    comp = db.query(models.Component).filter(models.Component.id == component_id).first()
-    if not comp:
-        return []
-    return db.query(models.Component).filter(
-        models.Component.code == comp.code
-    ).order_by(models.Component.created_at).all()
+# [REMOVED: old upgrade_component function]
 
 
 def upgrade_document(db, doc_id, user: str = None):

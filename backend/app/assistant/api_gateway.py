@@ -5,7 +5,7 @@ import asyncio
 
 # 业务数据路由前缀（均在 /api 下，附件在 /api/v2）——允许
 ALLOWED_PREFIXES = (
-    "/api/components", "/api/assemblies", "/api/bom", "/api/documents",
+    "/api/parts", "/api/bom", "/api/documents",
     "/api/v2/attachments", "/api/configurations", "/api/custom-fields",
     "/api/ecos", "/api/ecrs", "/api/inventory",
 )

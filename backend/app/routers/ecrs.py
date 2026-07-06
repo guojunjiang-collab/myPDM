@@ -8,7 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import User, Component
+from app.models import User
+from app.models_parts import PartMaster
 from app.models_ecr import ECR as ECRModel, ECRReviewRecord, ECRStatusLog, ECRAffectedItem
 from app.models_eco import ECO as ECOModel
 from app import crud_ecr, schemas_ecr
@@ -514,9 +515,9 @@ async def get_bom_trace(
 
     # 验证实体的存在性
     if entity_type == "part":
-        obj = db.query(Component).filter(Component.id == entity_id).first()
+        obj = db.query(PartMaster).filter(PartMaster.id == entity_id).first()
     else:
-        obj = db.query(Component).filter(Component.id == entity_id).first()
+        obj = db.query(PartMaster).filter(PartMaster.id == entity_id).first()
     if not obj:
         raise HTTPException(status_code=404, detail="实体不存在")
 

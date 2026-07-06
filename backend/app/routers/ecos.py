@@ -8,7 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import User, Component, BOMItem
+from app.models import User, BOMItem
+from app.models_parts import PartMaster
 from app.models_eco import ECO, ECOExecutionItem, ECOReviewRecord, ECOStatusLog
 from app import crud_eco, schemas_eco
 from ..permissions import require_permission, enforce_object_policy
@@ -71,14 +72,14 @@ def _build_eco_detail(db: Session, eco: ECO) -> dict:
         # 查询原始实体版本
         entity_version = None
         if ei.entity_id:
-            ent = db.query(Component).filter(Component.id == ei.entity_id).first()
+            ent = db.query(PartMaster).filter(PartMaster.id == ei.entity_id).first()
             if ent:
                 entity_version = ent.version
 
         # 查询新版实体的状态
         new_entity_status = None
         if ei.new_entity_id:
-            new_ent = db.query(Component).filter(Component.id == ei.new_entity_id).first()
+            new_ent = db.query(PartMaster).filter(PartMaster.id == ei.new_entity_id).first()
             if new_ent:
                 new_entity_status = new_ent.status
 
@@ -489,7 +490,7 @@ async def manual_upgrade_item(
     if not item.entity_id:
         raise HTTPException(status_code=400, detail="执行项缺少 entity_id")
 
-    model = Component
+    model = PartMaster
     entity = db.query(model).filter(model.id == item.entity_id).first()
     if not entity:
         raise HTTPException(status_code=404, detail="实体不存在")
@@ -521,7 +522,7 @@ async def manual_revert_item(
     if not target_entity_id:
         raise HTTPException(status_code=400, detail="尚未执行升版，无需还原")
 
-    model = Component
+    model = PartMaster
     new_entity = db.query(model).filter(model.id == target_entity_id).first()
 
     if not new_entity:
@@ -580,7 +581,7 @@ async def manual_freeze_item(
     if not target_entity_id:
         raise HTTPException(status_code=400, detail="尚未执行升版，无法冻结")
 
-    model = Component
+    model = PartMaster
     new_entity = db.query(model).filter(model.id == target_entity_id).first()
     if not new_entity:
         raise HTTPException(status_code=404, detail="新版本实体不存在")
@@ -612,7 +613,7 @@ async def manual_release_item(
     if not target_entity_id:
         raise HTTPException(status_code=400, detail="尚未执行升版，无法发布")
 
-    model = Component
+    model = PartMaster
     new_entity = db.query(model).filter(model.id == target_entity_id).first()
     if not new_entity:
         raise HTTPException(status_code=404, detail="新版本实体不存在")

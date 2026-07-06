@@ -1,27 +1,6 @@
 {
   "roles": ["admin", "engineer", "production", "guest"],
   "permissions": {
-    "parts:read": ["admin", "engineer", "production", "guest"],
-    "parts:create": ["admin", "engineer"],
-    "parts:update": ["admin", "engineer"],
-    "parts:delete": ["admin"],
-    "parts:export": ["admin", "engineer", "production"],
-    "parts:import": ["admin", "engineer"],
-    "parts.doc:read": ["admin", "engineer", "production", "guest"],
-    "parts.doc:link": ["admin", "engineer"],
-    "parts.doc:unlink": ["admin", "engineer"],
-
-    "assemblies:read": ["admin", "engineer", "production", "guest"],
-    "assemblies:create": ["admin", "engineer"],
-    "assemblies:update": ["admin", "engineer"],
-    "assemblies:delete": ["admin"],
-    "assemblies.bom:manage": ["admin", "engineer"],
-    "assemblies.bom:export_single": ["admin", "engineer", "production"],
-    "assemblies.bom:import_export_all": ["admin"],
-    "assemblies.doc:read": ["admin", "engineer", "production", "guest"],
-    "assemblies.doc:link": ["admin", "engineer"],
-    "assemblies.doc:unlink": ["admin", "engineer"],
-
     "components:create": ["admin", "engineer"],
     "components:delete": ["admin"],
     "components:read": ["admin", "engineer", "production", "guest"],

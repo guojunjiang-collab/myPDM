@@ -35,9 +35,8 @@ async def sync_status(
     前端每 10s 轮询此端点，对比本地 lastSyncTime 决定是否拉取增量。
     """
     return {
-        "components": _max_ts(db, "components"),
-        "parts": _max_ts(db, "components"),
-        "assemblies": _max_ts(db, "components"),
+        "parts": _max_ts(db, "part_masters"),
+        "assemblies": _max_ts(db, "part_masters"),
         "documents": _max_ts(db, "documents"),
         "bom_items": _max_ts(db, "bom_items"),
         "ecrs": _max_ts(db, "ecrs"),

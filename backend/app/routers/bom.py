@@ -7,7 +7,8 @@ from typing import List
 import uuid
 
 from ..database import get_db
-from ..models import User, Component
+from ..models import User
+from ..models_parts import PartMaster
 from .. import crud, models, schemas
 from ..bom import compare
 from ..permissions import require_permission
@@ -39,23 +40,20 @@ async def check_references(
         ).all()
         for item in bom_items:
             if item.parent_type in ("part", "component", "assembly"):
-                p = crud.get_component(db, item.parent_id)
+                p = db.query(PartMaster).filter(PartMaster.id == item.parent_id).first()
                 if p and p.deleted_at is None:
                     references.append({"type": "bom_child", "parent_id": str(item.parent_id), "label": f"零部件 {p.code}"})
 
-    # 2. 检查 document_links 引用（图文档被关联到零件/部件）
+    # 2. 检查 document_links 引用（图文档被关联到零部件）- 已迁移到 PartRevision.document_links
     if entity_type == "document":
-        from ..models import Component
+        from ..models_parts import PartRevision
         doc_id_str = str(entity_id)
-        for p in db.query(Component).all():
-            for link in (p.document_links or []):
+        for rev in db.query(PartRevision).all():
+            for link in (rev.document_links or []):
                 if link.get("document_id") == doc_id_str:
-                    references.append({"type": "entity_document", "parent_id": str(p.id), "label": f"零部件 {p.code}"})
-                    break
-        for a in db.query(Component).all():
-            for link in (a.document_links or []):
-                if link.get("document_id") == doc_id_str:
-                    references.append({"type": "entity_document", "parent_id": str(a.id), "label": f"零部件 {a.code}"})
+                    master = db.query(PartMaster).filter(PartMaster.id == rev.master_id).first()
+                    label = f"零部件 {master.code}" if master else "零部件"
+                    references.append({"type": "entity_document", "parent_id": str(rev.master_id), "label": label})
                     break
 
     return references
@@ -70,10 +68,10 @@ async def get_all_bom_items_route(updated_since: float = None, db: Session = Dep
     for item in items:
         result.append({
             "id": str(item.id),
-            "parent_type": item.parent_type,
-            "parent_id": str(item.parent_id) if item.parent_id else None,
-            "child_type": item.child_type,
-            "child_id": str(item.child_id) if item.child_id else None,
+            "parent_type": "part",
+            "parent_id": str(item.parent_revision_id) if item.parent_revision_id else None,
+            "child_type": "part",
+            "child_id": str(item.child_revision_id) if item.child_revision_id else None,
             "quantity": item.quantity,
             "created_at": item.created_at.isoformat() if item.created_at else None,
             "updated_at": item.updated_at.isoformat() if hasattr(item, 'updated_at') and item.updated_at else None,
@@ -89,14 +87,14 @@ async def get_bom_tree(item_type: str, item_id: uuid.UUID, db: Session = Depends
     items = crud.get_bom_items(db, item_type, item_id)
     result = []
     for item in items:
-        child = crud.get_component(db, item.child_id)
+        child = db.query(PartMaster).filter(PartMaster.id == item.child_revision_id).first() if item.child_revision_id else None
         child_detail = None
         if child:
-            child_detail = {"id": str(child.id), "code": child.code, "name": child.name, "spec": child.spec, "type": "component"}
+            child_detail = {"id": str(child.id), "code": child.code, "name": child.name, "spec": getattr(child, 'spec', ''), "type": "component"}
         result.append({
             "id": str(item.id),
-            "child_type": item.child_type,
-            "child_id": str(item.child_id),
+            "child_type": "part",
+            "child_id": str(item.child_revision_id) if item.child_revision_id else None,
             "quantity": int(item.quantity),
             "child_detail": child_detail
         })
@@ -139,11 +137,11 @@ async def get_bom_trace(
     for row in rows:
         parent_entity = None
         if row.parent_type in ("assembly", "component"):
-            a = crud.get_component(db, row.parent_id)
+            a = db.query(PartMaster).filter(PartMaster.id == row.parent_id).first()
             if a:
                 parent_entity = {
                     "id": str(a.id), "code": a.code, "name": a.name,
-                    "spec": a.spec, "version": a.version, "status": a.status,
+                    "spec": getattr(a, 'spec', ''), "version": "", "status": "",
                 }
         elif row.parent_type == "part":
             p = crud.get_part(db, row.parent_id)
@@ -154,7 +152,7 @@ async def get_bom_trace(
                 }
 
         child_type = "component"
-        c = crud.get_component(db, row.child_id)
+        c = db.query(PartMaster).filter(PartMaster.id == row.child_id).first()
         child_entity = None
         if c:
             child_entity = {"id": str(c.id), "code": c.code, "name": c.name, "type": "component"}

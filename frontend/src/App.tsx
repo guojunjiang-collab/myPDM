@@ -6,7 +6,6 @@ import { ToastContainer } from './components/Toast';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Board from './pages/Board';
-import ComponentsPage from './pages/ComponentsPage';
 import PartsPage from './pages/PartsPage';
 import Documents from './pages/Documents';
 import BOM from './pages/BOM/BOM';
@@ -66,7 +65,6 @@ export default function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="board" element={<Board />} />
-          <Route path="components" element={<ComponentsPage />} />
           <Route path="parts" element={<PartsPage />} />
           <Route path="documents" element={<Documents />} />
           <Route path="configuration" element={<Configuration />} />

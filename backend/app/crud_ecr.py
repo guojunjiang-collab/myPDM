@@ -11,7 +11,8 @@ from datetime import datetime, timezone
 
 from app.database import SessionLocal
 from app.models_ecr import ECR, ECRAffectedItem, ECRReviewRecord, ECRStatusLog
-from app.models import User, Component, BOMItem
+from app.models import User, BOMItem
+from app.models_parts import PartMaster, PartRevision
 from app.schemas_ecr import ECRCreate, ECREdit, ECRListParams, AffectedItemCreate
 
 # ─────────────────────────────────────────────────────
@@ -359,24 +360,12 @@ def add_affected_item(
     entity_name = ""
     entity_version = ""
 
-    if data.entity_type == "component":
-        entity = db.query(Component).filter(Component.id == entity_id).first()
+    if data.entity_type in ("component", "part", "assembly"):
+        entity = db.query(PartMaster).filter(PartMaster.id == entity_id).first()
         if entity:
             entity_code = entity.code or ""
             entity_name = entity.name or ""
-            entity_version = entity.version or ""
-    elif data.entity_type == "part":
-        entity = db.query(Component).filter(Component.id == entity_id).first()
-        if entity:
-            entity_code = entity.code or ""
-            entity_name = entity.name or ""
-            entity_version = entity.version or ""
-    elif data.entity_type == "assembly":
-        entity = db.query(Component).filter(Component.id == entity_id).first()
-        if entity:
-            entity_code = entity.code or ""
-            entity_name = entity.name or ""
-            entity_version = entity.version or ""
+            entity_version = getattr(entity, 'version', '') or ""
 
     item = ECRAffectedItem(
         ecr_id=ecr_id,
@@ -444,7 +433,7 @@ def _get_upward_trace(db: Session, entity_type: str, entity_id: uuid.UUID) -> li
     for row in rows:
         pk = str(row.parent_id)
         if pk not in nodes_by_id:
-            p = db.query(Component).filter(Component.id == row.parent_id).first()
+            p = db.query(PartMaster).filter(PartMaster.id == row.parent_id).first()
             if p:
                 nodes_by_id[pk] = {
                     "entity_type": row.parent_type,
@@ -467,12 +456,7 @@ def _get_upward_trace(db: Session, entity_type: str, entity_id: uuid.UUID) -> li
             parent_meta[pk] = {"child_id": ck, "quantity": float(row.quantity), "_cte_level": row.level}
 
     # 获取变更对象详情
-    if entity_type == "component":
-        obj = db.query(Component).filter(Component.id == entity_id).first()
-    elif entity_type == "part":
-        obj = db.query(Component).filter(Component.id == entity_id).first()
-    else:
-        obj = db.query(Component).filter(Component.id == entity_id).first()
+    obj = db.query(PartMaster).filter(PartMaster.id == entity_id).first()
     if not obj:
         return []
 
@@ -598,13 +582,12 @@ def _get_downward_trace(db: Session, entity_type: str, entity_id: uuid.UUID) -> 
             if child_type_db == "component":
                 child_type_db = "assembly"
             if child_type_db == "part":
-                c = db.query(Component).filter(Component.id == child.child_id).first()
-            else:
-                c = db.query(Component).filter(Component.id == child.child_id).first()
+                child_type_db = "part"  # no-op, just for clarity
+            c = db.query(PartMaster).filter(PartMaster.id == child.child_id).first()
             if c:
                 child_code = c.code
                 child_name = c.name
-                child_version = c.version
+                child_version = getattr(c, 'version', '') or ""
             downward_items.append({
                 "entity_type": child_type_db,
                 "entity_id": str(child.child_id),

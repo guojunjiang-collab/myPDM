@@ -11,7 +11,8 @@ import asyncio
 from pathlib import Path
 
 from ..database import get_db
-from ..models import User, DocumentAttachment, Document, Component
+from ..models import User, DocumentAttachment, Document
+from ..models_parts import PartMaster
 from ..file_storage import file_storage, chunked_uploader, MAX_FILE_SIZE, CHUNK_SIZE
 from .auth import get_current_active_user
 from ..permissions import require_permission, has_permission
@@ -125,8 +126,8 @@ async def upload_file(
             if doc:
                 folder_name = f"{doc.code}_{doc.version}"
         elif entity_type in ("component", "components"):
-            from ..models import Component
-            comp = db.query(Component).filter(Component.id == uuid.UUID(entity_id)).first()
+            from ..models_parts import PartMaster
+            comp = db.query(PartMaster).filter(PartMaster.id == uuid.UUID(entity_id)).first()
             if comp:
                 folder_name = f"{comp.code}_{comp.version}"
         result = file_storage.save_file(
@@ -139,7 +140,7 @@ async def upload_file(
 
         # 零部件附件：写入独立表 component_attachments
         if entity_type in ("component", "components"):
-            from ..models import ComponentAttachment
+            from ..models_parts import PartMasterAttachment
             catt_id = uuid.uuid4()
             new_catt = ComponentAttachment(
                 id=catt_id,
@@ -238,8 +239,8 @@ async def init_chunked_upload(
             if doc:
                 folder_name = f"{doc.code}_{doc.version}"
         elif entity_type in ("component", "components"):
-            from ..models import Component
-            comp = db.query(Component).filter(Component.id == uuid.UUID(entity_id)).first()
+            from ..models_parts import PartMaster
+            comp = db.query(PartMaster).filter(PartMaster.id == uuid.UUID(entity_id)).first()
             if comp:
                 folder_name = f"{comp.code}_{comp.version}"
         meta = chunked_uploader.init_upload(
@@ -324,7 +325,7 @@ async def complete_chunked_upload(
         file_info = result["file_info"]
 
         if file_info["entity_type"] in ("component", "components"):
-            from ..models import ComponentAttachment
+            from ..models_parts import PartMasterAttachment
             catt_id = uuid.uuid4()
             new_catt = ComponentAttachment(
                 id=catt_id,

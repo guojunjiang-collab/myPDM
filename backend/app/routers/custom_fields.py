@@ -150,8 +150,8 @@ async def get_values_batch(
     示例: GET /api/custom-fields/values/batch?type=part&ids=id1,id2,id3
     返回: { "id1": {"field_key": "value", ...}, "id2": {...} }
     """
-    if type not in ('part', 'component', 'document'):
-        raise HTTPException(status_code=400, detail="type 必须为 part、component 或 document")
+    if type not in ('part', 'document'):
+        raise HTTPException(status_code=400, detail="type 必须为 part 或 document")
     
     entity_ids = [id.strip() for id in ids.split(',') if id.strip()]
     if not entity_ids:
@@ -168,8 +168,8 @@ async def get_values(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("custom_field.value:read"))
 ):
-    if entity_type not in ('part', 'component', 'document'):
-        raise HTTPException(status_code=400, detail="entity_type 必须为 part、component 或 document")
+    if entity_type not in ('part', 'document'):
+        raise HTTPException(status_code=400, detail="entity_type 必须为 part 或 document")
     results = crud.get_custom_field_values(db, entity_type, entity_id)
     return [_value_response(val, field_def) for val, field_def in results]
 
@@ -183,9 +183,8 @@ async def set_values(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("custom_field.value:write"))
 ):
-    if entity_type not in ('part', 'component', 'document'):
-        raise HTTPException(status_code=400, detail="entity_type 必须为 part、component 或 document")
-    crud.assert_entity_editable(db, entity_type, entity_id, current_user.role)
+    if entity_type not in ('part', 'document'):
+        raise HTTPException(status_code=400, detail="entity_type 必须为 part 或 document")
     crud.set_custom_field_values(db, entity_type, entity_id, batch.values)
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username, "更新自定义字段值", entity_type, str(entity_id), f"{len(batch.values)}个字段", ip)

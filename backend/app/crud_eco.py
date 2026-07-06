@@ -11,7 +11,8 @@ from datetime import datetime, timezone
 
 from app.database import SessionLocal
 from app.models_eco import ECO, ECOExecutionItem, ECOReviewRecord, ECOStatusLog
-from app.models import User, Component, BOMItem
+from app.models import User, BOMItem
+from app.models_parts import PartMaster, PartRevision
 from app.schemas_eco import ECOCreate, ECOEdit, ECOListParams, ECOExecutionItemCreate, ECOExecutionItemEdit
 from app.crud import _get_next_version
 
@@ -365,7 +366,7 @@ def collect_release_tree_entities(db: Session, release_items: list) -> list:
     返回 [(entity_type, entity), ...]（entity 为 Part / Assembly ORM 对象）。
     一键发布、发布状态校验、提交冻结共用同一遍历，确保对"树"的定义完全一致。
     """
-    from app.models import Component, BOMItem
+    from app.models import BOMItem
     visited: set = set()
     entities: list = []
     stack: list = []
@@ -386,14 +387,8 @@ def collect_release_tree_entities(db: Session, release_items: list) -> list:
             continue
         visited.add(key)
 
-        if entity_type == "component":
-            model = Component
-        elif entity_type == "part":
-            model = Component
-        else:
-            model = Component
-        entity = db.query(model).filter(
-            model.id == entity_id, model.deleted_at.is_(None)
+        entity = db.query(PartMaster).filter(
+            PartMaster.id == entity_id, PartMaster.deleted_at.is_(None)
         ).first()
         if not entity:
             continue
@@ -431,7 +426,6 @@ def unfreeze_release_tree(db: Session, eco: ECO) -> int:
 
     仅当实体当前仍为"冻结"时才恢复，避免覆盖审批期间发生的其它状态变化。不在此提交，由调用方统一提交。
     """
-    from app.models import Component
     count = 0
     for rec in (eco.frozen_entities or []):
         et = rec.get("entity_type")
@@ -442,13 +436,7 @@ def unfreeze_release_tree(db: Session, eco: ECO) -> int:
             uid = uuid.UUID(str(eid))
         except (ValueError, AttributeError):
             continue
-        if et == "component":
-            model = Component
-        elif et == "part":
-            model = Component
-        else:
-            model = Component
-        entity = db.query(model).filter(model.id == uid, model.deleted_at.is_(None)).first()
+        entity = db.query(PartMaster).filter(PartMaster.id == uid, PartMaster.deleted_at.is_(None)).first()
         if entity and entity.status == "frozen":
             entity.status = "draft"
             count += 1
@@ -698,58 +686,20 @@ def _clone_entity(db: Session, entity, entity_type: str) -> uuid.UUID:
     """克隆实体创建新版本，返回新实体 ID。
     零件：基础字段+自定义字段沿用，关联图文档清空。
     部件：基础字段+自定义字段+子项列表沿用，关联图文档清空。"""
-    if entity_type == "component":
-        get_next_model = Component
-    elif entity_type == "part":
-        get_next_model = Component
-    else:
-        get_next_model = Component
-    new_version = _get_next_version(db, get_next_model, entity.code)
-    revisions = list(entity.revisions or [])
+    new_version = _get_next_version(db, PartMaster, entity.code)
 
-    if entity_type == "component":
-        new_entity = Component(
-            code=entity.code,
-            name=entity.name,
-            spec=entity.spec,
-            version=new_version,
-            status="draft",
-            remark=entity.remark,
-            revisions=revisions,
-            revision_parent_id=entity.id,
-            document_links=[],
-        )
-        db.add(new_entity)
-        db.flush()
-    elif entity_type == "part":
-        new_entity = Component(
-            code=entity.code,
-            name=entity.name,
-            spec=entity.spec,
-            version=new_version,
-            status="draft",
-            remark=entity.remark,
-            revisions=revisions,
-            revision_parent_id=entity.id,
-            document_links=[],  # 清空关联图文档
-        )
-        db.add(new_entity)
-        db.flush()
-    else:
-        new_entity = Component(
-            code=entity.code,
-            name=entity.name,
-            spec=entity.spec,
-            version=new_version,
-            status="draft",
-            remark=entity.remark,
-            revisions=revisions,
-            revision_parent_id=entity.id,
-            document_links=[],  # 清空关联图文档
-        )
-        db.add(new_entity)
-        db.flush()
-        # 复制子项列表（BOM）
+    new_entity = PartMaster(
+        code=entity.code,
+        name=entity.name,
+        spec=getattr(entity, 'spec', None),
+        type=entity_type if entity_type == "part" else "assembly",
+        creator_id=getattr(entity, 'creator_id', None),
+    )
+    db.add(new_entity)
+    db.flush()
+
+    # 复制子项列表（BOM）- 仅对部件类型
+    if entity_type not in ("part",):
         from app.models import BOMItem
         old_bom = db.query(BOMItem).filter(
             BOMItem.parent_type.in_(("assembly", "component")),
@@ -788,15 +738,9 @@ def _execute_create(db: Session, item: ECOExecutionItem) -> dict:
     entity_data = {
         "code": item.entity_code or f"NEW-{uuid.uuid4().hex[:8].upper()}",
         "name": item.entity_name,
-        "version": "A",
-        "status": "released",
+        "type": item.entity_type if item.entity_type in ("part", "assembly") else "assembly",
     }
-    if item.entity_type == "component":
-        new_entity = Component(**entity_data)
-    elif item.entity_type == "part":
-        new_entity = Component(**entity_data)
-    else:
-        new_entity = Component(**entity_data)
+    new_entity = PartMaster(**entity_data)
     db.add(new_entity)
     db.flush()
 
@@ -819,13 +763,7 @@ def _execute_upgrade(db: Session, item: ECOExecutionItem, ecr_affected_items) ->
     entity_id = item.entity_id
     entity_type = item.entity_type
 
-    if entity_type == "component":
-        model = Component
-    elif entity_type == "part":
-        model = Component
-    else:
-        model = Component
-    entity = db.query(model).filter(model.id == entity_id).first()
+    entity = db.query(PartMaster).filter(PartMaster.id == entity_id).first()
     if not entity:
         raise HTTPException(status_code=404, detail=f"实体 {entity_id} 不存在")
 
@@ -845,7 +783,7 @@ def _execute_upgrade(db: Session, item: ECOExecutionItem, ecr_affected_items) ->
         parent_id_str = parent_node.get("entity_id")
         if parent_id_str:
             parent_id = uuid.UUID(parent_id_str)
-            parent = db.query(Component).filter(Component.id == parent_id).first()
+            parent = db.query(PartMaster).filter(PartMaster.id == parent_id).first()
             if parent:
                 pnew_id, _ = _clone_entity(db, parent, parent_type)
                 cascaded.append(str(pnew_id))
@@ -860,7 +798,7 @@ def _execute_qty_change(db: Session, item: ECOExecutionItem, ecr_affected_items)
     entity_type = item.entity_type
 
     # 父项升版
-    parent = db.query(Component).filter(Component.id == parent_id).first()
+    parent = db.query(PartMaster).filter(PartMaster.id == parent_id).first()
     if not parent:
         raise HTTPException(status_code=404, detail=f"父项装配件 {parent_id} 不存在")
 
@@ -902,7 +840,7 @@ def _execute_qty_change(db: Session, item: ECOExecutionItem, ecr_affected_items)
         p_id_str = parent_node.get("entity_id")
         if p_id_str:
             p_id = uuid.UUID(p_id_str)
-            p = db.query(Component).filter(Component.id == p_id).first()
+            p = db.query(PartMaster).filter(PartMaster.id == p_id).first()
             if p:
                 pnew_id, _ = _clone_entity(db, p, "assembly")
                 cascaded.append(str(pnew_id))
@@ -917,7 +855,7 @@ def _execute_delete(db: Session, item: ECOExecutionItem, ecr_affected_items) -> 
     entity_type = item.entity_type
 
     # 父项升版
-    parent = db.query(Component).filter(Component.id == parent_id).first()
+    parent = db.query(PartMaster).filter(PartMaster.id == parent_id).first()
     if not parent:
         raise HTTPException(status_code=404, detail=f"父项装配件 {parent_id} 不存在")
 
@@ -948,7 +886,7 @@ def _execute_delete(db: Session, item: ECOExecutionItem, ecr_affected_items) -> 
         p_id_str = parent_node.get("entity_id")
         if p_id_str:
             p_id = uuid.UUID(p_id_str)
-            p = db.query(Component).filter(Component.id == p_id).first()
+            p = db.query(PartMaster).filter(PartMaster.id == p_id).first()
             if p:
                 pnew_id, _ = _clone_entity(db, p, "assembly")
                 cascaded.append(str(pnew_id))

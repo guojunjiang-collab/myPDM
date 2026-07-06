@@ -40,7 +40,7 @@ export const can = (perm: Permission): boolean => {
 };
 
 // 旧 helper 改为 can() 薄封装（保持向后兼容）
-export const canEdit = () => can('parts:create');
-export const canDownload = () => can('parts:export');
+export const canEdit = () => can('components:create');
+export const canDownload = () => can('components:read');
 export const canPreview = () => true;
-export const isAdmin = () => can('parts:delete');
+export const isAdmin = () => can('components:delete');

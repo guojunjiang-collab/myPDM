@@ -1,13 +1,13 @@
 """自生数据字典：内省 SQLAlchemy 模型 + 人工词汇表。"""
 from sqlalchemy import inspect as sa_inspect
 
-from .. import models, models_ecr, models_eco, models_configuration
+from .. import models, models_ecr, models_eco, models_configuration, models_parts
 from .knowledge_glossary import GLOSSARY, OVERVIEW
 
 ENTITY_MODELS = {
-    "component": models.Component,
-    "part": models.Component,
-    "assembly": models.Component,
+    "component": models_parts.PartMaster,
+    "part": models_parts.PartMaster,
+    "assembly": models_parts.PartMaster,
     "bom_item": models.BOMItem,
     "document": models.Document,
     "attachment": models.DocumentAttachment,

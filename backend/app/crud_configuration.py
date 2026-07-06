@@ -224,7 +224,7 @@ def remove_config_child(db: Session, child_id: str) -> bool:
 
 def _generate_checklist(db: Session, profile_id: str, config_item_id: str, source_type: str = "direct"):
     """递归展开构型项，生成配置清单 → 写入工作表"""
-    from app.models import Component
+    from app.models_parts import PartMaster
 
     parts = db.query(models.ConfigurationItemPart).filter(
         models.ConfigurationItemPart.configuration_item_id == config_item_id
@@ -233,7 +233,7 @@ def _generate_checklist(db: Session, profile_id: str, config_item_id: str, sourc
     for p in parts:
         item_code = None
         item_name = None
-        entity = db.query(Component).filter(Component.id == p.part_id).first()
+        entity = db.query(PartMaster).filter(PartMaster.id == p.part_id).first()
         if entity:
             item_code = entity.code
             item_name = entity.name

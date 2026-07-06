@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from .. import crud
 from ..bom import compare
 from ..models import User, DocumentAttachment
+from ..models_parts import PartMaster
 from ..file_storage import file_storage
 from . import document_builder
 from . import api_gateway
@@ -37,20 +38,28 @@ def search_entity(db: Session, user: User, keyword: str, type: Optional[str] = N
         return {"results": []}
     results = []
     if type in (None, "part", "component", "assembly"):
-        for p in crud.get_components(db, search=keyword, limit=10):
+        q = db.query(PartMaster)
+        if keyword:
+            pattern = f"%{keyword}%"
+            from sqlalchemy import or_
+            q = q.filter(or_(PartMaster.code.ilike(pattern), PartMaster.name.ilike(pattern)))
+        for p in q.limit(10).all():
             results.append(_entity_brief(p, "component"))
     return {"results": results}
 
+def _get_part_master(db, entity_id):
+    """从 part_masters 表查询实体"""
+    return db.query(PartMaster).filter(PartMaster.id == entity_id).first()
 
 def get_part_detail(db: Session, user: User, part_id: str):
-    p = crud.get_component(db, uuid.UUID(part_id))
+    p = _get_part_master(db, uuid.UUID(part_id))
     if not p:
         return {"error": "零部件不存在"}
     return {"detail": _entity_brief(p, "component")}
 
 
 def get_assembly_detail(db: Session, user: User, assembly_id: str):
-    a = crud.get_component(db, uuid.UUID(assembly_id))
+    a = _get_part_master(db, uuid.UUID(assembly_id))
     if not a:
         return {"error": "零部件不存在"}
     return {"detail": _entity_brief(a, "component")}
@@ -62,7 +71,7 @@ def get_bom_tree(db: Session, user: User, type: str, id: str):
     items = crud.get_bom_items(db, type, uuid.UUID(id))
     rows = []
     for it in items:
-        child = crud.get_component(db, it.child_id)
+        child = _get_part_master(db, it.child_id)
         rows.append({
             "child_type": it.child_type,
             "child_code": getattr(child, "code", None),
@@ -140,7 +149,7 @@ def trace_bom(db: Session, user: User, entity_type: str, entity_id: str, max_lev
             if r.parent_id in seen:
                 continue
             seen.add(r.parent_id)
-            pa = crud.get_component(db, r.parent_id)
+            pa = _get_part_master(db, r.parent_id)
             if pa:
                 parents.append({"level": level, "parent_type": r.parent_type,
                                 "code": pa.code, "name": pa.name})
