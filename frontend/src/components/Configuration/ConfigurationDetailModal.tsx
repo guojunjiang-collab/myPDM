@@ -7,6 +7,7 @@ import PartDetailContent from '../PartDetailContent';
 import AssemblyDetailContent from '../AssemblyDetailContent';
 import PartDetailModal from '../PartDetailModal';
 import { useDataStore } from '../../stores/data';
+import CustomFieldInput from '../CustomFieldInput';
 
 interface Props {
   itemId: string | null;
@@ -16,6 +17,8 @@ interface Props {
 export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<any>(null);
+  const [cfDefs, setCfDefs] = useState<CustomFieldDefinition[]>([]);
+  const [cfValues, setCfValues] = useState<Record<string, any>>({});
 
   // 展开状态: { key: children[] }
   const [expandedParts, setExpandedParts] = useState<Record<string, any[]>>({});
@@ -51,6 +54,17 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
         const d = res.data;
         if (d.children) d.children = sortByCode(d.children);
         setData(d);
+        // 加载自定义字段
+        const allDefs = useDataStore.getState().customFieldDefs;
+        const defs = allDefs.filter((d: CustomFieldDefinition) => d.applies_to?.includes('configuration_item'));
+        setCfDefs(defs);
+        if (defs.length > 0) {
+          customFieldsApi.getValues('configuration_item', itemId).then(res => {
+            const vals: Record<string, any> = {};
+            (res.data || []).forEach((v: CustomFieldValue) => { vals[v.field_id] = v.value; });
+            setCfValues(vals);
+          }).catch(() => {});
+        }
         setExpandedParts({}); setExpandedChild({}); setNoChildren(new Set());
       })
       .catch(() => setData(null))
@@ -308,6 +322,18 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
             <InfoItem label="创建人" value={data.creator_name || '-'} />
             <InfoItem label="备注" value={data.remark || '-'} className="col-span-2 md:col-span-4" />
           </div>
+
+          {/* 自定义字段 */}
+          {cfDefs.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {cfDefs.map(def => (
+                <div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                  <label className="block text-xs text-gray-500 mb-0.5">{def.name}</label>
+                  <CustomFieldInput def={def} value={cfValues[def.id]} onChange={() => {}} readOnly />
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* 关联零部件 */}
           <div>
