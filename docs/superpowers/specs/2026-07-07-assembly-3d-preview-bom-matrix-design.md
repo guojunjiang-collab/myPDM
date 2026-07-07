@@ -139,6 +139,13 @@ cad_instances = Column(JSONB, default=[])
 - GLB URL 复用现有单件 GLB 服务；去重由前端 `useLoader` 按 url 缓存自然完成。
 - 该接口是 `InstanceBodyWriterTools.generateInstanceStreamWithGlobalMatrix` 的 Python 对应实现，但数据源是 myPDM 的 BOM 表。
 
+**递归展平示意**（深度优先，`world = 父件世界 × 本地` 逐层右乘，只对叶子输出实例）：
+
+![整机递归展平世界矩阵](assets/2026-07-07-recursive-flatten-world-matrix.svg)
+
+- 多级子装配沿路径从根到叶逐层累乘；蓝节点继续下钻、绿叶子输出实例。
+- 前端不做树运算：拿到展平清单 → `clone` glb → 贴 `world`；Z-up→Y-up 只在装配根施加一次，平移已归一化为米。
+
 **配套嵌套 BOM 树接口**：`GET /api/parts/revisions/{assembly_revision_id}/assembly-tree`
 - 递归 `BOMItem` 树，返回**嵌套节点**：`{ bom_item_id, part_code, part_name, quantity, instance_count, is_leaf, children:[...] }`。
 - 供前端侧栏渲染真实层级 BOM（区别于单件查看器从 GLB 内部节点建的树）。节点 `bom_item_id` 与实例 `bom_path` 段一一对应，是双向对齐的锚点。
