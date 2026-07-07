@@ -8,6 +8,7 @@ from sqlalchemy import and_
 from fastapi import HTTPException
 
 from . import models, models_parts
+from .cad import matrix_utils as _mu
 from .database import SessionLocal
 
 
@@ -804,3 +805,183 @@ def delete_bom_item(db: Session, item_id: UUID) -> bool:
     item.deleted_at = datetime.now(timezone.utc)
     db.commit()
     return True
+
+
+# ====== CAD 矩阵匹配与展平 ======
+
+def _current_iteration(db: Session, revision_id):
+    """获取版本的最新迭代"""
+    revision = get_part_revision(db, revision_id)
+    if not revision:
+        return None
+    return (
+        db.query(models_parts.PartIteration)
+        .filter(
+            models_parts.PartIteration.revision_id == revision_id,
+            models_parts.PartIteration.iteration == revision.latest_iteration,
+        )
+        .first()
+    )
+
+
+def apply_step_matrices(db: Session, assembly_revision_id, parsed: dict) -> dict:
+    """把解析出的 occurrence 矩阵，按 code/name 匹配现有 BOM 子链接并回填"""
+    iteration = _current_iteration(db, assembly_revision_id)
+    if iteration is None:
+        return {"matched": [], "unmatched": [o["name"] for o in parsed.get("occurrences", [])],
+                "multi_instance": []}
+
+    bom_items = (
+        db.query(models.BOMItem)
+        .filter(models.BOMItem.iteration_id == iteration.id,
+                models.BOMItem.deleted_at.is_(None))
+        .all()
+    )
+
+    # 建立 code/name → BOMItem 索引
+    index = {}
+    for item in bom_items:
+        child_rev = get_part_revision(db, item.child_revision_id)
+        if not child_rev:
+            continue
+        master = get_part_master(db, child_rev.master_id)
+        if not master:
+            continue
+        index.setdefault(("code", master.code), item)
+        index.setdefault(("name", master.name), item)
+
+    # 先清空 step 来源的旧矩阵（幂等）
+    touched = set()
+    for item in bom_items:
+        kept = [c for c in (item.cad_instances or []) if c.get("source") != "step"]
+        if kept != (item.cad_instances or []):
+            item.cad_instances = kept
+            touched.add(item.id)
+
+    matched, unmatched = [], []
+    per_item_count = {}
+
+    for occ in parsed.get("occurrences", []):
+        name = occ["name"]
+        item = index.get(("code", name)) or index.get(("name", name))
+        if not item:
+            unmatched.append(name)
+            continue
+        norm = _mu.normalize_translation_mm_to_m(occ["local_matrix"])
+        instances = list(item.cad_instances or [])
+        instances.append({"matrix": norm, "source": "step", "label": name})
+        item.cad_instances = instances
+        touched.add(item.id)
+        matched.append(name)
+        per_item_count[item.id] = per_item_count.get(item.id, 0) + 1
+
+    from sqlalchemy.orm.attributes import flag_modified
+    for item in bom_items:
+        if item.id in touched:
+            flag_modified(item, "cad_instances")
+
+    db.commit()
+
+    multi = [i for i, c in per_item_count.items() if c > 1]
+    multi_names = []
+    for item in bom_items:
+        if item.id in multi:
+            cr = get_part_revision(db, item.child_revision_id)
+            m = get_part_master(db, cr.master_id) if cr else None
+            if m:
+                multi_names.append(m.code)
+
+    return {"matched": matched, "unmatched": unmatched, "multi_instance": multi_names}
+
+
+def get_assembly_instances(db: Session, assembly_revision_id, glb_url_resolver) -> list:
+    """递归展平装配 BOM 树，返回叶子实例清单（每个含世界矩阵）"""
+    instances = []
+
+    def children_of(rev_id, iteration_id):
+        return (
+            db.query(models.BOMItem)
+            .filter(models.BOMItem.iteration_id == iteration_id,
+                    models.BOMItem.deleted_at.is_(None))
+            .all()
+        )
+
+    def walk(rev_id, world, path, bom_path, visited):
+        if rev_id in visited:
+            return
+        visited = visited | {rev_id}
+        iteration = _current_iteration(db, rev_id)
+        child_links = children_of(rev_id, iteration.id) if iteration else []
+
+        if not child_links:
+            return
+
+        for link in child_links:
+            child_rev = get_part_revision(db, link.child_revision_id)
+            if not child_rev:
+                continue
+            master = get_part_master(db, child_rev.master_id)
+            child_iter = _current_iteration(db, child_rev.id)
+            grandchildren = children_of(child_rev.id, child_iter.id) if child_iter else []
+            glb_urls = glb_url_resolver(child_rev.id)
+
+            insts = link.cad_instances or [{"matrix": _mu.identity(), "source": "implicit", "label": ""}]
+            for idx, ci in enumerate(insts):
+                local = ci.get("matrix") or _mu.identity()
+                child_world = _mu.multiply(world, local)
+                child_path = path + [f"{link.id}:{idx}"]
+                child_bom_path = bom_path + [str(link.id)]
+
+                is_leaf = (not grandchildren) and glb_urls is not None
+                if is_leaf:
+                    instances.append({
+                        "path": "/".join(child_path),
+                        "bom_path": child_bom_path,
+                        "part_code": master.code if master else "",
+                        "revision_id": str(child_rev.id),
+                        "glb_urls": glb_urls,
+                        "matrix": child_world,
+                        "bbox": None,
+                    })
+                else:
+                    walk(child_rev.id, child_world, child_path, child_bom_path, visited)
+
+    walk(assembly_revision_id, _mu.identity(), [str(assembly_revision_id)], [], set())
+    return instances
+
+
+def get_assembly_tree(db: Session, assembly_revision_id) -> list:
+    """递归构建嵌套 BOM 树，供 AssemblyViewer 侧栏渲染"""
+    def build(rev_id, visited):
+        if rev_id in visited:
+            return []
+        visited = visited | {rev_id}
+        iteration = _current_iteration(db, rev_id)
+        if not iteration:
+            return []
+        links = (
+            db.query(models.BOMItem)
+            .filter(models.BOMItem.iteration_id == iteration.id,
+                    models.BOMItem.deleted_at.is_(None))
+            .order_by(models.BOMItem.sort_order)
+            .all()
+        )
+        nodes = []
+        for link in links:
+            child_rev = get_part_revision(db, link.child_revision_id)
+            if not child_rev:
+                continue
+            master = get_part_master(db, child_rev.master_id)
+            children = build(child_rev.id, visited)
+            nodes.append({
+                "bom_item_id": str(link.id),
+                "part_code": master.code if master else "",
+                "part_name": master.name if master else "",
+                "quantity": link.quantity,
+                "instance_count": len(link.cad_instances or []),
+                "is_leaf": len(children) == 0,
+                "children": children,
+            })
+        return nodes
+
+    return build(assembly_revision_id, set())
