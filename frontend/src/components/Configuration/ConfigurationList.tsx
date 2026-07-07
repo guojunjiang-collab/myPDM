@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { configurationApi } from '../../services/api';
+import { configurationApi, customFieldsApi } from '../../services/api';
 import type { ConfigurationItem } from '../../types';
 import { canEdit, isAdmin, canDownload } from '../../stores/auth';
 import { Modal, ConfirmModal } from '../Modal';
@@ -16,6 +16,7 @@ import ImportPreviewModal from '../ImportPreviewModal';
 
 export default function ConfigurationList() {
   const [items, setItems] = useState<ConfigurationItem[]>([]);
+  const [cfValuesMap, setCfValuesMap] = useState<Record<string, Record<string, any>>>({});
   const [search, setSearch] = useState('');
   const [searchField, setSearchField] = useState('all');
   const [loading, setLoading] = useState(false);
@@ -47,6 +48,15 @@ export default function ConfigurationList() {
     try {
       const res = await configurationApi.listItems({ page: 1, page_size: PAGE_CAP, top_level: topLevelOnly || undefined });
       setItems(res.data.items || []);
+      // 批量加载构型项自定义字段值
+      if (configCustomDefs.length > 0) {
+        const itemIds = (res.data.items || []).map((i: ConfigurationItem) => i.id);
+        if (itemIds.length > 0) {
+          customFieldsApi.getValuesBatch({ type: 'configuration_item', ids: itemIds.join(',') }).then(res => {
+            setCfValuesMap(res.data || {});
+          }).catch(() => {});
+        }
+      }
       setServerTotal(res.data.total ?? (res.data.items || []).length);
     } catch { } finally { setLoading(false); }
   };
@@ -58,9 +68,24 @@ export default function ConfigurationList() {
     if (!search) return items;
     const keyword = search.toLowerCase();
     const match = (val: string | undefined) => val?.toLowerCase().includes(keyword);
+
     return items.filter(item => {
       if (searchField === 'all') {
-        return match(item.code) || match(item.name) || match(item.spec) || match(item.remark);
+        if (match(item.code) || match(item.name) || match(item.spec) || match(item.remark)) return true;
+        const cfVals = cfValuesMap[item.id] || {};
+        return Object.values(cfVals).some(v => {
+          if (v === null || v === undefined) return false;
+          if (Array.isArray(v)) return v.some(s => String(s).toLowerCase().includes(keyword));
+          return String(v).toLowerCase().includes(keyword);
+        });
+      }
+      if (searchField.startsWith('cf_')) {
+        const fieldId = searchField.slice(3);
+        const cfVals = cfValuesMap[item.id] || {};
+        const v = cfVals[fieldId];
+        if (v === null || v === undefined) return false;
+        if (Array.isArray(v)) return v.some(s => String(s).toLowerCase().includes(keyword));
+        return String(v).toLowerCase().includes(keyword);
       }
       if (searchField === 'code') return match(item.code);
       if (searchField === 'name') return match(item.name);
@@ -68,7 +93,7 @@ export default function ConfigurationList() {
       if (searchField === 'remark') return match(item.remark);
       return true;
     });
-  }, [items, search, searchField]);
+  }, [items, search, searchField, cfValuesMap]);
 
 
   const handleDelete = async () => {
