@@ -351,18 +351,23 @@ def get_custom_field_values_batch(db, entity_type, entity_ids):
     
     return dict(output)
 
-def set_custom_field_values(db, entity_type, entity_id, values):
+def set_custom_field_values(db, entity_type, entity_id, values, iteration_id=None):
     """批量设置实体的自定义字段值"""
     for item in values:
         field_def = get_custom_field_definition(db, item.field_id)
         if not field_def:
             continue
-        # 查找已有值
-        existing = db.query(models.CustomFieldValue).filter(
+        # 查找已有值（加入 iteration_id 匹配）
+        query = db.query(models.CustomFieldValue).filter(
             models.CustomFieldValue.field_id == item.field_id,
             models.CustomFieldValue.entity_type == entity_type,
             models.CustomFieldValue.entity_id == entity_id
-        ).first()
+        )
+        if iteration_id is not None:
+            query = query.filter(models.CustomFieldValue.iteration_id == iteration_id)
+        else:
+            query = query.filter(models.CustomFieldValue.iteration_id.is_(None))
+        existing = query.first()
 
         # 根据字段类型确定存储列
         value_text = None
@@ -393,7 +398,8 @@ def set_custom_field_values(db, entity_type, entity_id, values):
                 entity_id=entity_id,
                 value_text=value_text,
                 value_number=value_number,
-                value_json=value_json
+                value_json=value_json,
+                iteration_id=iteration_id,
             )
             if item.id:
                 new_val.id = item.id
@@ -445,6 +451,25 @@ def _copy_custom_field_values(db, entity_type: str, old_entity_id, new_entity_id
         db.add(new_val)
     if old_values:
         db.flush()
+
+
+def _copy_iteration_custom_fields(db, source_iteration_id, target_iteration_id):
+    """复制迭代的自定义字段值到目标迭代（签出时调用）"""
+    source_values = db.query(models.CustomFieldValue).filter(
+        models.CustomFieldValue.iteration_id == source_iteration_id
+    ).all()
+    for sv in source_values:
+        new_val = models.CustomFieldValue(
+            field_id=sv.field_id,
+            entity_type=sv.entity_type,
+            entity_id=sv.entity_id,
+            value_text=sv.value_text,
+            value_number=sv.value_number,
+            value_json=sv.value_json,
+            iteration_id=target_iteration_id,
+        )
+        db.add(new_val)
+    db.flush()
 
 
 # [REMOVED: old upgrade_component function]
