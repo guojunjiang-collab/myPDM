@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { documentsApi, customFieldsApi, bomApi, v2UploadApi, CHUNK_SIZE, CHUNK_THRESHOLD, userGroupsApi } from '../services/api';
 import type { Document, CustomFieldDefinition, CustomFieldValue, DocumentAttachment } from '../types';
 import { canEdit, isAdmin, canDownload, useAuthStore } from '../stores/auth';
+import CustomFieldInput from '../components/CustomFieldInput';
 import { Modal, ConfirmModal } from '../components/Modal';
 import DocumentDetailContent from '../components/DocumentDetailContent';
 import VersionHistory from '../components/VersionHistory';
@@ -621,45 +622,7 @@ export default function Documents() {
     return tags[s] || { label: s, class: 'bg-gray-100 text-gray-800' };
   };
 
-  const renderCustomFieldInput = (def: CustomFieldDefinition) => {
-    const value = customFieldValues[def.id] ?? '';
-    const handleChange = (v: any) => {
-      setCustomFieldValues({ ...customFieldValues, [def.id]: v });
-    };
 
-    if (def.field_type === 'select' && def.options?.length) {
-      return (
-        <select
-          value={value}
-          onChange={(e) => handleChange(e.target.value)}
-          className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-        >
-          <option value="">请选择</option>
-          {def.options.map(opt => (
-            <option key={opt} value={opt}>{opt}</option>
-          ))}
-        </select>
-      );
-    }
-    if (def.field_type === 'number') {
-      return (
-        <input
-          type="number"
-          value={value}
-          onChange={(e) => handleChange(e.target.value ? Number(e.target.value) : null)}
-          className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-        />
-      );
-    }
-    return (
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => handleChange(e.target.value)}
-        className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-      />
-    );
-  };
 
   return (
     <div className="h-full flex flex-col">
@@ -870,7 +833,11 @@ export default function Documents() {
                         {def.name}
                         {def.is_required && <span className="text-red-500 ml-1">*</span>}
                       </label>
-                      {renderCustomFieldInput(def)}
+                      <CustomFieldInput
+                        def={def}
+                        value={customFieldValues[def.id]}
+                        onChange={(val) => setCustomFieldValues(prev => ({ ...prev, [def.id]: val }))}
+                      />
                     </div>
                   ))}
                 </div>
