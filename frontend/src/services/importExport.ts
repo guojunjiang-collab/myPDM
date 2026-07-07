@@ -3251,14 +3251,30 @@ async function _buildConfigItemsWorkbook(): Promise<XLSX.WorkBook | null> {
   const details = await mapLimit(items, (i: any) => configurationApi.getItem(i.id));
   const detailData: any[] = details.map((r: any) => r.data);
 
+  // 加载自定义字段
+  const cfDefs = getCustomFieldDefs('configuration_item');
+  const itemIds = items.map((i: any) => i.id);
+  const cfValuesMap = cfDefs.length > 0
+    ? await loadCustomFieldValues('configuration_item', itemIds)
+    : new Map<string, Record<string, unknown>>();
+
   // Sheet1: 构型项清单
-  const sheet1Rows = detailData.map((d: any) => ({
-    构型号: d.code || '',
-    名称: d.name || '',
-    备注: d.remark || '',
-    创建时间: d.created_at || '',
-    更新时间: d.updated_at || '',
-  }));
+  const sheet1Rows = detailData.map((d: any) => {
+    const row: Record<string, unknown> = {
+      构型号: d.code || '',
+      名称: d.name || '',
+      备注: d.remark || '',
+      创建时间: d.created_at || '',
+      更新时间: d.updated_at || '',
+    };
+    const cfValues = cfValuesMap.get(d.id);
+    if (cfValues) {
+      for (const def of cfDefs) {
+        row[def.name] = cfValues[def.id] ?? '';
+      }
+    }
+    return row;
+  });
 
   // Sheet2: 关联零部件（件号/版本取自 part_detail）
   const sheet2Rows: Record<string, unknown>[] = [];
@@ -3378,6 +3394,9 @@ export async function previewConfigurationItemsImport(file: File): Promise<Impor
     existingMap.set(item.code, item);
   }
 
+  // 自定义字段定义
+  const cfDefs = getCustomFieldDefs('configuration_item');
+
   // 解析各关联 Sheet
   const partRelRows = wb.Sheets['关联零部件']
     ? XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets['关联零部件'])
@@ -3445,6 +3464,8 @@ export async function previewConfigurationItemsImport(file: File): Promise<Impor
     const existing = existingMap.get(code);
     const status = existing ? ('更新' as const) : ('新增' as const);
 
+    const customFields = extractCustomFieldsFromRow(raw, cfDefs);
+
     return {
       status,
       code,
@@ -3454,6 +3475,7 @@ export async function previewConfigurationItemsImport(file: File): Promise<Impor
       _partCount: (partsByCode.get(code) || []).length,
       _childCount: (childrenByCode.get(code) || []).length,
       _docCount: (docsByCode.get(code) || []).length,
+      _customFields: customFields,
       _data: {
         code,
         name,
@@ -3521,6 +3543,16 @@ export async function executeConfigurationItemsImport(preview: ImportPreview): P
           await configurationApi.updateItem(existing.id, mainPayload as any);
           codeToId.set(row.code, existing.id);
           updatedCount++;
+
+          // 保存自定义字段
+          if (row._customFields && Object.keys(row._customFields).length > 0) {
+            const fieldValues = Object.entries(row._customFields)
+              .filter(([, v]) => v !== null && v !== '' && v !== undefined)
+              .map(([fieldId, value]) => ({ field_id: fieldId, value }));
+            if (fieldValues.length > 0) {
+              await customFieldsApi.setValues('configuration_item', existing.id, fieldValues);
+            }
+          }
         }
       } else {
         const res = await configurationApi.createItem(mainPayload as any);
@@ -3528,6 +3560,16 @@ export async function executeConfigurationItemsImport(preview: ImportPreview): P
         codeToId.set(row.code, created.id);
         row._newId = created.id;
         createdCount++;
+
+        // 保存自定义字段
+        if (row._customFields && Object.keys(row._customFields).length > 0) {
+          const fieldValues = Object.entries(row._customFields)
+            .filter(([, v]) => v !== null && v !== '' && v !== undefined)
+            .map(([fieldId, value]) => ({ field_id: fieldId, value }));
+          if (fieldValues.length > 0) {
+            await customFieldsApi.setValues('configuration_item', created.id, fieldValues);
+          }
+        }
       }
     } catch (err: any) {
       warnings.push(`构型项 ${row.code}: 主记录写入失败 ${err?.message || ''}`);
