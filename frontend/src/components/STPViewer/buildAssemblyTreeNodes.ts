@@ -25,15 +25,22 @@ export function buildAssemblyTreeNodes(
       ? `${node.bom_item_id}:${node.instance_index}`
       : node.bom_item_id;
 
+  // 显示名：根/单实例 → 件号；多实例展开节点 → 件号#实例顺序号(1 基)。不显示件名/glb 名。
+  const nameOf = (node: AssemblyTreeNode): string => {
+    const code = node.part_code || '未命名';
+    return node.instance_index !== undefined && node.instance_index !== null
+      ? `${code}#${node.instance_index + 1}`
+      : code;
+  };
+
   const convert = (node: AssemblyTreeNode, parentId: string | null): TreeNode => {
     const key = keyOf(node);
     const children = node.is_leaf ? [] : node.children.map((c) => convert(c, key));
     const own = meshUuidsByBomItemId.get(key) ?? [];
     const meshUuids = node.is_leaf ? own : children.flatMap((c) => c.meshUuids);
-    const label = `${node.part_code}${node.part_name ? ' ' + node.part_name : ''}`.trim() || '未命名';
     return {
       id: key,
-      name: node.instance_count > 1 ? `${label} ×${node.instance_count}` : label,
+      name: nameOf(node),
       type: node.is_leaf ? 'part' : 'group',
       meshUuids,
       parentId,
