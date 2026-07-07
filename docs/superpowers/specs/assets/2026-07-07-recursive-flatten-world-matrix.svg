@@ -1,4 +1,4 @@
-<svg viewBox="0 0 800 470" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI',system-ui,sans-serif" role="img">
+<svg viewBox="0 0 800 470" width="800" height="470" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI',system-ui,sans-serif" role="img">
   <title>整机递归展平世界矩阵示意</title>
   <desc>多级装配 BOM 树深度优先遍历，world = 父件世界矩阵 × 本地矩阵 逐层累乘，输出带世界矩阵的叶子实例清单。</desc>
 

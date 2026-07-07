@@ -1,4 +1,4 @@
-<svg viewBox="0 0 800 480" xmlns="http://www.w3.org/2000/svg" role="img" font-family="'Segoe UI', system-ui, sans-serif">
+<svg viewBox="0 0 800 480" width="800" height="480" xmlns="http://www.w3.org/2000/svg" role="img" font-family="'Segoe UI', system-ui, sans-serif">
   <title>多实例变换矩阵存储示意</title>
   <desc>一行 BOMItem 用 quantity=4 与 cad_instances 数组存 4 个不同的变换矩阵，共享一个零件 glb，展平后在装配世界坐标系里摆成 4 个实例。</desc>
 
