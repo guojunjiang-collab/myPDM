@@ -449,7 +449,39 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                     <span className="text-xs text-orange-600">已签出：{revision?.check_out_user_name}</span>
                   )}
                 </div>
-                <div className="flex gap-1 flex-wrap">
+                <div className="flex gap-1 flex-wrap items-center">
+                  {/* 3D 预览入口（操作按钮群左侧，"|" 分隔） */}
+                  {isAssembly ? (
+                    <>
+                      <input ref={assemblyFileRef} type="file" accept=".stp,.step" hidden
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImportStep(f); e.target.value = ''; }} />
+                      <button onClick={() => assemblyFileRef.current?.click()}
+                        className="px-3 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700">导入装配STEP</button>
+                      <button onClick={() => window.open(`/stp-viewer?assembly=${revisionId}`, '_blank')}
+                        className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">装配3D预览</button>
+                    </>
+                  ) : (
+                    <button onClick={async () => {
+                      if (!revisionId) return;
+                      try {
+                        const atts = await partsApi.listAttachments(revisionId, 'production');
+                        const stp = (Array.isArray(atts) ? atts : []).find((a: any) => {
+                          const n = (a.file_name || '').toLowerCase();
+                          return n.endsWith('.stp') || n.endsWith('.step');
+                        });
+                        if (stp) {
+                          const mt = await mediaApi.token(stp.id, 'gltf');
+                          window.open(`/stp-viewer?id=${stp.id}&token=${encodeURIComponent(mt)}`, '_blank');
+                        } else {
+                          alert('该零件没有 STP/STEP 附件，请先上传');
+                        }
+                      } catch { alert('预览失败'); }
+                    }}
+                      className="px-3 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700">3D预览</button>
+                  )}
+                  {(canCheckout || canCheckin || canUndo || canFreeze || canUnfreeze || canRelease || canUpgrade || canObsolete || canForceCheckin) && (
+                    <span className="mx-1 text-gray-300 self-center select-none">|</span>
+                  )}
                   {canCheckout && (
                     <button onClick={() => doAction(() => partsApi.checkout(revisionId!), '签出成功')}
                       className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">签出</button>
@@ -490,37 +522,6 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
               </div>
             </div>
 
-            {/* 3D 预览入口 */}
-            <div className="flex gap-1 justify-end">
-              {isAssembly ? (
-                <>
-                  <input ref={assemblyFileRef} type="file" accept=".stp,.step" hidden
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImportStep(f); e.target.value = ''; }} />
-                  <button onClick={() => assemblyFileRef.current?.click()}
-                    className="px-3 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700">导入装配STEP</button>
-                  <button onClick={() => window.open(`/stp-viewer?assembly=${revisionId}`, '_blank')}
-                    className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">装配3D预览</button>
-                </>
-              ) : (
-                <button onClick={async () => {
-                  if (!revisionId) return;
-                  try {
-                    const atts = await partsApi.listAttachments(revisionId, 'production');
-                    const stp = (Array.isArray(atts) ? atts : []).find((a: any) => {
-                      const n = (a.file_name || '').toLowerCase();
-                      return n.endsWith('.stp') || n.endsWith('.step');
-                    });
-                    if (stp) {
-                      const mt = await mediaApi.token(stp.id, 'gltf');
-                      window.open(`/stp-viewer?id=${stp.id}&token=${encodeURIComponent(mt)}`, '_blank');
-                    } else {
-                      alert('该零件没有 STP/STEP 附件，请先上传');
-                    }
-                  } catch { alert('预览失败'); }
-                }}
-                  className="px-3 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700">3D预览</button>
-              )}
-            </div>
 
             {viewingIterationId && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1.5 shrink-0 mb-3 text-sm flex items-center justify-between">
