@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { Modal } from '../Modal';
-import { configurationApi, partsApi, assembliesApi } from '../../services/api';
+import { configurationApi, partsApi, assembliesApi, customFieldsApi } from '../../services/api';
 import AssemblyPartPicker from '../AssemblyPartPicker';
 import VersionSelectModal from '../VersionSelectModal';
 import EntityDocumentSection from '../EntityDocumentSection';
 import EntityEditModal from '../EntityEditModal';
-import type { ConfigurationItem } from '../../types';
+import type { ConfigurationItem, CustomFieldDefinition } from '../../types';
+import { useDataStore } from '../../stores/data';
+import CustomFieldInput from '../CustomFieldInput';
 
 interface Props {
   open: boolean;
@@ -45,6 +47,8 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
   const [creatorName, setCreatorName] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [cfDefs, setCfDefs] = useState<CustomFieldDefinition[]>([]);
+  const [cfValues, setCfValues] = useState<Record<string, any>>({});
   const remarkRef = useRef<HTMLTextAreaElement>(null);
   // 弹窗打开或备注内容变化时，自适应 textarea 高度
   useEffect(() => {
@@ -100,6 +104,19 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
       } : { code: '', name: '', spec: '', remark: '' });
       setCreatorName((item as any)?.creator_name || '');
       setError('');
+      // 加载构型项自定义字段定义
+      const allDefs = useDataStore.getState().customFieldDefs;
+      const defs = allDefs.filter((d: CustomFieldDefinition) => d.applies_to?.includes('configuration_item'));
+      setCfDefs(defs);
+      if (item?.id && defs.length > 0) {
+        customFieldsApi.getValues('configuration_item', item.id).then(r => {
+          const vals: Record<string, any> = {};
+          (r.data || []).forEach((v: any) => { vals[v.field_id] = v.value; });
+          setCfValues(vals);
+        }).catch(() => {});
+      } else {
+        setCfValues({});
+      }
       setExpandedChild({}); setNoChildren(new Set()); setLoadingChild(null);
       // Load existing parts and children for edit mode
       if (item?.id) {
@@ -166,6 +183,16 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
         await configurationApi.addChildren(configId, children.map(c => ({
           child_id: c.child_id, is_required: c.is_required, quantity: c.quantity,
         })));
+      }
+      // 保存自定义字段值
+      if (cfDefs.length > 0) {
+        const fieldValues = cfDefs.map(def => ({
+          field_id: def.id,
+          value: cfValues[def.id] ?? null,
+        })).filter(fv => fv.value !== null && fv.value !== '');
+        if (fieldValues.length > 0) {
+          await customFieldsApi.setValues('configuration_item', configId, fieldValues);
+        }
       }
       onSaved();
     } catch (e: any) {
@@ -419,6 +446,28 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
             />
           </div>
         </div>
+
+        {/* 自定义字段 */}
+        {cfDefs.length > 0 && (
+          <div className="border-t pt-4">
+            <h4 className="text-sm font-bold text-gray-700 mb-2">自定义字段</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {cfDefs.map(def => (
+                <div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                  <label className="block text-xs text-gray-500 mb-0.5">
+                    {def.name}
+                    {def.is_required && <span className="text-red-500 ml-0.5">*</span>}
+                  </label>
+                  <CustomFieldInput
+                    def={def}
+                    value={cfValues[def.id]}
+                    onChange={(val) => setCfValues(prev => ({ ...prev, [def.id]: val }))}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* 关联零部件 */}
         <div className="border-t pt-4">
