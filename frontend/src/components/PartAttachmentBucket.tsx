@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import api, { partsApi } from '../services/api';
+import api, { partsApi, mediaApi } from '../services/api';
+import { previewAttachment } from '../utils/attachmentPreview';
+import ArchiveTreeModal from './ArchiveTreeModal';
 
 interface PartAttachmentItem {
   id: string;
@@ -29,6 +31,7 @@ export default function PartAttachmentBucket({ revisionId, category, label, edit
   const [uploading, setUploading] = useState(false);
   const [uploadName, setUploadName] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -75,23 +78,17 @@ export default function PartAttachmentBucket({ revisionId, category, label, edit
     finally { setDeletingId(null); }
   };
 
-  const handlePreview = async (att: PartAttachmentItem) => {
-    try {
-      const response = await api.get(`/parts/revisions/${revisionId}/attachments/${att.id}/file`, { responseType: 'blob' });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      window.open(url, '_blank');
-    } catch { alert('预览失败'); }
+  const handlePreview = (att: PartAttachmentItem) => {
+    previewAttachment(att.id, att.file_name, { onArchive: (id, name) => setArchivePreview({ attId: id, fileName: name }) });
   };
 
   const handleDownload = async (att: PartAttachmentItem) => {
     try {
-      const response = await api.get(`/parts/revisions/${revisionId}/attachments/${att.id}/file`, { responseType: 'blob' });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const mt = await mediaApi.token(att.id, 'direct-download');
       const a = document.createElement('a');
-      a.href = url;
+      a.href = `/api/v2/attachments/${att.id}/direct-download?token=${encodeURIComponent(mt)}`;
       a.download = att.file_name || 'download';
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
     } catch { alert('下载失败，请重试'); }
   };
 
@@ -152,6 +149,9 @@ export default function PartAttachmentBucket({ revisionId, category, label, edit
         )}
       </div>
 
+      {archivePreview && (
+        <ArchiveTreeModal open={!!archivePreview} onClose={() => setArchivePreview(null)} attachmentId={archivePreview.attId} fileName={archivePreview.fileName} />
+      )}
     </div>
   );
 }
