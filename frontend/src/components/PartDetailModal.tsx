@@ -45,7 +45,8 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const [iterationsList, setIterationsList] = useState<any[]>([]);
 
   const [cfDefs, setCfDefs] = useState<any[]>([]);
-  const [editData, setEditData] = useState<{ custom_fields: Record<string, any>; remark: string }>({ custom_fields: {}, remark: '' });
+  const [editRemark, setEditRemark] = useState('');
+  const [cfEditValues, setCfEditValues] = useState<Record<string, any>>({});
   const [editMaster, setEditMaster] = useState({ code: '', name: '', spec: '' });
   const [hasBomChildren, setHasBomChildren] = useState(false);
   const [bomPickerOpen, setBomPickerOpen] = useState(false);
@@ -70,9 +71,16 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
       customFieldsApi.listDefinitions().then((res: any) => {
         const defs = (res.data || res || []).filter((d: any) => {
           const applies: string[] = d.applies_to || [];
-          return applies.includes('parts');
+          return applies.includes('part');
         });
         setCfDefs(defs);
+        if (revisionId) {
+          customFieldsApi.getValues('part', revisionId).then(r => {
+            const vals: Record<string, any> = {};
+            (r.data || []).forEach((v: any) => { vals[v.field_id] = v.value; });
+            setCfEditValues(vals);
+          }).catch(() => {});
+        }
       }).catch((e: any) => {
         console.error('Failed to load custom field definitions', e);
         setCfDefs([]);
@@ -81,6 +89,31 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   }, [open, masterId, propRevisionId]);
 
   const revisionId = internalRevisionId || revision?.id;
+
+  const cfSaveTimer = useRef<ReturnType<typeof setTimeout>>();
+  const debouncedCfSave = useCallback((values: Record<string, any>) => {
+    if (!revisionId) return;
+    if (cfSaveTimer.current) clearTimeout(cfSaveTimer.current);
+    cfSaveTimer.current = setTimeout(() => {
+      const fieldValues = cfDefs.map((def: any) => ({
+        field_id: def.id,
+        value: values[def.id] ?? null,
+      })).filter((fv: any) => fv.value !== null && fv.value !== '');
+      if (fieldValues.length > 0) {
+        customFieldsApi.setValues('part', revisionId!, fieldValues).catch(console.error);
+      }
+    }, 500);
+  }, [revisionId, cfDefs]);
+
+  useEffect(() => {
+    if (cfDefs.length > 0 && revisionId && !propRevisionId) {
+      customFieldsApi.getValues('part', revisionId).then(r => {
+        const vals: Record<string, any> = {};
+        (r.data || []).forEach((v: any) => { vals[v.field_id] = v.value; });
+        setCfEditValues(vals);
+      }).catch(() => {});
+    }
+  }, [cfDefs, revisionId]);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout>>();
   const autoSave = useCallback((data: Record<string, any>) => {
@@ -114,10 +147,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
         setRevision(rev);
         if (rev.current_iteration) {
           setIteration(rev.current_iteration);
-          setEditData({
-            custom_fields: rev.current_iteration.custom_fields || {},
-            remark: rev.current_iteration.remark || '',
-          });
+          setEditRemark(rev.current_iteration.remark || '');
         }
         try {
           const bomData = await partsApi.getBOM(revId);
@@ -479,12 +509,11 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                               <div className="text-gray-400 text-sm col-span-3">无</div>
                             ) : (
                               cfDefs.map((def: any) => {
-                                const key = def.name;
-                                const val = editData.custom_fields[key] || '';
+                                const val = cfEditValues[def.id] ?? '';
                                 const handleChange = (newVal: string) => {
-                                  const newCf = { ...editData.custom_fields, [key]: newVal };
-                                  setEditData(prev => ({ ...prev, custom_fields: newCf }));
-                                  autoSave({ custom_fields: newCf });
+                                  const newVals = { ...cfEditValues, [def.id]: newVal };
+                                  setCfEditValues(newVals);
+                                  debouncedCfSave(newVals);
                                 };
                                 return (
                                   <div key={def.id}>
@@ -523,14 +552,14 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                             )}
                           </div>
                         </div>
-                        <div>
+                         <div>
                           <h4 className="text-sm font-semibold mb-1">备注</h4>
                           <textarea
                             className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 mt-1 resize-none"
                             rows={3}
-                            value={editData.remark}
+                            value={editRemark}
                             onChange={(e) => {
-                              setEditData(prev => ({ ...prev, remark: e.target.value }));
+                              setEditRemark(e.target.value);
                               autoSave({ remark: e.target.value });
                             }}
                           />
@@ -545,7 +574,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                               <div className="text-gray-400 text-sm col-span-3">无</div>
                             ) : (
                               cfDefs.map((def: any) => {
-                                const val = (currentDisplay.custom_fields || {})[def.name];
+                                const val = cfEditValues[def.id];
                                 return (
                                   <div key={def.id}>
                                     <label className="text-xs text-gray-500">{def.name}</label>
