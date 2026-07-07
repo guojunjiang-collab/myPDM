@@ -767,6 +767,9 @@ export const assemblyViewerApi = {
   importStep: (revisionId: string, file: File) => {
     const fd = new FormData();
     fd.append('file', file);
-    return api.post(`/parts/revisions/${revisionId}/import-assembly-step`, fd).then((r) => r.data);
+    return api.post(`/parts/revisions/${revisionId}/import-assembly-step`, fd, {
+      headers: { 'Content-Type': undefined },
+      transformRequest: [(data: any, headers: any) => { delete headers['Content-Type']; return data; }],
+    }).then((r) => r.data);
   },
 };

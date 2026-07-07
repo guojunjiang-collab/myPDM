@@ -16,7 +16,7 @@ from .. import schemas_parts
 from ..permissions import require_permission
 import tempfile, os as _os
 from ..cad.assembly_parser import parse_assembly_step
-from ..stp_converter import get_lod_glb_paths
+from ..stp_converter import get_lod_glb_paths, get_glb_cache_path
 from ..schemas_parts import MatchReport, AssemblyInstanceDTO, AssemblyTreeNodeDTO
 
 router = APIRouter(prefix="/parts", tags=["parts"])
@@ -838,15 +838,23 @@ def _glb_url_resolver_factory(db):
         if not att:
             return None
         paths = get_lod_glb_paths(str(att.id), att.file_path, is_part=True)
+        # 生成媒体令牌
+        from ..media_token import mint_media_token
+        token = mint_media_token(str(att.id), "gltf", ttl=3600)
+        # 优先使用 V2 的单文件 GLB 端点（支持 token 认证）
         urls = {}
-        for tier, p in paths.items():
-            if _os.path.exists(p):
-                urls[tier] = f"/api/parts/attachments/{att.id}/lod/{tier}"
-        if not urls:
+        # 检查 LOD 三级是否存在，不存在则全部指向单文件
+        glb_base = get_glb_cache_path(str(att.id), att.file_path, is_part=True)
+        has_lod = all(_os.path.exists(p) for p in paths.values())
+        if has_lod:
+            for tier, p in paths.items():
+                urls[tier] = f"/api/parts/attachments/{att.id}/lod/{tier}?token={token}"
+        elif _os.path.exists(glb_base):
+            fallback_url = f"/api/v2/attachments/{att.id}/gltf?token={token}"
+            for tier in ("coarse", "normal", "fine"):
+                urls[tier] = fallback_url
+        else:
             return None
-        fallback = urls.get("fine") or next(iter(urls.values()))
-        for tier in ("coarse", "normal", "fine"):
-            urls.setdefault(tier, fallback)
         return urls
 
     return resolver
@@ -859,16 +867,55 @@ async def import_assembly_step(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("components:update")),
 ):
-    """上传装配 STEP，解析结构+矩阵，按 code/name 匹配现有 BOM 并回填。"""
+    """上传装配 STEP，解析结构+矩阵，按 code/name 匹配现有 BOM 并回填，同时保存为生产附件。"""
+    import hashlib
+    content = await file.read()
     suffix = _os.path.splitext(file.filename or "a.step")[1] or ".step"
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(await file.read())
+        tmp.write(content)
         tmp_path = tmp.name
     try:
         parsed = parse_assembly_step(tmp_path)
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
     finally:
         _os.unlink(tmp_path)
     report = crud_parts.apply_step_matrices(db, revision_id, parsed)
+
+    # 保存装配 STEP 为生产附件
+    result = crud_parts.get_part_revision_with_current_iteration(db, revision_id)
+    if result:
+        revision, iteration = result
+        if iteration:
+            master = db.query(crud_parts.models_parts.PartMaster).filter(
+                crud_parts.models_parts.PartMaster.id == revision.master_id
+            ).first()
+            if master:
+                upload_dir = f"./uploads/parts/{master.code}/{revision.version}/{iteration.iteration}"
+                _os.makedirs(upload_dir, exist_ok=True)
+                file_path = _os.path.join(upload_dir, file.filename)
+                with open(file_path, "wb") as f:
+                    f.write(content)
+                file_hash = hashlib.sha256(content).hexdigest()
+                att = crud_parts.models_parts.PartAttachment(
+                    iteration_id=iteration.id,
+                    category="production",
+                    file_name=file.filename,
+                    file_size=len(content),
+                    file_path=file_path,
+                    file_hash=file_hash,
+                )
+                db.add(att)
+                db.commit()
+                # 触发 STP→GLB 转换
+                from ..stp_converter import convert_stp_to_gltf
+                import asyncio
+                try:
+                    loop = asyncio.get_event_loop()
+                    loop.run_in_executor(None, convert_stp_to_gltf, file_path, str(att.id), file_path, True)
+                except Exception:
+                    pass
+
     return report
 
 
@@ -899,11 +946,17 @@ def get_attachment_lod_glb(
     current_user: User = Depends(require_permission("components:read")),
 ):
     from ..models_parts import PartAttachment
-    if tier not in ("coarse", "normal", "fine"):
-        raise HTTPException(status_code=400, detail="非法档位")
     att = db.query(PartAttachment).filter(PartAttachment.id == attachment_id).first()
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
+    if tier == "glb":
+        # 单文件兜底
+        glb = get_glb_cache_path(str(att.id), att.file_path, is_part=True)
+        if not glb or not _os.path.exists(glb):
+            raise HTTPException(status_code=404, detail="GLB 未生成")
+        return FileResponse(str(glb), media_type="model/gltf-binary", filename=glb.name)
+    if tier not in ("coarse", "normal", "fine"):
+        raise HTTPException(status_code=400, detail="非法档位")
     paths = get_lod_glb_paths(str(att.id), att.file_path, is_part=True)
     glb = paths.get(tier)
     if not glb or not _os.path.exists(glb):

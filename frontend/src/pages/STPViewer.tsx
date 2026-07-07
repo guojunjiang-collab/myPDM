@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { Canvas, useThree } from '@react-three/fiber';
+import { ArcballControls } from '@react-three/drei';
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { ViewerCanvas } from '../components/STPViewer/ViewerCanvas';
 import { Toolbar } from '../components/STPViewer/Toolbar';
 import { ModelTreePanel } from '../components/STPViewer/ModelTreePanel';
@@ -14,35 +16,31 @@ import { assemblyViewerApi } from '../services/api';
 import type { AssemblyInstance, AssemblyTreeNode } from '../services/api';
 import axios from 'axios';
 
-function AssemblyToolbar() {
-  const wireframe = useAssemblyStore((s) => s.wireframe);
-  const setWireframe = useAssemblyStore((s) => s.setWireframe);
-  const isolateMode = useAssemblyStore((s) => s.isolateMode);
-  const setIsolate = useAssemblyStore((s) => s.setIsolate);
-  const explodeFactor = useAssemblyStore((s) => s.explodeFactor);
-  const setExplodeFactor = useAssemblyStore((s) => s.setExplodeFactor);
-  const reset = useAssemblyStore((s) => s.reset);
+/** 为装配模式同步相机四元数到 viewerStore（供 ViewCube 读取） */
+function AssemblyCameraSync() {
+  const { camera } = useThree();
+  useEffect(() => {
+    const id = setInterval(() => {
+      useViewerStore.setState({
+        cameraQuat: [camera.quaternion.x, camera.quaternion.y, camera.quaternion.z, camera.quaternion.w],
+      });
+    }, 100);
+    return () => clearInterval(id);
+  }, [camera]);
+  return null;
+}
 
-  return (
-    <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 border-b text-xs">
-      <button onClick={() => setWireframe(!wireframe)}
-        className={`px-2 py-0.5 rounded ${wireframe ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 hover:bg-gray-300'}`}>
-        线框
-      </button>
-      <button onClick={() => setIsolate(!isolateMode)}
-        className={`px-2 py-0.5 rounded ${isolateMode ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 hover:bg-gray-300'}`}>
-        隔离
-      </button>
-      <span className="text-gray-400">爆炸</span>
-      <input type="range" min="0" max="100" value={Math.round(explodeFactor * 100)}
-        onChange={(e) => setExplodeFactor(Number(e.target.value) / 100)}
-        className="w-20 h-4" title="爆炸幅度" />
-      <button onClick={reset}
-        className="px-2 py-0.5 rounded bg-gray-200 hover:bg-gray-300 ml-auto">
-        重置
-      </button>
-    </div>
-  );
+/** RoomEnvironment IBL（同单件模式） */
+function AssemblyLocalEnv() {
+  const { gl, scene } = useThree();
+  useEffect(() => {
+    const pmrem = new THREE.PMREMGenerator(gl);
+    const envMap = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environment = envMap;
+    scene.environmentIntensity = 0.8;
+    return () => { scene.environment = null; envMap.dispose(); pmrem.dispose(); };
+  }, [gl, scene]);
+  return null;
 }
 
 export default function STPViewerPage() {
@@ -57,13 +55,11 @@ export default function STPViewerPage() {
   const params = new URLSearchParams(location.search);
   const assemblyRevId = params.get('assembly');
 
-  // 装配模式状态
   const [asmInstances, setAsmInstances] = useState<AssemblyInstance[] | null>(null);
   const [asmTree, setAsmTree] = useState<AssemblyTreeNode[]>([]);
   const [asmError, setAsmError] = useState<string | null>(null);
   const asmReset = useAssemblyStore((s) => s.reset);
 
-  // Resize handle
   const onResizeDown = useCallback(() => { dragging.current = true; }, []);
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
@@ -93,7 +89,6 @@ export default function STPViewerPage() {
     const id = params.get('id');
     const token = params.get('token');
     if (!id || !token) { setState('error'); return; }
-
     const gltfUrl = `/api/v2/attachments/${id}/gltf?token=${encodeURIComponent(token)}`;
     checkAndLoad(gltfUrl);
   }, []);
@@ -143,7 +138,6 @@ export default function STPViewerPage() {
     }, 2000);
   }
 
-  // ── 装配模式渲染 ──
   if (assemblyRevId) {
     if (asmError) return <div className="w-screen h-screen flex items-center justify-center text-red-500">{asmError}</div>;
     if (!asmInstances) return <div className="w-screen h-screen flex items-center justify-center text-gray-500">加载中...</div>;
@@ -151,24 +145,18 @@ export default function STPViewerPage() {
 
     return (
       <div className="w-screen h-screen relative flex">
-        {/* Left: BOM 结构树 */}
         <div style={{ width: treeWidth }} className="shrink-0 h-full overflow-auto border-r bg-white">
           <AssemblyTreePanel tree={asmTree} />
         </div>
-        {/* Resize handle */}
-        <div
-          onMouseDown={onResizeDown}
-          className="w-1.5 cursor-col-resize hover:bg-blue-400 bg-gray-200 shrink-0 transition-colors"
-        />
-        {/* Right: Toolbar + Canvas */}
+        <div onMouseDown={onResizeDown} className="w-1.5 cursor-col-resize hover:bg-blue-400 bg-gray-200 shrink-0 transition-colors" />
         <div className="flex-1 flex flex-col min-w-0">
-          <AssemblyToolbar />
+          <Toolbar isAssembly />
           <div className="flex-1 relative">
-            <Canvas camera={{ position: [4, 4, 4], fov: 50 }}>
-              <ambientLight intensity={0.8} />
-              <directionalLight position={[5, 10, 7]} intensity={1} />
+            <Canvas camera={{ position: [2, 2, 3], fov: 45 }}>
+              <AssemblyLocalEnv />
               <InstancedScene instances={asmInstances} index={asmIndex} />
-              <OrbitControls makeDefault />
+              <ArcballControls makeDefault />
+              <AssemblyCameraSync />
             </Canvas>
             <ViewCube />
           </div>
@@ -177,23 +165,19 @@ export default function STPViewerPage() {
     );
   }
 
-  // ── 单件模式渲染 ──
   if (state === 'checking') return <div className="w-screen h-screen flex items-center justify-center text-gray-500">加载中...</div>;
   if (state === 'converting') return <div className="w-screen h-screen flex items-center justify-center text-gray-500">模型转换中，请稍后...</div>;
   if (state === 'error') return <div className="w-screen h-screen flex items-center justify-center text-red-500">加载失败，请关闭后重试</div>;
 
   return (
     <div className="w-screen h-screen relative flex">
-      {/* Left: Model Tree */}
       <div style={{ width: treeWidth }} className="shrink-0 h-full">
         <ModelTreePanel />
       </div>
-      {/* Resize handle */}
       <div
         onMouseDown={onResizeDown}
         className="w-1.5 cursor-col-resize hover:bg-blue-400 bg-gray-200 shrink-0 transition-colors"
       />
-      {/* Right: Toolbar + Canvas */}
       <div className="flex-1 flex flex-col min-w-0">
         <Toolbar />
         <div className="flex-1 relative">
@@ -201,7 +185,6 @@ export default function STPViewerPage() {
           <ViewCube />
         </div>
       </div>
-      {/* Download progress overlay */}
       {state === 'loading' && (
         <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/90 gap-4">
           <div className="text-gray-500 text-sm">正在下载模型... {downloadPct}%</div>
@@ -210,7 +193,6 @@ export default function STPViewerPage() {
           </div>
         </div>
       )}
-      {/* Parsing overlay */}
       {url && state === 'ready' && loadingState !== 'ready' && loadingState !== 'error' && (
         <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/90 gap-4">
           <div className="text-gray-500 text-sm">正在解析渲染...</div>

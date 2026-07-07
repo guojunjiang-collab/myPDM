@@ -8,7 +8,6 @@ import { Modal } from './Modal';
 import EntityDocumentSection from './EntityDocumentSection';
 import PartAttachmentBucket from './PartAttachmentBucket';
 import AssemblyPartPicker from './AssemblyPartPicker';
-import { AssemblyViewer } from './AssemblyViewer';
 
 const statusTag = (s: string) => {
   const map: Record<string, { label: string; cls: string }> = {
@@ -60,7 +59,6 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const [matrixPopup, setMatrixPopup] = useState<any>(null);
   const [nestedMasterId, setNestedMasterId] = useState<string | null>(null);
   const [nestedRevisionId, setNestedRevisionId] = useState<string | null>(null);
-  const [showAssembly, setShowAssembly] = useState(false);
   const assemblyFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -190,8 +188,8 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
     try {
       const report = await assemblyViewerApi.importStep(revisionId, file);
       alert(`匹配 ${report.matched.length} 个零件，${report.unmatched.length > 0 ? '未匹配 ' + report.unmatched.length + ' 个：' + report.unmatched.join(', ') : '全部匹配'}`);
-    } catch {
-      alert('导入失败');
+    } catch (e: any) {
+      alert(e?.response?.data?.detail || '导入失败');
     }
   };
   const isCheckedOutByMe = isCheckedOut && revision?.check_out_user_id === user?.id;
@@ -500,7 +498,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImportStep(f); e.target.value = ''; }} />
                   <button onClick={() => assemblyFileRef.current?.click()}
                     className="px-3 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700">导入装配STEP</button>
-                  <button onClick={() => setShowAssembly(true)}
+                  <button onClick={() => window.open(`/stp-viewer?assembly=${revisionId}`, '_blank')}
                     className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">装配3D预览</button>
                 </>
               ) : (
@@ -893,21 +891,6 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
           onClose={() => { setNestedMasterId(null); setNestedRevisionId(null); }}
         />
       )}
-      {/* ===== 装配 3D 预览弹窗 ===== */}
-      {showAssembly && revisionId && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center" onClick={() => setShowAssembly(false)}>
-          <div className="bg-white w-[90vw] h-[85vh] rounded-lg overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-4 py-2 border-b">
-              <span className="font-semibold">装配3D预览</span>
-              <button onClick={() => setShowAssembly(false)} className="text-gray-500 hover:text-gray-700 text-lg">&times;</button>
-            </div>
-            <div className="h-[calc(100%-44px)]">
-              <AssemblyViewer revisionId={revisionId} />
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ===== 变换矩阵详情弹窗 ===== */}
       {matrixPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setMatrixPopup(null)}>
