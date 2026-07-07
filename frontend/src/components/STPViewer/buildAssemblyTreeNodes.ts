@@ -16,13 +16,23 @@ export function buildAssemblyTreeNodes(
 ): TreeNode | null {
   if (!tree || tree.length === 0) return null;
 
+  // 与实例 bom_path 末段一致的 key：多实例展开用 "{bom_item_id}:{idx}"，否则用 bom_item_id。
+  // 后端 get_assembly_instances 对多实例链接的 bom_path 用 "{link.id}:{idx}"，
+  // get_assembly_tree 则把 idx 放在 instance_index 字段 —— 这里拼回一致的 key，
+  // 否则多实例零件的 meshUuids 挂不上，导致上色/高亮/选中对其无效。
+  const keyOf = (node: AssemblyTreeNode): string =>
+    node.instance_index !== undefined && node.instance_index !== null
+      ? `${node.bom_item_id}:${node.instance_index}`
+      : node.bom_item_id;
+
   const convert = (node: AssemblyTreeNode, parentId: string | null): TreeNode => {
-    const children = node.is_leaf ? [] : node.children.map((c) => convert(c, node.bom_item_id));
-    const own = meshUuidsByBomItemId.get(node.bom_item_id) ?? [];
+    const key = keyOf(node);
+    const children = node.is_leaf ? [] : node.children.map((c) => convert(c, key));
+    const own = meshUuidsByBomItemId.get(key) ?? [];
     const meshUuids = node.is_leaf ? own : children.flatMap((c) => c.meshUuids);
     const label = `${node.part_code}${node.part_name ? ' ' + node.part_name : ''}`.trim() || '未命名';
     return {
-      id: node.bom_item_id,
+      id: key,
       name: node.instance_count > 1 ? `${label} ×${node.instance_count}` : label,
       type: node.is_leaf ? 'part' : 'group',
       meshUuids,

@@ -751,6 +751,8 @@ export interface AssemblyInstance {
 
 export interface AssemblyTreeNode {
   bom_item_id: string;
+  /** 多实例展开时的实例序号；与实例 bom_path 的 "{bom_item_id}:{idx}" 末段对应 */
+  instance_index?: number;
   part_code: string;
   part_name: string;
   quantity: number;

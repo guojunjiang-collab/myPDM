@@ -40,6 +40,23 @@ describe('buildAssemblyTreeNodes', () => {
     expect(root.name).toBe('SCREW ×4');
   });
 
+  it('uses "{bom_item_id}:{instance_index}" key for expanded instances (matches bom_path)', () => {
+    // 多实例展开：两节点共享 bom_item_id='b'，靠 instance_index 区分；
+    // mesh 按 "b:0" / "b:1" 归属（与实例 bom_path 末段一致）
+    const tree: AssemblyTreeNode[] = [
+      node({ bom_item_id: 'b', instance_index: 0, part_code: 'SCREW#1', is_leaf: true }),
+      node({ bom_item_id: 'b', instance_index: 1, part_code: 'SCREW#2', is_leaf: true }),
+    ];
+    const meshes = new Map<string, string[]>([['b:0', ['m0']], ['b:1', ['m1']]]);
+    const root = buildAssemblyTreeNodes(tree, meshes)!;
+    // 顶层多节点 → 虚拟根；两个实例各自拿到自己的 mesh，id 不冲突
+    const ids = root.children.map((c) => c.id).sort();
+    expect(ids).toEqual(['b:0', 'b:1']);
+    const byId = new Map(root.children.map((c) => [c.id, c]));
+    expect(byId.get('b:0')!.meshUuids).toEqual(['m0']);
+    expect(byId.get('b:1')!.meshUuids).toEqual(['m1']);
+  });
+
   it('wraps multiple top-level nodes in a virtual root', () => {
     const tree: AssemblyTreeNode[] = [
       node({ bom_item_id: 'p1', part_code: 'A' }),
