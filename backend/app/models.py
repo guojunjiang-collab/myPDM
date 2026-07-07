@@ -103,6 +103,7 @@ class CustomFieldValue(Base):
     value_text = Column(Text, nullable=True)           # 文本/单选值
     value_number = Column(Numeric(12, 4), nullable=True)  # 数字值
     value_json = Column(JSONB, nullable=True)           # 多选值数组
+    iteration_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
