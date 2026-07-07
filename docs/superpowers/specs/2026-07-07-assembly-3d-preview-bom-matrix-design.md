@@ -108,6 +108,14 @@ cad_instances = Column(JSONB, default=[])
 - 一个 BOMItem 挂 N 个实例 = 同一子件在父件下摆 N 处，对应 DocDoku 的 `List<CADInstance>`。
 - 迁移脚本加进 `migrations_components.py`（现有迁移入口）。
 
+**多实例存储示意**（`quantity` 说"几个"，`cad_instances` 矩阵数组说"每个在哪"）：
+
+![多实例变换矩阵存储](assets/2026-07-07-multi-instance-matrix-storage.svg)
+
+- `quantity`（逻辑数量，人工录入）与 `cad_instances`（实际位姿，STEP 解析）**解耦独立存**：逻辑 BOM 可先于 CAD 存在。
+- 理想 `len(cad_instances) == quantity`；不一致时按实际矩阵摆放，差异由 `MatchReport`/UI 标出。
+- `cad_instances` 为空（纯逻辑 BOM、未导入装配 STEP）→ 展平退化为单位矩阵摆原点，提示用户导入。
+
 ### 4.4 装配展平接口（`routers/parts.py` 新增）
 
 `GET /api/parts/revisions/{assembly_revision_id}/assembly-instances`
