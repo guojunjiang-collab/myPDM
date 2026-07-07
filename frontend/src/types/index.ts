@@ -224,6 +224,7 @@ export interface CustomFieldValue {
   field_name: string;
   field_type: string;
   value: string | number | string[] | null;
+  iteration_id?: string | null;
 }
 
 export interface CustomFieldDef {
