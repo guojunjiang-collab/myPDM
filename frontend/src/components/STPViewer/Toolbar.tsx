@@ -1,33 +1,28 @@
 import { useViewerStore } from '../../stores/viewerStore';
-import { useAssemblyStore } from '../AssemblyViewer/assemblyViewerStore';
 
-interface Props { isAssembly?: boolean; }
-
-export function Toolbar({ isAssembly }: Props) {
-  // 同时订阅两个 store，按 isAssembly 选用
+export function Toolbar() {
   const vs = useViewerStore((s) => s);
-  const asm = useAssemblyStore((s) => s);
 
-  const clipPlanes = isAssembly ? asm.clipPlanes : vs.clipPlanes;
-  const wireframe = isAssembly ? asm.wireframe : vs.wireframe;
-  const autoColor = isAssembly ? asm.autoColor : vs.autoColor;
-  const explodeValue = isAssembly ? asm.explodeFactor : vs.explodeDistance;
+  const clipPlanes = vs.clipPlanes;
+  const wireframe = vs.wireframe;
+  const autoColor = vs.autoColor;
+  const explodeValue = vs.explodeDistance;
 
-  const setClipPlane = isAssembly ? asm.setClipPlane : vs.setClipPlane;
-  const removeClipPlane = isAssembly ? asm.removeClipPlane : vs.removeClipPlane;
-  const toggleClipFlip = isAssembly ? asm.toggleClipFlip : vs.toggleClipFlip;
-  const setExplode = isAssembly ? asm.setExplodeFactor : vs.setExplodeDistance;
-  const resetAction = isAssembly ? asm.reset : vs.triggerResetView;
+  const setClipPlane = vs.setClipPlane;
+  const removeClipPlane = vs.removeClipPlane;
+  const toggleClipFlip = vs.toggleClipFlip;
+  const setExplode = vs.setExplodeDistance;
+  const resetAction = vs.triggerResetView;
 
-  const measureMode = isAssembly ? 'off' : vs.measureMode;
+  const measureMode = vs.measureMode;
   const setMeasureMode = vs.setMeasureMode;
-  const cameraMode = isAssembly ? asm.cameraMode : vs.cameraMode;
-  const toggleCameraMode = isAssembly ? asm.toggleCameraMode : vs.toggleCameraMode;
+  const cameraMode = vs.cameraMode;
+  const toggleCameraMode = vs.toggleCameraMode;
 
   const getPlane = (axis: string) => clipPlanes.find((p: any) => p.axis === axis);
   const activeAxes = (['x', 'y', 'z'] as const).filter((a) => getPlane(a));
-  const onWireframe = () => isAssembly ? asm.setWireframe(!wireframe) : vs.toggleWireframe();
-  const onAutoColor = () => isAssembly ? asm.setAutoColor(!autoColor) : vs.toggleAutoColor();
+  const onWireframe = () => vs.toggleWireframe();
+  const onAutoColor = () => vs.toggleAutoColor();
 
   return (
     <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-100 bg-white shadow-sm">
@@ -56,18 +51,16 @@ export function Toolbar({ isAssembly }: Props) {
 
       <div className="w-px h-5 bg-gray-200 shrink-0" />
 
-      {/* Measure mode — 仅单件模式 */}
-      {!isAssembly && (
-        <button
-          onClick={() => setMeasureMode(measureMode === 'distance' ? 'off' : 'distance')}
-          className={`text-sm px-3 py-1.5 rounded-md font-medium transition-colors
-            ${measureMode === 'distance'
-              ? 'bg-blue-50 text-blue-600 border border-blue-200'
-              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-transparent'}`}
-        >
-          测量
-        </button>
-      )}
+      {/* Measure mode */}
+      <button
+        onClick={() => setMeasureMode(measureMode === 'distance' ? 'off' : 'distance')}
+        className={`text-sm px-3 py-1.5 rounded-md font-medium transition-colors
+          ${measureMode === 'distance'
+            ? 'bg-blue-50 text-blue-600 border border-blue-200'
+            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-transparent'}`}
+      >
+        测量
+      </button>
 
       {/* Explode */}
       <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -75,8 +68,8 @@ export function Toolbar({ isAssembly }: Props) {
         <input
           type="range"
           min={0}
-          max={isAssembly ? 1 : 5}
-          step={isAssembly ? 0.01 : 0.1}
+          max={5}
+          step={0.1}
           value={explodeValue}
           onChange={(e) => setExplode(Number(e.target.value))}
           className="w-14 h-1 accent-blue-500"

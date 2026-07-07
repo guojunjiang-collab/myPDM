@@ -5,7 +5,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { useViewerStore } from '../../stores/viewerStore';
 import { buildModelTree } from './buildModelTree';
-import { buildColorMap } from './autoColor';
+import { useSceneVisualState } from './useSceneVisualState';
 
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('/draco/');
@@ -17,8 +17,7 @@ interface ModelLoaderProps {
 export function ModelLoader({ url }: ModelLoaderProps) {
   const {
     setLoadingState, setModelScale, setTreeData, selectByMesh,
-    selectedNodeId, isolateMode, nodeMap, hiddenParts, wireframe, resetViewTrigger,
-    measureMode, autoColor,
+    resetViewTrigger, measureMode,
   } = useViewerStore();
   const setInitialState = useViewerStore((s) => s.setInitialState);
   const groupRef = useRef<THREE.Group>(null);
@@ -93,75 +92,8 @@ export function ModelLoader({ url }: ModelLoaderProps) {
     groupRef.current.position.set(...initGroupPos);
   }, [resetViewTrigger]);
 
-  useEffect(() => {
-    if (!groupRef.current) return;
-    const selNode = selectedNodeId ? nodeMap.get(selectedNodeId) : null;
-    const sel = selNode ? new Set(selNode.meshUuids) : null;
-
-    groupRef.current.traverse((child) => {
-      const mesh = child as THREE.Mesh;
-      if (!mesh.isMesh) return;
-
-      // 显隐不依赖材质，先处理，使多材质 mesh 也能正常隐藏/显示
-      mesh.visible = !hiddenParts.has(mesh.uuid);
-
-      const mat = mesh.material;
-      if (Array.isArray(mat)) return; // 多材质 mesh：跳过高亮/隔离/线框样式
-      const std = mat as THREE.MeshStandardMaterial;
-
-      std.wireframe = wireframe;
-
-      if (!sel) {
-        if (std.emissive) { std.emissive.setHex(0x000000); std.emissiveIntensity = 0; }
-        std.transparent = false; std.opacity = 1; std.depthWrite = true;
-      } else if (sel.has(mesh.uuid)) {
-        if (std.emissive) { std.emissive.setHex(0x224488); std.emissiveIntensity = 0.5; }
-        std.transparent = false; std.opacity = 1; std.depthWrite = true;
-      } else {
-        if (std.emissive) { std.emissive.setHex(0x000000); std.emissiveIntensity = 0; }
-        if (isolateMode) {
-          std.transparent = true; std.opacity = 0.12; std.depthWrite = false;
-        } else {
-          std.transparent = false; std.opacity = 1; std.depthWrite = true;
-        }
-      }
-      std.needsUpdate = true;
-    });
-  }, [selectedNodeId, isolateMode, nodeMap, hiddenParts, wireframe]);
-
-  // 自动上色：按零件名称着色；关闭时还原原始色。只改 color，不触碰 emissive/opacity。
-  useEffect(() => {
-    const group = groupRef.current;
-    const { treeData } = useViewerStore.getState();
-    if (!group || !treeData) return;
-
-    const target = new Map<string, number>();
-    if (autoColor) {
-      const names: string[] = [];
-      nodeMap.forEach((n) => { if (n.type === 'part') names.push(n.name); });
-      const colorMap = buildColorMap(names);
-      nodeMap.forEach((n) => {
-        if (n.type !== 'part') return;
-        const color = colorMap.get(n.name);
-        if (color === undefined) return;
-        n.meshUuids.forEach((u) => target.set(u, color));
-      });
-    } else {
-      origColorRef.current.forEach((hex, uuid) => target.set(uuid, hex));
-    }
-
-    group.traverse((child) => {
-      const mesh = child as THREE.Mesh;
-      if (!mesh.isMesh) return;
-      const mat = mesh.material;
-      if (Array.isArray(mat)) return;
-      const std = mat as THREE.MeshStandardMaterial;
-      const hex = target.get(mesh.uuid);
-      if (hex === undefined || !std.color) return;
-      std.color.setHex(hex);
-      std.needsUpdate = true;
-    });
-  }, [autoColor, nodeMap]);
+  // 选中高亮 / 隔离 / 显隐 / 线框 / 自动上色 —— 与装配模式共用同一套逻辑
+  useSceneVisualState(groupRef, origColorRef);
 
   const handlePointerDown = (e: any) => {
     pointerDown.current = { x: e.clientX, y: e.clientY };

@@ -153,7 +153,7 @@ export function STPViewerModal({ open, attachmentId, fileName, onClose }: STPVie
             <div className="flex-1 flex flex-col min-w-0">
               <Toolbar />
               <div className="flex-1 relative">
-                <ViewerCanvas url={modelUrl} />
+                <ViewerCanvas source={{ kind: 'single', url: modelUrl }} />
                 <ViewCube />
               </div>
             </div>

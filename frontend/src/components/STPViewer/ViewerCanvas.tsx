@@ -3,6 +3,7 @@ import { Canvas, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { ModelLoader } from './ModelLoader';
+import { AssemblyModelLoader } from './AssemblyModelLoader';
 import { PartHighlighter } from './PartHighlighter';
 import { GLTFErrorBoundary } from './GLTFErrorBoundary';
 import { SectionPlanes } from './SectionPlanes';
@@ -10,6 +11,12 @@ import { MeasureTool } from './MeasureTool';
 import { ExplodeView } from './ExplodeView';
 import { CameraController } from './CameraController';
 import { useViewerStore } from '../../stores/viewerStore';
+import type { AssemblyInstance, AssemblyTreeNode } from '../../services/api';
+
+/** 查看器数据源：单件(一个 glb) 或 装配(多实例 + BOM 树) */
+export type ViewerSource =
+  | { kind: 'single'; url: string }
+  | { kind: 'assembly'; instances: AssemblyInstance[]; tree: AssemblyTreeNode[] };
 
 /**
  * 程序化室内环境光（three 内置 RoomEnvironment + PMREMGenerator）。
@@ -33,10 +40,10 @@ function LocalEnvironment() {
 }
 
 interface ViewerCanvasProps {
-  url: string;
+  source: ViewerSource;
 }
 
-export function ViewerCanvas({ url }: ViewerCanvasProps) {
+export function ViewerCanvas({ source }: ViewerCanvasProps) {
   const selectNode = useViewerStore((s) => s.selectNode);
 
   useEffect(() => {
@@ -64,8 +71,14 @@ export function ViewerCanvas({ url }: ViewerCanvasProps) {
       <directionalLight position={[-8, 4, -6]} intensity={0.4} />
       <Suspense fallback={null}>
         <GLTFErrorBoundary>
-          <ModelLoader url={url} />
-          <PartHighlighter url={url} />
+          {source.kind === 'single' ? (
+            <>
+              <ModelLoader url={source.url} />
+              <PartHighlighter url={source.url} />
+            </>
+          ) : (
+            <AssemblyModelLoader instances={source.instances} tree={source.tree} />
+          )}
         </GLTFErrorBoundary>
       </Suspense>
       <SectionPlanes />

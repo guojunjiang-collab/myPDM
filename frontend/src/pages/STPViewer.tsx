@@ -1,47 +1,12 @@
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { Canvas, useThree } from '@react-three/fiber';
-import { ArcballControls } from '@react-three/drei';
-import * as THREE from 'three';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { ViewerCanvas } from '../components/STPViewer/ViewerCanvas';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { ViewerCanvas, type ViewerSource } from '../components/STPViewer/ViewerCanvas';
 import { Toolbar } from '../components/STPViewer/Toolbar';
 import { ModelTreePanel } from '../components/STPViewer/ModelTreePanel';
 import { ViewCube } from '../components/STPViewer/ViewCube';
 import { useViewerStore } from '../stores/viewerStore';
-import { AssemblyTreePanel } from '../components/AssemblyViewer/AssemblyTreePanel';
-import { InstancedScene } from '../components/AssemblyViewer/InstancedScene';
-import { buildInstanceIndex } from '../components/AssemblyViewer/buildInstanceIndex';
-import { useAssemblyStore } from '../components/AssemblyViewer/assemblyViewerStore';
 import { assemblyViewerApi } from '../services/api';
 import type { AssemblyInstance, AssemblyTreeNode } from '../services/api';
 import axios from 'axios';
-
-/** 为装配模式同步相机四元数到 viewerStore（供 ViewCube 读取） */
-function AssemblyCameraSync() {
-  const { camera } = useThree();
-  useEffect(() => {
-    const id = setInterval(() => {
-      useViewerStore.setState({
-        cameraQuat: [camera.quaternion.x, camera.quaternion.y, camera.quaternion.z, camera.quaternion.w],
-      });
-    }, 100);
-    return () => clearInterval(id);
-  }, [camera]);
-  return null;
-}
-
-/** RoomEnvironment IBL（同单件模式） */
-function AssemblyLocalEnv() {
-  const { gl, scene } = useThree();
-  useEffect(() => {
-    const pmrem = new THREE.PMREMGenerator(gl);
-    const envMap = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    scene.environment = envMap;
-    scene.environmentIntensity = 0.8;
-    return () => { scene.environment = null; envMap.dispose(); pmrem.dispose(); };
-  }, [gl, scene]);
-  return null;
-}
 
 export default function STPViewerPage() {
   const [state, setState] = useState<'checking' | 'converting' | 'loading' | 'ready' | 'error'>('checking');
@@ -51,6 +16,7 @@ export default function STPViewerPage() {
   const dragging = useRef(false);
   const loadingState = useViewerStore((s) => s.loadingState);
   const errorMessage = useViewerStore((s) => s.errorMessage);
+  const reset = useViewerStore((s) => s.reset);
 
   const params = new URLSearchParams(location.search);
   const assemblyRevId = params.get('assembly');
@@ -58,7 +24,6 @@ export default function STPViewerPage() {
   const [asmInstances, setAsmInstances] = useState<AssemblyInstance[] | null>(null);
   const [asmTree, setAsmTree] = useState<AssemblyTreeNode[]>([]);
   const [asmError, setAsmError] = useState<string | null>(null);
-  const asmReset = useAssemblyStore((s) => s.reset);
 
   const onResizeDown = useCallback(() => { dragging.current = true; }, []);
   useEffect(() => {
@@ -76,8 +41,8 @@ export default function STPViewerPage() {
   }, []);
 
   useEffect(() => {
+    reset();
     if (assemblyRevId) {
-      asmReset();
       Promise.all([
         assemblyViewerApi.instances(assemblyRevId),
         assemblyViewerApi.tree(assemblyRevId),
@@ -91,9 +56,8 @@ export default function STPViewerPage() {
     if (!id || !token) { setState('error'); return; }
     const gltfUrl = `/api/v2/attachments/${id}/gltf?token=${encodeURIComponent(token)}`;
     checkAndLoad(gltfUrl);
+    return () => { reset(); };
   }, []);
-
-  const asmIndex = useMemo(() => buildInstanceIndex(asmInstances ?? []), [asmInstances]);
 
   async function checkAndLoad(gltfUrl: string) {
     try {
@@ -138,36 +102,26 @@ export default function STPViewerPage() {
     }, 2000);
   }
 
+  // ── 统一数据源：装配 or 单件 ──
+  let source: ViewerSource | null = null;
+  if (assemblyRevId) {
+    if (asmInstances && asmInstances.length > 0) {
+      source = { kind: 'assembly', instances: asmInstances, tree: asmTree };
+    }
+  } else if (url) {
+    source = { kind: 'single', url };
+  }
+
+  // 装配模式的前置态（加载/空/错误）
   if (assemblyRevId) {
     if (asmError) return <div className="w-screen h-screen flex items-center justify-center text-red-500">{asmError}</div>;
     if (!asmInstances) return <div className="w-screen h-screen flex items-center justify-center text-gray-500">加载中...</div>;
     if (asmInstances.length === 0) return <div className="w-screen h-screen flex items-center justify-center text-gray-500">该装配暂无已摆位的零件（先导入装配 STEP）</div>;
-
-    return (
-      <div className="w-screen h-screen relative flex">
-        <div style={{ width: treeWidth }} className="shrink-0 h-full overflow-auto border-r bg-white">
-          <AssemblyTreePanel tree={asmTree} />
-        </div>
-        <div onMouseDown={onResizeDown} className="w-1.5 cursor-col-resize hover:bg-blue-400 bg-gray-200 shrink-0 transition-colors" />
-        <div className="flex-1 flex flex-col min-w-0">
-          <Toolbar isAssembly />
-          <div className="flex-1 relative">
-            <Canvas camera={{ position: [2, 2, 3], fov: 45 }}>
-              <AssemblyLocalEnv />
-              <InstancedScene instances={asmInstances} index={asmIndex} />
-              <ArcballControls makeDefault />
-              <AssemblyCameraSync />
-            </Canvas>
-            <ViewCube />
-          </div>
-        </div>
-      </div>
-    );
+  } else {
+    if (state === 'checking') return <div className="w-screen h-screen flex items-center justify-center text-gray-500">加载中...</div>;
+    if (state === 'converting') return <div className="w-screen h-screen flex items-center justify-center text-gray-500">模型转换中，请稍后...</div>;
+    if (state === 'error') return <div className="w-screen h-screen flex items-center justify-center text-red-500">加载失败，请关闭后重试</div>;
   }
-
-  if (state === 'checking') return <div className="w-screen h-screen flex items-center justify-center text-gray-500">加载中...</div>;
-  if (state === 'converting') return <div className="w-screen h-screen flex items-center justify-center text-gray-500">模型转换中，请稍后...</div>;
-  if (state === 'error') return <div className="w-screen h-screen flex items-center justify-center text-red-500">加载失败，请关闭后重试</div>;
 
   return (
     <div className="w-screen h-screen relative flex">
@@ -181,11 +135,13 @@ export default function STPViewerPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <Toolbar />
         <div className="flex-1 relative">
-          {url && <ViewerCanvas url={url} />}
+          {source && <ViewerCanvas source={source} />}
           <ViewCube />
         </div>
       </div>
-      {state === 'loading' && (
+
+      {/* 单件模式下载/解析进度 */}
+      {!assemblyRevId && state === 'loading' && (
         <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/90 gap-4">
           <div className="text-gray-500 text-sm">正在下载模型... {downloadPct}%</div>
           <div className="w-72 h-2 bg-gray-200 rounded-full overflow-hidden">
@@ -193,7 +149,7 @@ export default function STPViewerPage() {
           </div>
         </div>
       )}
-      {url && state === 'ready' && loadingState !== 'ready' && loadingState !== 'error' && (
+      {!assemblyRevId && url && state === 'ready' && loadingState !== 'ready' && loadingState !== 'error' && (
         <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/90 gap-4">
           <div className="text-gray-500 text-sm">正在解析渲染...</div>
           <div className="w-72 h-2 bg-gray-200 rounded-full overflow-hidden">
@@ -201,7 +157,7 @@ export default function STPViewerPage() {
           </div>
         </div>
       )}
-      {url && loadingState === 'error' && (
+      {loadingState === 'error' && (
         <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/90 gap-4">
           <div className="text-red-500 text-sm">模型加载失败</div>
           {errorMessage && <div className="text-gray-400 text-xs">{errorMessage}</div>}
