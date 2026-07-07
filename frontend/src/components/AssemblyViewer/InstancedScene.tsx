@@ -106,6 +106,47 @@ export function InstancedScene({ instances, index }: Props) {
     return useAssemblyStore.subscribe(apply);
   }, [index]);
 
+  useEffect(() => {
+    let prev = useAssemblyStore.getState().wireframe;
+    const apply = (wf: boolean) => {
+      lodByPath.current.forEach((lod) => {
+        lod.traverse((c) => {
+          const mesh = c as THREE.Mesh;
+          if (mesh.isMesh && !Array.isArray(mesh.material)) {
+            (mesh.material as any).wireframe = wf;
+          }
+        });
+      });
+    };
+    apply(prev);
+    return useAssemblyStore.subscribe((s) => {
+      if (s.wireframe !== prev) { prev = s.wireframe; apply(s.wireframe); }
+    });
+  }, []);
+
+  useEffect(() => {
+    let prev = useAssemblyStore.getState().explodeFactor;
+    const apply = (ef: number) => {
+      lodByPath.current.forEach((lod, path) => {
+        const inst = instances.find((i) => i.path === path);
+        if (!inst) return;
+        const center = new THREE.Vector3(inst.matrix[3], inst.matrix[7], inst.matrix[11]);
+        const len = center.length();
+        if (len < 0.001) return;
+        const dir = center.clone().normalize();
+        const offset = dir.multiplyScalar(ef * 0.5);
+        lod.matrix.fromArray(inst.matrix).transpose();
+        lod.matrix.elements[12] += offset.x;
+        lod.matrix.elements[13] += offset.y;
+        lod.matrix.elements[14] += offset.z;
+      });
+    };
+    apply(prev);
+    return useAssemblyStore.subscribe((s) => {
+      if (s.explodeFactor !== prev) { prev = s.explodeFactor; apply(s.explodeFactor); }
+    });
+  }, [instances]);
+
   const handleClick = (e: any) => {
     e.stopPropagation();
     let obj: THREE.Object3D | null = e.object;
