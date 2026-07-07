@@ -68,6 +68,9 @@ export function CameraController() {
       );
       newCam.position.copy(pos);
       newCam.quaternion.copy(quat);
+      // 标记为 manual，阻止 R3F 在画布尺寸变化时用"像素级视锥"覆盖我们的正交视锥
+      // （否则拖动模型树改变画布宽度会导致模型被缩放）。视锥由下面的 [size] 副作用统一维护。
+      (newCam as any).manual = true;
       set({ camera: newCam as any });
     } else {
       const cam = camera as THREE.OrthographicCamera;
