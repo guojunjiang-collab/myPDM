@@ -142,3 +142,34 @@ class PartListQuery(BaseModel):
     show_all_versions: bool = False
     page: int = 1
     page_size: int = 50
+
+
+# ===== 装配 3D 预览 =====
+
+class MatchReport(BaseModel):
+    matched: List[str]
+    unmatched: List[str]
+    multi_instance: List[str]
+
+
+class AssemblyInstanceDTO(BaseModel):
+    path: str
+    bom_path: List[str]
+    part_code: str
+    revision_id: str
+    glb_urls: dict
+    matrix: List[float]
+    bbox: Optional[dict] = None
+
+
+class AssemblyTreeNodeDTO(BaseModel):
+    bom_item_id: str
+    part_code: str
+    part_name: str
+    quantity: int
+    instance_count: int
+    is_leaf: bool
+    children: List["AssemblyTreeNodeDTO"] = []
+
+
+AssemblyTreeNodeDTO.model_rebuild()

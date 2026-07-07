@@ -2,7 +2,7 @@
 from __future__ import annotations
 import uuid as _uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from fastapi.responses import FileResponse
@@ -14,6 +14,10 @@ from ..models import User
 from .. import crud_parts
 from .. import schemas_parts
 from ..permissions import require_permission
+import tempfile, os as _os
+from ..cad.assembly_parser import parse_assembly_step
+from ..stp_converter import get_lod_glb_paths
+from ..schemas_parts import MatchReport, AssemblyInstanceDTO, AssemblyTreeNodeDTO
 
 router = APIRouter(prefix="/parts", tags=["parts"])
 
@@ -795,3 +799,96 @@ def get_attachment_file(
         raise HTTPException(404, "文件不存在")
     mime_type = mimetypes.guess_type(att.file_path)[0] or "application/octet-stream"
     return FileResponse(att.file_path, media_type=mime_type, filename=att.file_name)
+
+
+# ===== 装配 3D 预览 =====
+
+def _glb_url_resolver_factory(db):
+    from ..models_parts import PartIteration, PartAttachment
+
+    def resolver(child_revision_id):
+        rev = crud_parts.get_part_revision(db, child_revision_id)
+        if not rev:
+            return None
+        it = (db.query(PartIteration)
+              .filter(PartIteration.revision_id == rev.id,
+                      PartIteration.iteration == rev.latest_iteration).first())
+        if not it:
+            return None
+        att = (db.query(PartAttachment)
+               .filter(PartAttachment.iteration_id == it.id,
+                       PartAttachment.category == "cad").first())
+        if not att:
+            return None
+        paths = get_lod_glb_paths(str(att.id), att.file_path, is_part=True)
+        urls = {}
+        for tier, p in paths.items():
+            if _os.path.exists(p):
+                urls[tier] = f"/api/parts/attachments/{att.id}/lod/{tier}"
+        if not urls:
+            return None
+        fallback = urls.get("fine") or next(iter(urls.values()))
+        for tier in ("coarse", "normal", "fine"):
+            urls.setdefault(tier, fallback)
+        return urls
+
+    return resolver
+
+
+@router.post("/revisions/{revision_id}/import-assembly-step", response_model=MatchReport)
+async def import_assembly_step(
+    revision_id: UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("components:update")),
+):
+    """上传装配 STEP，解析结构+矩阵，按 code/name 匹配现有 BOM 并回填。"""
+    suffix = _os.path.splitext(file.filename or "a.step")[1] or ".step"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+    try:
+        parsed = parse_assembly_step(tmp_path)
+    finally:
+        _os.unlink(tmp_path)
+    report = crud_parts.apply_step_matrices(db, revision_id, parsed)
+    return report
+
+
+@router.get("/revisions/{revision_id}/assembly-instances", response_model=List[AssemblyInstanceDTO])
+def assembly_instances(
+    revision_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("components:read")),
+):
+    resolver = _glb_url_resolver_factory(db)
+    return crud_parts.get_assembly_instances(db, revision_id, resolver)
+
+
+@router.get("/revisions/{revision_id}/assembly-tree", response_model=List[AssemblyTreeNodeDTO])
+def assembly_tree(
+    revision_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("components:read")),
+):
+    return crud_parts.get_assembly_tree(db, revision_id)
+
+
+@router.get("/attachments/{attachment_id}/lod/{tier}")
+def get_attachment_lod_glb(
+    attachment_id: UUID,
+    tier: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("components:read")),
+):
+    from ..models_parts import PartAttachment
+    if tier not in ("coarse", "normal", "fine"):
+        raise HTTPException(status_code=400, detail="非法档位")
+    att = db.query(PartAttachment).filter(PartAttachment.id == attachment_id).first()
+    if not att:
+        raise HTTPException(status_code=404, detail="附件不存在")
+    paths = get_lod_glb_paths(str(att.id), att.file_path, is_part=True)
+    glb = paths.get(tier)
+    if not glb or not _os.path.exists(glb):
+        raise HTTPException(status_code=404, detail="LOD 未生成")
+    return FileResponse(str(glb), media_type="model/gltf-binary", filename=glb.name)
