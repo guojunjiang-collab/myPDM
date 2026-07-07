@@ -47,15 +47,37 @@ def _get_next_version(db: Session, master_id: UUID) -> str:
 # ====== PartMaster CRUD ======
 
 def create_part_master(db: Session, data: dict, user_id: UUID) -> models_parts.PartMaster:
-    """创建零件主数据，同时自动创建 Revision=A、Iteration=1"""
-    master = models_parts.PartMaster(
-        code=data["code"],
-        name=data["name"],
-        spec=data.get("spec"),
-        creator_id=user_id,
-    )
-    db.add(master)
-    db.flush()
+    """创建零件主数据，同时自动创建 Revision=A、Iteration=1。
+    如果件号已存在但无版本（孤儿数据），则复用该主数据并补建版本。
+    """
+    code = data["code"]
+    # 预检：件号是否已存在（排除已软删除的）
+    existing = db.query(models_parts.PartMaster).filter(
+        models_parts.PartMaster.code == code,
+        models_parts.PartMaster.deleted_at.is_(None),
+    ).first()
+    if existing:
+        # 如果已有有效版本，报错
+        has_rev = db.query(models_parts.PartRevision).filter(
+            models_parts.PartRevision.master_id == existing.id,
+            models_parts.PartRevision.deleted_at.is_(None),
+        ).count()
+        if has_rev > 0:
+            raise ValueError(f"件号「{code}」已存在，请更换件号")
+        # 孤儿数据：复用并更新名称/规格
+        existing.name = data["name"]
+        if data.get("spec"):
+            existing.spec = data["spec"]
+        master = existing
+    else:
+        master = models_parts.PartMaster(
+            code=code,
+            name=data["name"],
+            spec=data.get("spec"),
+            creator_id=user_id,
+        )
+        db.add(master)
+        db.flush()
 
     revision = models_parts.PartRevision(
         master_id=master.id,
@@ -749,6 +771,7 @@ def get_bom_tree(db: Session, revision_id: UUID) -> List[Dict]:
                     ),
                     "quantity": item.quantity,
                     "sort_order": item.sort_order,
+                    "cad_instances": item.cad_instances or [],
                 }
             )
     return result

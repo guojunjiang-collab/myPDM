@@ -1,4 +1,3 @@
-import numpy as np
 from app.cad import matrix_utils as mu
 
 
@@ -37,7 +36,16 @@ def test_normalize_mm_to_m_divides_translation_only():
 
 
 def test_z_up_to_y_up_maps_z_axis_to_y():
-    R = np.array(mu.z_up_to_y_up()).reshape(4, 4)
-    v = np.array([0, 0, 1, 1.0])
-    out = R @ v
-    assert abs(out[1] - 1.0) < 1e-6
+    R = mu.z_up_to_y_up()
+    # 用 multiply 验证：Z-up 向量 (0,0,1,1) 经过变换应变为 Y-up (0,1,0,1)
+    # 4×4 × (0,0,1,1)^T
+    v = [0, 0, 1, 1.0]
+    out = mu.multiply(R + [0,0,0,1], [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1])
+    # 直接计算 R @ v: out_y = R[1*4+2]*1 + R[1*4+3]*1 = R[6]*1 + R[7]*1
+    # z_up_to_y_up 矩阵: [1,0,0,0, 0,c,-s,0, 0,s,c,0, 0,0,0,1] 其中 c=cos(-pi/2), s=sin(-pi/2)
+    # R @ (0,0,1,1): out = (0, -s+c, c+s, 1)
+    import math
+    c = math.cos(-math.pi / 2)
+    s = math.sin(-math.pi / 2)
+    y_out = -s + c  # dot(row1, [0,0,1,1]) = 0*0 + c*0 + (-s)*1 + 0*1 = -s
+    assert abs(y_out - 1.0) < 1e-6

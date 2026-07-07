@@ -47,8 +47,11 @@ def create_part(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("components:create")),
 ):
-    master = crud_parts.create_part_master(db, data.model_dump(), current_user.id)
-    return _build_master_response(db, master)
+    try:
+        master = crud_parts.create_part_master(db, data.model_dump(), current_user.id)
+        return _build_master_response(db, master)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 @router.get("/{master_id}", response_model=schemas_parts.PartMasterResponse)
@@ -85,7 +88,7 @@ def delete_revision(
     rev = crud_parts.get_part_revision(db, revision_id)
     if not rev:
         raise HTTPException(404, "版本不存在")
-    # 检查是否为其他零部件的BOM子项
+    # 检查是否为其他零部件的BOM子项（排除已软删除的父零部件）
     used_as_child = db.query(crud_parts.models.BOMItem).filter(
         crud_parts.models.BOMItem.child_revision_id == revision_id,
         crud_parts.models.BOMItem.deleted_at.is_(None),
@@ -93,10 +96,19 @@ def delete_revision(
     if used_as_child:
         parent_rev = crud_parts.get_part_revision(db, used_as_child.parent_revision_id)
         parent_master = crud_parts.get_part_master(db, parent_rev.master_id) if parent_rev else None
-        parent_info = f"{parent_master.code} {parent_master.name}" if parent_master else "其他零部件"
-        raise HTTPException(400, f"该零部件是「{parent_info}」的BOM子项，请先在父部件中移除此子项后再删除")
+        # 父零部件未被软删除时才阻止
+        if parent_rev and parent_master and parent_rev.deleted_at is None and parent_master.deleted_at is None:
+            parent_info = f"{parent_master.code} {parent_master.name}" if parent_master else "其他零部件"
+            raise HTTPException(400, f"该零部件是「{parent_info}」的BOM子项，请先在父部件中移除此子项后再删除")
     rev.deleted_at = datetime.now(timezone.utc)
     db.commit()
+    # 如果该主数据下所有版本都已软删除，自动删除主数据
+    remaining = db.query(crud_parts.models_parts.PartRevision).filter(
+        crud_parts.models_parts.PartRevision.master_id == rev.master_id,
+        crud_parts.models_parts.PartRevision.deleted_at.is_(None),
+    ).count()
+    if remaining == 0:
+        crud_parts.delete_part_master(db, rev.master_id)
     return {"detail": "已删除"}
 
 
@@ -815,9 +827,14 @@ def _glb_url_resolver_factory(db):
                       PartIteration.iteration == rev.latest_iteration).first())
         if not it:
             return None
-        att = (db.query(PartAttachment)
-               .filter(PartAttachment.iteration_id == it.id,
-                       PartAttachment.category == "cad").first())
+        # 优先找生产附件中的 STP 文件（CAD 附件通常是原始 CAD 格式，不可直接预览）
+        from ..stp_converter import is_stp_file
+        atts = (db.query(PartAttachment)
+               .filter(PartAttachment.iteration_id == it.id)
+               .all())
+        att = next((a for a in atts if is_stp_file(a.file_name) and a.category == 'production'), None)
+        if not att:
+            att = next((a for a in atts if is_stp_file(a.file_name)), None)
         if not att:
             return None
         paths = get_lod_glb_paths(str(att.id), att.file_path, is_part=True)

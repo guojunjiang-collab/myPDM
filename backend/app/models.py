@@ -28,6 +28,7 @@ class BOMItem(Base):
     child_revision_id = Column(UUID(as_uuid=True), ForeignKey("part_revisions.id", ondelete="CASCADE"), nullable=True)
     quantity = Column(Integer, nullable=False, default=1)
     sort_order = Column(Integer, default=0)
+    cad_instances = Column(JSONB, default=list)  # [{matrix:[16 float], source:'step'|'manual', label:str}]
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)

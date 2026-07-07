@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { partsApi, customFieldsApi, assemblyViewerApi } from '../services/api';
+import { partsApi, customFieldsApi, assemblyViewerApi, mediaApi } from '../services/api';
 import { useAuthStore } from '../stores/auth';
 import type { PartMaster, PartRevision, PartIteration, PartStatus, CascadeResult } from '../types';
 import { Loading } from './Loading';
@@ -57,10 +57,10 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const [versionSelectItem, setVersionSelectItem] = useState<any>(null);
   const [versionSelectRevisions, setVersionSelectRevisions] = useState<any[]>([]);
   const [versionSelectLoading, setVersionSelectLoading] = useState(false);
+  const [matrixPopup, setMatrixPopup] = useState<any>(null);
   const [nestedMasterId, setNestedMasterId] = useState<string | null>(null);
   const [nestedRevisionId, setNestedRevisionId] = useState<string | null>(null);
   const [showAssembly, setShowAssembly] = useState(false);
-  const [showPart3D, setShowPart3D] = useState(false);
   const assemblyFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -268,6 +268,12 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                 }}
                 className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-1 focus:ring-primary-500" />
             ) : item.quantity}
+          </td>
+          <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+            {item.cad_instances?.length > 0 ? (
+              <button type="button" onClick={(e) => { e.stopPropagation(); setMatrixPopup(item); }}
+                className="text-indigo-500 hover:text-indigo-700 text-lg leading-none cursor-pointer" title="查看变换矩阵">📐</button>
+            ) : <span className="text-gray-300">—</span>}
           </td>
           {canEdit && (
             <td className="px-3 py-2 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
@@ -498,7 +504,22 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                     className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">装配3D预览</button>
                 </>
               ) : (
-                <button onClick={() => setShowPart3D(true)}
+                <button onClick={async () => {
+                  if (!revisionId) return;
+                  try {
+                    const atts = await partsApi.listAttachments(revisionId, 'production');
+                    const stp = (Array.isArray(atts) ? atts : []).find((a: any) => {
+                      const n = (a.file_name || '').toLowerCase();
+                      return n.endsWith('.stp') || n.endsWith('.step');
+                    });
+                    if (stp) {
+                      const mt = await mediaApi.token(stp.id, 'gltf');
+                      window.open(`/stp-viewer?id=${stp.id}&token=${encodeURIComponent(mt)}`, '_blank');
+                    } else {
+                      alert('该零件没有 STP/STEP 附件，请先上传');
+                    }
+                  } catch { alert('预览失败'); }
+                }}
                   className="px-3 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700">3D预览</button>
               )}
             </div>
@@ -658,8 +679,9 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                             <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
                             <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">状态</th>
                             <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">签出状态</th>
-                            <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">用量</th>
-                            {canEdit && (
+                             <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">用量</th>
+                             <th className="px-3 py-2 text-center text-gray-500 font-medium w-12 whitespace-nowrap">矩阵</th>
+                             {canEdit && (
                               <th className="px-3 py-2 text-right text-gray-500 font-medium w-36">操作</th>
                             )}
                           </tr>
@@ -886,16 +908,40 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
         </div>
       )}
 
-      {/* ===== 单件 3D 预览弹窗 ===== */}
-      {showPart3D && revisionId && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center" onClick={() => setShowPart3D(false)}>
-          <div className="bg-white w-[90vw] h-[85vh] rounded-lg overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-4 py-2 border-b">
-              <span className="font-semibold">3D预览</span>
-              <button onClick={() => setShowPart3D(false)} className="text-gray-500 hover:text-gray-700 text-lg">&times;</button>
+      {/* ===== 变换矩阵详情弹窗 ===== */}
+      {matrixPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setMatrixPopup(null)}>
+          <div className="absolute inset-0 bg-black/30" />
+          <div className="relative bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[70vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b sticky top-0 bg-white">
+              <span className="font-semibold text-sm">{matrixPopup.child_code} 变换矩阵</span>
+              <button onClick={() => setMatrixPopup(null)} className="text-gray-500 hover:text-gray-700 text-lg">&times;</button>
             </div>
-            <div className="h-[calc(100%-44px)]">
-              <iframe src={`/stp-viewer?id=${revisionId}`} className="w-full h-full border-0" />
+            <div className="p-4 space-y-3">
+              {(matrixPopup.cad_instances || []).map((inst: any, idx: number) => (
+                <div key={idx} className="border rounded-lg p-3 bg-gray-50">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="px-1.5 py-0.5 text-xs rounded bg-indigo-100 text-indigo-700">
+                      {inst.source === 'step' ? 'STEP' : inst.source || '—'}
+                    </span>
+                    <span className="text-xs text-gray-500">实例 {idx + 1}</span>
+                    {inst.label && <span className="text-xs text-gray-600">"{inst.label}"</span>}
+                  </div>
+                  <div className="grid grid-cols-4 gap-x-3 gap-y-1 font-mono text-xs">
+                    {(inst.matrix || []).map((v: number, i: number) => (
+                      <div key={i} className="text-right">
+                        <span className={i % 4 === 3 ? 'text-indigo-600' : 'text-gray-600'}>
+                          {Number(v).toFixed(3).replace(/\.?0+$/, '')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-1 text-xs text-gray-400">
+                    平移 (x,y,z): {[3,7,11].map(i => Number((inst.matrix || [])[i] || 0).toFixed(3).replace(/\.?0+$/, '')).join(', ')}m
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
