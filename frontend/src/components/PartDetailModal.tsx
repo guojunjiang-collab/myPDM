@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { partsApi, customFieldsApi } from '../services/api';
+import { partsApi, customFieldsApi, assemblyViewerApi } from '../services/api';
 import { useAuthStore } from '../stores/auth';
 import type { PartMaster, PartRevision, PartIteration, PartStatus, CascadeResult } from '../types';
 import { Loading } from './Loading';
@@ -8,6 +8,7 @@ import { Modal } from './Modal';
 import EntityDocumentSection from './EntityDocumentSection';
 import PartAttachmentBucket from './PartAttachmentBucket';
 import AssemblyPartPicker from './AssemblyPartPicker';
+import { AssemblyViewer } from './AssemblyViewer';
 
 const statusTag = (s: string) => {
   const map: Record<string, { label: string; cls: string }> = {
@@ -58,6 +59,9 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const [versionSelectLoading, setVersionSelectLoading] = useState(false);
   const [nestedMasterId, setNestedMasterId] = useState<string | null>(null);
   const [nestedRevisionId, setNestedRevisionId] = useState<string | null>(null);
+  const [showAssembly, setShowAssembly] = useState(false);
+  const [showPart3D, setShowPart3D] = useState(false);
+  const assemblyFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -179,6 +183,17 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   useEffect(() => { loadTabs(); }, [loadTabs]);
 
   const isCheckedOut = !!revision?.check_out_user_id;
+  const isAssembly = master?.type === 'assembly' || hasBomChildren;
+
+  const handleImportStep = async (file: File) => {
+    if (!revisionId) return;
+    try {
+      const report = await assemblyViewerApi.importStep(revisionId, file);
+      alert(`匹配 ${report.matched.length} 个零件，${report.unmatched.length > 0 ? '未匹配 ' + report.unmatched.length + ' 个：' + report.unmatched.join(', ') : '全部匹配'}`);
+    } catch {
+      alert('导入失败');
+    }
+  };
   const isCheckedOutByMe = isCheckedOut && revision?.check_out_user_id === user?.id;
   const isDraft = revision?.status === 'draft';
   const isAdminUser = user?.role === 'admin';
@@ -469,6 +484,23 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                   )}
                 </div>
               </div>
+            </div>
+
+            {/* 3D 预览入口 */}
+            <div className="flex gap-1">
+              {isAssembly ? (
+                <>
+                  <input ref={assemblyFileRef} type="file" accept=".stp,.step" hidden
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImportStep(f); e.target.value = ''; }} />
+                  <button onClick={() => assemblyFileRef.current?.click()}
+                    className="px-3 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700">导入装配STEP</button>
+                  <button onClick={() => setShowAssembly(true)}
+                    className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">装配3D预览</button>
+                </>
+              ) : (
+                <button onClick={() => setShowPart3D(true)}
+                  className="px-3 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700">3D预览</button>
+              )}
             </div>
 
             {viewingIterationId && (
@@ -838,6 +870,35 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
           open={!!nestedMasterId}
           onClose={() => { setNestedMasterId(null); setNestedRevisionId(null); }}
         />
+      )}
+      {/* ===== 装配 3D 预览弹窗 ===== */}
+      {showAssembly && revisionId && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center" onClick={() => setShowAssembly(false)}>
+          <div className="bg-white w-[90vw] h-[85vh] rounded-lg overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-2 border-b">
+              <span className="font-semibold">装配3D预览</span>
+              <button onClick={() => setShowAssembly(false)} className="text-gray-500 hover:text-gray-700 text-lg">&times;</button>
+            </div>
+            <div className="h-[calc(100%-44px)]">
+              <AssemblyViewer revisionId={revisionId} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== 单件 3D 预览弹窗 ===== */}
+      {showPart3D && revisionId && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center" onClick={() => setShowPart3D(false)}>
+          <div className="bg-white w-[90vw] h-[85vh] rounded-lg overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-2 border-b">
+              <span className="font-semibold">3D预览</span>
+              <button onClick={() => setShowPart3D(false)} className="text-gray-500 hover:text-gray-700 text-lg">&times;</button>
+            </div>
+            <div className="h-[calc(100%-44px)]">
+              <iframe src={`/stp-viewer?id=${revisionId}`} className="w-full h-full border-0" />
+            </div>
+          </div>
+        </div>
       )}
     </Modal>
   );
