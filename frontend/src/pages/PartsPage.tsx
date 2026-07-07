@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { partsApi } from '../services/api';
+import { partsApi, customFieldsApi } from '../services/api';
 import { useAuthStore } from '../stores/auth';
-import type { PartListItem } from '../types';
+import { useDataStore } from '../stores/data';
+import type { PartListItem, CustomFieldDefinition } from '../types';
 import { toast } from '../components/Toast';
 import { Modal, ConfirmModal } from '../components/Modal';
 import { useTableSort } from '../hooks/useTableSort';
@@ -27,6 +28,12 @@ export default function PartsPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [showAllVersions, setShowAllVersions] = useState(false);
   const [allData, setAllData] = useState<PartListItem[]>([]);
+
+  const [cfValuesMap, setCfValuesMap] = useState<Record<string, Record<string, any>>>({});
+  const storeCustomDefs = useDataStore((s) => s.customFieldDefs);
+  const componentCustomDefs = storeCustomDefs.filter((d: CustomFieldDefinition) =>
+    d.applies_to?.includes('component') || d.applies_to?.includes('part')
+  );
 
   const [detailMasterId, setDetailMasterId] = useState<string | null>(null);
   const [detailRevisionId, setDetailRevisionId] = useState<string | null>(null);
@@ -56,6 +63,16 @@ export default function PartsPage() {
         if (searchField === 'code') filtered = rawItems.filter((i: PartListItem) => i.code?.toLowerCase().includes(kw));
         else if (searchField === 'name') filtered = rawItems.filter((i: PartListItem) => i.name?.toLowerCase().includes(kw));
         else if (searchField === 'spec') filtered = rawItems.filter((i: PartListItem) => i.spec?.toLowerCase().includes(kw));
+        else if (searchField.startsWith('cf_')) {
+          const fieldId = searchField.slice(3);
+          filtered = rawItems.filter((i: PartListItem) => {
+            const cfVals = cfValuesMap[i.revision_id] || {};
+            const v = cfVals[fieldId];
+            if (v === null || v === undefined) return false;
+            if (Array.isArray(v)) return v.some(s => String(s).toLowerCase().includes(kw));
+            return String(v).toLowerCase().includes(kw);
+          });
+        }
       }
 
       if (!showAllVersions) {
@@ -70,6 +87,15 @@ export default function PartsPage() {
       }
 
       setItems(filtered);
+
+      if (componentCustomDefs.length > 0 && filtered.length > 0) {
+        const ids = filtered.map((i: PartListItem) => i.revision_id).filter(Boolean);
+        if (ids.length > 0) {
+          customFieldsApi.getValuesBatch({ type: 'component', ids: ids.join(',') }).then(res => {
+            setCfValuesMap(res.data || {});
+          }).catch(() => {});
+        }
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -154,6 +180,9 @@ export default function PartsPage() {
           <option value="code">件号</option>
           <option value="name">中文名称</option>
           <option value="spec">规格型号</option>
+          {componentCustomDefs.map(def => (
+            <option key={def.id} value={`cf_${def.id}`}>{def.name}</option>
+          ))}
         </select>
         <input
           type="text"

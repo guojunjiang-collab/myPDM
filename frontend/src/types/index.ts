@@ -102,7 +102,6 @@ export interface PartIteration {
   iteration: number;
   check_in_date?: string | null;
   check_in_note?: string;
-  custom_fields: Record<string, any>;
   document_links: DocumentLink[];
   remark?: string;
   created_at?: string;

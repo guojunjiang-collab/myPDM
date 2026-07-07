@@ -87,23 +87,11 @@ async def update_definition(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("custom_field.def:write"))
 ):
-    old_name = crud.get_custom_field_definition(db, field_id).name if crud.get_custom_field_definition(db, field_id) else None
     db_field = crud.update_custom_field_definition(db, field_id, field_update)
     if not db_field:
         raise HTTPException(status_code=404, detail="字段定义不存在")
-    # 如果字段名称变更，迁移 PartIteration.custom_fields 中的键名
-    new_name = db_field.name
-    if old_name and old_name != new_name:
-        from .. import models_parts
-        iterations = db.query(models_parts.PartIteration).filter(
-            models_parts.PartIteration.custom_fields.has_key(old_name)
-        ).all()
-        for it in iterations:
-            cf = dict(it.custom_fields or {})
-            if old_name in cf:
-                cf[new_name] = cf.pop(old_name)
-                it.custom_fields = cf
-        db.commit()
+    # 字段名称变更后，需要迁移 custom_field_values 中的旧值（如果字段定义名称变了，但 field_id 不变，值表不受影响）
+    # 注：旧的 PartIteration.custom_fields JSONB 已废弃，不再需要迁移
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username, "更新自定义字段", "custom_field", str(field_id), None, ip)
     return _def_response(db_field)
@@ -150,8 +138,8 @@ async def get_values_batch(
     示例: GET /api/custom-fields/values/batch?type=part&ids=id1,id2,id3
     返回: { "id1": {"field_key": "value", ...}, "id2": {...} }
     """
-    if type not in ('part', 'document', 'configuration_item'):
-        raise HTTPException(status_code=400, detail="type 必须为 part / document / configuration_item")
+    if type not in ('part', 'component', 'document', 'configuration_item'):
+        raise HTTPException(status_code=400, detail="type 必须为 part / component / document / configuration_item")
     
     entity_ids = [id.strip() for id in ids.split(',') if id.strip()]
     if not entity_ids:
@@ -168,8 +156,8 @@ async def get_values(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("custom_field.value:read"))
 ):
-    if entity_type not in ('part', 'document', 'configuration_item'):
-        raise HTTPException(status_code=400, detail="entity_type 必须为 part / document / configuration_item")
+    if entity_type not in ('part', 'component', 'document', 'configuration_item'):
+        raise HTTPException(status_code=400, detail="entity_type 必须为 part / component / document / configuration_item")
     results = crud.get_custom_field_values(db, entity_type, entity_id)
     return [_value_response(val, field_def) for val, field_def in results]
 
@@ -183,8 +171,8 @@ async def set_values(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("custom_field.value:write"))
 ):
-    if entity_type not in ('part', 'document', 'configuration_item'):
-        raise HTTPException(status_code=400, detail="entity_type 必须为 part / document / configuration_item")
+    if entity_type not in ('part', 'component', 'document', 'configuration_item'):
+        raise HTTPException(status_code=400, detail="entity_type 必须为 part / component / document / configuration_item")
     crud.set_custom_field_values(db, entity_type, entity_id, batch.values)
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username, "更新自定义字段值", entity_type, str(entity_id), f"{len(batch.values)}个字段", ip)

@@ -71,11 +71,11 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
       customFieldsApi.listDefinitions().then((res: any) => {
         const defs = (res.data || res || []).filter((d: any) => {
           const applies: string[] = d.applies_to || [];
-          return applies.includes('part');
+          return applies.includes('component');
         });
         setCfDefs(defs);
-        if (revisionId) {
-          customFieldsApi.getValues('part', revisionId).then(r => {
+        if (propRevisionId) {
+          customFieldsApi.getValues('component', propRevisionId).then(r => {
             const vals: Record<string, any> = {};
             (r.data || []).forEach((v: any) => { vals[v.field_id] = v.value; });
             setCfEditValues(vals);
@@ -100,14 +100,14 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
         value: values[def.id] ?? null,
       })).filter((fv: any) => fv.value !== null && fv.value !== '');
       if (fieldValues.length > 0) {
-        customFieldsApi.setValues('part', revisionId!, fieldValues).catch(console.error);
+        customFieldsApi.setValues('component', revisionId!, fieldValues).catch(console.error);
       }
     }, 500);
   }, [revisionId, cfDefs]);
 
   useEffect(() => {
-    if (cfDefs.length > 0 && revisionId && !propRevisionId) {
-      customFieldsApi.getValues('part', revisionId).then(r => {
+    if (cfDefs.length > 0 && revisionId) {
+      customFieldsApi.getValues('component', revisionId).then(r => {
         const vals: Record<string, any> = {};
         (r.data || []).forEach((v: any) => { vals[v.field_id] = v.value; });
         setCfEditValues(vals);

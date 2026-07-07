@@ -702,7 +702,7 @@ export async function executePartsImport(preview: ImportPreview): Promise<void> 
                   .filter(([, v]) => v !== null && v !== '' && v !== undefined)
                   .map(([fieldId, value]) => ({ field_id: fieldId, value }));
                 if (fieldValues.length > 0) {
-                  await customFieldsApi.setValues('part', existing.id, fieldValues);
+                  await customFieldsApi.setValues('component', existing.id, fieldValues);
                 }
               }
 
@@ -721,7 +721,7 @@ export async function executePartsImport(preview: ImportPreview): Promise<void> 
                 .filter(([, v]) => v !== null && v !== '' && v !== undefined)
                 .map(([fieldId, value]) => ({ field_id: fieldId, value }));
               if (fieldValues.length > 0) {
-                await customFieldsApi.setValues('part', created.id, fieldValues);
+                await customFieldsApi.setValues('component', created.id, fieldValues);
               }
             }
             // 关联图文档
