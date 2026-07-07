@@ -63,3 +63,33 @@ def test_instance_carries_bom_path(db):
     l2 = _link(db, sub_it, sub_r, leaf_r, [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1])
     instances = crud_parts.get_assembly_instances(db, asm_r.id, lambda cid: {"coarse":"c","normal":"n","fine":"f"})
     assert instances[0]["bom_path"] == [str(l1.id), str(l2.id)]
+
+
+def test_assembly_tree_expands_multi_instance(db):
+    import uuid
+    from app import models, models_parts, crud_parts
+
+    def _mk(code):
+        m = models_parts.PartMaster(id=uuid.uuid4(), code=code, name=code, type="part")
+        db.add(m); db.commit()
+        r = models_parts.PartRevision(id=uuid.uuid4(), master_id=m.id, version="A", latest_iteration=1)
+        db.add(r); db.commit()
+        it = models_parts.PartIteration(id=uuid.uuid4(), revision_id=r.id, iteration=1)
+        db.add(it); db.commit()
+        return m, r, it
+
+    _, asm_r, asm_it = _mk("ASM-MI")
+    _, leaf_r, _ = _mk("BOLT-MI")
+    b = models.BOMItem(id=uuid.uuid4(), iteration_id=asm_it.id,
+                       parent_revision_id=asm_r.id, child_revision_id=leaf_r.id,
+                       quantity=2, sort_order=0, cad_instances=[
+                           {"matrix": [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1], "source": "step", "label": "b1"},
+                           {"matrix": [1,0,0,5, 0,1,0,0, 0,0,1,0, 0,0,0,1], "source": "step", "label": "b2"},
+                       ])
+    db.add(b); db.commit()
+    tree = crud_parts.get_assembly_tree(db, asm_r.id)
+    assert len(tree) == 2
+    assert tree[0]["part_code"] == "b1"
+    assert tree[0]["instance_index"] == 0
+    assert tree[1]["part_code"] == "b2"
+    assert tree[1]["instance_index"] == 1

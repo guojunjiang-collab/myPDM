@@ -953,7 +953,7 @@ def get_assembly_instances(db: Session, assembly_revision_id, glb_url_resolver) 
                 local = ci.get("matrix") or _mu.identity()
                 child_world = _mu.multiply(world, local)
                 child_path = path + [f"{link.id}:{idx}"]
-                child_bom_path = bom_path + [str(link.id)]
+                child_bom_path = bom_path + [f"{link.id}:{idx}" if len(insts) > 1 else str(link.id)]
 
                 is_leaf = (not grandchildren) and glb_urls is not None
                 if is_leaf:
@@ -996,15 +996,30 @@ def get_assembly_tree(db: Session, assembly_revision_id) -> list:
                 continue
             master = get_part_master(db, child_rev.master_id)
             children = build(child_rev.id, visited)
-            nodes.append({
-                "bom_item_id": str(link.id),
-                "part_code": master.code if master else "",
-                "part_name": master.name if master else "",
-                "quantity": link.quantity,
-                "instance_count": len(link.cad_instances or []),
-                "is_leaf": len(children) == 0,
-                "children": children,
-            })
+            instances = link.cad_instances or []
+            if len(instances) > 1:
+                for idx, ci in enumerate(instances):
+                    label = ci.get("label", "") or f"{master.code}#{idx+1}" if master else f"#{idx+1}"
+                    nodes.append({
+                        "bom_item_id": str(link.id),
+                        "instance_index": idx,
+                        "part_code": label,
+                        "part_name": master.name if master else "",
+                        "quantity": 1,
+                        "instance_count": 1,
+                        "is_leaf": len(children) == 0,
+                        "children": children if idx == 0 else [],
+                    })
+            else:
+                nodes.append({
+                    "bom_item_id": str(link.id),
+                    "part_code": master.code if master else "",
+                    "part_name": master.name if master else "",
+                    "quantity": link.quantity,
+                    "instance_count": len(instances),
+                    "is_leaf": len(children) == 0,
+                    "children": children,
+                })
         return nodes
 
     return build(assembly_revision_id, set())
