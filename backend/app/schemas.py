@@ -219,6 +219,7 @@ class CustomFieldValueItem(BaseSchema):
     id: Optional[uuid.UUID] = None
     field_id: uuid.UUID
     value: Optional[Any] = None  # 可以是 str / number / list[str]
+    iteration_id: Optional[uuid.UUID] = None
 
 class CustomFieldValuesBatch(BaseSchema):
     """批量设置字段值的请求"""
@@ -231,6 +232,7 @@ class CustomFieldValueResponse(BaseSchema):
     field_name: Optional[str] = None
     field_type: Optional[str] = None
     value: Optional[Any] = None
+    iteration_id: Optional[uuid.UUID] = None
 
 
 # ===== 图文档 Schema =====
