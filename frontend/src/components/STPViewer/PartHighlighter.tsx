@@ -1,19 +1,18 @@
 import { useRef, useMemo } from 'react';
 import * as THREE from 'three';
-import { useFrame } from '@react-three/fiber';
-import { useGLTF } from '@react-three/drei';
+import { useFrame, useThree } from '@react-three/fiber';
 import { useViewerStore } from '../../stores/viewerStore';
 
-interface PartHighlighterProps {
-  url: string;
-}
-
-export function PartHighlighter({ url }: PartHighlighterProps) {
+/**
+ * 选中零件的包围盒线框高亮。遍历实时场景(useThree().scene)按 mesh uuid
+ * 定位选中节点，故单件与装配模式通用（不依赖某个具体 glb url）。
+ */
+export function PartHighlighter() {
   const selectedNodeId = useViewerStore((s) => s.selectedNodeId);
   const nodeMap = useViewerStore((s) => s.nodeMap);
   const lineRef = useRef<THREE.LineSegments>(null);
 
-  const { scene } = useGLTF(url);
+  const { scene } = useThree();
 
   const edgeGeometry = useMemo(() => {
     const box = new THREE.BoxGeometry(1, 1, 1);

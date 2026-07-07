@@ -72,13 +72,12 @@ export function ViewerCanvas({ source }: ViewerCanvasProps) {
       <Suspense fallback={null}>
         <GLTFErrorBoundary>
           {source.kind === 'single' ? (
-            <>
-              <ModelLoader url={source.url} />
-              <PartHighlighter url={source.url} />
-            </>
+            <ModelLoader url={source.url} />
           ) : (
             <AssemblyModelLoader instances={source.instances} tree={source.tree} />
           )}
+          {/* 选中包围盒高亮：遍历实时场景，单件/装配通用 */}
+          <PartHighlighter />
         </GLTFErrorBoundary>
       </Suspense>
       <SectionPlanes />
