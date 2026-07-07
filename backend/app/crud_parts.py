@@ -257,7 +257,6 @@ def list_iterations_by_revision(db: Session, revision_id: UUID) -> List[models_p
 def _copy_iteration_data(db: Session, source_iter: models_parts.PartIteration, new_iter: models_parts.PartIteration):
     """复制上一迭代的全部数据到新迭代"""
     import os, shutil
-    new_iter.custom_fields = source_iter.custom_fields or {}
     new_iter.document_links = source_iter.document_links or []
     new_iter.remark = source_iter.remark
     db.flush()
@@ -343,6 +342,9 @@ def checkout_part(db: Session, revision_id: UUID, user_id: UUID) -> Tuple[Option
 
     if prev_iter:
         _copy_iteration_data(db, prev_iter, new_iter)
+        # 复制自定义字段值到新迭代
+        from .. import crud as crud_common
+        crud_common._copy_iteration_custom_fields(db, prev_iter.id, new_iter.id)
 
     revision.latest_iteration = new_iteration_num
     revision.check_out_user_id = user_id
