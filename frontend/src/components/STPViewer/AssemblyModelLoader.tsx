@@ -107,7 +107,23 @@ export function AssemblyModelLoader({ instances, tree }: Props) {
       origColorRef.current = origColor;
 
       // 注册装配树（走 viewerStore，树面板/高亮/隔离全部复用）
-      setTreeData(buildAssemblyTreeNodes(tree, meshByBomItem));
+      const builtTree = buildAssemblyTreeNodes(tree, meshByBomItem);
+      // ── 临时诊断：核对 mesh uuid 是否挂到树上（排查上色/选中无效）──
+      let partNodes = 0, treeMeshUuids = 0;
+      const _count = (n: any) => { if (n.type === 'part') { partNodes++; treeMeshUuids += n.meshUuids.length; } n.children.forEach(_count); };
+      if (builtTree) _count(builtTree);
+      let collectedMeshes = 0; meshByBomItem.forEach((v) => { collectedMeshes += v.length; });
+      // eslint-disable-next-line no-console
+      console.warn('[AssemblyDBG]', {
+        instances: instances.length,
+        instSampleBomPathLast: instances.slice(0, 3).map((i) => i.bom_path[i.bom_path.length - 1]),
+        meshByBomItemKeys: Array.from(meshByBomItem.keys()).slice(0, 5),
+        collectedMeshes,
+        treePartNodes: partNodes,
+        treeMeshUuids,
+        treeLeafKeys: (() => { const ks: string[] = []; const w = (n: any) => { if (n.type === 'part') ks.push(n.id); n.children.forEach(w); }; if (builtTree) w(builtTree); return ks.slice(0, 5); })(),
+      });
+      setTreeData(builtTree);
 
       // 缩放居中 + 保存初始状态（同 ModelLoader）
       rootGroup.updateMatrixWorld(true);
