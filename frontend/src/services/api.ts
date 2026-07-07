@@ -738,3 +738,35 @@ export const configurationProfileApi = {
   updateStatus: (profileId: string, status: string) =>
     api.put(`/configurations/profiles/${profileId}/status`, { status }),
 };
+
+export interface AssemblyInstance {
+  path: string;
+  bom_path: string[];
+  part_code: string;
+  revision_id: string;
+  glb_urls: { coarse: string; normal: string; fine: string };
+  matrix: number[];
+  bbox: { min: number[]; max: number[] } | null;
+}
+
+export interface AssemblyTreeNode {
+  bom_item_id: string;
+  part_code: string;
+  part_name: string;
+  quantity: number;
+  instance_count: number;
+  is_leaf: boolean;
+  children: AssemblyTreeNode[];
+}
+
+export const assemblyViewerApi = {
+  instances: (revisionId: string) =>
+    api.get<AssemblyInstance[]>(`/parts/revisions/${revisionId}/assembly-instances`).then((r) => r.data),
+  tree: (revisionId: string) =>
+    api.get<AssemblyTreeNode[]>(`/parts/revisions/${revisionId}/assembly-tree`).then((r) => r.data),
+  importStep: (revisionId: string, file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return api.post(`/parts/revisions/${revisionId}/import-assembly-step`, fd).then((r) => r.data);
+  },
+};
