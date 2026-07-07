@@ -24,7 +24,7 @@ function buildEntities(): SyncEntity[] {
       key: 'components',
       fetch: async (since: number) => {
         const res = await partsApi.list({
-          page_size: 10000,
+          page_size: 200,
           show_all_versions: true,
         } as any);
         return Array.isArray(res)

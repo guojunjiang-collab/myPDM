@@ -322,12 +322,7 @@ def get_custom_field_values_batch(db, entity_type, entity_ids):
     from collections import defaultdict
     CFV = models.CustomFieldValue
     CFD = models.CustomFieldDefinition
-    
-    # 一次查询所有字段定义
-    all_defs = db.query(CFD).filter(
-        CFD.applies_to.contains(entity_type)
-    ).all()
-    
+
     # 批量查询所有实体的字段值
     results = db.query(CFV, CFD).join(CFD, CFV.field_id == CFD.id).filter(
         CFV.entity_type == entity_type,
