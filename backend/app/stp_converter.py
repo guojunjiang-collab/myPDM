@@ -152,3 +152,38 @@ def delete_glb_cache(attachment_id: str, file_path: str = None, is_part: bool = 
     if glb_path.exists():
         glb_path.unlink()
         logger.info(f"已删除 glb 缓存: {glb_path}")
+
+
+import json as _json
+
+LOD_QUALITIES = {"coarse": "Coarse", "normal": "Normal", "fine": "Fine"}
+
+
+def get_lod_glb_paths(attachment_id: str, file_path: str = None, is_part: bool = False) -> dict:
+    """返回三档 LOD 的 glb 路径 {coarse, normal, fine}。"""
+    base = get_glb_cache_path(attachment_id, file_path, is_part)
+    stem = base.stem
+    out = {}
+    for tier in ("coarse", "normal", "fine"):
+        out[tier] = base.with_name(f"{stem}_{tier}.glb")
+    return out
+
+
+def read_gltf_bbox(gltf_or_glb_path: str) -> dict | None:
+    """从 glTF(.gltf JSON) 读取所有 POSITION accessor 的整体 bbox。"""
+    p = Path(gltf_or_glb_path)
+    if p.suffix.lower() != ".gltf":
+        return None
+    try:
+        data = _json.loads(p.read_text())
+    except Exception:
+        return None
+    mins, maxs = None, None
+    for acc in data.get("accessors", []):
+        if acc.get("type") == "VEC3" and "min" in acc and "max" in acc and len(acc["min"]) == 3:
+            amin, amax = acc["min"], acc["max"]
+            mins = amin if mins is None else [min(a, b) for a, b in zip(mins, amin)]
+            maxs = amax if maxs is None else [max(a, b) for a, b in zip(maxs, amax)]
+    if mins is None:
+        return None
+    return {"min": mins, "max": maxs}
