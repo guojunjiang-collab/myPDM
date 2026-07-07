@@ -36,19 +36,23 @@ def is_stp_file(filename: str) -> bool:
     return ext in ('.stp', '.step')
 
 
-def get_glb_cache_path(attachment_id: str, file_path: str = None) -> Path:
+def get_glb_cache_path(attachment_id: str, file_path: str = None, is_part: bool = False) -> Path:
     """
     获取附件对应的 glb 文件路径
     
     Args:
         attachment_id: 附件 UUID
-        file_path: 可选的 STP 文件路径（如 document/test-STP-GD40_A/file.stp）
-                   如果提供，glb 将存放到 glb_cache/{图文档文件夹}/ 下
+        file_path: 可选的 STP 文件路径（图文档附件如 document/test/file.stp）
+        is_part: 是否为零部件附件（PartAttachment），使用 attachment_id 作为唯一键
     
     Returns:
         glb 文件路径
     """
-    if file_path:
+    if is_part:
+        target_dir = GLTF_CACHE_DIR / "parts"
+        target_dir.mkdir(parents=True, exist_ok=True)
+        return target_dir / f"{attachment_id}.glb"
+    elif file_path:
         # 存放到 gltf_cache/{图文档文件夹}/ 目录
         stp_path = Path(file_path)
         folder_name = stp_path.parent.name  # 如 test-STP-GD40_A
@@ -62,7 +66,7 @@ def get_glb_cache_path(attachment_id: str, file_path: str = None) -> Path:
         return GLTF_CACHE_DIR / f"{attachment_id}.glb"
 
 
-def convert_stp_to_gltf(stp_path: str, attachment_id: str, file_path: str = None) -> Optional[str]:
+def convert_stp_to_gltf(stp_path: str, attachment_id: str, file_path: str = None, is_part: bool = False) -> Optional[str]:
     """
     将 STP 文件转换为 glTF (.glb)
     使用 _stp_semaphore 限制并发 Mayo 进程数（最多 2 个）
@@ -71,7 +75,7 @@ def convert_stp_to_gltf(stp_path: str, attachment_id: str, file_path: str = None
         stp_path: STP 文件绝对路径
         attachment_id: 附件 UUID
         file_path: 可选的 STP 文件相对路径（如 document/test-STP-GD40_A/file.stp）
-                   如果提供，glb 将存放到 glb_cache/{图文档文件夹}/ 下
+        is_part: 是否为零部件附件
 
     Returns:
         glb 文件路径，失败返回 None
@@ -81,7 +85,7 @@ def convert_stp_to_gltf(stp_path: str, attachment_id: str, file_path: str = None
         logger.error(f"STP 文件不存在: {stp_path}")
         return None
 
-    glb_path = get_glb_cache_path(attachment_id, file_path)
+    glb_path = get_glb_cache_path(attachment_id, file_path, is_part)
 
     # 已有转换结果 → 跳过
     if glb_path.exists():
@@ -136,15 +140,15 @@ def convert_stp_to_gltf(stp_path: str, attachment_id: str, file_path: str = None
             return None
 
 
-def get_gltf_path_for_attachment(attachment_id: str, file_path: str = None) -> Optional[str]:
+def get_gltf_path_for_attachment(attachment_id: str, file_path: str = None, is_part: bool = False) -> Optional[str]:
     """获取附件对应的 glb 文件路径（不触发转换）"""
-    glb_path = get_glb_cache_path(attachment_id, file_path)
+    glb_path = get_glb_cache_path(attachment_id, file_path, is_part)
     return str(glb_path) if glb_path.exists() else None
 
 
-def delete_glb_cache(attachment_id: str, file_path: str = None):
+def delete_glb_cache(attachment_id: str, file_path: str = None, is_part: bool = False):
     """删除附件对应的 glb 文件"""
-    glb_path = get_glb_cache_path(attachment_id, file_path)
+    glb_path = get_glb_cache_path(attachment_id, file_path, is_part)
     if glb_path.exists():
         glb_path.unlink()
         logger.info(f"已删除 glb 缓存: {glb_path}")

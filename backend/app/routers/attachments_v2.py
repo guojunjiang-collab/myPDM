@@ -401,14 +401,27 @@ async def convert_pending_stp(
     db: Session = Depends(get_db),
 ):
     """扫描所有未转换的 STP 附件并后台批量转换（仅管理员）"""
-    stp_atts = db.query(DocumentAttachment).filter(
+    from ..models_parts import PartAttachment
+    
+    # 收集图文档附件中的 STP 文件
+    doc_stp = db.query(DocumentAttachment).filter(
         (DocumentAttachment.file_name.ilike('%.stp')) |
         (DocumentAttachment.file_name.ilike('%.step'))
     ).all()
+    # 收集零部件附件中的 STP 文件
+    part_stp = db.query(PartAttachment).filter(
+        (PartAttachment.file_name.ilike('%.stp')) |
+        (PartAttachment.file_name.ilike('%.step'))
+    ).all()
+    
     pending = []
-    for att in stp_atts:
-        if get_gltf_path_for_attachment(str(att.id), att.file_path) is None:
+    for att in doc_stp:
+        if get_gltf_path_for_attachment(str(att.id), att.file_path, is_part=False) is None:
             pending.append(att)
+    for att in part_stp:
+        if get_gltf_path_for_attachment(str(att.id), att.file_path, is_part=True) is None:
+            pending.append(att)
+    total_stp = len(doc_stp) + len(part_stp)
     if not pending:
         return {"status": "done", "message": "所有 STP 文件已转换", "converted": 0, "total": 0}
     loop = asyncio.get_event_loop()
@@ -416,13 +429,19 @@ async def convert_pending_stp(
         converted = failed = 0
         for att in pending:
             try:
-                stp_path = file_storage.base_dir / att.file_path
+                # 零部件附件 file_path 存的是完整路径
+                if isinstance(att, PartAttachment):
+                    stp_path = Path(att.file_path)
+                    is_part = True
+                else:
+                    stp_path = file_storage.base_dir / att.file_path
+                    is_part = False
                 if not stp_path.exists(): failed += 1; continue
-                await loop.run_in_executor(None, convert_stp_to_gltf, str(stp_path), str(att.id), att.file_path)
+                await loop.run_in_executor(None, convert_stp_to_gltf, str(stp_path), str(att.id), att.file_path, is_part)
                 converted += 1
             except Exception: failed += 1
     asyncio.create_task(batch_convert())
-    return {"status": "started", "message": f"开始批量转换 {len(pending)} 个 STP 文件", "pending": len(pending), "total_stp": len(stp_atts)}
+    return {"status": "started", "message": f"开始批量转换 {len(pending)} 个 STP 文件", "pending": len(pending), "total_stp": total_stp}
 
 
 @router.get("/convert-status")
@@ -431,12 +450,21 @@ async def convert_status(
     db: Session = Depends(get_db),
 ):
     """查询待转换的 STP 数量（用于轮询批量转换进度）"""
-    stp_atts = db.query(DocumentAttachment).filter(
+    from ..models_parts import PartAttachment
+    
+    doc_stp = db.query(DocumentAttachment).filter(
         (DocumentAttachment.file_name.ilike('%.stp')) |
         (DocumentAttachment.file_name.ilike('%.step'))
     ).all()
-    pending = sum(1 for att in stp_atts if get_gltf_path_for_attachment(str(att.id), att.file_path) is None)
-    return {"pending": pending, "total": len(stp_atts)}
+    part_stp = db.query(PartAttachment).filter(
+        (PartAttachment.file_name.ilike('%.stp')) |
+        (PartAttachment.file_name.ilike('%.step'))
+    ).all()
+    pending = (
+        sum(1 for att in doc_stp if get_gltf_path_for_attachment(str(att.id), att.file_path, is_part=False) is None) +
+        sum(1 for att in part_stp if get_gltf_path_for_attachment(str(att.id), att.file_path, is_part=True) is None)
+    )
+    return {"pending": pending, "total": len(doc_stp) + len(part_stp)}
 
 
 @router.get("/{attachment_id}")
@@ -660,7 +688,7 @@ async def get_gltf(
     """
     verify_media_token(token, str(attachment_id), "gltf")
 
-    att, _att_source = _resolve_attachment(db, attachment_id)
+    att, att_source = _resolve_attachment(db, attachment_id)
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
 
@@ -670,15 +698,21 @@ async def get_gltf(
     if not att.file_path:
         raise HTTPException(status_code=404, detail="附件文件路径为空")
 
-    # 获取 glb 文件路径
-    glb_path = get_gltf_path_for_attachment(str(attachment_id), att.file_path)
+    is_part = (att_source == "component")
+
+    # 获取 glb 文件路径（零部件附件用 attachment_id 作为唯一键）
+    glb_path = get_gltf_path_for_attachment(str(attachment_id), att.file_path, is_part)
 
     if not glb_path:
         # 缓存未命中 → 后台异步转换 + 返回 202
         import asyncio
-        stp_full_path = file_storage.base_dir / att.file_path
+        # 零部件附件的 file_path 是完整路径（如 ./uploads/parts/...），直接使用
+        if is_part:
+            stp_full_path = Path(att.file_path)
+        else:
+            stp_full_path = file_storage.base_dir / att.file_path
         loop = asyncio.get_event_loop()
-        loop.run_in_executor(None, convert_stp_to_gltf, str(stp_full_path), str(attachment_id), att.file_path)
+        loop.run_in_executor(None, convert_stp_to_gltf, str(stp_full_path), str(attachment_id), att.file_path, is_part)
         return JSONResponse(
             status_code=202,
             content={

@@ -741,6 +741,15 @@ async def add_attachment(
     db.add(att)
     db.commit()
     db.refresh(att)
+    # STP 附件上传后自动触发 GLB 转换
+    from ..stp_converter import convert_stp_to_gltf, is_stp_file
+    import asyncio
+    if is_stp_file(file.filename):
+        try:
+            loop = asyncio.get_event_loop()
+            loop.run_in_executor(None, convert_stp_to_gltf, file_path, str(att.id), file_path, True)
+        except Exception:
+            pass
     return {"id": str(att.id), "file_name": att.file_name, "file_size": att.file_size}
 
 
@@ -759,6 +768,10 @@ def delete_attachment(
     import os
     if att.file_path and os.path.exists(att.file_path):
         os.remove(att.file_path)
+    # 清理对应的 GLB 缓存
+    from ..stp_converter import delete_glb_cache, is_stp_file
+    if is_stp_file(att.file_name):
+        delete_glb_cache(str(attachment_id), att.file_path, is_part=True)
     db.delete(att)
     db.commit()
     return {"detail": "已删除"}
