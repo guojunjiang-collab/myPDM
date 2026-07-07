@@ -7,6 +7,7 @@ import EntityDocumentSection from './EntityDocumentSection';
 import AssemblyPartPicker from './AssemblyPartPicker';
 import VersionSelectModal from './VersionSelectModal';
 import type { CustomFieldDefinition, AssemblyPartItem } from '../types';
+import CustomFieldInput from './CustomFieldInput';
 
 interface EntityEditModalProps {
   open: boolean;
@@ -294,24 +295,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
     );
   };
 
-  const renderCustomFieldInput = (def: CustomFieldDefinition) => {
-    const value = customFieldValues[def.id] ?? '';
-    const onChange = (val: any) => setCustomFieldValues(prev => ({ ...prev, [def.id]: val }));
-    const baseClass = "w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-500";
 
-    if (def.field_type === 'select') {
-      return (
-        <select value={value} onChange={e => onChange(e.target.value)} disabled={locked} className={baseClass}>
-          <option value="">请选择</option>
-          {(def.options || []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
-        </select>
-      );
-    }
-    if (def.field_type === 'number') {
-      return <input type="number" value={value} onChange={e => onChange(e.target.value)} disabled={locked} className={baseClass} />;
-    }
-    return <input type="text" value={value} onChange={e => onChange(e.target.value)} disabled={locked} className={baseClass} />;
-  };
 
   const title = entityType === 'component' ? '编辑零部件' : entityType === 'assembly' ? '编辑部件' : '编辑零件';
 
@@ -370,7 +354,12 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
                         {def.name}
                         {def.is_required && <span className="text-red-500 ml-1">*</span>}
                       </label>
-                      {renderCustomFieldInput(def)}
+                      <CustomFieldInput
+                        def={def}
+                        value={customFieldValues[def.id]}
+                        onChange={(val) => setCustomFieldValues(prev => ({ ...prev, [def.id]: val }))}
+                        disabled={locked}
+                      />
                     </div>
                   ))}
                 </div>
