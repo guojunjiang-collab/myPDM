@@ -491,7 +491,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
             </div>
 
             {/* 3D 预览入口 */}
-            <div className="flex gap-1">
+            <div className="flex gap-1 justify-end">
               {isAssembly ? (
                 <>
                   <input ref={assemblyFileRef} type="file" accept=".stp,.step" hidden
