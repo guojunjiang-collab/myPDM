@@ -118,7 +118,8 @@ cad_instances = Column(JSONB, default=[])
 - 叶子输出：
 ```json
 {
-  "path": "rootId/childId/instanceIdx",
+  "path": "rootId/bomItemA:0/bomItemB:1",
+  "bom_path": ["bomItemA", "bomItemB"],
   "part_code": "BRACKET-01",
   "revision_id": "...",
   "glb_urls": { "coarse": "/api/.../coarse.glb", "normal": "/api/.../normal.glb", "fine": "/api/.../fine.glb" },
@@ -126,8 +127,13 @@ cad_instances = Column(JSONB, default=[])
   "bbox": { "min": [x,y,z], "max": [x,y,z] }
 }
 ```
+- `path` = `bomItemId:instanceIdx` 链，唯一标识一个摆放实例；`bom_path` = 该实例所经过的 BOMItem id 有序链，用于**树节点 ↔ 实例**双向映射（见 §4.5）。
 - GLB URL 复用现有单件 GLB 服务；去重由前端 `useLoader` 按 url 缓存自然完成。
 - 该接口是 `InstanceBodyWriterTools.generateInstanceStreamWithGlobalMatrix` 的 Python 对应实现，但数据源是 myPDM 的 BOM 表。
+
+**配套嵌套 BOM 树接口**：`GET /api/parts/revisions/{assembly_revision_id}/assembly-tree`
+- 递归 `BOMItem` 树，返回**嵌套节点**：`{ bom_item_id, part_code, part_name, quantity, instance_count, is_leaf, children:[...] }`。
+- 供前端侧栏渲染真实层级 BOM（区别于单件查看器从 GLB 内部节点建的树）。节点 `bom_item_id` 与实例 `bom_path` 段一一对应，是双向对齐的锚点。
 
 ### 4.5 前端 AssemblyViewer（`frontend/src/components/AssemblyViewer/`）
 
@@ -137,8 +143,16 @@ cad_instances = Column(JSONB, default=[])
   - **必须 clone**（同一 GLB 被多实例复用，`SkeletonUtils.clone` 或 `scene.clone(true)`）；
   - `matrixAutoUpdate = false`，直接 `object.matrix.fromArray(worldMatrix)`；
   - LOD 距离阈值按实例 `bbox` 尺寸归一化（小件更早切粗模）。
-- 装配树来自**后端 BOM**（非 GLB 节点树），树节点 ↔ 实例对象映射，复用现有显隐 / 隔离 / 选中高亮逻辑。
-- 入口：装配型（`PartMaster.type == 'assembly'`）零件详情页新增「装配 3D 预览」按钮；未匹配报告以提示条展示。
+**层级 BOM 树 ⇄ 3D 模型双向对齐（核心交互）**
+- 左侧侧栏渲染**后端 `assembly-tree` 的嵌套 BOM 树**（非 GLB 内部节点树），复用单件查看器 `ModelTreePanel` 的视觉与展开/选中样式。
+- 新增轻量 `assemblyViewerStore`（镜像现有 `viewerStore` 的语义：`selectedNodeId` / `hiddenNodePaths` / `isolateMode`），维护"BOMItem id ↔ 实例集合"索引：一个树节点对应所有 `bom_path` 含该 `bom_item_id` 的实例。
+- **点树节点 → 模型**：高亮 / 隔离该节点及其全部后代实例；支持按节点显隐。
+- **点模型实例 → 树**：raycast 命中 `THREE.LOD` → 读 `userData.path`/`userData.bomPath` → 反解到叶子 BOM 节点，展开祖先并选中。
+- 语义（高亮色、隔离半透明、显隐）与单件查看器保持一致（前端风格统一）。
+
+**入口（零件与部件统一）**
+- **零件（单件）**：详情页「3D 预览」按钮 → 打开现有 `STPViewer`（其自带 GLB 内部结构树的双向联动，保持不变）。
+- **部件（`PartMaster.type == 'assembly'` 或有子 BOM）**：详情页「装配 3D 预览」按钮 → 打开 `AssemblyViewer`（BOM 树 ⇄ 模型双向对齐）；另有「导入装配 STEP」按钮，导入后以提示条展示未匹配报告。
 
 ## 5. LOD 设计（自适应提速）
 
@@ -165,22 +179,27 @@ cad_instances = Column(JSONB, default=[])
 - **解析器单测**：喂已知小装配 STEP（2–3 级、含复用件），断言 occurrence 树、矩阵值、单位。
 - **匹配回填单测**：构造已有 BOM + 解析结果，断言匹配/未匹配/多实例分类与 `cad_instances` 写入。
 - **展平接口单测**：构造多级 BOM + 矩阵，断言世界矩阵累乘结果与叶子清单。
-- **前端**：`buildAssemblyTree` 纯函数单测；查看器以一个基准装配做视觉回归（人工确认摆位正确）。
-- **端到端校准**：用一个真实/已知装配走完整链路，人工确认三维摆位、单位、朝向正确（正确性风险 §6 的落地验证）。
+- **前端**：`buildBomTree`/映射索引纯函数单测；查看器以一个基准装配做视觉回归（人工确认摆位 + 双向对齐正确）。
+- **端到端校准**：用一个真实/已知装配走完整链路，人工确认三维摆位、单位、朝向、树↔模型双向选中正确（正确性风险 §6 的落地验证）。
 
 ## 8. 范围边界（YAGNI）
+
+**v1 做**：
+- 装配摆位 + 三档 LOD 距离自适应。
+- **层级 BOM 树 ⇄ 3D 模型全量双向对齐**（点树高亮/隔离/显隐模型、点模型反选树）。
+- 零件与部件统一的详情页 3D 预览入口。
 
 **v1 不做**：
 - 全局三角面预算 / 降级平衡器（v2）。
 - 查看器内手动摆位 / TransformControls 编辑矩阵（未选此路径）。
 - 装配 STEP 自动建零件树（明确不做，只匹配现有 BOM）。
-- 剖切 / 测量 / 爆炸在装配级的完整适配（v1 先保证摆位 + 树导航 + 显隐 + 选中；其余按需增量）。
+- 剖切 / 测量 / 爆炸在装配级的完整适配（按需增量）。
 
 ## 9. 实施顺序（供后续 writing-plans 细化）
 
 1. 后端：`BOMItem.cad_instances` 迁移 + STEP 解析器 `assembly_parser.py`（含单测）。
 2. 后端：匹配回填 `apply_step_matrices` + 上传装配 STEP 触发入口（含单测）。
-3. 后端：多档 GLB 生成 + bbox + 展平接口 `assembly-instances`（含单测）。
-4. 前端：`AssemblyViewer` 摆位 + BOM 树导航 + 显隐/选中。
-5. 前端：`THREE.LOD` 距离自适应接入 + 入口按钮 + 未匹配报告提示。
-6. 端到端校准（§6 单位/朝向）。
+3. 后端：多档 GLB 生成 + bbox + 展平接口 `assembly-instances`（带 `bom_path`）+ 嵌套 `assembly-tree` 接口（含单测）。
+4. 前端：`AssemblyViewer` 摆位 + 层级 BOM 树 + `assemblyViewerStore` 双向对齐（点树↔点模型）。
+5. 前端：`THREE.LOD` 距离自适应接入 + 零件/部件统一入口按钮 + 未匹配报告提示。
+6. 端到端校准（§6 单位/朝向 + 双向选中）。
