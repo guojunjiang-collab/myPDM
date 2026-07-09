@@ -75,7 +75,7 @@ const initialState = {
   measureMode: 'off' as const,
   explodeDistance: 0,
   wireframe: false,
-  autoColor: false,
+  autoColor: true,
   cameraMode: 'orthographic' as const,
   viewTarget: null as string | null,
   cameraQuat: [0, 0, 0, 1] as [number, number, number, number],
