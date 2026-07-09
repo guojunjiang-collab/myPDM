@@ -53,6 +53,62 @@ def test_split_leaf_includes_solid_geometry():
     assert used.issubset(defined), f"悬空引用: {used - defined}"
 
 
+# 两个叶件 P1/P2 共享同一 PRODUCT_CONTEXT #2 与几何 context #40（CATIA 的典型结构）。
+MINI_SHARED = """ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION((''),'2;1');
+FILE_NAME('a.stp','',(''),(''),'','CATIA V5','');
+FILE_SCHEMA(('CONFIG_CONTROL_DESIGN'));
+ENDSEC;
+DATA;
+#1=PRODUCT('P1','P1','',(#2));
+#2=PRODUCT_CONTEXT('',#3,'mechanical');
+#3=APPLICATION_CONTEXT('core');
+#8=PRODUCT('P2','P2','',(#2));
+#5=PRODUCT_DEFINITION_FORMATION_WITH_SPECIFIED_SOURCE('','',#1,.NOT_KNOWN.);
+#9=PRODUCT_DEFINITION_FORMATION_WITH_SPECIFIED_SOURCE('','',#8,.NOT_KNOWN.);
+#10=PRODUCT_DEFINITION('','',#5,#6);
+#11=PRODUCT_DEFINITION('','',#9,#6);
+#6=PRODUCT_DEFINITION_CONTEXT('',#3,'design');
+#20=PRODUCT_DEFINITION_SHAPE('','',#10);
+#21=PRODUCT_DEFINITION_SHAPE('','',#11);
+#25=SHAPE_DEFINITION_REPRESENTATION(#20,#30);
+#26=SHAPE_DEFINITION_REPRESENTATION(#21,#31);
+#30=SHAPE_REPRESENTATION('',(#32),#40);
+#31=SHAPE_REPRESENTATION('',(#33),#40);
+#32=AXIS2_PLACEMENT_3D('',#34,$,$);
+#33=AXIS2_PLACEMENT_3D('',#35,$,$);
+#34=CARTESIAN_POINT('',(0.,0.,0.));
+#35=CARTESIAN_POINT('',(1.,1.,1.));
+#40=(GEOMETRIC_REPRESENTATION_CONTEXT(3));
+#50=ADVANCED_BREP_SHAPE_REPRESENTATION('',(#51,#32),#40);
+#51=MANIFOLD_SOLID_BREP('p1solid',#52);
+#52=CLOSED_SHELL('',(#53));
+#53=ADVANCED_FACE('',(),#54,.T.);
+#54=PLANE('',#32);
+#60=SHAPE_REPRESENTATION_RELATIONSHIP('','',#30,#50);
+#70=ADVANCED_BREP_SHAPE_REPRESENTATION('',(#71,#33),#40);
+#71=MANIFOLD_SOLID_BREP('p2solid',#72);
+#72=CLOSED_SHELL('',(#73));
+#73=ADVANCED_FACE('',(),#74,.T.);
+#74=PLANE('',#33);
+#80=SHAPE_REPRESENTATION_RELATIONSHIP('','',#31,#70);
+ENDSEC;
+END-ISO-10303-21;
+"""
+
+
+def test_split_leaf_no_sibling_bleed():
+    """共享 PRODUCT_CONTEXT 时，拆 P1 不得因反向补全级联串入兄弟 P2（CATIA 空文件 bug）。"""
+    import re
+    idx = build_structure_index(MINI_SHARED)
+    out = split_subitem_step(idx, idx.root_pd_by_product_name['P1'], 'P1.STEP')
+    assert 'p1solid' in out, "缺自身几何"
+    assert 'p2solid' not in out, "串入了兄弟零件几何"
+    assert out.count('MANIFOLD_SOLID_BREP') == 1
+    assert len(re.findall(r'#\d+=PRODUCT\(', out)) == 1, "混入了兄弟 PRODUCT"
+
+
 def test_split_leaf_is_self_contained():
     idx = build_structure_index(MINI)
     root_pd = idx.root_pd_by_product_name['P1']

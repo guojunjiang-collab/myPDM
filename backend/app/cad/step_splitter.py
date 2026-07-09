@@ -68,17 +68,38 @@ def split_subitem_step(index: StructureIndex, root_pd: int, file_label: str) -> 
 
     included = _forward(seeds)
 
-    # 反向胶水补全：STEP 的关联/管理实体（PRODUCT_DEFINITION_SHAPE、
-    # SHAPE_DEFINITION_REPRESENTATION、SHAPE_REPRESENTATION_RELATIONSHIP、装配变换关系、
-    # PRODUCT_RELATED_PRODUCT_CATEGORY、STYLED_ITEM 颜色等）是"反向引用"骨架实体的，
-    # 前向闭包抓不到，导致 OpenCASCADE 无法从 PRODUCT_DEFINITION 走到几何(File transfer problem)。
-    # 规则：凡"引用的实体全部已在集合内"的语句都纳入(安全——不会引入范围外的兄弟零件)，
-    # 迭代至稳定。子装配场景下这会自动带回 NAUO/装配变换，保持内部零件摆位。
+    # 反向胶水补全：STEP 的表示层关联实体（PRODUCT_DEFINITION_SHAPE、
+    # SHAPE_DEFINITION_REPRESENTATION、SHAPE_REPRESENTATION_RELATIONSHIP、STYLED_ITEM 颜色、
+    # 以及两端 SR 都在集合内的装配变换关系）是"反向引用"骨架实体的，前向闭包抓不到，
+    # 缺了 OpenCASCADE 就无法从 PRODUCT_DEFINITION 走到几何(File transfer problem)。
+    # 规则：凡"引用的实体全部已在集合内"的语句都纳入，迭代至稳定。
+    #
+    # 但必须排除会"跨产品级联"的类型：CATIA 里所有 PRODUCT 共享同一个 MECHANICAL_CONTEXT，
+    # 一旦该 context 进入集合，PRODUCT(refs={context}) 会被全部拉入，继而 formation→PD→NAUO
+    # 级联整个装配，导致叶件里混入兄弟零件。目标件自身的这些实体已由前向闭包(从 PD 出发)纳入，
+    # 故反向补全不应再纳入任何 PRODUCT/PD/formation/NAUO/category 类型。
+    _NO_REVERSE_GLUE = (
+        'PRODUCT',
+        'PRODUCT_DEFINITION',
+        'PRODUCT_DEFINITION_WITH_ASSOCIATED_DOCUMENTS',
+        'PRODUCT_DEFINITION_FORMATION',
+        'PRODUCT_DEFINITION_FORMATION_WITH_SPECIFIED_SOURCE',
+        'NEXT_ASSEMBLY_USAGE_OCCURRENCE',
+        'PRODUCT_RELATED_PRODUCT_CATEGORY',
+        'APPLICATION_PROTOCOL_DEFINITION',
+    )
+
+    def _stmt_type(stmt: str) -> str:
+        m = re.match(r'#\d+\s*=\s*\(?\s*([A-Z_0-9]+)', stmt)
+        return m.group(1) if m else ''
+
     changed = True
     while changed:
         changed = False
         for eid, stmt in index.raw_by_id.items():
             if eid in included:
+                continue
+            if _stmt_type(stmt) in _NO_REVERSE_GLUE:
                 continue
             refs = refs_of(stmt)
             if refs and refs <= included:
