@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import cast, String, func
@@ -7,12 +8,13 @@ import uuid
 import base64
 
 from ..database import get_db
-from ..models import User, Document, DocumentAttachment, DocumentGroupLink, UserGroup
+from ..models import User, Document, DocumentAttachment, DocumentGroupLink, UserGroup, DocumentIteration
 from ..models_parts import PartMaster
 from .. import crud, schemas, crud_groups
 from ..permissions import require_permission, check_object_policy
 from ..stp_converter import is_stp_file, delete_glb_cache
 from ..office_converter import is_office_file, delete_pdf_cache
+from .. import crud_documents
 
 router = APIRouter(prefix="/documents", tags=["图文档管理"])
 
@@ -87,6 +89,9 @@ async def list_documents(skip: int = 0, limit: int = 100, keyword: str = None, s
             "created_at": d.created_at.isoformat() if d.created_at else None,
             "updated_at": d.updated_at.isoformat() if d.updated_at else None,
             "deleted_at": d.deleted_at.isoformat() if d.deleted_at else None,
+            "check_out_user_id": str(d.check_out_user_id) if d.check_out_user_id else None,
+            "check_out_date": d.check_out_date.isoformat() if d.check_out_date else None,
+            "latest_iteration": d.latest_iteration,
         } for d in docs])
     return [{
         "id": d.id, "code": d.code, "name": d.name,
@@ -100,6 +105,9 @@ async def list_documents(skip: int = 0, limit: int = 100, keyword: str = None, s
         "group_names": [group_name_map.get(g, str(g)) for g in doc_groups.get(d.id, set())],
         "created_at": d.created_at, "updated_at": d.updated_at,
         "deleted_at": d.deleted_at,
+        "check_out_user_id": str(d.check_out_user_id) if d.check_out_user_id else None,
+        "check_out_date": d.check_out_date.isoformat() if d.check_out_date else None,
+        "latest_iteration": d.latest_iteration,
     } for d in docs]
 
 @router.get("/{doc_id}/references")
@@ -216,6 +224,9 @@ async def create_document(doc: schemas.DocumentCreate, request: Request, db: Ses
         "creator_name": current_user.real_name,
         "group_ids": list(set(group_ids)),
         "created_at": d.created_at, "updated_at": d.updated_at,
+        "check_out_user_id": d.check_out_user_id,
+        "check_out_date": d.check_out_date.isoformat() if d.check_out_date else None,
+        "latest_iteration": d.latest_iteration,
     }
 
 @router.get("/{doc_id}")
@@ -239,6 +250,9 @@ async def get_document(doc_id: uuid.UUID, db: Session = Depends(get_db), current
         "group_ids": list(gids),
         "group_names": _resolve_group_names(db, gids),
         "created_at": d.created_at, "updated_at": d.updated_at,
+        "check_out_user_id": d.check_out_user_id,
+        "check_out_date": d.check_out_date.isoformat() if d.check_out_date else None,
+        "latest_iteration": d.latest_iteration,
     }
 
 @router.put("/{doc_id}")
@@ -283,6 +297,9 @@ async def update_document(doc_id: uuid.UUID, body: schemas.DocumentUpdate, reque
         "creator_name": creator_name,
         "group_ids": list(crud_groups.get_document_group_ids(db, d.id)),
         "created_at": d.created_at, "updated_at": d.updated_at,
+        "check_out_user_id": d.check_out_user_id,
+        "check_out_date": d.check_out_date.isoformat() if d.check_out_date else None,
+        "latest_iteration": d.latest_iteration,
     }
 
 def _find_doc_refs(db, doc_id_str):
@@ -501,3 +518,91 @@ async def get_document_versions_endpoint(doc_id: uuid.UUID, db: Session = Depend
         "file_name": v.file_name, "file_id": v.file_id,
         "created_at": v.created_at, "updated_at": v.updated_at,
     } for v in versions]
+
+
+# ====== 文档签入签出 ======
+
+
+@router.post("/{doc_id}/checkout")
+def checkout_document(
+    doc_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:update")),
+):
+    doc, err = crud_documents.checkout_document(db, doc_id, current_user.id)
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    from .. import crud as crud_common
+    crud_common.create_log(db, current_user.id, current_user.username,
+                           "图文档签出", "document", str(doc.id),
+                           f"编号:{doc.code} 版本:{doc.version}", None)
+    return {
+        "id": str(doc.id),
+        "code": doc.code,
+        "name": doc.name,
+        "version": doc.version,
+        "status": doc.status,
+        "check_out_user_id": str(doc.check_out_user_id) if doc.check_out_user_id else None,
+        "check_out_date": doc.check_out_date.isoformat() if doc.check_out_date else None,
+        "latest_iteration": doc.latest_iteration,
+    }
+
+
+@router.post("/{doc_id}/checkin")
+def checkin_document(
+    doc_id: uuid.UUID,
+    note: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:update")),
+):
+    doc, err = crud_documents.checkin_document(db, doc_id, current_user.id, note)
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    from .. import crud as crud_common
+    crud_common.create_log(db, current_user.id, current_user.username,
+                           "图文档签入", "document", str(doc.id),
+                           f"编号:{doc.code} 版本:{doc.version} 备注:{note or ''}", None)
+    return {
+        "id": str(doc.id),
+        "code": doc.code,
+        "name": doc.name,
+        "version": doc.version,
+        "status": doc.status,
+        "check_out_user_id": None,
+        "check_out_date": None,
+        "latest_iteration": doc.latest_iteration,
+    }
+
+
+@router.post("/{doc_id}/undo-checkout")
+def undo_checkout_document(
+    doc_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:update")),
+):
+    doc, err = crud_documents.undo_checkout_document(db, doc_id, current_user.id)
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    from .. import crud as crud_common
+    crud_common.create_log(db, current_user.id, current_user.username,
+                           "图文档撤销签出", "document", str(doc.id),
+                           f"编号:{doc.code} 版本:{doc.version}", None)
+    return {
+        "id": str(doc.id),
+        "code": doc.code,
+        "name": doc.name,
+        "version": doc.version,
+        "status": doc.status,
+        "check_out_user_id": None,
+        "check_out_date": None,
+        "latest_iteration": doc.latest_iteration,
+    }
+
+
+@router.get("/{doc_id}/iterations")
+def get_document_iterations(
+    doc_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:read")),
+):
+    return crud_documents.list_iterations(db, doc_id)

@@ -64,6 +64,27 @@ class Document(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
+    # 签入签出字段
+    check_out_user_id = Column(UUID(as_uuid=True), nullable=True)
+    check_out_date = Column(DateTime(timezone=True), nullable=True)
+    latest_iteration = Column(Integer, nullable=False, default=0)
+    
+    iterations = relationship("DocumentIteration", back_populates="document", lazy="dynamic",
+                              order_by="DocumentIteration.iteration")
+
+class DocumentIteration(Base):
+    """文档迭代（签入签出循环）"""
+    __tablename__ = "document_iterations"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    document_id = Column(UUID(as_uuid=True), ForeignKey('documents.id', ondelete='CASCADE'), nullable=False)
+    iteration = Column(Integer, nullable=False, default=1)
+    check_in_date = Column(DateTime(timezone=True), nullable=True)
+    check_in_note = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    document = relationship("Document", back_populates="iterations")
+    attachments = relationship("DocumentAttachment", back_populates="iteration", lazy="dynamic",
+                               order_by="DocumentAttachment.created_at")
 
 class DocumentAttachment(Base):
     """图文档独立附件表（文件存储在文件系统）"""
@@ -74,7 +95,10 @@ class DocumentAttachment(Base):
     file_size = Column(Integer)
     file_path = Column(String(512))  # 文件系统路径
     file_hash = Column(String(64))   # 文件哈希值
+    iteration_id = Column(UUID(as_uuid=True), ForeignKey('document_iterations.id', ondelete='SET NULL'), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    iteration = relationship("DocumentIteration", back_populates="attachments")
 
 
 # [REMOVED: old ComponentAttachment model]
