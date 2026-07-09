@@ -494,3 +494,93 @@ def _cross(a: List[float], b: List[float]) -> List[float]:
         a[2] * b[0] - a[0] * b[2],
         a[0] * b[1] - a[1] * b[0],
     ]
+
+
+# ── 结构索引：为 STEP 子集提取提供原始文本 + 产品/PD/NAUO 图 ──
+
+import re as _re2
+from dataclasses import dataclass, field
+
+
+# 完整语句：#id = ... 到分号（支持跨行）
+_RE_FULL_STMT = _re2.compile(r'#(\d+)\s*=\s*(.*?);', _re2.DOTALL)
+_RE_REF = _re2.compile(r'#(\d+)')
+
+
+def refs_of(stmt: str) -> set:
+    """取语句里引用的全部实体 id（跳过自身定义的 id）。"""
+    ids = [int(x) for x in _RE_REF.findall(stmt)]
+    return set(ids[1:]) if ids else set()  # 第一个是自身 id
+
+
+@dataclass
+class StructureIndex:
+    header: str
+    raw_by_id: dict                          # id -> 完整语句 '#id=...;'
+    root_pd_by_product_name: dict            # 产品名 -> 根 PRODUCT_DEFINITION id
+    shape_rep_by_pd: dict                    # PD id -> SHAPE_REPRESENTATION id
+    child_pds_by_parent_pd: dict = field(default_factory=dict)  # 父PD -> [子PD...]
+    nauo_ids: list = field(default_factory=list)                # 全部 NAUO 语句 id
+
+
+def build_structure_index(content: str) -> StructureIndex:
+    """从装配 STEP 文本构建结构索引，供多层级矩阵回填与子集提取共用。"""
+    content = content.replace('\r\n', '\n').replace('\r', '\n')
+    entities = _extract_entities(content)
+
+    # header：HEADER; 到 ENDSEC; 之间（含标记）
+    m = _re2.search(r'HEADER;(.*?)ENDSEC;', content, _re2.DOTALL)
+    header = m.group(0) if m else "HEADER;\nENDSEC;"
+
+    # 完整语句原文
+    raw_by_id = {}
+    for mm in _RE_FULL_STMT.finditer(content):
+        raw_by_id[int(mm.group(1))] = f"#{mm.group(1)}={mm.group(2).strip()};"
+
+    # 产品名 -> product id -> PD id
+    # 注：产品名取 PRODUCT 第二字段(args[1])，与 parse_assembly_step 保持一致，
+    #     使 root_pd_by_product_name 的键与 occurrence.name 同源，下游匹配才对得上。
+    products = {}          # product id -> name
+    pd_to_product = {}     # PD id -> product id
+    for eid, (etype, args) in entities.items():
+        if etype == 'PRODUCT' and len(args) >= 2:
+            products[eid] = _decode_step_string(str(args[1]))
+        elif etype == 'PRODUCT_DEFINITION' and len(args) >= 3:
+            fid = _ref_id(_ref_str(args[2]))
+            fent = entities.get(fid) if fid else None
+            if fent and fent[0] in ('PRODUCT_DEFINITION_FORMATION',
+                                    'PRODUCT_DEFINITION_FORMATION_WITH_SPECIFIED_SOURCE'):
+                pref = _ref_id(_ref_str(fent[1][-1]))
+                if pref:
+                    pd_to_product[eid] = pref
+    root_pd_by_product_name = {}
+    for pd_id, prod_id in pd_to_product.items():
+        nm = products.get(prod_id)
+        if nm:
+            root_pd_by_product_name.setdefault(nm, pd_id)
+
+    # PD -> shape rep（复用现有 _find_shape_representation）
+    shape_rep_by_pd = {}
+    for pd_id in pd_to_product:
+        sr = _find_shape_representation(pd_id, entities)
+        if sr:
+            shape_rep_by_pd[pd_id] = sr
+
+    # NAUO 父 PD -> 子 PD
+    child_pds_by_parent_pd = {}
+    nauo_ids = []
+    for eid, (etype, args) in entities.items():
+        if etype == 'NEXT_ASSEMBLY_USAGE_OCCURRENCE' and len(args) >= 5:
+            nauo_ids.append(eid)
+            parent_pd = _ref_id(_ref_str(args[3]))
+            child_pd = _ref_id(_ref_str(args[4]))
+            if parent_pd and child_pd:
+                child_pds_by_parent_pd.setdefault(parent_pd, []).append(child_pd)
+
+    return StructureIndex(
+        header=header, raw_by_id=raw_by_id,
+        root_pd_by_product_name=root_pd_by_product_name,
+        shape_rep_by_pd=shape_rep_by_pd,
+        child_pds_by_parent_pd=child_pds_by_parent_pd,
+        nauo_ids=nauo_ids,
+    )
