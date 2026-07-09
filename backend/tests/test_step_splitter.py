@@ -37,11 +37,15 @@ END-ISO-10303-21;
 
 
 def test_split_leaf_includes_solid_geometry():
-    """拆出的叶件必须带上 B-rep 实体几何（复现并防回归：起落架空文件 bug）。"""
+    """拆出的叶件必须带上 B-rep 实体几何 + 完整关联骨架（否则 OpenCASCADE 读不出/转不出）。"""
     idx = build_structure_index(MINI_GEOM)
     out = split_subitem_step(idx, idx.root_pd_by_product_name['P1'], 'P1.STEP')
     assert 'MANIFOLD_SOLID_BREP' in out, "拆出文件缺实体几何"
     assert 'ADVANCED_FACE' in out
+    # 关联骨架：PD→PDS→SDR→放置SR→SRR→几何ABSR，缺一 OpenCASCADE 就 File transfer problem
+    assert 'PRODUCT_DEFINITION_SHAPE' in out, "缺 PD→shape 锚点"
+    assert 'SHAPE_DEFINITION_REPRESENTATION' in out, "缺 PDS→SR 关联"
+    assert 'SHAPE_REPRESENTATION_RELATIONSHIP' in out, "缺 放置SR→几何 桥接关系"
     # 无悬空引用
     import re
     defined = set(re.findall(r'(?m)^#(\d+)\s*=', out))

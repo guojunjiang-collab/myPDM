@@ -43,25 +43,48 @@ def split_subitem_step(index: StructureIndex, root_pd: int, file_label: str) -> 
     # 几何关联：SolidWorks/AP214 里零件的 B-rep 实体几何存于独立的
     # ADVANCED_BREP_SHAPE_REPRESENTATION，通过"纯" SHAPE_REPRESENTATION_RELATIONSHIP
     # 与放置 SHAPE_REPRESENTATION 关联（区别于装配放置用的 ..._WITH_TRANSFORMATION）。
-    # 若一条纯关系触及本次 included 的放置 SR，则把关系两端 representation 一并纳入种子，
-    # 闭包会自动带出 MANIFOLD_SOLID_BREP 等全部几何。
+    # 若一条纯关系触及本次 included 的放置 SR，则把关系实体本身 + 两端 representation
+    # 一并纳入种子，闭包会自动带出 MANIFOLD_SOLID_BREP 等全部几何。
     for eid, stmt in index.raw_by_id.items():
         if 'SHAPE_REPRESENTATION_RELATIONSHIP' in stmt and 'WITH_TRANSFORMATION' not in stmt:
             rel_refs = refs_of(stmt)
             if rel_refs & placement_srs:
+                seeds.add(eid)
                 seeds |= rel_refs
 
     # 前向可达闭包
-    included = set()
-    stack = list(seeds)
-    while stack:
-        eid = stack.pop()
-        if eid in included or eid not in index.raw_by_id:
-            continue
-        included.add(eid)
-        for r in refs_of(index.raw_by_id[eid]):
-            if r not in included:
-                stack.append(r)
+    def _forward(seedset: set) -> set:
+        inc = set()
+        stack = list(seedset)
+        while stack:
+            eid = stack.pop()
+            if eid in inc or eid not in index.raw_by_id:
+                continue
+            inc.add(eid)
+            for r in refs_of(index.raw_by_id[eid]):
+                if r not in inc:
+                    stack.append(r)
+        return inc
+
+    included = _forward(seeds)
+
+    # 反向胶水补全：STEP 的关联/管理实体（PRODUCT_DEFINITION_SHAPE、
+    # SHAPE_DEFINITION_REPRESENTATION、SHAPE_REPRESENTATION_RELATIONSHIP、装配变换关系、
+    # PRODUCT_RELATED_PRODUCT_CATEGORY、STYLED_ITEM 颜色等）是"反向引用"骨架实体的，
+    # 前向闭包抓不到，导致 OpenCASCADE 无法从 PRODUCT_DEFINITION 走到几何(File transfer problem)。
+    # 规则：凡"引用的实体全部已在集合内"的语句都纳入(安全——不会引入范围外的兄弟零件)，
+    # 迭代至稳定。子装配场景下这会自动带回 NAUO/装配变换，保持内部零件摆位。
+    changed = True
+    while changed:
+        changed = False
+        for eid, stmt in index.raw_by_id.items():
+            if eid in included:
+                continue
+            refs = refs_of(stmt)
+            if refs and refs <= included:
+                included.add(eid)
+                changed = True
+
 
     # 重编号：旧 id 升序 → #1..#N
     old_ids = sorted(included)
