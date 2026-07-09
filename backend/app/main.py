@@ -102,9 +102,13 @@ async def startup_event():
                 WHERE table_name = '{table_name}' AND column_name = 'revision_parent_id'
             """))
             if not result.fetchone():
-                db.execute(text(f"ALTER TABLE {table_name} ADD COLUMN revision_parent_id UUID"))
-                db.commit()
-                print(f"✓ Added column revision_parent_id to {table_name} table")
+                try:
+                    db.execute(text(f"ALTER TABLE {table_name} ADD COLUMN revision_parent_id UUID"))
+                    db.commit()
+                    print(f"✓ Added column revision_parent_id to {table_name} table")
+                except Exception:
+                    db.rollback()
+                    pass
 
         # 检查 documents 表是否有 revisions 列
         result = db.execute(text("""
@@ -450,9 +454,13 @@ async def startup_event():
                 WHERE table_name = '{tbl}' AND column_name = 'deleted_at'
             """))
             if not result.fetchone():
-                db.execute(text(f"ALTER TABLE {tbl} ADD COLUMN deleted_at TIMESTAMPTZ DEFAULT NULL"))
-                db.commit()
-                print(f"✓ Added column deleted_at to {tbl} table")
+                try:
+                    db.execute(text(f"ALTER TABLE {tbl} ADD COLUMN deleted_at TIMESTAMPTZ DEFAULT NULL"))
+                    db.commit()
+                    print(f"✓ Added column deleted_at to {tbl} table")
+                except Exception:
+                    db.rollback()
+                    print(f"⏭ Skipped deleted_at for {tbl} (table may not exist)")
 
         # BOM items 的 updated_at 列
         result = db.execute(text("""
