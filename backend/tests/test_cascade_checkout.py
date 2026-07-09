@@ -35,3 +35,26 @@ def test_cascade_checkout_assembly(db):
     result = crud_parts.cascade_checkout(db, asm_r.id, user)
     assert result["failed_count"] == 0
     assert result["succeed_count"] == 2  # ASM + LEAF
+
+
+def test_undocheckout_clears_copied_attachments_and_bom(db):
+    """撤销签出删新迭代时，必须预先清理复制来的附件和 BOMItem，否则外键报错。"""
+    import uuid as _uuid
+    from app import models_parts as mp
+
+    _, r, it = _mk(db, "P1")
+    # 模拟签出后存在附属数据（_copy_iteration_data 会复制）
+    att = mp.PartAttachment(iteration_id=it.id, category="production",
+                            file_name="x.STEP", file_size=100, file_path="x")
+    db.add(att)
+    b = models.BOMItem(id=_uuid.uuid4(), iteration_id=it.id,
+                       parent_revision_id=r.id, child_revision_id=r.id,
+                       quantity=1, sort_order=0, cad_instances=[])
+    db.add(b); db.commit()
+    user = _uuid.uuid4()
+    # 先签出（会创建 iteration=2 并复制附件/BOM）
+    crud_parts.checkout_part(db, r.id, user)
+    # 再撤销——应不报错，且回到 iteration=1
+    rev, err = crud_parts.undocheckout_part(db, r.id, user)
+    assert err is None
+    assert rev.latest_iteration == 1

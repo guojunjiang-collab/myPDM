@@ -433,6 +433,18 @@ def undocheckout_part(db: Session, revision_id: UUID, user_id: UUID) -> Tuple[Op
         .first()
     )
     if latest_iter:
+        # 签出时 _copy_iteration_data 复制了附件和 BOMItem 到新迭代，
+        # 删迭代前必须先清理这些引用行（外键 NOT NULL 无 CASCADE）。
+        db.query(models_parts.PartAttachment).filter(
+            models_parts.PartAttachment.iteration_id == latest_iter.id
+        ).delete(synchronize_session=False)
+        db.query(models.BOMItem).filter(
+            models.BOMItem.iteration_id == latest_iter.id
+        ).delete(synchronize_session=False)
+        # 签出复制的自定义字段值也要清理
+        db.query(models.CustomFieldValue).filter(
+            models.CustomFieldValue.iteration_id == latest_iter.id
+        ).delete(synchronize_session=False)
         db.delete(latest_iter)
 
     revision.latest_iteration -= 1
