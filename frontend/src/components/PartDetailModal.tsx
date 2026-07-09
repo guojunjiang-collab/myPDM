@@ -346,6 +346,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
       else if (action === 'checkin') result = await partsApi.cascadeCheckin(revisionId);
       else result = await partsApi.cascadeUndocheckout(revisionId);
       toast.success(`成功: ${result.succeed_count}, 跳过: ${result.failed_count}`);
+      setExpandedBom({});  // 清 BOM 缓存，下次展开时拉取最新签出状态
       loadDetail();
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || '级联操作失败');
