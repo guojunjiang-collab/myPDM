@@ -717,8 +717,8 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
 
                 {activeTab === 'attachments' && revisionId && (
                   <div className="space-y-4">
-                    <PartAttachmentBucket revisionId={revisionId} category="cad" label="CAD 附件" editable={isCheckedOutByMe && isDraft && !viewingIterationId} />
-                    <PartAttachmentBucket revisionId={revisionId} category="production" label="生产附件" editable={isCheckedOutByMe && isDraft && !viewingIterationId} />
+                    <PartAttachmentBucket revisionId={revisionId} category="cad" label="CAD 附件" editable={isCheckedOutByMe && isDraft && !viewingIterationId} showDownloadAll={hasBomChildren} />
+                    <PartAttachmentBucket revisionId={revisionId} category="production" label="生产附件" editable={isCheckedOutByMe && isDraft && !viewingIterationId} showDownloadAll={hasBomChildren} />
                   </div>
                 )}
 

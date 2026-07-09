@@ -20,12 +20,13 @@ interface Props {
   label: string;
   editable: boolean;
   hideWhenEmpty?: boolean;
+  showDownloadAll?: boolean;
 }
 
 const fmtSize = (n: number | null) =>
   n == null ? '-' : n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`;
 
-export default function PartAttachmentBucket({ revisionId, category, label, editable, hideWhenEmpty }: Props) {
+export default function PartAttachmentBucket({ revisionId, category, label, editable, hideWhenEmpty, showDownloadAll }: Props) {
   const [items, setItems] = useState<PartAttachmentItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -94,18 +95,51 @@ export default function PartAttachmentBucket({ revisionId, category, label, edit
 
   const [downloadingAll, setDownloadingAll] = useState(false);
   const handleDownloadAll = async () => {
+    const anyWindow = window as any;
+    // 优先让用户选择保存文件夹（File System Access API，Chrome/Edge 支持）
+    let dirHandle: any = null;
+    if (anyWindow.showDirectoryPicker) {
+      try {
+        dirHandle = await anyWindow.showDirectoryPicker({ mode: 'readwrite' });
+      } catch {
+        return; // 用户取消选择文件夹
+      }
+    }
     setDownloadingAll(true);
     try {
       const data = await partsApi.listBomAttachments(revisionId, category);
-      for (const it of data.items) {
-        try {
-          const mt = await mediaApi.token(it.attachment_id, 'direct-download');
-          const a = document.createElement('a');
-          a.href = `/api/v2/attachments/${it.attachment_id}/direct-download?token=${encodeURIComponent(mt)}`;
-          a.download = it.file_name || 'download';
-          document.body.appendChild(a); a.click(); document.body.removeChild(a);
-          await new Promise((r) => setTimeout(r, 250)); // 间隔触发，避免浏览器合并/丢弃
-        } catch { /* 单个失败跳过，继续其余 */ }
+      if (dirHandle) {
+        // 写入用户选定的文件夹；平铺，同名跳过
+        let ok = 0, skip = 0;
+        for (const it of data.items) {
+          try {
+            let exists = false;
+            try { await dirHandle.getFileHandle(it.file_name); exists = true; } catch { /* 不存在 */ }
+            if (exists) { skip++; continue; }
+            const mt = await mediaApi.token(it.attachment_id, 'direct-download');
+            const resp = await fetch(`/api/v2/attachments/${it.attachment_id}/direct-download?token=${encodeURIComponent(mt)}`);
+            if (!resp.ok) continue;
+            const blob = await resp.blob();
+            const fh = await dirHandle.getFileHandle(it.file_name, { create: true });
+            const w = await fh.createWritable();
+            await w.write(blob);
+            await w.close();
+            ok++;
+          } catch { /* 单个失败跳过 */ }
+        }
+        alert(`已保存 ${ok} 个${label}到所选文件夹${skip ? `，跳过同名 ${skip} 个` : ''}`);
+      } else {
+        // 回退：浏览器逐个下载到默认目录（Firefox/Safari 等不支持文件夹选择）
+        for (const it of data.items) {
+          try {
+            const mt = await mediaApi.token(it.attachment_id, 'direct-download');
+            const a = document.createElement('a');
+            a.href = `/api/v2/attachments/${it.attachment_id}/direct-download?token=${encodeURIComponent(mt)}`;
+            a.download = it.file_name || 'download';
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            await new Promise((r) => setTimeout(r, 250));
+          } catch { /* 单个失败跳过 */ }
+        }
       }
     } catch (e: any) {
       if (e?.response?.status === 404) alert(`该部件及子项没有可下载的${label}`);
@@ -122,11 +156,13 @@ export default function PartAttachmentBucket({ revisionId, category, label, edit
       <div className="flex items-center justify-between mb-2">
         <h4 className="text-sm font-bold text-gray-700">{label}</h4>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={handleDownloadAll} disabled={downloadingAll}
-            title={`下载本部件及全部子项的${label}`}
-            className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50">
-            {downloadingAll ? '下载中...' : '一键下载(含子项)'}
-          </button>
+          {showDownloadAll && (
+            <button type="button" onClick={handleDownloadAll} disabled={downloadingAll}
+              title={`下载本部件及全部子项的${label}`}
+              className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50">
+              {downloadingAll ? '下载中...' : '一键下载(含子项)'}
+            </button>
+          )}
           {editable && !uploading && (
             <>
               <button type="button" onClick={() => fileInputRef.current?.click()} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 上传附件</button>
