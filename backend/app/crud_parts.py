@@ -366,7 +366,7 @@ def checkout_part(db: Session, revision_id: UUID, user_id: UUID) -> Tuple[Option
     if prev_iter:
         _copy_iteration_data(db, prev_iter, new_iter)
         # 复制自定义字段值到新迭代
-        from .. import crud as crud_common
+        from . import crud as crud_common
         crud_common._copy_iteration_custom_fields(db, prev_iter.id, new_iter.id)
 
     revision.latest_iteration = new_iteration_num
