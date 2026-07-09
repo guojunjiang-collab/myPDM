@@ -92,18 +92,48 @@ export default function PartAttachmentBucket({ revisionId, category, label, edit
     } catch { alert('下载失败，请重试'); }
   };
 
+  const [downloadingAll, setDownloadingAll] = useState(false);
+  const handleDownloadAll = async () => {
+    setDownloadingAll(true);
+    try {
+      const data = await partsApi.listBomAttachments(revisionId, category);
+      for (const it of data.items) {
+        try {
+          const mt = await mediaApi.token(it.attachment_id, 'direct-download');
+          const a = document.createElement('a');
+          a.href = `/api/v2/attachments/${it.attachment_id}/direct-download?token=${encodeURIComponent(mt)}`;
+          a.download = it.file_name || 'download';
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          await new Promise((r) => setTimeout(r, 250)); // 间隔触发，避免浏览器合并/丢弃
+        } catch { /* 单个失败跳过，继续其余 */ }
+      }
+    } catch (e: any) {
+      if (e?.response?.status === 404) alert(`该部件及子项没有可下载的${label}`);
+      else alert('获取附件清单失败，请重试');
+    } finally {
+      setDownloadingAll(false);
+    }
+  };
+
   if (hideWhenEmpty && !loading && !uploading && items.length === 0) return null;
 
   return (
     <div className="border-t pt-4">
       <div className="flex items-center justify-between mb-2">
         <h4 className="text-sm font-bold text-gray-700">{label}</h4>
-        {editable && !uploading && (
-          <>
-            <button type="button" onClick={() => fileInputRef.current?.click()} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 上传附件</button>
-            <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} accept="*/*" />
-          </>
-        )}
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={handleDownloadAll} disabled={downloadingAll}
+            title={`下载本部件及全部子项的${label}`}
+            className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50">
+            {downloadingAll ? '下载中...' : '一键下载(含子项)'}
+          </button>
+          {editable && !uploading && (
+            <>
+              <button type="button" onClick={() => fileInputRef.current?.click()} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 上传附件</button>
+              <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} accept="*/*" />
+            </>
+          )}
+        </div>
       </div>
 
       {uploading && (

@@ -200,6 +200,11 @@ export const partsApi = {
     api.post(`/parts/revisions/${revisionId}/attachments`, data).then((r) => r.data),
   deleteAttachment: (revisionId: string, attachmentId: string) =>
     api.delete(`/parts/revisions/${revisionId}/attachments/${attachmentId}`).then((r) => r.data),
+  // 部件及全部子孙件的指定类别附件清单（供顺序下载）
+  listBomAttachments: (revisionId: string, category: 'cad' | 'production') =>
+    api.get(`/parts/revisions/${revisionId}/bom-attachments`, { params: { category } }).then((r) => r.data as {
+      count: number; items: { attachment_id: string; file_name: string; part_code: string }[];
+    }),
 };
 
 // 图文档 API

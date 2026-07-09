@@ -722,6 +722,59 @@ def cascade_undocheckout(db: Session, revision_id: UUID, user_id: UUID) -> Dict[
     return result
 
 
+def collect_bom_attachments(db: Session, revision_id: UUID, category: str) -> List[Dict[str, Any]]:
+    """递归收集 BOM 树自身+全部子孙件当前迭代下指定 category 的附件清单。"""
+    rev_ids: List[UUID] = []
+    seen = set()
+
+    def _walk(rev_id):
+        if rev_id in seen:
+            return
+        seen.add(rev_id)
+        rev_ids.append(rev_id)
+        bom_items = (
+            db.query(models.BOMItem)
+            .filter(
+                models.BOMItem.parent_revision_id == rev_id,
+                models.BOMItem.deleted_at.is_(None),
+            )
+            .all()
+        )
+        for bom in bom_items:
+            child_rev = get_part_revision(db, bom.child_revision_id)
+            if child_rev and child_rev.id not in seen:
+                _walk(child_rev.id)
+
+    _walk(revision_id)
+
+    items: List[Dict[str, Any]] = []
+    for rid in rev_ids:
+        rev = get_part_revision(db, rid)
+        if not rev:
+            continue
+        it = _current_iteration(db, rid)
+        if not it:
+            continue
+        master = get_part_master(db, rev.master_id)
+        part_code = f"{master.code}_{rev.version}" if master else str(rid)
+        atts = (
+            db.query(models_parts.PartAttachment)
+            .filter(
+                models_parts.PartAttachment.iteration_id == it.id,
+                models_parts.PartAttachment.category == category,
+            )
+            .all()
+        )
+        for a in atts:
+            items.append({
+                "attachment_id": str(a.id),
+                "file_name": a.file_name,
+                "part_code": part_code,
+            })
+    return items
+
+
+
 # ====== BOM 操作 ======
 
 def get_bom_tree(db: Session, revision_id: UUID) -> List[Dict]:

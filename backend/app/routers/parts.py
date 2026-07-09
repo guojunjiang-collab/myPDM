@@ -793,6 +793,23 @@ def delete_attachment(
     return {"detail": "已删除"}
 
 
+@router.get("/revisions/{revision_id}/bom-attachments")
+def list_bom_attachments(
+    revision_id: UUID,
+    category: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("attachments:download")),
+):
+    """列出该部件及 BOM 树全部子孙件当前迭代下指定 category 的附件（供前端顺序下载）。"""
+    if category not in ("cad", "production"):
+        raise HTTPException(400, "category 必须为 cad 或 production")
+    items = crud_parts.collect_bom_attachments(db, revision_id, category)
+    if not items:
+        raise HTTPException(404, "未找到该类别的附件")
+    return {"revision_id": str(revision_id), "category": category,
+            "count": len(items), "items": items}
+
+
 @router.get("/revisions/{revision_id}/attachments/{attachment_id}/file")
 def get_attachment_file(
     revision_id: UUID,
