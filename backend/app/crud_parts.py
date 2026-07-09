@@ -1022,6 +1022,9 @@ def generate_subitem_steps(db: Session, assembly_revision_id, structure_index, c
     walk(assembly_revision_id, set())
     return {"generated": generated, "skipped_not_editable": skipped,
             "unmatched": unmatched, "failed": failed}
+
+
+def get_assembly_instances(db: Session, assembly_revision_id, glb_url_resolver) -> list:
     """递归展平装配 BOM 树，返回叶子实例清单（每个含世界矩阵）"""
     instances = []
 
