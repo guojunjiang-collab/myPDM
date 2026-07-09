@@ -550,7 +550,12 @@ def build_structure_index(content: str) -> StructureIndex:
             fent = entities.get(fid) if fid else None
             if fent and fent[0] in ('PRODUCT_DEFINITION_FORMATION',
                                     'PRODUCT_DEFINITION_FORMATION_WITH_SPECIFIED_SOURCE'):
-                pref = _ref_id(_ref_str(fent[1][-1]))
+                # of_product 是 formation 参数里的实体引用；不同格式位置不同：
+                #   FORMATION(id, desc, of_product) → 末位
+                #   WITH_SPECIFIED_SOURCE(id, desc, of_product, make_or_buy) → 倒数第二(末位是 .枚举.)
+                # 稳健做法：取参数中最后一个 #实体引用，避免误取 make_or_buy 枚举。
+                pref = next((_ref_id(_ref_str(a)) for a in reversed(fent[1])
+                             if _ref_id(_ref_str(a)) is not None), None)
                 if pref:
                     pd_to_product[eid] = pref
     root_pd_by_product_name = {}
