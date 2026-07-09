@@ -334,10 +334,10 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
     const pt = data.tasks.find((t) => t.id === dep.predecessor_id);
     const st = data.tasks.find((t) => t.id === dep.successor_id);
     if (!pt || !st) return null;
-    const pri = visRowIndex[pt.id] + taskRowOffset; const sri = visRowIndex[st.id] + taskRowOffset;
-    if (pri === undefined || sri === undefined) return null;
-    const pb = barBox(effTask(pt), range.start, scale, pri);
-    const sb = barBox(effTask(st), range.start, scale, sri);
+    const pri = visRowIndex[pt.id]; const sri = visRowIndex[st.id];
+    if (pri == null || sri == null) return null;
+    const pb = barBox(effTask(pt), range.start, scale, pri + taskRowOffset);
+    const sb = barBox(effTask(st), range.start, scale, sri + taskRowOffset);
     if (!pb || !sb) return null;
     const a = depAnchors(dep);
     const x1 = a.from === 'end' ? pb.x + pb.w : pb.x;
