@@ -848,34 +848,41 @@ def _current_iteration(db: Session, revision_id):
 
 
 def apply_step_matrices(db: Session, assembly_revision_id, parsed: dict) -> dict:
-    """把解析出的 occurrence 矩阵，按 code/name 匹配现有 BOM 子链接并回填"""
-    iteration = _current_iteration(db, assembly_revision_id)
-    if iteration is None:
-        return {"matched": [], "unmatched": [o["name"] for o in parsed.get("occurrences", [])],
-                "multi_instance": []}
+    """多层级：按 (父件号, 子件号) 匹配 BOM 树任意层级的 BOMItem 并回填矩阵。始终写。"""
+    from sqlalchemy.orm.attributes import flag_modified
 
-    bom_items = (
-        db.query(models.BOMItem)
-        .filter(models.BOMItem.iteration_id == iteration.id,
-                models.BOMItem.deleted_at.is_(None))
-        .all()
-    )
-
-    # 建立 code/name → BOMItem 索引
+    # 递归收集 BOM 树全部 BOMItem，建 (parent_code, child_code) -> BOMItem 索引
     index = {}
-    for item in bom_items:
-        child_rev = get_part_revision(db, item.child_revision_id)
-        if not child_rev:
-            continue
-        master = get_part_master(db, child_rev.master_id)
-        if not master:
-            continue
-        index.setdefault(("code", master.code), item)
-        index.setdefault(("name", master.name), item)
+    all_items = []
 
-    # 先清空 step 来源的旧矩阵（幂等）
+    def walk(rev_id, visited):
+        if rev_id in visited:
+            return
+        visited = visited | {rev_id}
+        it = _current_iteration(db, rev_id)
+        if not it:
+            return
+        parent_rev = get_part_revision(db, rev_id)
+        parent_master = get_part_master(db, parent_rev.master_id) if parent_rev else None
+        links = (db.query(models.BOMItem)
+                 .filter(models.BOMItem.iteration_id == it.id,
+                         models.BOMItem.deleted_at.is_(None)).all())
+        for link in links:
+            child_rev = get_part_revision(db, link.child_revision_id)
+            if not child_rev:
+                continue
+            child_master = get_part_master(db, child_rev.master_id)
+            if parent_master and child_master:
+                index.setdefault((parent_master.code, child_master.code), link)
+                index.setdefault((parent_master.name, child_master.name), link)
+            all_items.append(link)
+            walk(child_rev.id, visited)
+
+    walk(assembly_revision_id, set())
+
+    # 幂等：先清各 BOMItem 里 source=='step' 的旧矩阵
     touched = set()
-    for item in bom_items:
+    for item in all_items:
         kept = [c for c in (item.cad_instances or []) if c.get("source") != "step"]
         if kept != (item.cad_instances or []):
             item.cad_instances = kept
@@ -883,32 +890,29 @@ def apply_step_matrices(db: Session, assembly_revision_id, parsed: dict) -> dict
 
     matched, unmatched = [], []
     per_item_count = {}
-
     for occ in parsed.get("occurrences", []):
-        name = occ["name"]
-        item = index.get(("code", name)) or index.get(("name", name))
+        cname = occ.get("name")
+        pname = occ.get("parent_name")
+        item = index.get((pname, cname)) if pname else None
         if not item:
-            unmatched.append(name)
+            unmatched.append(cname)
             continue
         norm = _mu.normalize_translation_mm_to_m(occ["local_matrix"])
         instances = list(item.cad_instances or [])
-        instances.append({"matrix": norm, "source": "step", "label": name})
+        instances.append({"matrix": norm, "source": "step", "label": cname})
         item.cad_instances = instances
         touched.add(item.id)
-        matched.append(name)
+        matched.append(cname)
         per_item_count[item.id] = per_item_count.get(item.id, 0) + 1
 
-    from sqlalchemy.orm.attributes import flag_modified
-    for item in bom_items:
+    for item in all_items:
         if item.id in touched:
             flag_modified(item, "cad_instances")
-
     db.commit()
 
-    multi = [i for i, c in per_item_count.items() if c > 1]
     multi_names = []
-    for item in bom_items:
-        if item.id in multi:
+    for item in all_items:
+        if per_item_count.get(item.id, 0) > 1:
             cr = get_part_revision(db, item.child_revision_id)
             m = get_part_master(db, cr.master_id) if cr else None
             if m:
