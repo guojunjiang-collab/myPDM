@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import api, { partsApi, mediaApi } from '../services/api';
+import api, { partsApi } from '../services/api';
 import { previewAttachment } from '../utils/attachmentPreview';
 import ArchiveTreeModal from './ArchiveTreeModal';
 
@@ -85,11 +85,13 @@ export default function PartAttachmentBucket({ revisionId, category, label, edit
 
   const handleDownload = async (att: PartAttachmentItem) => {
     try {
-      const mt = await mediaApi.token(att.id, 'direct-download');
+      const blob = await partsApi.downloadPartAttachmentBlob(att.id);
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = `/api/v2/attachments/${att.id}/direct-download?token=${encodeURIComponent(mt)}`;
+      a.href = url;
       a.download = att.file_name || 'download';
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     } catch { alert('下载失败，请重试'); }
   };
 
@@ -116,10 +118,7 @@ export default function PartAttachmentBucket({ revisionId, category, label, edit
             let exists = false;
             try { await dirHandle.getFileHandle(it.file_name); exists = true; } catch { /* 不存在 */ }
             if (exists) { skip++; continue; }
-            const mt = await mediaApi.token(it.attachment_id, 'direct-download');
-            const resp = await fetch(`/api/v2/attachments/${it.attachment_id}/direct-download?token=${encodeURIComponent(mt)}`);
-            if (!resp.ok) continue;
-            const blob = await resp.blob();
+            const blob = await partsApi.downloadPartAttachmentBlob(it.attachment_id);
             const fh = await dirHandle.getFileHandle(it.file_name, { create: true });
             const w = await fh.createWritable();
             await w.write(blob);
@@ -132,11 +131,13 @@ export default function PartAttachmentBucket({ revisionId, category, label, edit
         // 回退：浏览器逐个下载到默认目录（Firefox/Safari 等不支持文件夹选择）
         for (const it of data.items) {
           try {
-            const mt = await mediaApi.token(it.attachment_id, 'direct-download');
+            const blob = await partsApi.downloadPartAttachmentBlob(it.attachment_id);
+            const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = `/api/v2/attachments/${it.attachment_id}/direct-download?token=${encodeURIComponent(mt)}`;
+            a.href = url;
             a.download = it.file_name || 'download';
             document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url);
             await new Promise((r) => setTimeout(r, 250));
           } catch { /* 单个失败跳过 */ }
         }

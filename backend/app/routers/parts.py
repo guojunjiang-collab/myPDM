@@ -830,6 +830,25 @@ def get_attachment_file(
     return FileResponse(att.file_path, media_type=mime_type, filename=att.file_name)
 
 
+@router.get("/attachments/{attachment_id}/download")
+def download_part_attachment(
+    attachment_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("attachments:download")),
+):
+    """按附件 ID 直接下载零部件附件（file_path 直读，避免 v2 的 base_dir 双重拼接问题）。"""
+    import os, mimetypes
+    att = db.query(crud_parts.models_parts.PartAttachment).filter(
+        crud_parts.models_parts.PartAttachment.id == attachment_id
+    ).first()
+    if not att:
+        raise HTTPException(404, "附件不存在")
+    if not att.file_path or not os.path.exists(att.file_path):
+        raise HTTPException(404, "文件不存在")
+    mime_type = mimetypes.guess_type(att.file_path)[0] or "application/octet-stream"
+    return FileResponse(att.file_path, media_type=mime_type, filename=att.file_name)
+
+
 # ===== 装配 3D 预览 =====
 
 def _glb_url_resolver_factory(db):

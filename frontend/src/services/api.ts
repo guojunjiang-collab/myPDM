@@ -205,6 +205,9 @@ export const partsApi = {
     api.get(`/parts/revisions/${revisionId}/bom-attachments`, { params: { category } }).then((r) => r.data as {
       count: number; items: { attachment_id: string; file_name: string; part_code: string }[];
     }),
+  // 按附件 ID 直接下载零部件附件（blob，带 JWT）
+  downloadPartAttachmentBlob: (attachmentId: string) =>
+    api.get(`/parts/attachments/${attachmentId}/download`, { responseType: 'blob' }).then((r) => r.data as Blob),
 };
 
 // 图文档 API

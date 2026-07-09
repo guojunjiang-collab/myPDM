@@ -90,3 +90,31 @@ def test_bom_attachments_route(db, engineer_user):
         assert resp3.status_code == 400
     finally:
         app.dependency_overrides.clear()
+
+
+def test_download_part_attachment_endpoint(db, engineer_user, tmp_path):
+    """按 attachment_id 直接下载：file_path 直读（不经 v2 base_dir 拼接）。"""
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.database import get_db as _get_db
+    from app.routers.auth import get_current_active_user
+
+    _, r, it = _mk(db, "DL")
+    f = tmp_path / "real.step"
+    f.write_text("ISO-10303-21;")
+    a = models_parts.PartAttachment(id=uuid.uuid4(), iteration_id=it.id, category="production",
+                                    file_name="real.step", file_size=13, file_path=str(f), file_hash="h")
+    db.add(a); db.commit()
+
+    app.dependency_overrides[_get_db] = lambda: db
+    app.dependency_overrides[get_current_active_user] = lambda: engineer_user
+    try:
+        client = TestClient(app)
+        resp = client.get(f"/api/parts/attachments/{a.id}/download")
+        assert resp.status_code == 200
+        assert resp.content == b"ISO-10303-21;"
+        # 不存在的附件 → 404
+        resp2 = client.get(f"/api/parts/attachments/{uuid.uuid4()}/download")
+        assert resp2.status_code == 404
+    finally:
+        app.dependency_overrides.clear()
