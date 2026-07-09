@@ -1014,6 +1014,57 @@ def _trigger_glb(*args, **kwargs):
     return None
 
 
+def _write_production_step(db, revision, iteration, data: bytes) -> None:
+    """把 STEP 字节写为该迭代下的生产附件，文件名固定 件号.STEP，同名替换、不转 GLB。"""
+    master = get_part_master(db, revision.master_id)
+    code = master.code if master else str(revision.id)
+    fname = f"{code}.STEP"
+    olds = (db.query(models_parts.PartAttachment)
+            .filter(models_parts.PartAttachment.iteration_id == iteration.id,
+                    models_parts.PartAttachment.category == "production",
+                    models_parts.PartAttachment.file_name == fname).all())
+    for old in olds:
+        try:
+            if old.file_path and _os_split.path.exists(old.file_path):
+                _os_split.remove(old.file_path)
+        except OSError:
+            pass
+        try:
+            from .stp_converter import delete_glb_cache
+            delete_glb_cache(str(old.id), old.file_path)
+        except Exception:
+            pass
+        db.delete(old)
+    db.commit()
+    upload_dir = f"{_uploads_root}/parts/{code}/{revision.version}/{iteration.iteration}"
+    _os_split.makedirs(upload_dir, exist_ok=True)
+    fpath = _os_split.path.join(upload_dir, fname)
+    with open(fpath, "wb") as f:
+        f.write(data)
+    att = models_parts.PartAttachment(
+        iteration_id=iteration.id, category="production", file_name=fname,
+        file_size=len(data), file_path=fpath,
+        file_hash=_hashlib_split.sha256(data).hexdigest(),
+    )
+    db.add(att); db.commit()
+
+
+def save_assembly_step_as_attachment(db: Session, revision_id, data: bytes, current_user_id) -> bool:
+    """把上传的装配 STEP 原文保存为该装配自身的生产附件(件号.STEP)。
+    门槛与子项一致：草稿 + 当前用户已检出；同名替换、不转 GLB。返回是否已写入。"""
+    rev = get_part_revision(db, revision_id)
+    if not rev:
+        return False
+    if not (rev.status == "draft"
+            and str(rev.check_out_user_id or "") == str(current_user_id)):
+        return False
+    it = _current_iteration(db, revision_id)
+    if not it:
+        return False
+    _write_production_step(db, rev, it, data)
+    return True
+
+
 def generate_subitem_steps(db: Session, assembly_revision_id, structure_index, current_user_id) -> dict:
     """遍历唯一子项，草稿+当前用户检出者拆出 件号.STEP 写生产附件(同名替换、不转GLB)。"""
     generated, skipped, unmatched, failed = [], [], [], []
@@ -1062,37 +1113,7 @@ def generate_subitem_steps(db: Session, assembly_revision_id, structure_index, c
         except Exception:
             failed.append(code)
             return
-        # 同名替换：删旧记录 + 文件 + glb 缓存
-        olds = (db.query(models_parts.PartAttachment)
-                .filter(models_parts.PartAttachment.iteration_id == child_it.id,
-                        models_parts.PartAttachment.category == "production",
-                        models_parts.PartAttachment.file_name == fname).all())
-        for old in olds:
-            try:
-                if old.file_path and _os_split.path.exists(old.file_path):
-                    _os_split.remove(old.file_path)
-            except OSError:
-                pass
-            try:
-                from .stp_converter import delete_glb_cache
-                delete_glb_cache(str(old.id), old.file_path)
-            except Exception:
-                pass
-            db.delete(old)
-        db.commit()
-        # 写新文件
-        upload_dir = f"{_uploads_root}/parts/{code}/{child_rev.version}/{child_it.iteration}"
-        _os_split.makedirs(upload_dir, exist_ok=True)
-        fpath = _os_split.path.join(upload_dir, fname)
-        data = text.encode("utf-8")
-        with open(fpath, "wb") as f:
-            f.write(data)
-        att = models_parts.PartAttachment(
-            iteration_id=child_it.id, category="production", file_name=fname,
-            file_size=len(data), file_path=fpath,
-            file_hash=_hashlib_split.sha256(data).hexdigest(),
-        )
-        db.add(att); db.commit()
+        _write_production_step(db, child_rev, child_it, text.encode("utf-8"))
         # 不触发 GLB（预览时懒转）
         generated.append(code)
 

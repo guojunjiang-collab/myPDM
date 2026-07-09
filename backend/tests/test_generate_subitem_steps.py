@@ -76,6 +76,36 @@ def test_same_name_replace_and_no_glb(db, monkeypatch, tmp_path):
     assert calls["glb"] == 0       # 不触发 GLB
 
 
+def test_save_assembly_step_as_attachment(db, monkeypatch, tmp_path):
+    """装配自身 STEP 存为生产附件：草稿+当前用户检出，同名替换。"""
+    user = uuid.uuid4()
+    _, asm_r, asm_it = _mk(db, "ASMSELF", status="draft", checkout=user)
+    monkeypatch.setattr(crud_parts, "_uploads_root", str(tmp_path), raising=False)
+
+    ok = crud_parts.save_assembly_step_as_attachment(db, asm_r.id, b"ISO-10303-21;\nDATA;\n", user)
+    assert ok is True
+    atts = (db.query(models_parts.PartAttachment)
+            .filter(models_parts.PartAttachment.iteration_id == asm_it.id,
+                    models_parts.PartAttachment.category == "production",
+                    models_parts.PartAttachment.file_name == "ASMSELF.STEP").all())
+    assert len(atts) == 1
+    # 再次导入：同名替换，仍只 1 份
+    crud_parts.save_assembly_step_as_attachment(db, asm_r.id, b"ISO-10303-21;\nDATA2;\n", user)
+    atts2 = (db.query(models_parts.PartAttachment)
+             .filter(models_parts.PartAttachment.iteration_id == asm_it.id,
+                     models_parts.PartAttachment.file_name == "ASMSELF.STEP").all())
+    assert len(atts2) == 1
+
+
+def test_save_assembly_step_skips_when_not_checked_out(db, tmp_path, monkeypatch):
+    """未签出/非当前用户 → 不保存装配自身。"""
+    user = uuid.uuid4()
+    _, rel_r, _ = _mk(db, "RELSELF", status="released", checkout=None)
+    monkeypatch.setattr(crud_parts, "_uploads_root", str(tmp_path), raising=False)
+    ok = crud_parts.save_assembly_step_as_attachment(db, rel_r.id, b"x", user)
+    assert ok is False
+
+
 def test_import_route_returns_split_report(db, engineer_user, monkeypatch, tmp_path):
     import io
     from fastapi.testclient import TestClient

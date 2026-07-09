@@ -903,7 +903,7 @@ async def import_assembly_step(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("components:update")),
 ):
-    """上传装配 STEP（仅作解析源）：多层级矩阵回填 + 逐子项拆分为生产附件。不存装配自身。"""
+    """上传装配 STEP：多层级矩阵回填 + 逐子项拆分为生产附件 + 装配自身也存为生产附件。"""
     content = await file.read()
     suffix = _os.path.splitext(file.filename or "a.step")[1] or ".step"
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -921,6 +921,8 @@ async def import_assembly_step(
 
     report = crud_parts.apply_step_matrices(db, revision_id, parsed)
     split = crud_parts.generate_subitem_steps(db, revision_id, index, current_user.id)
+    # 装配自身 STEP 原文也保存为其生产附件（件号.STEP，同名替换）
+    crud_parts.save_assembly_step_as_attachment(db, revision_id, content, current_user.id)
     # 合并：unmatched 取并集，其余 generated/skipped_not_editable/failed 来自拆分侧
     report["unmatched"] = sorted(set(report.get("unmatched", [])) | set(split.get("unmatched", [])))
     report["generated"] = split.get("generated", [])
