@@ -150,6 +150,9 @@ class MatchReport(BaseModel):
     matched: List[str]
     unmatched: List[str]
     multi_instance: List[str]
+    generated: List[str] = []              # 成功拆出 STEP 的件号(去重)
+    skipped_not_editable: List[str] = []   # 非草稿/未检出跳过
+    failed: List[str] = []                 # 子集提取/写盘失败
 
 
 class AssemblyInstanceDTO(BaseModel):
