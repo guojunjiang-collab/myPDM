@@ -175,7 +175,7 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
         <tr key={idx} className={`hover:bg-gray-50 ${rowCls}`}>
           <td className="px-3 py-2 text-sm text-gray-400 whitespace-nowrap">
             <span>{'-'.repeat(level)}{level}</span>
-            {entityId && (
+            {isAssembly && entityId && (
               <button onClick={(e) => { e.stopPropagation(); togglePart(idx, entityId, p.part_detail?.revision_id || ''); }}
                 className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
                 {childRows ? '▼' : '▶'}
@@ -228,7 +228,7 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
         <tr key={idx} className={`hover:bg-gray-50 ${rowCls}`}>
           <td className="px-3 py-2 text-sm text-gray-400 whitespace-nowrap">
             <span>{'-'.repeat(level)}</span>
-            {entityId && (
+            {isAssembly && entityId && (
               <button onClick={(e) => { e.stopPropagation(); togglePart(idx, entityId, p.part_detail?.revision_id || ''); }}
                 className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
                 {childRows ? '▼' : '▶'}
