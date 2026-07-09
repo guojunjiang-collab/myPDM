@@ -219,6 +219,28 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
     finally { setLoadingBom(prev => { const n = {...prev}; delete n[revId]; return n; }); }
   }, [expandedBom]);
 
+  const preview3D = useCallback(async (item: any) => {
+    const revId = item.child_revision_id;
+    if (!revId) return;
+    if (item.has_children) {
+      window.open(`/stp-viewer?assembly=${revId}`, '_blank');
+      return;
+    }
+    try {
+      const atts = await partsApi.listAttachments(revId, 'production');
+      const stp = (Array.isArray(atts) ? atts : []).find((a: any) => {
+        const n = (a.file_name || '').toLowerCase();
+        return n.endsWith('.stp') || n.endsWith('.step');
+      });
+      if (stp) {
+        const mt = await mediaApi.token(stp.id, 'gltf');
+        window.open(`/stp-viewer?id=${stp.id}&token=${encodeURIComponent(mt)}`, '_blank');
+      } else {
+        alert('该零件没有 STP/STEP 附件');
+      }
+    } catch { alert('打开预览失败'); }
+  }, []);
+
   const renderBomRow = useCallback((item: any, level: number): React.ReactNode => {
     const hasChildren = item.has_children;
     const children = expandedBom[item.child_revision_id];
@@ -273,6 +295,10 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                 className="text-indigo-500 hover:text-indigo-700 text-lg leading-none cursor-pointer" title="查看变换矩阵">📐</button>
             ) : <span className="text-gray-300">—</span>}
           </td>
+          <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+            <button type="button" onClick={(e) => { e.stopPropagation(); preview3D(item); }}
+              className="text-primary-600 hover:text-primary-800 text-xs whitespace-nowrap">3D预览</button>
+          </td>
           {canEdit && (
             <td className="px-3 py-2 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
               <span className="inline-flex items-center gap-1">
@@ -305,11 +331,11 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
             </td>
           )}
         </tr>
-        {isLoading && <tr><td colSpan={9} className="px-3 py-2 text-sm text-gray-400 text-center">加载中...</td></tr>}
+        {isLoading && <tr><td colSpan={canEdit ? 10 : 9} className="px-3 py-2 text-sm text-gray-400 text-center">加载中...</td></tr>}
         {children && children.map((child: any) => renderBomRow(child, level + 1))}
       </React.Fragment>
     );
-  }, [canEdit, expandedBom, loadingBom, toggleBomExpand, revisionId, loadTabs, toast]);
+  }, [canEdit, expandedBom, loadingBom, toggleBomExpand, revisionId, loadTabs, toast, preview3D]);
 
   const updateBomItemVersion = useCallback((items: any[], itemId: string, newRevisionId: string, newVersion: string) => {
     const update = (list: any[]): boolean => {
@@ -695,6 +721,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                             <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">签出状态</th>
                              <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">用量</th>
                              <th className="px-3 py-2 text-center text-gray-500 font-medium w-12 whitespace-nowrap">矩阵</th>
+                             <th className="px-3 py-2 text-center text-gray-500 font-medium w-20">预览</th>
                              {canEdit && (
                               <th className="px-3 py-2 text-right text-gray-500 font-medium w-36">操作</th>
                             )}
