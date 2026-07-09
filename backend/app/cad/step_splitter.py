@@ -25,18 +25,31 @@ def split_subitem_step(index: StructureIndex, root_pd: int, file_label: str) -> 
 
     # 种子：included PD 的结构语句 + 其 shape rep；父子都在集合内的 NAUO
     seeds = set()
+    placement_srs = set()
     for pd in pds:
         if pd in index.raw_by_id:
             seeds.add(pd)
         sr = index.shape_rep_by_pd.get(pd)
         if sr:
             seeds.add(sr)
+            placement_srs.add(sr)
     for nid in index.nauo_ids:
         stmt = index.raw_by_id.get(nid, '')
         ref_ids = refs_of(stmt)
         # NAUO 引用里若父、子 PD 都在集合内 → 保留该装配关系
         if len(pds & ref_ids) >= 2:
             seeds.add(nid)
+
+    # 几何关联：SolidWorks/AP214 里零件的 B-rep 实体几何存于独立的
+    # ADVANCED_BREP_SHAPE_REPRESENTATION，通过"纯" SHAPE_REPRESENTATION_RELATIONSHIP
+    # 与放置 SHAPE_REPRESENTATION 关联（区别于装配放置用的 ..._WITH_TRANSFORMATION）。
+    # 若一条纯关系触及本次 included 的放置 SR，则把关系两端 representation 一并纳入种子，
+    # 闭包会自动带出 MANIFOLD_SOLID_BREP 等全部几何。
+    for eid, stmt in index.raw_by_id.items():
+        if 'SHAPE_REPRESENTATION_RELATIONSHIP' in stmt and 'WITH_TRANSFORMATION' not in stmt:
+            rel_refs = refs_of(stmt)
+            if rel_refs & placement_srs:
+                seeds |= rel_refs
 
     # 前向可达闭包
     included = set()
