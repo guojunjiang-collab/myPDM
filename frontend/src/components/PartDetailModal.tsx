@@ -473,7 +473,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                         </>
                       )}
                       <button onClick={() => window.open(`/stp-viewer?assembly=${revisionId}`, '_blank')}
-                        className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">装配3D预览</button>
+                        className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">3D预览</button>
                     </>
                   ) : (
                     <button onClick={async () => {
