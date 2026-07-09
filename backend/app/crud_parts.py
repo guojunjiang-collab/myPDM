@@ -921,7 +921,107 @@ def apply_step_matrices(db: Session, assembly_revision_id, parsed: dict) -> dict
     return {"matched": matched, "unmatched": unmatched, "multi_instance": multi_names}
 
 
-def get_assembly_instances(db: Session, assembly_revision_id, glb_url_resolver) -> list:
+import os as _os_split
+import hashlib as _hashlib_split
+
+_uploads_root = "./uploads"
+
+
+def _split_subitem_step_impl(index, root_pd, label):
+    from .cad.step_splitter import split_subitem_step
+    return split_subitem_step(index, root_pd, label)
+
+
+def _trigger_glb(*args, **kwargs):
+    """占位：本特性写入不转 GLB（预览时懒转）。保留以便测试断言不被调用。"""
+    return None
+
+
+def generate_subitem_steps(db: Session, assembly_revision_id, structure_index, current_user_id) -> dict:
+    """遍历唯一子项，草稿+当前用户检出者拆出 件号.STEP 写生产附件(同名替换、不转GLB)。"""
+    generated, skipped, unmatched, failed = [], [], [], []
+    seen_rev = set()
+
+    def walk(rev_id, visited):
+        if rev_id in visited:
+            return
+        visited = visited | {rev_id}
+        it = _current_iteration(db, rev_id)
+        if not it:
+            return
+        links = (db.query(models.BOMItem)
+                 .filter(models.BOMItem.iteration_id == it.id,
+                         models.BOMItem.deleted_at.is_(None)).all())
+        for link in links:
+            child_rev = get_part_revision(db, link.child_revision_id)
+            if not child_rev or child_rev.id in seen_rev:
+                continue
+            seen_rev.add(child_rev.id)
+            _process(child_rev)
+            walk(child_rev.id, visited)
+
+    def _process(child_rev):
+        master = get_part_master(db, child_rev.master_id)
+        if not master:
+            return
+        code = master.code
+        root_pd = getattr(structure_index, "root_pd_by_product_name", {}).get(code) \
+            or getattr(structure_index, "root_pd_by_product_name", {}).get(master.name)
+        if root_pd is None:
+            unmatched.append(code)
+            return
+        # 门槛：草稿 且 当前用户已检出
+        if not (child_rev.status == "draft"
+                and str(child_rev.check_out_user_id or "") == str(current_user_id)):
+            skipped.append(code)
+            return
+        child_it = _current_iteration(db, child_rev.id)
+        if not child_it:
+            skipped.append(code)
+            return
+        fname = f"{code}.STEP"
+        try:
+            text = _split_subitem_step_impl(structure_index, root_pd, fname)
+        except Exception:
+            failed.append(code)
+            return
+        # 同名替换：删旧记录 + 文件 + glb 缓存
+        olds = (db.query(models_parts.PartAttachment)
+                .filter(models_parts.PartAttachment.iteration_id == child_it.id,
+                        models_parts.PartAttachment.category == "production",
+                        models_parts.PartAttachment.file_name == fname).all())
+        for old in olds:
+            try:
+                if old.file_path and _os_split.path.exists(old.file_path):
+                    _os_split.remove(old.file_path)
+            except OSError:
+                pass
+            try:
+                from .stp_converter import delete_glb_cache
+                delete_glb_cache(str(old.id), old.file_path)
+            except Exception:
+                pass
+            db.delete(old)
+        db.commit()
+        # 写新文件
+        upload_dir = f"{_uploads_root}/parts/{code}/{child_rev.version}/{child_it.iteration}"
+        _os_split.makedirs(upload_dir, exist_ok=True)
+        fpath = _os_split.path.join(upload_dir, fname)
+        data = text.encode("utf-8")
+        with open(fpath, "wb") as f:
+            f.write(data)
+        att = models_parts.PartAttachment(
+            iteration_id=child_it.id, category="production", file_name=fname,
+            file_size=len(data), file_path=fpath,
+            file_hash=_hashlib_split.sha256(data).hexdigest(),
+        )
+        db.add(att); db.commit()
+        # 不触发 GLB（预览时懒转）
+        generated.append(code)
+
+    walk(assembly_revision_id, set())
+    return {"generated": generated, "skipped_not_editable": skipped,
+            "unmatched": unmatched, "failed": failed}
     """递归展平装配 BOM 树，返回叶子实例清单（每个含世界矩阵）"""
     instances = []
 
