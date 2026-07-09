@@ -867,8 +867,7 @@ async def import_assembly_step(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("components:update")),
 ):
-    """上传装配 STEP，解析结构+矩阵，按 code/name 匹配现有 BOM 并回填，同时保存为生产附件。"""
-    import hashlib
+    """上传装配 STEP（仅作解析源）：多层级矩阵回填 + 逐子项拆分为生产附件。不存装配自身。"""
     content = await file.read()
     suffix = _os.path.splitext(file.filename or "a.step")[1] or ".step"
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -876,46 +875,21 @@ async def import_assembly_step(
         tmp_path = tmp.name
     try:
         parsed = parse_assembly_step(tmp_path)
+        from ..cad.assembly_parser import build_structure_index
+        text = content.decode("utf-8", errors="ignore")
+        index = build_structure_index(text)
     except RuntimeError as e:
         raise HTTPException(400, str(e))
     finally:
         _os.unlink(tmp_path)
+
     report = crud_parts.apply_step_matrices(db, revision_id, parsed)
-
-    # 保存装配 STEP 为生产附件
-    result = crud_parts.get_part_revision_with_current_iteration(db, revision_id)
-    if result:
-        revision, iteration = result
-        if iteration:
-            master = db.query(crud_parts.models_parts.PartMaster).filter(
-                crud_parts.models_parts.PartMaster.id == revision.master_id
-            ).first()
-            if master:
-                upload_dir = f"./uploads/parts/{master.code}/{revision.version}/{iteration.iteration}"
-                _os.makedirs(upload_dir, exist_ok=True)
-                file_path = _os.path.join(upload_dir, file.filename)
-                with open(file_path, "wb") as f:
-                    f.write(content)
-                file_hash = hashlib.sha256(content).hexdigest()
-                att = crud_parts.models_parts.PartAttachment(
-                    iteration_id=iteration.id,
-                    category="production",
-                    file_name=file.filename,
-                    file_size=len(content),
-                    file_path=file_path,
-                    file_hash=file_hash,
-                )
-                db.add(att)
-                db.commit()
-                # 触发 STP→GLB 转换
-                from ..stp_converter import convert_stp_to_gltf
-                import asyncio
-                try:
-                    loop = asyncio.get_event_loop()
-                    loop.run_in_executor(None, convert_stp_to_gltf, file_path, str(att.id), file_path, True)
-                except Exception:
-                    pass
-
+    split = crud_parts.generate_subitem_steps(db, revision_id, index, current_user.id)
+    # 合并：unmatched 取并集，其余 generated/skipped_not_editable/failed 来自拆分侧
+    report["unmatched"] = sorted(set(report.get("unmatched", [])) | set(split.get("unmatched", [])))
+    report["generated"] = split.get("generated", [])
+    report["skipped_not_editable"] = split.get("skipped_not_editable", [])
+    report["failed"] = split.get("failed", [])
     return report
 
 

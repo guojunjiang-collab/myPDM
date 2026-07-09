@@ -74,3 +74,25 @@ def test_same_name_replace_and_no_glb(db, monkeypatch, tmp_path):
                     models_parts.PartAttachment.file_name == "P.STEP").all())
     assert len(atts) == 1          # 同名替换：只留一份
     assert calls["glb"] == 0       # 不触发 GLB
+
+
+def test_import_route_returns_split_report(db, engineer_user, monkeypatch, tmp_path):
+    import io
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.database import get_db as _get_db
+    from app.routers.auth import get_current_active_user
+
+    _, asm_r, _ = _mk(db, "ASMR", status="draft", checkout=engineer_user.id)
+    app.dependency_overrides[_get_db] = lambda: db
+    app.dependency_overrides[get_current_active_user] = lambda: engineer_user
+    monkeypatch.setattr(crud_parts, "_uploads_root", str(tmp_path), raising=False)
+    try:
+        client = TestClient(app)
+        files = {"file": ("a.step", io.BytesIO(b"ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\nENDSEC;\nEND-ISO-10303-21;\n"), "application/step")}
+        resp = client.post(f"/api/parts/revisions/{asm_r.id}/import-assembly-step", files=files)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert "generated" in body and "skipped_not_editable" in body and "failed" in body
+    finally:
+        app.dependency_overrides.clear()
