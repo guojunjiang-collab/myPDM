@@ -346,8 +346,18 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
       else if (action === 'checkin') result = await partsApi.cascadeCheckin(revisionId);
       else result = await partsApi.cascadeUndocheckout(revisionId);
       toast.success(`成功: ${result.succeed_count}, 跳过: ${result.failed_count}`);
-      setExpandedBom({});  // 清 BOM 缓存，下次展开时拉取最新签出状态
+      // 即时刷新签出状态：保留已展开的 BOM 节点，重新拉取其子件最新状态
+      const expandedIds = Object.keys(expandedBom);
+      if (expandedIds.length) {
+        const refreshed: Record<string, any[]> = {};
+        await Promise.all(expandedIds.map(async (rid) => {
+          try { refreshed[rid] = (await partsApi.getBOM(rid)) || []; }
+          catch { refreshed[rid] = []; }
+        }));
+        setExpandedBom(refreshed);
+      }
       loadDetail();
+      loadTabs();  // 刷新 BOM 顶层子件签出状态
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || '级联操作失败');
     }
