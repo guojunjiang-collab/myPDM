@@ -76,3 +76,37 @@ def test_structure_index_with_specified_source():
     assert idx.root_pd_by_product_name.get('P1') == 10
     assert idx.shape_rep_by_pd.get(10) == 30
 
+
+# CATIA(AP203/CONFIG_CONTROL_DESIGN) 叶件用 PRODUCT_DEFINITION_WITH_ASSOCIATED_DOCUMENTS
+# （PRODUCT_DEFINITION 子类型，多一个 associated_documents 参数）。
+MINI_CATIA = """ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION((''),'2;1');
+FILE_NAME('a.stp','',(''),(''),'','CATIA V5','');
+FILE_SCHEMA(('CONFIG_CONTROL_DESIGN'));
+ENDSEC;
+DATA;
+#1=PRODUCT('P1','P1','',(#2));
+#2=PRODUCT_CONTEXT('',#3,'mechanical');
+#3=APPLICATION_CONTEXT('core');
+#5=PRODUCT_DEFINITION_FORMATION_WITH_SPECIFIED_SOURCE('','',#1,.NOT_KNOWN.);
+#10=PRODUCT_DEFINITION_WITH_ASSOCIATED_DOCUMENTS('','',#5,#6,(#99));
+#6=PRODUCT_DEFINITION_CONTEXT('',#3,'design');
+#99=DOCUMENT('','','');
+#20=PRODUCT_DEFINITION_SHAPE('','',#10);
+#25=SHAPE_DEFINITION_REPRESENTATION(#20,#30);
+#30=SHAPE_REPRESENTATION('',(#31),#40);
+#31=AXIS2_PLACEMENT_3D('',#32,$,$);
+#32=CARTESIAN_POINT('',(0.,0.,0.));
+#40=(GEOMETRIC_REPRESENTATION_CONTEXT(3));
+ENDSEC;
+END-ISO-10303-21;
+"""
+
+
+def test_structure_index_catia_associated_documents():
+    """CATIA 叶件的 PRODUCT_DEFINITION_WITH_ASSOCIATED_DOCUMENTS 也要能定位产品。"""
+    idx = build_structure_index(MINI_CATIA)
+    assert idx.root_pd_by_product_name.get('P1') == 10
+    assert idx.shape_rep_by_pd.get(10) == 30
+

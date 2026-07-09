@@ -27,6 +27,23 @@ class TestTokenizer:
         assert parsed[0] == "ID"
         assert parsed[1] == "PART-1"
 
+    def test_backslash_terminated_string(self):
+        """CATIA 的 \\X2\\..\\X0\\ 编码以反斜杠结尾，闭合引号前是 `\\'`。
+        STEP 标准用 '' 转义引号(非 C 风格 \\')，故字符串必须在此正确闭合，参数不能错位。"""
+        # #17=PRODUCT_DEFINITION('\X2\93C8\X0\',' ',#6,#3)
+        body = "'\\X2\\93C8\\X0\\',' ',#6,#3"
+        parsed = _parse_entity_body(body)
+        assert len(parsed) == 4, f"参数错位: {parsed}"
+        assert parsed[0] == "\\X2\\93C8\\X0\\"    # id(编码), 不吞掉后续
+        assert parsed[2] == "#6"                  # formation 引用位置正确
+        assert parsed[3] == "#3"
+
+    def test_step_doubled_quote_escape(self):
+        """STEP 标准：字符串内两个连续单引号表示一个单引号。"""
+        parsed = _parse_entity_body("'O''Brien','x'")
+        assert parsed[0] == "O'Brien"
+        assert parsed[1] == "x"
+
 
 class TestMatrix:
     def test_identity(self):

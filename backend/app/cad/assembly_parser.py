@@ -8,6 +8,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+# PRODUCT_DEFINITION 及其子类型：CATIA(AP203) 叶件用 WITH_ASSOCIATED_DOCUMENTS，
+# 前 4 个参数(id, desc, formation, context)与 PRODUCT_DEFINITION 一致，需同等对待。
+_PD_TYPES = ('PRODUCT_DEFINITION', 'PRODUCT_DEFINITION_WITH_ASSOCIATED_DOCUMENTS')
+
+
 # ── STEP 实体提取（括号计数，支持嵌套）──
 
 _RE_ENTITY_START = re.compile(r'^#(\d+)\s*=\s*(\w+)\s*\(', re.MULTILINE)
@@ -74,7 +79,7 @@ def _decode_step_string(s: str) -> str:
 # ── Tokenizer ──
 
 _RE_TOKEN = re.compile(
-    r"""'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|"""
+    r"""'(?:[^']|'')*'|"(?:[^"]|"")*"|"""
     r"""[^\s,()'"]+|\(|\)|,|(?:\d+\.?\d*(?:[eE][+-]?\d+)?)""",
     re.DOTALL,
 )
@@ -94,8 +99,11 @@ def _parse_tokens(tokens: List[str], cursor: int = 0):
         except ValueError:
             return token, cursor
 
-    if (token.startswith("'") and token.endswith("'")) or (token.startswith('"') and token.endswith('"')):
-        return token[1:-1], cursor
+    if token.startswith("'") and token.endswith("'"):
+        # STEP 标准：字符串内 '' 表示一个单引号
+        return token[1:-1].replace("''", "'"), cursor
+    if token.startswith('"') and token.endswith('"'):
+        return token[1:-1].replace('""', '"'), cursor
 
     if token == '(':
         items = []
@@ -166,7 +174,7 @@ def parse_assembly_step(step_path: str) -> Dict[str, Any]:
             if len(args) >= 2:
                 products[eid_str] = _decode_step_string(str(args[1]))
 
-        elif etype == 'PRODUCT_DEFINITION':
+        elif etype in _PD_TYPES:
             if len(args) >= 3:
                 formation_ref = _ref_str(args[2])
                 fid = _ref_id(formation_ref)
@@ -399,7 +407,7 @@ def _resolve_product_name(ref: str, products: Dict[str, str], entities: Dict[int
         ent = entities.get(eid)
         if ent:
             etype, args = ent
-            if etype == 'PRODUCT_DEFINITION' and len(args) >= 3:
+            if etype in _PD_TYPES and len(args) >= 3:
                 return _resolve_product_name(_ref_str(args[2]), products, entities, def_to_product)
             elif etype == 'PRODUCT_DEFINITION_FORMATION_WITH_SPECIFIED_SOURCE' and len(args) >= 3:
                 return _resolve_product_name(_ref_str(args[2]), products, entities, def_to_product)
@@ -545,7 +553,7 @@ def build_structure_index(content: str) -> StructureIndex:
     for eid, (etype, args) in entities.items():
         if etype == 'PRODUCT' and len(args) >= 2:
             products[eid] = _decode_step_string(str(args[1]))
-        elif etype == 'PRODUCT_DEFINITION' and len(args) >= 3:
+        elif etype in _PD_TYPES and len(args) >= 3:
             fid = _ref_id(_ref_str(args[2]))
             fent = entities.get(fid) if fid else None
             if fent and fent[0] in ('PRODUCT_DEFINITION_FORMATION',
