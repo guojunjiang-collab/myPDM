@@ -880,6 +880,15 @@ def apply_step_matrices(db: Session, assembly_revision_id, parsed: dict) -> dict
 
     walk(assembly_revision_id, set())
 
+    # STEP 顶层装配名可能与 myPDM 目标装配件号不一致（如 NX 导出为 "起落架-solidworks_step"）。
+    # 顶层零件的父就是本次导入的目标装配，故识别 STEP 根名(只作父、从不作子)，匹配时改写为目标件号。
+    root_rev = get_part_revision(db, assembly_revision_id)
+    root_master = get_part_master(db, root_rev.master_id) if root_rev else None
+    _occs = parsed.get("occurrences", [])
+    _pnames = {o.get("parent_name") for o in _occs if o.get("parent_name")}
+    _cnames = {o.get("name") for o in _occs}
+    step_root_names = _pnames - _cnames
+
     # 幂等：先清各 BOMItem 里 source=='step' 的旧矩阵
     touched = set()
     for item in all_items:
@@ -894,6 +903,9 @@ def apply_step_matrices(db: Session, assembly_revision_id, parsed: dict) -> dict
         cname = occ.get("name")
         pname = occ.get("parent_name")
         item = index.get((pname, cname)) if pname else None
+        # 顶层子件：STEP 根名改写为目标装配件号/名称再匹配
+        if not item and pname in step_root_names and root_master:
+            item = index.get((root_master.code, cname)) or index.get((root_master.name, cname))
         if not item:
             unmatched.append(cname)
             continue

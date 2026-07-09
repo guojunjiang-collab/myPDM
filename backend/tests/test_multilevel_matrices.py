@@ -69,3 +69,18 @@ def test_same_child_name_disambiguated_by_parent(db):
     db.refresh(la); db.refresh(lb)
     assert la.cad_instances[0]["matrix"][3] == 7.0    # SUBA 下的没串到 SUBB
     assert lb.cad_instances[0]["matrix"][3] == 9.0
+
+
+def test_top_level_name_mismatch_uses_target_assembly(db):
+    """STEP 顶层装配名与 myPDM 目标件号不一致(如 NX 导出名 '起落架-solidworks_step')时，
+    顶层直接子件的父就是本次导入的目标装配，应按目标件号匹配并回填。"""
+    _, asm_r, asm_it = _mk(db, "ASM")
+    _, leaf_r, _ = _mk(db, "LEAF")
+    link = _link(db, asm_it, asm_r, leaf_r)
+    parsed = {"unit": "mm", "occurrences": [
+        {"name": "LEAF", "parent_name": "ASM_EXPORTED_NAME",
+         "local_matrix": [1,0,0,5000, 0,1,0,0, 0,0,1,0, 0,0,0,1]},
+    ]}
+    crud_parts.apply_step_matrices(db, asm_r.id, parsed)
+    db.refresh(link)
+    assert link.cad_instances[0]["matrix"][3] == 5.0
