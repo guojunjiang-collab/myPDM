@@ -134,3 +134,54 @@ END-ISO-10303-21;
     assert occ["local_matrix"][3] == 100.0
     assert occ["local_matrix"][7] == 200.0
     assert occ["local_matrix"][11] == 300.0
+
+
+def test_catia_style_rep_rel_child_first(tmp_path):
+    """CATIA/NX 的 REPRESENTATION_RELATIONSHIP 参数是 (子SR, 父SR)，与 SolidWorks 相反。
+    经 CONTEXT_DEPENDENT_SHAPE_REPRESENTATION + 子件 shape 定位，矩阵方向应仍为"子相对父"，
+    不能算成逆变换(镜像)。此处子件相对父件平移 (10,0,0)，结果必须是 +10 而非 -10。"""
+    step = """ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION((''),'2;1');
+FILE_NAME('a.stp','',(''),(''),'','CATIA V5','');
+FILE_SCHEMA(('CONFIG_CONTROL_DESIGN'));
+ENDSEC;
+DATA;
+#1=PRODUCT('ASM','ASM','',(#2));
+#2=PRODUCT_CONTEXT('',#3,'mechanical');
+#3=APPLICATION_CONTEXT('core');
+#8=PRODUCT('LEAF','LEAF','',(#2));
+#5=PRODUCT_DEFINITION_FORMATION_WITH_SPECIFIED_SOURCE('','',#1,.NOT_KNOWN.);
+#9=PRODUCT_DEFINITION_FORMATION_WITH_SPECIFIED_SOURCE('','',#8,.NOT_KNOWN.);
+#10=PRODUCT_DEFINITION('','',#5,#6);
+#11=PRODUCT_DEFINITION('','',#9,#6);
+#6=PRODUCT_DEFINITION_CONTEXT('',#3,'design');
+#20=PRODUCT_DEFINITION_SHAPE('','',#10);
+#21=PRODUCT_DEFINITION_SHAPE('','',#11);
+#25=SHAPE_DEFINITION_REPRESENTATION(#20,#30);
+#26=SHAPE_DEFINITION_REPRESENTATION(#21,#31);
+#30=SHAPE_REPRESENTATION('',(#32),#40);
+#31=SHAPE_REPRESENTATION('',(#33),#40);
+#32=AXIS2_PLACEMENT_3D('',#34,#36,#37);
+#33=AXIS2_PLACEMENT_3D('',#34,#36,#37);
+#34=CARTESIAN_POINT('',(0.,0.,0.));
+#36=DIRECTION('',(0.,0.,1.));
+#37=DIRECTION('',(1.,0.,0.));
+#40=(GEOMETRIC_REPRESENTATION_CONTEXT(3));
+#50=AXIS2_PLACEMENT_3D('',#34,#36,#37);
+#51=AXIS2_PLACEMENT_3D('',#52,#36,#37);
+#52=CARTESIAN_POINT('',(10.,0.,0.));
+#60=ITEM_DEFINED_TRANSFORMATION('','',#50,#51);
+#70=(REPRESENTATION_RELATIONSHIP('','',#31,#30)REPRESENTATION_RELATIONSHIP_WITH_TRANSFORMATION(#60)SHAPE_REPRESENTATION_RELATIONSHIP());
+#80=CONTEXT_DEPENDENT_SHAPE_REPRESENTATION(#70,#85);
+#85=PRODUCT_DEFINITION_SHAPE('','',#90);
+#90=NEXT_ASSEMBLY_USAGE_OCCURRENCE('1','','',#10,#11,'');
+ENDSEC;
+END-ISO-10303-21;
+"""
+    p = tmp_path / "catia.stp"
+    p.write_text(step)
+    result = parse_assembly_step(str(p))
+    occ = next(o for o in result["occurrences"] if o["name"] == "LEAF")
+    assert occ["local_matrix"][3] == 10.0, f"矩阵方向反了(镜像): {occ['local_matrix'][3]}"
+    assert occ["parent_name"] == "ASM"

@@ -100,10 +100,11 @@ def _parse_tokens(tokens: List[str], cursor: int = 0):
             return token, cursor
 
     if token.startswith("'") and token.endswith("'"):
-        # STEP 标准：字符串内 '' 表示一个单引号
-        return token[1:-1].replace("''", "'"), cursor
+        # STEP 标准：字符串内 '' 表示一个单引号；
+        # 去除导出器为折行插入的换行(NX/ST-Developer 会把长件号折成多行)。
+        return token[1:-1].replace("''", "'").replace('\n', '').replace('\r', ''), cursor
     if token.startswith('"') and token.endswith('"'):
-        return token[1:-1].replace('""', '"'), cursor
+        return token[1:-1].replace('""', '"').replace('\n', '').replace('\r', ''), cursor
 
     if token == '(':
         items = []
@@ -256,19 +257,78 @@ def parse_assembly_step(step_path: str) -> Dict[str, Any]:
                 if def_id:
                     def_id_to_matrix[def_id] = matrices
 
+    # ── CONTEXT_DEPENDENT_SHAPE_REPRESENTATION 精确关联（CATIA/SolidWorks/NX 通用）──
+    # CDSR(rep_rel, pds) → pds 引用 NAUO；rep_rel(复合实体)= REPRESENTATION_RELATIONSHIP(rep1,rep2)
+    # + WITH_TRANSFORMATION(IDT)。IDT(item1,item2) 的 item1↔rep1、item2↔rep2。
+    # 各家 CAD 对 (rep1,rep2) 谁是子件/父件顺序不同(SolidWorks 是 (父,子)，CATIA/NX 是 (子,父))，
+    # 若盲目取 idt_map 固定方向会算成逆变换、导致摆位镜像。故按"子件 shape 落在 rep1 还是 rep2"
+    # 决定 (child_axis,parent_axis) 方向，统一得到"子件相对父件"的正确局部矩阵。
+    # 实证(同一装配三家导出)：child_shape==rep2 → (item1,item2)；child_shape==rep1 → (item2,item1)。
+    rep_rel_info: Dict[int, tuple] = {}
+    for m in re.finditer(
+        r'#(\d+)\s*=\s*\(\s*REPRESENTATION_RELATIONSHIP\s*\(\s*[^,]*,\s*[^,]*,\s*#(\d+)\s*,\s*#(\d+)\s*\)\s*'
+        r'REPRESENTATION_RELATIONSHIP_WITH_TRANSFORMATION\s*\(\s*#(\d+)\s*\)',
+        content,
+    ):
+        rep_rel_info[int(m.group(1))] = (int(m.group(2)), int(m.group(3)), int(m.group(4)))
+
+    nauo_to_matrix: Dict[str, list] = {}
+    for eid, (etype, args) in entities.items():
+        if etype == 'CONTEXT_DEPENDENT_SHAPE_REPRESENTATION' and len(args) >= 2:
+            rep_rel = _ref_id(_ref_str(args[0]))
+            pds = _ref_id(_ref_str(args[1]))
+            info = rep_rel_info.get(rep_rel) if rep_rel else None
+            if not (pds and info):
+                continue
+            rep1, rep2, idt = info
+            if idt not in idt_map:
+                continue
+            pe = entities.get(pds)
+            if not (pe and pe[0] == 'PRODUCT_DEFINITION_SHAPE' and pe[1]):
+                continue
+            nauo_ref = _ref_id(_ref_str(pe[1][-1]))
+            ne = entities.get(nauo_ref) if nauo_ref else None
+            if not (ne and ne[0] == 'NEXT_ASSEMBLY_USAGE_OCCURRENCE' and len(ne[1]) >= 5):
+                continue
+            child_pd = _ref_id(_ref_str(ne[1][4]))
+            child_shape = _find_shape_representation(child_pd, entities) if child_pd else None
+            item1, item2 = idt_map[idt]
+            # 子件 shape 落在 rep1 时交换方向，使 child_axis 始终对应子件坐标系
+            if child_shape is not None and child_shape == rep1:
+                child_axis, parent_axis = item2, item1
+            else:
+                child_axis, parent_axis = item1, item2
+            mat = _get_relative_matrix(child_axis, parent_axis, entities)
+            if mat:
+                nauo_to_matrix[f"#{nauo_ref}"] = mat
+
+
     # ── 构建 occurrences ──
     occurrences: List[Dict[str, Any]] = []
     _matrix_counter: Dict[str, int] = {}
 
     for occ_id, child_ref in child_links.items():
-        # 尝试通过 definition → shape → IDT 获取矩阵列表
         def_id = _ref_id(child_ref)
-        matrices = def_id_to_matrix.get(def_id, [])
-        
         child_name = _resolve_product_name(child_ref, products, entities, product_def_to_product)
         parent_name = _resolve_product_name(parent_links.get(occ_id, ''), products, entities, product_def_to_product)
-        
+
+        # 主路径：CDSR 精确关联（每个 NAUO 一个矩阵，天然区分多实例）
+        cdsr_mat = nauo_to_matrix.get(occ_id)
+        if cdsr_mat is not None:
+            occurrences.append({
+                "name": _decode_step_string(child_name),
+                "path": [_decode_step_string(p) for p in ([parent_name, child_name] if parent_name else [child_name])],
+                "parent_name": _decode_step_string(parent_name) if parent_name else None,
+                "local_matrix": cdsr_mat,
+                "label": _decode_step_string(child_name),
+            })
+            continue
+
+        # 兜底：旧的 definition → shape → IDT 启发式（非标准 CDSR 结构时）
+        matrices = def_id_to_matrix.get(def_id, [])
+
         if matrices:
+
             # 使用计数器为每个 NAO 分配一个不同的矩阵
             counter_key = def_id or child_name
             _matrix_counter.setdefault(counter_key, 0)
