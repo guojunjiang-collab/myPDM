@@ -391,9 +391,6 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                   </div>
                 )}
               </Field>
-              <Field label="创建人">
-                <div className="text-sm text-gray-900 font-medium">{doc.creator_name || '-'}</div>
-              </Field>
             </div>
 
             {/* 中部操作区：版本/状态/签出状态 与 签入签出等按钮同一行（参考零部件详情） */}
