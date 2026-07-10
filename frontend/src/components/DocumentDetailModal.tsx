@@ -501,7 +501,6 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                         <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">迭代</th>
                         <th className="px-3 py-2 text-left text-gray-500 font-medium w-44">签入时间</th>
                         <th className="px-3 py-2 text-left text-gray-500 font-medium">签入说明</th>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium w-44">附件</th>
                         <th className="px-3 py-2 text-right text-gray-500 font-medium w-24">操作</th>
                       </tr>
                     </thead>
@@ -530,9 +529,6 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                               </div>
                             </td>
                             <td className="px-3 py-2 text-gray-700">{it.check_in_note || '-'}</td>
-                            <td className="px-3 py-2 text-gray-500">
-                              {(it.attachments || []).length} 个
-                            </td>
                             <td className="px-3 py-2 text-right">
                               {isCurrent ? (
                                 <span className="text-primary-600 text-xs">当前</span>
@@ -555,7 +551,7 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                       })}
                       {iterations.length === 0 && (
                         <tr>
-                          <td colSpan={5} className="px-3 py-4 text-center text-gray-400">
+                          <td colSpan={4} className="px-3 py-4 text-center text-gray-400">
                             暂无迭代记录
                           </td>
                         </tr>
