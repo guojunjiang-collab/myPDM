@@ -230,22 +230,28 @@ export default function Documents() {
     }
   };
 
-  // 批量加载所有图文档的自定义字段值
+  // 批量加载所有图文档的自定义字段值（单次 API 调用，避免 N+1 请求触发 429）
   const loadAllCustomFieldValues = async (docsList: Document[]) => {
     if (docsList.length === 0) return;
     try {
-      const results = await Promise.allSettled(
-        docsList.map(doc => customFieldsApi.getValues('document', doc.id))
+      const ids = docsList.map((d) => d.id).filter(Boolean);
+      const res = await customFieldsApi.getValuesBatch({ type: 'document', ids: ids.join(',') });
+      // 后端返回 { entityId: { field_key: value, ... } }，按 field_key→field_id 映射转换为 { entityId: { field_id: value, ... } }
+      // 以兼容列表中按 def.id 查找自定义字段的逻辑
+      const fieldDefs = useDataStore.getState().customFieldDefs.filter((d) =>
+        d.applies_to?.includes('document')
       );
+      const keyToId: Record<string, string> = {};
+      fieldDefs.forEach((d) => { keyToId[d.field_key] = d.id; });
+      const raw = (res.data || {}) as Record<string, Record<string, any>>;
       const map: Record<string, Record<string, any>> = {};
-      results.forEach((result, index) => {
-        if (result.status === 'fulfilled') {
-          const values: Record<string, any> = {};
-          (result.value.data || []).forEach((v: CustomFieldValue) => {
-            values[v.field_id] = v.value;
-          });
-          map[docsList[index].id] = values;
-        }
+      Object.entries(raw).forEach(([docId, kvMap]) => {
+        const byId: Record<string, any> = {};
+        Object.entries(kvMap || {}).forEach(([k, v]) => {
+          const id = keyToId[k] || k;
+          byId[id] = v;
+        });
+        map[docId] = byId;
       });
       setCustomFieldValuesMap(map);
     } catch (error) {
