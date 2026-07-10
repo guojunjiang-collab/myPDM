@@ -141,11 +141,12 @@ async def get_document_references(doc_id: uuid.UUID, db: Session = Depends(get_d
         for link in (it.document_links or []):
             if link.get("document_id") != doc_id_str:
                 continue
+            # 跳过已软删除的父级：软删除的零部件不应构成引用
             rev = db.query(PartRevision).filter(PartRevision.id == it.revision_id).first()
-            if not rev:
+            if not rev or rev.deleted_at is not None:
                 break
             master = db.query(PartMaster).filter(PartMaster.id == rev.master_id).first()
-            if not master:
+            if not master or master.deleted_at is not None:
                 break
             entity_type = "component" if master.type == "assembly" else "part"
             references.append({
@@ -332,11 +333,12 @@ def _find_doc_refs(db, doc_id_str):
     for it in db.query(PartIteration).all():
         for link in (it.document_links or []):
             if link.get("document_id") == doc_id_str:
+                # 跳过已软删除的父级：软删除的零部件不应构成引用限制
                 rev = db.query(PartRevision).filter(PartRevision.id == it.revision_id).first()
-                if not rev:
+                if not rev or rev.deleted_at is not None:
                     break
                 master = db.query(PartMaster).filter(PartMaster.id == rev.master_id).first()
-                if not master:
+                if not master or master.deleted_at is not None:
                     break
                 entity_type = "component" if master.type == "assembly" else "part"
                 references.append({

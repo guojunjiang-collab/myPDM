@@ -7,11 +7,36 @@ from ..models import (
     User, Document, UserDashboard, DashboardFolder,
     DashboardItem, DashboardFolderShare
 )
-from ..models_parts import PartMaster
+from ..models_parts import PartMaster, PartRevision
 from ..models_configuration import ConfigurationItem
 from ..permissions import require_permission, enforce_object_policy
 
 router = APIRouter(prefix="/dashboard", tags=["用户看板"])
+
+# 零部件统一后，看板关联的实体类型：component（旧数据兼容 part / assembly）
+COMPONENT_ENTITY_TYPES = ("component", "part", "assembly")
+
+
+def _build_component_item(item, master: PartMaster, db: Session) -> dict:
+    """构建零部件看板项：版本/状态来自最新有效 revision（PartMaster 本身无这些字段）"""
+    rev = (
+        db.query(PartRevision)
+        .filter(
+            PartRevision.master_id == master.id,
+            PartRevision.deleted_at.is_(None),
+        )
+        .order_by(PartRevision.created_at.desc())
+        .first()
+    )
+    return {
+        "id": item.id,
+        "entity_type": "component",
+        "entity_id": str(master.id),
+        "code": master.code,
+        "name": master.name,
+        "version": rev.version if rev else "",
+        "status": rev.status if rev else "draft",
+    }
 
 
 def _folder_to_dict(folder, db: Session, include_items=False, include_children=False, depth=0):
@@ -37,30 +62,13 @@ def _folder_to_dict(folder, db: Session, include_items=False, include_children=F
         item_list = []
         for item in items:
             entity = None
-            if item.entity_type == "part":
-                entity = db.query(PartMaster).filter(PartMaster.id == item.entity_id).first()
+            if item.entity_type in COMPONENT_ENTITY_TYPES:
+                entity = db.query(PartMaster).filter(
+                    PartMaster.id == item.entity_id,
+                    PartMaster.deleted_at.is_(None),
+                ).first()
                 if entity:
-                    item_list.append({
-                        "id": item.id,
-                        "entity_type": "part",
-                        "entity_id": str(entity.id),
-                        "code": entity.code,
-                        "name": entity.name,
-                        "version": entity.version,
-                        "status": entity.status,
-                    })
-            elif item.entity_type == "assembly":
-                entity = db.query(PartMaster).filter(PartMaster.id == item.entity_id).first()
-                if entity:
-                    item_list.append({
-                        "id": item.id,
-                        "entity_type": "assembly",
-                        "entity_id": str(entity.id),
-                        "code": entity.code,
-                        "name": entity.name,
-                        "version": entity.version,
-                        "status": entity.status,
-                    })
+                    item_list.append(_build_component_item(item, entity, db))
             elif item.entity_type == "document":
                 entity = db.query(Document).filter(Document.id == item.entity_id).first()
                 if entity:
@@ -422,15 +430,18 @@ async def add_items(data: dict, request: Request, db: Session = Depends(get_db),
     for item_data in items:
         entity_type = item_data.get("entity_type")
         entity_id = item_data.get("entity_id")
-        if entity_type not in ("part", "assembly", "document", "configuration"):
+        if entity_type not in COMPONENT_ENTITY_TYPES and entity_type not in ("document", "configuration"):
             continue
 
         # 验证实体存在
         entity = None
-        if entity_type == "part":
-            entity = db.query(PartMaster).filter(PartMaster.id == entity_id).first()
-        elif entity_type == "assembly":
-            entity = db.query(PartMaster).filter(PartMaster.id == entity_id).first()
+        if entity_type in COMPONENT_ENTITY_TYPES:
+            # 零件/部件统一为零部件，存储归一化为 component
+            entity_type = "component"
+            entity = db.query(PartMaster).filter(
+                PartMaster.id == entity_id,
+                PartMaster.deleted_at.is_(None),
+            ).first()
         elif entity_type == "document":
             entity = db.query(Document).filter(Document.id == entity_id).first()
         elif entity_type == "configuration":
@@ -779,28 +790,34 @@ async def export_all_dashboards(
 
         # 为每个 item 查找关联实体的 code 和 name
         # 先按类型分组收集 entity_id，批量查询
-        part_ids = []
-        asm_ids = []
+        comp_ids = []
         doc_ids = []
         config_ids = []
         for i in items:
-            if i.entity_type == "part":
-                part_ids.append(i.entity_id)
-            elif i.entity_type == "assembly":
-                asm_ids.append(i.entity_id)
+            if i.entity_type in COMPONENT_ENTITY_TYPES:
+                comp_ids.append(i.entity_id)
             elif i.entity_type == "document":
                 doc_ids.append(i.entity_id)
             elif i.entity_type == "configuration":
                 config_ids.append(i.entity_id)
 
-        part_map = {}
-        if part_ids:
-            parts = db.query(PartMaster).filter(PartMaster.id.in_(part_ids)).all()
-            part_map = {str(p.id): p for p in parts}
-        asm_map = {}
-        if asm_ids:
-            asms = db.query(PartMaster).filter(PartMaster.id.in_(asm_ids)).all()
-            asm_map = {str(a.id): a for a in asms}
+        comp_map = {}
+        comp_ver_map = {}
+        if comp_ids:
+            comps = db.query(PartMaster).filter(PartMaster.id.in_(comp_ids)).all()
+            comp_map = {str(p.id): p for p in comps}
+            # 零部件版本在最新有效 revision 上
+            revs = (
+                db.query(PartRevision)
+                .filter(
+                    PartRevision.master_id.in_(comp_ids),
+                    PartRevision.deleted_at.is_(None),
+                )
+                .order_by(PartRevision.created_at.desc())
+                .all()
+            )
+            for r in revs:
+                comp_ver_map.setdefault(str(r.master_id), r.version)
         doc_map = {}
         if doc_ids:
             docs = db.query(Document).filter(Document.id.in_(doc_ids)).all()
@@ -813,16 +830,18 @@ async def export_all_dashboards(
         def _get_entity_info(entity_type, entity_id):
             """获取实体的 code、name 和 version"""
             eid = str(entity_id)
-            if entity_type == "part":
-                e = part_map.get(eid)
-            elif entity_type == "assembly":
-                e = asm_map.get(eid)
+            if entity_type in COMPONENT_ENTITY_TYPES:
+                e = comp_map.get(eid)
+                if e:
+                    return e.code or "", e.name or "", comp_ver_map.get(eid, "")
+                return "", "", ""
             elif entity_type == "document":
                 e = doc_map.get(eid)
             elif entity_type == "configuration":
                 e = config_map.get(eid)
                 if e:
                     return e.code or "", e.name or "", "-"
+                return "", "", ""
             else:
                 return "", "", ""
             if e:
@@ -995,17 +1014,18 @@ async def import_all_dashboards(
                 continue
 
             # 解析实体引用：优先按 entity_id 查找，失败则按 entity_code 查找
-            entity_type = i_data.get("entity_type", "part")
+            entity_type = i_data.get("entity_type", "component")
             entity_id = _opt_uuid(i_data.get("entity_id"))
             entity_code = i_data.get("entity_code", "").strip()
+            # 零件/部件统一归一化为零部件
+            if entity_type in COMPONENT_ENTITY_TYPES:
+                entity_type = "component"
 
             resolved_entity_id = None
             if entity_id:
                 # 先尝试按 ID 查找实体是否存在
                 exists = False
-                if entity_type == "part":
-                    exists = db.query(PartMaster).filter(PartMaster.id == entity_id).first() is not None
-                elif entity_type == "assembly":
+                if entity_type == "component":
                     exists = db.query(PartMaster).filter(PartMaster.id == entity_id).first() is not None
                 elif entity_type == "document":
                     exists = db.query(Document).filter(Document.id == entity_id).first() is not None
@@ -1019,9 +1039,7 @@ async def import_all_dashboards(
 
             # 如果按 ID 找不到，且有 entity_code，则按编码查找
             if not resolved_entity_id and entity_code:
-                if entity_type == "part":
-                    e = db.query(PartMaster).filter(PartMaster.code == entity_code).first()
-                elif entity_type == "assembly":
+                if entity_type == "component":
                     e = db.query(PartMaster).filter(PartMaster.code == entity_code).first()
                 elif entity_type == "document":
                     e = db.query(Document).filter(Document.code == entity_code).first()

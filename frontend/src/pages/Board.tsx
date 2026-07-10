@@ -1,15 +1,12 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { boardApi, usersApi, componentsApi, documentsApi, customFieldsApi, configurationApi } from '../services/api';
+import { boardApi, usersApi, partsApi, documentsApi, configurationApi } from '../services/api';
 import { useDataStore } from '../stores/data';
 import { Modal, ConfirmModal } from '../components/Modal';
-import PartDetailContent from '../components/PartDetailContent';
-import DocumentDetailContent from '../components/DocumentDetailContent';
+import PartDetailModal from '../components/PartDetailModal';
 import DocumentDetailModal from '../components/DocumentDetailModal';
 import ArchiveTreeModal from '../components/ArchiveTreeModal';
-import AssemblyDetailContent from '../components/AssemblyDetailContent';
 import ConfigurationDetailModal from '../components/Configuration/ConfigurationDetailModal';
 import { useAuthStore } from '../stores/auth';
-import type { CustomFieldDefinition, CustomFieldValue } from '../types';
 
 /* ================================================================
    Types
@@ -43,10 +40,13 @@ interface ShareRecord {
   created_at: string;
 }
 
-type FilterTab = 'all' | 'part' | 'assembly' | 'document' | 'configuration';
+type FilterTab = 'all' | 'component' | 'document' | 'configuration';
 
-const ENTITY_LABEL: Record<string, string> = { part: '零件', assembly: '部件', component: '零部件', document: '图文档', configuration: '构型项' };
-const ENTITY_ICON: Record<string, string> = { part: '🔧', assembly: '📦', component: '📦', document: '📄', configuration: '⚙️' };
+const ENTITY_LABEL: Record<string, string> = { part: '零部件', assembly: '零部件', component: '零部件', document: '图文档', configuration: '构型项' };
+const ENTITY_ICON: Record<string, string> = { part: '📦', assembly: '📦', component: '📦', document: '📄', configuration: '⚙️' };
+
+// 零件/部件已统一为「零部件」，旧数据 entity_type 可能仍为 part/assembly
+const isComponentType = (t: string) => t === 'component' || t === 'part' || t === 'assembly';
 
 const STATUS_TAG: Record<string, { label: string; cls: string }> = {
   draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
@@ -123,10 +123,7 @@ export default function Board() {
   const [sharePermission, setSharePermission] = useState('view');
   const [userSearch, setUserSearch] = useState('');
   const [detailItem, setDetailItem] = useState<DashboardItem | null>(null);
-  const [detailData, setDetailData] = useState<any>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [detailCustomDefs, setDetailCustomDefs] = useState<CustomFieldDefinition[]>([]);
-  const [detailCustomValues, setDetailCustomValues] = useState<Record<string, any>>({});
+  const [detailComponentId, setDetailComponentId] = useState<string | null>(null);
   const [detailDocId, setDetailDocId] = useState<string | null>(null);
   const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
 
@@ -162,7 +159,7 @@ export default function Board() {
   const allFolders = useMemo(() => [...myFolders, ...sharedFolders], [myFolders, sharedFolders]);
   const selectedFolder = useMemo(() => selectedId ? findFolderById(allFolders, selectedId) : null, [selectedId, allFolders]);
   const selectedItems = useMemo(() => selectedFolder ? flattenItems(selectedFolder) : [], [selectedFolder]);
-  const filteredItems = useMemo(() => filterTab === 'all' ? selectedItems : selectedItems.filter((i) => i.entity_type === filterTab), [selectedItems, filterTab]);
+  const filteredItems = useMemo(() => filterTab === 'all' ? selectedItems : selectedItems.filter((i) => filterTab === 'component' ? isComponentType(i.entity_type) : i.entity_type === filterTab), [selectedItems, filterTab]);
   const existingIds = useMemo(() => new Set(selectedItems.map((i) => i.entity_id)), [selectedItems]);
 
   /* Count items recursively */
@@ -275,52 +272,25 @@ export default function Board() {
 
   const canEditFolder = selectedFolder ? !selectedFolder.shared_from || selectedFolder.shared_from?.permission === 'edit' : false;
 
-  const handleViewDetail = async (item: DashboardItem) => {
-    // 图文档直接复用 DocumentDetailModal，无需加载到本地 state
+  const handleViewDetail = (item: DashboardItem) => {
+    // 图文档 → DocumentDetailModal；零部件 → 复用零部件管理的 PartDetailModal；构型项 → ConfigurationDetailModal
     if (item.entity_type === 'document') {
       setDetailDocId(item.entity_id);
+      setDetailComponentId(null);
       setDetailItem(null);
-      return;
+    } else if (isComponentType(item.entity_type)) {
+      setDetailComponentId(item.entity_id);
+      setDetailItem(null);
+    } else {
+      setDetailItem(item);
+      setDetailComponentId(null);
     }
-    setDetailItem(item);
-    setDetailData(null);
-    setDetailCustomDefs([]);
-    setDetailCustomValues({});
-    setDetailLoading(true);
-    try {
-      let res;
-      if (item.entity_type === 'part') res = await componentsApi.get(item.entity_id);
-      else if (item.entity_type === 'assembly' || item.entity_type === 'component') res = await componentsApi.get(item.entity_id);
-      else res = await configurationApi.getItem(item.entity_id);
-      
-      const data = res.data;
-      setDetailData(data);
-      
-      // Load custom field defs and values
-      const allDefs = useDataStore.getState().customFieldDefs;
-      const entityType = item.entity_type === 'part' ? 'part' : item.entity_type === 'assembly' ? 'component' : 'configuration';
-      const defs = allDefs.filter((d: CustomFieldDefinition) => d.applies_to?.includes(entityType));
-      setDetailCustomDefs(defs);
-      
-      if (defs.length > 0) {
-        try {
-          const valuesRes = await customFieldsApi.getValues(entityType, item.entity_id);
-          const vals: Record<string, any> = {};
-          (valuesRes.data || []).forEach((v: CustomFieldValue) => {
-            vals[v.field_id] = v.value;
-          });
-          setDetailCustomValues(vals);
-        } catch { /* ignore */ }
-      }
-    } catch { setDetailData(null); }
-    finally { setDetailLoading(false); }
   };
 
   /* Tab counts */
   const tabCounts = useMemo(() => ({
     all: selectedItems.length,
-    part: selectedItems.filter((i) => i.entity_type === 'part').length,
-    assembly: selectedItems.filter((i) => i.entity_type === 'assembly').length,
+    component: selectedItems.filter((i) => isComponentType(i.entity_type)).length,
     document: selectedItems.filter((i) => i.entity_type === 'document').length,
     configuration: selectedItems.filter((i) => i.entity_type === 'configuration').length,
   }), [selectedItems]);
@@ -387,7 +357,7 @@ export default function Board() {
 
             {/* Tabs */}
             <div className="px-6 flex gap-0 border-b border-gray-200">
-              {(['all', 'part', 'assembly', 'document', 'configuration'] as FilterTab[]).map((tab) => (
+              {(['all', 'component', 'document', 'configuration'] as FilterTab[]).map((tab) => (
                 <button
                   type="button"
                   key={tab}
@@ -562,35 +532,12 @@ export default function Board() {
       {/* ---- Item Picker ---- */}
       <ItemPicker open={pickerOpen} onClose={() => setPickerOpen(false)} onConfirm={handleAddItems} existingIds={existingIds} />
 
-      {/* ---- Detail Modal ---- */}
-      <Modal open={!!detailItem && detailItem.entity_type !== 'configuration'} title={detailItem ? `${ENTITY_LABEL[detailItem.entity_type]}详情` : ''} onClose={() => setDetailItem(null)} width="full">
-        {detailLoading ? (
-          <div className="py-8 text-center text-sm text-gray-400">加载中...</div>
-        ) : !detailData ? (
-          <div className="py-8 text-center text-sm text-gray-400">加载失败</div>
-        ) : detailItem?.entity_type === 'part' ? (
-          <PartDetailContent
-            part={detailData}
-            customFieldDefs={detailCustomDefs}
-            customFieldValues={detailCustomValues}
-          />
-        ) : detailItem?.entity_type === 'assembly' ? (
-          <AssemblyDetailContent
-            assembly={detailData}
-            customFieldDefs={detailCustomDefs}
-            customFieldValues={detailCustomValues}
-            onSubItemClick={(item) => handleViewDetail({
-              id: item.id,
-              entity_type: item.childType === 'part' ? 'part' : 'assembly',
-              entity_id: item.child_id,
-              code: item.child_detail?.code || '',
-              name: item.child_detail?.name || '',
-              version: item.child_detail?.version || '',
-              status: item.child_detail?.status || 'draft',
-            })}
-          />
-        ) : null}
-      </Modal>
+      {/* ---- 零部件详情：复用零部件管理的 PartDetailModal ---- */}
+      <PartDetailModal
+        masterId={detailComponentId || ''}
+        open={!!detailComponentId}
+        onClose={() => setDetailComponentId(null)}
+      />
 
       {detailDocId && (
         <DocumentDetailModal
@@ -712,8 +659,7 @@ function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) 
   const [selected, setSelected] = useState<Map<string, any>>(new Map());
 
   /* 服务器数据（弹窗打开时实时拉取，失败时回退到本地缓存） */
-  const [srcParts, setSrcParts] = useState<any[]>([]);
-  const [srcAssemblies, setSrcAssemblies] = useState<any[]>([]);
+  const [srcComponents, setSrcComponents] = useState<any[]>([]);
   const [srcDocuments, setSrcDocuments] = useState<any[]>([]);
   const [srcConfigItems, setSrcConfigItems] = useState<any[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
@@ -730,9 +676,8 @@ function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) 
     setDataLoading(true);
     setDataWarning(null);
     (async () => {
-      const [p, a, d, c] = await Promise.allSettled([
-        componentsApi.list({ page_size: 10000, brief: true }),
-        componentsApi.list({ page_size: 10000, brief: true }),
+      const [comp, d, c] = await Promise.allSettled([
+        partsApi.list({ page_size: 200 }),  // 零部件（part_masters，返回最新版本行，上限 200）
         documentsApi.list({ page_size: 10000, brief: true }),
         configurationApi.listItems({ page_size: 10000, brief: true }),
       ]);
@@ -744,11 +689,14 @@ function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) 
         console.error(`[ItemPicker] 加载${label}失败：`, r.reason);
         return fallback;
       };
-      setSrcParts(pick(p, cache.components.filter((c: any) => c.type !== 'assembly'), '零件'));
-      setSrcAssemblies(pick(a, cache.components.filter((c: any) => c.type === 'assembly'), '部件'));
+      // partsApi.list 直接返回 data（{items,total}），非 axios 响应，需单独解构
+      const comps = comp.status === 'fulfilled'
+        ? (Array.isArray(comp.value) ? comp.value : (comp.value?.items || []))
+        : (console.error('[ItemPicker] 加载零部件失败：', comp.reason), cache.components);
+      setSrcComponents(comps);
       setSrcDocuments(pick(d, cache.documents, '图文档'));
       setSrcConfigItems(pick(c, cache.configItems, '构型项'));
-      const failed = [p, a, d, c].some((r) => r.status === 'rejected');
+      const failed = [comp, d, c].some((r) => r.status === 'rejected');
       setDataWarning(failed ? '部分数据从服务器加载失败，已使用本地缓存' : null);
       setDataLoading(false);
     })();
@@ -758,12 +706,12 @@ function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) 
   const candidates = useMemo(() => {
     const kw = search.trim().toLowerCase();
     const all: any[] = [];
-    if (tab === 'all' || tab === 'part') srcParts.forEach((p: any) => { if (!existingIds.has(p.id)) all.push({ t: 'part', id: p.id, code: p.code, name: p.name, version: p.version || '', status: p.status || '' }); });
-    if (tab === 'all' || tab === 'assembly') srcAssemblies.forEach((a: any) => { if (!existingIds.has(a.id)) all.push({ t: 'assembly', id: a.id, code: a.code, name: a.name, version: a.version || '', status: a.status || '' }); });
+    // 零部件：id 取 master_id（part_masters 主键），兼容本地缓存的 id 字段
+    if (tab === 'all' || tab === 'component') srcComponents.forEach((p: any) => { const id = p.master_id || p.id; if (!existingIds.has(id)) all.push({ t: 'component', id, code: p.code, name: p.name, version: p.version || '', status: p.status || '' }); });
     if (tab === 'all' || tab === 'document') srcDocuments.forEach((d: any) => { if (!existingIds.has(d.id)) all.push({ t: 'document', id: d.id, code: d.code, name: d.name, version: d.version || '', status: d.status || '' }); });
     if (tab === 'all' || tab === 'configuration') srcConfigItems.forEach((c: any) => { if (!existingIds.has(c.id)) all.push({ t: 'configuration', id: c.id, code: c.code, name: c.name, version: '-', status: 'active' }); });
     return kw ? all.filter((i) => i.code.toLowerCase().includes(kw) || i.name.toLowerCase().includes(kw)) : all;
-  }, [tab, search, srcParts, srcAssemblies, srcDocuments, srcConfigItems, existingIds]);
+  }, [tab, search, srcComponents, srcDocuments, srcConfigItems, existingIds]);
 
   const handleConfirm = () => {
     onConfirm(Array.from(selected.values()).map((v) => ({ entity_type: v.t, entity_id: v.id })));
@@ -793,7 +741,7 @@ function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) 
         {/* Search + filter */}
         <div className="flex gap-2">
           <input type="text" placeholder="搜索编号/名称..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm" />
-          <div className="flex gap-1">{(['all', 'part', 'assembly', 'document', 'configuration'] as FilterTab[]).map((t) => (
+          <div className="flex gap-1">{(['all', 'component', 'document', 'configuration'] as FilterTab[]).map((t) => (
             <button type="button" key={t} onClick={() => setTab(t)} className={`px-3 py-2 text-sm rounded-lg ${tab === t ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{t === 'all' ? '全部' : ENTITY_LABEL[t]}</button>
           ))}</div>
         </div>
