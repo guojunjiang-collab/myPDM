@@ -443,9 +443,16 @@ def undocheckout_part(db: Session, revision_id: UUID, user_id: UUID) -> Tuple[Op
             if att.file_path:
                 try:
                     import os
-                    full_path = os.path.join('./uploads', att.file_path)
-                    if os.path.exists(full_path):
-                        os.remove(full_path)
+                    if os.path.exists(att.file_path):
+                        os.remove(att.file_path)
+                    # 同时清理空目录
+                    parent = os.path.dirname(att.file_path)
+                    for _ in range(3):  # 最多往上清 3 层
+                        if os.path.isdir(parent) and not os.listdir(parent):
+                            os.rmdir(parent)
+                            parent = os.path.dirname(parent)
+                        else:
+                            break
                 except Exception:
                     pass
             db.delete(att)
