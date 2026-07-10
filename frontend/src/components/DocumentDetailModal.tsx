@@ -369,7 +369,7 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
             <div className="bg-white rounded-lg border border-gray-200 p-3 mb-3 shrink-0">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-3 flex-wrap">
-                  <span className="font-semibold text-sm">版本：v{doc.version || '-'}</span>
+                  <span className="font-semibold text-sm">版本：{doc.version || '-'}</span>
                   <span className={`px-2 py-0.5 text-xs rounded-full ${tag.class}`}>{tag.label}</span>
                   {isCheckedOut ? (
                     <span className="text-xs text-orange-600">🔒 已签出：{doc.check_out_user_name || '未知'}</span>
@@ -431,7 +431,7 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
             {/* 查看历史版本提示 */}
             {isViewingOtherVersion && doc && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1.5 shrink-0 mb-3 text-sm flex items-center justify-between">
-                <span>正在查看版本 v{doc.version}（只读）</span>
+                <span>正在查看版本 {doc.version}（只读）</span>
                 <button
                   onClick={() => setViewingVersionId(null)}
                   className="text-primary-600 hover:text-primary-800 hover:underline text-xs"
@@ -473,46 +473,18 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
             <div className="flex-1 overflow-auto pt-3">
               {activeTab === 'info' && (
                 <div className="space-y-5">
-                  {/* 1. 自有字段（无标题） */}
+                  {/* 1. 自有字段（无标题） — 仅展示顶部/操作行未覆盖的字段（创建人、用户组） */}
                   <div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                        <div className="text-xs text-gray-500 mb-0.5">图文档编号</div>
-                        <div className="text-sm text-gray-900 font-medium font-mono break-all">{doc.code || '-'}</div>
-                      </div>
-                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                        <div className="text-xs text-gray-500 mb-0.5">名称</div>
-                        <div className="text-sm text-gray-900 font-medium break-all">{doc.name || '-'}</div>
-                      </div>
-                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                        <div className="text-xs text-gray-500 mb-0.5">版本</div>
-                        <div className="text-sm text-gray-900 font-medium">v{doc.version || '-'}</div>
-                      </div>
-                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                        <div className="text-xs text-gray-500 mb-0.5">状态</div>
-                        <span className={`inline-block px-2 py-0.5 text-xs rounded-full ${tag.class}`}>{tag.label}</span>
-                      </div>
+                    <div className="grid grid-cols-2 gap-3">
                       <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                         <div className="text-xs text-gray-500 mb-0.5">创建人</div>
                         <div className="text-sm text-gray-900 font-medium">{doc.creator_name || '-'}</div>
-                      </div>
-                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                        <div className="text-xs text-gray-500 mb-0.5">创建时间</div>
-                        <div className="text-sm text-gray-900 font-medium">{formatDateTime(doc.created_at)}</div>
-                      </div>
-                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                        <div className="text-xs text-gray-500 mb-0.5">更新时间</div>
-                        <div className="text-sm text-gray-900 font-medium">{formatDateTime(doc.updated_at)}</div>
                       </div>
                       <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                         <div className="text-xs text-gray-500 mb-0.5">用户组</div>
                         <div className="text-sm text-gray-900 font-medium break-all">
                           {(doc as any).group_names?.length ? (doc as any).group_names.join('、') : '-'}
                         </div>
-                      </div>
-                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 md:col-span-2">
-                        <div className="text-xs text-gray-500 mb-0.5">备注</div>
-                        <div className="text-sm text-gray-900 font-medium whitespace-pre-wrap break-all">{doc.remark || '-'}</div>
                       </div>
                     </div>
                   </div>
@@ -645,7 +617,7 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                             key={v.id}
                             className={`hover:bg-gray-50 ${isViewing ? 'bg-blue-50' : ''}`}
                           >
-                            <td className="px-3 py-2">v{v.version}</td>
+                            <td className="px-3 py-2">{v.version}</td>
                             <td className="px-3 py-2">
                               <span className={`px-1.5 py-0.5 text-xs rounded-full ${statusTag(v.status).class}`}>
                                 {statusTag(v.status).label}
