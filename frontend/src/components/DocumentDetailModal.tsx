@@ -3,10 +3,11 @@ import { Modal } from './Modal';
 import { Loading } from './Loading';
 import { toast } from './Toast';
 import { useAuthStore, isAdmin } from '../stores/auth';
-import { documentsApi, mediaApi, v2UploadApi, CHUNK_SIZE, CHUNK_THRESHOLD } from '../services/api';
+import { documentsApi, customFieldsApi, mediaApi, v2UploadApi, CHUNK_SIZE, CHUNK_THRESHOLD } from '../services/api';
+import CustomFieldInput from './CustomFieldInput';
 import { previewAttachment } from '../utils/attachmentPreview';
 import { formatDateTime } from '../utils/date';
-import type { Document, DocumentIteration, DocumentAttachment } from '../types';
+import type { Document, DocumentIteration, DocumentAttachment, CustomFieldDefinition } from '../types';
 
 interface Props {
   open: boolean;
@@ -31,16 +32,19 @@ const statusTag = (s: string) => {
   return tags[s] || { label: s, class: 'bg-gray-100 text-gray-800' };
 };
 
-type TabKey = 'attachments' | 'versions' | 'iterations';
+type TabKey = 'info' | 'versions' | 'iterations';
 
 export default function DocumentDetailModal({ open, docId, onClose, onSaved }: Props) {
   const user = useAuthStore((s) => s.user);
   const [doc, setDoc] = useState<Document | null>(null);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabKey>('attachments');
+  const [activeTab, setActiveTab] = useState<TabKey>('info');
   const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
   const [iterations, setIterations] = useState<DocumentIteration[]>([]);
   const [versions, setVersions] = useState<Document[]>([]);
+  // 自定义字段定义与值
+  const [cfDefs, setCfDefs] = useState<CustomFieldDefinition[]>([]);
+  const [cfValues, setCfValues] = useState<Record<string, any>>({});
   // 当前正在查看的迭代 id（null=查看当前最新迭代）
   const [viewingIterationId, setViewingIterationId] = useState<string | null>(null);
   // 当前正在查看的版本 id（null=查看 prop 传入的当前版本）
@@ -113,6 +117,26 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
     }
   }, [effectiveDocId]);
 
+  // 加载文档适用的自定义字段定义 + 当前文档的字段值
+  const loadCustomFields = useCallback(async () => {
+    if (!effectiveDocId) return;
+    try {
+      const defsRes = await customFieldsApi.listDefinitions();
+      const defs: CustomFieldDefinition[] = ((defsRes.data || defsRes || []) as CustomFieldDefinition[]).filter(
+        (d) => d.applies_to?.includes('document')
+      );
+      setCfDefs(defs);
+      const valsRes = await customFieldsApi.getValues('document', effectiveDocId);
+      const map: Record<string, any> = {};
+      ((valsRes.data || []) as any[]).forEach((v: any) => {
+        map[v.field_id] = v.value;
+      });
+      setCfValues(map);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [effectiveDocId]);
+
   // 当前迭代 id：未签入的迭代（最新且无 check_in_date）；若都已签入则取 iteration 最大的
   const currentIterationId = useMemo(() => {
     const ongoing = iterations.find((it) => !it.check_in_date);
@@ -136,6 +160,7 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
       loadAttachments();
       loadIterations();
       loadVersions();
+      loadCustomFields();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, docId]);
@@ -155,9 +180,32 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
       loadDoc();
       loadAttachments();
       loadIterations();
+      loadCustomFields();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewingVersionId]);
+
+  // 防抖保存自定义字段
+  const cfSaveTimer = useRef<ReturnType<typeof setTimeout>>();
+  const debouncedCfSave = useCallback(
+    (next: Record<string, any>) => {
+      if (!effectiveDocId) return;
+      if (cfSaveTimer.current) clearTimeout(cfSaveTimer.current);
+      cfSaveTimer.current = setTimeout(async () => {
+        try {
+          const fieldValues = cfDefs.map((def) => ({
+            field_id: def.id,
+            value: next[def.id] ?? null,
+          })).filter((fv) => fv.value !== null && fv.value !== '');
+          await customFieldsApi.setValues('document', effectiveDocId, fieldValues);
+          onSaved();
+        } catch (e: any) {
+          toast.error(e?.response?.data?.detail || '自定义字段保存失败');
+        }
+      }, 500);
+    },
+    [effectiveDocId, cfDefs, onSaved]
+  );
 
   // 字段自动保存（防抖）
   const saveTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -256,7 +304,7 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
 
   const tabs = useMemo(
     () => [
-      { key: 'attachments' as const, label: '附件' },
+      { key: 'info' as const, label: '基本信息' },
       { key: 'versions' as const, label: '版本历史' },
       { key: 'iterations' as const, label: '迭代历史' },
     ],
@@ -423,76 +471,158 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
               ))}
             </div>
             <div className="flex-1 overflow-auto pt-3">
-              {activeTab === 'attachments' && (
-                <div>
-                  {canEdit && !isViewingHistorical && (
-                    <div className="mb-2">
-                      <label className="inline-block px-3 py-1 text-sm bg-primary-600 text-white rounded cursor-pointer hover:bg-primary-700">
-                        {uploading ? '上传中...' : '上传附件'}
-                        <input
-                          type="file"
-                          className="hidden"
-                          onChange={handleUpload}
-                          disabled={uploading}
-                        />
-                      </label>
+              {activeTab === 'info' && (
+                <div className="space-y-5">
+                  {/* 1. 自有字段（无标题） */}
+                  <div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                        <div className="text-xs text-gray-500 mb-0.5">图文档编号</div>
+                        <div className="text-sm text-gray-900 font-medium font-mono break-all">{doc.code || '-'}</div>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                        <div className="text-xs text-gray-500 mb-0.5">名称</div>
+                        <div className="text-sm text-gray-900 font-medium break-all">{doc.name || '-'}</div>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                        <div className="text-xs text-gray-500 mb-0.5">版本</div>
+                        <div className="text-sm text-gray-900 font-medium">v{doc.version || '-'}</div>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                        <div className="text-xs text-gray-500 mb-0.5">状态</div>
+                        <span className={`inline-block px-2 py-0.5 text-xs rounded-full ${tag.class}`}>{tag.label}</span>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                        <div className="text-xs text-gray-500 mb-0.5">创建人</div>
+                        <div className="text-sm text-gray-900 font-medium">{doc.creator_name || '-'}</div>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                        <div className="text-xs text-gray-500 mb-0.5">创建时间</div>
+                        <div className="text-sm text-gray-900 font-medium">{formatDateTime(doc.created_at)}</div>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                        <div className="text-xs text-gray-500 mb-0.5">更新时间</div>
+                        <div className="text-sm text-gray-900 font-medium">{formatDateTime(doc.updated_at)}</div>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                        <div className="text-xs text-gray-500 mb-0.5">用户组</div>
+                        <div className="text-sm text-gray-900 font-medium break-all">
+                          {(doc as any).group_names?.length ? (doc as any).group_names.join('、') : '-'}
+                        </div>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 md:col-span-2">
+                        <div className="text-xs text-gray-500 mb-0.5">备注</div>
+                        <div className="text-sm text-gray-900 font-medium whitespace-pre-wrap break-all">{doc.remark || '-'}</div>
+                      </div>
                     </div>
-                  )}
-                  {attachments.length === 0 ? (
-                    <div className="text-sm text-gray-400 py-4 text-center border border-dashed border-gray-300 rounded-lg">
-                      {isViewingHistorical ? '该迭代暂无附件' : '暂无附件'}
+                  </div>
+
+                  {/* 2. 自定义字段 */}
+                  <div>
+                    <h4 className="text-sm font-semibold mb-2 text-gray-700">自定义字段</h4>
+                    {cfDefs.length === 0 ? (
+                      <div className="text-sm text-gray-400 border border-dashed border-gray-200 rounded-lg py-3 text-center">无</div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {cfDefs.map((def) => {
+                          const val = cfValues[def.id] ?? '';
+                          const handleChange = (newVal: any) => {
+                            const next = { ...cfValues, [def.id]: newVal };
+                            setCfValues(next);
+                            if (canEdit && !isViewingHistorical && !isViewingOtherVersion) {
+                              debouncedCfSave(next);
+                            }
+                          };
+                          return (
+                            <div key={def.id}>
+                              <label className="text-xs text-gray-500">{def.name}</label>
+                              <div className="mt-0.5">
+                                <CustomFieldInput
+                                  def={def}
+                                  value={val}
+                                  onChange={handleChange}
+                                  readOnly={!canEdit || isViewingHistorical || isViewingOtherVersion}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. 附件 */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-semibold text-gray-700">附件</h4>
+                      {canEdit && !isViewingHistorical && !isViewingOtherVersion && (
+                        <label className="inline-block px-3 py-1 text-sm bg-primary-600 text-white rounded cursor-pointer hover:bg-primary-700">
+                          {uploading ? '上传中...' : '上传附件'}
+                          <input
+                            type="file"
+                            className="hidden"
+                            onChange={handleUpload}
+                            disabled={uploading}
+                          />
+                        </label>
+                      )}
                     </div>
-                  ) : (
-                    <div className="border rounded-lg overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead className="bg-gray-50 border-b">
-                          <tr>
-                            <th className="px-3 py-2 text-left text-gray-500 font-medium">文件名</th>
-                            <th className="px-3 py-2 text-left text-gray-500 font-medium w-24">大小</th>
-                            <th className="px-3 py-2 text-left text-gray-500 font-medium w-40">上传时间</th>
-                            <th className="px-3 py-2 text-right text-gray-500 font-medium w-40">操作</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                          {attachments.map((att) => (
-                            <tr key={att.id} className="hover:bg-gray-50">
-                              <td className="px-3 py-2 text-primary-600">{att.file_name}</td>
-                              <td className="px-3 py-2 text-gray-500">
-                                {formatFileSize(att.file_size || 0)}
-                              </td>
-                              <td className="px-3 py-2 text-gray-500">{formatDateTime(att.created_at)}</td>
-                              <td className="px-3 py-2 text-right">
-                                <button
-                                  onClick={() =>
-                                    previewAttachment(att.id, att.file_name || 'preview', {
-                                      onArchive: () => {},
-                                    })
-                                  }
-                                  className="text-blue-600 hover:text-blue-800 mr-2"
-                                >
-                                  预览
-                                </button>
-                                <button
-                                  onClick={() => handleDownload(att.id, att.file_name || 'download')}
-                                  className="text-primary-600 hover:text-primary-800 mr-2"
-                                >
-                                  下载
-                                </button>
-                                {canEdit && !isViewingHistorical && (
-                                  <button
-                                    onClick={() => handleDeleteAtt(att.id)}
-                                    className="text-red-600 hover:text-red-800"
-                                  >
-                                    删除
-                                  </button>
-                                )}
-                              </td>
+                    {attachments.length === 0 ? (
+                      <div className="text-sm text-gray-400 py-4 text-center border border-dashed border-gray-300 rounded-lg">
+                        {isViewingHistorical ? '该迭代暂无附件' : '暂无附件'}
+                      </div>
+                    ) : (
+                      <div className="border rounded-lg overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-50 border-b">
+                            <tr>
+                              <th className="px-3 py-2 text-left text-gray-500 font-medium">文件名</th>
+                              <th className="px-3 py-2 text-left text-gray-500 font-medium w-24">大小</th>
+                              <th className="px-3 py-2 text-left text-gray-500 font-medium w-40">上传时间</th>
+                              <th className="px-3 py-2 text-right text-gray-500 font-medium w-40">操作</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {attachments.map((att) => (
+                              <tr key={att.id} className="hover:bg-gray-50">
+                                <td className="px-3 py-2 text-primary-600">{att.file_name}</td>
+                                <td className="px-3 py-2 text-gray-500">
+                                  {formatFileSize(att.file_size || 0)}
+                                </td>
+                                <td className="px-3 py-2 text-gray-500">{formatDateTime(att.created_at)}</td>
+                                <td className="px-3 py-2 text-right">
+                                  <button
+                                    onClick={() =>
+                                      previewAttachment(att.id, att.file_name || 'preview', {
+                                        onArchive: () => {},
+                                      })
+                                    }
+                                    className="text-blue-600 hover:text-blue-800 mr-2"
+                                  >
+                                    预览
+                                  </button>
+                                  <button
+                                    onClick={() => handleDownload(att.id, att.file_name || 'download')}
+                                    className="text-primary-600 hover:text-primary-800 mr-2"
+                                  >
+                                    下载
+                                  </button>
+                                  {canEdit && !isViewingHistorical && (
+                                    <button
+                                      onClick={() => handleDeleteAtt(att.id)}
+                                      className="text-red-600 hover:text-red-800"
+                                    >
+                                      删除
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
               {activeTab === 'versions' && (
