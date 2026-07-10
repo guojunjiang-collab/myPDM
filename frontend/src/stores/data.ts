@@ -104,7 +104,8 @@ export const useDataStore = create<DataState>()(
           ]);
 
           set({
-            components: componentsRes.status === 'fulfilled' ? extractData<PartListItem>(componentsRes.value.data) : [],
+            // partsApi.list 已解包为 payload（{items,total}），不再有 .data 层
+            components: componentsRes.status === 'fulfilled' ? extractData<PartListItem>(componentsRes.value) : [],
             documents: documentsRes.status === 'fulfilled' ? extractData<DocumentBrief>(documentsRes.value.data) : [],
             customFieldDefs: fieldsRes.status === 'fulfilled' ? extractData<CustomFieldDefinition>(fieldsRes.value.data) : [],
             configItems: configRes.status === 'fulfilled' ? extractData<ConfigItemBrief>(configRes.value.data) : [],

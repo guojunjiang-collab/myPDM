@@ -15,9 +15,15 @@ const cardCls = 'bg-gray-50 rounded-lg px-3 py-2 border border-gray-100';
 const cardLabelCls = 'block text-xs text-gray-500 mb-0.5';
 const cardInputCls = 'w-full text-sm px-2 py-1 border border-gray-200 rounded bg-white focus:outline-none focus:ring-2 focus:ring-primary-500';
 
-// PDM 零件/部件状态中文（与零件管理一致）
-const STATUS_LABEL: Record<string, string> = {
-  draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废',
+// PDM 零件/部件状态徽标（与零件管理一致）
+const statusTag = (s: string) => {
+  const map: Record<string, { label: string; cls: string }> = {
+    draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
+    frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
+    released: { label: '发布', cls: 'bg-green-100 text-green-800' },
+    obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
+  };
+  return map[s] || { label: s, cls: 'bg-gray-100 text-gray-800' };
 };
 
 export default function MaterialTab() {
@@ -65,10 +71,14 @@ export default function MaterialTab() {
   const storeComponents = useDataStore((s) => s.components);
   const syncAll = useDataStore((s) => s.syncAll);
 
+  // PDM 搜索结果（直接调用后端，避免依赖全局 store 的缓存/结构差异）
+  const [pdmResults, setPdmResults] = useState<any[]>([]);
+  const [pdmLoading, setPdmLoading] = useState(false);
+
   // 正在编辑的物料是否来自 PDM，及其关联零部件（用于编辑弹窗体现来源）
   const editingIsPdm = !!editing && !!editing.source_type && editing.source_type !== 'standalone';
   const editingPdm = editingIsPdm && editing!.ref_entity_id
-    ? storeComponents.find((c: any) => c.id === editing!.ref_entity_id)
+    ? storeComponents.find((c: any) => (c.master_id || c.id) === editing!.ref_entity_id)
     : null;
 
   const reload = async (s?: string) => {
@@ -89,12 +99,12 @@ export default function MaterialTab() {
   };
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, []);
 
-  // 打开「从 PDM 启用」时，若 store 尚未加载则拉一次
+  // 打开「从 PDM 启用」时刷新零部件缓存（不依赖 length，避免旧格式持久化数据导致列表为空）
   useEffect(() => {
-    if (pdmMode && storeComponents.length === 0) {
+    if (pdmMode) {
       syncAll();
     }
-  }, [pdmMode, storeComponents.length, syncAll]);
+  }, [pdmMode, syncAll]);
 
   const saveStandalone = async () => {
     if (!editing) return;
@@ -104,21 +114,39 @@ export default function MaterialTab() {
     await reload();
   };
 
-  const pdmResults = useMemo(() => {
-    const kw = pdmKeyword.trim().toLowerCase();
-    if (!kw) return [];
-    const match = (x: any) =>
-      (x.code || '').toLowerCase().includes(kw) ||
-      (x.name || '').toLowerCase().includes(kw) ||
-      (x.spec || '').toLowerCase().includes(kw);
-    const pick = (x: any, entity_type: 'part' | 'assembly') => ({
-      id: x.id, code: x.code, name: x.name, spec: x.spec, version: x.version, status: x.status, entity_type,
-    });
-    return storeComponents
-      .filter(match)
-      .slice(0, 50)
-      .map((x: any) => pick(x, x.type === 'assembly' ? 'assembly' : 'part'));
-  }, [pdmKeyword, storeComponents]);
+  // 打开弹窗或关键词变化时，直接向后端查询 PDM 零部件（防抖）
+  useEffect(() => {
+    if (!pdmMode) return;
+    let cancelled = false;
+    setPdmLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const kw = pdmKeyword.trim();
+        const res = await partsApi.list({
+          page_size: 50,
+          show_all_versions: true,
+          ...(kw ? { search: kw } : {}),
+        });
+        const items = Array.isArray(res) ? res : (res?.items || []);
+        if (!cancelled) {
+          setPdmResults(items.map((x: any) => ({
+            id: x.master_id || x.id,
+            code: x.code,
+            name: x.name,
+            spec: x.spec,
+            version: x.version,
+            status: x.status,
+            entity_type: x.type === 'assembly' ? 'assembly' : 'part',
+          })));
+        }
+      } catch {
+        if (!cancelled) setPdmResults([]);
+      } finally {
+        if (!cancelled) setPdmLoading(false);
+      }
+    }, 300);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [pdmMode, pdmKeyword]);
 
   const enablePdm = async (r: { id: string; entity_type: string }) => {
     try {
@@ -231,7 +259,13 @@ export default function MaterialTab() {
                           <td className="px-3 py-2 text-sm">{editingPdm?.name || editing.name}</td>
                           <td className="px-3 py-2 text-sm text-gray-500">{editingPdm?.spec || editing.spec || '-'}</td>
                           <td className="px-3 py-2 text-sm text-gray-500">{editingPdm?.version || '-'}</td>
-                          <td className="px-3 py-2 text-sm text-gray-500">{editingPdm ? (STATUS_LABEL[editingPdm.status] || editingPdm.status) : '-'}</td>
+                          <td className="px-3 py-2">
+                            {editingPdm ? (
+                              <span className={`px-2 py-1 text-xs rounded-full ${statusTag(editingPdm.status).cls}`}>
+                                {statusTag(editingPdm.status).label}
+                              </span>
+                            ) : '-'}
+                          </td>
                         </tr>
                       </tbody>
                     </table>
@@ -293,33 +327,35 @@ export default function MaterialTab() {
             onChange={(e) => setPdmKeyword(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
           <div className="max-h-80 overflow-auto rounded-lg border border-gray-200">
-            {!pdmKeyword.trim() ? (
-              <div className="px-4 py-8 text-center text-sm text-gray-400">输入关键词搜索 PDM 零件/部件</div>
+            {pdmLoading ? (
+              <div className="px-4 py-8 text-center text-sm text-gray-400">加载中...</div>
             ) : pdmResults.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-gray-400">无匹配结果</div>
             ) : (
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
                   <tr>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">类型</th>
                     <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">编号</th>
                     <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">名称</th>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">版本</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-24 whitespace-nowrap">版本</th>
                     <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">规格型号</th>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">状态</th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">操作</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-24 whitespace-nowrap">状态</th>
+                    <th className="text-right px-3 py-2 text-xs font-medium text-gray-500 w-24 whitespace-nowrap">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {pdmResults.map((r) => (
                     <tr key={`${r.entity_type}-${r.id}`} className="hover:bg-gray-50">
-                      <td className="px-3 py-2 text-sm text-gray-500">{r.entity_type === 'part' ? '零件' : '部件'}</td>
                       <td className="px-3 py-2 text-sm font-medium">{r.code}</td>
                       <td className="px-3 py-2 text-sm">{r.name}</td>
-                      <td className="px-3 py-2 text-sm text-gray-500">{r.version || '-'}</td>
+                      <td className="px-3 py-2 text-sm text-gray-500 w-24 whitespace-nowrap">{r.version || '-'}</td>
                       <td className="px-3 py-2 text-sm text-gray-500">{r.spec || '-'}</td>
-                      <td className="px-3 py-2 text-sm text-gray-500">{STATUS_LABEL[r.status as string] || r.status || '-'}</td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-3 py-2 w-24 whitespace-nowrap">
+                        <span className={`px-2 py-1 text-xs rounded-full ${statusTag(r.status as string).cls}`}>
+                          {statusTag(r.status as string).label}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-right w-24 whitespace-nowrap">
                         <button onClick={() => enablePdm(r)} className="text-green-600 hover:text-green-800">启用</button>
                       </td>
                     </tr>

@@ -39,7 +39,7 @@ export default function MaterialDetail({ material, onClose, onViewEntity }: Prop
 
   // 关联零部件（取自全局 DataStore 的 brief）
   const pdmEntity = hasPdmRef
-    ? storeComponents.find((c: any) => c.id === m.ref_entity_id)
+    ? storeComponents.find((c: any) => (c.master_id || c.id) === m.ref_entity_id)
     : null;
 
   // store 未加载时拉一次

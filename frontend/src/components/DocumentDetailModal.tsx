@@ -516,23 +516,24 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
               </div>
             )}
 
-            {/* 底部 Tab */}
-            <div className="border-b flex gap-1 shrink-0">
-              {tabs.map((t) => (
-                <button
-                  key={t.key}
-                  onClick={() => setActiveTab(t.key)}
-                  className={`px-4 py-2 text-sm -mb-px border-b-2 ${
-                    activeTab === t.key
-                      ? 'border-primary-600 text-primary-600 font-medium'
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-            <div className="flex-1 overflow-auto pt-3">
+            {/* 底部 Tab（外框，参考零部件详情） */}
+            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
+              <div className="flex border-b border-gray-200 shrink-0">
+                {tabs.map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => setActiveTab(t.key)}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === t.key
+                        ? 'border-primary-600 text-primary-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <div className="p-4 overflow-y-auto flex-1">
               {activeTab === 'info' && (
                 <div className="space-y-5">
                   {/* 1. 自有字段（无标题） */}
@@ -822,6 +823,7 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                   </table>
                 </div>
               )}
+            </div>
             </div>
           </>
         )}
