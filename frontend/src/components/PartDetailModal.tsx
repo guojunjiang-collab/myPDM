@@ -803,30 +803,30 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                           <td className="px-4 py-3 text-gray-500">{it.check_in_date ? new Date(it.check_in_date).toLocaleString('zh-CN') : '未签入'}</td>
                           <td className="px-4 py-3">{it.check_in_note || '—'}</td>
                           <td className="px-4 py-3">
-                            {it.id === iteration?.id ? (
-                              <span className="text-primary-600 text-xs">当前</span>
-                            ) : (
-                              <>
-                                <button onClick={() => handleViewIteration(it.id)} className="text-primary-600 hover:text-primary-800 hover:underline text-xs mr-2">查看数据</button>
-                                {isAdminUser && (
-                                  <button
-                                    onClick={async () => {
-                                      if (!revisionId || !confirm(`确定删除迭代 #${it.iteration}？该迭代的附件也将被删除。`)) return;
-                                      try {
-                                        await partsApi.deleteIteration(revisionId, it.id);
-                                        toast.success('迭代已删除');
-                                        setIterationsList(await partsApi.iterations(revisionId));
-                                      } catch (e: any) {
-                                        toast.error(e?.response?.data?.detail || '删除失败');
-                                      }
-                                    }}
-                                    className="text-xs text-red-600 hover:text-red-800 hover:underline"
-                                  >
-                                    删除
-                                  </button>
-                                )}
-                              </>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {it.id === iteration?.id ? (
+                                <span className="text-primary-600 text-xs">当前</span>
+                              ) : (
+                                <button onClick={() => handleViewIteration(it.id)} className="text-primary-600 hover:text-primary-800 hover:underline text-xs">查看数据</button>
+                              )}
+                              {it.iteration > 1 && isAdminUser && (
+                                <button
+                                  onClick={async () => {
+                                    if (!revisionId || !confirm(`确定删除迭代 #${it.iteration}？该迭代的附件也将被删除。`)) return;
+                                    try {
+                                      await partsApi.deleteIteration(revisionId, it.id);
+                                      toast.success('迭代已删除');
+                                      setIterationsList(await partsApi.iterations(revisionId));
+                                    } catch (e: any) {
+                                      toast.error(e?.response?.data?.detail || '删除失败');
+                                    }
+                                  }}
+                                  className="text-xs text-red-600 hover:text-red-800 hover:underline"
+                                >
+                                  删除
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
