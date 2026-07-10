@@ -411,6 +411,23 @@ async def upload_document_attachment(doc_id: uuid.UUID, body: schemas.DocumentAt
         raise HTTPException(status_code=400, detail="请先签出后再上传附件")
     current_iter = crud_documents.get_current_iteration(db, d)
 
+    # 图文档仅允许一个附件：删除当前迭代的已有附件
+    existing_atts = db.query(DocumentAttachment).filter(
+        DocumentAttachment.document_id == doc_id,
+        DocumentAttachment.iteration_id == current_iter.id,
+    ).all() if current_iter else []
+    for ea in existing_atts:
+        if ea.file_path:
+            try:
+                file_storage.delete_file(ea.file_path)
+                if is_stp_file(ea.file_name):
+                    delete_glb_cache(str(ea.id))
+                if is_office_file(ea.file_name):
+                    delete_pdf_cache(str(ea.id), ea.file_path)
+            except Exception:
+                pass
+        db.delete(ea)
+
     # 文件校验失败（非法 base64 / 不允许的扩展名 / 文件名非法 / 超大）属于客户端数据问题，
     # 返回 400 并带上原因，而不是裸 ValueError 冒泡成 500。binascii.Error 是 ValueError 子类，一并捕获。
     try:

@@ -138,6 +138,17 @@ async def upload_file(
                         DocumentIteration.iteration == doc.latest_iteration,
                     ).first()
                 folder_name = f"{doc.code}/{doc.version}/{current_iter.iteration}" if current_iter else f"{doc.code}_{doc.version}"
+                # 图文档仅允许一个附件
+                if current_iter:
+                    old_atts = db.query(DocumentAttachment).filter(
+                        DocumentAttachment.document_id == doc.id,
+                        DocumentAttachment.iteration_id == current_iter.id,
+                    ).all()
+                    for oa in old_atts:
+                        if oa.file_path:
+                            try: file_storage.delete_file(oa.file_path)
+                            except Exception: pass
+                        db.delete(oa)
         elif entity_type in ("component", "components"):
             from ..models_parts import PartMaster
             comp = db.query(PartMaster).filter(PartMaster.id == uuid.UUID(entity_id)).first()
@@ -336,6 +347,17 @@ async def complete_chunked_upload(
                         DocumentIteration.document_id == doc.id,
                         DocumentIteration.iteration == doc.latest_iteration,
                     ).first()
+                # 图文档仅允许一个附件：删除已有附件
+                if current_iter:
+                    old_atts = db.query(DocumentAttachment).filter(
+                        DocumentAttachment.document_id == doc.id,
+                        DocumentAttachment.iteration_id == current_iter.id,
+                    ).all()
+                    for oa in old_atts:
+                        if oa.file_path:
+                            try: file_storage.delete_file(oa.file_path)
+                            except Exception: pass
+                        db.delete(oa)
 
         # 创建数据库记录
         att_id = str(uuid.uuid4())

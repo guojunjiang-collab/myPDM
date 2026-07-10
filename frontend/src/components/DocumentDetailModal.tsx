@@ -618,7 +618,7 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-sm font-semibold text-gray-700">附件</h4>
-                      {canEdit && !isViewingHistorical && !isViewingOtherVersion && (
+                      {canEdit && !isViewingHistorical && !isViewingOtherVersion && attachments.length === 0 && (
                         <label className="inline-block px-3 py-1 text-sm bg-primary-600 text-white rounded cursor-pointer hover:bg-primary-700">
                           {uploading ? '上传中...' : '上传附件'}
                           <input
