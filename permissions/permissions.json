@@ -35,6 +35,10 @@
     "documents.attachment:download": ["admin", "engineer", "production", "guest"],
     "documents.attachment:preview": ["admin", "engineer", "production", "guest"],
     "documents.attachment:delete": ["admin", "engineer"],
+    "documents:checkout": ["admin", "engineer"],
+    "documents:checkin": ["admin", "engineer"],
+    "documents:undocheckout": ["admin", "engineer"],
+    "documents:force_checkin": ["admin"],
 
     "attachments:list": ["admin", "engineer"],
     "attachments:upload": ["admin", "engineer"],
