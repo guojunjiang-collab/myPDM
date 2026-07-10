@@ -66,6 +66,9 @@ def checkout_document(db: Session, doc_id: UUID, user_id: UUID) -> Tuple[Optiona
                 file_hash=att.file_hash,
             )
             db.add(new_att)
+        # 复制上一迭代的自定义字段值到新迭代（对齐零件）
+        from . import crud as crud_common
+        crud_common._copy_iteration_custom_fields(db, prev_iter.id, new_iter.id)
 
     doc.latest_iteration = new_iter_num
     doc.check_out_user_id = user_id
@@ -129,10 +132,30 @@ def undo_checkout_document(db: Session, doc_id: UUID, user_id: UUID) -> Tuple[Op
                 except Exception:
                     pass
             db.delete(att)
+        # 清理当前迭代复制的自定义字段值
+        db.query(models.CustomFieldValue).filter(
+            models.CustomFieldValue.iteration_id == iteration.id
+        ).delete(synchronize_session=False)
         # 删除迭代
         db.delete(iteration)
         doc.latest_iteration = doc.latest_iteration - 1
 
+    doc.check_out_user_id = None
+    doc.check_out_date = None
+    db.commit()
+    db.refresh(doc)
+    return doc, None
+
+
+# ====== 强制签入（管理员） ======
+
+def force_checkin_document(db: Session, doc_id: UUID) -> Tuple[Optional[models.Document], Optional[str]]:
+    """管理员强制签入：清除签出锁，保留当前迭代"""
+    doc = get_document(db, doc_id)
+    if not doc:
+        return None, "文档不存在"
+    if doc.check_out_user_id is None:
+        return None, "该文档未被签出"
     doc.check_out_user_id = None
     doc.check_out_date = None
     db.commit()
