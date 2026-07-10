@@ -540,7 +540,7 @@ async def delete_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, request: Reque
 
 @router.post("/{doc_id}/upgrade")
 async def upgrade_document_endpoint(doc_id: uuid.UUID, body: schemas.UpgradeRequest, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents:create"))):
-    db_doc, err = crud.upgrade_document(db, doc_id, current_user.real_name or current_user.username)
+    db_doc, err = crud.upgrade_document(db, doc_id, current_user.id, current_user.real_name or current_user.username)
     if err:
         raise HTTPException(status_code=400, detail=err)
     ip = request.client.host if request.client else None

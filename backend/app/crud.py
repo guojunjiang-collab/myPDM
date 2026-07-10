@@ -1,4 +1,5 @@
 import uuid
+from uuid import UUID
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sqlfunc
@@ -470,8 +471,8 @@ def _copy_iteration_custom_fields(db, source_iteration_id, target_iteration_id):
 # [REMOVED: old upgrade_component function]
 
 
-def upgrade_document(db, doc_id, user: str = None):
-    """图文档升版：创建新版本图文档，复制自定义字段（不拷贝附件）"""
+def upgrade_document(db, doc_id, user_id: UUID, user_name: str = None):
+    """图文档升版：创建新版本图文档，自动签出，复制自定义字段和附件（对齐零部件）"""
     from datetime import datetime, timezone
     source = db.query(models.Document).filter(models.Document.id == doc_id).first()
     if not source:
@@ -487,17 +488,67 @@ def upgrade_document(db, doc_id, user: str = None):
         status='draft',
         remark=source.remark,
         revision_parent_id=source.id,
+        creator_id=user_id,
+        latest_iteration=1,
         revisions=[{
             'version': new_version,
             'parent_version': source.version,
             'action': 'upgraded_from',
-            'user': user,
+            'user': user_name,
             'timestamp': datetime.now(timezone.utc).isoformat(),
         }],
     )
     db.add(new_doc)
     db.flush()
-    _copy_custom_field_values(db, 'document', source.id, new_doc.id)
+
+    # 自动建首个迭代并签出给操作者（对齐零部件升版逻辑）
+    first_iter = models.DocumentIteration(
+        document_id=new_doc.id,
+        iteration=1,
+    )
+    db.add(first_iter)
+    db.flush()
+
+    new_doc.check_out_user_id = user_id
+    new_doc.check_out_date = datetime.now(timezone.utc)
+
+    # 复制源文档最后一次迭代的附件和自定义字段到新迭代
+    from . import crud_documents
+    source_iter = crud_documents.get_current_iteration(db, source)
+    if not source_iter:
+        source_iter = db.query(models.DocumentIteration).filter(
+            models.DocumentIteration.document_id == source.id,
+        ).order_by(models.DocumentIteration.iteration.desc()).first()
+    if source_iter:
+        source_atts = db.query(models.DocumentAttachment).filter(
+            models.DocumentAttachment.iteration_id == source_iter.id,
+        ).all()
+        from .file_storage import file_storage
+        for att in source_atts:
+            new_path = f"document/{new_doc.code}/{new_doc.version}/1/{att.file_name}"
+            if att.file_path:
+                try:
+                    old_full = file_storage._safe_resolve(att.file_path)
+                    if old_full.exists():
+                        new_full = file_storage._safe_resolve(new_path)
+                        new_full.parent.mkdir(parents=True, exist_ok=True)
+                        import shutil
+                        shutil.copy2(str(old_full), str(new_full))
+                except Exception:
+                    new_path = att.file_path
+            new_att = models.DocumentAttachment(
+                document_id=new_doc.id,
+                iteration_id=first_iter.id,
+                file_name=att.file_name,
+                file_size=att.file_size,
+                file_path=new_path,
+                file_hash=att.file_hash,
+            )
+            db.add(new_att)
+        _copy_iteration_custom_fields(db, source_iter.id, first_iter.id)
+        # 复制文档级别的自定义字段值
+        _copy_custom_field_values(db, 'document', source.id, new_doc.id)
+
     db.commit()
     db.refresh(new_doc)
     return new_doc, None
