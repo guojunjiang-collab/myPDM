@@ -3,7 +3,7 @@ import { Modal } from './Modal';
 import { Loading } from './Loading';
 import { toast } from './Toast';
 import { useAuthStore, isAdmin } from '../stores/auth';
-import { documentsApi, customFieldsApi, mediaApi, v2UploadApi, CHUNK_SIZE, CHUNK_THRESHOLD } from '../services/api';
+import { documentsApi, customFieldsApi, mediaApi, v2UploadApi, CHUNK_SIZE, CHUNK_THRESHOLD, userGroupsApi } from '../services/api';
 import CustomFieldInput from './CustomFieldInput';
 import { previewAttachment } from '../utils/attachmentPreview';
 import { formatDateTime } from '../utils/date';
@@ -55,6 +55,10 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
   const [checkinNote, setCheckinNote] = useState('');
   const [uploading, setUploading] = useState(false);
 
+  // 用户组
+  const [allGroups, setAllGroups] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+
   const isCheckedOut = !!doc?.check_out_user_id;
   const isCheckedOutByMe = isCheckedOut && doc?.check_out_user_id === user?.id;
   const isDraft = doc?.status === 'draft';
@@ -87,14 +91,17 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
     }
   }, [effectiveDocId]);
 
-  const loadAttachments = useCallback(async () => {
+  const loadAttachments = useCallback(async (iterId?: string | null) => {
     if (!effectiveDocId) return;
     try {
-      const res = await documentsApi.listAttachments(effectiveDocId, viewingIterationId || undefined);
+      // 始终按迭代过滤：传入 iterId 用指定，否则用当前迭代
+      const finalIterId = iterId ?? viewingIterationId ?? currentIterationId;
+      const res = await documentsApi.listAttachments(effectiveDocId, finalIterId || undefined);
       setAttachments((res.data || []) as DocumentAttachment[]);
     } catch {
       setAttachments([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveDocId, viewingIterationId]);
 
   const loadIterations = useCallback(async () => {
@@ -137,6 +144,20 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
     }
   }, [effectiveDocId]);
 
+  // 加载全部用户组 + 当前文档的用户组选择
+  const loadGroups = useCallback(async () => {
+    if (!effectiveDocId) return;
+    try {
+      const res = await userGroupsApi.list();
+      setAllGroups(Array.isArray(res.data) ? res.data : []);
+      const d = await documentsApi.get(effectiveDocId);
+      const docData: any = (d.data ?? d);
+      setSelectedGroupIds((docData.group_ids || []).map(String));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [effectiveDocId]);
+
   // 当前迭代 id：未签入的迭代（最新且无 check_in_date）；若都已签入则取 iteration 最大的
   const currentIterationId = useMemo(() => {
     const ongoing = iterations.find((it) => !it.check_in_date);
@@ -161,17 +182,26 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
       loadIterations();
       loadVersions();
       loadCustomFields();
+      loadGroups();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, docId]);
 
-  // 切换查看的迭代时重拉附件
+  // 切换查看的迭代时重拉附件（传指定迭代 id）
   useEffect(() => {
     if (open && docId) {
-      loadAttachments();
+      loadAttachments(viewingIterationId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewingIterationId]);
+
+  // 当前迭代确定后重拉附件（初始加载 iterations 完成后）
+  useEffect(() => {
+    if (open && docId && currentIterationId && !viewingIterationId) {
+      loadAttachments();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIterationId]);
 
   // 切换查看的版本时重拉所有数据，并清空迭代选择（不同版本的迭代不互通）
   useEffect(() => {
@@ -181,6 +211,7 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
       loadAttachments();
       loadIterations();
       loadCustomFields();
+      loadGroups();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewingVersionId]);
@@ -473,7 +504,7 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
             <div className="flex-1 overflow-auto pt-3">
               {activeTab === 'info' && (
                 <div className="space-y-5">
-                  {/* 1. 自有字段（无标题） — 仅展示顶部/操作行未覆盖的字段（创建人、用户组） */}
+                  {/* 1. 自有字段（无标题） */}
                   <div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
@@ -482,9 +513,41 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                       </div>
                       <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                         <div className="text-xs text-gray-500 mb-0.5">用户组</div>
-                        <div className="text-sm text-gray-900 font-medium break-all">
-                          {(doc as any).group_names?.length ? (doc as any).group_names.join('、') : '-'}
-                        </div>
+                        {canEdit ? (
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 py-0.5">
+                            {allGroups.length === 0 ? (
+                              <span className="text-sm text-gray-400">加载中...</span>
+                            ) : (
+                              allGroups.map((g) => (
+                                <label key={g.id} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    className="w-3 h-3"
+                                    checked={selectedGroupIds.includes(String(g.id))}
+                                    onChange={async (e) => {
+                                      const next = e.target.checked
+                                        ? [...selectedGroupIds, String(g.id)]
+                                        : selectedGroupIds.filter((x) => x !== String(g.id));
+                                      setSelectedGroupIds(next);
+                                      try {
+                                        await documentsApi.update(doc.id, { group_ids: next });
+                                        await loadDoc();
+                                        onSaved();
+                                      } catch (err: any) {
+                                        toast.error(err?.response?.data?.detail || '用户组更新失败');
+                                      }
+                                    }}
+                                  />
+                                  {g.name}
+                                </label>
+                              ))
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-900 font-medium break-all">
+                            {(doc as any).group_names?.length ? (doc as any).group_names.join('、') : '-'}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
