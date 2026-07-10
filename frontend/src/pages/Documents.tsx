@@ -1,9 +1,8 @@
-import { useEffect, useState, useRef } from 'react';
-import { documentsApi, customFieldsApi, bomApi, v2UploadApi, CHUNK_SIZE, CHUNK_THRESHOLD, userGroupsApi } from '../services/api';
-import type { Document, CustomFieldDefinition, CustomFieldValue, DocumentAttachment } from '../types';
+import { useEffect, useState } from 'react';
+import { documentsApi, customFieldsApi, bomApi, userGroupsApi } from '../services/api';
+import type { Document, CustomFieldDefinition, CustomFieldValue } from '../types';
 import { canEdit, isAdmin, canDownload, useAuthStore } from '../stores/auth';
 import { compareVersions } from '../constants';
-import CustomFieldInput from '../components/CustomFieldInput';
 import { Modal, ConfirmModal } from '../components/Modal';
 import DocumentDetailContent from '../components/DocumentDetailContent';
 import DocumentDetailModal from '../components/DocumentDetailModal';
@@ -20,52 +19,6 @@ import type { ImportPreview } from '../services/importExport';
 import ImportPreviewModal from '../components/ImportPreviewModal';
 import ArchiveTreeModal from '../components/ArchiveTreeModal';
 
-/** 生成 UUID */
-function generateUUID(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
-
-/** 文件大小格式化 */
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-}
-
-/** Base64 编码文件 */
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      const base64 = result.split(',')[1];
-      resolve(base64);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-interface DocFormData {
-  code: string;
-  name: string;
-  version: string;
-  status: string;
-  remark: string;
-}
-
-const initialFormData: DocFormData = {
-  code: '',
-  name: '',
-  version: 'A',
-  status: 'draft',
-  remark: '',
-};
-
 export default function Documents() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,20 +28,14 @@ export default function Documents() {
   const [showAllVersions, setShowAllVersions] = useState(false);
   const [showAccessibleOnly, setShowAccessibleOnly] = useState(false);
 
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingDoc, setEditingDoc] = useState<Document | null>(null);
-  const [formData, setFormData] = useState<DocFormData>(initialFormData);
-  const remarkRef = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    if (!modalOpen) return;
-    const timer = setTimeout(() => {
-      const el = remarkRef.current;
-      if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [modalOpen, formData.remark]);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  // 新增图文档弹窗
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createCode, setCreateCode] = useState('');
+  const [createName, setCreateName] = useState('');
+  const [createRemark, setCreateRemark] = useState('');
+  const [createGroupIds, setCreateGroupIds] = useState<string[]>([]);
+  const [createSaving, setCreateSaving] = useState(false);
+  const [createSaveError, setCreateSaveError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -107,21 +54,8 @@ export default function Documents() {
 
   // Custom fields
   const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDefinition[]>([]);
-  const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
-  const [loadingCustomFields, setLoadingCustomFields] = useState(false);
   // 自定义字段值映射：{ entityId: { fieldId: value } }
   const [customFieldValuesMap, setCustomFieldValuesMap] = useState<Record<string, Record<string, any>>>({});
-
-  // 附件管理
-  const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
-  const [loadingAttachments, setLoadingAttachments] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploadingFileName, setUploadingFileName] = useState<string>('');
-  const [uploadProgress, setUploadProgress] = useState<number>(0); // 上传进度百分比
-  const [deletingAttId, setDeletingAttId] = useState<string | null>(null);
-  // 新增模式下暂存的待上传文件（文档创建后随保存上传）
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 导入导出
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
@@ -131,7 +65,6 @@ export default function Documents() {
 
   // 用户组关联
   const [allGroups, setAllGroups] = useState<Array<{ id: string; name: string }>>([]);
-  const [formGroupIds, setFormGroupIds] = useState<string[]>([]);
 
   useEffect(() => {
     userGroupsApi.list().then((res) => setAllGroups(Array.isArray(res.data) ? res.data : [])).catch(() => {});
@@ -259,268 +192,37 @@ export default function Documents() {
     }
   };
 
-  const loadCustomFields = async () => {
-    const localDefs = useDataStore.getState().customFieldDefs;
-    if (localDefs.length > 0) {
-      setCustomFieldDefs(localDefs.filter((d: CustomFieldDefinition) =>
-        d.applies_to?.includes('document')
-      ));
-      setLoadingCustomFields(false);
-      return;
-    }
-    try {
-      setLoadingCustomFields(true);
-      const response = await customFieldsApi.listDefinitions();
-      const defs = (response.data || []).filter((d: CustomFieldDefinition) =>
-        d.applies_to?.includes('document')
-      );
-      setCustomFieldDefs(defs);
-    } catch (error) {
-      console.error('加载自定义字段失败', error);
-    } finally {
-      setLoadingCustomFields(false);
-    }
-  };
-
-  const loadCustomFieldValues = async (docId: string) => {
-    try {
-      const response = await customFieldsApi.getValues('document', docId);
-      const values: Record<string, any> = {};
-      (response.data || []).forEach((v: CustomFieldValue) => {
-        values[v.field_id] = v.value;
-      });
-      setCustomFieldValues(values);
-    } catch (error) {
-      console.error('加载自定义字段值失败', error);
-    }
-  };
-
-  // 加载附件列表
-  const loadAttachments = async (docId: string) => {
-    setLoadingAttachments(true);
-    try {
-      const res = await documentsApi.listAttachments(docId);
-      setAttachments(res.data || []);
-    } catch (error) {
-      console.error('加载附件失败', error);
-      setAttachments([]);
-    } finally {
-      setLoadingAttachments(false);
-    }
-  };
-
-  // 上传附件 - 后台进行，不阻塞 UI
-  const handleUploadClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // 文件大小限制检查 (1GB)
-    const MAX_ALLOWED = 1073741824;
-    if (file.size > MAX_ALLOWED) {
-      alert(`文件大小 ${formatFileSize(file.size)} 超过系统限制 1GB`);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
-
-    // 新增模式：尚无文档 ID，先暂存到前端，保存时再上传
-    if (!editingDoc) {
-      setPendingFile(file);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
-
-    setUploading(true);
-    setUploadingFileName(file.name);
-    setUploadProgress(0);
-
-    try {
-      // 根据文件大小选择上传方式
-      if (file.size > CHUNK_THRESHOLD) {
-        // 大文件：分块上传
-        await uploadLargeFile(file, editingDoc.id, (progress) => {
-          setUploadProgress(progress);
-        });
-      } else {
-        // 小文件：直接 multipart 上传
-        await v2UploadApi.uploadSmallFile(file, 'documents', editingDoc.id, (progress) => {
-          setUploadProgress(progress);
-        });
-      }
-
-      // 上传成功后刷新附件列表
-      await loadAttachments(editingDoc.id);
-    } catch (error) {
-      console.error('上传失败', error);
-      alert('上传失败，请重试');
-    } finally {
-      setUploading(false);
-      setUploadingFileName('');
-      setUploadProgress(0);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  /**
-   * 分块上传大文件
-   */
-  const uploadLargeFile = async (
-    file: File,
-    docId: string,
-    onProgress: (percent: number) => void
-  ): Promise<void> => {
-    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-
-    // 1. 初始化分块上传
-    const initResult = await v2UploadApi.initChunkedUpload(
-      file.name,
-      file.size,
-      'documents',
-      docId
-    );
-
-    const uploadId = initResult.upload_id;
-    let uploadedChunks = 0;
-
-    // 2. 逐个上传分块
-    for (let i = 0; i < totalChunks; i++) {
-      const start = i * CHUNK_SIZE;
-      const end = Math.min(start + CHUNK_SIZE, file.size);
-      const chunk = file.slice(start, end);
-
-      await v2UploadApi.uploadChunk(uploadId, i, chunk);
-      uploadedChunks++;
-
-      // 更新进度 (包含初始化和完成两个阶段，各占 5%)
-      const uploadProgress = Math.round(
-        5 + (uploadedChunks / totalChunks) * 90
-      );
-      onProgress(uploadProgress);
-    }
-
-    // 3. 完成分块上传
-    await v2UploadApi.completeChunkedUpload(uploadId);
-    onProgress(100);
-  };
-
-  // 删除附件
-  const handleDeleteAttachment = async (attId: string) => {
-    if (!editingDoc || !confirm('确定要删除该附件吗？')) return;
-
-    setDeletingAttId(attId);
-    try {
-      await documentsApi.deleteAttachment(editingDoc.id, attId);
-      await loadAttachments(editingDoc.id);
-    } catch (error) {
-      console.error('删除失败', error);
-      alert('删除失败，请重试');
-    } finally {
-      setDeletingAttId(null);
-    }
-  };
-
-  // 下载附件
-  const handleDownloadAttachment = async (attId: string, fileName: string) => {
-    if (!editingDoc) return;
-    try {
-      const res = await documentsApi.getAttachment(editingDoc.id, attId);
-      const data = res.data as { file_data?: string };
-
-      if (data.file_data) {
-        const link = document.createElement('a');
-        link.href = `data:application/octet-stream;base64,${data.file_data}`;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } else {
-        alert('文件数据获取失败');
-      }
-    } catch (error) {
-      console.error('下载失败', error);
-      alert('下载失败，请重试');
-    }
-  };
-
   const handleAdd = () => {
-    setEditingDoc(null);
-    setFormData(initialFormData);
-    setCustomFieldValues({});
-    setAttachments([]);
-    setPendingFile(null);
-    setFormGroupIds([]);
-    loadCustomFields();
-    setModalOpen(true);
+    setCreateCode('');
+    setCreateName('');
+    setCreateRemark('');
+    setCreateGroupIds([]);
+    setCreateSaveError(null);
+    setCreateModalOpen(true);
   };
 
-  const handleEdit = async (doc: Document) => {
-    setEditingDoc(doc);
-    setFormData({
-      code: doc.code,
-      name: doc.name,
-      version: doc.version || 'A',
-      status: doc.status,
-      remark: doc.remark || '',
-    });
-    setFormGroupIds(((doc as any).group_ids || []).map(String));
-    await loadCustomFields();
-    await loadCustomFieldValues(doc.id);
-    await loadAttachments(doc.id);
-    setModalOpen(true);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
-    setSaveError(null);
-
-    const data: Record<string, unknown> = {
-      code: formData.code,
-      name: formData.name,
-      version: formData.version || undefined,
-      status: formData.status,
-      remark: formData.remark || undefined,
-      group_ids: formGroupIds,
-    };
-
+    setCreateSaving(true);
+    setCreateSaveError(null);
     try {
-      let newDoc: Document | null = null;
-      if (editingDoc) {
-        const res = await documentsApi.update(editingDoc.id, data);
-        newDoc = res.data;
-        useDataStore.getState().setDocuments(
-          useDataStore.getState().documents.map(d => d.id === editingDoc.id ? newDoc! : d)
-        );
-      } else {
-        const res = await documentsApi.create(data);
-        newDoc = res.data;
-        useDataStore.getState().setDocuments([...useDataStore.getState().documents, newDoc!]);
-        // 丢弃暂存的待传文件：新创建文档已自动签出给当前用户，附件请在详情弹窗内上传
-        if (pendingFile) setPendingFile(null);
-      }
-
-      const fieldValues = customFieldDefs.map(def => ({
-        field_id: def.id,
-        value: customFieldValues[def.id] ?? null,
-      })).filter(fv => fv.value !== null && fv.value !== '');
-
-      if (fieldValues.length > 0) {
-        await customFieldsApi.setValues('document', newDoc!.id, fieldValues);
-      }
-
-      setModalOpen(false);
-      if (!editingDoc && newDoc) {
-        // 新建后直接打开详情弹窗（用户已签出，可在弹窗内继续上传附件）
-        setDetailDocId(newDoc.id);
-      }
+      const res = await documentsApi.create({
+        code: createCode,
+        name: createName,
+        version: 'A',
+        status: 'draft',
+        remark: createRemark || undefined,
+        group_ids: createGroupIds,
+      });
+      const newDoc = res.data as Document;
+      setCreateModalOpen(false);
+      useDataStore.getState().setDocuments([...useDataStore.getState().documents, newDoc]);
+      setDetailDocId(newDoc.id);
     } catch (error: any) {
       const detail = error.response?.data?.detail;
-      setSaveError(Array.isArray(detail) ? detail.map((e: any) => e.msg || JSON.stringify(e)).join('; ') : (typeof detail === 'string' ? detail : (editingDoc ? '更新失败，请重试' : '创建失败，请检查网络或数据是否已存在')));
+      setCreateSaveError(typeof detail === 'string' ? detail : '创建失败，请重试');
     } finally {
-      setSaving(false);
+      setCreateSaving(false);
     }
   };
 
@@ -542,23 +244,6 @@ export default function Documents() {
       );
     } catch (error) {
       alert('删除失败');
-    }
-  };
-
-  const handleUpgrade = async () => {
-    if (!editingDoc) return;
-    setSaving(true);
-    setSaveError(null);
-    try {
-      const res = await documentsApi.upgrade(editingDoc.id);
-      const newDoc = res.data;
-      useDataStore.getState().setDocuments([...useDataStore.getState().documents, newDoc]);
-      setModalOpen(false);
-    } catch (error: any) {
-      const detail = error.response?.data?.detail;
-      setSaveError(typeof detail === 'string' ? detail : '升版失败，请重试');
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -776,264 +461,68 @@ export default function Documents() {
       </div>
 
       <Modal
-        open={modalOpen}
-        title={editingDoc ? '编辑图文档' : '新增图文档'}
-        onClose={() => setModalOpen(false)}
-        width="full"
+        open={createModalOpen}
+        title="新增图文档"
+        onClose={() => setCreateModalOpen(false)}
+        width="md"
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* 基本属性 - 卡片式 */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">编号 <span className="text-red-500">*</span></label>
-              <input
-                type="text"
-                value={formData.code}
-                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                disabled={!!editingDoc && !(isAdmin() && formData.version === 'A')}
-                title={editingDoc && isAdmin() ? (formData.version === 'A' ? '管理员可修改编号' : '仅 A 版允许修改编号，升版后的版本不可改') : undefined}
-                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300 disabled:bg-gray-100 disabled:text-gray-400"
-                required
-              />
-            </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">名称 <span className="text-red-500">*</span></label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300"
-                required
-              />
-            </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">版本</label>
-              <input
-                type="text"
-                value={formData.version}
-                disabled
-                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300 disabled:bg-gray-100 disabled:text-gray-400"
-                placeholder="如: A, B, V1.0"
-              />
-            </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">状态</label>
-              <select
-                value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="draft">草稿</option>
-                <option value="frozen">冻结</option>
-                <option value="released">发布</option>
-                <option value="obsolete">作废</option>
-              </select>
-            </div>
-            <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">备注</label>
-              <textarea
-                ref={remarkRef}
-                value={formData.remark}
-                onChange={(e) => setFormData({ ...formData, remark: e.target.value })}
-                onInput={(e) => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }}
-                rows={1}
-                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none placeholder:text-gray-300"
-              />
-            </div>
-            {editingDoc && (
-              <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                <label className="block text-xs text-gray-500 mb-0.5">创建人</label>
-                <div className="text-sm text-gray-700 py-1">{(editingDoc as any).creator_name || '-'}</div>
-              </div>
-            )}
+        <form onSubmit={handleCreateSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">编号 <span className="text-red-500">*</span></label>
+            <input
+              type="text"
+              value={createCode}
+              onChange={(e) => setCreateCode(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              required
+            />
           </div>
-
-          {/* Custom Fields */}
-          {customFieldDefs.length > 0 && (
-            <div className="border-t pt-4">
-              <h4 className="text-sm font-bold text-gray-700 mb-2">自定义字段</h4>
-              {loadingCustomFields ? (
-                <div className="text-sm text-gray-500">加载中...</div>
-              ) : (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {customFieldDefs.map(def => (
-                    <div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                      <label className="block text-xs text-gray-500 mb-0.5">
-                        {def.name}
-                        {def.is_required && <span className="text-red-500 ml-1">*</span>}
-                      </label>
-                      <CustomFieldInput
-                        def={def}
-                        value={customFieldValues[def.id]}
-                        onChange={(val) => setCustomFieldValues(prev => ({ ...prev, [def.id]: val }))}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">名称 <span className="text-red-500">*</span></label>
+            <input
+              type="text"
+              value={createName}
+              onChange={(e) => setCreateName(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">备注</label>
+            <textarea
+              value={createRemark}
+              onChange={(e) => setCreateRemark(e.target.value)}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">关联用户组（留空=全员可预览/下载）</label>
+            <div className="max-h-40 overflow-auto border border-gray-200 rounded-lg p-2 grid grid-cols-2 gap-x-2 gap-y-0.5">
+              {allGroups.length === 0 && <span className="text-gray-400 text-sm col-span-2">暂无用户组</span>}
+              {allGroups.map((g) => (
+                <label key={g.id} className="flex items-center gap-1.5 py-0.5">
+                  <input
+                    type="checkbox"
+                    checked={createGroupIds.includes(String(g.id))}
+                    onChange={(e) => setCreateGroupIds((prev) =>
+                      e.target.checked ? [...prev, String(g.id)] : prev.filter((x) => x !== String(g.id)))}
+                  />
+                  <span className="text-sm truncate">{g.name}</span>
+                </label>
+              ))}
             </div>
-          )}
-
-          {/* 关联用户组 */}
-          {(isAdmin() || (editingDoc && (editingDoc as any).creator_id === useAuthStore.getState().user?.id)) && (
-            <div className="border-t pt-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">关联用户组（留空=全员可预览/下载）</h4>
-              <div className="max-h-32 overflow-auto border border-gray-200 rounded p-2 grid grid-cols-3 gap-x-2 gap-y-0.5">
-                {allGroups.length === 0 && <span className="text-gray-400 text-sm col-span-3">暂无用户组</span>}
-                {allGroups.map((g) => (
-                  <label key={g.id} className="flex items-center gap-1.5 py-0.5">
-                    <input
-                      type="checkbox"
-                      checked={formGroupIds.includes(String(g.id))}
-                      onChange={(e) => setFormGroupIds((prev) =>
-                        e.target.checked ? [...prev, String(g.id)] : prev.filter((x) => x !== String(g.id)))}
-                    />
-                    <span className="text-sm truncate">{g.name}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 附件管理 - 新增/编辑界面一致，且只能上传一个附件 */}
-          {(() => {
-            const hasAttachment = editingDoc ? attachments.length > 0 : !!pendingFile;
-            return (
-            <div className="border-t pt-4">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-medium text-gray-700">附件管理</h4>
-                {!hasAttachment && !uploading && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handleUploadClick}
-                      className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700"
-                    >
-                      + 上传附件
-                    </button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      className="hidden"
-                      onChange={handleFileChange}
-                      accept="*/*"
-                    />
-                  </>
-                )}
-              </div>
-
-              {/* 上传状态提示 - 不阻塞保存操作 */}
-              {uploading && (
-                <div className="mb-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-blue-700">
-                      正在上传 "{uploadingFileName}"
-                    </span>
-                    <span className="text-blue-600 font-medium">
-                      {uploadProgress}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-blue-200 rounded-full h-2">
-                    <div
-                      className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${uploadProgress}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {loadingAttachments ? (
-                <div className="text-sm text-gray-500">加载中...</div>
-              ) : !hasAttachment && !uploading ? (
-                <div className="text-sm text-gray-400 py-4 text-center border border-dashed border-gray-300 rounded-lg">
-                  暂无附件
-                </div>
-              ) : (
-                <div className="border rounded-lg overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 border-b">
-                      <tr>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium">文件名</th>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium w-24">大小</th>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium w-40">上传时间</th>
-                        <th className="px-3 py-2 text-right text-gray-500 font-medium w-32">操作</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {editingDoc ? (
-                        attachments.map(att => (
-                          <tr key={att.id} className="hover:bg-gray-50">
-                            <td className="px-3 py-2">
-                              <span className="text-primary-600">{att.file_name}</span>
-                            </td>
-                            <td className="px-3 py-2 text-gray-500">{formatFileSize(att.file_size || 0)}</td>
-                            <td className="px-3 py-2 text-gray-500">
-                              {att.created_at ? new Date(att.created_at).toLocaleString('zh-CN') : '-'}
-                            </td>
-                            <td className="px-3 py-2 text-right">
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteAttachment(att.id)}
-                                disabled={deletingAttId === att.id}
-                                className="text-red-600 hover:text-red-800 disabled:opacity-50"
-                              >
-                                {deletingAttId === att.id ? '删除中...' : '删除'}
-                              </button>
-                            </td>
-                          </tr>
-                        ))
-                      ) : pendingFile ? (
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-3 py-2">
-                            <span className="text-primary-600">{pendingFile.name}</span>
-                          </td>
-                          <td className="px-3 py-2 text-gray-500">{formatFileSize(pendingFile.size)}</td>
-                          <td className="px-3 py-2 text-gray-400">待保存后上传</td>
-                          <td className="px-3 py-2 text-right">
-                            <button
-                              type="button"
-                              onClick={() => setPendingFile(null)}
-                              className="text-red-600 hover:text-red-800"
-                            >
-                              删除
-                            </button>
-                          </td>
-                        </tr>
-                      ) : null}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-            );
-          })()}
-
-          {saveError && (
+          </div>
+          {createSaveError && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
-              {saveError}
+              {createSaveError}
             </div>
           )}
-
-           <div className="flex justify-between items-center gap-2 pt-4 border-t">
-            <div>
-              {editingDoc && (editingDoc.status === 'released' || editingDoc.status === 'obsolete') && (
-                <button
-                  type="button"
-                  onClick={handleUpgrade}
-                  disabled={saving}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                  title="升版"
-                >
-                  {saving ? '升版中...' : '升版'}
-                </button>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-              <button type="submit" disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
-                {saving ? '保存中...' : '保存'}
-              </button>
-            </div>
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <button type="button" onClick={() => setCreateModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
+            <button type="submit" disabled={createSaving} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+              {createSaving ? '创建中...' : '创建'}
+            </button>
           </div>
         </form>
       </Modal>

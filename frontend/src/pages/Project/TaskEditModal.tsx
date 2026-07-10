@@ -9,7 +9,7 @@ import DocumentPicker from '../../components/DocumentPicker';
 import ConfigItemPicker from '../../components/Configuration/ConfigItemPicker';
 import ECPicker from '../../components/ECPicker';
 import PartDetailModal from '../../components/PartDetailModal';
-import DocumentDetailContent from '../../components/DocumentDetailContent';
+import DocumentDetailModal from '../../components/DocumentDetailModal';
 import ConfigurationDetailModal from '../../components/Configuration/ConfigurationDetailModal';
 import ArchiveTreeModal from '../../components/ArchiveTreeModal';
 import { ECRDetailModal } from '../../components/ECR/ECRDetailModal';
@@ -73,6 +73,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailCustomDefs, setDetailCustomDefs] = useState<CustomFieldDefinition[]>([]);
   const [detailCustomValues, setDetailCustomValues] = useState<Record<string, unknown>>({});
+  const [detailDocId, setDetailDocId] = useState<string | null>(null);
   const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
   const [ecView, setEcView] = useState<{ id: string; kind: 'ecr' | 'eco' } | null>(null);
 
@@ -224,6 +225,10 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
           alert('无法打开该变更单(ECR/ECO 不存在或无权限)');
         }
       }
+      return;
+    }
+    if (entityType === 'document') {
+      setDetailDocId(entityId);
       return;
     }
     setDetailEntityId(entityId);
@@ -713,20 +718,13 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
           onClose={() => { setDetailEntityId(null); setDetailEntityType(null); setDetailData(null); }}
         />
       )}
-      {detailEntityId && detailEntityType === 'document' && (
-        <Modal
-          open={!!detailEntityId}
-          title="图文档详情"
-          onClose={() => { setDetailEntityId(null); setDetailEntityType(null); setDetailData(null); setDetailCustomDefs([]); setDetailCustomValues({}); }}
-          width="full"
-        >
-          {detailLoading ? (
-            <div className="flex items-center justify-center py-8 text-gray-400">加载中...</div>
-          ) : detailData ? (
-            <DocumentDetailContent doc={detailData} customFieldDefs={detailCustomDefs} customFieldValues={detailCustomValues}
-              onArchivePreview={(attId, fileName) => setArchivePreview({ attId, fileName })} />
-          ) : null}
-        </Modal>
+      {detailDocId && (
+        <DocumentDetailModal
+          open={!!detailDocId}
+          docId={detailDocId}
+          onClose={() => setDetailDocId(null)}
+          onSaved={() => {}}
+        />
       )}
 
       {archivePreview && (

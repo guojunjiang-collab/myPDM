@@ -5,6 +5,7 @@ import type { EntityDocument, CustomFieldDefinition, CustomFieldValue, Document,
 import { canEdit } from '../stores/auth';
 import { useDataStore } from '../stores/data';
 import { Modal } from './Modal';
+import DocumentDetailModal from './DocumentDetailModal';
 import DocumentPicker from './DocumentPicker';
 import VersionSelectModal from './VersionSelectModal';
 import ArchiveTreeModal from './ArchiveTreeModal';
@@ -63,9 +64,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
 
   /* 图文档编辑弹窗 */
   const [editingDoc, setEditingDoc] = useState<Document | null>(null);
-  const [viewingDocDetail, setViewingDocDetail] = useState<Document | null>(null);
-  const [viewingDocCustomDefs, setViewingDocCustomDefs] = useState<CustomFieldDefinition[]>([]);
-  const [viewingDocCustomValues, setViewingDocCustomValues] = useState<Record<string, any>>({});
+  const [viewingDocId, setViewingDocId] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<{ name: string; status: string; remark: string }>({ name: '', status: 'draft', remark: '' });
   const [editCustomDefs, setEditCustomDefs] = useState<CustomFieldDefinition[]>([]);
   const [editCustomValues, setEditCustomValues] = useState<Record<string, any>>({});
@@ -183,28 +182,9 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
     });
   };
 
-  /** 查看图文档详情 */
-  const handleViewDocument = async (ed: EntityDocument) => {
-    let doc: Document;
-    try {
-      const res = await documentsApi.get(ed.document_id);
-      doc = res.data as Document;
-    } catch {
-      doc = ed.document as Document;
-    }
-    setViewingDocDetail(doc);
-    const allDefs = useDataStore.getState().customFieldDefs;
-    setViewingDocCustomDefs(allDefs.filter((d: CustomFieldDefinition) => d.applies_to?.includes('document')));
-    if (docFieldValues[ed.document_id]) {
-      setViewingDocCustomValues(docFieldValues[ed.document_id] as Record<string, any>);
-    } else {
-      try {
-        const res = await customFieldsApi.getValues('document', ed.document_id);
-        const values: Record<string, any> = {};
-        (res.data || []).forEach((v: CustomFieldValue) => { values[v.field_id] = v.value; });
-        setViewingDocCustomValues(values);
-      } catch { setViewingDocCustomValues({}); }
-    }
+  /** 查看图文档详情（复用 DocumentDetailModal） */
+  const handleViewDocument = (ed: EntityDocument) => {
+    setViewingDocId(ed.document_id);
   };
 
   /** 编辑图文档 */
@@ -581,20 +561,13 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
         )}
       </Modal>
 
-      {/* 图文档详情弹窗 */}
-      {viewingDocDetail && (
-        <Modal open={!!viewingDocDetail} title="图文档详情" onClose={() => setViewingDocDetail(null)} width="full" zIndex={61}>
-          <DocumentDetailContent
-            doc={viewingDocDetail}
-            customFieldDefs={viewingDocCustomDefs}
-            customFieldValues={viewingDocCustomValues}
-            groupNames={(viewingDocDetail as any).group_names || []}
-          />
-          <div className="flex justify-end pt-4 border-t mt-4">
-            <button type="button" onClick={() => setViewingDocDetail(null)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">关闭</button>
-          </div>
-        </Modal>
-      )}
+      {/* 图文档详情弹窗（复用 DocumentDetailModal） */}
+      <DocumentDetailModal
+        open={!!viewingDocId}
+        docId={viewingDocId}
+        onClose={() => setViewingDocId(null)}
+        onSaved={() => {}}
+      />
 
       {/* 版本选择弹窗 */}
       <VersionSelectModal
