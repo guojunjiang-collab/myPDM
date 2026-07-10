@@ -469,10 +469,14 @@ async def download_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, db: Session 
     }
 
 @router.get("/{doc_id}/attachments/")
-async def list_attachments(doc_id: uuid.UUID, skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents.attachment:download"))):
-    atts = db.query(DocumentAttachment).filter(DocumentAttachment.document_id == doc_id).offset(skip).limit(limit).all()
+async def list_attachments(doc_id: uuid.UUID, iteration_id: Optional[uuid.UUID] = None, skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents.attachment:download"))):
+    """列出文档附件。iteration_id 可选：传入时只返回该迭代的附件。"""
+    query = db.query(DocumentAttachment).filter(DocumentAttachment.document_id == doc_id)
+    if iteration_id is not None:
+        query = query.filter(DocumentAttachment.iteration_id == iteration_id)
+    atts = query.offset(skip).limit(limit).all()
     return [{
-        "id": a.id, "document_id": a.document_id,
+        "id": a.id, "document_id": a.document_id, "iteration_id": str(a.iteration_id) if a.iteration_id else None,
         "file_name": a.file_name, "file_size": a.file_size, "created_at": a.created_at,
     } for a in atts]
 

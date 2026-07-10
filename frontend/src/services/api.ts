@@ -230,7 +230,8 @@ export const documentsApi = {
   // 图文档附件
   uploadAttachment: (docId: string, data: { id?: string; file_name: string; file_data: string }) =>
     api.post(`/documents/${docId}/attachments`, data),
-  listAttachments: (docId: string) => api.get(`/documents/${docId}/attachments/`),
+  listAttachments: (docId: string, iterationId?: string) =>
+    api.get(`/documents/${docId}/attachments/`, { params: iterationId ? { iteration_id: iterationId } : {} }),
   getAttachment: (docId: string, attId: string) => api.get(`/documents/${docId}/attachments/${attId}`),
   deleteAttachment: (docId: string, attId: string) => api.delete(`/documents/${docId}/attachments/${attId}`),
   /** 图文档反查：查询引用该文档的零件、部件和用户看板 */

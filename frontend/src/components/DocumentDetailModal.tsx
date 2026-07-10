@@ -41,6 +41,8 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
   const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
   const [iterations, setIterations] = useState<DocumentIteration[]>([]);
   const [versions, setVersions] = useState<Document[]>([]);
+  // 当前正在查看的迭代 id（null=查看当前最新迭代）
+  const [viewingIterationId, setViewingIterationId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ code: '', name: '', remark: '' });
   const [showCheckinModal, setShowCheckinModal] = useState(false);
   const [checkinNote, setCheckinNote] = useState('');
@@ -73,12 +75,12 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
   const loadAttachments = useCallback(async () => {
     if (!docId) return;
     try {
-      const res = await documentsApi.listAttachments(docId);
+      const res = await documentsApi.listAttachments(docId, viewingIterationId || undefined);
       setAttachments((res.data || []) as DocumentAttachment[]);
     } catch {
       setAttachments([]);
     }
-  }, [docId]);
+  }, [docId, viewingIterationId]);
 
   const loadIterations = useCallback(async () => {
     if (!docId) return;
@@ -100,14 +102,39 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
     }
   }, [docId]);
 
+  // 当前迭代 id：未签入的迭代（最新且无 check_in_date）；若都已签入则取 iteration 最大的
+  const currentIterationId = useMemo(() => {
+    const ongoing = iterations.find((it) => !it.check_in_date);
+    if (ongoing) return ongoing.id;
+    if (iterations.length === 0) return null;
+    return iterations.reduce((max, it) => (it.iteration > max.iteration ? it : max)).id;
+  }, [iterations]);
+
+  // 查看的迭代对象
+  const viewingIteration = useMemo(
+    () => iterations.find((it) => it.id === viewingIterationId) ?? null,
+    [iterations, viewingIterationId]
+  );
+  const isViewingHistorical = !!viewingIterationId;
+
   useEffect(() => {
     if (open && docId) {
+      setViewingIterationId(null);
       loadDoc();
       loadAttachments();
       loadIterations();
       loadVersions();
     }
-  }, [open, docId, loadDoc, loadAttachments, loadIterations, loadVersions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, docId]);
+
+  // 切换查看的迭代时重拉附件
+  useEffect(() => {
+    if (open && docId) {
+      loadAttachments();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewingIterationId]);
 
   // 字段自动保存（防抖）
   const saveTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -335,6 +362,19 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
               </div>
             </div>
 
+            {/* 查看历史迭代提示 */}
+            {isViewingHistorical && viewingIteration && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1.5 shrink-0 mb-3 text-sm flex items-center justify-between">
+                <span>正在查看 Iteration #{viewingIteration.iteration} 历史数据（只读）</span>
+                <button
+                  onClick={() => setViewingIterationId(null)}
+                  className="text-primary-600 hover:text-primary-800 hover:underline text-xs"
+                >
+                  返回当前
+                </button>
+              </div>
+            )}
+
             {/* 底部 Tab */}
             <div className="border-b flex gap-1 shrink-0">
               {tabs.map((t) => (
@@ -354,7 +394,7 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
             <div className="flex-1 overflow-auto pt-3">
               {activeTab === 'attachments' && (
                 <div>
-                  {canEdit && (
+                  {canEdit && !isViewingHistorical && (
                     <div className="mb-2">
                       <label className="inline-block px-3 py-1 text-sm bg-primary-600 text-white rounded cursor-pointer hover:bg-primary-700">
                         {uploading ? '上传中...' : '上传附件'}
@@ -369,7 +409,7 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                   )}
                   {attachments.length === 0 ? (
                     <div className="text-sm text-gray-400 py-4 text-center border border-dashed border-gray-300 rounded-lg">
-                      暂无附件
+                      {isViewingHistorical ? '该迭代暂无附件' : '暂无附件'}
                     </div>
                   ) : (
                     <div className="border rounded-lg overflow-hidden">
@@ -407,7 +447,7 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                                 >
                                   下载
                                 </button>
-                                {canEdit && (
+                                {canEdit && !isViewingHistorical && (
                                   <button
                                     onClick={() => handleDeleteAtt(att.id)}
                                     className="text-red-600 hover:text-red-800"
@@ -458,32 +498,57 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                       <tr>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">迭代</th>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium w-40">签入时间</th>
+                        <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">迭代</th>
+                        <th className="px-3 py-2 text-left text-gray-500 font-medium w-44">签入时间</th>
                         <th className="px-3 py-2 text-left text-gray-500 font-medium">签入说明</th>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium">附件</th>
+                        <th className="px-3 py-2 text-left text-gray-500 font-medium w-44">附件</th>
+                        <th className="px-3 py-2 text-right text-gray-500 font-medium w-24">操作</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {iterations.map((it) => (
-                        <tr key={it.id} className="hover:bg-gray-50">
-                          <td className="px-3 py-2">#{it.iteration}</td>
-                          <td className="px-3 py-2 text-gray-500">
-                            {it.check_in_date ? (
-                              formatDateTime(it.check_in_date)
-                            ) : (
-                              <span className="text-orange-600">进行中</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 text-gray-700">{it.check_in_note || '-'}</td>
-                          <td className="px-3 py-2 text-gray-500">
-                            {(it.attachments || []).map((a) => a.file_name).join('、') || '-'}
-                          </td>
-                        </tr>
-                      ))}
+                      {iterations.map((it) => {
+                        const isCurrent = it.id === currentIterationId;
+                        const isViewing = it.id === viewingIterationId;
+                        return (
+                          <tr
+                            key={it.id}
+                            className={`hover:bg-gray-50 ${isViewing ? 'bg-blue-50' : ''}`}
+                          >
+                            <td className="px-3 py-2">#{it.iteration}</td>
+                            <td className="px-3 py-2 text-gray-500">
+                              {it.check_in_date ? (
+                                new Date(it.check_in_date).toLocaleString('zh-CN', { hour12: false })
+                              ) : (
+                                <span className="text-orange-600">进行中</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-gray-700">{it.check_in_note || '-'}</td>
+                            <td className="px-3 py-2 text-gray-500">
+                              {(it.attachments || []).length} 个
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              {isCurrent ? (
+                                <span className="text-primary-600 text-xs">当前</span>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setViewingIterationId(it.id);
+                                    setActiveTab('attachments');
+                                  }}
+                                  className={`text-xs hover:underline ${
+                                    isViewing ? 'text-orange-600' : 'text-primary-600 hover:text-primary-800'
+                                  }`}
+                                >
+                                  {isViewing ? '查看中' : '查看数据'}
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                       {iterations.length === 0 && (
                         <tr>
-                          <td colSpan={4} className="px-3 py-4 text-center text-gray-400">
+                          <td colSpan={5} className="px-3 py-4 text-center text-gray-400">
                             暂无迭代记录
                           </td>
                         </tr>
