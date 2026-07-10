@@ -435,9 +435,20 @@ def undocheckout_part(db: Session, revision_id: UUID, user_id: UUID) -> Tuple[Op
     if latest_iter:
         # 签出时 _copy_iteration_data 复制了附件和 BOMItem 到新迭代，
         # 删迭代前必须先清理这些引用行（外键 NOT NULL 无 CASCADE）。
-        db.query(models_parts.PartAttachment).filter(
+        # 同时删除物理文件。
+        copied_atts = db.query(models_parts.PartAttachment).filter(
             models_parts.PartAttachment.iteration_id == latest_iter.id
-        ).delete(synchronize_session=False)
+        ).all()
+        for att in copied_atts:
+            if att.file_path:
+                try:
+                    import os
+                    full_path = os.path.join('./uploads', att.file_path)
+                    if os.path.exists(full_path):
+                        os.remove(full_path)
+                except Exception:
+                    pass
+            db.delete(att)
         db.query(models.BOMItem).filter(
             models.BOMItem.iteration_id == latest_iter.id
         ).delete(synchronize_session=False)
