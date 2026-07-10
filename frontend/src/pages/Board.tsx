@@ -4,6 +4,7 @@ import { useDataStore } from '../stores/data';
 import { Modal, ConfirmModal } from '../components/Modal';
 import PartDetailContent from '../components/PartDetailContent';
 import DocumentDetailContent from '../components/DocumentDetailContent';
+import DocumentDetailModal from '../components/DocumentDetailModal';
 import ArchiveTreeModal from '../components/ArchiveTreeModal';
 import AssemblyDetailContent from '../components/AssemblyDetailContent';
 import ConfigurationDetailModal from '../components/Configuration/ConfigurationDetailModal';
@@ -126,6 +127,7 @@ export default function Board() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailCustomDefs, setDetailCustomDefs] = useState<CustomFieldDefinition[]>([]);
   const [detailCustomValues, setDetailCustomValues] = useState<Record<string, any>>({});
+  const [detailDocId, setDetailDocId] = useState<string | null>(null);
   const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
 
   /* Load */
@@ -274,6 +276,12 @@ export default function Board() {
   const canEditFolder = selectedFolder ? !selectedFolder.shared_from || selectedFolder.shared_from?.permission === 'edit' : false;
 
   const handleViewDetail = async (item: DashboardItem) => {
+    // 图文档直接复用 DocumentDetailModal，无需加载到本地 state
+    if (item.entity_type === 'document') {
+      setDetailDocId(item.entity_id);
+      setDetailItem(null);
+      return;
+    }
     setDetailItem(item);
     setDetailData(null);
     setDetailCustomDefs([]);
@@ -283,7 +291,6 @@ export default function Board() {
       let res;
       if (item.entity_type === 'part') res = await componentsApi.get(item.entity_id);
       else if (item.entity_type === 'assembly' || item.entity_type === 'component') res = await componentsApi.get(item.entity_id);
-      else if (item.entity_type === 'document') res = await documentsApi.get(item.entity_id);
       else res = await configurationApi.getItem(item.entity_id);
       
       const data = res.data;
@@ -291,7 +298,7 @@ export default function Board() {
       
       // Load custom field defs and values
       const allDefs = useDataStore.getState().customFieldDefs;
-      const entityType = item.entity_type === 'part' ? 'part' : item.entity_type === 'assembly' ? 'component' : item.entity_type === 'document' ? 'document' : 'configuration';
+      const entityType = item.entity_type === 'part' ? 'part' : item.entity_type === 'assembly' ? 'component' : 'configuration';
       const defs = allDefs.filter((d: CustomFieldDefinition) => d.applies_to?.includes(entityType));
       setDetailCustomDefs(defs);
       
@@ -582,15 +589,17 @@ export default function Board() {
               status: item.child_detail?.status || 'draft',
             })}
           />
-        ) : detailItem?.entity_type === 'document' ? (
-          <DocumentDetailContent
-            doc={detailData}
-            customFieldDefs={detailCustomDefs}
-            customFieldValues={detailCustomValues}
-            onArchivePreview={(attId, fileName) => setArchivePreview({ attId, fileName })}
-          />
         ) : null}
       </Modal>
+
+      {detailDocId && (
+        <DocumentDetailModal
+          open={!!detailDocId}
+          docId={detailDocId}
+          onClose={() => setDetailDocId(null)}
+          onSaved={() => {}}
+        />
+      )}
 
       {detailItem?.entity_type === 'configuration' && (
         <ConfigurationDetailModal
