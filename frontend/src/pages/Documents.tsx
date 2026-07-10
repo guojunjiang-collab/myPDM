@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { documentsApi, customFieldsApi, bomApi, v2UploadApi, CHUNK_SIZE, CHUNK_THRESHOLD, userGroupsApi } from '../services/api';
 import type { Document, CustomFieldDefinition, CustomFieldValue, DocumentAttachment } from '../types';
 import { canEdit, isAdmin, canDownload, useAuthStore } from '../stores/auth';
+import { compareVersions } from '../constants';
 import CustomFieldInput from '../components/CustomFieldInput';
 import { Modal, ConfirmModal } from '../components/Modal';
 import DocumentDetailContent from '../components/DocumentDetailContent';
@@ -185,13 +186,13 @@ export default function Documents() {
     versionCountMap[d.code] = (versionCountMap[d.code] || 0) + 1;
   });
 
-  // 仅显示最新版本
+  // 仅显示最新版本（按版本号序列 A→B→C...→ZZ 比较）
   const displayData = (() => {
     let data = showAllVersions ? filteredData : (() => {
       const latestMap: Record<string, typeof filteredData[0]> = {};
       filteredData.forEach(d => {
         const existing = latestMap[d.code];
-        if (!existing || new Date(d.created_at || 0) > new Date(existing.created_at || 0)) {
+        if (!existing || compareVersions(d.version || 'A', existing.version || 'A') > 0) {
           latestMap[d.code] = d;
         }
       });
