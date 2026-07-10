@@ -207,6 +207,13 @@ async def create_document(doc: schemas.DocumentCreate, request: Request, db: Ses
     group_ids = data.pop("group_ids", None) or []
     d = Document(**data, creator_id=current_user.id)
     db.add(d)
+    db.flush()
+    # 自动建首个迭代并签出给创建者（对齐零件：创建即可编辑/传附件）
+    first_iter = DocumentIteration(document_id=d.id, iteration=1)
+    db.add(first_iter)
+    d.latest_iteration = 1
+    d.check_out_user_id = current_user.id
+    d.check_out_date = datetime.now(timezone.utc)
     db.commit()
     db.refresh(d)
     for gid in set(group_ids):
@@ -224,7 +231,8 @@ async def create_document(doc: schemas.DocumentCreate, request: Request, db: Ses
         "creator_name": current_user.real_name,
         "group_ids": list(set(group_ids)),
         "created_at": d.created_at, "updated_at": d.updated_at,
-        "check_out_user_id": d.check_out_user_id,
+        "check_out_user_id": str(d.check_out_user_id) if d.check_out_user_id else None,
+        "check_out_user_name": current_user.real_name,
         "check_out_date": d.check_out_date.isoformat() if d.check_out_date else None,
         "latest_iteration": d.latest_iteration,
     }
