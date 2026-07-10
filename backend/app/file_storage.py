@@ -61,20 +61,29 @@ class FileStorage:
         return full_path
 
     def _get_file_path(self, entity_type: str, entity_id: str, filename: str, folder_name: str = None) -> Path:
-        """获取文件存储路径"""
+        """获取文件存储路径。folder_name 支持含 / 的分层路径。"""
         entity_type = ENTITY_TYPE_ALIASES.get(entity_type, entity_type)
         if entity_type not in ALLOWED_ENTITY_TYPES:
             raise ValueError(f"无效的实体类型: {entity_type}")
 
-        dir_name = str(entity_id)
         if folder_name:
-            sanitized = folder_name.strip().strip('.')
-            illegal_chars = r'\/:*?"<>|' + '\x00'
-            for ch in illegal_chars:
-                sanitized = sanitized.replace(ch, '_')
-            dir_name = sanitized if sanitized else str(entity_id)
+            # 支持分层路径如 code/version/iteration
+            parts = folder_name.strip().strip('/').split('/')
+            sanitized_parts = []
+            for p in parts:
+                s = p.strip().strip('.')
+                illegal_chars = r'\/:*?"<>|' + '\x00'
+                for ch in illegal_chars:
+                    s = s.replace(ch, '_')
+                if s:
+                    sanitized_parts.append(s)
+            entity_dir = self.base_dir / entity_type
+            for sp in sanitized_parts:
+                entity_dir = entity_dir / sp
+        else:
+            entity_dir = self.base_dir / entity_type / str(entity_id)
 
-        entity_dir = (self.base_dir / entity_type / dir_name).resolve()
+        entity_dir = entity_dir.resolve()
         if not entity_dir.is_relative_to(self.base_dir.resolve()):
             raise ValueError("非法文件路径")
         entity_dir.mkdir(parents=True, exist_ok=True)
