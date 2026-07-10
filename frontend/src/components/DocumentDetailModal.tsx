@@ -43,6 +43,9 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
   const [versions, setVersions] = useState<Document[]>([]);
   // 当前正在查看的迭代 id（null=查看当前最新迭代）
   const [viewingIterationId, setViewingIterationId] = useState<string | null>(null);
+  // 当前正在查看的版本 id（null=查看 prop 传入的当前版本）
+  const [viewingVersionId, setViewingVersionId] = useState<string | null>(null);
+  // 切换版本时显示的附件迭代过滤器（不与 viewingIterationId 互锁）
   const [editForm, setEditForm] = useState({ code: '', name: '', remark: '' });
   const [showCheckinModal, setShowCheckinModal] = useState(false);
   const [checkinNote, setCheckinNote] = useState('');
@@ -51,17 +54,25 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
   const isCheckedOut = !!doc?.check_out_user_id;
   const isCheckedOutByMe = isCheckedOut && doc?.check_out_user_id === user?.id;
   const isDraft = doc?.status === 'draft';
-  const canEdit = isCheckedOutByMe && isDraft;
-  const canCheckout = isDraft && !isCheckedOut;
-  const canCheckin = isDraft && isCheckedOutByMe;
-  const canUndo = isDraft && isCheckedOutByMe && (doc?.latest_iteration || 0) > 1;
-  const canForceCheckin = isCheckedOut && isAdmin();
+
+  // 实际加载/展示的文档 id：viewingVersionId 优先，否则用 prop 传入的 docId
+  const effectiveDocId = viewingVersionId || docId;
+  // 是否在查看历史版本（不是打开时传入的那个版本）
+  const isViewingOtherVersion = !!viewingVersionId && viewingVersionId !== docId;
+  // 当前版本 id（即 prop 传入的 docId）
+  const currentVersionId = docId;
+
+  const canEdit = isCheckedOutByMe && isDraft && !isViewingOtherVersion;
+  const canCheckout = isDraft && !isCheckedOut && !isViewingOtherVersion;
+  const canCheckin = isDraft && isCheckedOutByMe && !isViewingOtherVersion;
+  const canUndo = isDraft && isCheckedOutByMe && (doc?.latest_iteration || 0) > 1 && !isViewingOtherVersion;
+  const canForceCheckin = isCheckedOut && isAdmin() && !isViewingOtherVersion;
 
   const loadDoc = useCallback(async () => {
-    if (!docId) return;
+    if (!effectiveDocId) return;
     setLoading(true);
     try {
-      const res = await documentsApi.get(docId);
+      const res = await documentsApi.get(effectiveDocId);
       const d = (res.data ?? res) as Document;
       setDoc(d);
       setEditForm({ code: d.code || '', name: d.name || '', remark: d.remark || '' });
@@ -70,37 +81,37 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
     } finally {
       setLoading(false);
     }
-  }, [docId]);
+  }, [effectiveDocId]);
 
   const loadAttachments = useCallback(async () => {
-    if (!docId) return;
+    if (!effectiveDocId) return;
     try {
-      const res = await documentsApi.listAttachments(docId, viewingIterationId || undefined);
+      const res = await documentsApi.listAttachments(effectiveDocId, viewingIterationId || undefined);
       setAttachments((res.data || []) as DocumentAttachment[]);
     } catch {
       setAttachments([]);
     }
-  }, [docId, viewingIterationId]);
+  }, [effectiveDocId, viewingIterationId]);
 
   const loadIterations = useCallback(async () => {
-    if (!docId) return;
+    if (!effectiveDocId) return;
     try {
-      const res = await documentsApi.iterations(docId);
+      const res = await documentsApi.iterations(effectiveDocId);
       setIterations((res.data || []) as DocumentIteration[]);
     } catch {
       setIterations([]);
     }
-  }, [docId]);
+  }, [effectiveDocId]);
 
   const loadVersions = useCallback(async () => {
-    if (!docId) return;
+    if (!effectiveDocId) return;
     try {
-      const res = await documentsApi.versions(docId);
+      const res = await documentsApi.versions(effectiveDocId);
       setVersions((res.data || []) as Document[]);
     } catch {
       setVersions([]);
     }
-  }, [docId]);
+  }, [effectiveDocId]);
 
   // 当前迭代 id：未签入的迭代（最新且无 check_in_date）；若都已签入则取 iteration 最大的
   const currentIterationId = useMemo(() => {
@@ -120,6 +131,7 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
   useEffect(() => {
     if (open && docId) {
       setViewingIterationId(null);
+      setViewingVersionId(null);
       loadDoc();
       loadAttachments();
       loadIterations();
@@ -135,6 +147,17 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewingIterationId]);
+
+  // 切换查看的版本时重拉所有数据，并清空迭代选择（不同版本的迭代不互通）
+  useEffect(() => {
+    if (open && docId) {
+      setViewingIterationId(null);
+      loadDoc();
+      loadAttachments();
+      loadIterations();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewingVersionId]);
 
   // 字段自动保存（防抖）
   const saveTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -349,7 +372,7 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                     强制签入
                   </button>
                 )}
-                {isDraft && isCheckedOutByMe && (
+                {isDraft && isCheckedOutByMe && !isViewingOtherVersion && (
                   <button
                     onClick={() => {
                       if (confirm('确定升版？')) doAction(() => documentsApi.upgrade(doc.id), '升版成功');
@@ -362,8 +385,21 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
               </div>
             </div>
 
+            {/* 查看历史版本提示 */}
+            {isViewingOtherVersion && doc && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1.5 shrink-0 mb-3 text-sm flex items-center justify-between">
+                <span>正在查看版本 v{doc.version}（只读）</span>
+                <button
+                  onClick={() => setViewingVersionId(null)}
+                  className="text-primary-600 hover:text-primary-800 hover:underline text-xs"
+                >
+                  返回当前
+                </button>
+              </div>
+            )}
+
             {/* 查看历史迭代提示 */}
-            {isViewingHistorical && viewingIteration && (
+            {isViewingHistorical && viewingIteration && !isViewingOtherVersion && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1.5 shrink-0 mb-3 text-sm flex items-center justify-between">
                 <span>正在查看 Iteration #{viewingIteration.iteration} 历史数据（只读）</span>
                 <button
@@ -469,22 +505,48 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                       <tr>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium">版本</th>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium">状态</th>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium">更新时间</th>
+                        <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
+                        <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">状态</th>
+                        <th className="px-3 py-2 text-left text-gray-500 font-medium w-44">更新时间</th>
+                        <th className="px-3 py-2 text-right text-gray-500 font-medium w-24">操作</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {versions.map((v) => (
-                        <tr key={v.id} className="hover:bg-gray-50">
-                          <td className="px-3 py-2">{v.version}</td>
-                          <td className="px-3 py-2">{statusTag(v.status).label}</td>
-                          <td className="px-3 py-2 text-gray-500">{formatDateTime(v.updated_at)}</td>
-                        </tr>
-                      ))}
+                      {versions.map((v) => {
+                        const isCurrent = v.id === currentVersionId;
+                        const isViewing = v.id === viewingVersionId;
+                        return (
+                          <tr
+                            key={v.id}
+                            className={`hover:bg-gray-50 ${isViewing ? 'bg-blue-50' : ''}`}
+                          >
+                            <td className="px-3 py-2">v{v.version}</td>
+                            <td className="px-3 py-2">
+                              <span className={`px-1.5 py-0.5 text-xs rounded-full ${statusTag(v.status).class}`}>
+                                {statusTag(v.status).label}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-gray-500">{formatDateTime(v.updated_at)}</td>
+                            <td className="px-3 py-2 text-right">
+                              {isCurrent ? (
+                                <span className="text-primary-600 text-xs">当前</span>
+                              ) : (
+                                <button
+                                  onClick={() => setViewingVersionId(v.id)}
+                                  className={`text-xs hover:underline ${
+                                    isViewing ? 'text-orange-600' : 'text-primary-600 hover:text-primary-800'
+                                  }`}
+                                >
+                                  {isViewing ? '查看中' : '切换'}
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                       {versions.length === 0 && (
                         <tr>
-                          <td colSpan={3} className="px-3 py-4 text-center text-gray-400">
+                          <td colSpan={4} className="px-3 py-4 text-center text-gray-400">
                             暂无版本历史
                           </td>
                         </tr>
