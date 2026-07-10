@@ -9,7 +9,7 @@ import base64
 
 from ..database import get_db
 from ..models import User, Document, DocumentAttachment, DocumentGroupLink, UserGroup, DocumentIteration
-from ..models_parts import PartMaster
+from ..models_parts import PartMaster, PartRevision
 from .. import crud, schemas, crud_groups
 from ..permissions import require_permission, check_object_policy
 from ..stp_converter import is_stp_file, delete_glb_cache
@@ -134,41 +134,31 @@ async def get_document_references(doc_id: uuid.UUID, db: Session = Depends(get_d
     from ..models import DashboardItem, DashboardFolder, User, UserDashboard
     doc_id_str = str(doc_id)
 
-    # 扫描零件的 document_links
-    parts = db.query(PartMaster).all()
+    # 扫描 document_links（字段实际在 PartIteration 上：iteration -> revision -> master）
+    from ..models_parts import PartIteration
     references = []
-    for p in parts:
-        links = p.document_links or []
-        for link in links:
-            if link.get("document_id") == doc_id_str:
-                references.append({
-                    "entity_type": "part",
-                    "entity_id": str(p.id),
-                    "entity_code": p.code,
-                    "entity_name": p.name,
-                    "version": p.version or "",
-                    "status": p.status or "draft",
-                    "category": link.get("category"),
-                })
+    for it in db.query(PartIteration).all():
+        for link in (it.document_links or []):
+            if link.get("document_id") != doc_id_str:
+                continue
+            rev = db.query(PartRevision).filter(PartRevision.id == it.revision_id).first()
+            if not rev:
                 break
+            master = db.query(PartMaster).filter(PartMaster.id == rev.master_id).first()
+            if not master:
+                break
+            entity_type = "component" if master.type == "assembly" else "part"
+            references.append({
+                "entity_type": entity_type,
+                "entity_id": str(master.id),
+                "entity_code": master.code,
+                "entity_name": master.name,
+                "version": master.version or "",
+                "status": master.status or "draft",
+                "category": link.get("category"),
+            })
+            break
 
-    # 扫描部件的 document_links
-    assemblies = db.query(PartMaster).all()
-    for a in assemblies:
-        links = a.document_links or []
-        for link in links:
-            if link.get("document_id") == doc_id_str:
-                references.append({
-                    "entity_type": "component",
-                    "entity_id": str(a.id),
-                    "entity_code": a.code,
-                    "entity_name": a.name,
-                    "version": a.version or "",
-                    "status": a.status or "draft",
-                    "category": link.get("category"),
-                })
-                break
-    
     # 查询用户看板中引用该图文档的记录
     dashboard_refs = db.query(DashboardItem).filter(
         DashboardItem.entity_type == 'document',
@@ -335,40 +325,31 @@ async def update_document(doc_id: uuid.UUID, body: schemas.DocumentUpdate, reque
     }
 
 def _find_doc_refs(db, doc_id_str):
-    """精确扫描 document_links JSONB，找出引用指定图文档的零件和部件"""
+    """精确扫描 document_links JSONB（字段位于 PartIteration），找出引用指定图文档的零部件"""
+    from ..models_parts import PartIteration
     references = []
-    # 扫描零件
-    for p in db.query(PartMaster).all():
-        for link in (p.document_links or []):
+    # document_links 字段实际在 PartIteration 上：通过 iteration -> revision -> master 关联拿 master 信息
+    for it in db.query(PartIteration).all():
+        for link in (it.document_links or []):
             if link.get("document_id") == doc_id_str:
+                rev = db.query(PartRevision).filter(PartRevision.id == it.revision_id).first()
+                if not rev:
+                    break
+                master = db.query(PartMaster).filter(PartMaster.id == rev.master_id).first()
+                if not master:
+                    break
+                entity_type = "component" if master.type == "assembly" else "part"
                 references.append({
-                    "entity_type": "part",
-                    "entity_id": str(p.id),
-                    "entity_code": p.code,
-                    "entity_name": p.name,
-                    "version": p.version or "",
-                    "status": p.status or "draft",
+                    "entity_type": entity_type,
+                    "entity_id": str(master.id),
+                    "entity_code": master.code,
+                    "entity_name": master.name,
+                    "version": master.version or "",
+                    "status": master.status or "draft",
                     "category": link.get("category"),
-                    "id": str(p.id),
-                    "code": p.code,
-                    "name": p.name,
-                })
-                break
-    # 扫描部件
-    for a in db.query(PartMaster).all():
-        for link in (a.document_links or []):
-            if link.get("document_id") == doc_id_str:
-                references.append({
-                    "entity_type": "component",
-                    "entity_id": str(a.id),
-                    "entity_code": a.code,
-                    "entity_name": a.name,
-                    "version": a.version or "",
-                    "status": a.status or "draft",
-                    "category": link.get("category"),
-                    "id": str(a.id),
-                    "code": a.code,
-                    "name": a.name,
+                    "id": str(master.id),
+                    "code": master.code,
+                    "name": master.name,
                 })
                 break
     return references

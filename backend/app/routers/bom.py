@@ -8,7 +8,7 @@ import uuid
 
 from ..database import get_db
 from ..models import User
-from ..models_parts import PartMaster
+from ..models_parts import PartMaster, PartRevision
 from .. import crud, models, schemas
 from ..bom import compare
 from ..permissions import require_permission
@@ -44,16 +44,18 @@ async def check_references(
                 if p and p.deleted_at is None:
                     references.append({"type": "bom_child", "parent_id": str(item.parent_id), "label": f"零部件 {p.code}"})
 
-    # 2. 检查 document_links 引用（图文档被关联到零部件）- 已迁移到 PartRevision.document_links
+    # 2. 检查 document_links 引用（图文档被关联到零部件）— 字段实际在 PartIteration
     if entity_type == "document":
-        from ..models_parts import PartRevision
+        from ..models_parts import PartIteration
         doc_id_str = str(entity_id)
-        for rev in db.query(PartRevision).all():
-            for link in (rev.document_links or []):
+        for iter in db.query(PartIteration).all():
+            for link in (iter.document_links or []):
                 if link.get("document_id") == doc_id_str:
-                    master = db.query(PartMaster).filter(PartMaster.id == rev.master_id).first()
-                    label = f"零部件 {master.code}" if master else "零部件"
-                    references.append({"type": "entity_document", "parent_id": str(rev.master_id), "label": label})
+                    rev = db.query(PartRevision).filter(PartRevision.id == iter.revision_id).first()
+                    if rev:
+                        master = db.query(PartMaster).filter(PartMaster.id == rev.master_id).first()
+                        label = f"零部件 {master.code}" if master else "零部件"
+                        references.append({"type": "entity_document", "parent_id": str(rev.master_id), "label": label})
                     break
 
     return references
