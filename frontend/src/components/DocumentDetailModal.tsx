@@ -774,14 +774,35 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                               {isCurrent ? (
                                 <span className="text-primary-600 text-xs">当前</span>
                               ) : (
-                                <button
-                                  onClick={() => setViewingIterationId(it.id)}
-                                  className={`text-xs hover:underline ${
-                                    isViewing ? 'text-orange-600' : 'text-primary-600 hover:text-primary-800'
-                                  }`}
-                                >
-                                  {isViewing ? '查看中' : '查看数据'}
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() => setViewingIterationId(it.id)}
+                                    className={`text-xs hover:underline mr-2 ${
+                                      isViewing ? 'text-orange-600' : 'text-primary-600 hover:text-primary-800'
+                                    }`}
+                                  >
+                                    {isViewing ? '查看中' : '查看数据'}
+                                  </button>
+                                  {isAdmin() && (
+                                    <button
+                                      onClick={async () => {
+                                        if (!doc || !confirm(`确定删除迭代 #${it.iteration}？该迭代的附件也将被删除。`)) return;
+                                        try {
+                                          await documentsApi.deleteIteration(doc.id, it.id);
+                                          toast.success('迭代已删除');
+                                          await loadIterations();
+                                          await loadAttachments();
+                                          onSaved();
+                                        } catch (e: any) {
+                                          toast.error(e?.response?.data?.detail || '删除失败');
+                                        }
+                                      }}
+                                      className="text-xs text-red-600 hover:text-red-800 hover:underline"
+                                    >
+                                      删除
+                                    </button>
+                                  )}
+                                </>
                               )}
                             </td>
                           </tr>

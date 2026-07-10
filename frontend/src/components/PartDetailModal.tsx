@@ -806,7 +806,26 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                             {it.id === iteration?.id ? (
                               <span className="text-primary-600 text-xs">当前</span>
                             ) : (
-                              <button onClick={() => handleViewIteration(it.id)} className="text-primary-600 hover:text-primary-800 hover:underline text-xs">查看数据</button>
+                              <>
+                                <button onClick={() => handleViewIteration(it.id)} className="text-primary-600 hover:text-primary-800 hover:underline text-xs mr-2">查看数据</button>
+                                {isAdminUser && (
+                                  <button
+                                    onClick={async () => {
+                                      if (!revisionId || !confirm(`确定删除迭代 #${it.iteration}？该迭代的附件也将被删除。`)) return;
+                                      try {
+                                        await partsApi.deleteIteration(revisionId, it.id);
+                                        toast.success('迭代已删除');
+                                        setIterationsList(await partsApi.iterations(revisionId));
+                                      } catch (e: any) {
+                                        toast.error(e?.response?.data?.detail || '删除失败');
+                                      }
+                                    }}
+                                    className="text-xs text-red-600 hover:text-red-800 hover:underline"
+                                  >
+                                    删除
+                                  </button>
+                                )}
+                              </>
                             )}
                           </td>
                         </tr>

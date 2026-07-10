@@ -172,6 +172,8 @@ export const partsApi = {
     api.get(`/parts/revisions/${revisionId}/iterations`).then((r) => r.data),
   getIteration: (revisionId: string, iterationId: string) =>
     api.get(`/parts/revisions/${revisionId}/iterations/${iterationId}`).then((r) => r.data),
+  deleteIteration: (revisionId: string, iterationId: string) =>
+    api.delete(`/parts/revisions/${revisionId}/iterations/${iterationId}`).then((r) => r.data),
   updateIteration: (revisionId: string, data: Record<string, any>) =>
     api.put(`/parts/revisions/${revisionId}/iterations/current`, data).then((r) => r.data),
 
@@ -227,6 +229,7 @@ export const documentsApi = {
   undocheckout: (docId: string) => api.post(`/documents/${docId}/undo-checkout`),
   forceCheckin: (docId: string) => api.post(`/documents/${docId}/force-checkin`),
   iterations: (docId: string) => api.get(`/documents/${docId}/iterations`),
+  deleteIteration: (docId: string, iterationId: string) => api.delete(`/documents/${docId}/iterations/${iterationId}`),
   // 状态变更
   freeze: (docId: string) => api.post(`/documents/${docId}/freeze`),
   unfreeze: (docId: string) => api.post(`/documents/${docId}/unfreeze`),

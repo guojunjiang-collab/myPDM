@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import User
+from ..models import User, BOMItem, CustomFieldValue
 from .. import crud_parts
 from .. import schemas_parts
 from ..permissions import require_permission
@@ -361,6 +361,83 @@ def get_iteration(
         "remark": iteration.remark,
         "created_at": iteration.created_at.isoformat() if iteration.created_at else None,
     }
+
+
+@router.delete("/revisions/{revision_id}/iterations/{iteration_id}")
+def delete_iteration(
+    revision_id: UUID,
+    iteration_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("components:delete")),
+):
+    """管理员删除指定迭代（含物理附件文件）"""
+    rev = db.query(crud_parts.models_parts.PartRevision).filter(
+        crud_parts.models_parts.PartRevision.id == revision_id,
+    ).first()
+    if not rev:
+        raise HTTPException(404, "版本不存在")
+    target = db.query(crud_parts.models_parts.PartIteration).filter(
+        crud_parts.models_parts.PartIteration.id == iteration_id,
+        crud_parts.models_parts.PartIteration.revision_id == revision_id,
+    ).first()
+    if not target:
+        raise HTTPException(404, "迭代不存在")
+
+    total = db.query(crud_parts.models_parts.PartIteration).filter(
+        crud_parts.models_parts.PartIteration.revision_id == revision_id,
+    ).count()
+    if total <= 1:
+        raise HTTPException(400, "至少需保留一个迭代")
+
+    # 删除该迭代的附件及物理文件
+    atts = db.query(crud_parts.models_parts.PartAttachment).filter(
+        crud_parts.models_parts.PartAttachment.iteration_id == iteration_id,
+    ).all()
+    for att in atts:
+        if att.file_path:
+            try:
+                import os
+                if os.path.exists(att.file_path):
+                    os.remove(att.file_path)
+                parent = os.path.dirname(att.file_path)
+                for _ in range(3):
+                    if os.path.isdir(parent) and not os.listdir(parent):
+                        os.rmdir(parent)
+                        parent = os.path.dirname(parent)
+                    else:
+                        break
+            except Exception:
+                pass
+        db.delete(att)
+
+    # 清理该迭代关联的 BOMItem 和自定义字段值
+    db.query(BOMItem).filter(
+        BOMItem.iteration_id == iteration_id,
+    ).delete(synchronize_session=False)
+    db.query(CustomFieldValue).filter(
+        CustomFieldValue.iteration_id == iteration_id,
+    ).delete(synchronize_session=False)
+
+    # 如果删除的是当前最新迭代，回退 latest_iteration
+    if target.iteration == rev.latest_iteration:
+        prev = db.query(crud_parts.models_parts.PartIteration).filter(
+            crud_parts.models_parts.PartIteration.revision_id == revision_id,
+            crud_parts.models_parts.PartIteration.iteration < target.iteration,
+        ).order_by(crud_parts.models_parts.PartIteration.iteration.desc()).first()
+        rev.latest_iteration = prev.iteration if prev else 1
+        if rev.check_out_user_id is not None:
+            rev.check_out_user_id = None
+            rev.check_out_date = None
+
+    db.delete(target)
+    db.commit()
+
+    ip = request.client.host if request.client else None
+    crud.create_log(db, current_user.id, current_user.username,
+                    "删除零部件迭代", "part_iteration", str(iteration_id),
+                    f"件号:{rev.master_id} 迭代:{target.iteration}", ip)
+    return {"message": "迭代已删除", "latest_iteration": rev.latest_iteration}
 
 
 # ===== 级联操作 =====

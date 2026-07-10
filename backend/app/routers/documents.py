@@ -8,7 +8,7 @@ import uuid
 import base64
 
 from ..database import get_db
-from ..models import User, Document, DocumentAttachment, DocumentGroupLink, UserGroup, DocumentIteration
+from ..models import User, Document, DocumentAttachment, DocumentGroupLink, UserGroup, DocumentIteration, CustomFieldValue
 from ..models_parts import PartMaster, PartRevision
 from .. import crud, schemas, crud_groups
 from ..permissions import require_permission, check_object_policy
@@ -767,3 +767,69 @@ def get_document_iterations(
     current_user: User = Depends(require_permission("documents:read")),
 ):
     return crud_documents.list_iterations(db, doc_id)
+
+
+@router.delete("/{doc_id}/iterations/{iteration_id}")
+def delete_document_iteration(
+    doc_id: uuid.UUID,
+    iteration_id: uuid.UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:delete")),
+):
+    """管理员删除指定迭代（含物理附件文件）"""
+    d = db.query(Document).filter(Document.id == doc_id).first()
+    if not d:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    target = db.query(DocumentIteration).filter(
+        DocumentIteration.id == iteration_id,
+        DocumentIteration.document_id == doc_id,
+    ).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="迭代不存在")
+
+    total = db.query(DocumentIteration).filter(
+        DocumentIteration.document_id == doc_id,
+    ).count()
+    if total <= 1:
+        raise HTTPException(status_code=400, detail="至少需保留一个迭代")
+
+    # 删除该迭代的附件及物理文件
+    atts = db.query(DocumentAttachment).filter(
+        DocumentAttachment.iteration_id == iteration_id,
+    ).all()
+    for att in atts:
+        if att.file_path:
+            try:
+                file_storage.delete_file(att.file_path)
+                if is_stp_file(att.file_name):
+                    delete_glb_cache(str(att.id))
+            except Exception:
+                pass
+        db.delete(att)
+
+    # 清理该迭代的自定义字段值
+    db.query(CustomFieldValue).filter(
+        CustomFieldValue.iteration_id == iteration_id,
+    ).delete(synchronize_session=False)
+
+    # 如果删除的是当前最新迭代，回退 latest_iteration
+    if target.iteration == d.latest_iteration:
+        prev = db.query(DocumentIteration).filter(
+            DocumentIteration.document_id == doc_id,
+            DocumentIteration.iteration < target.iteration,
+        ).order_by(DocumentIteration.iteration.desc()).first()
+        d.latest_iteration = prev.iteration if prev else 1
+        # 如果文档被这个迭代签出，也解除
+        if d.check_out_user_id is not None:
+            d.check_out_user_id = None
+            d.check_out_date = None
+
+    db.delete(target)
+    db.commit()
+
+    ip = request.client.host if request.client else None
+    crud.create_log(db, current_user.id, current_user.username,
+                    "删除图文档迭代", "document_iteration", str(iteration_id),
+                    f"编号:{d.code} 迭代:{target.iteration}", ip)
+    return {"message": "迭代已删除", "latest_iteration": d.latest_iteration}
