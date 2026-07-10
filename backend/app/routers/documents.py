@@ -408,7 +408,11 @@ async def upload_document_attachment(doc_id: uuid.UUID, body: schemas.DocumentAt
     d = db.query(Document).filter(Document.id == doc_id).first()
     if not d:
         raise HTTPException(status_code=404, detail="图文档不存在")
-    
+    # 签出校验
+    if d.check_out_user_id is None or str(d.check_out_user_id) != str(current_user.id):
+        raise HTTPException(status_code=400, detail="请先签出后再上传附件")
+    current_iter = crud_documents.get_current_iteration(db, d)
+
     # 文件校验失败（非法 base64 / 不允许的扩展名 / 文件名非法 / 超大）属于客户端数据问题，
     # 返回 400 并带上原因，而不是裸 ValueError 冒泡成 500。binascii.Error 是 ValueError 子类，一并捕获。
     try:
@@ -424,6 +428,7 @@ async def upload_document_attachment(doc_id: uuid.UUID, body: schemas.DocumentAt
         file_name=body.file_name,
         file_size=result["file_size"],
         file_path=result["file_path"],
+        iteration_id=current_iter.id if current_iter else None,
     )
     db.add(att)
     db.commit()
@@ -431,9 +436,9 @@ async def upload_document_attachment(doc_id: uuid.UUID, body: schemas.DocumentAt
     d.file_name = body.file_name
     d.file_id = att.id
     db.commit()
-    
+
     # STP 文件不再自动转换，改为预览时按需转换（避免批量导入卡死）
-    
+
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username, "上传附件", "document_att", str(doc_id), f"文件:{body.file_name}", ip)
     return {"id": att.id, "file_name": att.file_name, "file_size": att.file_size, "created_at": att.created_at}
@@ -479,7 +484,14 @@ async def delete_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, request: Reque
     att = db.query(DocumentAttachment).filter(DocumentAttachment.id == att_id, DocumentAttachment.document_id == doc_id).first()
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
-    
+    d_lock = db.query(Document).filter(Document.id == doc_id).first()
+    if d_lock:
+        if d_lock.check_out_user_id is None or str(d_lock.check_out_user_id) != str(current_user.id):
+            raise HTTPException(status_code=400, detail="请先签出后再删除附件")
+        current_iter = crud_documents.get_current_iteration(db, d_lock)
+        if current_iter and att.iteration_id and str(att.iteration_id) != str(current_iter.id):
+            raise HTTPException(status_code=400, detail="只能删除当前迭代的附件")
+
     if att.file_path:
         try:
             file_storage.delete_file(att.file_path)
