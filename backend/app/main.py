@@ -569,6 +569,32 @@ async def startup_event():
             db.rollback()
             print(f"⚠ Parent date rollup skipped: {_re}")
 
+        # 图文档签入签出：为 latest_iteration=0 的存量文档补建首个迭代并回填附件
+        try:
+            legacy_docs = db.execute(text(
+                "SELECT id FROM documents WHERE latest_iteration = 0 AND deleted_at IS NULL"
+            )).fetchall()
+            for row in legacy_docs:
+                doc_id = row[0]
+                new_iter_id = db.execute(text("""
+                    INSERT INTO document_iterations (id, document_id, iteration, created_at)
+                    VALUES (gen_random_uuid(), :doc_id, 1, now())
+                    RETURNING id
+                """), {"doc_id": doc_id}).fetchone()[0]
+                db.execute(text("""
+                    UPDATE document_attachments SET iteration_id = :iter_id
+                    WHERE document_id = :doc_id AND iteration_id IS NULL
+                """), {"iter_id": new_iter_id, "doc_id": doc_id})
+                db.execute(text(
+                    "UPDATE documents SET latest_iteration = 1 WHERE id = :doc_id"
+                ), {"doc_id": doc_id})
+            if legacy_docs:
+                db.commit()
+                print(f"✓ Initialized iteration=1 for {len(legacy_docs)} legacy documents")
+        except Exception as _dme:
+            db.rollback()
+            print(f"⚠ Document iteration migration skipped: {_dme}")
+
 
 
         print("✓ Database migration completed successfully")
