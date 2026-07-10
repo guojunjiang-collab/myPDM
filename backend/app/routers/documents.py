@@ -26,6 +26,14 @@ def _resolve_group_names(db: Session, gids: set) -> list:
     gname_map = {g.id: g.name for g in gs}
     return [gname_map.get(gid, str(gid)) for gid in gids]
 
+
+def _checkout_user_name(db: Session, uid) -> Optional[str]:
+    """解析签出用户的真实姓名"""
+    if not uid:
+        return None
+    u = db.query(User).filter(User.id == uid).first()
+    return u.real_name if u else None
+
 @router.get("/")
 async def list_documents(skip: int = 0, limit: int = 100, keyword: str = None, status: str = None, updated_since: float = None, brief: bool = False, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents:read"))):
     query = db.query(Document)
@@ -60,6 +68,12 @@ async def list_documents(skip: int = 0, limit: int = 100, keyword: str = None, s
         users = db.query(User).filter(User.id.in_(creator_ids)).all()
         creator_map = {u.id: u.real_name for u in users}
 
+    checkout_ids = {d.check_out_user_id for d in docs if d.check_out_user_id}
+    checkout_map = {}
+    if checkout_ids:
+        cus = db.query(User).filter(User.id.in_(checkout_ids)).all()
+        checkout_map = {u.id: u.real_name for u in cus}
+
     all_gids = set()
     for gids in doc_groups.values():
         all_gids.update(gids)
@@ -90,6 +104,7 @@ async def list_documents(skip: int = 0, limit: int = 100, keyword: str = None, s
             "updated_at": d.updated_at.isoformat() if d.updated_at else None,
             "deleted_at": d.deleted_at.isoformat() if d.deleted_at else None,
             "check_out_user_id": str(d.check_out_user_id) if d.check_out_user_id else None,
+            "check_out_user_name": checkout_map.get(d.check_out_user_id) if d.check_out_user_id else None,
             "check_out_date": d.check_out_date.isoformat() if d.check_out_date else None,
             "latest_iteration": d.latest_iteration,
         } for d in docs])
@@ -106,6 +121,7 @@ async def list_documents(skip: int = 0, limit: int = 100, keyword: str = None, s
         "created_at": d.created_at, "updated_at": d.updated_at,
         "deleted_at": d.deleted_at,
         "check_out_user_id": str(d.check_out_user_id) if d.check_out_user_id else None,
+        "check_out_user_name": checkout_map.get(d.check_out_user_id) if d.check_out_user_id else None,
         "check_out_date": d.check_out_date.isoformat() if d.check_out_date else None,
         "latest_iteration": d.latest_iteration,
     } for d in docs]
@@ -259,6 +275,7 @@ async def get_document(doc_id: uuid.UUID, db: Session = Depends(get_db), current
         "group_names": _resolve_group_names(db, gids),
         "created_at": d.created_at, "updated_at": d.updated_at,
         "check_out_user_id": d.check_out_user_id,
+        "check_out_user_name": _checkout_user_name(db, d.check_out_user_id),
         "check_out_date": d.check_out_date.isoformat() if d.check_out_date else None,
         "latest_iteration": d.latest_iteration,
     }
@@ -554,7 +571,7 @@ async def get_document_versions_endpoint(doc_id: uuid.UUID, db: Session = Depend
 def checkout_document(
     doc_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("documents:update")),
+    current_user: User = Depends(require_permission("documents:checkout")),
 ):
     doc, err = crud_documents.checkout_document(db, doc_id, current_user.id)
     if err:
@@ -570,6 +587,7 @@ def checkout_document(
         "version": doc.version,
         "status": doc.status,
         "check_out_user_id": str(doc.check_out_user_id) if doc.check_out_user_id else None,
+        "check_out_user_name": current_user.real_name,
         "check_out_date": doc.check_out_date.isoformat() if doc.check_out_date else None,
         "latest_iteration": doc.latest_iteration,
     }
@@ -580,7 +598,7 @@ def checkin_document(
     doc_id: uuid.UUID,
     note: Optional[str] = Query(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("documents:update")),
+    current_user: User = Depends(require_permission("documents:checkin")),
 ):
     doc, err = crud_documents.checkin_document(db, doc_id, current_user.id, note)
     if err:
@@ -596,6 +614,7 @@ def checkin_document(
         "version": doc.version,
         "status": doc.status,
         "check_out_user_id": None,
+        "check_out_user_name": None,
         "check_out_date": None,
         "latest_iteration": doc.latest_iteration,
     }
@@ -605,7 +624,7 @@ def checkin_document(
 def undo_checkout_document(
     doc_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("documents:update")),
+    current_user: User = Depends(require_permission("documents:undocheckout")),
 ):
     doc, err = crud_documents.undo_checkout_document(db, doc_id, current_user.id)
     if err:
@@ -621,6 +640,33 @@ def undo_checkout_document(
         "version": doc.version,
         "status": doc.status,
         "check_out_user_id": None,
+        "check_out_user_name": None,
+        "check_out_date": None,
+        "latest_iteration": doc.latest_iteration,
+    }
+
+
+@router.post("/{doc_id}/force-checkin")
+def force_checkin_document_endpoint(
+    doc_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:force_checkin")),
+):
+    doc, err = crud_documents.force_checkin_document(db, doc_id)
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    from .. import crud as crud_common
+    crud_common.create_log(db, current_user.id, current_user.username,
+                           "图文档强制签入", "document", str(doc.id),
+                           f"编号:{doc.code} 版本:{doc.version}", None)
+    return {
+        "id": str(doc.id),
+        "code": doc.code,
+        "name": doc.name,
+        "version": doc.version,
+        "status": doc.status,
+        "check_out_user_id": None,
+        "check_out_user_name": None,
         "check_out_date": None,
         "latest_iteration": doc.latest_iteration,
     }
