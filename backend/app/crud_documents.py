@@ -51,18 +51,31 @@ def checkout_document(db: Session, doc_id: UUID, user_id: UUID) -> Tuple[Optiona
     db.add(new_iter)
     db.flush()
 
-    # 复制上一迭代的附件到新迭代
+    # 复制上一迭代的附件到新迭代（物理文件也复制一份到新路径）
     if prev_iter:
         prev_atts = db.query(models.DocumentAttachment).filter(
             models.DocumentAttachment.iteration_id == prev_iter.id
         ).all()
         for att in prev_atts:
+            # 新路径：document/{code}/{version}/{new_iter}/{filename}
+            new_path = f"document/{doc.code}/{doc.version}/{new_iter_num}/{att.file_name}"
+            if att.file_path:
+                try:
+                    from .file_storage import file_storage
+                    old_full = file_storage._safe_resolve(att.file_path)
+                    if old_full.exists():
+                        new_full = file_storage._safe_resolve(new_path)
+                        new_full.parent.mkdir(parents=True, exist_ok=True)
+                        import shutil
+                        shutil.copy2(str(old_full), str(new_full))
+                except Exception:
+                    new_path = att.file_path  # 复制失败则沿用旧路径
             new_att = models.DocumentAttachment(
                 document_id=doc_id,
                 iteration_id=new_iter.id,
                 file_name=att.file_name,
                 file_size=att.file_size,
-                file_path=att.file_path,
+                file_path=new_path,
                 file_hash=att.file_hash,
             )
             db.add(new_att)
