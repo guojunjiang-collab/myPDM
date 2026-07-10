@@ -214,8 +214,8 @@ export default function Documents() {
       const res = await documentsApi.list({ page_size: 10000, brief: true });
       const localDocuments: Document[] = Array.isArray(res.data) ? (res.data as Document[]) : [];
       setDocuments(localDocuments);
-      // 同步到 store，保持跨页（看板、库存等）一致
-      useDataStore.getState().setDocuments(localDocuments as any);
+      // 不回写 store：会触发 useEffect 无限循环（storeDocuments 变 → loadDocuments → ...）
+      // store 由 syncService 轮询维护，跨页同步仍生效
       // 加载自定义字段定义（同步版本）
       const localDefs = useDataStore.getState().customFieldDefs;
       setCustomFieldDefs(localDefs.filter((d: CustomFieldDefinition) =>
