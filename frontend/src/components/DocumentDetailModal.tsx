@@ -525,10 +525,7 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                                 <span className="text-primary-600 text-xs">当前</span>
                               ) : (
                                 <button
-                                  onClick={() => {
-                                    setViewingIterationId(it.id);
-                                    setActiveTab('attachments');
-                                  }}
+                                  onClick={() => setViewingIterationId(it.id)}
                                   className={`text-xs hover:underline ${
                                     isViewing ? 'text-orange-600' : 'text-primary-600 hover:text-primary-800'
                                   }`}
