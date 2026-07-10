@@ -6,6 +6,7 @@ import { useAuthStore, isAdmin } from '../stores/auth';
 import { documentsApi, customFieldsApi, mediaApi, v2UploadApi, CHUNK_SIZE, CHUNK_THRESHOLD, userGroupsApi } from '../services/api';
 import CustomFieldInput from './CustomFieldInput';
 import { previewAttachment } from '../utils/attachmentPreview';
+import ArchiveTreeModal from './ArchiveTreeModal';
 import { formatDateTime } from '../utils/date';
 import type { Document, DocumentIteration, DocumentAttachment, CustomFieldDefinition } from '../types';
 
@@ -54,6 +55,8 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
   const [showCheckinModal, setShowCheckinModal] = useState(false);
   const [checkinNote, setCheckinNote] = useState('');
   const [uploading, setUploading] = useState(false);
+  // 压缩包预览弹窗
+  const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
 
   // 用户组
   const [allGroups, setAllGroups] = useState<Array<{ id: string; name: string }>>([]);
@@ -657,7 +660,7 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                                   <button
                                     onClick={() =>
                                       previewAttachment(att.id, att.file_name || 'preview', {
-                                        onArchive: () => {},
+                                        onArchive: (id, name) => setArchivePreview({ attId: id, fileName: name }),
                                       })
                                     }
                                     className="text-blue-600 hover:text-blue-800 mr-2"
@@ -861,6 +864,14 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
             </button>
           </div>
         </Modal>
+      )}
+      {archivePreview && (
+        <ArchiveTreeModal
+          open={!!archivePreview}
+          onClose={() => setArchivePreview(null)}
+          attachmentId={archivePreview.attId}
+          fileName={archivePreview.fileName}
+        />
       )}
     </Modal>
   );

@@ -426,7 +426,6 @@ export default function Documents() {
                       : <span className="text-gray-400">—</span>}
                   </td>
                   <td className="px-4 py-3 text-right text-sm" onClick={(e) => e.stopPropagation()}>
-                    <button onClick={() => setDetailDocId(doc.id)} className="text-primary-600 hover:text-primary-800 mr-3">详情</button>
                     {doc.status === 'draft' && !doc.check_out_user_id && (
                       <button
                         onClick={async () => {
@@ -440,7 +439,7 @@ export default function Documents() {
                             toast.error(typeof detail === 'string' ? detail : '签出失败');
                           }
                         }}
-                        className="text-orange-600 hover:text-orange-800 mr-3"
+                        className="text-primary-600 hover:text-primary-800 mr-3"
                       >
                         签出
                       </button>
@@ -449,7 +448,7 @@ export default function Documents() {
                       const isCreator = (doc as any).creator_id === useAuthStore.getState().user?.id;
                       const canManage = isAdmin() || isCreator;
                       return canManage && (doc as any).accessible !== false ? (
-                        <button onClick={() => setDeleteId(doc.id)} className="text-red-600 hover:text-red-800">删除</button>
+                        <button onClick={() => setDeleteId(doc.id)} className="text-red-500 hover:text-red-700">删除</button>
                       ) : null;
                     })()}
                   </td>

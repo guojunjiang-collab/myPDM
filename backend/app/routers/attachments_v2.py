@@ -70,6 +70,26 @@ def _resolve_attachment(db, attachment_id):
     return None, None
 
 
+def _resolve_attachment_path(att):
+    """
+    解析附件的实际磁盘路径，兼容两种存储约定：
+    - 图文档附件：file_path 相对 base_dir（如 document/xxx/A/1/x.pdf）
+    - 零部件附件：file_path 相对工作目录（如 ./uploads/parts/xxx/A/1/x.zip）
+    直接用 base_dir 拼接零部件路径会产生 uploads/uploads 双重前缀，故此处两种都尝试。
+    """
+    if not getattr(att, "file_path", None):
+        return None
+    from pathlib import Path as _Path
+    candidates = [
+        file_storage.base_dir / att.file_path,  # 图文档约定
+        _Path(att.file_path),                    # 零部件约定（相对 cwd 或绝对路径）
+    ]
+    for p in candidates:
+        if p.exists():
+            return p
+    return None
+
+
 @router.get("/")
 async def list_attachments(
     db: Session = Depends(get_db),
@@ -597,12 +617,7 @@ async def stream_attachment(
         raise HTTPException(status_code=404, detail="附件不存在")
     crud_groups.enforce_attachment_content_access(db, current_user, attachment_id)
 
-    file_path = None
-    if hasattr(att, 'file_path') and att.file_path:
-        full_path = file_storage.base_dir / att.file_path
-        if full_path.exists():
-            file_path = full_path
-
+    file_path = _resolve_attachment_path(att)
     if not file_path:
         raise HTTPException(status_code=404, detail="文件不存在")
 
@@ -656,12 +671,7 @@ async def direct_download_attachment(
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
 
-    file_path = None
-    if hasattr(att, 'file_path') and att.file_path:
-        full_path = file_storage.base_dir / att.file_path
-        if full_path.exists():
-            file_path = full_path
-
+    file_path = _resolve_attachment_path(att)
     if not file_path:
         raise HTTPException(status_code=404, detail="文件不存在")
 
@@ -700,12 +710,7 @@ async def preview_attachment(
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
 
-    file_path = None
-    if hasattr(att, 'file_path') and att.file_path:
-        full_path = file_storage.base_dir / att.file_path
-        if full_path.exists():
-            file_path = full_path
-
+    file_path = _resolve_attachment_path(att)
     if not file_path:
         raise HTTPException(status_code=404, detail="文件不存在")
 
@@ -806,8 +811,8 @@ async def get_office_pdf(
     if not att.file_path:
         raise HTTPException(status_code=404, detail="附件文件路径为空")
 
-    src_full = file_storage.base_dir / att.file_path
-    if not src_full.exists():
+    src_full = _resolve_attachment_path(att)
+    if not src_full:
         raise HTTPException(status_code=404, detail="文件不存在")
 
     pdf_path = get_pdf_path_for_attachment(str(attachment_id), att.file_path)
@@ -869,10 +874,8 @@ async def get_archive_tree(
     """
     verify_media_token(token, str(attachment_id), "archive-tree")
 
-    # 获取附件记录
-    att = db.query(DocumentAttachment).filter(
-        DocumentAttachment.id == attachment_id
-    ).first()
+    # 获取附件记录（兼容图文档附件与零部件附件）
+    att, _att_source = _resolve_attachment(db, attachment_id)
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
 
@@ -890,12 +893,7 @@ async def get_archive_tree(
         )
 
     # 定位文件
-    file_path = None
-    if hasattr(att, 'file_path') and att.file_path:
-        full_path = file_storage.base_dir / att.file_path
-        if full_path.exists():
-            file_path = full_path
-
+    file_path = _resolve_attachment_path(att)
     if not file_path:
         raise HTTPException(status_code=404, detail="文件不存在")
 
@@ -933,11 +931,7 @@ async def extract_archive_file(
     if ext not in SUPPORTED_EXTENSIONS and suffixes != ['.tar', '.gz']:
         raise HTTPException(status_code=400, detail="非压缩包文件")
 
-    file_path = None
-    if hasattr(att, 'file_path') and att.file_path:
-        full_path = file_storage.base_dir / att.file_path
-        if full_path.exists():
-            file_path = full_path
+    file_path = _resolve_attachment_path(att)
     if not file_path:
         raise HTTPException(status_code=404, detail="文件不存在")
 
