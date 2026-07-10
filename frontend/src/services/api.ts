@@ -227,6 +227,11 @@ export const documentsApi = {
   undocheckout: (docId: string) => api.post(`/documents/${docId}/undo-checkout`),
   forceCheckin: (docId: string) => api.post(`/documents/${docId}/force-checkin`),
   iterations: (docId: string) => api.get(`/documents/${docId}/iterations`),
+  // 状态变更
+  freeze: (docId: string) => api.post(`/documents/${docId}/freeze`),
+  unfreeze: (docId: string) => api.post(`/documents/${docId}/unfreeze`),
+  release: (docId: string) => api.post(`/documents/${docId}/release`),
+  obsolete: (docId: string) => api.post(`/documents/${docId}/obsolete`),
   // 图文档附件
   uploadAttachment: (docId: string, data: { id?: string; file_name: string; file_data: string }) =>
     api.post(`/documents/${docId}/attachments`, data),

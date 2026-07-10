@@ -74,6 +74,11 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
   const canCheckout = isDraft && !isCheckedOut && !isViewingOtherVersion;
   const canCheckin = isDraft && isCheckedOutByMe && !isViewingOtherVersion;
   const canUndo = isDraft && isCheckedOutByMe && (doc?.latest_iteration || 0) > 1 && !isViewingOtherVersion;
+  const canRelease = (doc?.status === 'draft' || doc?.status === 'frozen') && !isCheckedOut && !isViewingOtherVersion;
+  const canFreeze = doc?.status === 'draft' && !isCheckedOut && !isViewingOtherVersion;
+  const canUnfreeze = doc?.status === 'frozen' && isAdmin();
+  const canUpgrade = (doc?.status === 'released' || doc?.status === 'obsolete') && !isViewingOtherVersion;
+  const canObsolete = doc?.status === 'released' && !isViewingOtherVersion;
   const canForceCheckin = isCheckedOut && isAdmin() && !isViewingOtherVersion;
 
   const loadDoc = useCallback(async () => {
@@ -406,52 +411,78 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                   )}
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                {canCheckout && (
-                  <button
-                    onClick={() => doAction(() => documentsApi.checkout(doc.id), '签出成功')}
-                    className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700"
-                  >
-                    签出
-                  </button>
-                )}
-                {canCheckin && (
-                  <button
-                    onClick={() => setShowCheckinModal(true)}
-                    className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
-                  >
-                    签入
-                  </button>
-                )}
-                {canUndo && (
-                  <button
-                    onClick={() => doAction(() => documentsApi.undocheckout(doc.id), '已撤销签出')}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded text-gray-600 hover:bg-gray-100"
-                  >
-                    撤销签出
-                  </button>
-                )}
-                {canForceCheckin && (
-                  <button
-                    onClick={() => {
-                      if (confirm('确定强制签入该文档？')) {
-                        doAction(() => documentsApi.forceCheckin(doc.id), '已强制签入');
-                      }
-                    }}
-                    className="px-3 py-1 text-sm border border-red-300 rounded text-red-600 hover:bg-red-50"
-                  >
-                    强制签入
-                  </button>
-                )}
-                {isDraft && isCheckedOutByMe && !isViewingOtherVersion && (
-                  <button
-                    onClick={() => {
-                      if (confirm('确定升版？')) doAction(() => documentsApi.upgrade(doc.id), '升版成功');
-                    }}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded text-gray-600 hover:bg-gray-100"
-                  >
-                    升版
-                  </button>
-                )}
+                  {canCheckout && (
+                    <button
+                      onClick={() => doAction(() => documentsApi.checkout(doc.id), '签出成功')}
+                      className="px-3 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700"
+                    >
+                      签出
+                    </button>
+                  )}
+                  {canCheckin && (
+                    <button
+                      onClick={() => setShowCheckinModal(true)}
+                      className="px-3 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700"
+                    >
+                      检入
+                    </button>
+                  )}
+                  {canUndo && (
+                    <button
+                      onClick={() => doAction(() => documentsApi.undocheckout(doc.id), '已撤销签出')}
+                      className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600"
+                    >
+                      撤销签出
+                    </button>
+                  )}
+                  {canFreeze && (
+                    <button
+                      onClick={() => doAction(() => documentsApi.freeze(doc.id), '已冻结')}
+                      className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                    >
+                      冻结
+                    </button>
+                  )}
+                  {canUnfreeze && (
+                    <button
+                      onClick={() => doAction(() => documentsApi.unfreeze(doc.id), '已解冻')}
+                      className="px-3 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600"
+                    >
+                      解冻
+                    </button>
+                  )}
+                  {canRelease && (
+                    <button
+                      onClick={() => doAction(() => documentsApi.release(doc.id), '已发布')}
+                      className="px-3 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700"
+                    >
+                      发布
+                    </button>
+                  )}
+                  {canUpgrade && (
+                    <button
+                      onClick={() => doAction(() => documentsApi.upgrade(doc.id), '已升版')}
+                      className="px-3 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
+                    >
+                      升版
+                    </button>
+                  )}
+                  {canObsolete && (
+                    <button
+                      onClick={() => doAction(() => documentsApi.obsolete(doc.id), '已作废')}
+                      className="px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
+                    >
+                      作废
+                    </button>
+                  )}
+                  {canForceCheckin && (
+                    <button
+                      onClick={() => doAction(() => documentsApi.forceCheckin(doc.id), '已强制签入')}
+                      className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                    >
+                      强制签入
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

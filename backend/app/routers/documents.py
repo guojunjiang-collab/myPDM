@@ -537,6 +537,92 @@ async def upgrade_document_endpoint(doc_id: uuid.UUID, body: schemas.UpgradeRequ
     }
 
 
+# ====== 状态变更 ======
+
+@router.post("/{doc_id}/freeze")
+def freeze_document(
+    doc_id: uuid.UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:update")),
+):
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    if doc.status != "draft":
+        raise HTTPException(status_code=400, detail="仅草稿状态可冻结")
+    if doc.check_out_user_id is not None:
+        raise HTTPException(status_code=400, detail="已被签出，请先签入再冻结")
+    doc.status = "frozen"
+    db.commit()
+    db.refresh(doc)
+    ip = request.client.host if request.client else None
+    crud.create_log(db, current_user.id, current_user.username, "图文档冻结", "document", str(doc_id), f"编号:{doc.code}", ip)
+    return {"id": str(doc.id), "code": doc.code, "version": doc.version, "status": doc.status}
+
+
+@router.post("/{doc_id}/unfreeze")
+def unfreeze_document(
+    doc_id: uuid.UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:update")),
+):
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    if doc.status != "frozen":
+        raise HTTPException(status_code=400, detail="仅冻结状态可解冻")
+    doc.status = "draft"
+    db.commit()
+    db.refresh(doc)
+    ip = request.client.host if request.client else None
+    crud.create_log(db, current_user.id, current_user.username, "图文档解冻", "document", str(doc_id), f"编号:{doc.code}", ip)
+    return {"id": str(doc.id), "code": doc.code, "version": doc.version, "status": doc.status}
+
+
+@router.post("/{doc_id}/release")
+def release_document(
+    doc_id: uuid.UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:update")),
+):
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    if doc.status not in ("draft", "frozen"):
+        raise HTTPException(status_code=400, detail="仅草稿或冻结状态可发布")
+    if doc.check_out_user_id is not None:
+        raise HTTPException(status_code=400, detail="已被签出，请先签入再发布")
+    doc.status = "released"
+    db.commit()
+    db.refresh(doc)
+    ip = request.client.host if request.client else None
+    crud.create_log(db, current_user.id, current_user.username, "图文档发布", "document", str(doc_id), f"编号:{doc.code}", ip)
+    return {"id": str(doc.id), "code": doc.code, "version": doc.version, "status": doc.status}
+
+
+@router.post("/{doc_id}/obsolete")
+def obsolete_document(
+    doc_id: uuid.UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:update")),
+):
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    if doc.status != "released":
+        raise HTTPException(status_code=400, detail="仅发布状态可作废")
+    doc.status = "obsolete"
+    db.commit()
+    db.refresh(doc)
+    ip = request.client.host if request.client else None
+    crud.create_log(db, current_user.id, current_user.username, "图文档作废", "document", str(doc_id), f"编号:{doc.code}", ip)
+    return {"id": str(doc.id), "code": doc.code, "version": doc.version, "status": doc.status}
+
+
 @router.get("/{doc_id}/versions")
 async def get_document_versions_endpoint(doc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents:read"))):
     versions = crud.get_document_versions(db, doc_id)
