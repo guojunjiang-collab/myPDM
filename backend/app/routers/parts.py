@@ -4,7 +4,7 @@ import uuid as _uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import UUID, uuid4
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, Request
 from fastapi.responses import FileResponse
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import User, BOMItem, CustomFieldValue
 from .. import crud_parts
+from .. import crud
 from .. import schemas_parts
 from ..permissions import require_permission
 import tempfile, os as _os
