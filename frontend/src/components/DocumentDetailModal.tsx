@@ -516,11 +516,18 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                           >
                             <td className="px-3 py-2">#{it.iteration}</td>
                             <td className="px-3 py-2 text-gray-500">
-                              {it.check_in_date ? (
-                                new Date(it.check_in_date).toLocaleString('zh-CN', { hour12: false })
-                              ) : (
-                                <span className="text-orange-600">进行中</span>
-                              )}
+                              <div className="flex items-center gap-1.5">
+                                <span>
+                                  {it.check_in_date
+                                    ? new Date(it.check_in_date).toLocaleString('zh-CN', { hour12: false })
+                                    : it.created_at
+                                    ? new Date(it.created_at).toLocaleString('zh-CN', { hour12: false })
+                                    : '-'}
+                                </span>
+                                {!it.check_in_date && (
+                                  <span className="px-1.5 py-0.5 text-[10px] rounded bg-orange-100 text-orange-700">签入中</span>
+                                )}
+                              </div>
                             </td>
                             <td className="px-3 py-2 text-gray-700">{it.check_in_note || '-'}</td>
                             <td className="px-3 py-2 text-gray-500">
