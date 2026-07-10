@@ -5,6 +5,8 @@ import { canEdit, isAdmin, canDownload, useAuthStore } from '../stores/auth';
 import CustomFieldInput from '../components/CustomFieldInput';
 import { Modal, ConfirmModal } from '../components/Modal';
 import DocumentDetailContent from '../components/DocumentDetailContent';
+import DocumentDetailModal from '../components/DocumentDetailModal';
+import { toast } from '../components/Toast';
 import VersionHistory from '../components/VersionHistory';
 import { useDataStore } from '../stores/data';
 import { useTableSort } from '../hooks/useTableSort';
@@ -95,6 +97,9 @@ export default function Documents() {
   const [viewingCustomValues, setViewingCustomValues] = useState<Record<string, any>>({});
   const [detailTab, setDetailTab] = useState<'detail' | 'versions'>('detail');
   const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
+
+  // 详情/编辑合一弹窗（签入签出）
+  const [detailDocId, setDetailDocId] = useState<string | null>(null);
 
   // 从 store 订阅数据
   const storeDocuments = useDataStore((s) => s.documents);
@@ -473,40 +478,24 @@ export default function Documents() {
         const res = await documentsApi.create(data);
         newDoc = res.data;
         useDataStore.getState().setDocuments([...useDataStore.getState().documents, newDoc!]);
-
-        // 新增模式：文档创建成功后上传暂存的附件
-        if (pendingFile) {
-          setUploading(true);
-          setUploadingFileName(pendingFile.name);
-          setUploadProgress(0);
-          try {
-            if (pendingFile.size > CHUNK_THRESHOLD) {
-              await uploadLargeFile(pendingFile, newDoc!.id, (p) => setUploadProgress(p));
-            } else {
-              await v2UploadApi.uploadSmallFile(pendingFile, 'documents', newDoc!.id, (p) => setUploadProgress(p));
-            }
-          } catch (uploadErr) {
-            console.error('附件上传失败', uploadErr);
-            alert('图文档已创建，但附件上传失败，请在编辑中重新上传');
-          } finally {
-            setUploading(false);
-            setUploadingFileName('');
-            setUploadProgress(0);
-            setPendingFile(null);
-          }
-        }
+        // 丢弃暂存的待传文件：新创建文档已自动签出给当前用户，附件请在详情弹窗内上传
+        if (pendingFile) setPendingFile(null);
       }
 
       const fieldValues = customFieldDefs.map(def => ({
         field_id: def.id,
         value: customFieldValues[def.id] ?? null,
       })).filter(fv => fv.value !== null && fv.value !== '');
-      
+
       if (fieldValues.length > 0) {
         await customFieldsApi.setValues('document', newDoc!.id, fieldValues);
       }
 
       setModalOpen(false);
+      if (!editingDoc && newDoc) {
+        // 新建后直接打开详情弹窗（用户已签出，可在弹窗内继续上传附件）
+        setDetailDocId(newDoc.id);
+      }
     } catch (error: any) {
       const detail = error.response?.data?.detail;
       setSaveError(Array.isArray(detail) ? detail.map((e: any) => e.msg || JSON.stringify(e)).join('; ') : (typeof detail === 'string' ? detail : (editingDoc ? '更新失败，请重试' : '创建失败，请检查网络或数据是否已存在')));
@@ -698,17 +687,18 @@ export default function Documents() {
               <th onClick={() => handleSort('name' as keyof Document)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">名称 {getSortIcon('name' as keyof Document)}</th>
               <th onClick={() => handleSort('version' as keyof Document)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">版本 {getSortIcon('version' as keyof Document)}</th>
               <th onClick={() => handleSort('status' as keyof Document)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">状态 {getSortIcon('status' as keyof Document)}</th>
+              <th className="w-28 px-4 py-3 text-left text-sm font-medium text-gray-500">签出状态</th>
               <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
             ) : filteredData.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">无匹配数据</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">无匹配数据</td></tr>
             ) : (
               displayData.map((doc) => (
-                <tr key={doc.id} className={`hover:bg-gray-50 cursor-pointer ${(doc as any).accessible === false ? 'opacity-60' : ''}`} onClick={() => handleView(doc)}>
+                <tr key={doc.id} className={`hover:bg-gray-50 cursor-pointer ${(doc as any).accessible === false ? 'opacity-60' : ''}`} onClick={() => setDetailDocId(doc.id)}>
                   <td className="px-4 py-3 text-sm font-medium">
                     {(doc as any).accessible === false && <span className="mr-1" title="无权限：需关联用户组成员">🔒</span>}
                     {doc.code}
@@ -725,18 +715,37 @@ export default function Documents() {
                       {getStatusTag(doc.status).label}
                     </span>
                   </td>
+                  <td className="px-4 py-3 text-sm">
+                    {doc.check_out_user_name
+                      ? <span className="text-orange-600">🔒 {doc.check_out_user_name}</span>
+                      : <span className="text-gray-400">—</span>}
+                  </td>
                   <td className="px-4 py-3 text-right text-sm" onClick={(e) => e.stopPropagation()}>
+                    <button onClick={() => setDetailDocId(doc.id)} className="text-primary-600 hover:text-primary-800 mr-3">详情</button>
+                    {doc.status === 'draft' && !doc.check_out_user_id && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            await documentsApi.checkout(doc.id);
+                            toast.success('签出成功');
+                            setDetailDocId(doc.id);
+                            loadDocuments();
+                          } catch (e: any) {
+                            const detail = e?.response?.data?.detail;
+                            toast.error(typeof detail === 'string' ? detail : '签出失败');
+                          }
+                        }}
+                        className="text-orange-600 hover:text-orange-800 mr-3"
+                      >
+                        签出
+                      </button>
+                    )}
                     {(() => {
                       const isCreator = (doc as any).creator_id === useAuthStore.getState().user?.id;
                       const canManage = isAdmin() || isCreator;
-                      return (
-                        <>
-                          {canManage && (doc as any).accessible !== false && <button onClick={() => handleEdit(doc)} className="text-primary-600 hover:text-primary-800 mr-3">编辑</button>}
-                          {canManage && (
-                            <button onClick={() => setDeleteId(doc.id)} className="text-red-600 hover:text-red-800">删除</button>
-                          )}
-                        </>
-                      );
+                      return canManage && (doc as any).accessible !== false ? (
+                        <button onClick={() => setDeleteId(doc.id)} className="text-red-600 hover:text-red-800">删除</button>
+                      ) : null;
                     })()}
                   </td>
                 </tr>
@@ -1099,6 +1108,16 @@ export default function Documents() {
           fileName={archivePreview.fileName}
         />
       )}
+
+      <DocumentDetailModal
+        open={!!detailDocId}
+        docId={detailDocId}
+        onClose={() => {
+          setDetailDocId(null);
+          loadDocuments();
+        }}
+        onSaved={() => loadDocuments()}
+      />
     </div>
   );
 }
