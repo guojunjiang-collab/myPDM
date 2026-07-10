@@ -778,6 +778,7 @@ def delete_document_iteration(
     current_user: User = Depends(require_permission("documents:delete")),
 ):
     """管理员删除指定迭代（含物理附件文件）"""
+    from ..file_storage import file_storage
     d = db.query(Document).filter(Document.id == doc_id).first()
     if not d:
         raise HTTPException(status_code=404, detail="文档不存在")
