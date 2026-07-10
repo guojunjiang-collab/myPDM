@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import api, { partsApi } from '../services/api';
+import api, { partsApi, v2UploadApi, CHUNK_SIZE, CHUNK_THRESHOLD } from '../services/api';
 import { previewAttachment } from '../utils/attachmentPreview';
 import ArchiveTreeModal from './ArchiveTreeModal';
 
@@ -31,6 +31,7 @@ export default function PartAttachmentBucket({ revisionId, category, label, edit
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadName, setUploadName] = useState('');
+  const [progress, setProgress] = useState(0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -49,24 +50,40 @@ export default function PartAttachmentBucket({ revisionId, category, label, edit
 
   useEffect(() => { load(); }, [load]);
 
+  const uploadLarge = async (file: File) => {
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    const init = await v2UploadApi.initPartAttachmentChunk(revisionId, file.name, file.size, category);
+    for (let i = 0; i < totalChunks; i++) {
+      const start = i * CHUNK_SIZE;
+      await v2UploadApi.uploadChunk(init.upload_id, i, file.slice(start, Math.min(start + CHUNK_SIZE, file.size)));
+      setProgress(Math.round(5 + ((i + 1) / totalChunks) * 90));
+    }
+    await v2UploadApi.completePartAttachmentChunk(revisionId, init.upload_id);
+    setProgress(100);
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const MAX_ALLOWED = 1073741824;
     if (file.size > MAX_ALLOWED) { alert('文件大小超过系统限制 1GB'); if (fileInputRef.current) fileInputRef.current.value = ''; return; }
-    setUploading(true); setUploadName(file.name);
+    setUploading(true); setUploadName(file.name); setProgress(0);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('category', category);
-      await api.post(`/parts/revisions/${revisionId}/attachments`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      if (file.size > CHUNK_THRESHOLD) {
+        await uploadLarge(file);
+      } else {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('category', category);
+        await api.post(`/parts/revisions/${revisionId}/attachments`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+      }
       await load();
     } catch {
       alert('上传失败，请重试');
     } finally {
-      setUploading(false); setUploadName('');
+      setUploading(false); setUploadName(''); setProgress(0);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -175,7 +192,13 @@ export default function PartAttachmentBucket({ revisionId, category, label, edit
 
       {uploading && (
         <div className="mb-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-          <span className="text-blue-700">正在上传 "{uploadName}"</span>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-blue-700">正在上传 "{uploadName}"</span>
+            <span className="text-blue-600 font-medium">{progress}%</span>
+          </div>
+          <div className="w-full bg-blue-200 rounded-full h-2">
+            <div className="bg-blue-500 h-2 rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
+          </div>
         </div>
       )}
 

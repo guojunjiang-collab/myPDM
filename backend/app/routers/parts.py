@@ -19,6 +19,7 @@ import tempfile, os as _os
 from ..cad.assembly_parser import parse_assembly_step
 from ..stp_converter import get_lod_glb_paths, get_glb_cache_path
 from ..schemas_parts import MatchReport, AssemblyInstanceDTO, AssemblyTreeNodeDTO
+from ..file_storage import chunked_uploader, CHUNK_SIZE
 
 router = APIRouter(prefix="/parts", tags=["parts"])
 
@@ -791,16 +792,15 @@ def list_attachments(
     ]
 
 
-@router.post("/revisions/{revision_id}/attachments")
-async def add_attachment(
-    revision_id: UUID,
-    file: UploadFile = File(...),
-    category: str = Form("cad"),
-    db: Session = Depends(get_db),
-):
-    """上传附件到当前迭代"""
+def _store_part_attachment(db: Session, revision_id: UUID, filename: str,
+                           content: bytes, category: str):
+    """
+    将附件内容落盘到当前迭代目录并创建 PartAttachment 记录。
+    供整包上传与分块上传完成两条路径共用，保证存储路径规范一致：
+    ./uploads/parts/{code}/{version}/{iteration}/{filename}
+    """
     import os, hashlib
-    
+
     result = crud_parts.get_part_revision_with_current_iteration(db, revision_id)
     if not result:
         raise HTTPException(404, "版本不存在")
@@ -814,11 +814,13 @@ async def add_attachment(
     if not master:
         raise HTTPException(404, "主数据不存在")
 
+    # 防路径遍历：仅取文件名部分
+    safe_name = os.path.basename(filename or "unnamed")
+
     upload_dir = f"./uploads/parts/{master.code}/{revision.version}/{iteration.iteration}"
     os.makedirs(upload_dir, exist_ok=True)
 
-    file_path = os.path.join(upload_dir, file.filename)
-    content = await file.read()
+    file_path = os.path.join(upload_dir, safe_name)
     with open(file_path, "wb") as f:
         f.write(content)
 
@@ -827,7 +829,7 @@ async def add_attachment(
     att = crud_parts.models_parts.PartAttachment(
         iteration_id=iteration.id,
         category=category,
-        file_name=file.filename,
+        file_name=safe_name,
         file_size=len(content),
         file_path=file_path,
         file_hash=file_hash,
@@ -838,12 +840,83 @@ async def add_attachment(
     # STP 附件上传后自动触发 GLB 转换
     from ..stp_converter import convert_stp_to_gltf, is_stp_file
     import asyncio
-    if is_stp_file(file.filename):
+    if is_stp_file(safe_name):
         try:
             loop = asyncio.get_event_loop()
             loop.run_in_executor(None, convert_stp_to_gltf, file_path, str(att.id), file_path, True)
         except Exception:
             pass
+    return att
+
+
+@router.post("/revisions/{revision_id}/attachments")
+async def add_attachment(
+    revision_id: UUID,
+    file: UploadFile = File(...),
+    category: str = Form("cad"),
+    db: Session = Depends(get_db),
+):
+    """上传附件到当前迭代（整包，适用于小文件）"""
+    content = await file.read()
+    att = _store_part_attachment(db, revision_id, file.filename, content, category)
+    return {"id": str(att.id), "file_name": att.file_name, "file_size": att.file_size}
+
+
+@router.post("/revisions/{revision_id}/attachments/chunk/init")
+async def init_attachment_chunk(
+    revision_id: UUID,
+    filename: str = Form(...),
+    file_size: int = Form(...),
+    category: str = Form("cad"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("attachments:upload")),
+):
+    """初始化零部件附件分块上传（大文件走此路径，绕开单请求体积限制）"""
+    result = crud_parts.get_part_revision_with_current_iteration(db, revision_id)
+    if not result:
+        raise HTTPException(404, "版本不存在")
+    _revision, iteration = result
+    if not iteration:
+        raise HTTPException(400, "当前迭代不存在")
+
+    total_chunks = (file_size + CHUNK_SIZE - 1) // CHUNK_SIZE
+    try:
+        meta = chunked_uploader.init_upload(
+            filename, file_size, "part", str(revision_id), total_chunks, category=category,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    return {
+        "upload_id": meta["upload_id"],
+        "total_chunks": total_chunks,
+        "chunk_size": CHUNK_SIZE,
+    }
+
+
+@router.post("/revisions/{revision_id}/attachments/chunk/complete")
+async def complete_attachment_chunk(
+    revision_id: UUID,
+    upload_id: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("attachments:upload")),
+):
+    """完成零部件附件分块上传：合并分块 → 落盘到迭代目录 → 建记录 → 清理临时分块。
+
+    分块本身复用通用端点 POST /api/v2/attachments/chunk/upload 上传。
+    """
+    try:
+        content, meta = chunked_uploader.assemble_chunks(upload_id)
+    except FileNotFoundError as e:
+        raise HTTPException(404, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    filename = meta.get("filename") or "unnamed"
+    category = meta.get("category") or "cad"
+    att = _store_part_attachment(db, revision_id, filename, content, category)
+    # 清理临时分块文件与元数据
+    chunked_uploader.cancel_upload(upload_id)
     return {"id": str(att.id), "file_name": att.file_name, "file_size": att.file_size}
 
 

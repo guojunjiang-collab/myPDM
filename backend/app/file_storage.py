@@ -307,6 +307,39 @@ class ChunkedUploader:
             "is_complete": len(meta["uploaded_chunks"]) == meta["total_chunks"],
         }
     
+    def assemble_chunks(self, upload_id: str) -> tuple[bytes, Dict[str, Any]]:
+        """
+        合并所有分块为完整字节流，校验完整性，但不落盘、不清理临时文件。
+
+        用于需要自定义存储路径的调用方（如零部件附件走 ./uploads/parts/{code}/{version}/{iteration}/，
+        不能沿用 FileStorage 的通用 entity_type 目录结构）。合并后由调用方自行落盘，
+        再调用 cancel_upload(upload_id) 清理分块。
+
+        Args:
+            upload_id: 上传ID
+
+        Returns:
+            (文件字节流, 上传元数据)
+        """
+        meta_path = self._get_upload_meta_path(upload_id)
+        if not meta_path.exists():
+            raise FileNotFoundError(f"上传不存在: {upload_id}")
+
+        with open(meta_path, 'r') as f:
+            meta = json.load(f)
+
+        if len(meta["uploaded_chunks"]) != meta["total_chunks"]:
+            missing = set(range(meta["total_chunks"])) - set(meta["uploaded_chunks"])
+            raise ValueError(f"缺少分块: {missing}")
+
+        file_data = bytearray()
+        for i in range(meta["total_chunks"]):
+            chunk_path = self._get_chunk_path(upload_id, i)
+            with open(chunk_path, 'rb') as f:
+                file_data.extend(f.read())
+
+        return bytes(file_data), meta
+
     def complete_upload(self, upload_id: str) -> Dict[str, Any]:
         """
         完成分块上传，合并所有分块

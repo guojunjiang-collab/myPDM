@@ -532,6 +532,38 @@ export const v2UploadApi = {
     return uploadAxios.post('/v2/attachments/chunk/complete', formData)
       .then(res => res.data);
   },
+
+  /**
+   * 初始化零部件附件分块上传
+   * 零部件附件存储路径与文档不同，需走 parts 专用端点
+   */
+  initPartAttachmentChunk: (
+    revisionId: string,
+    filename: string,
+    fileSize: number,
+    category: string
+  ): Promise<{ upload_id: string; total_chunks: number; chunk_size: number }> => {
+    const formData = new FormData();
+    formData.append('filename', filename);
+    formData.append('file_size', String(fileSize));
+    formData.append('category', category);
+    return uploadAxios.post(`/parts/revisions/${revisionId}/attachments/chunk/init`, formData)
+      .then(res => res.data);
+  },
+
+  /**
+   * 完成零部件附件分块上传（合并分块并落盘到迭代目录）
+   * 分块本身复用 uploadChunk（POST /v2/attachments/chunk/upload）
+   */
+  completePartAttachmentChunk: (
+    revisionId: string,
+    uploadId: string
+  ): Promise<{ id: string; file_name: string; file_size: number }> => {
+    const formData = new FormData();
+    formData.append('upload_id', uploadId);
+    return uploadAxios.post(`/parts/revisions/${revisionId}/attachments/chunk/complete`, formData)
+      .then(res => res.data);
+  },
 };
 
 // 分块大小阈值 (10MB) - 与后端 CHUNK_SIZE * 2 保持一致
