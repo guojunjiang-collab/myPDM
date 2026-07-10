@@ -415,7 +415,7 @@ async def upload_document_attachment(doc_id: uuid.UUID, body: schemas.DocumentAt
     # 返回 400 并带上原因，而不是裸 ValueError 冒泡成 500。binascii.Error 是 ValueError 子类，一并捕获。
     try:
         file_data_bytes = base64.b64decode(body.file_data)
-        folder_name = f"{d.code}_{d.version}"
+        folder_name = f"{d.code}/{d.version}/{current_iter.iteration}" if current_iter else f"{d.code}_{d.version}"
         result = file_storage.save_file(file_data_bytes, "document", str(doc_id), body.file_name, folder_name=folder_name)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"附件上传失败: {e}")

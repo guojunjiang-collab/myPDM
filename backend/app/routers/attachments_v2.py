@@ -122,16 +122,22 @@ async def upload_file(
         }
     
     try:
-        # 保存文件到文件系统（图文档使用 编号_版本 作为文件夹名）
+        # 保存文件到文件系统（图文档使用 编号/版本/迭代 分层路径，对齐零部件）
         folder_name = None
         doc = None
+        current_iter = None
         if entity_type in ("document", "documents"):
             doc = db.query(Document).filter(Document.id == uuid.UUID(entity_id)).first()
             if doc:
-                folder_name = f"{doc.code}_{doc.version}"
                 # 签出校验
                 if doc.check_out_user_id is None or str(doc.check_out_user_id) != str(current_user.id):
                     raise HTTPException(status_code=400, detail="请先签出后再上传附件")
+                if doc.latest_iteration and doc.latest_iteration > 0:
+                    current_iter = db.query(DocumentIteration).filter(
+                        DocumentIteration.document_id == doc.id,
+                        DocumentIteration.iteration == doc.latest_iteration,
+                    ).first()
+                folder_name = f"{doc.code}/{doc.version}/{current_iter.iteration}" if current_iter else f"{doc.code}_{doc.version}"
         elif entity_type in ("component", "components"):
             from ..models_parts import PartMaster
             comp = db.query(PartMaster).filter(PartMaster.id == uuid.UUID(entity_id)).first()
@@ -147,14 +153,6 @@ async def upload_file(
 
         # 零部件附件：改用 PartAttachment 直传，不再在此处创建
         # （component_attachments 表已删除）
-
-        # 绑定图文档当前迭代（签出态下上传应归入当前迭代）
-        current_iter = None
-        if doc and doc.latest_iteration and doc.latest_iteration > 0:
-            current_iter = db.query(DocumentIteration).filter(
-                DocumentIteration.document_id == doc.id,
-                DocumentIteration.iteration == doc.latest_iteration,
-            ).first()
 
         # 创建数据库记录
         att_id = str(uuid.uuid4())
@@ -227,11 +225,17 @@ async def init_chunked_upload(
     total_chunks = (file_size + CHUNK_SIZE - 1) // CHUNK_SIZE
     
     try:
-        # 图文档使用 编号_版本 作为文件夹名
+        # 图文档使用 编号/版本/迭代 分层路径（对齐零部件）
         folder_name = None
         if entity_type in ("document", "documents"):
             doc = db.query(Document).filter(Document.id == uuid.UUID(entity_id)).first()
-            if doc:
+            if doc and doc.latest_iteration and doc.latest_iteration > 0:
+                current_iter = db.query(DocumentIteration).filter(
+                    DocumentIteration.document_id == doc.id,
+                    DocumentIteration.iteration == doc.latest_iteration,
+                ).first()
+                folder_name = f"{doc.code}/{doc.version}/{current_iter.iteration}" if current_iter else f"{doc.code}_{doc.version}"
+            elif doc:
                 folder_name = f"{doc.code}_{doc.version}"
         elif entity_type in ("component", "components"):
             from ..models_parts import PartMaster
