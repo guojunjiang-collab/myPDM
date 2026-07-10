@@ -220,6 +220,13 @@ export const documentsApi = {
   delete: (id: string) => api.delete(`/documents/${id}`),
   upgrade: (id: string, note?: string) => api.post(`/documents/${id}/upgrade`, { note }),
   versions: (id: string) => api.get(`/documents/${id}/versions`),
+  // 签入签出
+  checkout: (docId: string) => api.post(`/documents/${docId}/checkout`),
+  checkin: (docId: string, note?: string) =>
+    api.post(`/documents/${docId}/checkin`, null, { params: note ? { note } : {} }),
+  undocheckout: (docId: string) => api.post(`/documents/${docId}/undo-checkout`),
+  forceCheckin: (docId: string) => api.post(`/documents/${docId}/force-checkin`),
+  iterations: (docId: string) => api.get(`/documents/${docId}/iterations`),
   // 图文档附件
   uploadAttachment: (docId: string, data: { id?: string; file_name: string; file_data: string }) =>
     api.post(`/documents/${docId}/attachments`, data),

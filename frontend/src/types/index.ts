@@ -170,6 +170,27 @@ export interface Document {
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
+  check_out_user_id?: string | null;
+  check_out_user_name?: string | null;
+  check_out_date?: string | null;
+  latest_iteration?: number;
+}
+
+export interface DocumentAttachmentBrief {
+  id: string;
+  file_name: string;
+  file_size: number;
+  file_path?: string;
+  created_at?: string | null;
+}
+
+export interface DocumentIteration {
+  id: string;
+  iteration: number;
+  check_in_date?: string | null;
+  check_in_note?: string | null;
+  created_at?: string | null;
+  attachments: DocumentAttachmentBrief[];
 }
 
 export interface DocumentAttachment {
