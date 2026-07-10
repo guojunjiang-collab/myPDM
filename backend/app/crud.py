@@ -509,5 +509,6 @@ def get_document_versions(db, doc_id):
     if not doc:
         return []
     return db.query(models.Document).filter(
-        models.Document.code == doc.code
+        models.Document.code == doc.code,
+        models.Document.deleted_at.is_(None),
     ).order_by(models.Document.created_at).all()
