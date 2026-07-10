@@ -139,7 +139,10 @@ export default function Documents() {
 
   useEffect(() => {
     loadDocuments();
-  }, [search, status, storeDocuments]);
+    // 依赖 storeDocuments：跨页变更（创建/编辑/删除/轮询）后自动拉取最新
+    // 不依赖 search/status：本地筛选即可，不需要重新拉取
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeDocuments]);
 
   const { sortedData, handleSort, getSortIcon } = useTableSort<Document>(documents, 'code', 'asc');
 
@@ -204,17 +207,27 @@ export default function Documents() {
     return data;
   })();
 
-  const loadDocuments = () => {
-    const localDocuments = useDataStore.getState().documents;
-    setDocuments(localDocuments);
-    setLoading(false);
-    // 加载自定义字段定义（同步版本）
-    const localDefs = useDataStore.getState().customFieldDefs;
-    setCustomFieldDefs(localDefs.filter((d: CustomFieldDefinition) =>
-      d.applies_to?.includes('document')
-    ));
-    // 加载所有图文档的自定义字段值
-    loadAllCustomFieldValues(localDocuments);
+  const loadDocuments = async () => {
+    setLoading(true);
+    try {
+      // 直接调 API 取全量（含所有版本），避免依赖 store 缓存导致看不到「多版本」徽标
+      const res = await documentsApi.list({ page_size: 10000, brief: true });
+      const localDocuments: Document[] = Array.isArray(res.data) ? (res.data as Document[]) : [];
+      setDocuments(localDocuments);
+      // 同步到 store，保持跨页（看板、库存等）一致
+      useDataStore.getState().setDocuments(localDocuments as any);
+      // 加载自定义字段定义（同步版本）
+      const localDefs = useDataStore.getState().customFieldDefs;
+      setCustomFieldDefs(localDefs.filter((d: CustomFieldDefinition) =>
+        d.applies_to?.includes('document')
+      ));
+      // 加载所有图文档的自定义字段值
+      loadAllCustomFieldValues(localDocuments);
+    } catch (error) {
+      console.error('加载图文档失败', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // 批量加载所有图文档的自定义字段值
