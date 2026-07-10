@@ -268,6 +268,13 @@ async def update_document(doc_id: uuid.UUID, body: schemas.DocumentUpdate, reque
     d = db.query(Document).filter(Document.id == doc_id).first()
     if not d:
         raise HTTPException(status_code=404, detail="图文档不存在")
+    # 编辑门槛：仅本人已签出且草稿态可编辑（对齐零件）
+    if d.status != "draft":
+        raise HTTPException(status_code=400, detail="仅草稿状态可编辑")
+    if d.check_out_user_id is None:
+        raise HTTPException(status_code=400, detail="请先签出后再编辑")
+    if str(d.check_out_user_id) != str(current_user.id):
+        raise HTTPException(status_code=400, detail="该文档被他人签出，无法编辑")
     # 修改编号后须保证 (编号+版本) 仍唯一（version 不可改，按当前版本校验 code 冲突）
     if body.code and body.code != d.code:
         if d.version != 'A':
