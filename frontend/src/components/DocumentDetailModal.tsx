@@ -275,7 +275,7 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
           <div className="text-gray-400 text-sm py-8 text-center">加载失败</div>
         ) : (
           <>
-            {/* 顶部核心信息 */}
+            {/* 顶部核心信息（不含版本/状态/更新时间 — 版本状态放入操作行，更新时间见版本/迭代历史） */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0 mb-3">
               <Field label="图文档编号">
                 {canEdit && doc.version === 'A' ? (
@@ -299,12 +299,6 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                   <div className="text-sm text-gray-900 font-medium">{doc.name}</div>
                 )}
               </Field>
-              <Field label="版本">
-                <div className="text-sm text-gray-900 font-medium">{doc.version || '-'}</div>
-              </Field>
-              <Field label="状态">
-                <span className={`inline-block px-2 py-0.5 text-xs rounded-full ${tag.class}`}>{tag.label}</span>
-              </Field>
               <Field label="备注" className="col-span-2">
                 {canEdit ? (
                   <input
@@ -321,21 +315,21 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
               <Field label="创建人">
                 <div className="text-sm text-gray-900 font-medium">{doc.creator_name || '-'}</div>
               </Field>
-              <Field label="更新时间">
-                <div className="text-sm text-gray-900 font-medium">{formatDateTime(doc.updated_at)}</div>
-              </Field>
             </div>
 
-            {/* 中部操作区 */}
-            <div className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 mb-3 shrink-0">
-              <div className="text-xs">
-                {isCheckedOut ? (
-                  <span className="text-orange-600">🔒 已签出：{doc.check_out_user_name || '未知'}</span>
-                ) : (
-                  <span className="text-gray-400">未签出</span>
-                )}
-              </div>
-              <div className="flex gap-2">
+            {/* 中部操作区：版本/状态/签出状态 与 签入签出等按钮同一行（参考零部件详情） */}
+            <div className="bg-white rounded-lg border border-gray-200 p-3 mb-3 shrink-0">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="font-semibold text-sm">版本：v{doc.version || '-'}</span>
+                  <span className={`px-2 py-0.5 text-xs rounded-full ${tag.class}`}>{tag.label}</span>
+                  {isCheckedOut ? (
+                    <span className="text-xs text-orange-600">🔒 已签出：{doc.check_out_user_name || '未知'}</span>
+                  ) : (
+                    <span className="text-xs text-gray-400">未签出</span>
+                  )}
+                </div>
+                <div className="flex gap-2 flex-wrap">
                 {canCheckout && (
                   <button
                     onClick={() => doAction(() => documentsApi.checkout(doc.id), '签出成功')}
@@ -382,6 +376,7 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                     升版
                   </button>
                 )}
+                </div>
               </div>
             </div>
 
