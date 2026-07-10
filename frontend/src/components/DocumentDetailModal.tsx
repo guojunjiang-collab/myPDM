@@ -347,7 +347,7 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
 
   return (
     <Modal open={open} title="图文档详情" onClose={onClose} width="full">
-      <div className="min-h-[50vh] flex flex-col">
+      <div className="h-[50vh] flex flex-col">
         {loading && !doc ? (
           <Loading />
         ) : !doc ? (
