@@ -13,11 +13,33 @@ draco.setDecoderPath('/draco/');
 const loader = new GLTFLoader();
 loader.setDRACOLoader(draco);
 
+// 拉取 GLB 二进制；若叶项尚未转换（后端返回 202），轮询等待转换完成后再解析。
+async function fetchGlbBuffer(url: string): Promise<ArrayBuffer> {
+  const maxTries = 60; // 最多 ~120 秒
+  for (let i = 0; i < maxTries; i++) {
+    const resp = await fetch(url);
+    if (resp.status === 200) return await resp.arrayBuffer();
+    if (resp.status === 202) {
+      await new Promise((r) => setTimeout(r, 2000));
+      continue;
+    }
+    throw new Error(`GLB 加载失败: ${resp.status}`);
+  }
+  throw new Error('GLB 转换超时');
+}
+
 // 按 url 缓存已加载的 GLB 场景（去重：同一零件只下载一次）
 const sceneCache = new Map<string, Promise<THREE.Group>>();
 function loadScene(url: string): Promise<THREE.Group> {
   if (!sceneCache.has(url)) {
-    sceneCache.set(url, loader.loadAsync(url).then((g) => g.scene));
+    const p = fetchGlbBuffer(url)
+      .then((buf) => loader.parseAsync(buf, ''))
+      .then((g) => g.scene)
+      .catch((err) => {
+        sceneCache.delete(url); // 失败不缓存，允许重试
+        throw err;
+      });
+    sceneCache.set(url, p);
   }
   return sceneCache.get(url)!;
 }
@@ -60,11 +82,18 @@ export function AssemblyModelLoader({ instances, tree }: Props) {
       const origColor = new Map<string, number>();
 
       for (const inst of instances) {
-        const [coarse, normal, fine] = await Promise.all([
-          loadScene(inst.glb_urls.coarse),
-          loadScene(inst.glb_urls.normal),
-          loadScene(inst.glb_urls.fine),
-        ]);
+        let coarse: THREE.Group, normal: THREE.Group, fine: THREE.Group;
+        try {
+          [coarse, normal, fine] = await Promise.all([
+            loadScene(inst.glb_urls.coarse),
+            loadScene(inst.glb_urls.normal),
+            loadScene(inst.glb_urls.fine),
+          ]);
+        } catch (err) {
+          // 单个零件加载/转换失败时跳过，不影响整个装配渲染
+          console.warn(`装配零件加载失败，已跳过: ${inst.part_code}`, err);
+          continue;
+        }
         if (cancelled) return;
 
         const lod = new THREE.LOD();

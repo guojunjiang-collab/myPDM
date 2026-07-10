@@ -968,7 +968,11 @@ def _glb_url_resolver_factory(db):
             for tier in ("coarse", "normal", "fine"):
                 urls[tier] = fallback_url
         else:
-            return None
+            # GLB 尚未生成：仍返回 /gltf 端点地址（该端点会按需触发后台转换并在完成前返回 202）。
+            # 这样叶项不会被静默跳过，前端可轮询等待转换完成后再加载。
+            fallback_url = f"/api/v2/attachments/{att.id}/gltf?token={token}"
+            for tier in ("coarse", "normal", "fine"):
+                urls[tier] = fallback_url
         return urls
 
     return resolver
