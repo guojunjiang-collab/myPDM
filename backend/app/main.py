@@ -507,6 +507,7 @@ async def startup_event():
             import app.models_inventory  # noqa: F401
             import app.models_project  # noqa: F401
             import app.models_parts  # noqa: F401
+            import app.models_notification  # noqa: F401
 
             # 幂等建表：仅创建尚不存在的表（如库存模块新表）
             Base.metadata.create_all(bind=engine)
