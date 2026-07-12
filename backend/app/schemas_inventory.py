@@ -47,7 +47,7 @@ class MaterialEdit(BaseSchema):
 
 
 class MaterialEnableFromPDM(BaseSchema):
-    entity_type: Literal["part", "assembly"]
+    entity_type: Literal["part", "assembly", "component"]
     entity_id: str
     track_mode: Literal["quantity", "batch"] = "quantity"
     unit: Optional[str] = None

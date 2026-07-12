@@ -7,7 +7,7 @@ from sqlalchemy import func as sqlfunc
 from fastapi import HTTPException
 
 from app.models import User
-from app.models_parts import PartMaster
+from app.models_parts import PartMaster, PartRevision
 from app.models_inventory import (
     Warehouse, InventoryMaterial, InventoryStock, InventoryLedger,
     InventoryDocument, InventoryDocumentLine, InventoryReviewRecord, InventoryStatusLog,
@@ -109,8 +109,16 @@ def enable_material_from_pdm(db: Session, data: MaterialEnableFromPDM) -> Invent
     ).first()
     if dup:
         raise HTTPException(status_code=400, detail="该零部件已启用库存")
+    # 版本在最新有效 revision 上（PartMaster 本身无 version 字段）
+    latest_rev = (
+        db.query(PartRevision)
+        .filter(PartRevision.master_id == entity.id, PartRevision.deleted_at.is_(None))
+        .order_by(PartRevision.created_at.desc())
+        .first()
+    )
+    version = latest_rev.version if latest_rev else "A"
     m = InventoryMaterial(
-        code=f"{entity.code}_{entity.version}", name=entity.name, spec=getattr(entity, "spec", None),
+        code=f"{entity.code}_{version}", name=entity.name, spec=getattr(entity, "spec", None),
         unit=data.unit, source_type=data.entity_type,
         ref_entity_type=data.entity_type, ref_entity_id=entity.id,
         track_mode=data.track_mode, safety_stock=data.safety_stock,

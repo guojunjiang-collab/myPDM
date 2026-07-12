@@ -9,12 +9,22 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User, BOMItem
-from app.models_parts import PartMaster
+from app.models_parts import PartMaster, PartRevision
 from app.models_eco import ECO, ECOExecutionItem, ECOReviewRecord, ECOStatusLog
 from app import crud_eco, schemas_eco
 from ..permissions import require_permission, enforce_object_policy
 
 router = APIRouter(prefix="/ecos", tags=["变更管理-ECO"])
+
+
+def _latest_revision(db: Session, master_id):
+    """取某零部件 master 的最新有效 revision（版本/状态字段来源）。"""
+    return (
+        db.query(PartRevision)
+        .filter(PartRevision.master_id == master_id, PartRevision.deleted_at.is_(None))
+        .order_by(PartRevision.created_at.desc())
+        .first()
+    )
 
 
 # ─────────────────────────────────────────────────────
@@ -69,19 +79,19 @@ def _build_eco_detail(db: Session, eco: ECO) -> dict:
     ).order_by(ECOExecutionItem.sort_order).all()
     execution_item_list = []
     for ei in execution_items:
-        # 查询原始实体版本
+        # 查询原始实体版本（版本在 revision 上）
         entity_version = None
         if ei.entity_id:
-            ent = db.query(PartMaster).filter(PartMaster.id == ei.entity_id).first()
-            if ent:
-                entity_version = ent.version
+            rev = _latest_revision(db, ei.entity_id)
+            if rev:
+                entity_version = rev.version
 
-        # 查询新版实体的状态
+        # 查询新版实体的状态（状态在 revision 上）
         new_entity_status = None
         if ei.new_entity_id:
-            new_ent = db.query(PartMaster).filter(PartMaster.id == ei.new_entity_id).first()
-            if new_ent:
-                new_entity_status = new_ent.status
+            rev = _latest_revision(db, ei.new_entity_id)
+            if rev:
+                new_entity_status = rev.status
 
         execution_item_list.append({
             "id": str(ei.id), "source": ei.source, "entity_type": ei.entity_type,
