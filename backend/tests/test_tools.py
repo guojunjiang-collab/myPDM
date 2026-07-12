@@ -1,12 +1,47 @@
 import uuid
 from app.assistant import tools
 from app import models
+from app import models_parts
+
+
+def _make_master(db, code, name, mtype="part"):
+    """创建 PartMaster + 一个 draft 版本 + 当前迭代，返回 (master, revision, iteration)。"""
+    master = models_parts.PartMaster(id=uuid.uuid4(), code=code, name=name, type=mtype)
+    db.add(master); db.commit(); db.refresh(master)
+    rev = models_parts.PartRevision(
+        id=uuid.uuid4(), master_id=master.id, version="A", status="draft",
+        latest_iteration=1,
+    )
+    db.add(rev); db.commit(); db.refresh(rev)
+    it = models_parts.PartIteration(id=uuid.uuid4(), revision_id=rev.id, iteration=1)
+    db.add(it); db.commit(); db.refresh(it)
+    return master, rev, it
 
 
 def _make_part(db, code, name):
-    p = models.Component(id=uuid.uuid4(), code=code, name=name, status="active")
-    db.add(p); db.commit(); db.refresh(p)
-    return p
+    master, _, _ = _make_master(db, code, name, "part")
+    return master
+
+
+def _make_assembly(db, code, name):
+    master, _, _ = _make_master(db, code, name, "assembly")
+    return master
+
+
+def _link_bom(db, parent, child, quantity=1):
+    """在 parent 的当前迭代下挂 child（均为 master），建立一条 BOM 关系。"""
+    prev = db.query(models_parts.PartRevision).filter(
+        models_parts.PartRevision.master_id == parent.id).first()
+    pit = db.query(models_parts.PartIteration).filter(
+        models_parts.PartIteration.revision_id == prev.id).first()
+    crev = db.query(models_parts.PartRevision).filter(
+        models_parts.PartRevision.master_id == child.id).first()
+    bi = models.BOMItem(
+        id=uuid.uuid4(), iteration_id=pit.id,
+        parent_revision_id=prev.id, child_revision_id=crev.id, quantity=quantity,
+    )
+    db.add(bi); db.commit()
+    return bi
 
 
 def test_search_entity_matches_part_by_code(db, engineer_user):
@@ -28,10 +63,21 @@ def test_registry_specs_have_required_openai_shape():
         assert "parameters" in s["function"]
 
 
-def _make_assembly(db, code, name):
-    a = models.Component(id=uuid.uuid4(), code=code, name=name, status="active")
-    db.add(a); db.commit(); db.refresh(a)
-    return a
+def test_get_part_detail_returns_brief(db, engineer_user):
+    p = _make_part(db, "P-1", "零件")
+    out = tools.REGISTRY["get_part_detail"]["execute"](db, engineer_user, part_id=str(p.id))
+    assert out["detail"]["code"] == "P-1"
+
+
+def test_get_bom_tree_returns_children(db, engineer_user):
+    parent = _make_assembly(db, "A-P", "父")
+    child = _make_part(db, "P-C", "子")
+    _link_bom(db, parent, child, quantity=3)
+    out = tools.REGISTRY["get_bom_tree"]["execute"](
+        db, engineer_user, type="assembly", id=str(parent.id))
+    codes = {r["child_code"] for r in out["items"]}
+    assert "P-C" in codes
+    assert out["_card"]["card_type"] == "table"
 
 
 def _fake_node(code, qty, level=0):
@@ -74,12 +120,11 @@ def test_diff_bom_large_returns_preprocessed_diff(db, engineer_user, monkeypatch
 def test_trace_bom_returns_parents(db, engineer_user):
     parent = _make_assembly(db, "A-P", "父")
     child = _make_part(db, "P-C", "子")
-    bi = models.BOMItem(id=uuid.uuid4(), parent_type="component", parent_id=parent.id,
-                        child_type="component", child_id=child.id, quantity=2)
-    db.add(bi); db.commit()
+    _link_bom(db, parent, child, quantity=2)
     out = tools.REGISTRY["trace_bom"]["execute"](
         db, engineer_user, entity_type="component", entity_id=str(child.id))
     assert isinstance(out["parents"], list)
+    assert any(p["code"] == "A-P" for p in out["parents"])
 
 
 def test_export_bom_returns_link_for_engineer(db, engineer_user):
@@ -110,7 +155,7 @@ def test_list_api_endpoints_registered_and_returns_endpoints(db, engineer_user):
     assert "endpoints" in out
     paths = {e["path"] for e in out["endpoints"]}
     # 至少包含零件列表，且不含用户接口
-    assert any(p.startswith("/api/components") for p in paths)
+    assert any(p.startswith("/api/parts") for p in paths)
     assert not any(p.startswith("/api/users") for p in paths)
 
 

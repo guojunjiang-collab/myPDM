@@ -11,6 +11,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from .. import crud
+from .. import crud_parts
 from ..bom import compare
 from ..models import User, DocumentAttachment
 from ..models_parts import PartMaster
@@ -51,6 +52,24 @@ def _get_part_master(db, entity_id):
     """从 part_masters 表查询实体"""
     return db.query(PartMaster).filter(PartMaster.id == entity_id).first()
 
+
+def _latest_revision_id(db, entity_id):
+    """把 master_id 解析为其最新版本(revision)的 id。
+
+    三层模型下 BOM 关系挂在 revision 上，而 search/detail 工具对模型返回的是
+    master_id。此处统一取"最新创建的版本"，与前端列表默认行为一致。
+    若传入的本身已是 revision_id，则原样返回。
+    """
+    eid = uuid.UUID(str(entity_id)) if not isinstance(entity_id, uuid.UUID) else entity_id
+    # 传入的是 master_id：取其最新版本
+    revisions = crud_parts.list_revisions_by_master(db, eid)  # 按 created_at 升序
+    if revisions:
+        return revisions[-1].id
+    # 兜底：传入的可能已经是 revision_id
+    rev = crud_parts.get_part_revision(db, eid)
+    return rev.id if rev else None
+
+
 def get_part_detail(db: Session, user: User, part_id: str):
     p = _get_part_master(db, uuid.UUID(part_id))
     if not p:
@@ -68,16 +87,20 @@ def get_assembly_detail(db: Session, user: User, assembly_id: str):
 def get_bom_tree(db: Session, user: User, type: str, id: str):
     if type not in ("part", "assembly"):
         return {"error": "无效的类型，仅支持 part 或 assembly"}
-    items = crud.get_bom_items(db, type, uuid.UUID(id))
-    rows = []
-    for it in items:
-        child = _get_part_master(db, it.child_id)
-        rows.append({
-            "child_type": it.child_type,
-            "child_code": getattr(child, "code", None),
-            "child_name": getattr(child, "name", None),
-            "quantity": int(it.quantity),
-        })
+    revision_id = _latest_revision_id(db, id)
+    if not revision_id:
+        return {"error": "零部件不存在"}
+    # crud_parts.get_bom_tree 返回当前迭代的直接子项（含 child_code/child_name/child_type）
+    tree = crud_parts.get_bom_tree(db, revision_id)
+    rows = [
+        {
+            "child_type": n.get("child_type"),
+            "child_code": n.get("child_code"),
+            "child_name": n.get("child_name"),
+            "quantity": int(n.get("quantity") or 0),
+        }
+        for n in tree
+    ]
     card = {"card_type": "table", "payload": {"title": "BOM 树", "columns":
             ["child_type", "child_code", "child_name", "quantity"], "rows": rows}}
     return {"items": rows, "_card": card}
@@ -86,7 +109,10 @@ def get_bom_tree(db: Session, user: User, type: str, id: str):
 def _flatten_tree(db, etype, eid):
     if etype != "assembly":
         return []
-    return compare.get_bom_tree_recursive(db, eid)
+    revision_id = _latest_revision_id(db, eid)
+    if not revision_id:
+        return []
+    return compare.get_bom_tree_recursive(db, revision_id)
 
 
 def diff_bom(db: Session, user: User, left_id: str, right_id: str,
@@ -131,29 +157,39 @@ def diff_bom(db: Session, user: User, left_id: str, right_id: str,
 
 
 def trace_bom(db: Session, user: User, entity_type: str, entity_id: str, max_level: int = 10):
+    """BOM 反查：查找使用了某零部件的所有上层部件（向上追溯）。
+
+    三层模型下 BOM 关系挂在 revision 上（parent_revision_id → child_revision_id）。
+    入参 entity_id 为 master_id，先解析为其最新版本再逐层向上追溯。
+    """
     from ..models import BOMItem
     if entity_type not in ("component", "part", "assembly"):
         return {"error": "无效类型"}
+    start_rev = _latest_revision_id(db, entity_id)
+    if not start_rev:
+        return {"error": "零部件不存在"}
     parents = []
-    frontier = [uuid.UUID(entity_id)]
+    frontier = [start_rev]
     seen = set()
     level = 0
     while frontier and level < max_level:
         level += 1
         next_frontier = []
         rows = db.query(BOMItem).filter(
-            BOMItem.child_id.in_(frontier),
+            BOMItem.child_revision_id.in_(frontier),
             BOMItem.deleted_at.is_(None),
         ).all()
         for r in rows:
-            if r.parent_id in seen:
+            parent_rev_id = r.parent_revision_id
+            if parent_rev_id is None or parent_rev_id in seen:
                 continue
-            seen.add(r.parent_id)
-            pa = _get_part_master(db, r.parent_id)
+            seen.add(parent_rev_id)
+            parent_rev = crud_parts.get_part_revision(db, parent_rev_id)
+            pa = crud_parts.get_part_master(db, parent_rev.master_id) if parent_rev else None
             if pa:
-                parents.append({"level": level, "parent_type": r.parent_type,
+                parents.append({"level": level, "parent_type": "component",
                                 "code": pa.code, "name": pa.name})
-                next_frontier.append(r.parent_id)
+                next_frontier.append(parent_rev_id)
         frontier = next_frontier
     return {"parents": parents}
 
@@ -161,8 +197,11 @@ def trace_bom(db: Session, user: User, entity_type: str, entity_id: str, max_lev
 def export_bom(db: Session, user: User, type: str, id: str):
     if user.role not in DOWNLOAD_ROLES:
         return {"error": "当前账号无下载/导出权限"}
-    # 复用现有 BOM 导出端点（前端用带 token 链接调用）
-    url = f"/api/bom/export/{type}/{id}"
+    # 导出端点按 revision_id 递归展开 BOM，需把 master_id 解析为最新版本
+    revision_id = _latest_revision_id(db, id)
+    if not revision_id:
+        return {"error": "零部件不存在"}
+    url = f"/api/bom/export/{type}/{revision_id}"
     card = {"card_type": "download", "payload": {"label": "下载 BOM 导出", "url": url}}
     return {"url": url, "_card": card}
 

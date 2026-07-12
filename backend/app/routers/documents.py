@@ -490,6 +490,10 @@ async def download_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, db: Session 
 @router.get("/{doc_id}/attachments/")
 async def list_attachments(doc_id: uuid.UUID, iteration_id: Optional[uuid.UUID] = None, skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents.attachment:download"))):
     """列出文档附件。iteration_id 可选：传入时只返回该迭代的附件。"""
+    # 与单附件下载保持一致的内容访问控制：非共享成员/非创建者/非管理员不得列出附件
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if doc:
+        crud_groups.enforce_document_content_access(db, current_user, doc)
     query = db.query(DocumentAttachment).filter(DocumentAttachment.document_id == doc_id)
     if iteration_id is not None:
         query = query.filter(DocumentAttachment.iteration_id == iteration_id)

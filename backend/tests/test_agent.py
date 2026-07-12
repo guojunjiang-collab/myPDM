@@ -2,6 +2,7 @@ import json
 import uuid
 from app.assistant import agent
 from app import models
+from app import models_parts
 
 
 def _emit_collector():
@@ -10,9 +11,14 @@ def _emit_collector():
 
 
 def _make_part(db, code, name):
-    p = models.Component(id=uuid.uuid4(), code=code, name=name, status="active")
-    db.add(p); db.commit(); db.refresh(p)
-    return p
+    master = models_parts.PartMaster(id=uuid.uuid4(), code=code, name=name, type="part")
+    db.add(master); db.commit(); db.refresh(master)
+    rev = models_parts.PartRevision(
+        id=uuid.uuid4(), master_id=master.id, version="A", status="draft",
+        latest_iteration=1,
+    )
+    db.add(rev); db.commit(); db.refresh(rev)
+    return master
 
 
 def test_agent_plain_answer_emits_token_and_done(db, engineer_user, make_fake_llm):
