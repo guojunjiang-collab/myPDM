@@ -7,6 +7,8 @@ def test_is_allowed_business_paths():
     assert gw.is_allowed("/api/bom/tree/assembly/abc")
     assert gw.is_allowed("/api/ecrs/")
     assert gw.is_allowed("/api/v2/attachments/")
+    assert gw.is_allowed("/api/inventory/warehouses/")
+    assert gw.is_allowed("/api/projects/abc/tasks")
 
 
 def test_is_allowed_denies_sensitive_and_binary():
