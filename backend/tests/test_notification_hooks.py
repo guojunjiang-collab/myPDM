@@ -124,6 +124,18 @@ def test_eco_executing_notifies_cc_only(db):
     assert str(creator.id) not in recipients
 
 
+def test_eco_rejected_notifies_creator_and_cc(db):
+    creator = _user(db, "创建人")
+    cc = _user(db, "知会人")
+    approver = _user(db, "审批人")
+    eco = _eco(db, creator.id, cc_users=[{"user_id": str(cc.id), "user_name": "知会人"}])
+    crud_eco.change_eco_status(db, eco.id, "rejected", approver.id)
+    rows = _notifs(db, eco.id)
+    recipients = {str(r.recipient_id) for r in rows}
+    assert str(creator.id) in recipients and str(cc.id) in recipients
+    assert all(r.event_type == "eco_rejected" for r in rows)
+
+
 def test_eco_cc_added_notifies_new_user(db):
     from fastapi.testclient import TestClient
     from app.main import app

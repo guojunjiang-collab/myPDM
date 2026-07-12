@@ -10,6 +10,19 @@ from sqlalchemy import func as sqlfunc
 from .models_notification import Notification
 
 
+def parse_uuids(raw_ids: Iterable) -> List[UUID]:
+    """把一组可能为字符串/UUID/非法值的 id 容错解析为 UUID 列表，跳过非法项。"""
+    out: List[UUID] = []
+    for v in raw_ids:
+        if v is None:
+            continue
+        try:
+            out.append(UUID(str(v)))
+        except (ValueError, TypeError, AttributeError):
+            continue
+    return out
+
+
 def create_notifications(
     db: Session,
     *,

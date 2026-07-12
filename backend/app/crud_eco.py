@@ -481,12 +481,7 @@ def change_eco_status(
     db.refresh(eco)
 
     # 站内通知：知会类事件（approved/rejected 通知创建人+cc；executing/completed 仅通知 cc）
-    def _safe_uuid(v):
-        try:
-            return uuid.UUID(str(v))
-        except (ValueError, TypeError, AttributeError):
-            return None
-    _cc_ids = [u for u in (_safe_uuid(c.get("user_id")) for c in (eco.cc_users or []) if c.get("user_id")) if u]
+    _cc_ids = _notif.parse_uuids(c.get("user_id") for c in (eco.cc_users or []))
     if to_status in ("approved", "rejected"):
         _evt = "eco_approved" if to_status == "approved" else "eco_rejected"
         _label = "审批通过" if to_status == "approved" else "审批驳回"
