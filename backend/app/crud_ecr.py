@@ -275,6 +275,26 @@ def change_ecr_status(
 
     db.commit()
     db.refresh(ecr)
+
+    # 站内通知：知会类事件（approved/rejected 通知创建人+cc；closed 仅通知 cc）
+    from . import notifications as _notif
+    _cc_ids = [uuid.UUID(c.get("user_id")) for c in (ecr.cc_users or []) if c.get("user_id")]
+    if to_status in ("approved", "rejected"):
+        _evt = "ecr_approved" if to_status == "approved" else "ecr_rejected"
+        _label = "审批通过" if to_status == "approved" else "审批驳回"
+        _notif.create_notifications(
+            db, recipient_ids=[ecr.creator_id, *_cc_ids], sender_id=operator_id,
+            event_type=_evt, title=f"{ecr.ecr_number} {_label}",
+            body=(comment or None), target_type="ecr", target_id=ecr.id,
+            exclude_sender=True,
+        )
+    elif to_status == "closed":
+        _notif.create_notifications(
+            db, recipient_ids=_cc_ids, sender_id=operator_id,
+            event_type="ecr_closed", title=f"{ecr.ecr_number} 已关闭",
+            body=None, target_type="ecr", target_id=ecr.id, exclude_sender=True,
+        )
+
     return ecr
 
 

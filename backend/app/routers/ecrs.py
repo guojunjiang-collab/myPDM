@@ -544,14 +544,23 @@ async def cc_ecr(
     
     cc_list = list(ecr.cc_users or [])
     existing = {c["user_id"] for c in cc_list}
+    newly_added = []
     for uid in user_ids:
         if uid not in existing:
             user = db.query(User).filter(User.id == uid).first()
             if user:
                 cc_list.append({"user_id": str(user.id), "user_name": user.real_name})
+                newly_added.append(user.id)
     
     ecr.cc_users = cc_list
     db.commit()
+    if newly_added:
+        from .. import notifications as _notif
+        _notif.create_notifications(
+            db, recipient_ids=newly_added, sender_id=current_user.id,
+            event_type="cc_added", title=f"你被加为 {ecr.ecr_number} 知会人",
+            body=None, target_type="ecr", target_id=ecr.id, exclude_sender=True,
+        )
     return {"message": "知会成功", "cc_users": cc_list}
 
 
