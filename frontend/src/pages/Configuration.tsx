@@ -1,7 +1,7 @@
-import { useState } from 'react';
 import ConfigurationList from '../components/Configuration/ConfigurationList';
 import ProfileList from '../components/Configuration/ProfileList';
 import { useHeaderTabs } from '../hooks/useHeaderTabs';
+import { usePersistedTabState } from '../hooks/usePersistedTabState';
 
 type TabKey = 'effectivity' | 'single-config';
 
@@ -11,7 +11,7 @@ const tabs: { key: TabKey; label: string }[] = [
 ];
 
 export default function Configuration() {
-  const [activeTab, setActiveTab] = useState<TabKey>('effectivity');
+  const [activeTab, setActiveTab] = usePersistedTabState<TabKey>('effectivity');
   useHeaderTabs(tabs, activeTab, setActiveTab);
 
   return (

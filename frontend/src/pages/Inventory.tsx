@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useInventoryStore } from '../stores/inventory';
 import StockTab from '../components/Inventory/StockTab';
 import DocumentTab from '../components/Inventory/DocumentTab';
 import MaterialTab from '../components/Inventory/MaterialTab';
 import WarehouseTab from '../components/Inventory/WarehouseTab';
 import { useHeaderTabs } from '../hooks/useHeaderTabs';
+import { usePersistedTabState } from '../hooks/usePersistedTabState';
 
 type TabKey = 'stock' | 'documents' | 'materials' | 'warehouses';
 
@@ -16,7 +17,7 @@ const tabs: { key: TabKey; label: string }[] = [
 ];
 
 export default function Inventory() {
-  const [activeTab, setActiveTab] = useState<TabKey>('stock');
+  const [activeTab, setActiveTab] = usePersistedTabState<TabKey>('stock');
   const { loadWarehouses, loadUsers } = useInventoryStore();
   useHeaderTabs(tabs, activeTab, setActiveTab);
 

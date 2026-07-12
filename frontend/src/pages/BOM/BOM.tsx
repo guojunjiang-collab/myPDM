@@ -5,6 +5,7 @@ import BOMComparePanel from './BOMComparePanel';
 import BOMTracePanel from './BOMTracePanel';
 import DocTracePanel from './DocTracePanel';
 import { useHeaderTabs } from '../../hooks/useHeaderTabs';
+import { usePersistedTabState } from '../../hooks/usePersistedTabState';
 
 type ModeKey = 'tree' | 'compare' | 'trace' | 'doc-trace';
 const modeTabs: { key: ModeKey; label: string }[] = [
@@ -15,7 +16,7 @@ const modeTabs: { key: ModeKey; label: string }[] = [
 ];
 
 export default function BOM() {
-  const [mode, setMode] = useState<ModeKey>('tree');
+  const [mode, setMode] = usePersistedTabState<ModeKey>('tree');
 
   // 将模式 Tab 注入顶栏，替代默认的“管理工具”标题，节省一行高度、内容区更高
   useHeaderTabs(modeTabs, mode, setMode);

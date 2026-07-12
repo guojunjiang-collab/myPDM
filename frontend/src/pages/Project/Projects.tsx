@@ -7,6 +7,7 @@ import { can, useAuthStore } from '../../stores/auth';
 import { Modal, ConfirmModal } from '../../components/Modal';
 import { toast } from '../../components/Toast';
 import { useHeaderTabs } from '../../hooks/useHeaderTabs';
+import { usePersistedTabState } from '../../hooks/usePersistedTabState';
 import MemberManageModal from './MemberManageModal';
 import TaskEditModal from './TaskEditModal';
 import GanttView from './gantt/GanttView';
@@ -41,7 +42,7 @@ const tabs: { key: TabKey; label: string }[] = [
 ];
 
 export default function Projects() {
-  const [tab, setTabState] = useState<TabKey>('summary');
+  const [tab, setTabState] = usePersistedTabState<TabKey>('summary');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
   const handleTabChange = useCallback((t: TabKey) => {

@@ -1,7 +1,7 @@
-import { useState } from 'react';
 import { ECRList } from '../components/ECR/ECRList';
 import { ECOList } from '../components/ECO/ECOList';
 import { useHeaderTabs } from '../hooks/useHeaderTabs';
+import { usePersistedTabState } from '../hooks/usePersistedTabState';
 
 type TabKey = 'ecr' | 'eco' | 'ecn';
 
@@ -12,7 +12,7 @@ const tabs: { key: TabKey; label: string; enabled?: boolean }[] = [
 ];
 
 export default function EC() {
-  const [activeTab, setActiveTab] = useState<TabKey>('ecr');
+  const [activeTab, setActiveTab] = usePersistedTabState<TabKey>('ecr');
   useHeaderTabs(tabs, activeTab, setActiveTab);
 
   return (
