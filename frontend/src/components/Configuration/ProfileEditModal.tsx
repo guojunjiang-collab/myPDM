@@ -2,15 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import { Modal } from '../Modal';
 import ConfigItemPicker from './ConfigItemPicker';
 import ConfigurationDetailModal from './ConfigurationDetailModal';
-import PartDetailContent from '../PartDetailContent';
-import AssemblyDetailContent from '../AssemblyDetailContent';
+import PartDetailModal from '../PartDetailModal';
 import ProfileStatusBadge from './ProfileStatusBadge';
 import ProfileReviewPanel from './ProfileReviewPanel';
-import { configurationApi, configurationProfileApi, partsApi, usersApi } from '../../services/api';
+import { configurationApi, configurationProfileApi, usersApi } from '../../services/api';
 import { exportProfilePdf, exportProfileExcel } from '../../services/configProfilePdfExport';
 import { isAdmin } from '../../stores/auth';
 import { useAuthStore } from '../../stores/auth';
-import type { ConfigurationProfileDetail, ConfigTreeNode, Part, Assembly, ProfileReviewer, ProfileCcUser } from '../../types';
+import type { ConfigurationProfileDetail, ConfigTreeNode, ProfileReviewer, ProfileCcUser } from '../../types';
 
 interface Props {
   open: boolean;
@@ -138,23 +137,16 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
 
   // Formal checklist row click → detail modal
   const [detailModal, setDetailModal] = useState<{ type: string; id: string } | null>(null);
-  const [detailData, setDetailData] = useState<Part | Assembly | null>(null);
+  // 零部件行点击 → 复用最新的 PartDetailModal（master_id）
+  const [partDetailMasterId, setPartDetailMasterId] = useState<string | null>(null);
 
   const handleFormalRowClick = async (itemType: string, itemId: string) => {
-    setDetailModal({ type: itemType, id: itemId });
-    if (itemType === 'part') {
-      try {
-        const r = await partsApi.get(itemId);
-        setDetailData({ ...r, version: r.latest_revision?.version || '', status: r.latest_revision?.status || '' } as Part);
-      } catch { setDetailData(null); }
-    } else if (itemType === 'assembly' || itemType === 'component') {
-      try {
-        const r = await partsApi.get(itemId);
-        setDetailData({ ...r, version: r.latest_revision?.version || '', status: r.latest_revision?.status || '' } as Assembly);
-      } catch { setDetailData(null); }
-    } else {
-      setDetailData(null);
+    if (itemType === 'part' || itemType === 'assembly' || itemType === 'component') {
+      // 复用最新的零部件详情弹窗（三层模型）；itemId 为 master_id
+      setPartDetailMasterId(itemId);
+      return;
     }
+    setDetailModal({ type: itemType, id: itemId });
   };
 
   // Load profile for VIEW/EDIT mode
@@ -1020,32 +1012,13 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         onClose={() => setDetailModal(null)}
       />
     )}
-    {detailModal && (detailModal.type === 'part' || detailModal.type === 'assembly') && (
-      <Modal
-        open={!!detailModal}
-        title={detailModal.type === 'part' ? '零件详情' : '部件详情'}
-        onClose={() => { setDetailModal(null); setDetailData(null); }}
-        width="full"
-        zIndex={70}
-      >
-        {detailData && detailModal.type === 'part' && (
-          <PartDetailContent
-            part={detailData as Part}
-            customFieldDefs={[]}
-            customFieldValues={{}}
-          />
-        )}
-        {detailData && detailModal.type === 'assembly' && (
-          <AssemblyDetailContent
-            assembly={detailData as Assembly}
-            customFieldDefs={[]}
-            customFieldValues={{}}
-          />
-        )}
-        {!detailData && (
-          <div className="px-4 py-8 text-center text-sm text-gray-400">加载中...</div>
-        )}
-      </Modal>
+    {/* 零部件行点击 → 复用最新的零部件详情弹窗 */}
+    {partDetailMasterId && (
+      <PartDetailModal
+        masterId={partDetailMasterId}
+        open={!!partDetailMasterId}
+        onClose={() => setPartDetailMasterId(null)}
+      />
     )}
   </>
 );
