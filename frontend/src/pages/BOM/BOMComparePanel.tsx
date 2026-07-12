@@ -18,6 +18,7 @@ export default function BOMComparePanel({ onViewEntity }: BOMComparePanelProps) 
   const [compareLeft, setCompareLeft] = useState<SelectOption | null>(null);
   const [compareRight, setCompareRight] = useState<SelectOption | null>(null);
   const [compareResult, setCompareResult] = useState<BOMCompareResponse | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [splitRatio, setSplitRatio] = useState(50);
   const [loading, setLoading] = useState(false);
   const dragStateRef = useRef<{ startX: number; startRatio: number } | null>(null);
@@ -70,12 +71,44 @@ export default function BOMComparePanel({ onViewEntity }: BOMComparePanelProps) 
     try {
       const response = await bomApi.compare(compareLeft.revisionId, compareRight.revisionId);
       setCompareResult(response.data);
+      // 默认只展开到第 1 层级：折叠所有含子节点的路径（逐级展开）
+      const nodes = response.data.comparison;
+      const toCollapse = new Set<string>();
+      nodes.forEach((n: BOMCompareNode, i: number) => {
+        const next = nodes[i + 1];
+        if (next && next.level > n.level && next.path.startsWith(n.path + '/')) {
+          toCollapse.add(n.path);
+        }
+      });
+      setCollapsed(toCollapse);
     } catch (error) {
       setCompareResult(null);
       alert('对比失败: ' + (error as Error).message);
     } finally {
       setLoading(false);
     }
+  };
+
+  // 判断某节点是否有子节点（下一节点 level 更深且 path 以其为前缀）
+  const hasChildren = (nodes: BOMCompareNode[], idx: number): boolean => {
+    const next = nodes[idx + 1];
+    return !!next && next.level > nodes[idx].level && next.path.startsWith(nodes[idx].path + '/');
+  };
+
+  // 折叠状态下需隐藏的节点：任一祖先 path 被折叠即隐藏
+  const isHidden = (path: string): boolean => {
+    for (const p of collapsed) {
+      if (path.startsWith(p + '/')) return true;
+    }
+    return false;
+  };
+
+  const toggleCollapse = (path: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path); else next.add(path);
+      return next;
+    });
   };
 
   // 拖拽分隔线处理
@@ -316,8 +349,11 @@ export default function BOMComparePanel({ onViewEntity }: BOMComparePanelProps) 
               </thead>
               <tbody>
                 {compareResult.comparison.map((node: BOMCompareNode, idx: number) => {
+                  if (isHidden(node.path)) return null;
                   const bgClass = getRowBgClass(node.change_type);
                   const changed = getChangedFields(node);
+                  const nodeHasChildren = hasChildren(compareResult.comparison, idx);
+                  const isCollapsed = collapsed.has(node.path);
 
                   return (
                     <tr
@@ -329,10 +365,17 @@ export default function BOMComparePanel({ onViewEntity }: BOMComparePanelProps) 
                         onViewEntity(side.child_master_id || side.child_id, side.child_revision_id);
                       }}
                     >
-                      <td className="px-2 py-1 text-xs text-gray-500 whitespace-nowrap">
+                      <td className="px-2 py-1 text-xs text-gray-400 whitespace-nowrap">
                         <span className="inline-flex items-center gap-0.5">
-                          <span className="w-4 inline-block" />
-                          <span>L{node.level + 1}</span>
+                          <span>{'-'.repeat(node.level + 1)}{node.level + 1}</span>
+                          {nodeHasChildren && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); toggleCollapse(node.path); }}
+                              className="inline-flex items-center justify-center w-4 h-4 text-gray-400 hover:text-gray-600 ml-0.5"
+                            >
+                              {isCollapsed ? '\u25B6' : '\u25BC'}
+                            </button>
+                          )}
                         </span>
                       </td>
                       <td className="px-2 py-1">

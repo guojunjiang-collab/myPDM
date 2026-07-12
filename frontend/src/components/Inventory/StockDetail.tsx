@@ -34,8 +34,9 @@ export default function StockDetail({ materialId, rows, whName, onClose, onViewD
 
   return (
     <Modal open title="物料库存详情" onClose={onClose} width="3xl">
+      <div className="h-[30vh] flex flex-col">
       {/* TAB 切换 */}
-      <div className="flex border-b border-gray-200 mb-4">
+      <div className="flex border-b border-gray-200 mb-4 shrink-0">
         <button
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'info' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
           onClick={() => setTab('info')}
@@ -52,7 +53,7 @@ export default function StockDetail({ materialId, rows, whName, onClose, onViewD
 
       {/* TAB 1: 基础信息 + 各仓库/批次库存 */}
       {tab === 'info' && (
-        <div className="space-y-6">
+        <div className="space-y-6 flex-1 min-h-0 overflow-y-auto">
           {first && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <InfoItem label="编码" value={first.material_code} />
@@ -95,8 +96,8 @@ export default function StockDetail({ materialId, rows, whName, onClose, onViewD
 
       {/* TAB 2: 库存流水（滚动容器） */}
       {tab === 'ledger' && (
-        <div>
-          <div className="rounded-lg border border-gray-200 overflow-hidden max-h-[60vh] overflow-y-auto">
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="rounded-lg border border-gray-200 overflow-hidden">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
                 <tr>
@@ -131,6 +132,7 @@ export default function StockDetail({ materialId, rows, whName, onClose, onViewD
           </div>
         </div>
       )}
+      </div>
     </Modal>
   );
 }

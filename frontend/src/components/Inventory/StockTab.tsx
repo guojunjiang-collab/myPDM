@@ -62,7 +62,8 @@ export default function StockTab() {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">物料</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">编码</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">名称</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">仓库</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">批次</th>
               <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">数量</th>
@@ -71,15 +72,16 @@ export default function StockTab() {
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
             ) : allRows.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
             ) : rows.map((r, i) => (
               <tr key={i} className={`hover:bg-gray-50 cursor-pointer ${r.is_low ? 'bg-red-50' : ''}`}
                 onClick={() => setDetailMatId(r.material_id)}>
-                <td className={`px-4 py-3 text-sm font-medium ${r.is_low ? 'text-red-600' : 'text-primary-600'}`}>{r.material_code} {r.material_name}</td>
+                <td className={`px-4 py-3 text-sm font-medium ${r.is_low ? 'text-red-600' : 'text-primary-600'}`}>{r.material_code}</td>
+                <td className="px-4 py-3 text-sm font-medium">{r.material_name}</td>
                 <td className="px-4 py-3 text-sm font-medium">{whName(r.warehouse_id)}</td>
                 <td className="px-4 py-3 text-sm font-medium">{r.batch_no || '-'}</td>
                 <td className={`px-4 py-3 text-sm text-right font-medium ${r.is_low ? 'text-red-600' : ''}`}>{r.quantity} {r.unit || ''}</td>
