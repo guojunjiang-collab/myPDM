@@ -15,6 +15,7 @@ from app.models import User, BOMItem
 from app.models_parts import PartMaster, PartRevision
 from app.schemas_eco import ECOCreate, ECOEdit, ECOListParams, ECOExecutionItemCreate, ECOExecutionItemEdit
 from app.crud import _get_next_version
+from . import notifications as _notif
 
 # ─────────────────────────────────────────────────────
 # 状态流转规则
@@ -478,6 +479,35 @@ def change_eco_status(
         unfreeze_release_tree(db, eco)
     db.commit()
     db.refresh(eco)
+
+    # 站内通知：知会类事件（approved/rejected 通知创建人+cc；executing/completed 仅通知 cc）
+    def _safe_uuid(v):
+        try:
+            return uuid.UUID(str(v))
+        except (ValueError, TypeError, AttributeError):
+            return None
+    _cc_ids = [u for u in (_safe_uuid(c.get("user_id")) for c in (eco.cc_users or []) if c.get("user_id")) if u]
+    if to_status in ("approved", "rejected"):
+        _evt = "eco_approved" if to_status == "approved" else "eco_rejected"
+        _label = "审批通过" if to_status == "approved" else "审批驳回"
+        _notif.create_notifications(
+            db, recipient_ids=[eco.creator_id, *_cc_ids], sender_id=operator_id,
+            event_type=_evt, title=f"{eco.eco_number} {_label}",
+            body=(comment or None), target_type="eco", target_id=eco.id, exclude_sender=True,
+        )
+    elif to_status == "executing" and _cc_ids:
+        _notif.create_notifications(
+            db, recipient_ids=_cc_ids, sender_id=operator_id,
+            event_type="eco_executing", title=f"{eco.eco_number} 开始执行",
+            body=None, target_type="eco", target_id=eco.id, exclude_sender=True,
+        )
+    elif to_status == "completed" and _cc_ids:
+        _notif.create_notifications(
+            db, recipient_ids=_cc_ids, sender_id=operator_id,
+            event_type="eco_closed", title=f"{eco.eco_number} 已完成",
+            body=None, target_type="eco", target_id=eco.id, exclude_sender=True,
+        )
+
     return eco
 
 
@@ -1008,19 +1038,27 @@ def _check_eco_completion(db: Session, eco_id: uuid.UUID):
 # 知会操作
 # ─────────────────────────────────────────────────────
 
-def add_cc_users(db: Session, eco: ECO, user_ids: list):
+def add_cc_users(db: Session, eco: ECO, user_ids: list, sender_id=None):
     """添加知会用户"""
     current = list(eco.cc_users or [])
     existing_ids = {u.get("user_id") for u in current}
+    newly_added = []
     for uid in user_ids:
         if uid in existing_ids:
             continue
         user = db.query(User).filter(User.id == uuid.UUID(uid)).first()
         if user:
             current.append({"user_id": uid, "user_name": user.real_name})
+            newly_added.append(user.id)
     eco.cc_users = current
     db.commit()
     db.refresh(eco)
+    if newly_added:
+        _notif.create_notifications(
+            db, recipient_ids=newly_added, sender_id=sender_id,
+            event_type="cc_added", title=f"你被加为 {eco.eco_number} 知会人",
+            body=None, target_type="eco", target_id=eco.id, exclude_sender=True,
+        )
     return eco
 
 

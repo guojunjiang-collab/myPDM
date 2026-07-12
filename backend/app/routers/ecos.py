@@ -705,7 +705,7 @@ async def cc_users(
     current_user: User = Depends(require_permission("eco:cc_manage"))
 ):
     eco = crud_eco.get_eco(db, eco_id)
-    crud_eco.add_cc_users(db, eco, data.user_ids)
+    crud_eco.add_cc_users(db, eco, data.user_ids, sender_id=current_user.id)
     return {"detail": "已添加知会"}
 
 

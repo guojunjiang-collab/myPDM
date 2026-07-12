@@ -82,3 +82,65 @@ def test_ecr_cc_added_notifies_new_user(db):
         assert any(x.event_type == "cc_added" for x in rows)
     finally:
         app.dependency_overrides.clear()
+
+
+# ─────────────────────────────────────────────────────
+# ECO 事件埋点测试
+# ─────────────────────────────────────────────────────
+
+from app import crud_eco
+from app.models_eco import ECO
+
+
+def _eco(db, creator_id, cc_users=None, status="reviewing"):
+    e = ECO(id=uuid.uuid4(), eco_number=f"ECO-{uuid.uuid4().hex[:6]}", title="t",
+            reason="r", status=status, creator_id=creator_id, reviewers=[],
+            cc_users=cc_users or [])
+    db.add(e); db.commit(); db.refresh(e)
+    return e
+
+
+def test_eco_approved_notifies_creator_and_cc(db):
+    creator = _user(db, "创建人")
+    cc = _user(db, "知会人")
+    approver = _user(db, "审批人")
+    eco = _eco(db, creator.id, cc_users=[{"user_id": str(cc.id), "user_name": "知会人"}])
+    crud_eco.change_eco_status(db, eco.id, "approved", approver.id)
+    rows = _notifs(db, eco.id)
+    recipients = {str(r.recipient_id) for r in rows}
+    assert str(creator.id) in recipients and str(cc.id) in recipients
+    assert all(r.event_type == "eco_approved" for r in rows)
+
+
+def test_eco_executing_notifies_cc_only(db):
+    creator = _user(db, "创建人")
+    cc = _user(db, "知会人")
+    eco = _eco(db, creator.id, cc_users=[{"user_id": str(cc.id), "user_name": "知会人"}], status="approved")
+    crud_eco.change_eco_status(db, eco.id, "executing", creator.id)
+    rows = _notifs(db, eco.id)
+    recipients = {str(r.recipient_id) for r in rows}
+    assert str(cc.id) in recipients
+    assert all(r.event_type == "eco_executing" for r in rows)
+    assert str(creator.id) not in recipients
+
+
+def test_eco_cc_added_notifies_new_user(db):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.database import get_db
+    from app.routers.auth import get_current_active_user
+    creator = _user(db, "创建人")
+    newcc = _user(db, "新知会人")
+    eco = _eco(db, creator.id, status="draft")
+    app.dependency_overrides[get_db] = lambda: db
+    app.dependency_overrides[get_current_active_user] = lambda: creator
+    try:
+        c = TestClient(app)
+        r = c.post(f"/api/ecos/{eco.id}/cc", json={"user_ids": [str(newcc.id)]})
+        assert r.status_code == 200, r.text
+        rows = _notifs(db, eco.id)
+        recipients = {str(x.recipient_id) for x in rows}
+        assert str(newcc.id) in recipients
+        assert any(x.event_type == "cc_added" for x in rows)
+    finally:
+        app.dependency_overrides.clear()
