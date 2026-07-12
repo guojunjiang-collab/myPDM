@@ -11,6 +11,7 @@ import Documents from './pages/Documents';
 import BOM from './pages/BOM/BOM';
 import Users from './pages/Users';
 import Logs from './pages/Logs';
+import Notifications from './pages/Notifications';
 import Settings from './pages/Settings';
 import EC from './pages/EC';
 import Configuration from './pages/Configuration';
@@ -74,6 +75,7 @@ export default function App() {
           <Route path="projects" element={<Projects />} />
           <Route path="users" element={<Users />} />
           <Route path="logs" element={<Logs />} />
+          <Route path="notifications" element={<Notifications />} />
           <Route path="settings" element={<Settings />} />
           <Route path="data-management" element={<DataManagement />} />
           <Route path="datamanagement" element={<DataManagement />} />
