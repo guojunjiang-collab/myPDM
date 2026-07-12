@@ -35,7 +35,7 @@ def list_parts(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=10000),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("components:read")),
+    current_user: User = Depends(require_permission("parts:read")),
 ):
     items, total = crud_parts.list_part_masters(
         db, search, status, check_out_user_id, show_all_versions, page, page_size
@@ -47,7 +47,7 @@ def list_parts(
 def create_part(
     data: schemas_parts.PartMasterCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("components:create")),
+    current_user: User = Depends(require_permission("parts:create")),
 ):
     try:
         master = crud_parts.create_part_master(db, data.model_dump(), current_user.id)
@@ -60,7 +60,7 @@ def create_part(
 def get_part(
     master_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("components:read")),
+    current_user: User = Depends(require_permission("parts:read")),
 ):
     master = crud_parts.get_part_master(db, master_id)
     if not master:
@@ -73,7 +73,7 @@ def update_part(
     master_id: UUID,
     data: schemas_parts.PartMasterUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("components:update")),
+    current_user: User = Depends(require_permission("parts:update")),
 ):
     master = crud_parts.update_part_master(db, master_id, data.model_dump(exclude_none=True))
     if not master:
@@ -85,7 +85,7 @@ def update_part(
 def delete_revision(
     revision_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("components:delete")),
+    current_user: User = Depends(require_permission("parts:delete")),
 ):
     rev = crud_parts.get_part_revision(db, revision_id)
     if not rev:
@@ -118,7 +118,7 @@ def delete_revision(
 def delete_part(
     master_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("components:delete")),
+    current_user: User = Depends(require_permission("parts:delete")),
 ):
     ok = crud_parts.delete_part_master(db, master_id)
     if not ok:
@@ -132,7 +132,7 @@ def delete_part(
 def list_revisions(
     master_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("components:read")),
+    current_user: User = Depends(require_permission("parts:read")),
 ):
     revisions = crud_parts.list_revisions_by_master(db, master_id)
     result = []
@@ -163,7 +163,7 @@ def list_revisions(
 def get_revision(
     revision_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("components:read")),
+    current_user: User = Depends(require_permission("parts:read")),
 ):
     result = crud_parts.get_part_revision_with_current_iteration(db, revision_id)
     if not result:
@@ -300,7 +300,7 @@ def upgrade(
 def list_iterations(
     revision_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("components:read")),
+    current_user: User = Depends(require_permission("parts:read")),
 ):
     iterations = crud_parts.list_iterations_by_revision(db, revision_id)
     return [
@@ -322,7 +322,7 @@ def update_current_iteration(
     revision_id: UUID,
     data: dict,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("components:update")),
+    current_user: User = Depends(require_permission("parts:update")),
 ):
     """更新当前迭代的可变数据（remark）"""
     result = crud_parts.get_part_revision_with_current_iteration(db, revision_id)
@@ -348,7 +348,7 @@ def get_iteration(
     revision_id: UUID,
     iteration_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("components:read")),
+    current_user: User = Depends(require_permission("parts:read")),
 ):
     iteration = crud_parts.get_part_iteration(db, iteration_id)
     if not iteration or str(iteration.revision_id) != str(revision_id):
@@ -371,7 +371,7 @@ def delete_iteration(
     iteration_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("components:delete")),
+    current_user: User = Depends(require_permission("parts:delete")),
 ):
     """管理员删除指定迭代（含物理附件文件）"""
     rev = db.query(crud_parts.models_parts.PartRevision).filter(
@@ -713,22 +713,22 @@ def _remove_doc(db: Session, revision_id: UUID, link_id: str):
 @router.get("/{revision_id}/documents")
 def list_docs_alt(revision_id: UUID, iteration_id: Optional[UUID] = Query(None),
                   db: Session = Depends(get_db),
-                  current_user: User = Depends(require_permission("components.doc:read"))):
+                  current_user: User = Depends(require_permission("parts.doc:read"))):
     return _list_docs(db, revision_id, iteration_id)
 
 @router.post("/{revision_id}/documents")
 def add_doc_alt(revision_id: UUID, data: dict, db: Session = Depends(get_db),
-                current_user: User = Depends(require_permission("components.doc:link"))):
+                current_user: User = Depends(require_permission("parts.doc:link"))):
     return _add_doc(db, revision_id, data)
 
 @router.put("/{revision_id}/documents/{link_id}")
 def update_doc_alt(revision_id: UUID, link_id: str, data: dict, db: Session = Depends(get_db),
-                   current_user: User = Depends(require_permission("components.doc:link"))):
+                   current_user: User = Depends(require_permission("parts.doc:link"))):
     return _update_doc(db, revision_id, link_id, data)
 
 @router.delete("/{revision_id}/documents/{link_id}")
 def remove_doc_alt(revision_id: UUID, link_id: str, db: Session = Depends(get_db),
-                   current_user: User = Depends(require_permission("components.doc:unlink"))):
+                   current_user: User = Depends(require_permission("parts.doc:unlink"))):
     return _remove_doc(db, revision_id, link_id)
 
 
@@ -736,22 +736,22 @@ def remove_doc_alt(revision_id: UUID, link_id: str, db: Session = Depends(get_db
 @router.get("/revisions/{revision_id}/documents")
 def list_docs(revision_id: UUID, iteration_id: Optional[UUID] = Query(None),
               db: Session = Depends(get_db),
-              current_user: User = Depends(require_permission("components.doc:read"))):
+              current_user: User = Depends(require_permission("parts.doc:read"))):
     return _list_docs(db, revision_id, iteration_id)
 
 @router.post("/revisions/{revision_id}/documents")
 def add_doc(revision_id: UUID, data: dict, db: Session = Depends(get_db),
-            current_user: User = Depends(require_permission("components.doc:link"))):
+            current_user: User = Depends(require_permission("parts.doc:link"))):
     return _add_doc(db, revision_id, data)
 
 @router.put("/revisions/{revision_id}/documents/{link_id}")
 def update_doc(revision_id: UUID, link_id: str, data: dict, db: Session = Depends(get_db),
-               current_user: User = Depends(require_permission("components.doc:link"))):
+               current_user: User = Depends(require_permission("parts.doc:link"))):
     return _update_doc(db, revision_id, link_id, data)
 
 @router.delete("/revisions/{revision_id}/documents/{link_id}")
 def remove_doc(revision_id: UUID, link_id: str, db: Session = Depends(get_db),
-               current_user: User = Depends(require_permission("components.doc:unlink"))):
+               current_user: User = Depends(require_permission("parts.doc:unlink"))):
     return _remove_doc(db, revision_id, link_id)
 
 
@@ -1056,7 +1056,7 @@ async def import_assembly_step(
     revision_id: UUID,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("components:update")),
+    current_user: User = Depends(require_permission("parts:update")),
 ):
     """上传装配 STEP：多层级矩阵回填 + 逐子项拆分为生产附件 + 装配自身也存为生产附件。"""
     content = await file.read()
@@ -1090,7 +1090,7 @@ async def import_assembly_step(
 def assembly_instances(
     revision_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("components:read")),
+    current_user: User = Depends(require_permission("parts:read")),
 ):
     resolver = _glb_url_resolver_factory(db)
     return crud_parts.get_assembly_instances(db, revision_id, resolver)
@@ -1100,7 +1100,7 @@ def assembly_instances(
 def assembly_tree(
     revision_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("components:read")),
+    current_user: User = Depends(require_permission("parts:read")),
 ):
     return crud_parts.get_assembly_tree(db, revision_id)
 
@@ -1110,7 +1110,7 @@ def get_attachment_lod_glb(
     attachment_id: UUID,
     tier: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("components:read")),
+    current_user: User = Depends(require_permission("parts:read")),
 ):
     from ..models_parts import PartAttachment
     att = db.query(PartAttachment).filter(PartAttachment.id == attachment_id).first()
