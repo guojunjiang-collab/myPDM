@@ -84,6 +84,17 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
   const canObsolete = doc?.status === 'released' && !isViewingOtherVersion;
   const canForceCheckin = isCheckedOut && isAdmin() && !isViewingOtherVersion;
 
+  // 当前迭代 id：未签入的迭代（最新且无 check_in_date）；若都已签入则取 iteration 最大的
+  const currentIterationId = useMemo(() => {
+    const ongoing = iterations.find((it) => !it.check_in_date);
+    if (ongoing) return ongoing.id;
+    if (iterations.length === 0) return null;
+    return iterations.reduce((max, it) => (it.iteration > max.iteration ? it : max)).id;
+  }, [iterations]);
+
+  // 请求序号：用于丢弃过期（乱序返回）的附件请求结果，避免竞态
+  const loadSeq = useRef(0);
+
   const loadDoc = useCallback(async () => {
     if (!effectiveDocId) return;
     setLoading(true);
@@ -101,16 +112,20 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
 
   const loadAttachments = useCallback(async (iterId?: string | null) => {
     if (!effectiveDocId) return;
+    const seq = ++loadSeq.current;
     try {
       // 始终按迭代过滤：传入 iterId 用指定，否则用当前迭代
       const finalIterId = iterId ?? viewingIterationId ?? currentIterationId;
       const res = await documentsApi.listAttachments(effectiveDocId, finalIterId || undefined);
+      // 丢弃过期请求：仅最后一次发起的请求可写入状态，避免乱序返回覆盖正确结果
+      if (seq !== loadSeq.current) return;
       setAttachments((res.data || []) as DocumentAttachment[]);
     } catch {
+      if (seq !== loadSeq.current) return;
       setAttachments([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveDocId, viewingIterationId]);
+  }, [effectiveDocId, viewingIterationId, currentIterationId]);
 
   const loadIterations = useCallback(async () => {
     if (!effectiveDocId) return;
@@ -166,14 +181,6 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
     }
   }, [effectiveDocId]);
 
-  // 当前迭代 id：未签入的迭代（最新且无 check_in_date）；若都已签入则取 iteration 最大的
-  const currentIterationId = useMemo(() => {
-    const ongoing = iterations.find((it) => !it.check_in_date);
-    if (ongoing) return ongoing.id;
-    if (iterations.length === 0) return null;
-    return iterations.reduce((max, it) => (it.iteration > max.iteration ? it : max)).id;
-  }, [iterations]);
-
   // 查看的迭代对象
   const viewingIteration = useMemo(
     () => iterations.find((it) => it.id === viewingIterationId) ?? null,
@@ -185,6 +192,9 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
     if (open && docId) {
       setViewingIterationId(null);
       setViewingVersionId(null);
+      // 清除上一个文档遗留的迭代/附件，避免用脏迭代 id 过滤导致附件加载为空
+      setIterations([]);
+      setAttachments([]);
       loadDoc();
       loadAttachments();
       loadIterations();
@@ -215,6 +225,9 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
   useEffect(() => {
     if (open && docId) {
       setViewingIterationId(null);
+      // 不同版本的迭代不互通，清除旧迭代/附件避免脏迭代过滤
+      setIterations([]);
+      setAttachments([]);
       loadDoc();
       loadAttachments();
       loadIterations();
