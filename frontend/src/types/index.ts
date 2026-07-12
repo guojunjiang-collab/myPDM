@@ -1026,3 +1026,22 @@ export interface InvDocument {
   created_at?: string; updated_at?: string;
 }
 
+export interface Notification {
+  id: string;
+  event_type: string;
+  title: string;
+  body?: string | null;
+  target_type: 'ecr' | 'eco' | 'configuration_profile' | 'inventory_document' | 'project_task';
+  target_id: string;
+  is_read: boolean;
+  read_at?: string | null;
+  created_at?: string | null;
+  sender_id?: string | null;
+}
+
+export interface NotificationListResult {
+  items: Notification[];
+  total: number;
+  unread: number;
+}
+
