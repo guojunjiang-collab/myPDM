@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuthStore } from '../stores/auth';
 import { useDataStore } from '../stores/data';
 import { usePageHeader } from '../stores/pageHeader';
+import { useNotificationStore } from '../stores/notification';
 import { syncService } from '../services/syncService';
 import { APP_VERSION } from '../constants';
 import { ConfirmModal } from './Modal';
@@ -47,6 +48,7 @@ export default function Layout() {
   const [lastSyncText, setLastSyncText] = useState<string>('--');
   const headerContent = usePageHeader((s) => s.content);
   const userRole = user?.role || 'guest';
+  const fetchUnread = useNotificationStore((s) => s.fetchUnread);
 
   // Auto-start sync on mount
   useEffect(() => {
@@ -71,6 +73,12 @@ export default function Layout() {
     const timer = setInterval(update, 1000);
     return () => clearInterval(timer);
   }, [lastSyncTime]);
+
+  useEffect(() => {
+    fetchUnread();
+    const t = setInterval(fetchUnread, 10000);
+    return () => clearInterval(t);
+  }, [fetchUnread]);
 
   const isSeparator = (item: NavItem | NavSeparator): item is NavSeparator =>
     'type' in item && item.type === 'separator';
