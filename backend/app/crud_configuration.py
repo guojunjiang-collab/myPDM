@@ -11,6 +11,7 @@ from fastapi import HTTPException
 
 from . import models_configuration as models
 from . import schemas_configuration as schemas
+from . import notifications as _notif
 
 
 # ============================================================
@@ -551,6 +552,16 @@ def archive_profile(db, profile, user, comment=""):
     profile.archived_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(profile)
+
+    # 站内通知：配置概要归档
+    _cc_ids = _notif.parse_uuids(c.get("user_id") for c in (profile.cc_users or []))
+    _notif.create_notifications(
+        db, recipient_ids=[profile.creator_id, *_cc_ids], sender_id=user.id,
+        event_type="profile_archived", title=f"配置概要 {profile.code} 已归档",
+        body=(comment or None), target_type="configuration_profile", target_id=profile.id,
+        exclude_sender=True,
+    )
+
     return profile
 
 
@@ -604,6 +615,24 @@ def review_profile(db, profile, reviewer, decision, comment=""):
 
     db.commit()
     db.refresh(profile)
+
+    # 站内通知：审批结果（根据最终状态决定通知类型）
+    _cc_ids = _notif.parse_uuids(c.get("user_id") for c in (profile.cc_users or []))
+    if profile.status == "active":
+        _notif.create_notifications(
+            db, recipient_ids=[profile.creator_id, *_cc_ids], sender_id=reviewer.id,
+            event_type="profile_approved", title=f"配置概要 {profile.code} 审批通过",
+            body=(comment or None), target_type="configuration_profile", target_id=profile.id,
+            exclude_sender=True,
+        )
+    elif profile.status == "rejected":
+        _notif.create_notifications(
+            db, recipient_ids=[profile.creator_id, *_cc_ids], sender_id=reviewer.id,
+            event_type="profile_rejected", title=f"配置概要 {profile.code} 审批驳回",
+            body=(comment or None), target_type="configuration_profile", target_id=profile.id,
+            exclude_sender=True,
+        )
+
     return profile
 
 

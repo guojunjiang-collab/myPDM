@@ -11,6 +11,7 @@ from app.schemas_project import (
     TaskCreate, TaskEdit, TaskStatusUpdate, TaskMove, TaskReorder, TaskLinkAdd, CommentAdd, DepCreate,
 )
 from ..permissions import require_permission, enforce_object_policy
+from .. import notifications as _notif
 
 router = APIRouter(prefix="/projects", tags=["项目管理"])
 
@@ -203,6 +204,14 @@ async def create_task(project_id: uuid.UUID, data: TaskCreate, db: Session = Dep
     p = crud_project.get_project(db, project_id)
     _enforce_manager(db, current_user, p)
     t = crud_project.create_task(db, p, data)
+    # 站内通知：任务指派
+    if t.assignee_id and t.assignee_id != current_user.id:
+        _notif.create_notifications(
+            db, recipient_ids=[t.assignee_id], sender_id=current_user.id,
+            event_type="task_assigned", title=f"你被指派任务：{t.name}",
+            body=None, target_type="project_task", target_id=t.id,
+            exclude_sender=True,
+        )
     ip = request.client.host if request and request.client else None
     crud.create_log(db, current_user.id, current_user.username, "创建任务", "project_task", str(t.id), f"名称:{t.name}", ip)
     crud.create_log(db, current_user.id, current_user.username, "新增任务", "project", str(project_id), f"{t.code} {t.name}", ip)
@@ -222,11 +231,21 @@ async def update_task(project_id: uuid.UUID, task_id: uuid.UUID, data: TaskEdit,
             return None
         return str(v)
     # 必须在 update_task 之前读旧值，update 后 SQLAlchemy 对象已被修改
+    old_assignee = t.assignee_id
     old_vals = {k: getattr(t, k, None) for k in changed}
     ip = request.client.host if request and request.client else None
     # 传入 actor：级联改期的后置任务由 auto_schedule 单独写操作记录
     actor = {"user_id": current_user.id, "username": current_user.username, "ip": ip}
     result = _task_dict(db, crud_project.update_task(db, t, data, actor=actor))
+    # 站内通知：任务指派变更
+    if (t.assignee_id and t.assignee_id != old_assignee
+            and t.assignee_id != current_user.id):
+        _notif.create_notifications(
+            db, recipient_ids=[t.assignee_id], sender_id=current_user.id,
+            event_type="task_assigned", title=f"你被指派任务：{t.name}",
+            body=None, target_type="project_task", target_id=t.id,
+            exclude_sender=True,
+        )
     parts = []
     for k, new_val in changed.items():
         old_val = old_vals[k]

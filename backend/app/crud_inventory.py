@@ -16,6 +16,7 @@ from app.schemas_inventory import (
     WarehouseCreate, WarehouseEdit, MaterialCreate, MaterialEdit, MaterialEnableFromPDM,
     DocumentCreate, DocumentEdit, DocumentListParams,
 )
+from . import notifications as _notif
 
 # ── 状态流转规则 ──
 _ALLOWED_TRANSITIONS = {
@@ -258,6 +259,13 @@ def post_document(db: Session, doc: InventoryDocument, operator: User) -> Invent
         ))
         db.commit()
         db.refresh(doc)
+        # 站内通知：单据过账
+        _notif.create_notifications(
+            db, recipient_ids=[doc.creator_id], sender_id=operator.id,
+            event_type="inv_doc_posted", title=f"单据 {doc.doc_number} 已过账",
+            body=None, target_type="inventory_document", target_id=doc.id,
+            exclude_sender=True,
+        )
         return doc
     except Exception:
         db.rollback()
@@ -463,9 +471,25 @@ def review_document(db, doc, reviewer: User, decision: str, comment: str = "") -
     ))
     db.commit()
     if decision == "approved" and _check_all_approved(db, doc):
-        return _change_status(db, doc, "approved", reviewer, "审批通过")
+        result = _change_status(db, doc, "approved", reviewer, "审批通过")
+        # 站内通知：单据审批通过
+        _notif.create_notifications(
+            db, recipient_ids=[doc.creator_id], sender_id=reviewer.id,
+            event_type="inv_doc_approved", title=f"单据 {doc.doc_number} 审批通过",
+            body=None, target_type="inventory_document", target_id=doc.id,
+            exclude_sender=True,
+        )
+        return result
     if decision == "rejected":
-        return _change_status(db, doc, "rejected", reviewer, comment or "驳回")
+        result = _change_status(db, doc, "rejected", reviewer, comment or "驳回")
+        # 站内通知：单据审批驳回
+        _notif.create_notifications(
+            db, recipient_ids=[doc.creator_id], sender_id=reviewer.id,
+            event_type="inv_doc_rejected", title=f"单据 {doc.doc_number} 审批驳回",
+            body=None, target_type="inventory_document", target_id=doc.id,
+            exclude_sender=True,
+        )
+        return result
     db.refresh(doc)
     return doc
 
