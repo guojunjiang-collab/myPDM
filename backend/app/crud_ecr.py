@@ -14,6 +14,7 @@ from app.models_ecr import ECR, ECRAffectedItem, ECRReviewRecord, ECRStatusLog
 from app.models import User, BOMItem
 from app.models_parts import PartMaster, PartRevision
 from app.schemas_ecr import ECRCreate, ECREdit, ECRListParams, AffectedItemCreate
+from . import notifications as _notif
 
 # ─────────────────────────────────────────────────────
 # 状态流转规则
@@ -277,8 +278,12 @@ def change_ecr_status(
     db.refresh(ecr)
 
     # 站内通知：知会类事件（approved/rejected 通知创建人+cc；closed 仅通知 cc）
-    from . import notifications as _notif
-    _cc_ids = [uuid.UUID(c.get("user_id")) for c in (ecr.cc_users or []) if c.get("user_id")]
+    def _safe_uuid(v):
+        try:
+            return uuid.UUID(str(v))
+        except (ValueError, TypeError, AttributeError):
+            return None
+    _cc_ids = [u for u in (_safe_uuid(c.get("user_id")) for c in (ecr.cc_users or []) if c.get("user_id")) if u]
     if to_status in ("approved", "rejected"):
         _evt = "ecr_approved" if to_status == "approved" else "ecr_rejected"
         _label = "审批通过" if to_status == "approved" else "审批驳回"
@@ -288,7 +293,7 @@ def change_ecr_status(
             body=(comment or None), target_type="ecr", target_id=ecr.id,
             exclude_sender=True,
         )
-    elif to_status == "closed":
+    elif to_status == "closed" and _cc_ids:
         _notif.create_notifications(
             db, recipient_ids=_cc_ids, sender_id=operator_id,
             event_type="ecr_closed", title=f"{ecr.ecr_number} 已关闭",

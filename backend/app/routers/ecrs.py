@@ -14,6 +14,7 @@ from app.models_ecr import ECR as ECRModel, ECRReviewRecord, ECRStatusLog, ECRAf
 from app.models_eco import ECO as ECOModel
 from app import crud_ecr, schemas_ecr
 from ..permissions import require_permission, enforce_object_policy
+from .. import notifications as _notif
 
 router = APIRouter(prefix="/ecrs", tags=["变更管理"])
 
@@ -545,8 +546,12 @@ async def cc_ecr(
     cc_list = list(ecr.cc_users or [])
     existing = {c["user_id"] for c in cc_list}
     newly_added = []
-    for uid in user_ids:
-        if uid not in existing:
+    for uid_str in user_ids:
+        if uid_str not in existing:
+            try:
+                uid = uuid.UUID(str(uid_str))
+            except (ValueError, TypeError, AttributeError):
+                continue
             user = db.query(User).filter(User.id == uid).first()
             if user:
                 cc_list.append({"user_id": str(user.id), "user_name": user.real_name})
@@ -555,7 +560,6 @@ async def cc_ecr(
     ecr.cc_users = cc_list
     db.commit()
     if newly_added:
-        from .. import notifications as _notif
         _notif.create_notifications(
             db, recipient_ids=newly_added, sender_id=current_user.id,
             event_type="cc_added", title=f"你被加为 {ecr.ecr_number} 知会人",
