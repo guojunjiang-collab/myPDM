@@ -3,7 +3,7 @@ import uuid
 from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
-from .database import Base
+from app.database import Base
 
 
 class Notification(Base):
@@ -15,7 +15,7 @@ class Notification(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     recipient_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    sender_id = Column(UUID(as_uuid=True), nullable=True)
+    sender_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     event_type = Column(String(48), nullable=False)
     title = Column(String(255), nullable=False)
     body = Column(String(512), nullable=True)
