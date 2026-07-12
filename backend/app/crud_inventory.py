@@ -427,7 +427,13 @@ def submit_document(db, doc, user: User) -> InventoryDocument:
     db.query(InventoryReviewRecord).filter(InventoryReviewRecord.doc_id == doc.id).delete()
     db.commit()
     if not doc.reviewers:
-        return _change_status(db, doc, "approved", user, "无审批人，自动批准")
+        result = _change_status(db, doc, "approved", user, "无审批人，自动批准")
+        _notif.create_notifications(
+            db, recipient_ids=[result.creator_id], sender_id=None,
+            event_type="inv_doc_approved", title=f"单据 {result.doc_number} 审批通过",
+            body=None, target_type="inventory_document", target_id=result.id, exclude_sender=True,
+        )
+        return result
     return _change_status(db, doc, "reviewing", user, "提交审批")
 
 

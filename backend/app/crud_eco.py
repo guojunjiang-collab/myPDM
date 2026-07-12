@@ -1027,6 +1027,13 @@ def _check_eco_completion(db: Session, eco_id: uuid.UUID):
             eco.status = "completed"
             eco.executed_at = datetime.now(timezone.utc)
             db.commit()
+            _cc_ids = _notif.parse_uuids(c.get("user_id") for c in (eco.cc_users or []))
+            if _cc_ids:
+                _notif.create_notifications(
+                    db, recipient_ids=_cc_ids, sender_id=None,
+                    event_type="eco_closed", title=f"{eco.eco_number} 已完成",
+                    body=None, target_type="eco", target_id=eco.id, exclude_sender=True,
+                )
 
 
 # ─────────────────────────────────────────────────────

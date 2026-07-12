@@ -230,6 +230,50 @@ def _inv_doc(db, creator_id, reviewers=None, status="draft"):
     return d
 
 
+def test_eco_auto_complete_notifies_cc(db):
+    from app.models_eco import ECOExecutionItem
+
+    creator = _user(db, "创建人")
+    cc = _user(db, "知会人")
+    eco = _eco(db, creator.id, cc_users=[{"user_id": str(cc.id), "user_name": "知会人"}], status="executing")
+
+    for i in range(2):
+        db.add(ECOExecutionItem(
+            eco_id=eco.id, entity_type="part", entity_name=f"零件{i}",
+            action="modify", status="completed", detail={}, sort_order=i,
+        ))
+    db.commit()
+
+    crud_eco._check_eco_completion(db, eco.id)
+    rows = _notifs(db, eco.id)
+    recipients = {str(r.recipient_id) for r in rows}
+    assert str(cc.id) in recipients
+    assert all(r.event_type == "eco_closed" for r in rows)
+
+
+def test_inv_doc_auto_approved_notifies_creator(db):
+    creator = _user(db, "创建人")
+    doc = _inv_doc(db, creator.id, reviewers=[], status="draft")
+    crud_inventory.submit_document(db, doc, creator)
+    rows = _notifs(db, doc.id)
+    recipients = {str(r.recipient_id) for r in rows}
+    assert str(creator.id) in recipients
+    assert all(r.event_type == "inv_doc_approved" for r in rows)
+
+
+def test_profile_auto_active_notifies_creator(db):
+    creator = _user(db, "创建人")
+    cc = _user(db, "知会人")
+    profile = _profile(db, creator.id, reviewers=[],
+                       cc_users=[{"user_id": str(cc.id), "user_name": "知会人"}], status="draft")
+    crud_configuration.submit_profile(db, profile, creator)
+    rows = _notifs(db, profile.id)
+    recipients = {str(r.recipient_id) for r in rows}
+    assert str(creator.id) in recipients
+    assert str(cc.id) in recipients
+    assert all(r.event_type == "profile_approved" for r in rows)
+
+
 def test_inv_doc_rejected_notifies_creator(db):
     creator = _user(db, "创建人")
     reviewer = _user(db, "审批人")

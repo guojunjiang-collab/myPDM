@@ -516,6 +516,13 @@ def submit_profile(db, profile, user):
         profile.submitted_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(profile)
+    if profile.status == "active":
+        _cc_ids = _notif.parse_uuids(c.get("user_id") for c in (profile.cc_users or []))
+        _notif.create_notifications(
+            db, recipient_ids=[profile.creator_id, *_cc_ids], sender_id=None,
+            event_type="profile_approved", title=f"配置概要 {profile.code} 审批通过",
+            body=None, target_type="configuration_profile", target_id=profile.id, exclude_sender=True,
+        )
     return profile
 
 
@@ -653,9 +660,17 @@ def add_profile_cc(db, profile, user_id, user_name):
     if not any(c.get("user_id") == user_id for c in cc):
         cc.append({"user_id": user_id, "user_name": user_name})
         profile.cc_users = cc
-        db.commit()
-        db.refresh(profile)
+    db.commit()
+    db.refresh(profile)
+    if profile.status == "active":
+        _cc_ids = _notif.parse_uuids(c.get("user_id") for c in (profile.cc_users or []))
+        _notif.create_notifications(
+            db, recipient_ids=[profile.creator_id, *_cc_ids], sender_id=user.id,
+            event_type="profile_approved", title=f"配置概要 {profile.code} 审批通过",
+            body=None, target_type="configuration_profile", target_id=profile.id, exclude_sender=True,
+        )
     return profile
+
 
 
 def remove_profile_cc(db, profile, user_id):
