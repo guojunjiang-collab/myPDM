@@ -1,9 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useDataStore } from '../stores/data';
-import { componentsApi, bomApi, partsApi } from '../services/api';
+import { bomApi, partsApi } from '../services/api';
 import { Modal } from './Modal';
 import { toast } from './Toast';
-import type { Component } from '../types';
 
 /* ----------------------------------------------------------------
    Types
@@ -35,7 +33,6 @@ interface AssemblyPartPickerProps {
   onConfirm: (items: { child_type: string; child_id: string; quantity: number }[]) => void;
   currentAssemblyId?: string;
   existingChildIds?: Set<string>;
-  dataMode?: 'components' | 'parts';
 }
 
 /* ----------------------------------------------------------------
@@ -67,7 +64,6 @@ export default function AssemblyPartPicker({
   onConfirm,
   currentAssemblyId,
   existingChildIds = new Set(),
-  dataMode = 'parts',
 }: AssemblyPartPickerProps) {
   /* ---- 筛选 ---- */
   const [search, setSearch] = useState('');
@@ -79,8 +75,6 @@ export default function AssemblyPartPicker({
   const [selected, setSelected] = useState<Map<string, SelectedItem>>(new Map());
 
   /* ---- 数据源 ---- */
-  const storeComponents = useDataStore((s) => s.components);
-  const [fetchedComponents, setFetchedComponents] = useState<Component[]>([]);
   const [fetchedParts, setFetchedParts] = useState<any[]>([]);
   const [ancestorIds, setAncestorIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -95,87 +89,60 @@ export default function AssemblyPartPicker({
     setQuickOpen(false);
     setQuickCreating(false);
 
-    if (dataMode === 'parts') {
-      setLoading(true);
-      partsApi.list({ page_size: 200, show_all_versions: true })
-        .then((r: any) => {
-          const items = r.items || r || [];
-          const transformed = items.map((p: any) => ({
-            id: p.revision_id,
-            code: p.code,
-            name: p.name,
-            spec: p.spec,
-            version: p.version,
-            status: p.status,
-            type: p.type || 'part',
-            component_type: p.type || 'part',
-          }));
-          setFetchedParts(transformed);
-        })
-        .catch(() => setFetchedParts([]))
-        .finally(() => setLoading(false));
-      return;
-    }
-
-    if (storeComponents.length > 0 && !currentAssemblyId) {
-      setAncestorIds(new Set());
-      return;
-    }
-
     setLoading(true);
-    const promises: Promise<unknown>[] = [];
+    partsApi.list({ page_size: 200, show_all_versions: true })
+      .then((r: any) => {
+        const items = r.items || r || [];
+        const transformed = items.map((p: any) => ({
+          id: p.revision_id,
+          code: p.code,
+          name: p.name,
+          spec: p.spec,
+          version: p.version,
+          status: p.status,
+          type: p.type || 'part',
+          component_type: p.type || 'part',
+        }));
+        setFetchedParts(transformed);
+      })
+      .catch(() => setFetchedParts([]))
+      .finally(() => setLoading(false));
 
-    promises.push(
-      componentsApi.list({ page_size: 10000 })
-        .then((r: unknown) => {
-          const data = (r as any).data;
-          const items = Array.isArray(data) ? data : data?.items || [];
-          if (storeComponents.length === 0) setFetchedComponents(items);
-        })
-        .catch(() => {}),
-    );
-
-    // 计算祖先链：向上查找所有包含当前部件的父部件
+    // 计算祖先链：向上查找所有包含当前部件的父部件（避免自引用循环）
     if (currentAssemblyId) {
-      promises.push(
-        bomApi.getAll()
-          .then((r) => r.data as { parent_type: string; parent_id: string; child_type: string; child_id: string }[])
-          .then((allItems) => {
-            const childToParents = new Map<string, string[]>();
-            for (const item of allItems) {
-              if (item.child_type === 'assembly' || item.child_type === 'component') {
-                const existing = childToParents.get(item.child_id) || [];
-                existing.push(item.parent_id);
-                childToParents.set(item.child_id, existing);
-              }
+      bomApi.getAll()
+        .then((r) => r.data as { parent_type: string; parent_id: string; child_type: string; child_id: string }[])
+        .then((allItems) => {
+          const childToParents = new Map<string, string[]>();
+          for (const item of allItems) {
+            if (item.child_type === 'assembly' || item.child_type === 'component') {
+              const existing = childToParents.get(item.child_id) || [];
+              existing.push(item.parent_id);
+              childToParents.set(item.child_id, existing);
             }
-            // BFS 向上查找所有祖先
-            const ancestors = new Set<string>();
-            const queue = [currentAssemblyId];
-            while (queue.length > 0) {
-              const current = queue.shift()!;
-              const parents = childToParents.get(current);
-              if (parents) {
-                for (const pid of parents) {
-                  if (!ancestors.has(pid)) {
-                    ancestors.add(pid);
-                    queue.push(pid);
-                  }
+          }
+          // BFS 向上查找所有祖先
+          const ancestors = new Set<string>();
+          const queue = [currentAssemblyId];
+          while (queue.length > 0) {
+            const current = queue.shift()!;
+            const parents = childToParents.get(current);
+            if (parents) {
+              for (const pid of parents) {
+                if (!ancestors.has(pid)) {
+                  ancestors.add(pid);
+                  queue.push(pid);
                 }
               }
             }
-            setAncestorIds(ancestors);
-          })
-          .catch(() => setAncestorIds(new Set())),
-      );
+          }
+          setAncestorIds(ancestors);
+        })
+        .catch(() => setAncestorIds(new Set()));
     }
+  }, [open, currentAssemblyId]);
 
-    Promise.all(promises).finally(() => setLoading(false));
-  }, [open, storeComponents, currentAssemblyId, dataMode]);
-
-  const componentsList = dataMode === 'parts'
-    ? fetchedParts
-    : (storeComponents.length > 0 ? storeComponents : fetchedComponents);
+  const componentsList = fetchedParts;
 
   /* 合并所有零件+部件为一个列表 */
   const allCandidates = useMemo<CandidateItem[]>(() => {
@@ -376,23 +343,15 @@ export default function AssemblyPartPicker({
                   if (!quickForm.code.trim() || !quickForm.name.trim()) return;
                   setQuickCreating(true);
                   try {
-                    if (dataMode === 'parts') {
-                      const created = await partsApi.create({ code: quickForm.code.trim(), name: quickForm.name.trim(), spec: quickForm.spec || undefined });
-                      const revId = created.latest_revision?.id;
-                      if (!revId) throw new Error('创建的零部件缺少版本信息');
-                      const version = created.latest_revision?.version || '-';
-                      const status = created.latest_revision?.status || 'draft';
-                      const newItem: SelectedItem = { id: revId, code: created.code, name: created.name, version, status, type: 'part', quantity: 1 };
-                      setSelected(prev => new Map(prev).set(newItem.id, newItem));
-                      const candidate: CandidateItem = { id: revId, code: created.code, name: created.name, spec: created.spec, version, status, type: 'part' };
-                      setFetchedParts(prev => [...prev, candidate as any]);
-                    } else {
-                      const r = await componentsApi.create({ code: quickForm.code.trim(), name: quickForm.name.trim(), spec: quickForm.spec || undefined, remark: quickForm.remark || undefined });
-                      const newItem: SelectedItem = { id: r.data.id, code: r.data.code, name: r.data.name, version: r.data.version || '-', status: r.data.status || 'draft', type: 'component', quantity: 1 };
-                      setSelected(prev => new Map(prev).set(newItem.id, newItem));
-                      const candidate: CandidateItem = { id: newItem.id, code: newItem.code, name: newItem.name, version: newItem.version, status: newItem.status, type: 'component' };
-                      setFetchedComponents(prev => [...prev, candidate as any]);
-                    }
+                    const created = await partsApi.create({ code: quickForm.code.trim(), name: quickForm.name.trim(), spec: quickForm.spec || undefined });
+                    const revId = created.latest_revision?.id;
+                    if (!revId) throw new Error('创建的零部件缺少版本信息');
+                    const version = created.latest_revision?.version || '-';
+                    const status = created.latest_revision?.status || 'draft';
+                    const newItem: SelectedItem = { id: revId, code: created.code, name: created.name, version, status, type: 'part', quantity: 1 };
+                    setSelected(prev => new Map(prev).set(newItem.id, newItem));
+                    const candidate: CandidateItem = { id: revId, code: created.code, name: created.name, spec: created.spec, version, status, type: 'part' };
+                    setFetchedParts(prev => [...prev, candidate as any]);
                     setQuickForm({ code: '', name: '', spec: '', remark: '' });
                   } catch (e: any) {
                     toast.error(e?.response?.data?.detail || e?.message || '创建失败');

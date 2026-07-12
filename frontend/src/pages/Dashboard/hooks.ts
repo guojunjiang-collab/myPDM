@@ -27,7 +27,7 @@ export interface RecentDisplay { key: string; entityType: string; entityId: stri
 
 export function useRecentEdited(userId: string | undefined, limit = 5): RecentDisplay[] {
   // myPDM 统一 components 模型（含 part/assembly），文档、构型项单独存储
-  const components = useDataStore((s) => s.components);
+  const components = useDataStore((s) => s.parts);
   const documents = useDataStore((s) => s.documents);
   const configItems = useDataStore((s) => s.configItems);
   const [refs, setRefs] = useState<{ targetType: string; targetId: string }[]>([]);

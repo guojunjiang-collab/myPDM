@@ -44,7 +44,7 @@ export default function MaterialTab() {
   };
 
   // PDM 零件/部件来自全局 DataStore（已全量预加载），客户端即时过滤
-  const storeComponents = useDataStore((s) => s.components);
+  const storeComponents = useDataStore((s) => s.parts);
   const syncAll = useDataStore((s) => s.syncAll);
 
   // PDM 搜索结果（直接调用后端，避免依赖全局 store 的缓存/结构差异）

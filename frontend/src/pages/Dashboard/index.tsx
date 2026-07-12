@@ -11,7 +11,7 @@ import { MyTasksTile } from './MyTasksTile';
 
 export default function Dashboard() {
   // myPDM 统一 components 模型（含 part/assembly）
-  const components = useDataStore((s) => s.components);
+  const components = useDataStore((s) => s.parts);
   const documents = useDataStore((s) => s.documents);
   const configItems = useDataStore((s) => s.configItems);
   const user = useAuthStore((s) => s.user);

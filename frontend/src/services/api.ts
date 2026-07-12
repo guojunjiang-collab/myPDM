@@ -88,42 +88,7 @@ export const authApi = {
     }),
 };
 
-// 部件 API
-export const assembliesApi = {
-  list: (params?: { page?: number; page_size?: number; search?: string; status?: string; brief?: boolean; updated_since?: number; top_level?: boolean }) =>
-    api.get('/assemblies/', { params }),
-  get: (id: string) => api.get(`/assemblies/${id}`),
-  create: (data: unknown) => api.post('/assemblies/', data),
-  update: (id: string, data: unknown) => api.put(`/assemblies/${id}`, data),
-  delete: (id: string) => api.delete(`/assemblies/${id}`),
-  upgrade: (id: string, note?: string) => api.post(`/assemblies/${id}/upgrade`, { note }),
-  versions: (id: string) => api.get(`/assemblies/${id}/versions`),
-  exportBOM: (id: string) =>
-    api.get(`/assemblies/${id}/bom/export`, { responseType: 'blob' }),
-};
-
 // 零部件 API (v2 统一接口)
-export const componentsApi = {
-  list: (params?: Record<string, any>) =>
-    api.get('/components/', { params }),
-  get: (id: string) =>
-    api.get(`/components/${id}`),
-  create: (data: Record<string, any>) =>
-    api.post('/components/', data),
-  update: (id: string, data: Record<string, any>) =>
-    api.put(`/components/${id}`, data),
-  delete: (id: string) =>
-    api.delete(`/components/${id}`),
-  upgrade: (id: string, note?: string) =>
-    api.post(`/components/${id}/upgrade`, { note }),
-  versions: (id: string) =>
-    api.get(`/components/${id}/versions`),
-  updateDocumentLinks: (id: string, documentLinks: any[]) =>
-    api.post(`/components/${id}/document-links`, { document_links: documentLinks }),
-  exportBOM: (id: string) =>
-    api.get(`/components/${id}/bom/export`, { responseType: 'blob' }),
-};
-
 export const partsApi = {
   // PartMaster
   list: (params?: Record<string, any>) =>
@@ -568,17 +533,6 @@ export const v2UploadApi = {
 // 分块大小阈值 (10MB) - 与后端 CHUNK_SIZE * 2 保持一致
 export const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
 export const CHUNK_THRESHOLD = CHUNK_SIZE * 2; // 10MB
-
-// 部件子项 API
-export const assemblyPartsApi = {
-  list: (assemblyId: string) => api.get(`/components/${assemblyId}/parts`),
-  add: (assemblyId: string, data: { child_type: string; child_id: string; quantity: number }) =>
-    api.post(`/components/${assemblyId}/parts`, data),
-  update: (assemblyId: string, itemId: string, data: { quantity: number }) =>
-    api.put(`/components/${assemblyId}/parts/${itemId}`, data),
-  remove: (assemblyId: string, itemId: string) =>
-    api.delete(`/components/${assemblyId}/parts/${itemId}`),
-};
 
 // 自定义字段 API
 export const customFieldsApi = {

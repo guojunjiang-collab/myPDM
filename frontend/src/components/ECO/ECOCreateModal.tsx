@@ -729,7 +729,7 @@ onExecuteFreeze={(itemId, newEntityId) => handleExecuteAction('freeze', itemId, 
       />
 
       {/* 零部件选择器（工程变更结果） */}
-      <AssemblyPartPicker open={showReleasePicker} onClose={() => setShowReleasePicker(false)} dataMode="parts"
+      <AssemblyPartPicker open={showReleasePicker} onClose={() => setShowReleasePicker(false)}
         onConfirm={(items) => {
           setShowReleasePicker(false);
           Promise.allSettled(items.map(async (item) => { const rev = await partsApi.getRevision(item.child_id); const m = await partsApi.get(rev.master_id); return { ...m, ...rev, child_type: item.child_type, quantity: item.quantity }; })).then(results => {

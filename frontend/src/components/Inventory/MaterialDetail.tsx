@@ -34,7 +34,7 @@ export default function MaterialDetail({ material, onClose, onViewEntity }: Prop
   const m = material;
   const hasPdmRef = m.source_type !== 'standalone' && !!m.ref_entity_id;
 
-  const storeComponents = useDataStore((s) => s.components);
+  const storeComponents = useDataStore((s) => s.parts);
   const syncAll = useDataStore((s) => s.syncAll);
 
   // 关联零部件（取自全局 DataStore 的 brief）

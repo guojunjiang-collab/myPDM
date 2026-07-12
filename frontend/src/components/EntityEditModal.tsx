@@ -447,7 +447,6 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
         open={pickerOpen}
         onClose={() => { setPickerOpen(false); setPickerTargetId(null); }}
         onConfirm={handleAddParts}
-        dataMode="parts"
         currentAssemblyId={pickerTargetId || entityId}
         existingChildIds={new Set(editParts.map(p => p.child_id))}
       />

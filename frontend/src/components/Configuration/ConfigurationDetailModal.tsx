@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { Modal } from '../Modal';
-import { configurationApi, assemblyPartsApi, partsApi, assembliesApi, componentsApi, customFieldsApi } from '../../services/api';
+import { configurationApi, partsApi, customFieldsApi } from '../../services/api';
 import type { ConfigPartItem, ConfigChildItem, CustomFieldDefinition, CustomFieldValue } from '../../types';
 import EntityDocumentSection from '../EntityDocumentSection';
 import PartDetailContent from '../PartDetailContent';

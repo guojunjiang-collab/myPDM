@@ -20,8 +20,8 @@ interface SyncEntity {
 function buildEntities(): SyncEntity[] {
   return [
     {
-      name: 'components',
-      key: 'components',
+      name: 'parts',
+      key: 'parts',
       fetch: async (since: number) => {
         const res = await partsApi.list({
           page_size: 200,
@@ -33,9 +33,9 @@ function buildEntities(): SyncEntity[] {
       },
       merge: (items: PartListItem[]) => {
         const store = useDataStore.getState();
-        const current = [...store.components] as any[];
+        const current = [...store.parts] as any[];
         mergeItems(current, items as any[]);
-        store.setComponents(current);
+        store.setParts(current);
       },
     },
     {
@@ -122,7 +122,7 @@ class SyncService {
 
   /** Per-entity last-sync timestamps (server max timestamps) */
   private lastSync: SyncStatus = {
-    components: 0,
+    parts: 0,
     documents: 0,
     bom_items: 0,
     ecrs: 0,
@@ -135,7 +135,7 @@ class SyncService {
 
     // Trigger initial full pull if store is empty or configItems not yet synced (migration)
     const needsInitialSync =
-      (store.components.length === 0 &&
+      (store.parts.length === 0 &&
        store.documents.length === 0) ||
       store.configItems.length === 0;
     if (needsInitialSync) {

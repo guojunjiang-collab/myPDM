@@ -736,7 +736,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
       </div>
 
       {/* 零部件选择器 */}
-      <AssemblyPartPicker open={pickerOpen} onClose={() => setPickerOpen(false)} dataMode="parts"
+      <AssemblyPartPicker open={pickerOpen} onClose={() => setPickerOpen(false)}
         onConfirm={async (items) => {
           for (const it of items) {
             let masterId = ''; let code = ''; let name = ''; let ver = ''; let spec = ''; let status = ''; let type = 'part';

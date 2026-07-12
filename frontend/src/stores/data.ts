@@ -8,7 +8,7 @@ function extractData<T>(response: any): T[] {
 }
 
 interface DataState {
-  components: any[];
+  parts: any[];
   documents: DocumentBrief[];
   customFieldDefs: CustomFieldDefinition[];
   bomItems: BOMItemBrief[];
@@ -21,7 +21,7 @@ interface DataState {
   syncError: string | null;
   autoSyncEnabled: boolean;
 
-  setComponents: (components: any[]) => void;
+  setParts: (parts: any[]) => void;
   setDocuments: (documents: DocumentBrief[]) => void;
   setCustomFieldDefs: (defs: CustomFieldDefinition[]) => void;
   setBomItems: (items: BOMItemBrief[]) => void;
@@ -29,7 +29,7 @@ interface DataState {
   setEcos: (ecos: ECOBrief[]) => void;
   setConfigItems: (items: ConfigItemBrief[]) => void;
 
-  updateComponent: (id: string, data: any) => void;
+  updatePart: (id: string, data: any) => void;
   updateDocument: (id: string, data: Partial<Document>) => void;
 
   setSyncing: (syncing: boolean) => void;
@@ -43,7 +43,7 @@ interface DataState {
 export const useDataStore = create<DataState>()(
   persist(
     (set) => ({
-      components: [],
+      parts: [],
       documents: [],
       customFieldDefs: [],
       bomItems: [],
@@ -55,7 +55,7 @@ export const useDataStore = create<DataState>()(
       syncError: null,
       autoSyncEnabled: true,
 
-      setComponents: (components) => set({ components }),
+      setParts: (parts) => set({ parts }),
       setDocuments: (documents) => set({ documents }),
       setCustomFieldDefs: (defs) => set({ customFieldDefs: defs }),
       setBomItems: (bomItems) => set({ bomItems }),
@@ -63,9 +63,9 @@ export const useDataStore = create<DataState>()(
       setEcos: (ecos) => set({ ecos }),
       setConfigItems: (configItems) => set({ configItems }),
 
-      updateComponent: (id, data) =>
+      updatePart: (id, data) =>
         set((state) => ({
-          components: state.components.map((c) =>
+          parts: state.parts.map((c) =>
             c.revision_id === id ? { ...c, ...data } : c
           ),
         })),
@@ -83,7 +83,7 @@ export const useDataStore = create<DataState>()(
 
       clearCache: () =>
         set({
-          components: [],
+          parts: [],
           documents: [],
           customFieldDefs: [],
           bomItems: [],
@@ -96,7 +96,7 @@ export const useDataStore = create<DataState>()(
       syncAll: async () => {
         set({ isSyncing: true, syncError: null });
         try {
-          const [componentsRes, documentsRes, fieldsRes, configRes] = await Promise.allSettled([
+          const [partsRes, documentsRes, fieldsRes, configRes] = await Promise.allSettled([
             partsApi.list({ page_size: 200, show_all_versions: true }),
             documentsApi.list({ page_size: 10000, brief: true }),
             customFieldsApi.listDefinitions(),
@@ -105,7 +105,7 @@ export const useDataStore = create<DataState>()(
 
           set({
             // partsApi.list 已解包为 payload（{items,total}），不再有 .data 层
-            components: componentsRes.status === 'fulfilled' ? extractData<PartListItem>(componentsRes.value) : [],
+            parts: partsRes.status === 'fulfilled' ? extractData<PartListItem>(partsRes.value) : [],
             documents: documentsRes.status === 'fulfilled' ? extractData<DocumentBrief>(documentsRes.value.data) : [],
             customFieldDefs: fieldsRes.status === 'fulfilled' ? extractData<CustomFieldDefinition>(fieldsRes.value.data) : [],
             configItems: configRes.status === 'fulfilled' ? extractData<ConfigItemBrief>(configRes.value.data) : [],
@@ -120,7 +120,7 @@ export const useDataStore = create<DataState>()(
     {
       name: 'data-storage',
       partialize: (state) => ({
-        components: state.components,
+        parts: state.parts,
         documents: state.documents,
         customFieldDefs: state.customFieldDefs,
         bomItems: state.bomItems,

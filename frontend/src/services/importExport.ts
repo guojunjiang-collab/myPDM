@@ -438,7 +438,7 @@ async function loadEntityDocuments(
  * 包含 Sheet1: 零件数据, Sheet2: 关联图文档
  */
 async function _buildPartsWorkbook(): Promise<XLSX.WorkBook> {
-  const parts = useDataStore.getState().components.filter(c => c.type !== 'assembly');
+  const parts = useDataStore.getState().parts.filter(c => c.type !== 'assembly');
   if (parts.length === 0) {
     throw new Error('没有可导出的零件数据');
   }
@@ -563,7 +563,7 @@ export async function previewPartsImport(
   if (rawRows.length === 0) throw new Error('Excel 中无数据');
 
   const defs = getCustomFieldDefs('part');
-  const existingParts = useDataStore.getState().components.filter(c => c.type !== 'assembly');
+  const existingParts = useDataStore.getState().parts.filter(c => c.type !== 'assembly');
 
   // 构建已存在映射：key = code|version
   const existingMap = new Map<string, Part>();
@@ -687,7 +687,7 @@ export async function executePartsImport(preview: ImportPreview): Promise<void> 
           if (row.status === '更新') {
             const existing = useDataStore
               .getState()
-              .components.find(
+              .parts.find(
                 (c) =>
                   c.type !== 'assembly' && c.code === row.code && (c.version || '') === row.version,
               );
@@ -759,7 +759,7 @@ export async function executePartsImport(preview: ImportPreview): Promise<void> 
         const key = `${code}|${version}`;
         if (!codeVersionToNewFromPreview.get(key)) continue;
 
-        const comp = useDataStore.getState().components.find(
+        const comp = useDataStore.getState().parts.find(
           (c) => c.code === code && (c.version || '') === version,
         );
         if (!comp) continue;
@@ -857,7 +857,7 @@ export async function exportAssembliesToFolder(dirHandle?: FileSystemDirectoryHa
     throw new Error('您的浏览器不支持文件夹操作，请使用 Chrome 86+ 或 Edge 86+');
   }
 
-  const allComps = useDataStore.getState().components;
+  const allComps = useDataStore.getState().parts;
   if (allComps.length === 0) {
     throw new Error('没有可导出的零部件数据');
   }
@@ -1038,7 +1038,7 @@ export async function exportAssembliesToFolder(dirHandle?: FileSystemDirectoryHa
  * 包含 Sheet1: 部件信息(含自定义字段), Sheet2: BOM(含自定义字段), Sheet3: 关联图文档
  */
 export async function exportSingleAssemblyBOM(assemblyId: string): Promise<void> {
-  const allComps = useDataStore.getState().components;
+  const allComps = useDataStore.getState().parts;
   const asm = allComps.find((a) => a.id === assemblyId);
   if (!asm) {
     throw new Error('未找到该部件');
@@ -1233,7 +1233,7 @@ export async function previewAssembliesImport(dirHandle?: FileSystemDirectoryHan
   });
   _importDirHandle = handle;
 
-  const existingComps = useDataStore.getState().components;
+  const existingComps = useDataStore.getState().parts;
 
   // 读取部件清单.xlsx
   const manifestBuf = await readFileAsBuffer(handle, '部件清单.xlsx');
@@ -1383,7 +1383,7 @@ export async function executeAssembliesImport(
       if (row.status === '更新') {
         const existing = useDataStore
           .getState()
-          .components.find(
+          .parts.find(
             (c) => c.code === row.code && (c.version || '') === row.version,
           );
         if (existing) {
@@ -1466,7 +1466,7 @@ export async function executeAssembliesImport(
         if (!childRevisionId) {
           const found = useDataStore
             .getState()
-            .components.find(
+            .parts.find(
               (c) => c.code === childCode && (c.version || '') === childVersion,
             );
           if (found) childRevisionId = (found as any).revision_id || found.id;
@@ -2656,7 +2656,7 @@ export async function previewDashboardImport(
   const partMap = new Map<string, string>();
   const asmMap = new Map<string, string>();
   const docMap = new Map<string, string>();
-  for (const c of useDataStore.getState().components) {
+  for (const c of useDataStore.getState().parts) {
     if (c.type === 'assembly') {
       asmMap.set(`${c.code}|${c.version || ''}`, c.id);
     } else {
@@ -2871,7 +2871,7 @@ export async function previewDashboardImportFromFile(file: File): Promise<Import
   const partMap = new Map<string, string>();
   const asmMap = new Map<string, string>();
   const docMap = new Map<string, string>();
-  for (const c of useDataStore.getState().components) {
+  for (const c of useDataStore.getState().parts) {
     if (c.type === 'assembly') {
       asmMap.set(`${c.code}|${c.version || ''}`, c.id);
     } else {
@@ -2947,7 +2947,7 @@ export async function executeDashboardImport(preview: ImportPreview): Promise<vo
  * 导出零件到指定目录
  */
 async function exportPartsToDir(dirHandle: FileSystemDirectoryHandle): Promise<void> {
-  const parts = useDataStore.getState().components.filter(c => c.type !== 'assembly');
+  const parts = useDataStore.getState().parts.filter(c => c.type !== 'assembly');
   if (parts.length === 0) return;
 
   const wb = await _buildPartsWorkbook();
@@ -3047,7 +3047,7 @@ export async function exportAllData(
   }
 
   // 2. 导出零件
-  const parts = useDataStore.getState().components.filter(c => c.type !== 'assembly');
+  const parts = useDataStore.getState().parts.filter(c => c.type !== 'assembly');
   if (parts.length > 0) {
     onProgress?.(`正在导出零件 (${parts.length} 条记录)...`);
     await exportPartsToDir(dirHandle);
@@ -3056,7 +3056,7 @@ export async function exportAllData(
   }
 
   // 3. 导出部件
-  const assemblies = useDataStore.getState().components.filter(c => c.type === 'assembly');
+  const assemblies = useDataStore.getState().parts.filter(c => c.type === 'assembly');
   if (assemblies.length > 0) {
     onProgress?.(`正在导出部件 (${assemblies.length} 条记录)...`);
     await exportAssembliesToFolder(dirHandle);
@@ -3411,7 +3411,7 @@ export async function previewConfigurationItemsImport(file: File): Promise<Impor
     if (!partsByCode.has(code)) partsByCode.set(code, []);
     const partCode = String(r['零部件件号'] || '').trim();
     const partVer = String(r['零部件版本'] || '').trim();
-    const found = store.components.find((c: any) => c.code === partCode && (c.version || '') === partVer);
+    const found = store.parts.find((c: any) => c.code === partCode && (c.version || '') === partVer);
     if (!found) partWarnings++;
     partsByCode.get(code)!.push(r);
   }
@@ -3602,7 +3602,7 @@ export async function executeConfigurationItemsImport(preview: ImportPreview): P
       for (const p of parts) {
         const pc = p.part_code as string;
         const pv = p.part_version as string;
-        const entity = store.components.find((c: any) => c.code === pc && (c.version || '') === pv);
+        const entity = store.parts.find((c: any) => c.code === pc && (c.version || '') === pv);
         if (!entity) {
           warnings.push(`构型项 ${row.code}: 关联零部件未找到 ${pc}@${pv}`);
           console.warn(`构型项 ${row.code} 关联零部件未找到，跳过: ${pc}@${pv}`);

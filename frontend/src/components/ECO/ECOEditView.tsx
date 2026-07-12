@@ -756,7 +756,7 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
       </>)}
       {ecrId && !loading && !ecrData && <p className="text-xs text-gray-400 text-center py-4">未找到 ECR</p>}
 
-      <AssemblyPartPicker open={pickerOpen} onClose={() => setPickerOpen(false)} dataMode="parts"
+      <AssemblyPartPicker open={pickerOpen} onClose={() => setPickerOpen(false)}
         onConfirm={async (items) => {
           for (const item of items) {
             let code = ''; let name = ''; let ver = '';

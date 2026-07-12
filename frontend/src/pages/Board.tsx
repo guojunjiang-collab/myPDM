@@ -692,7 +692,7 @@ function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) 
       // partsApi.list 直接返回 data（{items,total}），非 axios 响应，需单独解构
       const comps = comp.status === 'fulfilled'
         ? (Array.isArray(comp.value) ? comp.value : (comp.value?.items || []))
-        : (console.error('[ItemPicker] 加载零部件失败：', comp.reason), cache.components);
+        : (console.error('[ItemPicker] 加载零部件失败：', comp.reason), cache.parts);
       setSrcComponents(comps);
       setSrcDocuments(pick(d, cache.documents, '图文档'));
       setSrcConfigItems(pick(c, cache.configItems, '构型项'));

@@ -880,7 +880,6 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
           if (failed === 0) toast.success(`已添加 ${items.length} 个子项`);
         }}
         currentAssemblyId={revisionId}
-        dataMode="parts"
       />
       {versionSelectItem && (
         <Modal open={!!versionSelectItem} onClose={() => setVersionSelectItem(null)} title={`选择版本 - ${versionSelectItem.child_code}`} width="md">
@@ -942,7 +941,6 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
             setHasBomChildren(true);
           }}
           currentAssemblyId={nestedPickerRevId}
-          dataMode="parts"
         />
       )}
       {nestedMasterId && (

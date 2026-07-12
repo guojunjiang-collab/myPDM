@@ -740,7 +740,6 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
         <AssemblyPartPicker
           open={showPartPicker}
           onClose={() => setShowPartPicker(false)}
-          dataMode="parts"
           onConfirm={(items) => {
             addLinks(items.map((it) => ({ entity_type: 'part', entity_id: it.child_id })));
             setShowPartPicker(false);
