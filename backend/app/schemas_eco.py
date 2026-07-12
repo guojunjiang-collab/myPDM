@@ -77,7 +77,7 @@ class ECOCcUserItem(BaseModel):
 class ECOExecutionItemCreate(BaseSchema):
     """添加执行项请求"""
     source: Literal["ecr", "manual"] = "ecr"
-    entity_type: Literal["part", "assembly"]
+    entity_type: Literal["part", "assembly", "component"]
     entity_name: str = Field(..., max_length=255)
     action: Literal["create", "upgrade", "qty_change", "delete", "no_change", "add_existing"]
     entity_id: Optional[str] = None

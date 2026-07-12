@@ -635,7 +635,7 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
                 onClick={() => setShowAffectedPicker(true)}
                 className="text-xs px-3 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
               >
-                + 添加零件/部件
+                + 添加零部件
               </button>
             </div>
           </div>

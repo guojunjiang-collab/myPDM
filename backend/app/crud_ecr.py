@@ -365,7 +365,7 @@ def add_affected_item(
         if entity:
             entity_code = entity.code or ""
             entity_name = entity.name or ""
-            entity_version = getattr(entity, 'version', '') or ""
+            entity_version = _master_version(db, entity.id) or ""
 
     item = ECRAffectedItem(
         ecr_id=ecr_id,
@@ -404,65 +404,101 @@ def delete_affected_item(db: Session, item_id: uuid.UUID):
 # BOM 溯源辅助函数（供 ECO 和 ECR 共享）
 # ─────────────────────────────────────────────────────
 
-def _get_upward_trace(db: Session, entity_type: str, entity_id: uuid.UUID) -> list:
-    """向上追溯：查找引用该实体的所有父级（最多10层），构建树结构"""
-    from sqlalchemy import text
-    sql = text("""
-    WITH RECURSIVE trace AS (
-      SELECT bi.id, bi.parent_type, bi.parent_id, bi.child_type, bi.child_id,
-             bi.quantity, 1 AS level
-      FROM bom_items bi
-      WHERE bi.child_id = :entity_id
-        AND bi.deleted_at IS NULL
-        AND (bi.child_type = :entity_type
-             OR (bi.child_type = 'component' AND :entity_type = 'assembly'))
-      UNION ALL
-      SELECT bi.id, bi.parent_type, bi.parent_id, bi.child_type, bi.child_id,
-             bi.quantity, t.level + 1
-      FROM bom_items bi
-      JOIN trace t ON bi.child_id = t.parent_id
-      WHERE t.level < 10
-        AND bi.deleted_at IS NULL
+def _revision_of_master(db: Session, master_id: uuid.UUID):
+    """该 master 的最新有效 revision（按创建时间倒序）。"""
+    return (
+        db.query(PartRevision)
+        .filter(PartRevision.master_id == master_id, PartRevision.deleted_at.is_(None))
+        .order_by(PartRevision.created_at.desc())
+        .first()
     )
-    SELECT * FROM trace ORDER BY level
-    """)
-    rows = db.execute(sql, {"entity_id": entity_id, "entity_type": entity_type}).fetchall()
 
-    # 构建节点查找表
-    nodes_by_id = {}
-    for row in rows:
-        pk = str(row.parent_id)
-        if pk not in nodes_by_id:
-            p = db.query(PartMaster).filter(PartMaster.id == row.parent_id).first()
-            if p:
-                nodes_by_id[pk] = {
-                    "entity_type": row.parent_type,
-                    "entity_code": p.code,
-                    "entity_name": p.name,
-                    "entity_version": p.version,
-                }
 
-    # 构建 child→parents 映射
-    child_to_parents = {}
-    parent_meta = {}
-    for row in rows:
-        ck = str(row.child_id)
-        pk = str(row.parent_id)
-        if ck not in child_to_parents:
-            child_to_parents[ck] = []
-        if pk not in child_to_parents[ck]:
-            child_to_parents[ck].append(pk)
-        if pk not in parent_meta or row.level < parent_meta[pk].get("_cte_level", 999):
-            parent_meta[pk] = {"child_id": ck, "quantity": float(row.quantity), "_cte_level": row.level}
+def _master_version(db: Session, master_id: uuid.UUID) -> str:
+    rev = _revision_of_master(db, master_id)
+    return rev.version if rev else ""
 
-    # 获取变更对象详情
+
+def _parent_masters_of(db: Session, master_id: uuid.UUID) -> list:
+    """查找使用该 master（其任一版本，取父版本当前迭代的有效 BOM 关系）的父 master 列表。
+    返回 [(parent_master_id: UUID, quantity: float)]（父 master 去重）。"""
+    from app.models_parts import PartIteration
+    rev_ids = [
+        r.id for r in db.query(PartRevision).filter(
+            PartRevision.master_id == master_id, PartRevision.deleted_at.is_(None)
+        ).all()
+    ]
+    if not rev_ids:
+        return []
+    items = (
+        db.query(BOMItem)
+        .join(PartIteration, PartIteration.id == BOMItem.iteration_id)
+        .join(PartRevision, PartRevision.id == BOMItem.parent_revision_id)
+        .filter(
+            BOMItem.child_revision_id.in_(rev_ids),
+            BOMItem.deleted_at.is_(None),
+            PartRevision.deleted_at.is_(None),
+            PartIteration.iteration == PartRevision.latest_iteration,
+        )
+        .all()
+    )
+    out = []
+    seen = set()
+    for bi in items:
+        prev = db.query(PartRevision).filter(PartRevision.id == bi.parent_revision_id).first()
+        if not prev:
+            continue
+        key = str(prev.master_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append((prev.master_id, float(bi.quantity or 1)))
+    return out
+
+
+def _get_upward_trace(db: Session, entity_type: str, entity_id: uuid.UUID) -> list:
+    """向上追溯：查找引用该零部件（master）的所有父级（最多10层），构建树结构。
+    基于 PartRevision BOM 模型（bom_items.child_revision_id → parent_revision_id，取父版本当前迭代）。"""
     obj = db.query(PartMaster).filter(PartMaster.id == entity_id).first()
     if not obj:
         return []
 
+    # BFS 向上构建 child_master -> [parent_master] 映射
+    child_to_parents: dict = {}
+    nodes_by_id: dict = {}
+    parent_meta: dict = {}
+    visited = set()
+    queue = [str(entity_id)]
+    level = 0
+    while queue and level < 10:
+        next_q = []
+        for cid in queue:
+            if cid in visited:
+                continue
+            visited.add(cid)
+            for parent_master_id, qty in _parent_masters_of(db, uuid.UUID(cid)):
+                pk = str(parent_master_id)
+                child_to_parents.setdefault(cid, [])
+                if pk not in child_to_parents[cid]:
+                    child_to_parents[cid].append(pk)
+                if pk not in nodes_by_id:
+                    pm = db.query(PartMaster).filter(PartMaster.id == parent_master_id).first()
+                    if pm:
+                        nodes_by_id[pk] = {
+                            "entity_type": "assembly",
+                            "entity_code": pm.code,
+                            "entity_name": pm.name,
+                            "entity_version": _master_version(db, parent_master_id),
+                        }
+                if pk not in parent_meta:
+                    parent_meta[pk] = {"child_id": cid, "quantity": qty}
+                next_q.append(pk)
+        queue = next_q
+        level += 1
+
     target_id = str(entity_id)
     target_qty = 0
-    if target_id in child_to_parents:
+    if target_id in child_to_parents and child_to_parents[target_id]:
         first_parent = child_to_parents[target_id][0]
         target_qty = parent_meta.get(first_parent, {}).get("quantity", 1)
 
@@ -475,7 +511,7 @@ def _get_upward_trace(db: Session, entity_type: str, entity_id: uuid.UUID) -> li
         "entity_id": target_id,
         "entity_code": obj.code,
         "entity_name": obj.name,
-        "entity_version": obj.version,
+        "entity_version": _master_version(db, entity_id),
         "quantity": target_qty,
         "parent_entity_id": None,
         "parent_entity_code": None,
@@ -565,42 +601,30 @@ def _get_upward_trace(db: Session, entity_type: str, entity_id: uuid.UUID) -> li
 
 
 def _get_downward_trace(db: Session, entity_type: str, entity_id: uuid.UUID) -> list:
-    """向下展开：仅当实体为部件时，取一级 BOM 子项"""
+    """向下展开：取实体最新版本的一级 BOM 子项（基于 PartRevision 模型）。"""
+    from app import crud_parts
     downward_items = []
-    if entity_type == "assembly":
-        child_rows = db.query(BOMItem).filter(
-            BOMItem.parent_type == "assembly",
-            BOMItem.parent_id == entity_id,
-            BOMItem.deleted_at.is_(None)
-        ).all()
-        for child in child_rows:
-            child_code = None
-            child_name = None
-            child_version = None
-            # 兼容旧数据：child_type 为 'component' 时等同 'assembly'
-            child_type_db = child.child_type
-            if child_type_db == "component":
-                child_type_db = "assembly"
-            if child_type_db == "part":
-                child_type_db = "part"  # no-op, just for clarity
-            c = db.query(PartMaster).filter(PartMaster.id == child.child_id).first()
-            if c:
-                child_code = c.code
-                child_name = c.name
-                child_version = getattr(c, 'version', '') or ""
-            downward_items.append({
-                "entity_type": child_type_db,
-                "entity_id": str(child.child_id),
-                "entity_code": child_code,
-                "entity_name": child_name or "",
-                "entity_version": child_version,
-                "quantity": float(child.quantity),
-                "selected": False,
-                "action": "no_change",
-                "target_version": None,
-                "quantity_change": None,
-                "change_description": "",
-                "parent_entity_id": str(entity_id),
-                "parent_target_version": None,
-            })
+    rev = _revision_of_master(db, entity_id)
+    if not rev:
+        return []
+    try:
+        children = crud_parts.get_bom_tree(db, rev.id)
+    except Exception:
+        children = []
+    for c in children:
+        downward_items.append({
+            "entity_type": "assembly" if c.get("child_type") == "assembly" else "part",
+            "entity_id": c.get("child_master_id"),
+            "entity_code": c.get("child_code"),
+            "entity_name": c.get("child_name") or "",
+            "entity_version": c.get("child_version") or "",
+            "quantity": float(c.get("quantity") or 1),
+            "selected": False,
+            "action": "no_change",
+            "target_version": None,
+            "quantity_change": None,
+            "change_description": "",
+            "parent_entity_id": str(entity_id),
+            "parent_target_version": None,
+        })
     return downward_items

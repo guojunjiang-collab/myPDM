@@ -510,14 +510,11 @@ async def get_bom_trace(
     current_user: User = Depends(require_permission("ecr:bom_trace"))
 ):
     """BOM 双向溯源：向上追溯父级 + 部件时向下展开一级子项"""
-    if entity_type not in ("part", "assembly"):
-        raise HTTPException(status_code=400, detail="仅支持 part 或 assembly")
+    if entity_type not in ("part", "assembly", "component"):
+        raise HTTPException(status_code=400, detail="仅支持 part、assembly 或 component")
 
-    # 验证实体的存在性
-    if entity_type == "part":
-        obj = db.query(PartMaster).filter(PartMaster.id == entity_id).first()
-    else:
-        obj = db.query(PartMaster).filter(PartMaster.id == entity_id).first()
+    # 验证实体的存在性（entity_id 为 PartMaster.id）
+    obj = db.query(PartMaster).filter(PartMaster.id == entity_id).first()
     if not obj:
         raise HTTPException(status_code=404, detail="实体不存在")
 

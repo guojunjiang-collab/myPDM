@@ -33,7 +33,7 @@ def list_parts(
     check_out_user_id: Optional[UUID] = Query(None),
     show_all_versions: bool = Query(False),
     page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=200),
+    page_size: int = Query(50, ge=1, le=10000),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("components:read")),
 ):

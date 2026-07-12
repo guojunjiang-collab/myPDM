@@ -161,7 +161,7 @@ class ECRCloseAction(BaseSchema):
 
 class AffectedItemCreate(BaseSchema):
     """添加受影响对象请求"""
-    entity_type: Literal["part", "assembly"]
+    entity_type: Literal["part", "assembly", "component"]
     entity_id: str
     change_description: Optional[str] = None
     change_type: Optional[str] = None
