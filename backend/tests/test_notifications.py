@@ -91,3 +91,60 @@ def test_mark_read_other_user_denied(db):
         event_type="e", title="t", body=None, target_type="ecr", target_id="1")
     n = db.query(models_notification.Notification).first()
     assert notif_svc.mark_read(db, intruder.id, n.id) is False
+
+
+# ── API 路由测试 ──
+
+from fastapi.testclient import TestClient
+from app.main import app
+from app.database import get_db
+from app.routers.auth import get_current_active_user
+
+
+def _client(db, user):
+    app.dependency_overrides[get_db] = lambda: db
+    app.dependency_overrides[get_current_active_user] = lambda: user
+    return TestClient(app)
+
+
+def test_api_list_and_unread_count(db):
+    u = _mk_user(db, "接收者")
+    notif_svc.create_notifications(db, recipient_ids=[u.id], sender_id=None,
+        event_type="e", title="t1", body=None, target_type="ecr", target_id="1")
+    try:
+        c = _client(db, u)
+        r = c.get("/api/notifications/")
+        assert r.status_code == 200, r.text
+        assert r.json()["total"] == 1 and r.json()["unread"] == 1
+        rc = c.get("/api/notifications/unread-count")
+        assert rc.status_code == 200 and rc.json()["unread"] == 1
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_api_mark_read_and_read_all_and_clear(db):
+    u = _mk_user(db, "操作者")
+    notif_svc.create_notifications(db, recipient_ids=[u.id], sender_id=None,
+        event_type="e", title="t1", body=None, target_type="ecr", target_id="1")
+    n = db.query(models_notification.Notification).first()
+    try:
+        c = _client(db, u)
+        assert c.post(f"/api/notifications/{n.id}/read").status_code == 200
+        assert c.get("/api/notifications/unread-count").json()["unread"] == 0
+        assert c.post("/api/notifications/read-all").status_code == 200
+        assert c.request("DELETE", "/api/notifications/read").status_code == 200
+        assert c.get("/api/notifications/").json()["total"] == 0
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_api_only_own_notifications(db):
+    owner = _mk_user(db, "主人2")
+    intruder = _mk_user(db, "闯入者2")
+    notif_svc.create_notifications(db, recipient_ids=[owner.id], sender_id=None,
+        event_type="e", title="t", body=None, target_type="ecr", target_id="1")
+    try:
+        c = _client(db, intruder)
+        assert c.get("/api/notifications/").json()["total"] == 0
+    finally:
+        app.dependency_overrides.clear()
