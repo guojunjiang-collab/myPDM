@@ -2,22 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { notificationApi } from '../services/notificationApi';
 import { useNotificationStore } from '../stores/notification';
+import { notificationIcon, NOTIFICATION_TARGET_ROUTE } from '../lib/notification';
+import { isToday } from '../lib/date';
 import type { Notification } from '../types';
 
-const EVENT_ICON: Record<string, { icon: string; bg: string }> = {
-  ecr_approved: { icon: '✅', bg: '#dcfce7' }, eco_approved: { icon: '✅', bg: '#dcfce7' },
-  profile_approved: { icon: '✅', bg: '#dcfce7' }, inv_doc_approved: { icon: '✅', bg: '#dcfce7' },
-  ecr_rejected: { icon: '↩️', bg: '#fee2e2' }, eco_rejected: { icon: '↩️', bg: '#fee2e2' },
-  profile_rejected: { icon: '↩️', bg: '#fee2e2' }, inv_doc_rejected: { icon: '↩️', bg: '#fee2e2' },
-  cc_added: { icon: '👁', bg: '#dbeafe' }, profile_archived: { icon: '📦', bg: '#f3f4f6' },
-  eco_executing: { icon: '⚙️', bg: '#e0e7ff' }, eco_closed: { icon: '📦', bg: '#f3f4f6' },
-  ecr_closed: { icon: '📦', bg: '#f3f4f6' }, inv_doc_posted: { icon: '📥', bg: '#fef9c3' },
-  task_assigned: { icon: '📋', bg: '#dbeafe' },
-};
-const TARGET_ROUTE: Record<string, string> = {
-  ecr: '/ec', eco: '/ec', configuration_profile: '/configuration',
-  inventory_document: '/inventory', project_task: '/projects',
-};
 const MODULE_FILTERS: { key: string; label: string; targets: string[] }[] = [
   { key: 'all', label: '全部', targets: [] },
   { key: 'unread', label: '未读', targets: [] },
@@ -33,10 +21,9 @@ function relativeTime(iso?: string | null): string {
 }
 
 function groupByDay(items: Notification[]): { label: string; rows: Notification[] }[] {
-  const today = new Date().toISOString().slice(0, 10);
   const g1: Notification[] = [], g2: Notification[] = [];
   for (const n of items) {
-    if ((n.created_at || '').slice(0, 10) === today) g1.push(n); else g2.push(n);
+    if (isToday(n.created_at)) g1.push(n); else g2.push(n);
   }
   const out: { label: string; rows: Notification[] }[] = [];
   if (g1.length) out.push({ label: '今天', rows: g1 });
@@ -49,12 +36,12 @@ export default function Notifications() {
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { fetchUnread, markAllRead } = useNotificationStore();
+  const { fetchUnread, markAllRead, markRead } = useNotificationStore();
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const f = MODULE_FILTERS.find((x) => x.key === filter)!;
+      const f = MODULE_FILTERS.find((x) => x.key === filter) ?? MODULE_FILTERS[0];
       const params: any = { page: 1, page_size: 100 };
       if (filter === 'unread') params.is_read = false;
       const res = await notificationApi.list(params);
@@ -67,8 +54,8 @@ export default function Notifications() {
   useEffect(() => { load(); }, [load]);
 
   const onRowClick = async (n: Notification) => {
-    if (!n.is_read) { await notificationApi.markRead(n.id); fetchUnread(); }
-    navigate(TARGET_ROUTE[n.target_type] || '/');
+    if (!n.is_read) { await markRead(n.id); setItems(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x)); }
+    navigate(NOTIFICATION_TARGET_ROUTE[n.target_type] || '/');
   };
 
   const groups = groupByDay(items);
@@ -101,7 +88,7 @@ export default function Notifications() {
           <div className="text-xs text-gray-400 font-semibold mb-2">{g.label}</div>
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             {g.rows.map((n) => {
-              const ic = EVENT_ICON[n.event_type] || { icon: '🔔', bg: '#f3f4f6' };
+              const ic = notificationIcon(n.event_type);
               return (
                 <div key={n.id} onClick={() => onRowClick(n)}
                   className={`px-3.5 py-3 border-b border-gray-50 last:border-b-0 flex gap-3 items-start cursor-pointer hover:bg-gray-50 ${!n.is_read ? 'bg-blue-50' : ''}`}>
