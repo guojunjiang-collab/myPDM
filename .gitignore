@@ -39,3 +39,4 @@ migrations/
 # Secrets / 本地环境变量（含 API key，禁止入库）
 .env
 .env.example
+.superpowers/
