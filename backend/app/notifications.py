@@ -88,25 +88,23 @@ def mark_read(db: Session, user_id: UUID, notification_id: UUID) -> bool:
 
 
 def mark_all_read(db: Session, user_id: UUID) -> int:
-    rows = db.query(Notification).filter(
+    """将该用户所有未读通知置为已读，返回更新条数。"""
+    n = db.query(Notification).filter(
         Notification.recipient_id == user_id,
         Notification.is_read == False,  # noqa: E712
-    ).all()
-    for n in rows:
-        n.is_read = True
-        n.read_at = sqlfunc.now()
+    ).update(
+        {"is_read": True, "read_at": sqlfunc.now()},
+        synchronize_session=False,
+    )
     db.commit()
-    return len(rows)
+    return n
 
 
 def clear_read(db: Session, user_id: UUID) -> int:
-    """删除当前用户所有已读通知，返回删除条数。"""
-    rows = db.query(Notification).filter(
+    """删除该用户所有已读通知，返回删除条数。"""
+    n = db.query(Notification).filter(
         Notification.recipient_id == user_id,
         Notification.is_read == True,  # noqa: E712
-    ).all()
-    n = len(rows)
-    for row in rows:
-        db.delete(row)
+    ).delete(synchronize_session=False)
     db.commit()
     return n
