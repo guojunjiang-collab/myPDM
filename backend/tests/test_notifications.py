@@ -126,13 +126,20 @@ def test_api_mark_read_and_read_all_and_clear(db):
     u = _mk_user(db, "操作者")
     notif_svc.create_notifications(db, recipient_ids=[u.id], sender_id=None,
         event_type="e", title="t1", body=None, target_type="ecr", target_id="1")
+    notif_svc.create_notifications(db, recipient_ids=[u.id], sender_id=None,
+        event_type="e", title="t2", body=None, target_type="ecr", target_id="2")
     n = db.query(models_notification.Notification).first()
     try:
         c = _client(db, u)
+        # 标记第 1 条已读，仍剩 1 条未读
         assert c.post(f"/api/notifications/{n.id}/read").status_code == 200
+        assert c.get("/api/notifications/unread-count").json()["unread"] == 1
+        # read-all 应把剩余 1 条也标记已读
+        r = c.post("/api/notifications/read-all")
+        assert r.status_code == 200
         assert c.get("/api/notifications/unread-count").json()["unread"] == 0
-        assert c.post("/api/notifications/read-all").status_code == 200
-        assert c.request("DELETE", "/api/notifications/read").status_code == 200
+        # 清除全部已读
+        assert c.delete("/api/notifications/read").status_code == 200
         assert c.get("/api/notifications/").json()["total"] == 0
     finally:
         app.dependency_overrides.clear()
