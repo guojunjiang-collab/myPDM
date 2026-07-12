@@ -108,6 +108,7 @@ PERMISSIONS: dict[str, list[str]] = {
     "logs:read": ["admin"],
     "nav.admin_tools": ["admin", "engineer", "production"],
     "nav.settings": ["admin", "engineer"],
+    "notifications:read": ["admin", "engineer", "production", "guest"],
     "parts.bom:export_single": ["admin", "engineer", "production"],
     "parts.bom:import_export_all": ["admin"],
     "parts.bom:manage": ["admin", "engineer"],

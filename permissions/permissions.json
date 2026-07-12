@@ -172,6 +172,8 @@
 
     "sync:read": ["admin", "engineer", "production", "guest"],
 
+    "notifications:read": ["admin", "engineer", "production", "guest"],
+
     "nav.admin_tools": ["admin", "engineer", "production"],
     "nav.settings": ["admin", "engineer"]
   }
