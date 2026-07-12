@@ -90,9 +90,6 @@ export function StatusDistributionTile({ partsMasters, documents, configItems }:
       {empty ? <EmptyState text="暂无数据，去各页面检出后自动统计" /> : (
         <div className="flex flex-col gap-3 flex-1">
           {rows.map((r) => <DistRow key={r.label} label={r.label} dist={r.dist} />)}
-          {configItems.length > 0 && (
-            <div className="text-sm text-gray-500">构型项 · {configItems.length}</div>
-          )}
           <div className="flex gap-3 flex-wrap text-sm text-gray-500 mt-auto pt-1">
             {(['draft', 'frozen', 'released', 'obsolete'] as const).map((k) => (
               <span key={k} className="flex items-center gap-1">
