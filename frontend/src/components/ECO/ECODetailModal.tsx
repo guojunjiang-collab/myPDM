@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ecoApi, documentsApi, assemblyPartsApi, partsApi, assembliesApi, customFieldsApi, mediaApi } from '../../services/api';
+import { ecoApi, documentsApi, partsApi, customFieldsApi, mediaApi } from '../../services/api';
 import type { ECORequest, Document, ECRDocumentLink } from '../../types';
 import { ECOStatusBadge, ECOPriorityBadge } from './ECOStatusBadge';
 import { Modal, ConfirmModal } from '../Modal';
@@ -78,9 +78,8 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
       if (items.length > 0) {
         const refreshed = await Promise.all(items.map(async (ri: any) => {
           try {
-            const api = ri.entity_type === 'assembly' ? assembliesApi : partsApi;
-            const entity = await api.get(ri.entity_id);
-            return { ...ri, status: entity.data.status };
+            const entity = await partsApi.get(ri.entity_id);
+            return { ...ri, status: entity.latest_revision?.status };
           } catch { return ri; }
         }));
         setReleaseItems(refreshed);
@@ -153,8 +152,12 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
 
   const viewItem = async (entityType: string, entityId: string, mode?: 'view' | 'edit') => {
     if (mode === 'edit') {
-      // 打开编辑弹窗
-      setEditEntity({ type: entityType, id: entityId });
+      // 打开编辑弹窗；entityId 为 master_id，需转换为 revision_id
+      try {
+        const r = await partsApi.get(entityId);
+        const revId = r.latest_revision?.id;
+        if (revId) setEditEntity({ type: entityType, id: revId });
+      } catch { toast.error('加载失败'); }
       return;
     }
     setNestedDetail({ type: entityType, id: entityId });
@@ -162,18 +165,21 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
     setNestedCustomDefs([]);
     setNestedCustomValues({});
     try {
-      const api = entityType === 'assembly' ? assembliesApi : partsApi;
-      const r = await api.get(entityId);
-      setNestedData(r.data);
-      // 加载自定义字段定义
+      const r = await partsApi.get(entityId);
+      const revId = r.latest_revision?.id;
+      setNestedData({
+        ...r,
+        master_id: r.id,
+        revision_id: revId,
+        version: r.latest_revision?.version,
+        status: r.latest_revision?.status,
+      });
       const allDefs = useDataStore.getState().customFieldDefs;
-      const cfType = entityType === 'assembly' ? 'component' : 'part';
-      const defs = allDefs.filter((d: any) => d.applies_to?.includes(cfType));
+      const defs = allDefs.filter((d: any) => d.applies_to?.includes('part'));
       setNestedCustomDefs(defs);
-      // 加载自定义字段值
-      if (defs.length > 0) {
+      if (defs.length > 0 && revId) {
         try {
-          const valuesRes = await customFieldsApi.getValues(cfType, entityId);
+          const valuesRes = await customFieldsApi.getValues('part', revId);
           const vals: Record<string, any> = {};
           (valuesRes.data || []).forEach((v: any) => { vals[v.field_id] = v.value; });
           setNestedCustomValues(vals);
@@ -432,22 +438,28 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
                 <VersionHistory
                   entityType={nestedDetail.type as 'part' | 'assembly'}
                   entityId={nestedData.id}
-                  onViewVersion={async (id) => {
-                    try {
-                      const api = nestedDetail.type === 'assembly' ? assembliesApi : partsApi;
-                      const r = await api.get(id);
-                      setNestedData(r.data);
-                      // 加载该版本的自定义字段值
-                      const cfType = nestedDetail.type === 'assembly' ? 'component' : 'part';
+                    onViewVersion={async (id) => {
                       try {
-                        const valuesRes = await customFieldsApi.getValues(cfType, id);
-                        const vals: Record<string, any> = {};
-                        (valuesRes.data || []).forEach((v: any) => { vals[v.field_id] = v.value; });
-                        setNestedCustomValues(vals);
-                      } catch { /* optional */ }
-                      setDetailTab('detail');
-                    } catch { toast.error('加载版本失败'); }
-                  }}
+                        const r = await partsApi.get(id);
+                        setNestedData({
+                          ...r,
+                          master_id: r.id,
+                          revision_id: r.latest_revision?.id,
+                          version: r.latest_revision?.version,
+                          status: r.latest_revision?.status,
+                        });
+                        const revId = r.latest_revision?.id;
+                        if (revId) {
+                          try {
+                            const valuesRes = await customFieldsApi.getValues('part', revId);
+                            const vals: Record<string, any> = {};
+                            (valuesRes.data || []).forEach((v: any) => { vals[v.field_id] = v.value; });
+                            setNestedCustomValues(vals);
+                          } catch { /* optional */ }
+                        }
+                        setDetailTab('detail');
+                      } catch { toast.error('加载版本失败'); }
+                    }}
                 />
               )}
             </div>
@@ -478,13 +490,13 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
       alreadyLinked={documentLinks.map(d => d.document_id)} />
 
     {/* 零部件选择器 */}
-    <AssemblyPartPicker open={showReleasePicker} onClose={() => setShowReleasePicker(false)}
+    <AssemblyPartPicker open={showReleasePicker} onClose={() => setShowReleasePicker(false)} dataMode="parts"
       onConfirm={(items) => {
         setShowReleasePicker(false);
-        Promise.allSettled(items.map(async (item) => { const api = item.child_type === 'assembly' ? assembliesApi : partsApi; const r = await api.get(item.child_id); return { ...r.data, child_type: item.child_type, quantity: item.quantity }; })).then(results => {
+        Promise.allSettled(items.map(async (item) => { const rev = await partsApi.getRevision(item.child_id); const m = await partsApi.get(rev.master_id); return { ...m, ...rev, child_type: item.child_type, quantity: item.quantity }; })).then(results => {
           const loaded = results.filter(r => r.status === 'fulfilled').map((r: any) => r.value);
           const existingIds = new Set(releaseItems.map((r: any) => r.entity_id));
-          const merged = [...releaseItems, ...loaded.filter((r: any) => !existingIds.has(r.id)).map((r: any) => ({ entity_type: r.child_type === 'assembly' ? 'assembly' : 'part', entity_id: r.id, entity_code: r.code || '', entity_name: r.name || '', entity_version: r.version || '', spec: r.spec || '', status: r.status || '', quantity: r.quantity || 1 }))];
+          const merged = [...releaseItems, ...loaded.filter((r: any) => !existingIds.has(r.master_id || r.id)).map((r: any) => ({ entity_type: r.type === 'assembly' ? 'assembly' : 'part', entity_id: r.master_id || r.id, entity_code: r.code || '', entity_name: r.name || '', entity_version: r.version || '', spec: r.spec || '', status: r.status || '', quantity: r.quantity || 1 }))];
           saveReleaseItems(merged);
         });
       }} />
@@ -553,8 +565,11 @@ function ReleaseItemsTable({ items, onViewItem, publishedNonce }: { items: any[]
     if (entityType !== 'assembly') return;
     setLoadingIdx(idx);
     try {
-      const r = await assemblyPartsApi.list(entityId);
-      const children = (r.data || []).map((c: any) => ({ entity_type: c.childType === 'component' || c.childType === 'assembly' ? 'assembly' : 'part', entity_id: c.child_id, entity_code: c.child_detail?.code || '', entity_name: c.child_detail?.name || '', entity_version: c.child_detail?.version || '', spec: c.child_detail?.spec || '', status: c.child_detail?.status || '', quantity: c.quantity || 1 }));
+      const master = await partsApi.get(entityId);
+      const revId = master.latest_revision?.id;
+      if (!revId) { toast.error('无法获取最新版本'); return; }
+      const rows = await partsApi.getBOM(revId);
+      const children = rows.map((c: any) => ({ entity_type: c.child_type === 'assembly' ? 'assembly' : 'part', entity_id: c.child_master_id, entity_code: c.child_code || '', entity_name: c.child_name || '', entity_version: c.child_version || '', spec: c.child_spec || '', status: c.child_status || '', quantity: c.quantity || 1 }));
       setExpanded(prev => ({ ...prev, [idx]: children }));
     } catch { toast.error('加载子项失败'); }
     finally { setLoadingIdx(null); }

@@ -7,9 +7,9 @@ from typing import List
 import uuid
 
 from ..database import get_db
-from ..models import User
-from ..models_parts import PartMaster, PartRevision
-from .. import crud, models, schemas
+from ..models import User, BOMItem
+from ..models_parts import PartMaster, PartRevision, PartIteration
+from .. import crud, crud_parts, models, schemas
 from ..bom import compare
 from ..permissions import require_permission
 from sqlalchemy import cast, String, text
@@ -109,65 +109,77 @@ async def get_bom_trace(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("bom:trace")),
 ):
-    """递归反查：查找使用该零件/部件的所有父装配体（向上追溯最多10层）"""
+    """递归反查：查找使用该零部件版本的所有父装配版本（向上追溯，最多 10 层）。
+
+    entity_id 为 PartRevision 的 id。仅追溯"父版本当前迭代"下有效（未软删除）的 BOM 关系。
+    """
     if entity_type not in ("component", "part", "assembly"):
-        raise HTTPException(status_code=400, detail="无效的类型，仅支持 part 或 assembly")
+        raise HTTPException(status_code=400, detail="无效的类型")
 
-    # 递归 CTE：向上追溯父级（忽略软删除的 BOM 关系）
-    sql = text("""
-    WITH RECURSIVE trace AS (
-      SELECT bi.id, bi.parent_type, bi.parent_id, bi.child_type, bi.child_id,
-             bi.quantity, 1 AS level
-      FROM bom_items bi
-      WHERE bi.child_id = :entity_id
-        AND bi.deleted_at IS NULL
-        AND (bi.child_type = :entity_type
-             OR (bi.child_type = 'component' AND :entity_type = 'assembly'))
-      UNION ALL
-      SELECT bi.id, bi.parent_type, bi.parent_id, bi.child_type, bi.child_id,
-             bi.quantity, t.level + 1
-      FROM bom_items bi
-      JOIN trace t ON bi.child_id = t.parent_id
-      WHERE t.level < 10
-        AND bi.deleted_at IS NULL
-    )
-    SELECT * FROM trace ORDER BY level
-    """)
-    rows = db.execute(sql, {"entity_id": entity_id, "entity_type": entity_type}).fetchall()
+    def _entity_of(rev_id: uuid.UUID):
+        """返回 (revision, master)。"""
+        rev = crud_parts.get_part_revision(db, rev_id)
+        if not rev:
+            return None, None
+        master = crud_parts.get_part_master(db, rev.master_id)
+        return rev, master
 
-    result = []
-    for row in rows:
-        parent_entity = None
-        if row.parent_type in ("assembly", "component"):
-            a = db.query(PartMaster).filter(PartMaster.id == row.parent_id).first()
-            if a:
-                parent_entity = {
-                    "id": str(a.id), "code": a.code, "name": a.name,
-                    "spec": getattr(a, 'spec', ''), "version": "", "status": "",
-                }
-        elif row.parent_type == "part":
-            p = crud.get_part(db, row.parent_id)
-            if p:
-                parent_entity = {
-                    "id": str(p.id), "code": p.code, "name": p.name,
-                    "spec": p.spec, "version": p.version, "status": p.status,
-                }
+    def _parents_of(child_rev_id: uuid.UUID):
+        """查找把 child_rev_id 作为直接子项、且属于父版本当前迭代、未软删除的 BOM 关系。"""
+        return (
+            db.query(BOMItem)
+            .join(PartIteration, PartIteration.id == BOMItem.iteration_id)
+            .join(PartRevision, PartRevision.id == BOMItem.parent_revision_id)
+            .filter(
+                BOMItem.child_revision_id == child_rev_id,
+                BOMItem.deleted_at.is_(None),
+                PartRevision.deleted_at.is_(None),
+                PartIteration.iteration == PartRevision.latest_iteration,
+            )
+            .all()
+        )
 
-        child_type = "component"
-        c = db.query(PartMaster).filter(PartMaster.id == row.child_id).first()
-        child_entity = None
-        if c:
-            child_entity = {"id": str(c.id), "code": c.code, "name": c.name, "type": "component"}
+    result: List[dict] = []
 
-        result.append({
-            "level": row.level,
-            "bom_item_id": str(row.id),
-            "parent_assembly": parent_entity if row.parent_type in ("assembly", "component") else None,
-            "parent_part": parent_entity if row.parent_type == "part" else None,
-            "child_entity": child_entity,
-            "quantity": int(row.quantity) if row.quantity else 1,
-        })
+    def walk(child_rev_id: uuid.UUID, level: int, visited: frozenset):
+        if level > 10 or child_rev_id in visited:
+            return
+        child_rev, child_master = _entity_of(child_rev_id)
+        if not child_rev:
+            return
+        for bi in _parents_of(child_rev_id):
+            parent_rev, parent_master = _entity_of(bi.parent_revision_id)
+            if not parent_rev or not parent_master:
+                continue
+            parent_entity = {
+                "id": str(parent_rev.id),               # id 统一为 revision id，供前端建树
+                "revision_id": str(parent_rev.id),
+                "master_id": str(parent_master.id),
+                "code": parent_master.code,
+                "name": parent_master.name,
+                "spec": parent_master.spec or "",
+                "version": parent_rev.version,
+                "status": parent_rev.status,
+            }
+            child_entity = {
+                "id": str(child_rev.id),
+                "revision_id": str(child_rev.id),
+                "master_id": str(child_master.id) if child_master else "",
+                "code": child_master.code if child_master else "",
+                "name": child_master.name if child_master else "",
+                "type": "component",
+            }
+            result.append({
+                "level": level,
+                "bom_item_id": str(bi.id),
+                "parent_assembly": parent_entity,
+                "parent_part": None,
+                "child_entity": child_entity,
+                "quantity": int(bi.quantity) if bi.quantity else 1,
+            })
+            walk(parent_rev.id, level + 1, visited | {child_rev_id})
 
+    walk(entity_id, 1, frozenset())
     return result
 
 

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { ecrApi, ecoApi, componentsApi } from '../../services/api';
+import { ecrApi, ecoApi, partsApi } from '../../services/api';
 import type { BomImpactNode } from '../../types';
 import { ECOActionBadge } from './ECOStatusBadge';
 import AssemblyPartPicker from '../AssemblyPartPicker';
@@ -632,10 +632,10 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
       promises.push(
         Promise.allSettled(
           partCodes.map(async ({ entity_id, entity_code }) => {
-            const list = await componentsApi.list({ search: entity_code, page_size: 100 });
-            const items = list.data?.items || list.data || [];
-            const newVersion = items.find((item: any) => item.code === entity_code && item.id !== entity_id);
-            if (newVersion) return { entity_id, status: newVersion.status, newId: newVersion.id };
+            const list = await partsApi.list({ search: entity_code, page_size: 100 });
+            const items = list.items || list || [];
+            const newVersion = items.find((item: any) => item.code === entity_code && item.master_id !== entity_id);
+            if (newVersion) return { entity_id, status: newVersion.status, newId: newVersion.master_id };
             return null;
           })
         )
@@ -646,10 +646,10 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
       promises.push(
         Promise.allSettled(
           assemblyCodes.map(async ({ entity_id, entity_code }) => {
-            const list = await componentsApi.list({ search: entity_code, page_size: 100 });
-            const items = list.data?.items || list.data || [];
-            const newVersion = items.find((item: any) => item.code === entity_code && item.id !== entity_id);
-            if (newVersion) return { entity_id, status: newVersion.status, newId: newVersion.id };
+            const list = await partsApi.list({ search: entity_code, page_size: 100 });
+            const items = list.items || list || [];
+            const newVersion = items.find((item: any) => item.code === entity_code && item.master_id !== entity_id);
+            if (newVersion) return { entity_id, status: newVersion.status, newId: newVersion.master_id };
             return null;
           })
         )
@@ -756,15 +756,15 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
       </>)}
       {ecrId && !loading && !ecrData && <p className="text-xs text-gray-400 text-center py-4">未找到 ECR</p>}
 
-      <AssemblyPartPicker open={pickerOpen} onClose={() => setPickerOpen(false)}
+      <AssemblyPartPicker open={pickerOpen} onClose={() => setPickerOpen(false)} dataMode="parts"
         onConfirm={async (items) => {
           for (const item of items) {
             let code = ''; let name = ''; let ver = '';
-            if (item.child_type === 'part' || item.child_type === 'component') {
-              try { const r = await componentsApi.get(item.child_id); code = r.data.code; name = r.data.name; ver = r.data.version || 'A'; } catch {}
-            } else {
-              try { const r = await componentsApi.get(item.child_id); code = r.data.code; name = r.data.name; ver = r.data.version || 'A'; } catch {}
-            }
+            try {
+              const rev = await partsApi.getRevision(item.child_id);
+              const m = await partsApi.get(rev.master_id);
+              code = m.code; name = m.name; ver = rev.version || 'A';
+            } catch {}
             const parentAffected = localAffected.find(a => a.entity_id === pickerParentId || a.entity_code === pickerParentId);
             setLocalDown(prev => [...prev, { entity_type: item.child_type === 'assembly' || item.child_type === 'component' ? 'assembly' : 'part', entity_id: item.child_id, entity_code: code, entity_name: name, entity_version: ver, quantity: 0, action: 'add_existing', parent_entity_id: pickerParentId || undefined, _targetQty: item.quantity || 1, _affectedCode: (parentAffected as any)?.entity_code, _affectedName: (parentAffected as any)?.entity_name } as any]);
           }

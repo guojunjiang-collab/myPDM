@@ -132,17 +132,28 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
     setNestedCustomDefs([]);
     setNestedCustomValues({});
     try {
-      const api = type === 'part' ? partsApi : componentsApi;
-      const res = await api.get(id);
+      // id 可能是 revision_id 或 master_id：先按 revision 尝试，回退 master
+      const rev = await partsApi.getRevision(id).catch(() => null);
+      const masterId = rev?.master_id || id;
+      const master = await partsApi.get(masterId);
       if (reqId !== nestedReqId.current) return;
-      setNestedData(res.data);
+      const revObj = rev || master.latest_revision;
+      const revisionId = revObj?.id || id;
+      setNestedData({
+        ...master,
+        id: master.id,
+        master_id: master.id,
+        revision_id: revisionId,
+        version: revObj?.version,
+        status: revObj?.status,
+      });
       const allDefs = useDataStore.getState().customFieldDefs;
       const entityType = type === 'part' ? 'part' : 'component';
       const defs = allDefs.filter((d: CustomFieldDefinition) => d.applies_to?.includes(entityType));
       setNestedCustomDefs(defs);
       if (defs.length > 0) {
         try {
-          const valuesRes = await customFieldsApi.getValues(entityType, id);
+          const valuesRes = await customFieldsApi.getValues(entityType, revisionId);
           if (reqId !== nestedReqId.current) return;
           const vals: Record<string, any> = {};
           (valuesRes.data || []).forEach((v: CustomFieldValue) => { vals[v.field_id] = v.value; });

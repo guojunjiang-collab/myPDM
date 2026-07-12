@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Modal } from './Modal';
-import { customFieldsApi, partsApi, assembliesApi, componentsApi, assemblyPartsApi } from '../services/api';
+import { customFieldsApi, partsApi } from '../services/api';
 import { useDataStore } from '../stores/data';
 import { isAdmin } from '../stores/auth';
 import EntityDocumentSection from './EntityDocumentSection';
@@ -47,17 +47,38 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
   // 子项树形展开
   const [expandedParts, setExpandedParts] = useState<Record<string, any[]>>({});
   const [loadingPart, setLoadingPart] = useState<string | null>(null);
-  // 选择器目标（null=当前部件, string=子部件ID）
+  // 选择器目标（null=当前部件, string=子部件 revision_id）
   const [pickerTargetId, setPickerTargetId] = useState<string | null>(null);
+  // 当前编辑版本对应的 master_id（保存基本信息用）
+  const [masterId, setMasterId] = useState('');
 
-  const api = entityType === 'component' ? componentsApi : entityType === 'assembly' ? assembliesApi : partsApi;
-  const cfType = entityType === 'component' ? 'component' : entityType === 'assembly' ? 'component' : 'part';
+  const cfType = entityType === 'part' ? 'part' : 'component';
 
-  const loadEditParts = useCallback(async (assemblyId: string) => {
+  /** 把 partsApi.getBOM 扁平子项映射为编辑用行结构（child_id 用 revision_id） */
+  const mapBom = (rows: any[], parentRevId: string): any[] =>
+    (rows || []).map((c) => ({
+      id: c.id,
+      childType: c.child_type === 'assembly' ? 'assembly' : 'part',
+      child_id: c.child_revision_id,
+      child_master_id: c.child_master_id,
+      child_revision_id: c.child_revision_id,
+      parent_id: parentRevId,
+      quantity: c.quantity,
+      child_detail: {
+        id: c.child_master_id,
+        code: c.child_code,
+        name: c.child_name,
+        spec: c.child_spec,
+        version: c.child_version,
+        status: c.child_status,
+      },
+    }));
+
+  const loadEditParts = useCallback(async (revisionId: string) => {
     setLoadingEditParts(true);
     try {
-      const res = await assemblyPartsApi.list(assemblyId);
-      setEditParts(res.data || []);
+      const rows = await partsApi.getBOM(revisionId);
+      setEditParts(mapBom(rows as any[], revisionId) as any);
     } catch {
       setEditParts([]);
     } finally {
@@ -69,10 +90,17 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
     if (!open || !entityId) return;
     setLoading(true);
     setSaveError(null);
-    api.get(entityId).then(r => {
-      const d = r.data;
-      setFormData({ code: d.code || '', name: d.name || '', spec: d.spec || '', remark: d.remark || '', version: d.version || '-', status: d.status || 'draft' });
-      setLocked((d.status === 'frozen' || d.status === 'released') && !isAdmin());
+    // entityId 为 revision_id：取版本 + 其 master 组合基本信息
+    partsApi.getRevision(entityId).then(async (rev: any) => {
+      let master: any = {};
+      try { master = await partsApi.get(rev.master_id); } catch { /* ignore */ }
+      setMasterId(rev.master_id || '');
+      setFormData({
+        code: master.code || '', name: master.name || '', spec: master.spec || '',
+        remark: rev.current_iteration?.remark || '',
+        version: rev.version || '-', status: rev.status || 'draft',
+      });
+      setLocked((rev.status === 'frozen' || rev.status === 'released') && !isAdmin());
     }).catch(() => { setSaveError('加载失败'); }).finally(() => setLoading(false));
 
     // 加载自定义字段定义
@@ -80,7 +108,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
     const defs = allDefs.filter((d: CustomFieldDefinition) => d.applies_to?.includes(cfType));
     setCustomFieldDefs(defs);
 
-    // 加载自定义字段值
+    // 加载自定义字段值（按 revision_id）
     setLoadingCustomFields(true);
     customFieldsApi.getValues(cfType, entityId).then(r => {
       const vals: Record<string, any> = {};
@@ -108,7 +136,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
   const handleAddParts = async (items: { child_type: string; child_id: string; quantity: number }[]) => {
     try {
       const targetId = pickerTargetId || entityId;
-      await Promise.all(items.map((it) => assemblyPartsApi.add(targetId, it)));
+      await Promise.all(items.map((it) => partsApi.addBOMItem(targetId, { child_revision_id: it.child_id, quantity: it.quantity })));
       if (pickerTargetId) {
         refreshParentParts(pickerTargetId);
       } else {
@@ -123,7 +151,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
 
   const handleRemovePart = async (itemId: string) => {
     try {
-      await assemblyPartsApi.remove(entityId, itemId);
+      await partsApi.deleteBOMItem(entityId, itemId);
       await loadEditParts(entityId);
     } catch {
       alert('删除子项失败');
@@ -135,12 +163,8 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
     const item = editParts.find(p => p.id === versionSelectState.itemId);
     if (!item) return;
     try {
-      await assemblyPartsApi.remove(entityId, versionSelectState.itemId);
-      await assemblyPartsApi.add(entityId, {
-        child_type: versionSelectState.childType,
-        child_id: selectedVersionId,
-        quantity: item.quantity,
-      });
+      await partsApi.deleteBOMItem(entityId, versionSelectState.itemId);
+      await partsApi.addBOMItem(entityId, { child_revision_id: selectedVersionId, quantity: item.quantity });
       await loadEditParts(entityId);
     } catch {
       alert('切换版本失败');
@@ -151,35 +175,28 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
 
   const handleUpdateQuantity = async (itemId: string, qty: number) => {
     try {
-      await assemblyPartsApi.update(entityId, itemId, { quantity: qty });
+      await partsApi.updateBOMItem(entityId, itemId, { quantity: qty });
     } catch {
       alert('更新用量失败');
     }
   };
 
-  // 展开/折叠子部件的子项
-  const toggleExpand = async (idx: string, childId: string) => {
+  // 展开/折叠子部件的子项（childRevId 为子部件 revision_id）
+  const toggleExpand = async (idx: string, childRevId: string) => {
     if (expandedParts[idx]) { setExpandedParts(p => { const n = { ...p }; delete n[idx]; return n; }); return; }
     setLoadingPart(idx);
     try {
-      const res = await assemblyPartsApi.list(childId);
-      const children = (res.data || []).map((c: any) => ({
-        ...c,
-        childType: c.childType === 'component' ? 'assembly' : c.childType,
-      }));
-      setExpandedParts(p => ({ ...p, [idx]: children }));
+      const rows = await partsApi.getBOM(childRevId);
+      setExpandedParts(p => ({ ...p, [idx]: mapBom(rows as any[], childRevId) }));
     } catch { } finally { setLoadingPart(null); }
   };
 
-  // 刷新指定父级的展开子项（嵌套操作后使用）
+  // 刷新指定父级的展开子项（嵌套操作后使用；parentId 为父 revision_id）
   const refreshParentParts = (parentId: string) => {
     for (const [key, rows] of Object.entries(expandedParts)) {
       if (rows.length > 0 && rows[0]?.parent_id === parentId) {
-        assemblyPartsApi.list(parentId).then(res => {
-          const fresh = (res.data || []).map((c: any) => ({
-            ...c, childType: c.childType === 'component' ? 'assembly' : c.childType,
-          }));
-          setExpandedParts(p => ({ ...p, [key]: fresh }));
+        partsApi.getBOM(parentId).then(fresh => {
+          setExpandedParts(p => ({ ...p, [key]: mapBom(fresh as any[], parentId) }));
         }).catch(() => {});
         return;
       }
@@ -188,13 +205,13 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
 
   // 嵌套行：移除
   const handleNestedRemove = async (parentId: string, itemId: string) => {
-    await assemblyPartsApi.remove(parentId, itemId);
+    await partsApi.deleteBOMItem(parentId, itemId);
     refreshParentParts(parentId);
   };
 
   // 嵌套行：更新用量
   const handleNestedQuantity = async (parentId: string, itemId: string, qty: number) => {
-    await assemblyPartsApi.update(parentId, itemId, { quantity: qty });
+    await partsApi.updateBOMItem(parentId, itemId, { quantity: qty });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -203,13 +220,13 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
     setSaving(true);
     setSaveError(null);
     try {
-      await api.update(entityId, {
+      await partsApi.update(masterId, {
         code: formData.code,
         name: formData.name,
         spec: formData.spec || undefined,
-        remark: formData.remark || undefined,
-        status: formData.status,
       });
+      // 备注在当前迭代上
+      try { await partsApi.updateIteration(entityId, { remark: formData.remark || '' }); } catch { /* ignore */ }
       // 保存自定义字段值
       const fieldDefs = customFieldDefs.filter(d => d.applies_to?.includes(cfType));
       const fieldValues = fieldDefs.map(def => ({
@@ -370,8 +387,8 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
           {/* 关联图文档 */}
           <EntityDocumentSection entityType={entityType} entityId={entityId} entityCode={entityCode} entityName={entityName} editable={!locked} />
 
-          {/* 子项清单（仅部件编辑时显示） */}
-          {entityType === 'assembly' && (
+          {/* 子项清单（部件编辑时显示） */}
+          {(entityType === 'assembly' || entityType === 'component') && (
             <div className="border-t pt-4">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-sm font-bold text-gray-700">子项清单</h4>
@@ -425,11 +442,12 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
     </Modal>
 
     {/* 子项选择弹窗 */}
-    {entityType === 'assembly' && (
+    {(entityType === 'assembly' || entityType === 'component') && (
       <AssemblyPartPicker
         open={pickerOpen}
         onClose={() => { setPickerOpen(false); setPickerTargetId(null); }}
         onConfirm={handleAddParts}
+        dataMode="parts"
         currentAssemblyId={pickerTargetId || entityId}
         existingChildIds={new Set(editParts.map(p => p.child_id))}
       />
@@ -440,9 +458,9 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
       <VersionSelectModal
         open={!!versionSelectState}
         entityType={versionSelectState.childType === 'part' ? 'part' : 'assembly'}
-        entityId={editParts.find(p => p.id === versionSelectState.itemId)?.child_id || ''}
+        entityId={editParts.find(p => p.id === versionSelectState.itemId)?.child_master_id || ''}
         entityName={editParts.find(p => p.id === versionSelectState.itemId)?.child_detail?.code || ''}
-        currentVersionId={editParts.find(p => p.id === versionSelectState.itemId)?.child_id || ''}
+        currentVersionId={editParts.find(p => p.id === versionSelectState.itemId)?.child_revision_id || ''}
         onSelect={handleVersionSelectChild}
         onClose={() => setVersionSelectState(null)}
       />

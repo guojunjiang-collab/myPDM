@@ -6,7 +6,7 @@ import PartDetailContent from '../PartDetailContent';
 import AssemblyDetailContent from '../AssemblyDetailContent';
 import ProfileStatusBadge from './ProfileStatusBadge';
 import ProfileReviewPanel from './ProfileReviewPanel';
-import { configurationApi, configurationProfileApi, componentsApi, usersApi } from '../../services/api';
+import { configurationApi, configurationProfileApi, partsApi, usersApi } from '../../services/api';
 import { exportProfilePdf, exportProfileExcel } from '../../services/configProfilePdfExport';
 import { isAdmin } from '../../stores/auth';
 import { useAuthStore } from '../../stores/auth';
@@ -144,13 +144,13 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
     setDetailModal({ type: itemType, id: itemId });
     if (itemType === 'part') {
       try {
-        const r = await componentsApi.get(itemId);
-        setDetailData(r.data as Part);
+        const r = await partsApi.get(itemId);
+        setDetailData({ ...r, version: r.latest_revision?.version || '', status: r.latest_revision?.status || '' } as Part);
       } catch { setDetailData(null); }
     } else if (itemType === 'assembly' || itemType === 'component') {
       try {
-        const r = await componentsApi.get(itemId);
-        setDetailData(r.data as Assembly);
+        const r = await partsApi.get(itemId);
+        setDetailData({ ...r, version: r.latest_revision?.version || '', status: r.latest_revision?.status || '' } as Assembly);
       } catch { setDetailData(null); }
     } else {
       setDetailData(null);

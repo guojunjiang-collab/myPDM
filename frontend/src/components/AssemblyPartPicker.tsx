@@ -67,7 +67,7 @@ export default function AssemblyPartPicker({
   onConfirm,
   currentAssemblyId,
   existingChildIds = new Set(),
-  dataMode = 'components',
+  dataMode = 'parts',
 }: AssemblyPartPickerProps) {
   /* ---- 筛选 ---- */
   const [search, setSearch] = useState('');

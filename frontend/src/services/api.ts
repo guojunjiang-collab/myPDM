@@ -356,24 +356,22 @@ export const entityDocumentsApi = {
     return { id, params };
   },
   list: (entityType: 'part' | 'assembly' | 'component' | 'configuration', entityId: string) => {
-    const base = entityType === 'part' ? 'parts' : (entityType === 'assembly' || entityType === 'component') ? 'components' : 'configurations/items';
-    if (entityType === 'part') {
-      const { id, params } = entityDocumentsApi._resolveParts(entityId);
-      return api.get(`/${base}/${id}/documents`, { params });
-    }
-    return api.get(`/${base}/${entityId}/documents`);
+    if (entityType === 'configuration') return api.get(`/configurations/items/${entityId}/documents`);
+    // part/component/assembly 统一走 parts（以 revision_id 为主键）
+    const { id, params } = entityDocumentsApi._resolveParts(entityId);
+    return api.get(`/parts/${id}/documents`, { params });
   },
   add: (entityType: 'part' | 'assembly' | 'component' | 'configuration', entityId: string, data: { document_id: string; category?: string; sort_order?: number }) => {
-    const base = entityType === 'part' ? 'parts' : (entityType === 'assembly' || entityType === 'component') ? 'components' : 'configurations/items';
-    return api.post(`/${base}/${entityId}/documents`, data);
+    if (entityType === 'configuration') return api.post(`/configurations/items/${entityId}/documents`, data);
+    return api.post(`/parts/${entityId}/documents`, data);
   },
   update: (entityType: 'part' | 'assembly' | 'component' | 'configuration', entityId: string, edocId: string, data: { category?: string; sort_order?: number }) => {
-    const base = entityType === 'part' ? 'parts' : (entityType === 'assembly' || entityType === 'component') ? 'components' : 'configurations/items';
-    return api.put(`/${base}/${entityId}/documents/${edocId}`, data);
+    if (entityType === 'configuration') return api.put(`/configurations/items/${entityId}/documents/${edocId}`, data);
+    return api.put(`/parts/${entityId}/documents/${edocId}`, data);
   },
   remove: (entityType: 'part' | 'assembly' | 'component' | 'configuration', entityId: string, edocId: string) => {
-    const base = entityType === 'part' ? 'parts' : (entityType === 'assembly' || entityType === 'component') ? 'components' : 'configurations/items';
-    return api.delete(`/${base}/${entityId}/documents/${edocId}`);
+    if (entityType === 'configuration') return api.delete(`/configurations/items/${entityId}/documents/${edocId}`);
+    return api.delete(`/parts/${entityId}/documents/${edocId}`);
   },
 };
 
@@ -388,10 +386,11 @@ export interface ComponentAttachment {
 }
 
 export const componentAttachmentsApi = {
-  list: (componentId: string, category?: 'cad' | 'production') =>
-    api.get<ComponentAttachment[]>(`/components/${componentId}/attachments`, { params: category ? { category } : {} }),
-  remove: (componentId: string, attachmentId: string) =>
-    api.delete(`/components/${componentId}/attachments/${attachmentId}`),
+  // 零部件附件统一走 parts（以 revision_id 为主键）
+  list: (revisionId: string, category?: 'cad' | 'production') =>
+    api.get<ComponentAttachment[]>(`/parts/revisions/${revisionId}/attachments`, { params: category ? { category } : {} }),
+  remove: (revisionId: string, attachmentId: string) =>
+    api.delete(`/parts/revisions/${revisionId}/attachments/${attachmentId}`),
 };
 
 // 附件下载

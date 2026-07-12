@@ -6,6 +6,10 @@ export interface SelectOption {
   id: string;
   code: string;
   name: string;
+  masterId?: string;
+  revisionId?: string;
+  version?: string;
+  status?: string;
 }
 
 export interface TraceTreeNode {

@@ -1,6 +1,6 @@
 ﻿import { useState, useCallback, useEffect, useRef } from 'react';
-import { bomApi, componentsApi } from '../../services/api';
-import type { BOMCompareNode, BOMCompareResponse } from '../../types';
+import { bomApi, partsApi } from '../../services/api';
+import type { BOMCompareNode, BOMCompareResponse, PartListItem } from '../../types';
 import {
   getChangedFields,
   getChangeLabel,
@@ -11,8 +11,7 @@ import {
 } from './helpers';
 
 interface BOMComparePanelProps {
-  assemblies: SelectOption[];
-  onViewEntity: (type: 'part' | 'assembly' | 'component', id: string) => void;
+  onViewEntity: (masterId: string, revisionId?: string) => void;
 }
 
 export default function BOMComparePanel({ onViewEntity }: BOMComparePanelProps) {
@@ -42,9 +41,8 @@ export default function BOMComparePanel({ onViewEntity }: BOMComparePanelProps) 
     cmpLeftDebounceRef.current = setTimeout(async () => {
       setCompareLeftSearchLoading(true);
       try {
-        const response = await componentsApi.list({ search: query.trim() });
-        const items = Array.isArray(response.data) ? response.data : (response.data.items || []);
-        setCompareLeftResults(items.slice(0, 20));
+        const data = await partsApi.list({ search: query.trim(), page_size: 20 });
+        setCompareLeftResults((data.items || []).slice(0, 20));
       } catch { setCompareLeftResults([]); }
       finally { setCompareLeftSearchLoading(false); }
     }, 300);
@@ -58,20 +56,19 @@ export default function BOMComparePanel({ onViewEntity }: BOMComparePanelProps) 
     cmpRightDebounceRef.current = setTimeout(async () => {
       setCompareRightSearchLoading(true);
       try {
-        const response = await componentsApi.list({ search: query.trim() });
-        const items = Array.isArray(response.data) ? response.data : (response.data.items || []);
-        setCompareRightResults(items.slice(0, 20));
+        const data = await partsApi.list({ search: query.trim(), page_size: 20 });
+        setCompareRightResults((data.items || []).slice(0, 20));
       } catch { setCompareRightResults([]); }
       finally { setCompareRightSearchLoading(false); }
     }, 300);
   }, []);
 
-  // 执行 BOM 对比
+  // 执行 BOM 对比（基于 revision id）
   const handleCompare = async () => {
-    if (!compareLeft || !compareRight) return;
+    if (!compareLeft?.revisionId || !compareRight?.revisionId) return;
     setLoading(true);
     try {
-      const response = await bomApi.compare(compareLeft.id, compareRight.id);
+      const response = await bomApi.compare(compareLeft.revisionId, compareRight.revisionId);
       setCompareResult(response.data);
     } catch (error) {
       setCompareResult(null);
@@ -130,10 +127,10 @@ export default function BOMComparePanel({ onViewEntity }: BOMComparePanelProps) 
                 <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-auto">
                   {compareLeftResults.map((item: any) => (
                     <button
-                      key={item.id}
+                      key={item.revision_id}
                       type="button"
                       onClick={() => {
-                        setCompareLeft({ id: item.id, code: item.code, name: item.name });
+                        setCompareLeft({ id: item.revision_id, code: item.code, name: item.name, masterId: item.master_id, revisionId: item.revision_id, version: item.version, status: item.status });
                         setCompareLeftSearch(item.code + ' - ' + item.name);
                         setCompareLeftResults([]);
                       }}
@@ -178,10 +175,10 @@ export default function BOMComparePanel({ onViewEntity }: BOMComparePanelProps) 
                 <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-auto">
                   {compareRightResults.map((item: any) => (
                     <button
-                      key={item.id}
+                      key={item.revision_id}
                       type="button"
                       onClick={() => {
-                        setCompareRight({ id: item.id, code: item.code, name: item.name });
+                        setCompareRight({ id: item.revision_id, code: item.code, name: item.name, masterId: item.master_id, revisionId: item.revision_id, version: item.version, status: item.status });
                         setCompareRightSearch(item.code + ' - ' + item.name);
                         setCompareRightResults([]);
                       }}
@@ -329,8 +326,7 @@ export default function BOMComparePanel({ onViewEntity }: BOMComparePanelProps) 
                       onClick={() => {
                         const side = node.left || node.right;
                         if (!side) return;
-                        const type: 'part' | 'assembly' | 'component' = side.child_type === 'part' || side.child_type === 'component' ? 'component' : 'assembly';
-                        onViewEntity(type, side.child_id);
+                        onViewEntity(side.child_master_id || side.child_id, side.child_revision_id);
                       }}
                     >
                       <td className="px-2 py-1 text-xs text-gray-500 whitespace-nowrap">

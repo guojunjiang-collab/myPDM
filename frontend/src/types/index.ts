@@ -283,6 +283,8 @@ export interface AssemblyPartItem {
   id: string;
   childType: 'part' | 'component';
   child_id: string;
+  child_master_id?: string;
+  child_revision_id?: string;
   componentId: string | null;
   partId: string | null;
   quantity: number;
@@ -315,6 +317,8 @@ export interface BOMCompareNode {
     id: string;
     child_type: string;
     child_id: string;
+    child_master_id?: string;
+    child_revision_id?: string;
     quantity: number;
     detail: {
       code: string;
@@ -328,6 +332,8 @@ export interface BOMCompareNode {
     id: string;
     child_type: string;
     child_id: string;
+    child_master_id?: string;
+    child_revision_id?: string;
     quantity: number;
     detail: {
       code: string;
@@ -351,9 +357,9 @@ export interface BOMCompareResponse {
 export interface BOMTraceItem {
   level: number;
   bom_item_id: string;
-  parent_assembly: { id: string; code: string; name: string; spec: string; version: string; status: string; } | null;
-  parent_part: { id: string; code: string; name: string; spec: string; version: string; status: string; } | null;
-  child_entity: { id: string; code: string; name: string; type: string; };
+  parent_assembly: { id: string; master_id?: string; revision_id?: string; code: string; name: string; spec: string; version: string; status: string; } | null;
+  parent_part: { id: string; master_id?: string; revision_id?: string; code: string; name: string; spec: string; version: string; status: string; } | null;
+  child_entity: { id: string; master_id?: string; revision_id?: string; code: string; name: string; type: string; };
   quantity: number;
 }
 

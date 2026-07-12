@@ -829,6 +829,7 @@ def get_bom_tree(db: Session, revision_id: UUID) -> List[Dict]:
                     "child_master_id": str(child_rev.master_id) if child_rev else "",
                     "child_code": master.code if master else "",
                     "child_name": master.name if master else "",
+                    "child_spec": master.spec if master else "",
                     "child_version": child_rev.version,
                     "child_status": child_rev.status,
                     "child_check_out_user_id": str(child_rev.check_out_user_id) if child_rev.check_out_user_id else None,

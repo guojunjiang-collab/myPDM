@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { partsApi, assembliesApi, componentsApi, documentsApi } from '../services/api';
+import { partsApi, documentsApi } from '../services/api';
 import { formatDateTime } from '../utils/date';
 import { Modal } from './Modal';
 
@@ -47,12 +47,18 @@ export default function VersionSelectModal({
   useEffect(() => {
     if (open && entityId) {
       setLoading(true);
-      const apiMap: Record<string, any> = { part: partsApi, assembly: assembliesApi, component: componentsApi, document: documentsApi };
-      const api = apiMap[entityType];
-      api.versions(entityId)
-        .then((res: any) => setVersions(res.data || []))
-        .catch(() => setVersions([]))
-        .finally(() => setLoading(false));
+      // 图文档走 documentsApi；零件/部件/零部件统一走 partsApi.revisions（entityId 为 master_id）
+      if (entityType === 'document') {
+        documentsApi.versions(entityId)
+          .then((res: any) => setVersions(res.data || []))
+          .catch(() => setVersions([]))
+          .finally(() => setLoading(false));
+      } else {
+        partsApi.revisions(entityId)
+          .then((rows: any) => setVersions(Array.isArray(rows) ? rows : (rows?.data || [])))
+          .catch(() => setVersions([]))
+          .finally(() => setLoading(false));
+      }
     }
   }, [open, entityId, entityType]);
 

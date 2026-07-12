@@ -154,8 +154,8 @@ async def get_document_references(doc_id: uuid.UUID, db: Session = Depends(get_d
                 "entity_id": str(master.id),
                 "entity_code": master.code,
                 "entity_name": master.name,
-                "version": master.version or "",
-                "status": master.status or "draft",
+                "version": rev.version or "",
+                "status": rev.status or "draft",
                 "category": link.get("category"),
             })
             break
@@ -346,8 +346,8 @@ def _find_doc_refs(db, doc_id_str):
                     "entity_id": str(master.id),
                     "entity_code": master.code,
                     "entity_name": master.name,
-                    "version": master.version or "",
-                    "status": master.status or "draft",
+                    "version": rev.version or "",
+                    "status": rev.status or "draft",
                     "category": link.get("category"),
                     "id": str(master.id),
                     "code": master.code,

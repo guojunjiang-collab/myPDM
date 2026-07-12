@@ -2,7 +2,7 @@
 import { documentsApi } from '../../services/api';
 
 interface DocTracePanelProps {
-  onViewEntity: (type: 'part' | 'assembly', id: string) => void;
+  onViewEntity: (masterId: string, revisionId?: string) => void;
 }
 
 export default function DocTracePanel({ onViewEntity }: DocTracePanelProps) {
@@ -204,7 +204,7 @@ export default function DocTracePanel({ onViewEntity }: DocTracePanelProps) {
                         <tr
                           key={`${ref.entity_id}-${idx}`}
                           className="hover:bg-gray-50 cursor-pointer"
-                          onClick={() => onViewEntity(isPart ? 'part' : 'assembly', ref.entity_id)}
+                          onClick={() => onViewEntity(ref.entity_id)}
                         >
                           <td className="px-3 py-2">
                             <span className={`px-1.5 py-0.5 text-xs rounded ${isPart ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>

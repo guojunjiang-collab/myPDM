@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { partsApi, assembliesApi, componentsApi, documentsApi } from '../services/api';
+import { partsApi, documentsApi } from '../services/api';
 import { formatDateTime } from '../utils/date';
 
 interface VersionItem {
@@ -38,10 +38,14 @@ export default function VersionHistory({ entityType, entityId, onViewVersion }: 
   const loadVersions = async () => {
     setLoading(true);
     try {
-      const apiMap: Record<string, any> = { part: partsApi, assembly: assembliesApi, component: componentsApi, document: documentsApi };
-      const api = apiMap[entityType];
-      const res = await api.versions(entityId);
-      setVersions(res.data || []);
+      if (entityType === 'document') {
+        const res = await documentsApi.versions(entityId);
+        setVersions(res.data || []);
+      } else {
+        // 零件/部件/零部件：entityId 为 master_id，列出其所有版本
+        const rows = await partsApi.revisions(entityId);
+        setVersions(Array.isArray(rows) ? rows : (rows?.data || []));
+      }
     } catch {
       setVersions([]);
     } finally {

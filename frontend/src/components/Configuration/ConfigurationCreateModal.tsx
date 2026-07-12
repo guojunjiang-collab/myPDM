@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Modal } from '../Modal';
-import { configurationApi, partsApi, assembliesApi, customFieldsApi } from '../../services/api';
+import { configurationApi, partsApi, customFieldsApi } from '../../services/api';
 import AssemblyPartPicker from '../AssemblyPartPicker';
 import VersionSelectModal from '../VersionSelectModal';
 import EntityDocumentSection from '../EntityDocumentSection';
@@ -19,7 +19,8 @@ interface Props {
 interface PartEntry {
   id?: string;
   part_type: string;
-  part_id: string;
+  part_id: string;       // master_id
+  revision_id?: string;  // 当前选中的 revision_id
   part_code: string;
   part_name: string;
   part_version: string;
@@ -126,6 +127,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
           setCreatorName(d.creator_name || '');
           setParts((r.data.parts || []).map((p: any) => ({
             id: p.id, part_type: p.part_type, part_id: p.part_id,
+            revision_id: p.part_detail?.revision_id || '',
             part_code: p.part_detail?.code || '', part_name: p.part_detail?.name || '',
             part_version: p.part_detail?.version || '', part_spec: p.part_detail?.spec || '',
             part_status: p.part_detail?.status || '', is_required: p.is_required,
@@ -734,20 +736,25 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
       </div>
 
       {/* 零部件选择器 */}
-      <AssemblyPartPicker open={pickerOpen} onClose={() => setPickerOpen(false)}
+      <AssemblyPartPicker open={pickerOpen} onClose={() => setPickerOpen(false)} dataMode="parts"
         onConfirm={async (items) => {
           for (const it of items) {
-            const key = `${it.child_type}_${it.child_id}`;
+            let masterId = ''; let code = ''; let name = ''; let ver = ''; let spec = ''; let status = ''; let type = 'part';
+            try {
+              const rev = await partsApi.getRevision(it.child_id);
+              ver = rev.version || '';
+              status = rev.status || '';
+              masterId = rev.master_id;
+              const master = await partsApi.get(masterId);
+              code = master.code || '';
+              name = master.name || '';
+              spec = master.spec || '';
+              type = master.type || 'part';
+            } catch {}
+            const key = `${type}_${masterId}`;
             const exists = parts.some(p => `${p.part_type}_${p.part_id}` === key);
             if (exists) continue;
-            let code = ''; let name = ''; let ver = ''; let spec = ''; let status = '';
-            try {
-              const api = it.child_type === 'assembly' ? assembliesApi : partsApi;
-              const r = await api.get(it.child_id);
-              code = r.data.code; name = r.data.name; ver = r.data.version || '';
-              spec = r.data.spec || ''; status = r.data.status || '';
-            } catch {}
-            setParts(prev => [...prev, { part_type: it.child_type === 'assembly' ? 'assembly' : 'part', part_id: it.child_id, part_code: code, part_name: name, part_version: ver, part_spec: spec, part_status: status, is_required: true, quantity: it.quantity ?? 1 }]);
+            setParts(prev => [...prev, { part_type: type, part_id: masterId, revision_id: it.child_id, part_code: code, part_name: name, part_version: ver, part_spec: spec, part_status: status, is_required: true, quantity: it.quantity ?? 1 }]);
           }
           setPickerOpen(false);
         }}
@@ -757,17 +764,17 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
       {versionSelectIdx !== null && parts[versionSelectIdx] && (
         <VersionSelectModal
           open={versionSelectIdx !== null}
-          entityType={parts[versionSelectIdx].part_type === 'assembly' ? 'assembly' : 'part'}
+          entityType="part"
           entityId={parts[versionSelectIdx].part_id}
           entityName={parts[versionSelectIdx].part_name}
-          currentVersionId={parts[versionSelectIdx].part_id}
+          currentVersionId={parts[versionSelectIdx].revision_id || parts[versionSelectIdx].part_id}
           onSelect={(versionId: string) => {
-            const api = parts[versionSelectIdx].part_type === 'assembly' ? assembliesApi : partsApi;
-            api.get(versionId).then(r => {
+            partsApi.getRevision(versionId).then(r => {
               setParts(prev => prev.map((p, i) => i === versionSelectIdx ? {
-                ...p, part_id: versionId,
-                part_code: r.data.code, part_name: r.data.name,
-                part_version: r.data.version || '', part_spec: r.data.spec || '', part_status: r.data.status || '',
+                ...p,
+                revision_id: r.id,
+                part_version: r.version || '',
+                part_status: r.status || '',
               } : p));
             }).catch(() => {});
             setVersionSelectIdx(null);
@@ -832,15 +839,14 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
           const target = editingPartEntity;
           setEditingPartEntity(null);
           // 刷新对应的零部件信息
-          const api = target.type === 'assembly' ? assembliesApi : partsApi;
-          api.get(target.id).then(r => {
+          partsApi.get(target.id).then(r => {
             setParts(prev => prev.map(p => p.part_type === target.type && p.part_id === target.id ? {
               ...p,
-              part_code: r.data.code,
-              part_name: r.data.name,
-              part_version: r.data.version || '',
-              part_spec: r.data.spec || '',
-              part_status: r.data.status || '',
+              part_code: r.code,
+              part_name: r.name,
+              part_version: r.latest_revision?.version || '',
+              part_spec: r.spec || '',
+              part_status: r.latest_revision?.status || '',
             } : p));
           }).catch(() => {});
         }}

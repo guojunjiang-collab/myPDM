@@ -30,10 +30,9 @@ declare global {
   }
 }
 import api, {
-  componentsApi,
+  partsApi,
   documentsApi,
   entityDocumentsApi,
-  assemblyPartsApi,
   customFieldsApi,
   usersApi,
   configurationApi,
@@ -52,7 +51,6 @@ import type {
   Document,
   CustomFieldDefinition,
   CustomFieldValue,
-  AssemblyPartItem,
 } from '../types';
 
 // ================================================================
@@ -694,8 +692,7 @@ export async function executePartsImport(preview: ImportPreview): Promise<void> 
                   c.type !== 'assembly' && c.code === row.code && (c.version || '') === row.version,
               );
             if (existing) {
-              const res = await componentsApi.update(existing.id, data);
-              const updated = res.data;
+              await partsApi.update(existing.id, data);
               // 保存自定义字段
               if (row._customFields && Object.keys(row._customFields).length > 0) {
                 const fieldValues = Object.entries(row._customFields)
@@ -710,11 +707,9 @@ export async function executePartsImport(preview: ImportPreview): Promise<void> 
               if (row._docRelations && row._docRelations.length > 0) {
                 await linkPartDocuments(existing.id, row._docRelations);
               }
-              return updated;
             }
           } else {
-            const res = await componentsApi.create(data);
-            const created = res.data;
+            const created = await partsApi.create(data);
             // 自定义字段
             if (row._customFields && Object.keys(row._customFields).length > 0) {
               const fieldValues = Object.entries(row._customFields)
@@ -819,38 +814,36 @@ interface BOMEntityRef {
 
 /** 递归收集 BOM 树，同时返回实体引用用于自定义字段加载 */
 async function gatherBOMTree(
-  assemblyId: string,
+  revisionId: string,
   level: number = 1,
 ): Promise<{ rows: BOMRow[]; refs: BOMEntityRef[] }> {
   const rows: BOMRow[] = [];
   const refs: BOMEntityRef[] = [];
   try {
-    const res = await assemblyPartsApi.list(assemblyId);
-    const items: AssemblyPartItem[] = res.data || [];
+    const items = await partsApi.getBOM(revisionId) || [];
 
     for (const item of items) {
-      const detail = item.child_detail;
-      refs.push({ type: item.childType as 'part' | 'component', id: detail?.id || '' });
+      refs.push({ type: item.child_type === 'part' ? 'part' : 'component', id: item.child_master_id || '' });
       rows.push({
         层级: level,
-        类型: item.childType === 'part' ? '零件' : '部件',
-        件号: detail?.code || '',
-        中文名称: detail?.name || '',
-        规格型号: detail?.spec || '',
-        版本: detail?.version || '',
-        状态: statusToZh(detail?.status),
+        类型: item.child_type === 'part' ? '零件' : '部件',
+        件号: item.child_code || '',
+        中文名称: item.child_name || '',
+        规格型号: item.child_spec || '',
+        版本: item.child_version || '',
+        状态: statusToZh(item.child_status),
         用量: item.quantity,
       });
 
       // 如果是部件，递归收集子项
-      if (item.childType === 'component' && detail?.id) {
-        const child = await gatherBOMTree(detail.id, level + 1);
+      if (item.child_type === 'assembly' && item.has_children && item.child_revision_id) {
+        const child = await gatherBOMTree(item.child_revision_id, level + 1);
         rows.push(...child.rows);
         refs.push(...child.refs);
       }
     }
   } catch (err) {
-    console.error(`获取 BOM 树失败: ${assemblyId}`, err);
+    console.error(`获取 BOM 树失败: ${revisionId}`, err);
   }
   return { rows, refs };
 }
@@ -985,7 +978,7 @@ export async function exportAssembliesToFolder(dirHandle?: FileSystemDirectoryHa
 
   // ===== 2. 每个部件的 BOM_xxx.xlsx =====
   for (const asm of allComps) {
-    const { rows: bomRows } = await gatherBOMTree(asm.id);
+    const { rows: bomRows } = await gatherBOMTree((asm as any).revision_id || asm.id);
     // 加上自身行（层级0）
     const allRows: BOMRow[] = [
       {
@@ -1055,7 +1048,7 @@ export async function exportSingleAssemblyBOM(assemblyId: string): Promise<void>
   const [cfValuesMap, docMap, bomResult] = await Promise.all([
     asmDefs.length > 0 ? loadCustomFieldValues('component', [asm.id]) : Promise.resolve(new Map()),
     loadEntityDocuments('component', [asm.id]),
-    gatherBOMTree(asm.id),
+    gatherBOMTree((asm as any).revision_id || asm.id),
   ]);
   const bomRows = bomResult.rows;
   const bomRefs = bomResult.refs;
@@ -1378,7 +1371,8 @@ export async function executeAssembliesImport(
   const validRows = preview.rows.filter((r) => r.status !== '错误');
 
   // ===== 阶段1: 创建/更新所有部件 =====
-  const codeVersionToId = new Map<string, string>();
+  const codeVersionToId = new Map<string, string>();         // master_id
+  const codeVersionToRevisionId = new Map<string, string>(); // revision_id（BOM 操作使用）
   const codeVersionToNew = new Map<string, boolean>();
 
   for (const row of validRows) {
@@ -1393,8 +1387,9 @@ export async function executeAssembliesImport(
             (c) => c.code === row.code && (c.version || '') === row.version,
           );
         if (existing) {
-          const res = await componentsApi.update(existing.id, data);
+          await partsApi.update(existing.id, data);
           codeVersionToId.set(key, existing.id);
+          codeVersionToRevisionId.set(key, (existing as any).revision_id || existing.id);
           codeVersionToNew.set(key, false);
 
           // 自定义字段
@@ -1408,9 +1403,9 @@ export async function executeAssembliesImport(
           }
         }
       } else {
-        const res = await componentsApi.create(data);
-        const created = res.data;
+        const created = await partsApi.create(data);
         codeVersionToId.set(key, created.id);
+        codeVersionToRevisionId.set(key, created.latest_revision.id);
         codeVersionToNew.set(key, true);
 
         // 自定义字段
@@ -1436,8 +1431,8 @@ export async function executeAssembliesImport(
       const parsed = parseBOMFilename(bf);
       if (!parsed) continue;
       const parentKey = `${parsed.code}|${parsed.version}`;
-      const parentId = codeVersionToId.get(parentKey);
-      if (!parentId) continue;
+      const parentRevisionId = codeVersionToRevisionId.get(parentKey);
+      if (!parentRevisionId) continue;
 
     const buf = await readFileAsBuffer(dirHandle!, bf);
       if (!buf) continue;
@@ -1459,56 +1454,52 @@ export async function executeAssembliesImport(
         const isPart = childTypeStr === '零件';
         const childKey = `${childCode}|${childVersion}`;
 
-        // 查找子项 ID
-        let childId: string | null = null;
+        // 查找子项 revision_id（BOM 操作使用）
+        let childRevisionId: string | null = null;
 
         // 1. 先在本次新建/更新中查找
-        if (codeVersionToId.has(childKey)) {
-          childId = codeVersionToId.get(childKey)!;
+        if (codeVersionToRevisionId.has(childKey)) {
+          childRevisionId = codeVersionToRevisionId.get(childKey)!;
         }
 
         // 2. 在 store 中查找已有部件或零件
-        if (!childId) {
+        if (!childRevisionId) {
           const found = useDataStore
             .getState()
             .components.find(
               (c) => c.code === childCode && (c.version || '') === childVersion,
             );
-          if (found) childId = found.id;
+          if (found) childRevisionId = (found as any).revision_id || found.id;
         }
 
         // 3. 如果是零件且未找到，自动创建草稿零件
-        if (!childId && isPart) {
+        if (!childRevisionId && isPart) {
           try {
-            const res = await componentsApi.create({
+            const res = await partsApi.create({
               code: childCode,
               name: String(bomRow['中文名称'] || childCode),
               spec: String(bomRow['规格型号'] || ''),
-              version: childVersion || 'A',
-              status: 'draft',
             });
-            childId = res.data.id;
+            childRevisionId = res.latest_revision.id;
           } catch (err) {
             console.error(`自动创建零件失败: ${childCode}`, err);
             continue;
           }
         }
 
-        if (!childId) continue;
+        if (!childRevisionId) continue;
 
         // 4. 检查是否已存在关联关系（去重）
         try {
-          const existingItems = await assemblyPartsApi.list(parentId);
-          const existingChildren: AssemblyPartItem[] = existingItems.data || [];
-          const alreadyExists = existingChildren.some(
-            (item) => item.child_id === childId,
+          const existingItems = await partsApi.getBOM(parentRevisionId) || [];
+          const alreadyExists = existingItems.some(
+            (item: any) => item.child_revision_id === childRevisionId,
           );
           if (alreadyExists) continue;
 
           // 5. 添加子项
-          await assemblyPartsApi.add(parentId, {
-            child_type: 'component',
-            child_id: childId,
+          await partsApi.addBOMItem(parentRevisionId, {
+            child_revision_id: childRevisionId,
             quantity,
           });
         } catch (err) {

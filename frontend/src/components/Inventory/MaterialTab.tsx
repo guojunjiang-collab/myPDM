@@ -2,13 +2,12 @@ import { useEffect, useState, useMemo } from 'react';
 import { useInventoryStore } from '../../stores/inventory';
 import { useDataStore } from '../../stores/data';
 import { inventoryApi } from '../../services/inventoryApi';
-import { partsApi, assembliesApi, customFieldsApi } from '../../services/api';
+import { partsApi } from '../../services/api';
 import { canEdit, isAdmin } from '../../stores/auth';
 import { Modal, ConfirmModal } from '../Modal';
 import MaterialDetail from './MaterialDetail';
-import PartDetailContent from '../PartDetailContent';
-import AssemblyDetailContent from '../AssemblyDetailContent';
-import type { InvMaterial, CustomFieldDefinition, CustomFieldValue } from '../../types';
+import PartDetailModal from '../PartDetailModal';
+import type { InvMaterial } from '../../types';
 
 // ECR 式卡片字段样式
 const cardCls = 'bg-gray-50 rounded-lg px-3 py-2 border border-gray-100';
@@ -37,34 +36,11 @@ export default function MaterialTab() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // 零部件详情（与物料详情同级，避免被父弹窗 transform 限制宽度）
-  const [entity, setEntity] = useState<{ type: 'part' | 'assembly'; id: string } | null>(null);
-  const [entityData, setEntityData] = useState<any>(null);
-  const [entityLoading, setEntityLoading] = useState(false);
-  const [entityDefs, setEntityDefs] = useState<CustomFieldDefinition[]>([]);
-  const [entityValues, setEntityValues] = useState<Record<string, any>>({});
+  // 零部件详情：通过 PartDetailModal 查看（ref_entity_id 存储的是 master_id）
+  const [viewMasterId, setViewMasterId] = useState<string | null>(null);
 
-  const viewEntity = async (type: 'part' | 'assembly', id: string) => {
-    setEntity({ type, id });
-    setEntityData(null); setEntityLoading(true); setEntityDefs([]); setEntityValues({});
-    try {
-      const api = type === 'part' ? partsApi : assembliesApi;
-      const res = await api.get(id);
-      setEntityData(res.data);
-      const allDefs = useDataStore.getState().customFieldDefs;
-      const entityType = type === 'part' ? 'part' : 'component';
-      const defs = allDefs.filter((d: CustomFieldDefinition) => d.applies_to?.includes(entityType));
-      setEntityDefs(defs);
-      if (defs.length > 0) {
-        try {
-          const valuesRes = await customFieldsApi.getValues(entityType, id);
-          const vals: Record<string, any> = {};
-          (valuesRes.data || []).forEach((v: CustomFieldValue) => { vals[v.field_id] = v.value; });
-          setEntityValues(vals);
-        } catch { /* 自定义字段可选 */ }
-      }
-    } catch { setEntityData(null); }
-    finally { setEntityLoading(false); }
+  const viewEntity = (_type: 'part' | 'assembly', id: string) => {
+    setViewMasterId(id);
   };
 
   // PDM 零件/部件来自全局 DataStore（已全量预加载），客户端即时过滤
@@ -370,20 +346,12 @@ export default function MaterialTab() {
       {/* 物料详情 */}
       {detail && <MaterialDetail material={detail} onClose={() => setDetail(null)} onViewEntity={viewEntity} />}
 
-      {/* 零部件详情（同级，宽度同零件/部件管理） */}
-      <Modal open={!!entity} title={entity ? (entity.type === 'part' ? '零件详情' : '部件详情') : ''}
-        onClose={() => setEntity(null)} width="full">
-        {entityLoading ? (
-          <div className="py-8 text-center text-sm text-gray-400">加载中...</div>
-        ) : !entityData ? (
-          <div className="py-8 text-center text-sm text-gray-400">加载失败</div>
-        ) : entity?.type === 'part' ? (
-          <PartDetailContent part={entityData} customFieldDefs={entityDefs} customFieldValues={entityValues} />
-        ) : (
-          <AssemblyDetailContent assembly={entityData} customFieldDefs={entityDefs} customFieldValues={entityValues}
-            onSubItemClick={(item: any) => viewEntity(item.childType === 'part' ? 'part' : 'assembly', item.child_id)} />
-        )}
-      </Modal>
+      {/* 零部件详情（通过 PartDetailModal 查看，ref_entity_id 存储的是 master_id） */}
+      <PartDetailModal
+        masterId={viewMasterId || ''}
+        open={viewMasterId !== null}
+        onClose={() => setViewMasterId(null)}
+      />
 
       <ConfirmModal
         open={!!deleteId}

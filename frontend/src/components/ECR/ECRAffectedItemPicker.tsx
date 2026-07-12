@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Modal } from '../Modal';
 import { toast } from '../Toast';
-import { componentsApi } from '../../services/api';
+import { partsApi } from '../../services/api';
 import { useTableSort } from '../../hooks/useTableSort';
 import type { Part, Assembly } from '../../types';
 
@@ -62,11 +62,11 @@ export function ECRAffectedItemPicker({
     let cancelled = false;
     setLoading(true);
 
-    componentsApi
+    partsApi
       .list({ page_size: 10000, search: search || undefined })
       .then((r) => {
         if (cancelled) return;
-        const items = normalizeItems<any>(r.data);
+        const items = normalizeItems<any>(r);
         const parts: Part[] = [];
         const assemblies: Assembly[] = [];
         for (const item of items) {
@@ -105,10 +105,11 @@ export function ECRAffectedItemPicker({
 
     if (activeTab === 'all' || activeTab === 'component') {
       for (const p of parts) {
-        if (alreadySelected.includes(p.id)) continue;
+        const pid = (p as any).master_id || p.id;
+        if (alreadySelected.includes(pid)) continue;
         result.push({
           entity_type: 'component',
-          entity_id: p.id,
+          entity_id: pid,
           entity_code: p.code,
           entity_name: p.name,
           entity_version: p.version || '—',
@@ -116,10 +117,11 @@ export function ECRAffectedItemPicker({
       }
 
       for (const a of assemblies) {
-        if (alreadySelected.includes(a.id)) continue;
+        const aid = (a as any).master_id || a.id;
+        if (alreadySelected.includes(aid)) continue;
         result.push({
           entity_type: 'component',
-          entity_id: a.id,
+          entity_id: aid,
           entity_code: a.code,
           entity_name: a.name,
           entity_version: a.version || '—',

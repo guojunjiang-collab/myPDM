@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import BOMTreeTable from './BOMTreeTable';
 import type { Assembly, AssemblyPartItem, CustomFieldDefinition } from '../types';
 import { formatDateTime } from '../utils/date';
-import { assemblyPartsApi } from '../services/api';
+import { partsApi } from '../services/api';
 import EntityDocumentSection from './EntityDocumentSection';
 import ComponentAttachmentBucket from './ComponentAttachmentBucket';
 
@@ -27,16 +27,19 @@ export default function AssemblyDetailContent({ assembly, customFieldDefs, custo
   const [hasSubItems, setHasSubItems] = useState<boolean | null>(null);
   const docLinks = (assembly as any).document_links;
   const hasDocuments = Array.isArray(docLinks) && docLinks.length > 0;
+  // 统一以 revision_id 操作 BOM/附件/文档；master_id 用于身份导航
+  const revId = (assembly as any).revision_id || assembly.id;
+  const masterId = (assembly as any).master_id || assembly.id;
 
   useEffect(() => {
     let cancelled = false;
-    assemblyPartsApi.list(assembly.id).then(res => {
-      if (!cancelled) setHasSubItems(((res.data || []) as any[]).length > 0);
+    partsApi.getBOM(revId).then((rows: any[]) => {
+      if (!cancelled) setHasSubItems((rows || []).length > 0);
     }).catch(() => {
       if (!cancelled) setHasSubItems(false);
     });
     return () => { cancelled = true; };
-  }, [assembly.id]);
+  }, [revId]);
 
   return (
     <div className="space-y-4">
@@ -75,18 +78,18 @@ export default function AssemblyDetailContent({ assembly, customFieldDefs, custo
 
       {/* 关联图文档 */}
       {hasDocuments && (
-        <EntityDocumentSection entityType="component" entityId={assembly.id} entityCode={assembly.code} entityName={assembly.name} editable={false} />
+        <EntityDocumentSection entityType="component" entityId={revId} entityCode={assembly.code} entityName={assembly.name} editable={false} />
       )}
 
       {/* CAD附件 / 生产附件（只读，无附件时隐藏） */}
-      <ComponentAttachmentBucket componentId={assembly.id} category="cad" label="CAD附件" editable={false} hideWhenEmpty />
-      <ComponentAttachmentBucket componentId={assembly.id} category="production" label="生产附件" editable={false} hideWhenEmpty />
+      <ComponentAttachmentBucket componentId={revId} category="cad" label="CAD附件" editable={false} hideWhenEmpty />
+      <ComponentAttachmentBucket componentId={revId} category="production" label="生产附件" editable={false} hideWhenEmpty />
 
       {/* 子项清单 */}
       {hasSubItems && (
         <div className="border-t pt-4">
           <h4 className="text-sm font-bold text-gray-700 mb-2">子项清单</h4>
-          <BOMTreeTable assemblyId={assembly.id} onRowClick={onSubItemClick} />
+          <BOMTreeTable revisionId={revId} rootMasterId={masterId} onRowClick={onSubItemClick} />
         </div>
       )}
     </div>
