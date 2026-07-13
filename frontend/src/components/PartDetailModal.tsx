@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { partsApi, customFieldsApi, assemblyViewerApi, mediaApi } from '../services/api';
+import { partsApi, customFieldsApi, assemblyViewerApi, mediaApi, v2UploadApi, CHUNK_SIZE, CHUNK_THRESHOLD } from '../services/api';
 import api from '../services/api';
 import { useAuthStore } from '../stores/auth';
 import type { PartMaster, PartRevision, PartIteration, PartStatus, CascadeResult } from '../types';
@@ -72,6 +72,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const [cadFolderFiles, setCadFolderFiles] = useState<FileList | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0, name: '' });
+  const [attachmentReloadKey, setAttachmentReloadKey] = useState(0);
 
   useEffect(() => {
     if (open) {
@@ -252,13 +253,24 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
         if (!file) return;
         setImportProgress((p) => ({ ...p, name: item.file_name }));
         try {
-          const formData = new FormData();
-          formData.append('file', file);
-          formData.append('category', 'cad');
-          formData.append('overwrite', 'true');
-          await api.post(`/parts/revisions/${item.revision_id}/attachments`, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-          });
+          if (file.size > CHUNK_THRESHOLD) {
+            // 大文件走分块上传
+            const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+            const init = await v2UploadApi.initPartAttachmentChunk(item.revision_id, file.name, file.size, 'cad');
+            for (let c = 0; c < totalChunks; c++) {
+              const start = c * CHUNK_SIZE;
+              await v2UploadApi.uploadChunk(init.upload_id, c, file.slice(start, Math.min(start + CHUNK_SIZE, file.size)));
+            }
+            await v2UploadApi.completePartAttachmentChunk(item.revision_id, init.upload_id);
+          } else {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('category', 'cad');
+            formData.append('overwrite', 'true');
+            await api.post(`/parts/revisions/${item.revision_id}/attachments`, formData, {
+              headers: { 'Content-Type': 'multipart/form-data' },
+            });
+          }
           successCount++;
         } catch {
           failCount++;
@@ -270,6 +282,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
 
     setIsImporting(false);
     setCadFolderFiles(null);
+    setAttachmentReloadKey((k) => k + 1);
     if (failCount > 0) {
       toast.error(`导入完成：成功 ${successCount} 个，失败 ${failCount} 个`);
     } else {
@@ -864,8 +877,8 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                         </div>
                       </div>
                     )}
-                    <PartAttachmentBucket revisionId={revisionId} category="cad" label="CAD 附件" editable={isCheckedOutByMe && isDraft && !viewingIterationId} showDownloadAll={hasBomChildren} />
-                    <PartAttachmentBucket revisionId={revisionId} category="production" label="生产附件" editable={isCheckedOutByMe && isDraft && !viewingIterationId} showDownloadAll={hasBomChildren} />
+                    <PartAttachmentBucket key={`cad-${attachmentReloadKey}`} revisionId={revisionId} category="cad" label="CAD 附件" editable={isCheckedOutByMe && isDraft && !viewingIterationId} showDownloadAll={hasBomChildren} />
+                    <PartAttachmentBucket key={`prod-${attachmentReloadKey}`} revisionId={revisionId} category="production" label="生产附件" editable={isCheckedOutByMe && isDraft && !viewingIterationId} showDownloadAll={hasBomChildren} />
                   </div>
                 )}
 
