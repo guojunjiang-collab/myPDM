@@ -179,3 +179,27 @@ class AssemblyTreeNodeDTO(BaseModel):
 
 
 AssemblyTreeNodeDTO.model_rebuild()
+
+
+# ===== CAD 文件夹导入预览 =====
+
+class CadImportPreviewRequest(BaseModel):
+    file_names: List[str]
+
+
+class MatchedFileItem(BaseModel):
+    file_name: str
+    code: str
+    name: str
+    revision_id: str
+    revision_version: str
+    iteration_id: str
+    existing_count: int
+    can_upload: bool
+    block_reason: Optional[str] = None
+
+
+class CadImportPreviewResponse(BaseModel):
+    matched: List[MatchedFileItem]
+    unmatched: List[str]
+    summary: dict
