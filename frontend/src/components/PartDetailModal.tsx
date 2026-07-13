@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { partsApi, customFieldsApi, assemblyViewerApi, mediaApi } from '../services/api';
+import api from '../services/api';
 import { useAuthStore } from '../stores/auth';
 import type { PartMaster, PartRevision, PartIteration, PartStatus, CascadeResult } from '../types';
 import { Loading } from './Loading';
@@ -7,6 +8,7 @@ import { toast } from './Toast';
 import { Modal } from './Modal';
 import EntityDocumentSection from './EntityDocumentSection';
 import PartAttachmentBucket from './PartAttachmentBucket';
+import CadImportPreviewModal from './CadImportPreviewModal';
 import AssemblyPartPicker from './AssemblyPartPicker';
 
 const statusTag = (s: string) => {
@@ -60,6 +62,16 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const [nestedMasterId, setNestedMasterId] = useState<string | null>(null);
   const [nestedRevisionId, setNestedRevisionId] = useState<string | null>(null);
   const assemblyFileRef = useRef<HTMLInputElement>(null);
+  const cadFolderInputRef = useRef<HTMLInputElement>(null);
+  const [cadImportPreview, setCadImportPreview] = useState<{
+    open: boolean;
+    items: any[];
+    unmatched: string[];
+    summary: any;
+  }>({ open: false, items: [], unmatched: [], summary: {} });
+  const [cadFolderFiles, setCadFolderFiles] = useState<FileList | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0, name: '' });
 
   useEffect(() => {
     if (open) {
@@ -182,6 +194,88 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
 
   const isCheckedOut = !!revision?.check_out_user_id;
   const isAssembly = master?.type === 'assembly' || hasBomChildren;
+
+  const handleCadFolderSelect = () => {
+    cadFolderInputRef.current?.click();
+  };
+
+  const handleCadFolderChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const fileNames: string[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      const name = f.webkitRelativePath ? f.webkitRelativePath.split('/').pop() || f.name : f.name;
+      fileNames.push(name);
+    }
+
+    if (!revisionId) return;
+
+    try {
+      const result = await partsApi.cadImportPreview(revisionId, fileNames);
+      setCadImportPreview({ open: true, items: result.matched, unmatched: result.unmatched, summary: result.summary });
+      setCadFolderFiles(files);
+    } catch {
+      toast.error('匹配失败，请重试');
+    } finally {
+      if (cadFolderInputRef.current) cadFolderInputRef.current.value = '';
+    }
+  };
+
+  const handleCadImportExecute = async () => {
+    if (!cadFolderFiles || cadFolderFiles.length === 0) return;
+
+    setCadImportPreview({ open: false, items: [], unmatched: [], summary: {} });
+
+    const items = cadImportPreview.items.filter((i: any) => i.can_upload);
+    if (items.length === 0) return;
+
+    const fileMap = new Map<string, File>();
+    for (let i = 0; i < cadFolderFiles.length; i++) {
+      const f = cadFolderFiles[i];
+      const name = f.webkitRelativePath ? f.webkitRelativePath.split('/').pop() || f.name : f.name;
+      fileMap.set(name, f);
+    }
+
+    setIsImporting(true);
+    setImportProgress({ current: 0, total: items.length, name: '' });
+
+    let successCount = 0;
+    let failCount = 0;
+    const concurrency = 5;
+
+    for (let i = 0; i < items.length; i += concurrency) {
+      const batch = items.slice(i, i + concurrency);
+      const promises = batch.map(async (item: any) => {
+        const file = fileMap.get(item.file_name);
+        if (!file) return;
+        setImportProgress((p) => ({ ...p, name: item.file_name }));
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('category', 'cad');
+          formData.append('overwrite', 'true');
+          await api.post(`/parts/revisions/${item.revision_id}/attachments`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
+          successCount++;
+        } catch {
+          failCount++;
+        }
+        setImportProgress((p) => ({ ...p, current: p.current + 1 }));
+      });
+      await Promise.all(promises);
+    }
+
+    setIsImporting(false);
+    setCadFolderFiles(null);
+    if (failCount > 0) {
+      toast.error(`导入完成：成功 ${successCount} 个，失败 ${failCount} 个`);
+    } else {
+      toast.success(`导入完成：成功 ${successCount} 个，失败 ${failCount} 个`);
+    }
+  };
 
   const handleImportStep = async (file: File) => {
     if (!revisionId) return;
@@ -492,6 +586,17 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                     <>
                       {canEdit && (
                         <>
+                          <input ref={cadFolderInputRef} type="file"
+                            // @ts-ignore webkitdirectory is not in standard TS types
+                            webkitdirectory=""
+                            // @ts-ignore
+                            directory=""
+                            hidden
+                            onChange={handleCadFolderChange} />
+                          <button onClick={handleCadFolderSelect}
+                            className="px-3 py-1 bg-emerald-600 text-white rounded text-xs hover:bg-emerald-700">
+                            导入CAD文件夹
+                          </button>
                           <input ref={assemblyFileRef} type="file" accept=".stp,.step" hidden
                             onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImportStep(f); e.target.value = ''; }} />
                           <button onClick={() => assemblyFileRef.current?.click()}
@@ -748,6 +853,17 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
 
                 {activeTab === 'attachments' && revisionId && (
                   <div className="space-y-4">
+                    {isImporting && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <div className="flex items-center gap-2 text-sm text-blue-700 mb-2">
+                          <span>上传中: {importProgress.name}</span>
+                          <span className="text-blue-500">{importProgress.current}/{importProgress.total}</span>
+                        </div>
+                        <div className="w-full bg-blue-200 rounded-full h-2">
+                          <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${importProgress.total > 0 ? (importProgress.current / importProgress.total) * 100 : 0}%` }} />
+                        </div>
+                      </div>
+                    )}
                     <PartAttachmentBucket revisionId={revisionId} category="cad" label="CAD 附件" editable={isCheckedOutByMe && isDraft && !viewingIterationId} showDownloadAll={hasBomChildren} />
                     <PartAttachmentBucket revisionId={revisionId} category="production" label="生产附件" editable={isCheckedOutByMe && isDraft && !viewingIterationId} showDownloadAll={hasBomChildren} />
                   </div>
@@ -989,6 +1105,14 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
           </div>
         </div>
       )}
+      <CadImportPreviewModal
+        open={cadImportPreview.open}
+        items={cadImportPreview.items}
+        unmatched={cadImportPreview.unmatched}
+        summary={cadImportPreview.summary}
+        onClose={() => setCadImportPreview({ open: false, items: [], unmatched: [], summary: {} })}
+        onComplete={handleCadImportExecute}
+      />
     </Modal>
   );
 }
