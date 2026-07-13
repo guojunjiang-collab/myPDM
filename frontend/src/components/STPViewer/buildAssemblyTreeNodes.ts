@@ -25,12 +25,14 @@ export function buildAssemblyTreeNodes(
       ? `${node.bom_item_id}:${node.instance_index}`
       : node.bom_item_id;
 
-  // 显示名：根/单实例 → 件号；多实例展开节点 → 件号#实例顺序号(1 基)。不显示件名/glb 名。
+  // 显示名：件号_名称_实例顺序号（1基）
   const nameOf = (node: AssemblyTreeNode): string => {
-    const code = node.part_code || '未命名';
+    const code = node.part_code || '';
+    const name = node.part_name || '';
+    const base = [code, name].filter(Boolean).join('_') || '未命名';
     return node.instance_index !== undefined && node.instance_index !== null
-      ? `${code}#${node.instance_index + 1}`
-      : code;
+      ? `${base}_${node.instance_index + 1}`
+      : base;
   };
 
   const convert = (node: AssemblyTreeNode, parentId: string | null): TreeNode => {
