@@ -19,6 +19,7 @@ import tempfile, os as _os
 from ..cad.assembly_parser import parse_assembly_step
 from ..stp_converter import get_lod_glb_paths, get_glb_cache_path
 from ..schemas_parts import MatchReport, AssemblyInstanceDTO, AssemblyTreeNodeDTO
+from ..schemas_parts import CadImportPreviewRequest, CadImportPreviewResponse
 from ..file_storage import chunked_uploader, CHUNK_SIZE
 
 router = APIRouter(prefix="/parts", tags=["parts"])
@@ -792,6 +793,32 @@ def list_attachments(
     ]
 
 
+def _delete_existing_attachment(db: Session, revision_id: UUID, filename: str, category: str):
+    """覆盖模式：删除指定版本当前迭代下同名同类的旧附件"""
+    import os
+    result = crud_parts.get_part_revision_with_current_iteration(db, revision_id)
+    if not result:
+        return
+    _revision, iteration = result
+    if not iteration:
+        return
+    existing = (
+        db.query(crud_parts.models_parts.PartAttachment)
+        .filter(
+            crud_parts.models_parts.PartAttachment.iteration_id == iteration.id,
+            crud_parts.models_parts.PartAttachment.category == category,
+            crud_parts.models_parts.PartAttachment.file_name == filename,
+        )
+        .all()
+    )
+    for att in existing:
+        if att.file_path and os.path.exists(att.file_path):
+            os.remove(att.file_path)
+        db.delete(att)
+    if existing:
+        db.commit()
+
+
 def _store_part_attachment(db: Session, revision_id: UUID, filename: str,
                            content: bytes, category: str):
     """
@@ -854,10 +881,13 @@ async def add_attachment(
     revision_id: UUID,
     file: UploadFile = File(...),
     category: str = Form("cad"),
+    overwrite: bool = Form(False),
     db: Session = Depends(get_db),
 ):
     """上传附件到当前迭代（整包，适用于小文件）"""
     content = await file.read()
+    if overwrite:
+        _delete_existing_attachment(db, revision_id, file.filename, category)
     att = _store_part_attachment(db, revision_id, file.filename, content, category)
     return {"id": str(att.id), "file_name": att.file_name, "file_size": att.file_size}
 
@@ -1049,6 +1079,23 @@ def _glb_url_resolver_factory(db):
         return urls
 
     return resolver
+
+
+@router.post("/revisions/{revision_id}/cad/import-preview", response_model=CadImportPreviewResponse)
+def cad_import_preview(
+    revision_id: UUID,
+    body: CadImportPreviewRequest,
+    current_user: User = Depends(require_permission("parts:update")),
+    db: Session = Depends(get_db),
+):
+    """CAD文件夹导入预览：匹配文件名到BOM树零部件"""
+    result = crud_parts.match_cad_files(
+        db=db,
+        revision_id=revision_id,
+        file_names=body.file_names,
+        current_user_id=current_user.id,
+    )
+    return CadImportPreviewResponse(**result)
 
 
 @router.post("/revisions/{revision_id}/import-assembly-step", response_model=MatchReport)
