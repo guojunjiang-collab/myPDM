@@ -69,7 +69,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
     unmatched: string[];
     summary: any;
   }>({ open: false, items: [], unmatched: [], summary: {} });
-  const [cadFolderFiles, setCadFolderFiles] = useState<FileList | null>(null);
+  const [cadFolderFiles, setCadFolderFiles] = useState<Map<string, File> | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0, name: '' });
   const [attachmentReloadKey, setAttachmentReloadKey] = useState(0);
@@ -204,11 +204,13 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    const fileMap = new Map<string, File>();
     const fileNames: string[] = [];
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
       const name = f.webkitRelativePath ? f.webkitRelativePath.split('/').pop() || f.name : f.name;
       fileNames.push(name);
+      fileMap.set(name, f);
     }
 
     if (!revisionId) return;
@@ -216,7 +218,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
     try {
       const result = await partsApi.cadImportPreview(revisionId, fileNames);
       setCadImportPreview({ open: true, items: result.matched, unmatched: result.unmatched, summary: result.summary });
-      setCadFolderFiles(files);
+      setCadFolderFiles(fileMap);
     } catch {
       toast.error('匹配失败，请重试');
     } finally {
@@ -225,19 +227,12 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   };
 
   const handleCadImportExecute = async () => {
-    if (!cadFolderFiles || cadFolderFiles.length === 0) return;
-
-    setCadImportPreview({ open: false, items: [], unmatched: [], summary: {} });
+    if (!cadFolderFiles || cadFolderFiles.size === 0) return;
 
     const items = cadImportPreview.items.filter((i: any) => i.can_upload);
     if (items.length === 0) return;
 
-    const fileMap = new Map<string, File>();
-    for (let i = 0; i < cadFolderFiles.length; i++) {
-      const f = cadFolderFiles[i];
-      const name = f.webkitRelativePath ? f.webkitRelativePath.split('/').pop() || f.name : f.name;
-      fileMap.set(name, f);
-    }
+    const fileMap = cadFolderFiles;
 
     setIsImporting(true);
     setImportProgress({ current: 0, total: items.length, name: '' });
@@ -261,7 +256,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
               const start = c * CHUNK_SIZE;
               await v2UploadApi.uploadChunk(init.upload_id, c, file.slice(start, Math.min(start + CHUNK_SIZE, file.size)));
             }
-            await v2UploadApi.completePartAttachmentChunk(item.revision_id, init.upload_id);
+            await v2UploadApi.completePartAttachmentChunk(item.revision_id, init.upload_id, true);
           } else {
             const formData = new FormData();
             formData.append('file', file);
@@ -866,17 +861,6 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
 
                 {activeTab === 'attachments' && revisionId && (
                   <div className="space-y-4">
-                    {isImporting && (
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                        <div className="flex items-center gap-2 text-sm text-blue-700 mb-2">
-                          <span>上传中: {importProgress.name}</span>
-                          <span className="text-blue-500">{importProgress.current}/{importProgress.total}</span>
-                        </div>
-                        <div className="w-full bg-blue-200 rounded-full h-2">
-                          <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${importProgress.total > 0 ? (importProgress.current / importProgress.total) * 100 : 0}%` }} />
-                        </div>
-                      </div>
-                    )}
                     <PartAttachmentBucket key={`cad-${attachmentReloadKey}`} revisionId={revisionId} category="cad" label="CAD 附件" editable={isCheckedOutByMe && isDraft && !viewingIterationId} showDownloadAll={hasBomChildren} />
                     <PartAttachmentBucket key={`prod-${attachmentReloadKey}`} revisionId={revisionId} category="production" label="生产附件" editable={isCheckedOutByMe && isDraft && !viewingIterationId} showDownloadAll={hasBomChildren} />
                   </div>
@@ -1126,6 +1110,18 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
         onClose={() => setCadImportPreview({ open: false, items: [], unmatched: [], summary: {} })}
         onComplete={handleCadImportExecute}
       />
+      {isImporting && (
+        <div className="fixed top-4 right-4 z-[100] bg-white rounded-lg shadow-lg border border-blue-200 p-4 w-80">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-blue-700">CAD附件导入中</span>
+            <span className="text-xs text-blue-500">{importProgress.current}/{importProgress.total}</span>
+          </div>
+          <div className="text-xs text-gray-500 mb-2 truncate">{importProgress.name}</div>
+          <div className="w-full bg-blue-100 rounded-full h-2">
+            <div className="bg-blue-600 h-2 rounded-full transition-all duration-300" style={{ width: `${importProgress.total > 0 ? (importProgress.current / importProgress.total) * 100 : 0}%` }} />
+          </div>
+        </div>
+      )}
     </Modal>
   );
 }

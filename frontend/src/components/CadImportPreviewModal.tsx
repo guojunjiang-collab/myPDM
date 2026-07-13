@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Modal } from './Modal';
 import type { MatchedFileItem } from '../types';
 
@@ -31,18 +30,17 @@ function getItemStatus(item: MatchedFileItem): keyof typeof statusConfig {
 }
 
 export default function CadImportPreviewModal({ open, items, unmatched, summary, onClose, onComplete }: Props) {
-  const [uploading, setUploading] = useState(false);
 
   const uploadableItems = items.filter((i) => i.can_upload);
   const blockedItems = items.filter((i) => !i.can_upload);
 
-  const handleImport = async () => {
-    setUploading(true);
+  const handleImport = () => {
+    onClose();
     onComplete();
   };
 
   return (
-    <Modal open={open} onClose={onClose} width="lg">
+    <Modal open={open} onClose={onClose} width="3xl">
       <div className="p-6">
         <h2 className="text-lg font-semibold mb-4">导入CAD附件 - 匹配预览</h2>
 
@@ -107,8 +105,7 @@ export default function CadImportPreviewModal({ open, items, unmatched, summary,
           {uploadableItems.length > 0 && (
             <button
               onClick={handleImport}
-              disabled={uploading}
-              className="px-4 py-2 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50"
+              className="px-4 py-2 text-sm bg-primary-600 text-white rounded hover:bg-primary-700"
             >
               确认导入
             </button>

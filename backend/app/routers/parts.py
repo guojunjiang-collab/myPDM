@@ -796,6 +796,7 @@ def list_attachments(
 def _delete_existing_attachment(db: Session, revision_id: UUID, filename: str, category: str):
     """覆盖模式：删除指定版本当前迭代下同名同类的旧附件"""
     import os
+    safe_name = os.path.basename(filename or "unnamed")
     result = crud_parts.get_part_revision_with_current_iteration(db, revision_id)
     if not result:
         return
@@ -807,7 +808,7 @@ def _delete_existing_attachment(db: Session, revision_id: UUID, filename: str, c
         .filter(
             crud_parts.models_parts.PartAttachment.iteration_id == iteration.id,
             crud_parts.models_parts.PartAttachment.category == category,
-            crud_parts.models_parts.PartAttachment.file_name == filename,
+            crud_parts.models_parts.PartAttachment.file_name == safe_name,
         )
         .all()
     )
@@ -928,6 +929,7 @@ async def init_attachment_chunk(
 async def complete_attachment_chunk(
     revision_id: UUID,
     upload_id: str = Form(...),
+    overwrite: bool = Form(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("attachments:upload")),
 ):
@@ -944,6 +946,8 @@ async def complete_attachment_chunk(
 
     filename = meta.get("filename") or "unnamed"
     category = meta.get("category") or "cad"
+    if overwrite:
+        _delete_existing_attachment(db, revision_id, filename, category)
     att = _store_part_attachment(db, revision_id, filename, content, category)
     # 清理临时分块文件与元数据
     chunked_uploader.cancel_upload(upload_id)

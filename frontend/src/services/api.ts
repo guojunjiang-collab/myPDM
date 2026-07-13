@@ -524,10 +524,12 @@ export const v2UploadApi = {
    */
   completePartAttachmentChunk: (
     revisionId: string,
-    uploadId: string
+    uploadId: string,
+    overwrite: boolean = false
   ): Promise<{ id: string; file_name: string; file_size: number }> => {
     const formData = new FormData();
     formData.append('upload_id', uploadId);
+    if (overwrite) formData.append('overwrite', 'true');
     return uploadAxios.post(`/parts/revisions/${revisionId}/attachments/chunk/complete`, formData)
       .then(res => res.data);
   },
