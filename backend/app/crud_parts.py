@@ -792,6 +792,133 @@ def collect_bom_attachments(db: Session, revision_id: UUID, category: str) -> Li
     return items
 
 
+def get_bom_descendants(db: Session, revision_id: UUID) -> List[Dict[str, Any]]:
+    """递归遍历BOM树，返回所有子孙零部件的展开清单（广度优先，按revision_id去重）"""
+    from .. import models_parts as mp
+    result: List[Dict[str, Any]] = []
+    seen: set = set()
+    queue = [revision_id]
+
+    while queue:
+        rid = queue.pop(0)
+        if rid in seen:
+            continue
+        seen.add(rid)
+        rev = get_part_revision(db, rid)
+        if not rev:
+            continue
+        master = get_part_master(db, rev.master_id)
+        if not master:
+            continue
+        it = _current_iteration(db, rid)
+        result.append({
+            "code": master.code,
+            "name": master.name,
+            "revision_id": str(rev.id),
+            "revision_version": rev.version,
+            "iteration_id": str(it.id) if it else None,
+            "check_out_user_id": str(rev.check_out_user_id) if rev.check_out_user_id else None,
+        })
+        # 查询子项并入队
+        bom_items = (
+            db.query(models.BOMItem)
+            .filter(
+                models.BOMItem.parent_revision_id == rid,
+                models.BOMItem.deleted_at.is_(None),
+            )
+            .all()
+        )
+        for bom in bom_items:
+            if bom.child_revision_id not in seen:
+                queue.append(bom.child_revision_id)
+
+    return result
+
+
+def match_cad_files(
+    db: Session,
+    revision_id: UUID,
+    file_names: List[str],
+    current_user_id: UUID,
+) -> Dict[str, Any]:
+    """
+    匹配文件夹文件名到BOM树零部件:
+    1. 获取BOM子孙件列表
+    2. 建立 code -> component_info 映射
+    3. 遍历 file_names，去扩展名后匹配
+    4. 对每个命中项检查签出状态、已有附件
+    """
+    from .. import models_parts as mp
+    from ..schemas_parts import CadImportPreviewResponse, MatchedFileItem
+
+    descendants = get_bom_descendants(db, revision_id)
+    code_map: Dict[str, dict] = {}
+    for item in descendants:
+        code_map[item["code"]] = item
+
+    matched: List[dict] = []
+    unmatched: List[str] = []
+    will_overwrite_count = 0
+    blocked_count = 0
+
+    for fname in file_names:
+        # 去扩展名获取件号
+        base = fname.rsplit(".", 1)[0] if "." in fname else fname
+        info = code_map.get(base)
+
+        if info is None:
+            unmatched.append(fname)
+            continue
+
+        # 检查已有附件
+        existing_count = 0
+        if info.get("iteration_id"):
+            existing_count = (
+                db.query(mp.PartAttachment)
+                .filter(
+                    mp.PartAttachment.iteration_id == UUID(info["iteration_id"]),
+                    mp.PartAttachment.category == "cad",
+                    mp.PartAttachment.file_name == fname,
+                )
+                .count()
+            )
+
+        # 检查签出状态
+        can_upload = True
+        block_reason = None
+        if info.get("check_out_user_id") != str(current_user_id):
+            can_upload = False
+            block_reason = "未签出"
+
+        if can_upload and existing_count > 0:
+            will_overwrite_count += 1
+        if not can_upload:
+            blocked_count += 1
+
+        matched.append(MatchedFileItem(
+            file_name=fname,
+            code=info["code"],
+            name=info["name"],
+            revision_id=info["revision_id"],
+            revision_version=info["revision_version"],
+            iteration_id=info["iteration_id"] or "",
+            existing_count=existing_count,
+            can_upload=can_upload,
+            block_reason=block_reason,
+        ))
+
+    return {
+        "matched": matched,
+        "unmatched": unmatched,
+        "summary": {
+            "total_files": len(file_names),
+            "matched_count": len(matched),
+            "unmatched_count": len(unmatched),
+            "will_overwrite_count": will_overwrite_count,
+            "blocked_count": blocked_count,
+        },
+    }
+
 
 # ====== BOM 操作 ======
 
