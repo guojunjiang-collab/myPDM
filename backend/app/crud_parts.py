@@ -9,6 +9,7 @@ from fastapi import HTTPException
 
 from . import models, models_parts
 from .cad import matrix_utils as _mu
+from .schemas_parts import MatchedFileItem
 from .database import SessionLocal
 
 
@@ -793,8 +794,7 @@ def collect_bom_attachments(db: Session, revision_id: UUID, category: str) -> Li
 
 
 def get_bom_descendants(db: Session, revision_id: UUID) -> List[Dict[str, Any]]:
-    """递归遍历BOM树，返回所有子孙零部件的展开清单（广度优先，按revision_id去重）"""
-    from .. import models_parts as mp
+    """广度优先遍历BOM树，返回所有子孙零部件的展开清单（按revision_id去重）"""
     result: List[Dict[str, Any]] = []
     seen: set = set()
     queue = [revision_id]
@@ -848,8 +848,6 @@ def match_cad_files(
     3. 遍历 file_names，去扩展名后匹配
     4. 对每个命中项检查签出状态、已有附件
     """
-    from .. import models_parts as mp
-    from ..schemas_parts import CadImportPreviewResponse, MatchedFileItem
 
     descendants = get_bom_descendants(db, revision_id)
     code_map: Dict[str, dict] = {}
@@ -874,11 +872,11 @@ def match_cad_files(
         existing_count = 0
         if info.get("iteration_id"):
             existing_count = (
-                db.query(mp.PartAttachment)
+                db.query(models_parts.PartAttachment)
                 .filter(
-                    mp.PartAttachment.iteration_id == UUID(info["iteration_id"]),
-                    mp.PartAttachment.category == "cad",
-                    mp.PartAttachment.file_name == fname,
+                    models_parts.PartAttachment.iteration_id == UUID(info["iteration_id"]),
+                    models_parts.PartAttachment.category == "cad",
+                    models_parts.PartAttachment.file_name == fname,
                 )
                 .count()
             )
