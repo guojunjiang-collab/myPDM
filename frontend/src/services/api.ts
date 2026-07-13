@@ -175,6 +175,9 @@ export const partsApi = {
   // 按附件 ID 直接下载零部件附件（blob，带 JWT）
   downloadPartAttachmentBlob: (attachmentId: string) =>
     api.get(`/parts/attachments/${attachmentId}/download`, { responseType: 'blob' }).then((r) => r.data as Blob),
+  // CAD 文件夹导入
+  cadImportPreview: (revisionId: string, fileNames: string[]) =>
+    api.post(`/parts/revisions/${revisionId}/cad/import-preview`, { file_names: fileNames }).then((r) => r.data),
 };
 
 // 图文档 API
