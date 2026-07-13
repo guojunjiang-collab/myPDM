@@ -129,6 +129,34 @@ export interface PartAttachment {
   created_at?: string;
 }
 
+export interface CadImportPreviewRequest {
+  file_names: string[];
+}
+
+export interface MatchedFileItem {
+  file_name: string;
+  code: string;
+  name: string;
+  revision_id: string;
+  revision_version: string;
+  iteration_id: string;
+  existing_count: number;
+  can_upload: boolean;
+  block_reason: string | null;
+}
+
+export interface CadImportPreviewResponse {
+  matched: MatchedFileItem[];
+  unmatched: string[];
+  summary: {
+    total_files: number;
+    matched_count: number;
+    unmatched_count: number;
+    will_overwrite_count: number;
+    blocked_count: number;
+  };
+}
+
 export interface CascadeResult {
   succeed_count: number;
   failed_count: number;
