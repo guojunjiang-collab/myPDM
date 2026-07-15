@@ -1,0 +1,86 @@
+"""CAD 桥接服务入口
+用法: python -m cad_bridge --port 9527 --pdm-url https://localhost:8080/api
+"""
+import sys
+import asyncio
+import logging
+import argparse
+
+from cad_bridge.server import BridgeServer
+from cad_bridge.pdm_client import PDMClient
+from cad_bridge.catia.client import catia_client
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
+logger = logging.getLogger("cad_bridge")
+
+
+def register_handlers(server: BridgeServer, pdm_client: PDMClient):
+    """注册所有 JSON-RPC 方法处理器"""
+
+    async def handle_ping(params: dict, token: str) -> dict:
+        return {"status": "ok"}
+
+    async def handle_detect(params: dict, token: str) -> dict:
+        return catia_client.detect()
+
+    async def handle_read_tree(params: dict, token: str) -> dict:
+        return catia_client.read_assembly_tree(params)
+
+    async def handle_read_properties(params: dict, token: str) -> dict:
+        return catia_client.read_properties(params)
+
+    async def handle_write_property(params: dict, token: str) -> dict:
+        return catia_client.write_property(params)
+
+    async def handle_download(params: dict, token: str) -> dict:
+        attachment_id = params["attachment_id"]
+        revision_code = params.get("code", "unknown")
+        revision_version = params.get("version", "A")
+        save_dir = params.get("save_dir") or f"./cad_workspace/{revision_code}/{revision_version}"
+        return await pdm_client.download_attachment(attachment_id, save_dir, token)
+
+    async def handle_upload(params: dict, token: str) -> dict:
+        file_path = params["file_path"]
+        revision_id = params["revision_id"]
+        category = params.get("category", "cad")
+        return await pdm_client.upload_attachment(file_path, revision_id, category, token)
+
+    server.register("catia.ping", handle_ping)
+    server.register("catia.detect", handle_detect)
+    server.register("catia.assembly.read_tree", handle_read_tree)
+    server.register("catia.assembly.read_properties", handle_read_properties)
+    server.register("catia.property.write", handle_write_property)
+    server.register("workspace.download", handle_download)
+    server.register("workspace.upload", handle_upload)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="CAD 桥接服务")
+    parser.add_argument("--port", type=int, default=9527, help="WebSocket 监听端口（默认 9527）")
+    parser.add_argument("--host", type=str, default="127.0.0.1", help="监听地址（默认 127.0.0.1）")
+    parser.add_argument("--pdm-url", type=str, default="https://localhost:8080/api",
+                        help="PDM 后端地址（默认 https://localhost:8080/api）")
+    args = parser.parse_args()
+
+    pdm_client = PDMClient(base_url=args.pdm_url)
+    server = BridgeServer(host=args.host, port=args.port)
+    register_handlers(server, pdm_client)
+
+    logger.info(f"CAD 桥接服务启动中...")
+    logger.info(f"  WebSocket: ws://{args.host}:{args.port}")
+    logger.info(f"  PDM 后端: {args.pdm_url}")
+
+    try:
+        asyncio.run(server.start())
+    except KeyboardInterrupt:
+        logger.info("服务已停止")
+    except Exception as e:
+        logger.error(f"服务异常退出: {e}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
