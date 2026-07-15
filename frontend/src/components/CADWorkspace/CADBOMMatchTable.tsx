@@ -136,7 +136,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
         code: row.builtin.PartNumber || row.instance_name,
         name: row.builtin.Definition || row.instance_name,
         spec: row.user_properties['规格型号'] || '',
-        type: row.is_assembly ? 'assembly' : 'part' as const,
+        type: (row.is_assembly ? 'assembly' : 'part') as 'part' | 'assembly',
       };
       const result = await partsApi.create(data);
       setRows(prev => prev.map(r =>
