@@ -68,10 +68,10 @@ cad_bridge/
 ├── pdm_client.py            # PDM API 代理（附件上传/下载，JWT 透传）（共用）
 ├── catia/                   # CATIA 桥接
 │   ├── client.py            # CATIA COM 互操作（检测/读取/写入）
-│   └── field_mapper.py      # 字段映射（CATIA属性 ↔ PDM字段）
+│   └── field_mapping.json   # CATIA-PDM 属性映射配置（用户可自定义）
 └── sw/                      # SolidWorks 桥接（二期）
     ├── client.py            # SolidWorks COM 互操作
-    └── field_mapper.py      # 字段映射（SW属性 ↔ PDM字段）
+    └── field_mapping.json   # SW-PDM 属性映射配置
 ```
 
 ### 2.4 关键设计原则
@@ -243,26 +243,38 @@ def write_property(product, prop_name, value) -> None:
 
 ### 5.3 字段映射规则
 
-| CATIA 属性 | 来源 | PDM 字段 | 方向 |
-|------------|------|----------|------|
-| PartNumber | 内置 | 件号 (code) | 双向 |
-| Revision | 内置 | 版本 (version) | 双向 |
-| Definition | 内置 | 中文名称 (name) | 双向 |
-| 规格型号 | UserRefProperties | 规格型号 (spec) | 双向 |
-| 重量(kg) | UserRefProperties | 自定义字段 "重量(kg)" | 双向 |
-| 存货类别 | UserRefProperties | 自定义字段 "存货类别" | 双向 |
-| 物料类型 | UserRefProperties | 自定义字段 "物料类型" | 双向 |
-| ...任意属性名 | UserRefProperties | 同名的 PDM 自定义字段 | 双向 |
+映射通过 `catia/field_mapping.json` 定义，用户可自定义修改：
+
+```json
+{
+  "builtin": {
+    "PartNumber": "code",
+    "Revision": "version",
+    "Definition": "name"
+  },
+  "properties": {
+    "规格型号": "spec",
+    "重量(kg)": "重量(kg)",
+    "存货类别": "存货类别",
+    "物料类型": "物料类型"
+  }
+}
+```
+
+**结构说明**：
+
+| 字段 | 说明 |
+|------|------|
+| `builtin` | CATIA 内置属性 → PDM 固定字段（仅 `code`/`name`/`version`/`spec`） |
+| `properties` | CATIA UserRefProperties → PDM 字段（内置字段名或自定义字段名） |
 
 **匹配逻辑**：
-1. `PartNumber` → `code`（固定映射）
-2. `Revision` → `version`（固定映射）
-3. `Definition` → `name`（固定映射）
-4. CATIA UserRefProperties 属性名直接作为 PDM 字段名查找：
-   - 先匹配 PDM 内置字段（如 spec）
-   - 再匹配 PDM 自定义字段
-   - 同名即匹配，无需前缀，无需额外配置
-5. CATIA 中有但 PDM 中不存在的属性名 → 忽略
+1. `builtin` 中的 CATIA 内置属性按映射表直接对应 PDM 字段
+2. `properties` 中的 CATIA UserRefProperties 属性名作为 key，value 为 PDM 字段名：
+   - 先匹配 PDM 内置字段（code/name/version/spec）
+   - 再匹配 PDM 自定义字段（同名查找）
+3. 不在 `properties` 中的 CATIA 属性 → 忽略
+4. 用户可编辑 `field_mapping.json` 增减映射条目，无需改代码
 
 ---
 
@@ -357,10 +369,10 @@ myPDM/
 │   ├── pdm_client.py                   # PDM API 代理（共用）
 │   ├── catia/                          # CATIA 桥接
 │   │   ├── client.py
-│   │   └── field_mapper.py
+│   │   └── field_mapping.json       # 属性映射配置（用户可自定义）
 │   ├── sw/                             # SolidWorks 桥接（二期）
 │   │   ├── client.py
-│   │   └── field_mapper.py
+│   │   └── field_mapping.json
 │   └── requirements.txt
 ├── frontend/src/
 │   ├── components/CADWorkspace/       # 新增：CAD 工作台组件
