@@ -172,9 +172,9 @@ Modal 全屏，分三个步骤标签页：
 | 2 | CATIA PartNumber | CATIA 零件号 | 标识 |
 | 3 | CATIA 名称 | CATIA 零部件实例名 | 标识 |
 | 4 | 规格型号 | CATIA 属性，可编辑→写回 CATIA | 双向编辑 |
-| 5 | 材质 | CATIA 属性，可编辑→写回 CATIA | 双向编辑 |
-| 6 | 重量(kg) | CATIA 属性，可编辑→写回 CATIA | 双向编辑 |
-| 7 | 图号 | CATIA 属性，可编辑→写回 CATIA | 双向编辑 |
+| 5 | 重量(kg) | CATIA 属性，可编辑→写回 CATIA | 双向编辑 |
+| 6 | 存货类别 | CATIA 属性，可编辑→写回 CATIA | 双向编辑 |
+| 7 | 物料类型 | CATIA 属性，可编辑→写回 CATIA | 双向编辑 |
 | 8 | 📐 CAD附件 | 已有数量 + 上传按钮(签出时) | 附件 |
 | 9 | 📦 生产附件 | 已有数量 + PDF上传 + STP上传(签出时) | 附件 |
 | 10 | PDM匹配 | 匹配到的 PDM 零部件（件号+版本） | 匹配 |
@@ -233,7 +233,7 @@ def read_assembly_tree(product, level=0) -> dict:
     """递归读取 Product 树，返回 BOM 结构（含层级、零件号、实例名、是否装配）"""
 
 def read_properties(product) -> dict:
-    """读取内置属性(PartNumber/Nomenclature/Revision/Definition/Source/Description)
+    """读取内置属性(PartNumber/Revision/Definition)
      + 所有 UserRefProperties 自定义属性，以字典返回"""
 
 def write_property(product, prop_name, value) -> None:
@@ -243,26 +243,26 @@ def write_property(product, prop_name, value) -> None:
 
 ### 5.3 字段映射规则
 
-| CATIA 属性 | 来源 | PDM 匹配目标 |
-|------------|------|-------------|
-| PartNumber | 内置 | PDM 件号 (code) |
-| Nomenclature | 内置 | PDM 名称 (name) |
-| 规格型号 | UserRefProperties | PDM 规格型号 (spec) |
-| 材质 | UserRefProperties | 自定义字段 "材质" |
-| 重量 | UserRefProperties | 自定义字段 "重量" |
-| 图号 | UserRefProperties | 自定义字段 "图号" |
-| ...任意属性名 | UserRefProperties | 同名的 PDM 自定义字段 |
+| CATIA 属性 | 来源 | PDM 字段 | 方向 |
+|------------|------|----------|------|
+| PartNumber | 内置 | 件号 (code) | 双向 |
+| Revision | 内置 | 版本 (version) | 双向 |
+| Definition | 内置 | 中文名称 (name) | 双向 |
+| 规格型号 | UserRefProperties | 规格型号 (spec) | 双向 |
+| 重量(kg) | UserRefProperties | 自定义字段 "重量(kg)" | 双向 |
+| 存货类别 | UserRefProperties | 自定义字段 "存货类别" | 双向 |
+| 物料类型 | UserRefProperties | 自定义字段 "物料类型" | 双向 |
+| ...任意属性名 | UserRefProperties | 同名的 PDM 自定义字段 | 双向 |
 
 **匹配逻辑**：
 1. `PartNumber` → `code`（固定映射）
-2. `Nomenclature` → `name`（固定映射）
-3. CATIA UserRefProperties 属性名直接作为 PDM 字段名查找：
+2. `Revision` → `version`（固定映射）
+3. `Definition` → `name`（固定映射）
+4. CATIA UserRefProperties 属性名直接作为 PDM 字段名查找：
    - 先匹配 PDM 内置字段（如 spec）
    - 再匹配 PDM 自定义字段
    - 同名即匹配，无需前缀，无需额外配置
-4. CATIA 中有但 PDM 中不存在的属性名 → 忽略
-
-> **注意**：具体映射表后续在实施阶段细化，当前文档仅定义匹配规则框架。
+5. CATIA 中有但 PDM 中不存在的属性名 → 忽略
 
 ---
 
