@@ -62,12 +62,16 @@
 ### 2.3 桥接服务模块
 
 ```
-CAD/Catia/
-├── __main__.py          # 入口，启动 WebSocket 服务
-├── server.py            # WebSocket 服务端，JSON-RPC 消息路由
-├── catia_client.py      # CATIA COM 互操作（检测/读取/写入）
-├── pdm_client.py        # PDM API 代理（附件上传/下载，JWT 透传）
-└── field_mapper.py      # 字段映射（CATIA属性 ↔ PDM字段）
+cad_bridge/
+├── __main__.py              # 统一入口，启动 WebSocket 服务
+├── server.py                # WebSocket 服务端，JSON-RPC 消息路由（共用）
+├── pdm_client.py            # PDM API 代理（附件上传/下载，JWT 透传）（共用）
+├── catia/                   # CATIA 桥接
+│   ├── client.py            # CATIA COM 互操作（检测/读取/写入）
+│   └── field_mapper.py      # 字段映射（CATIA属性 ↔ PDM字段）
+└── sw/                      # SolidWorks 桥接（二期）
+    ├── client.py            # SolidWorks COM 互操作
+    └── field_mapper.py      # 字段映射（SW属性 ↔ PDM字段）
 ```
 
 ### 2.4 关键设计原则
@@ -325,14 +329,14 @@ def write_property(product, prop_name, value) -> None:
 
 ```powershell
 # 在用户 Windows 机器上
-cd CAD\Catia
+cd cad_bridge
 pip install -r requirements.txt  # pywin32, websockets, httpx
 ```
 
 ### 8.2 桥接服务启动
 
 ```powershell
-python -m CAD.Catia --port 9527 --pdm-url https://localhost:8080/api
+python -m cad_bridge --port 9527 --pdm-url https://localhost:8080/api
 ```
 
 ### 8.3 开机自启（可选）
@@ -347,14 +351,17 @@ python -m CAD.Catia --port 9527 --pdm-url https://localhost:8080/api
 
 ```
 myPDM/
-├── CAD/
-│   └── Catia/                          # 新增：CATIA 桥接服务
-│       ├── __main__.py
-│       ├── server.py
-│       ├── catia_client.py
-│       ├── pdm_client.py
-│       ├── field_mapper.py
-│       └── requirements.txt
+├── cad_bridge/                         # 新增：CAD 桥接服务
+│   ├── __main__.py                     # 统一入口
+│   ├── server.py                       # WebSocket 服务（共用）
+│   ├── pdm_client.py                   # PDM API 代理（共用）
+│   ├── catia/                          # CATIA 桥接
+│   │   ├── client.py
+│   │   └── field_mapper.py
+│   ├── sw/                             # SolidWorks 桥接（二期）
+│   │   ├── client.py
+│   │   └── field_mapper.py
+│   └── requirements.txt
 ├── frontend/src/
 │   ├── components/CADWorkspace/       # 新增：CAD 工作台组件
 │   │   ├── CADWorkspaceModal.tsx      # 三步流程 Modal 容器
@@ -376,7 +383,7 @@ myPDM/
 
 ## 10. 二期展望
 
-- SolidWorks 支持（复用同一桥接架构，增加 `solidworks_client.py`）
+- SolidWorks 支持（复用同一桥接架构，增加 `sw/client.py`）
 - CATIA 选择联动（选择 CATIA 中的零件 → BOM 面板高亮对应行）
 - 级联签出/签入（BOM 树批量操作）
 - 自动目录同步（签出时自动下载，保存时自动上传）
