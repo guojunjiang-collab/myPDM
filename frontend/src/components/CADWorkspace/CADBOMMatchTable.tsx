@@ -230,7 +230,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
   };
 
   return (
-    <div>
+    <div style={{ maxHeight: '75vh', display: 'flex', flexDirection: 'column' }}>
       {/* 汇总栏 */}
       <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 border-b border-gray-200 flex-wrap">
         <span className="bg-green-100 text-green-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">已匹配 {totalMatched}</span>
@@ -267,7 +267,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
                 row.match_status === 'new' ? 'bg-yellow-50' :
                 row.checkout_status === 'checked_out' ? 'bg-blue-50' : ''
               }`}>
-                <td className="p-2" style={{ paddingLeft: `${8 + row.level * 16}px` }}>
+                <td className="p-2">
                   {row.level === 0 ? <strong>{row.level}</strong> : row.path.replace('0.', '')}
                 </td>
                 <td className="p-2">{row.builtin.PartNumber || ''}</td>

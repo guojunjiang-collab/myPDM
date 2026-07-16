@@ -23,11 +23,14 @@ class CATIAClient:
     def _get_catia_app(self):
         """通过 COM GetObject 获取已运行的 CATIA Application"""
         import pythoncom
+        import traceback
         pythoncom.CoInitialize()
         try:
             from win32com.client import GetObject
             return GetObject(None, "CATIA.Application")
-        except Exception:
+        except Exception as e:
+            logger.warning(f"CATIA GetObject 失败: {e}")
+            logger.debug(traceback.format_exc())
             return None
 
     def detect(self) -> dict:
@@ -65,10 +68,31 @@ class CATIAClient:
         return self._read_product_tree(product, path="0", level=0)
 
     def _read_product_tree(self, product, path: str, level: int) -> dict:
-        """递归读取产品树节点"""
+        """递归读取产品树节点（含属性）"""
         is_assembly = False
         try:
             is_assembly = product.Products.Count > 0
+        except Exception:
+            pass
+
+        # 读取内置属性
+        builtin = {}
+        for attr in self.BUILTIN_ATTRS:
+            try:
+                val = getattr(product, attr, None)
+                if val is not None:
+                    builtin[attr] = str(val)
+            except Exception:
+                pass
+
+        # 读取 UserRefProperties 自定义属性
+        user_props = {}
+        try:
+            for prop in product.UserRefProperties:
+                try:
+                    user_props[prop.Name] = str(prop.Value) if prop.Value is not None else ""
+                except Exception:
+                    pass
         except Exception:
             pass
 
@@ -77,6 +101,8 @@ class CATIAClient:
             "path": path,
             "level": level,
             "is_assembly": is_assembly,
+            "builtin": builtin,
+            "user_properties": user_props,
             "children": []
         }
 

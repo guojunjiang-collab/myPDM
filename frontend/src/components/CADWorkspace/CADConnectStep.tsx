@@ -43,7 +43,6 @@ export function CADConnectStep({ bridge, onAssemblyLoaded, onClose }: Props) {
         setError('读取装配结构失败');
         return;
       }
-      // 递归扁平化树结构为 BOM 行
       const rows = flattenTree(tree);
       onAssemblyLoaded(rows);
     } catch (e: any) {
@@ -87,7 +86,7 @@ export function CADConnectStep({ bridge, onAssemblyLoaded, onClose }: Props) {
       <div className="flex gap-3">
         <button
           onClick={handleDetect}
-          disabled={detecting || !bridge.connected}
+          disabled={detecting}
           className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-gray-300 text-sm"
         >
           {detecting ? '检测中...' : '检测 CATIA'}
@@ -112,12 +111,12 @@ function flattenTree(tree: any): BOMRow[] {
   function walk(node: any) {
     rows.push({
       instance_name: node.instance_name || '',
-      part_number: '',
+      part_number: node.builtin?.PartNumber || '',
       path: node.path || '',
       level: node.level || 0,
       is_assembly: node.is_assembly || false,
-      builtin: {},
-      user_properties: {},
+      builtin: node.builtin || {},
+      user_properties: node.user_properties || {},
       pdm_match: null,
       match_status: 'unknown' as const,
       checkout_status: null,
