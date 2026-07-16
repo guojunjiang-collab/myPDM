@@ -67,6 +67,41 @@ class CATIAClient:
         product = doc.Product
         return self._read_product_tree(product, path="0", level=0)
 
+    def _get_ref_product(self, product):
+        """获取实例引用的产品对象。
+        CATIA 装配中的子节点是实例（Instance），其 PartNumber/Definition/
+        UserRefProperties 等属性存储在 ReferenceProduct 上；
+        根产品的 ReferenceProduct 为自身。读/写属性必须走引用产品。
+        """
+        try:
+            ref = product.ReferenceProduct
+            if ref is not None:
+                return ref
+        except Exception:
+            pass
+        return product
+
+    @staticmethod
+    def _short_prop_name(full_name: str) -> str:
+        """UserRefProperties 项的 Name 为全路径（如 'Part1\\属性\\存货类别'），
+        且每个零部件前缀不同。统一取最后一段作为短名，
+        保证各节点属性 key 一致，前端才能按同一列名对齐显示。"""
+        return str(full_name).split("\\")[-1]
+
+    def _read_user_props(self, ref) -> dict:
+        """读取引用产品的 UserRefProperties，key 为属性短名"""
+        user_props = {}
+        try:
+            for prop in ref.UserRefProperties:
+                try:
+                    key = self._short_prop_name(prop.Name)
+                    user_props[key] = str(prop.Value) if prop.Value is not None else ""
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.warning(f"读取 UserRefProperties 失败: {e}")
+        return user_props
+
     def _read_product_tree(self, product, path: str, level: int) -> dict:
         """递归读取产品树节点（含属性）"""
         is_assembly = False
@@ -75,26 +110,21 @@ class CATIAClient:
         except Exception:
             pass
 
+        # 属性从引用产品读取（子实例直接读会失败）
+        ref = self._get_ref_product(product)
+
         # 读取内置属性
         builtin = {}
         for attr in self.BUILTIN_ATTRS:
             try:
-                val = getattr(product, attr, None)
+                val = getattr(ref, attr, None)
                 if val is not None:
                     builtin[attr] = str(val)
             except Exception:
                 pass
 
         # 读取 UserRefProperties 自定义属性
-        user_props = {}
-        try:
-            for prop in product.UserRefProperties:
-                try:
-                    user_props[prop.Name] = str(prop.Value) if prop.Value is not None else ""
-                except Exception:
-                    pass
-        except Exception:
-            pass
+        user_props = self._read_user_props(ref)
 
         node = {
             "instance_name": str(product.Name),
@@ -132,26 +162,20 @@ class CATIAClient:
         if product is None:
             raise RuntimeError("PRODUCT_NOT_FOUND")
 
+        ref = self._get_ref_product(product)
+
         props = {}
         # 读取内置属性
         for attr in self.BUILTIN_ATTRS:
             try:
-                val = getattr(product, attr, None)
+                val = getattr(ref, attr, None)
                 if val is not None:
                     props[attr] = str(val)
             except Exception:
                 pass
 
         # 读取 UserRefProperties
-        user_props = {}
-        try:
-            for prop in product.UserRefProperties:
-                try:
-                    user_props[prop.Name] = str(prop.Value) if prop.Value is not None else ""
-                except Exception:
-                    pass
-        except Exception as e:
-            logger.warning(f"读取 UserRefProperties 失败: {e}")
+        user_props = self._read_user_props(ref)
 
         return {"builtin": props, "user_properties": user_props}
 
@@ -168,24 +192,62 @@ class CATIAClient:
         prop_name = params["prop_name"]
         value = params["value"]
 
+        # 写属性同样必须走引用产品
+        ref = self._get_ref_product(product)
+
         # 内置属性直接 setattr
         if prop_name in self.BUILTIN_ATTRS:
             try:
-                setattr(product, prop_name, value)
+                setattr(ref, prop_name, value)
             except Exception as e:
                 raise RuntimeError(f"写入内置属性 {prop_name} 失败: {e}")
         else:
-            # 自定义属性写入 UserRefProperties
-            try:
+            # 自定义属性：按短名匹配已有项（Name 为全路径，无法直接 Item）
+            prop = self._find_user_prop(ref, prop_name)
+            if prop is not None:
+                self._set_param_value(prop, value)
+            else:
+                # 不存在则新建字符串参数（Parameters 集合无 Add 方法）
                 try:
-                    prop = product.UserRefProperties.Item(prop_name)
-                    prop.Value = value
-                except Exception:
-                    product.UserRefProperties.Add(prop_name, value)
-            except Exception as e:
-                raise RuntimeError(f"写入自定义属性 {prop_name} 失败: {e}")
+                    ref.UserRefProperties.CreateString(self._short_prop_name(prop_name), str(value))
+                except Exception as e:
+                    raise RuntimeError(f"创建自定义属性 {prop_name} 失败: {e}")
 
         return {"success": True, "prop_name": prop_name}
+
+    def _find_user_prop(self, ref, prop_name: str):
+        """按短名遍历查找 UserRefProperties 中的属性项"""
+        short = self._short_prop_name(prop_name)
+        try:
+            for prop in ref.UserRefProperties:
+                try:
+                    if self._short_prop_name(prop.Name) == short:
+                        return prop
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        return None
+
+    @staticmethod
+    def _set_param_value(prop, value):
+        """按参数实际类型写入值。
+        CATIA 参数分 String/Real/Integer 等类型，Real 参数（如 重量(kg)）
+        直接赋字符串会失败，需依次尝试类型适配。"""
+        try:
+            prop.Value = value
+            return
+        except Exception:
+            pass
+        try:
+            prop.Value = float(value)
+            return
+        except Exception:
+            pass
+        try:
+            prop.ValuateFromString(str(value))
+        except Exception as e:
+            raise RuntimeError(f"写入属性值失败（类型不匹配）: {e}")
 
     def _find_product_by_path(self, product, path: str):
         """根据路径查找产品节点"""
