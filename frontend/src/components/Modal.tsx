@@ -10,9 +10,11 @@ interface ModalProps {
   zIndex?: number;
   /** 标题栏右侧、关闭按钮左侧的操作区（如导出按钮） */
   headerAction?: ReactNode;
+  /** 弹窗固定高度（如 '75vh'），设置后内容区自动滚动 */
+  height?: string;
 }
 
-export function Modal({ open, title, onClose, children, width = 'md', zIndex = 50, headerAction }: ModalProps) {
+export function Modal({ open, title, onClose, children, width = 'md', zIndex = 50, headerAction, height }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
 
@@ -53,7 +55,8 @@ export function Modal({ open, title, onClose, children, width = 'md', zIndex = 5
       <div
         className={`bg-white rounded-lg shadow-xl w-full mx-4 ${widthMap[width]} transform transition-transform duration-300 ${
           open ? 'scale-100' : 'scale-95'
-        }`}
+        } ${height ? 'flex flex-col' : ''}`}
+        style={height ? { height } : undefined}
       >
         {title && (
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
@@ -69,7 +72,7 @@ export function Modal({ open, title, onClose, children, width = 'md', zIndex = 5
             </div>
           </div>
         )}
-        <div className="px-6 py-4">{children}</div>
+        <div className={`px-6 py-4 ${height ? 'flex-1 overflow-auto' : ''}`}>{children}</div>
       </div>
     </div>
   ), document.body);
