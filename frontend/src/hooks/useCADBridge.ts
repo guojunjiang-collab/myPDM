@@ -94,9 +94,10 @@ export function useCADBridge() {
     return cadBridge.call('workspace.download', { attachment_id: attachmentId, code, version }, tokenRef.current);
   }, [ensureConnected]);
 
-  const uploadFile = useCallback(async (filePath: string, revisionId: string, category: 'cad' | 'production', overwrite = false): Promise<any> => {
+  const uploadFile = useCallback(async (filePath: string, revisionId: string, category: 'cad' | 'production', overwrite = false, includeDrawing = false): Promise<any> => {
     await ensureConnected();
-    return cadBridge.call('workspace.upload', { file_path: filePath, revision_id: revisionId, category, overwrite }, tokenRef.current);
+    // 大文件上传较慢，超时放宽到 3 分钟
+    return cadBridge.call('workspace.upload', { file_path: filePath, revision_id: revisionId, category, overwrite, include_drawing: includeDrawing }, tokenRef.current, 180000);
   }, [ensureConnected]);
 
   const exportStpUpload = useCallback(async (path: string, fileName: string, revisionId: string): Promise<any> => {

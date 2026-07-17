@@ -2,6 +2,7 @@
 用法: python -m cad_bridge --port 9527 --pdm-url https://localhost:8080/api
 """
 import sys
+import os
 import asyncio
 import logging
 import argparse
@@ -51,7 +52,16 @@ def register_handlers(server: BridgeServer, pdm_client: PDMClient):
         revision_id = params["revision_id"]
         category = params.get("category", "cad")
         overwrite = bool(params.get("overwrite", False))
-        return await pdm_client.upload_attachment(file_path, revision_id, category, token, overwrite=overwrite)
+        result = await pdm_client.upload_attachment(file_path, revision_id, category, token, overwrite=overwrite)
+        uploaded = [os.path.basename(file_path)]
+        # 上传源文件时，同目录同名的 CATDrawing 工程图（若存在）一并上传
+        if params.get("include_drawing"):
+            base, _ = os.path.splitext(file_path)
+            drawing_path = base + ".CATDrawing"
+            if os.path.isfile(drawing_path):
+                await pdm_client.upload_attachment(drawing_path, revision_id, category, token, overwrite=overwrite)
+                uploaded.append(os.path.basename(drawing_path))
+        return {"uploaded": uploaded, **(result or {})}
 
     async def handle_export_stp_upload(params: dict, token: str) -> dict:
         # 导出 CATIA 零部件为 STP 并上传为 PDM 生产附件（同名覆盖）

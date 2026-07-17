@@ -362,8 +362,9 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
     }
     setUploadingCad(row.path);
     try {
-      await bridge.uploadFile(row.doc_path, row.pdm_match.revision_id, 'cad', true);
-      toast.success(`CAD 源文件已上传: ${row.doc_path.split('\\').pop()}`);
+      const res = await bridge.uploadFile(row.doc_path, row.pdm_match.revision_id, 'cad', true, true);
+      const uploaded: string[] = res?.uploaded || [row.doc_path.split('\\').pop() || ''];
+      toast.success(`CAD 源文件已上传: ${uploaded.join('、')}`);
       refreshAttCount(row.pdm_match.revision_id);
     } catch (e: any) {
       toast.error(e.message || 'CAD 源文件上传失败');
