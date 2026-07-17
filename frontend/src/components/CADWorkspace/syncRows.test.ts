@@ -56,4 +56,15 @@ describe('syncRowsByPartNumber', () => {
     expect(rows[0].user_properties['规格型号']).toBe('old');
     expect(result[0]).not.toBe(rows[0]);
   });
+
+  it('空 rows 返回空数组', () => {
+    expect(syncRowsByPartNumber([], makeRow({ part_number: 'P-001' }), '规格型号', 'v')).toEqual([]);
+  });
+
+  it('匹配不到任何行时所有行保持原引用不变', () => {
+    const rows = [makeRow({ part_number: 'P-002', path: '0.1', user_properties: { 规格型号: 'a' } })];
+    const result = syncRowsByPartNumber(rows, makeRow({ part_number: 'P-001', path: '0.9' }), '规格型号', 'v');
+    expect(result).toHaveLength(1);
+    expect(result[0]).toBe(rows[0]);
+  });
 });
