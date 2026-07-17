@@ -187,9 +187,13 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
   const handlePushToPDM = async (row: BOMRow) => {
     if (!row.pdm_match?.revision_id) return;
     try {
+      // 推送映射与拉取方向对称：件号→code、定义→name、规格型号→spec；
+      // CATIA 规格型号为空时不传 spec，避免清空 PDM 已有值
+      const spec = row.user_properties['规格型号'];
       await partsApi.update(row.pdm_match.master_id!, {
         code: row.builtin.PartNumber || row.pdm_match.code,
         name: row.builtin.Definition || row.pdm_match.name,
+        ...(spec ? { spec } : {}),
       });
       toast.success('属性已推送到 PDM');
     } catch (e: any) {
