@@ -6,7 +6,7 @@ interface ModalProps {
   title?: string;
   onClose: () => void;
   children: ReactNode;
-  width?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | '3xl';
+  width?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | '3xl' | 'max';
   zIndex?: number;
   /** 标题栏右侧、关闭按钮左侧的操作区（如导出按钮） */
   headerAction?: ReactNode;
@@ -39,6 +39,7 @@ export function Modal({ open, title, onClose, children, width = 'md', zIndex = 5
     xl: 'max-w-xl',
     full: 'max-w-4xl',
     '3xl': 'max-w-6xl',
+    max: 'max-w-[95vw]',
   };
 
   if (!visible && !open) return null;

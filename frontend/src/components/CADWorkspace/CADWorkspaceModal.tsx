@@ -41,7 +41,7 @@ export function CADWorkspaceModal({ open, onClose }: Props) {
   };
 
   return (
-    <Modal open={open} onClose={handleClose} title="CAD 入口 · 工作台" width="3xl" height="75vh">
+    <Modal open={open} onClose={handleClose} title="CAD 入口 · 工作台" width="max" height="85vh">
       {/* 步骤标签 */}
       <div className="flex border-b border-gray-200 mb-4">
         {(['connect', 'match', 'complete'] as Step[]).map((s, i) => (
