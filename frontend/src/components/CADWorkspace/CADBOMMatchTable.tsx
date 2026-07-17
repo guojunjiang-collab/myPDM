@@ -407,7 +407,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
   return (
     <div className="flex flex-col h-full">
       {/* 汇总栏 */}
-      <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 border-b border-gray-200 flex-wrap">
+      <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 border-b border-gray-200 flex-wrap shrink-0">
         <span className="bg-green-100 text-green-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">已匹配 {totalMatched}</span>
         <span className="bg-yellow-100 text-yellow-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">可新建 {totalNew}</span>
         <span className="bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">冲突 {totalConflict}</span>
@@ -424,14 +424,14 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
         <button onClick={handleBatchCheckin} className="px-3 py-1.5 bg-emerald-500 text-white rounded text-xs hover:bg-emerald-600">全部签入</button>
       </div>
 
-      {/* 表格 */}
-      <div className="overflow-x-auto">
+      {/* 表格：仅列表内容垂直滚动，表头 sticky 固定 */}
+      <div className="flex-1 min-h-0 overflow-auto">
         <table className="w-full text-xs border-collapse whitespace-nowrap">
-          <thead>
-            <tr className="bg-gray-50 border-b-2 border-gray-200">
-              <th className="p-2 text-left">层级</th>
-              <th className="p-2 text-left">件号</th>
-              <th className="p-2 text-center">用量</th>
+          <thead className="sticky top-0 z-10">
+            <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
+              <th className="p-2 text-left bg-gray-50">层级</th>
+              <th className="p-2 text-left bg-gray-50">件号</th>
+              <th className="p-2 text-center bg-gray-50">用量</th>
               {BUILTIN_COLUMNS.map(col => (
                 <th key={col.attr} className="p-2 text-left bg-sky-50">{col.label}</th>
               ))}
@@ -440,17 +440,17 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
               ))}
               <th className="p-2 text-center bg-blue-50">CAD附件</th>
               <th className="p-2 text-center bg-amber-50">生产附件</th>
-              <th className="p-2 text-left">PDM匹配</th>
-              <th className="p-2 text-left">匹配状态</th>
-              <th className="p-2 text-left">签出状态</th>
-              <th className="p-2 text-center">操作</th>
+              <th className="p-2 text-left bg-gray-50">PDM匹配</th>
+              <th className="p-2 text-left bg-gray-50">匹配状态</th>
+              <th className="p-2 text-left bg-gray-50">签出状态</th>
+              <th className="p-2 text-center bg-gray-50">操作</th>
             </tr>
           </thead>
           <tbody>
             {rows.map(row => (
-              <tr key={row.path} className={`border-b border-gray-100 ${
-                row.match_status === 'new' ? 'bg-yellow-50' :
-                row.checkout_status === 'checked_out' ? 'bg-blue-50' : ''
+              <tr key={row.path} className={`border-b border-gray-200 transition-colors ${
+                row.match_status === 'new' ? 'bg-yellow-50 hover:bg-yellow-100' :
+                row.checkout_status === 'checked_out' ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-100'
               }`}>
                 <td className="p-2">
                   {row.level === 0 ? <strong>{row.level}</strong> : row.path.replace('0.', '')}

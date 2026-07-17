@@ -42,43 +42,48 @@ export function CADWorkspaceModal({ open, onClose }: Props) {
 
   return (
     <Modal open={open} onClose={handleClose} title="CAD 入口 · 工作台" width="max" height="85vh">
-      {/* 步骤标签 */}
-      <div className="flex border-b border-gray-200 mb-4">
-        {(['connect', 'match', 'complete'] as Step[]).map((s, i) => (
-          <div
-            key={s}
-            className={`px-5 py-2.5 text-sm font-semibold ${
-              step === s
-                ? 'text-primary-600 border-b-2 border-primary-600'
-                : 'text-gray-400'
-            }`}
-          >
-            {i === 0 ? '①' : i === 1 ? '②' : '③'} {stepLabels[s]}
-          </div>
-        ))}
-      </div>
+      {/* 满高 flex 布局：步骤标签固定，步骤内容占余下高度（内部自行滚动） */}
+      <div className="flex flex-col h-full">
+        {/* 步骤标签 */}
+        <div className="flex border-b border-gray-200 mb-4 shrink-0">
+          {(['connect', 'match', 'complete'] as Step[]).map((s, i) => (
+            <div
+              key={s}
+              className={`px-5 py-2.5 text-sm font-semibold ${
+                step === s
+                  ? 'text-primary-600 border-b-2 border-primary-600'
+                  : 'text-gray-400'
+              }`}
+            >
+              {i === 0 ? '①' : i === 1 ? '②' : '③'} {stepLabels[s]}
+            </div>
+          ))}
+        </div>
 
-      {/* 步骤内容 */}
-      {step === 'connect' && (
-        <CADConnectStep
-          bridge={bridge}
-          onAssemblyLoaded={handleAssemblyLoaded}
-          onClose={handleClose}
-        />
-      )}
-      {step === 'match' && (
-        <CADBOMMatchTable
-          bridge={bridge}
-          rows={bomRows}
-          onComplete={handleMatchComplete}
-        />
-      )}
-      {step === 'complete' && (
-        <CADCompleteStep
-          count={completedCount}
-          onClose={handleClose}
-        />
-      )}
+        {/* 步骤内容 */}
+        <div className="flex-1 min-h-0">
+          {step === 'connect' && (
+            <CADConnectStep
+              bridge={bridge}
+              onAssemblyLoaded={handleAssemblyLoaded}
+              onClose={handleClose}
+            />
+          )}
+          {step === 'match' && (
+            <CADBOMMatchTable
+              bridge={bridge}
+              rows={bomRows}
+              onComplete={handleMatchComplete}
+            />
+          )}
+          {step === 'complete' && (
+            <CADCompleteStep
+              count={completedCount}
+              onClose={handleClose}
+            />
+          )}
+        </div>
+      </div>
     </Modal>
   );
 }
