@@ -103,6 +103,20 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
   }, [bridge]);
 
   const [matching, setMatching] = useState(false);
+  // 各版本附件计数（cad/production），显示在附件列按钮上方
+  const [attCounts, setAttCounts] = useState<Record<string, { cad: number; production: number }>>({});
+
+  const refreshAttCount = useCallback(async (revisionId?: string) => {
+    if (!revisionId) return;
+    try {
+      const atts = await partsApi.listAttachments(revisionId);
+      const cad = (atts || []).filter((a: any) => a.category === 'cad').length;
+      const production = (atts || []).filter((a: any) => a.category === 'production').length;
+      setAttCounts(prev => ({ ...prev, [revisionId]: { cad, production } }));
+    } catch {
+      // 计数失败不影响主流程
+    }
+  }, []);
   // PDM匹配列点击后弹出的零部件详情
   const [detailPart, setDetailPart] = useState<{ masterId: string; revisionId?: string } | null>(null);
 
@@ -153,12 +167,19 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
         }
         return { ...r, match_status: 'new' as const, pdm_match: null, checkout_status: null };
       }));
+      // 匹配成功的版本刷新附件计数
+      const matchedRevIds: string[] = [...new Set<string>(
+        (data.results || [])
+          .filter((res: any) => res.match_status === 'matched' && res.revision_id)
+          .map((res: any) => res.revision_id as string)
+      )];
+      matchedRevIds.forEach(id => { refreshAttCount(id); });
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || 'PDM 匹配失败');
     } finally {
       setMatching(false);
     }
-  }, []);
+  }, [refreshAttCount]);
 
   // 进入匹配步骤时自动执行一次 PDM 匹配
   useEffect(() => {
@@ -343,6 +364,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
     try {
       await bridge.uploadFile(row.doc_path, row.pdm_match.revision_id, 'cad', true);
       toast.success(`CAD 源文件已上传: ${row.doc_path.split('\\').pop()}`);
+      refreshAttCount(row.pdm_match.revision_id);
     } catch (e: any) {
       toast.error(e.message || 'CAD 源文件上传失败');
     } finally {
@@ -363,6 +385,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
         const entityType = row.is_assembly ? 'assembly' : 'part';
         await v2UploadApi.uploadSmallFile(file, entityType, row.pdm_match!.revision_id!, undefined, 'production');
         toast.success('PDF 上传成功');
+        refreshAttCount(row.pdm_match!.revision_id);
       } catch (e: any) {
         toast.error(e?.response?.data?.detail || '上传失败');
       }
@@ -380,6 +403,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
       const fileName = `${(row.part_number || 'export').trim()}.stp`;
       await bridge.exportStpUpload(row.path, fileName, row.pdm_match.revision_id);
       toast.success(`STP 已导出并上传: ${fileName}`);
+      refreshAttCount(row.pdm_match.revision_id);
     } catch (e: any) {
       toast.error(e.message || 'STP 导出上传失败');
     } finally {
@@ -488,7 +512,14 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
                 ))}
 
                 <td className="p-2 text-center bg-blue-50">
-                  <div className="text-xs text-gray-500">—</div>
+                  {(() => {
+                    const n = row.pdm_match?.revision_id ? attCounts[row.pdm_match.revision_id]?.cad : undefined;
+                    return (
+                      <div className={`text-xs ${n ? 'font-semibold text-blue-600' : 'text-gray-500'}`}>
+                        {n !== undefined ? n : '—'}
+                      </div>
+                    );
+                  })()}
                   {isCheckedOutByMe(row) && (
                     <button
                       onClick={() => handleUploadCAD(row)}
@@ -509,7 +540,14 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
                 </td>
 
                 <td className="p-2 text-center bg-amber-50">
-                  <div className="text-xs text-gray-500">—</div>
+                  {(() => {
+                    const n = row.pdm_match?.revision_id ? attCounts[row.pdm_match.revision_id]?.production : undefined;
+                    return (
+                      <div className={`text-xs ${n ? 'font-semibold text-amber-600' : 'text-gray-500'}`}>
+                        {n !== undefined ? n : '—'}
+                      </div>
+                    );
+                  })()}
                   {isCheckedOutByMe(row) && (
                     <div className="flex gap-1 justify-center mt-1">
                       <button onClick={() => handleUploadPDF(row)} className="px-2 py-0.5 bg-red-500 text-white rounded text-xs hover:bg-red-600">PDF</button>
