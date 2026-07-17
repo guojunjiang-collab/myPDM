@@ -203,3 +203,30 @@ class CadImportPreviewResponse(BaseModel):
     matched: List[MatchedFileItem]
     unmatched: List[str]
     summary: dict
+
+
+# === CAD 工作台 件号+版本 批量匹配 ===
+
+class CadBomMatchItem(BaseModel):
+    code: str
+    version: Optional[str] = None
+
+
+class CadBomMatchRequest(BaseModel):
+    items: List[CadBomMatchItem] = []
+
+
+class CadBomMatchResult(BaseModel):
+    code: str
+    version: Optional[str] = None
+    match_status: str  # matched / conflict / new
+    master_id: Optional[UUID] = None
+    revision_id: Optional[UUID] = None
+    matched_version: Optional[str] = None
+    name: Optional[str] = None
+    checkout_status: Optional[str] = None  # not_checked_out / checked_out / other_checked_out
+    latest_version: Optional[str] = None
+
+
+class CadBomMatchResponse(BaseModel):
+    results: List[CadBomMatchResult] = []

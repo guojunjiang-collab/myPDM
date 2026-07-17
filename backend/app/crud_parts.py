@@ -1322,6 +1322,84 @@ def get_assembly_instances(db: Session, assembly_revision_id, glb_url_resolver) 
     return instances
 
 
+def match_cad_bom_items(db: Session, items: list, current_user_id) -> list:
+    """
+    按 件号+版本 批量匹配 PDM 零部件（CAD 工作台自动匹配）。
+    - 件号不存在 → new
+    - 版本为空 → 匹配最新版本（created_at 最新）→ matched
+    - 版本命中（trim 后不区分大小写）→ matched
+    - 版本未命中 → conflict（latest_version 返回 PDM 已有最新版本号）
+    matched 时返回相对当前用户的签出状态。
+    """
+    results = []
+    for item in items:
+        code = (item.get("code") or "").strip()
+        version = (item.get("version") or "").strip()
+        entry = {
+            "code": code,
+            "version": version or None,
+            "match_status": "new",
+            "master_id": None,
+            "revision_id": None,
+            "matched_version": None,
+            "name": None,
+            "checkout_status": None,
+            "latest_version": None,
+        }
+        if not code:
+            results.append(entry)
+            continue
+        master = (
+            db.query(models_parts.PartMaster)
+            .filter(
+                models_parts.PartMaster.code == code,
+                models_parts.PartMaster.deleted_at.is_(None),
+            )
+            .first()
+        )
+        if master is None:
+            results.append(entry)
+            continue
+        revisions = (
+            db.query(models_parts.PartRevision)
+            .filter(
+                models_parts.PartRevision.master_id == master.id,
+                models_parts.PartRevision.deleted_at.is_(None),
+            )
+            .order_by(models_parts.PartRevision.created_at.desc())
+            .all()
+        )
+        if not revisions:
+            results.append(entry)
+            continue
+        latest = revisions[0]
+        entry["master_id"] = master.id
+        entry["latest_version"] = latest.version
+        matched_rev = None
+        if not version:
+            matched_rev = latest
+        else:
+            for rev in revisions:
+                if (rev.version or "").strip().upper() == version.upper():
+                    matched_rev = rev
+                    break
+        if matched_rev is None:
+            entry["match_status"] = "conflict"
+        else:
+            entry["match_status"] = "matched"
+            entry["revision_id"] = matched_rev.id
+            entry["matched_version"] = matched_rev.version
+            entry["name"] = master.name
+            if matched_rev.check_out_user_id is None:
+                entry["checkout_status"] = "not_checked_out"
+            elif matched_rev.check_out_user_id == current_user_id:
+                entry["checkout_status"] = "checked_out"
+            else:
+                entry["checkout_status"] = "other_checked_out"
+        results.append(entry)
+    return results
+
+
 def get_assembly_tree(db: Session, assembly_revision_id) -> list:
     """递归构建嵌套 BOM 树，供 AssemblyViewer 侧栏渲染"""
     def build(rev_id, visited):

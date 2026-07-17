@@ -57,6 +57,19 @@ def create_part(
         raise HTTPException(400, str(e))
 
 
+@router.post("/cad/bom-match", response_model=schemas_parts.CadBomMatchResponse)
+def cad_bom_match(
+    data: schemas_parts.CadBomMatchRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("parts:read")),
+):
+    """CAD 工作台：按 件号+版本 批量匹配 PDM 零部件"""
+    results = crud_parts.match_cad_bom_items(
+        db, [i.model_dump() for i in data.items], current_user.id
+    )
+    return {"results": results}
+
+
 @router.get("/{master_id}", response_model=schemas_parts.PartMasterResponse)
 def get_part(
     master_id: UUID,
