@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { toast } from '../Toast';
 import { partsApi } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
@@ -19,6 +19,7 @@ export interface BOMRow {
     code?: string;
     version?: string;
     name?: string;
+    latest_version?: string;
   } | null;
   match_status: 'matched' | 'new' | 'conflict' | 'unknown';
   checkout_status: 'not_checked_out' | 'checked_out' | 'other_checked_out' | null;
@@ -80,6 +81,68 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
       toast.error(e.message || '写入 CATIA 失败');
     }
   }, [bridge]);
+
+  const [matching, setMatching] = useState(false);
+
+  // 件号+版本 组成去重键；版本 trim 后不区分大小写，与后端匹配规则一致
+  const matchKeyOf = (r: BOMRow) =>
+    `${(r.builtin.PartNumber || '').trim()}|${(r.builtin.Revision || '').trim().toUpperCase()}`;
+
+  const runPdmMatch = useCallback(async (targetRows: BOMRow[]) => {
+    const uniq = new Map<string, { code: string; version?: string }>();
+    for (const r of targetRows) {
+      const code = (r.builtin.PartNumber || '').trim();
+      if (!code) continue;
+      const k = matchKeyOf(r);
+      if (!uniq.has(k)) uniq.set(k, { code, version: (r.builtin.Revision || '').trim() || undefined });
+    }
+    if (uniq.size === 0) return;
+    setMatching(true);
+    try {
+      const data = await partsApi.cadBomMatch([...uniq.values()]);
+      const resultMap = new Map<string, any>();
+      for (const res of data.results || []) {
+        resultMap.set(`${res.code}|${(res.version || '').toUpperCase()}`, res);
+      }
+      setRows(prev => prev.map(r => {
+        const res = resultMap.get(matchKeyOf(r));
+        if (!res) return r;
+        if (res.match_status === 'matched') {
+          return {
+            ...r,
+            match_status: 'matched' as const,
+            pdm_match: {
+              master_id: res.master_id,
+              revision_id: res.revision_id,
+              code: res.code,
+              version: res.matched_version,
+              name: res.name,
+            },
+            checkout_status: res.checkout_status,
+          };
+        }
+        if (res.match_status === 'conflict') {
+          return {
+            ...r,
+            match_status: 'conflict' as const,
+            pdm_match: { code: res.code, latest_version: res.latest_version },
+            checkout_status: null,
+          };
+        }
+        return { ...r, match_status: 'new' as const, pdm_match: null, checkout_status: null };
+      }));
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'PDM 匹配失败');
+    } finally {
+      setMatching(false);
+    }
+  }, []);
+
+  // 进入匹配步骤时自动执行一次 PDM 匹配
+  useEffect(() => {
+    runPdmMatch(initialRows);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCheckout = async (row: BOMRow) => {
     if (!row.pdm_match?.revision_id) return;
@@ -257,6 +320,13 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
         <span className="bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">冲突 {totalConflict}</span>
         <span className="bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">已签出 {totalCheckedOut}</span>
         <div className="flex-1" />
+        <button
+          onClick={() => runPdmMatch(rows)}
+          disabled={matching}
+          className="px-3 py-1.5 bg-sky-500 text-white rounded text-xs hover:bg-sky-600 disabled:bg-gray-300"
+        >
+          {matching ? '匹配中...' : '重新匹配'}
+        </button>
         <button onClick={handleBatchPushToPDM} className="px-3 py-1.5 bg-amber-500 text-white rounded text-xs hover:bg-amber-600">批量属性→PDM</button>
         <button onClick={handleBatchCheckin} className="px-3 py-1.5 bg-emerald-500 text-white rounded text-xs hover:bg-emerald-600">全部签入</button>
       </div>
@@ -357,7 +427,13 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
                 </td>
 
                 <td className="p-2">
-                  {row.pdm_match ? (
+                  {row.match_status === 'conflict' && row.pdm_match ? (
+                    <span className="text-red-600">
+                      {row.pdm_match.latest_version
+                        ? `版本冲突 (PDM最新: v${row.pdm_match.latest_version})`
+                        : '版本冲突'}
+                    </span>
+                  ) : row.pdm_match ? (
                     <span className="text-blue-600">{row.pdm_match.code} (v{row.pdm_match.version})</span>
                   ) : (
                     <span className="text-amber-600">— 无 —</span>

@@ -178,6 +178,9 @@ export const partsApi = {
   // CAD 文件夹导入
   cadImportPreview: (revisionId: string, fileNames: string[]) =>
     api.post(`/parts/revisions/${revisionId}/cad/import-preview`, { file_names: fileNames }).then((r) => r.data),
+  // CAD 工作台：按 件号+版本 批量匹配 PDM 零部件
+  cadBomMatch: (items: { code: string; version?: string }[]) =>
+    api.post('/parts/cad/bom-match', { items }).then((r) => r.data),
 };
 
 // 图文档 API
