@@ -44,8 +44,8 @@ function getPropertyColumns(userProps: Record<string, string>): string[] {
 
 // CATIA 内置属性列：列头中文，写回 CATIA 用英文属性名。
 // 件号（PartNumber）只读不在此列表；属性存于零件文档，编辑后按同 PartNumber 实例同步。
-const BUILTIN_COLUMNS: { label: string; attr: string }[] = [
-  { label: '版本', attr: 'Revision' },
+const BUILTIN_COLUMNS: { label: string; attr: string; width?: string }[] = [
+  { label: '版本', attr: 'Revision', width: 'w-14' },
   { label: '定义', attr: 'Definition' },
   { label: '术语', attr: 'Nomenclature' },
   { label: '描述', attr: 'DescriptionRef' },
@@ -433,7 +433,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
               <th className="p-2 text-left bg-gray-50">件号</th>
               <th className="p-2 text-center bg-gray-50">用量</th>
               {BUILTIN_COLUMNS.map(col => (
-                <th key={col.attr} className="p-2 text-left bg-sky-50">{col.label}</th>
+                <th key={col.attr} className={`p-2 text-left bg-sky-50 ${col.width || ''}`}>{col.label}</th>
               ))}
               {propertyColumns.map(col => (
                 <th key={col} className="p-2 text-left bg-green-50">{col}</th>
@@ -459,7 +459,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
                 <td className="p-2 text-center">{row.quantity}</td>
 
                 {BUILTIN_COLUMNS.map(col => (
-                  <td key={col.attr} className="p-2 bg-sky-50">
+                  <td key={col.attr} className={`p-2 bg-sky-50 ${col.width || ''}`}>
                     <input
                       value={row.builtin[col.attr] || ''}
                       disabled={!canEditProps(row)}
