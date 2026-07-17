@@ -1329,9 +1329,16 @@ def match_cad_bom_items(db: Session, items: list, current_user_id) -> list:
     - 版本为空 → 匹配最新版本（created_at 最新）→ matched
     - 版本命中（trim 后不区分大小写）→ matched
     - 版本未命中 → conflict（latest_version 返回 PDM 已有最新版本号）
+    - 件号存在但无未删除版本 → conflict（latest_version=None，master_id 返回，与"有版本但未命中"区分）
     matched 时返回相对当前用户的签出状态。
+
+    批量预取策略：先收集所有去重后的件号，批量查询 master 与 revisions，
+    再逐条从索引回填结果，避免同一件号重复查库。
     """
-    results = []
+    # 1. 收集去重件号，构建 entry 雏形（保持输入顺序）
+    entries: list = []
+    codes: list = []  # 需要查询的有效件号列表（保持首次出现的顺序用于去重）
+    code_index_map: dict = {}  # code → 该 code 对应 entries 中首次出现位置的索引列表
     for item in items:
         code = (item.get("code") or "").strip()
         version = (item.get("version") or "").strip()
@@ -1346,43 +1353,77 @@ def match_cad_bom_items(db: Session, items: list, current_user_id) -> list:
             "checkout_status": None,
             "latest_version": None,
         }
-        if not code:
-            results.append(entry)
-            continue
-        master = (
-            db.query(models_parts.PartMaster)
-            .filter(
-                models_parts.PartMaster.code == code,
-                models_parts.PartMaster.deleted_at.is_(None),
-            )
-            .first()
+        entries.append(entry)
+        if code:
+            if code not in code_index_map:
+                code_index_map[code] = []
+                codes.append(code)
+            code_index_map[code].append(len(entries) - 1)
+
+    if not codes:
+        return entries
+
+    # 2. 批量预取 master（按去重件号），构建 code→master 索引
+    masters = (
+        db.query(models_parts.PartMaster)
+        .filter(
+            models_parts.PartMaster.code.in_(codes),
+            models_parts.PartMaster.deleted_at.is_(None),
         )
-        if master is None:
-            results.append(entry)
-            continue
-        revisions = (
+        .all()
+    )
+    code_to_master: dict = {m.code: m for m in masters}
+    found_master_ids = [m.id for m in masters]
+
+    # 3. 批量预取 revisions（按已找到的 master_id），按 created_at DESC 排序
+    master_revisions: dict = {}  # master_id → [revisions 列表，created_at DESC]
+    if found_master_ids:
+        all_revs = (
             db.query(models_parts.PartRevision)
             .filter(
-                models_parts.PartRevision.master_id == master.id,
+                models_parts.PartRevision.master_id.in_(found_master_ids),
                 models_parts.PartRevision.deleted_at.is_(None),
             )
             .order_by(models_parts.PartRevision.created_at.desc())
             .all()
         )
-        if not revisions:
-            results.append(entry)
+        for rev in all_revs:
+            master_revisions.setdefault(str(rev.master_id), []).append(rev)
+
+    # 4. 逐 item 从索引回填结果
+    for idx, entry in enumerate(entries):
+        code = entry["code"]
+        if not code:
             continue
+
+        master = code_to_master.get(code)
+        if master is None:
+            continue  # 件号不存在，保持 new
+
+        revisions = master_revisions.get(str(master.id), [])
+        if not revisions:
+            # 件号存在但无未删除版本 → conflict（与"版本未命中"区分，latest_version=None）
+            entry["match_status"] = "conflict"
+            entry["master_id"] = master.id
+            entry["latest_version"] = None
+            continue
+
         latest = revisions[0]
         entry["master_id"] = master.id
         entry["latest_version"] = latest.version
+
+        version = entry["version"]
         matched_rev = None
         if not version:
+            # 版本为空 → 自动命中最新版本
             matched_rev = latest
         else:
+            # 精确匹配版本（trim 后不区分大小写）
             for rev in revisions:
                 if (rev.version or "").strip().upper() == version.upper():
                     matched_rev = rev
                     break
+
         if matched_rev is None:
             entry["match_status"] = "conflict"
         else:
@@ -1396,8 +1437,8 @@ def match_cad_bom_items(db: Session, items: list, current_user_id) -> list:
                 entry["checkout_status"] = "checked_out"
             else:
                 entry["checkout_status"] = "other_checked_out"
-        results.append(entry)
-    return results
+
+    return entries
 
 
 def get_assembly_tree(db: Session, assembly_revision_id) -> list:

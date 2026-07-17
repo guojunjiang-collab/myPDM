@@ -96,6 +96,46 @@ def test_checkout_status(db):
     assert results[1]["checkout_status"] == "other_checked_out"
 
 
+def test_version_with_surrounding_spaces_still_matches(db):
+    """版本含前后空格如 " a " 经 trim 后仍能精确命中"""
+    user = _make_user(db)
+    master, revs = _make_part(db, "P-007", [("A", None), ("B", None)])
+    results = crud_parts.match_cad_bom_items(db, [{"code": "P-007", "version": " a "}], user.id)
+    assert results[0]["match_status"] == "matched"
+    assert results[0]["revision_id"] == revs[0].id
+    assert results[0]["matched_version"] == "A"
+
+
+def test_soft_deleted_master_returns_new(db):
+    """件号的 master 已被软删除（deleted_at 非空）时应返回 new，不泄露已删除数据"""
+    user = _make_user(db)
+    master = models_parts.PartMaster(
+        id=uuid.uuid4(), code="P-DELETED", name="已删除件",
+        deleted_at=datetime.now(),
+    )
+    db.add(master)
+    db.commit()
+    results = crud_parts.match_cad_bom_items(db, [{"code": "P-DELETED", "version": "A"}], user.id)
+    assert results[0]["match_status"] == "new"
+    assert results[0]["master_id"] is None
+
+
+def test_master_exists_no_undeleted_revision_returns_conflict(db):
+    """件号 master 存在但没有任何未删除的 revision → conflict，
+    latest_version=None（与「有版本但未命中」的 conflict 区分，后者 latest_version 有值）"""
+    user = _make_user(db)
+    master = models_parts.PartMaster(
+        id=uuid.uuid4(), code="P-EMPTY", name="空版本件",
+    )
+    db.add(master)
+    # 不创建任何 revision
+    db.commit()
+    results = crud_parts.match_cad_bom_items(db, [{"code": "P-EMPTY", "version": ""}], user.id)
+    assert results[0]["match_status"] == "conflict"
+    assert results[0]["master_id"] == master.id
+    assert results[0]["latest_version"] is None
+
+
 def test_endpoint(db):
     user = _make_user(db)
     _make_part(db, "P-006", [("A", None)])
