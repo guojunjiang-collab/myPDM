@@ -67,4 +67,26 @@ describe('syncRowsByPartNumber', () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toBe(rows[0]);
   });
+
+  it('target 为 builtin 时同步更新 builtin 属性，user_properties 不受影响', () => {
+    const rows = [
+      makeRow({ part_number: 'P-001', path: '0.1', builtin: { Revision: 'A' }, user_properties: { 规格型号: 'x' } }),
+      makeRow({ part_number: 'P-001', path: '0.2', builtin: { Revision: 'A' }, user_properties: { 规格型号: 'x' } }),
+      makeRow({ part_number: 'P-002', path: '0.3', builtin: { Revision: 'A' } }),
+    ];
+    const result = syncRowsByPartNumber(rows, rows[0], 'Revision', 'B', 'builtin');
+    expect(result[0].builtin['Revision']).toBe('B');
+    expect(result[1].builtin['Revision']).toBe('B');
+    expect(result[2].builtin['Revision']).toBe('A');
+    expect(result[0].user_properties['规格型号']).toBe('x');
+  });
+
+  it('省略 target 时行为不变：更新 user_properties，builtin 不变', () => {
+    const rows = [
+      makeRow({ part_number: 'P-001', path: '0.1', builtin: { Revision: 'A' }, user_properties: { 规格型号: 'x' } }),
+    ];
+    const result = syncRowsByPartNumber(rows, rows[0], '规格型号', 'y');
+    expect(result[0].user_properties['规格型号']).toBe('y');
+    expect(result[0].builtin['Revision']).toBe('A');
+  });
 });
