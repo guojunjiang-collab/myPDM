@@ -11,6 +11,7 @@ export interface BOMRow {
   path: string;
   level: number;
   is_assembly: boolean;
+  quantity: number;
   builtin: Record<string, string>;
   user_properties: Record<string, string>;
   pdm_match: {
@@ -338,6 +339,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
             <tr className="bg-gray-50 border-b-2 border-gray-200">
               <th className="p-2 text-left">层级</th>
               <th className="p-2 text-left">件号</th>
+              <th className="p-2 text-center">用量</th>
               {BUILTIN_COLUMNS.map(col => (
                 <th key={col.attr} className="p-2 text-left bg-sky-50">{col.label}</th>
               ))}
@@ -362,6 +364,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
                   {row.level === 0 ? <strong>{row.level}</strong> : row.path.replace('0.', '')}
                 </td>
                 <td className="p-2">{row.builtin.PartNumber || ''}</td>
+                <td className="p-2 text-center">{row.quantity}</td>
 
                 {BUILTIN_COLUMNS.map(col => (
                   <td key={col.attr} className="p-2 bg-sky-50">
