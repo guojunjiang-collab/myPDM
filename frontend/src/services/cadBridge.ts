@@ -103,7 +103,7 @@ class CADBridgeClient {
     }
   }
 
-  call(method: string, params: Record<string, any> = {}, token: string): Promise<any> {
+  call(method: string, params: Record<string, any> = {}, token: string, timeoutMs = 30000): Promise<any> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       return Promise.reject(new Error('桥接服务未连接'));
     }
@@ -120,7 +120,7 @@ class CADBridgeClient {
           this.pending.delete(id);
           reject(new Error('请求超时'));
         }
-      }, 30000);
+      }, timeoutMs);
     });
   }
 }

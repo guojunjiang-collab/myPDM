@@ -370,24 +370,21 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
     input.click();
   };
 
+  const [uploadingStp, setUploadingStp] = useState<string | null>(null);
+
   const handleUploadSTP = async (row: BOMRow) => {
     if (!row.pdm_match?.revision_id) return;
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.stp,.step';
-    input.onchange = async (e: any) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      try {
-        const { v2UploadApi } = await import('../../services/api');
-        const entityType = row.is_assembly ? 'assembly' : 'part';
-        await v2UploadApi.uploadSmallFile(file, entityType, row.pdm_match!.revision_id!, undefined, 'production');
-        toast.success('STP 上传成功');
-      } catch (e: any) {
-        toast.error(e?.response?.data?.detail || '上传失败');
-      }
-    };
-    input.click();
+    // 通过桥接程序将 CATIA 零部件导出为 STP 并上传到生产附件，同名覆盖
+    setUploadingStp(row.path);
+    try {
+      const fileName = `${(row.part_number || 'export').trim()}.stp`;
+      await bridge.exportStpUpload(row.path, fileName, row.pdm_match.revision_id);
+      toast.success(`STP 已导出并上传: ${fileName}`);
+    } catch (e: any) {
+      toast.error(e.message || 'STP 导出上传失败');
+    } finally {
+      setUploadingStp(null);
+    }
   };
 
   const handleBatchPushToPDM = async () => {
@@ -516,7 +513,14 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
                   {isCheckedOutByMe(row) && (
                     <div className="flex gap-1 justify-center mt-1">
                       <button onClick={() => handleUploadPDF(row)} className="px-2 py-0.5 bg-red-500 text-white rounded text-xs hover:bg-red-600">PDF</button>
-                      <button onClick={() => handleUploadSTP(row)} className="px-2 py-0.5 bg-purple-500 text-white rounded text-xs hover:bg-purple-600">STP</button>
+                      <button
+                        onClick={() => handleUploadSTP(row)}
+                        disabled={uploadingStp === row.path}
+                        title="通过桥接程序将 CATIA 零部件导出为 STP 并上传（同名覆盖）"
+                        className="px-2 py-0.5 bg-purple-500 text-white rounded text-xs hover:bg-purple-600 disabled:bg-gray-300"
+                      >
+                        {uploadingStp === row.path ? '导出中...' : 'STP'}
+                      </button>
                     </div>
                   )}
                   {!row.pdm_match && <span className="text-gray-400 text-xs">—</span>}

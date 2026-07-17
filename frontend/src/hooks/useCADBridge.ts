@@ -99,6 +99,12 @@ export function useCADBridge() {
     return cadBridge.call('workspace.upload', { file_path: filePath, revision_id: revisionId, category, overwrite }, tokenRef.current);
   }, [ensureConnected]);
 
+  const exportStpUpload = useCallback(async (path: string, fileName: string, revisionId: string): Promise<any> => {
+    await ensureConnected();
+    // STP 导出大装配较慢，超时放宽到 3 分钟
+    return cadBridge.call('workspace.export_stp_upload', { path, file_name: fileName, revision_id: revisionId }, tokenRef.current, 180000);
+  }, [ensureConnected]);
+
   return {
     connected,
     catiaStatus,
@@ -111,5 +117,6 @@ export function useCADBridge() {
     getFieldMapping,
     downloadFile,
     uploadFile,
+    exportStpUpload,
   };
 }

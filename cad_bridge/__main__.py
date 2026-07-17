@@ -53,6 +53,14 @@ def register_handlers(server: BridgeServer, pdm_client: PDMClient):
         overwrite = bool(params.get("overwrite", False))
         return await pdm_client.upload_attachment(file_path, revision_id, category, token, overwrite=overwrite)
 
+    async def handle_export_stp_upload(params: dict, token: str) -> dict:
+        # 导出 CATIA 零部件为 STP 并上传为 PDM 生产附件（同名覆盖）
+        export = catia_client.export_stp(params)
+        result = await pdm_client.upload_attachment(
+            export["file_path"], params["revision_id"], "production", token, overwrite=True
+        )
+        return {"file_name": export["file_name"], **(result or {})}
+
     server.register("catia.ping", handle_ping)
     server.register("catia.detect", handle_detect)
     server.register("catia.assembly.read_tree", handle_read_tree)
@@ -61,6 +69,7 @@ def register_handlers(server: BridgeServer, pdm_client: PDMClient):
     server.register("mapping.get", handle_mapping_get)
     server.register("workspace.download", handle_download)
     server.register("workspace.upload", handle_upload)
+    server.register("workspace.export_stp_upload", handle_export_stp_upload)
 
 
 def main():

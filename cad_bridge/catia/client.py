@@ -266,6 +266,42 @@ class CATIAClient:
 
         return {"builtin": props, "user_properties": user_props}
 
+    def export_stp(self, params: dict) -> dict:
+        """将指定路径零部件的源文档导出为 STP 文件，返回本地文件路径。
+        输出到本地工作目录 cad_workspace/stp_export，同名文件先删除（覆盖导出）。"""
+        catia = self._get_catia_app()
+        if catia is None:
+            raise RuntimeError("CATIA_NOT_FOUND")
+
+        product = self._find_product_by_path(catia.ActiveDocument.Product, params.get("path", "0"))
+        if product is None:
+            raise RuntimeError("PRODUCT_NOT_FOUND")
+
+        ref = self._get_ref_product(product)
+        doc = None
+        try:
+            doc = ref.ReferenceProduct.Parent
+        except Exception:
+            try:
+                doc = ref.Parent
+            except Exception:
+                pass
+        if doc is None:
+            raise RuntimeError("无法获取零部件源文档，无法导出 STP")
+
+        file_name = params.get("file_name") or f"{getattr(ref, 'PartNumber', '') or 'export'}.stp"
+        out_dir = os.path.abspath(params.get("out_dir") or os.path.join("cad_workspace", "stp_export"))
+        os.makedirs(out_dir, exist_ok=True)
+        out_path = os.path.join(out_dir, file_name)
+        if os.path.exists(out_path):
+            os.remove(out_path)
+
+        doc.ExportData(out_path, "stp")
+        if not os.path.exists(out_path):
+            raise RuntimeError("STP 导出失败：CATIA 未生成文件")
+        logger.info(f"STP 导出完成: {out_path}")
+        return {"file_path": out_path, "file_name": file_name}
+
     def write_property(self, params: dict) -> dict:
         """写入指定零部件的属性"""
         catia = self._get_catia_app()
