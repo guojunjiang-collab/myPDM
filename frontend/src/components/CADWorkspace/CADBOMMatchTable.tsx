@@ -4,6 +4,7 @@ import { partsApi, customFieldsApi } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
 import type { useCADBridge } from '../../hooks/useCADBridge';
 import { syncRowsByPartNumber } from './syncRows';
+import { flattenTree } from './flattenTree';
 import PartDetailModal from '../PartDetailModal';
 
 export interface BOMRow {
@@ -186,6 +187,25 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
     runPdmMatch(initialRows);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 重新匹配：先重新读取 CATIA 装配树刷新全部行数据，再执行 PDM 匹配
+  const handleRefreshAndMatch = async () => {
+    setMatching(true);
+    try {
+      const tree = await bridge.readAssemblyTree();
+      if (!tree) {
+        toast.error('读取装配结构失败');
+        return;
+      }
+      const newRows = flattenTree(tree);
+      setRows(newRows);
+      await runPdmMatch(newRows);
+    } catch (e: any) {
+      toast.error(e.message || '读取装配结构失败');
+    } finally {
+      setMatching(false);
+    }
+  };
 
   const handleCheckout = async (row: BOMRow) => {
     if (!row.pdm_match?.revision_id) return;
@@ -435,8 +455,9 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
         <span className="bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">已签出 {totalCheckedOut}</span>
         <div className="flex-1" />
         <button
-          onClick={() => runPdmMatch(rows)}
+          onClick={handleRefreshAndMatch}
           disabled={matching}
+          title="重新读取 CATIA 装配结构并重新匹配 PDM"
           className="px-3 py-1.5 bg-sky-500 text-white rounded text-xs hover:bg-sky-600 disabled:bg-gray-300"
         >
           {matching ? '匹配中...' : '重新匹配'}
