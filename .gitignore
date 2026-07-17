@@ -40,3 +40,4 @@ migrations/
 .env
 .env.example
 .superpowers/
+cad_workspace/
