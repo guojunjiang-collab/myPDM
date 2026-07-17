@@ -118,6 +118,7 @@ function flattenTree(tree: any): BOMRow[] {
       is_assembly: node.is_assembly || false,
       quantity,
       instances,
+      doc_path: node.doc_path || '',
       builtin: node.builtin || {},
       user_properties: node.user_properties || {},
       pdm_match: null,

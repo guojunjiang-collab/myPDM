@@ -15,6 +15,8 @@ export interface BOMRow {
   quantity: number;
   /** 该行合并的全部 CATIA 实例（变换矩阵相对父装配，平移单位 mm） */
   instances: { matrix: number[] | null; label: string }[];
+  /** CATIA 源文档完整路径（.CATPart/.CATProduct，未保存时为空） */
+  doc_path: string;
   builtin: Record<string, string>;
   user_properties: Record<string, string>;
   pdm_match: {
@@ -328,24 +330,24 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
     }
   };
 
+  const [uploadingCad, setUploadingCad] = useState<string | null>(null);
+
   const handleUploadCAD = async (row: BOMRow) => {
     if (!row.pdm_match?.revision_id) return;
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.CATPart,.CATProduct,.CATDrawing';
-    input.onchange = async (e: any) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      try {
-        const { v2UploadApi } = await import('../../services/api');
-        const entityType = row.is_assembly ? 'assembly' : 'part';
-        await v2UploadApi.uploadSmallFile(file, entityType, row.pdm_match!.revision_id!, undefined, 'cad');
-        toast.success('CAD 附件上传成功');
-      } catch (e: any) {
-        toast.error(e?.response?.data?.detail || '上传失败');
-      }
-    };
-    input.click();
+    // 直接通过桥接程序上传 CATIA 源文件（无需用户选择文件），同名附件覆盖
+    if (!row.doc_path) {
+      toast.error('未获取到 CATIA 源文件路径，请在 CATIA 中保存文档后重新读取装配结构');
+      return;
+    }
+    setUploadingCad(row.path);
+    try {
+      await bridge.uploadFile(row.doc_path, row.pdm_match.revision_id, 'cad', true);
+      toast.success(`CAD 源文件已上传: ${row.doc_path.split('\\').pop()}`);
+    } catch (e: any) {
+      toast.error(e.message || 'CAD 源文件上传失败');
+    } finally {
+      setUploadingCad(null);
+    }
   };
 
   const handleUploadPDF = async (row: BOMRow) => {
@@ -491,8 +493,13 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
                 <td className="p-2 text-center bg-blue-50">
                   <div className="text-xs text-gray-500">—</div>
                   {isCheckedOutByMe(row) && (
-                    <button onClick={() => handleUploadCAD(row)} className="mt-1 px-2 py-0.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600">
-                      上传
+                    <button
+                      onClick={() => handleUploadCAD(row)}
+                      disabled={uploadingCad === row.path}
+                      title={row.doc_path || 'CATIA 源文件路径未知'}
+                      className="mt-1 px-2 py-0.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 disabled:bg-gray-300"
+                    >
+                      {uploadingCad === row.path ? '上传中...' : '上传源文件'}
                     </button>
                   )}
                   {!row.pdm_match && <span className="text-gray-400 text-xs">—</span>}

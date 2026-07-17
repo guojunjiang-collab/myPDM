@@ -50,7 +50,8 @@ def register_handlers(server: BridgeServer, pdm_client: PDMClient):
         file_path = params["file_path"]
         revision_id = params["revision_id"]
         category = params.get("category", "cad")
-        return await pdm_client.upload_attachment(file_path, revision_id, category, token)
+        overwrite = bool(params.get("overwrite", False))
+        return await pdm_client.upload_attachment(file_path, revision_id, category, token, overwrite=overwrite)
 
     server.register("catia.ping", handle_ping)
     server.register("catia.detect", handle_detect)

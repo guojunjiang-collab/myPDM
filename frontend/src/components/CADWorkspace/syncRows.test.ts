@@ -11,6 +11,7 @@ function makeRow(overrides: Partial<BOMRow>): BOMRow {
     is_assembly: false,
     quantity: 1,
     instances: [],
+    doc_path: '',
     builtin: {},
     user_properties: {},
     pdm_match: null,

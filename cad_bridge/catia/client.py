@@ -163,6 +163,20 @@ class CATIAClient:
             0.0, 0.0, 0.0, 1.0,
         ]
 
+    @staticmethod
+    def _get_doc_path(ref) -> str:
+        """获取引用产品的源文档完整路径（.CATPart/.CATProduct）。
+        未保存的新文档无路径，返回空字符串。"""
+        try:
+            doc = ref.ReferenceProduct.Parent
+            path = str(doc.FullName or "")
+            return path
+        except Exception:
+            try:
+                return str(ref.Parent.FullName or "")
+            except Exception:
+                return ""
+
     def _read_product_tree(self, product, path: str, level: int) -> dict:
         """递归读取产品树节点（含属性）"""
         is_assembly = False
@@ -195,6 +209,7 @@ class CATIAClient:
             "builtin": builtin,
             "user_properties": user_props,
             "matrix": self._read_position_matrix(product) if level > 0 else None,
+            "doc_path": self._get_doc_path(ref),
             "children": []
         }
 

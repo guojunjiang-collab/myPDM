@@ -94,9 +94,9 @@ export function useCADBridge() {
     return cadBridge.call('workspace.download', { attachment_id: attachmentId, code, version }, tokenRef.current);
   }, [ensureConnected]);
 
-  const uploadFile = useCallback(async (filePath: string, revisionId: string, category: 'cad' | 'production'): Promise<any> => {
+  const uploadFile = useCallback(async (filePath: string, revisionId: string, category: 'cad' | 'production', overwrite = false): Promise<any> => {
     await ensureConnected();
-    return cadBridge.call('workspace.upload', { file_path: filePath, revision_id: revisionId, category }, tokenRef.current);
+    return cadBridge.call('workspace.upload', { file_path: filePath, revision_id: revisionId, category, overwrite }, tokenRef.current);
   }, [ensureConnected]);
 
   return {

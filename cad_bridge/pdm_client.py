@@ -46,8 +46,15 @@ class PDMClient:
 
             return {"file_name": filename, "file_path": filepath, "file_size": len(resp.content)}
 
-    async def upload_attachment(self, file_path: str, revision_id: str, category: str, token: str) -> dict:
-        """上传本地文件到 PDM 零部件附件"""
+    async def upload_attachment(self, file_path: str, revision_id: str, category: str, token: str,
+                                overwrite: bool = False) -> dict:
+        """上传本地文件到 PDM 零部件附件。
+        契约与后端一致：init/complete 为 Form 参数（filename/file_size/category、upload_id/overwrite），
+        分块本身走通用端点 POST /v2/attachments/chunk/upload。
+        overwrite=True 时后端删除当前迭代下同名同类旧附件（覆盖模式）。
+        """
+        if not file_path or not os.path.isfile(file_path):
+            raise FileNotFoundError(f"本地文件不存在: {file_path}")
         filename = os.path.basename(file_path)
         file_size = os.path.getsize(file_path)
 
@@ -55,10 +62,10 @@ class PDMClient:
             # 初始化分块上传
             init_resp = await client.post(
                 f"{self.base_url}/parts/revisions/{revision_id}/attachments/chunk/init",
-                json={
-                    "file_name": filename,
-                    "file_size": file_size,
-                    "category": category
+                data={
+                    "filename": filename,
+                    "file_size": str(file_size),
+                    "category": category,
                 },
                 headers={"Authorization": f"Bearer {token}"}
             )
@@ -67,7 +74,7 @@ class PDMClient:
             upload_id = upload_info["upload_id"]
             chunk_size = upload_info.get("chunk_size", 5 * 1024 * 1024)
 
-            # 分块上传
+            # 分块上传（通用 v2 端点）
             with open(file_path, "rb") as f:
                 chunk_index = 0
                 while True:
@@ -75,7 +82,7 @@ class PDMClient:
                     if not chunk:
                         break
                     resp = await client.post(
-                        f"{self.base_url}/parts/revisions/{revision_id}/attachments/chunk/upload",
+                        f"{self.base_url}/v2/attachments/chunk/upload",
                         data={"upload_id": upload_id, "chunk_index": str(chunk_index)},
                         files={"chunk": (filename, chunk)},
                         headers={"Authorization": f"Bearer {token}"}
@@ -86,7 +93,7 @@ class PDMClient:
             # 完成上传
             complete_resp = await client.post(
                 f"{self.base_url}/parts/revisions/{revision_id}/attachments/chunk/complete",
-                json={"upload_id": upload_id},
+                data={"upload_id": upload_id, "overwrite": "true" if overwrite else "false"},
                 headers={"Authorization": f"Bearer {token}"}
             )
             complete_resp.raise_for_status()
