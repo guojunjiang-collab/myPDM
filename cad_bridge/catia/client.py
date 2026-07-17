@@ -65,7 +65,19 @@ class CATIAClient:
             raise RuntimeError("NO_ACTIVE_DOC")
 
         product = doc.Product
-        return self._read_product_tree(product, path="0", level=0)
+        tree = self._read_product_tree(product, path="0", level=0)
+        # 矩阵读取统计日志，便于排查"推送无矩阵"类问题
+        total, ok = [0], [0]
+        def _count(node):
+            if node.get("level", 0) > 0:
+                total[0] += 1
+                if node.get("matrix"):
+                    ok[0] += 1
+            for ch in node.get("children") or []:
+                _count(ch)
+        _count(tree)
+        logger.info(f"装配树读取完成: 实例 {total[0]} 个, 矩阵读取成功 {ok[0]} 个")
+        return tree
 
     def _get_ref_product(self, product):
         """获取实例引用的产品对象。
@@ -108,24 +120,48 @@ class CATIAClient:
         [Ux,Uy,Uz, Vx,Vy,Vz, Wx,Wy,Wz, Tx,Ty,Tz]（三个轴向量 + 平移，平移单位 mm）。
         转为 4x4 行主序矩阵返回（平移保持 mm，单位换算由 PDM 后端负责）；
         读取失败返回 None（调用方按单位矩阵处理）。
+
+        方式1 直接 COM SAFEARRAY byref 在 pywin32 下常不回写（平台已知限制），
+        因此提供方式2 SystemService.Evaluate 执行 VBScript 读取（pycatia 同源方案）。
         """
+        c = None
+        # 方式1：直接 COM byref SAFEARRAY
         try:
             import pythoncom
             from win32com.client import VARIANT
             arr = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8 | pythoncom.VT_BYREF, [0.0] * 12)
             product.Position.GetComponents(arr)
-            c = list(arr.value)
-            if len(c) != 12:
-                return None
-            return [
-                c[0], c[3], c[6], c[9],
-                c[1], c[4], c[7], c[10],
-                c[2], c[5], c[8], c[11],
-                0.0, 0.0, 0.0, 1.0,
-            ]
+            vals = list(arr.value)
+            # 全零说明 COM 未回写（合法矩阵至少有一个轴分量非零），视为失败转方式2
+            if len(vals) == 12 and any(abs(v) > 1e-12 for v in vals[:9]):
+                c = vals
         except Exception as e:
-            logger.warning(f"读取实例矩阵失败: {e}")
+            logger.debug(f"直接读取实例矩阵失败，转用 VBScript 方案: {e}")
+        # 方式2：SystemService.Evaluate 执行 VBScript
+        if c is None:
+            try:
+                app = product.Application
+                vbs = (
+                    "Public Function get_components(oPos)\n"
+                    "    Dim c(11)\n"
+                    "    oPos.GetComponents c\n"
+                    "    get_components = c\n"
+                    "End Function"
+                )
+                result = app.SystemService.Evaluate(vbs, 0, "get_components", [product.Position])
+                vals = list(result)
+                if len(vals) == 12:
+                    c = [float(v) for v in vals]
+            except Exception as e:
+                logger.warning(f"读取实例矩阵失败(VBScript): {e}")
+        if c is None or len(c) != 12:
             return None
+        return [
+            c[0], c[3], c[6], c[9],
+            c[1], c[4], c[7], c[10],
+            c[2], c[5], c[8], c[11],
+            0.0, 0.0, 0.0, 1.0,
+        ]
 
     def _read_product_tree(self, product, path: str, level: int) -> dict:
         """递归读取产品树节点（含属性）"""
