@@ -136,6 +136,20 @@ def test_master_exists_no_undeleted_revision_returns_conflict(db):
     assert results[0]["latest_version"] is None
 
 
+def test_duplicate_code_in_same_request(db):
+    user = _make_user(db)
+    _make_part(db, "P-007", [("A", None)])
+    results = crud_parts.match_cad_bom_items(
+        db,
+        [{"code": "P-007", "version": "A"}, {"code": "P-007", "version": "B"}],
+        user.id,
+    )
+    assert len(results) == 2
+    assert results[0]["match_status"] == "matched"
+    assert results[1]["match_status"] == "conflict"
+    assert results[1]["latest_version"] == "A"
+
+
 def test_endpoint(db):
     user = _make_user(db)
     _make_part(db, "P-006", [("A", None)])

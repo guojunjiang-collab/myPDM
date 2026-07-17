@@ -86,12 +86,12 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
 
   // 件号+版本 组成去重键；版本 trim 后不区分大小写，与后端匹配规则一致
   const matchKeyOf = (r: BOMRow) =>
-    `${(r.builtin.PartNumber || '').trim()}|${(r.builtin.Revision || '').trim().toUpperCase()}`;
+    `${(r.part_number || '').trim()}|${(r.builtin.Revision || '').trim().toUpperCase()}`;
 
   const runPdmMatch = useCallback(async (targetRows: BOMRow[]) => {
     const uniq = new Map<string, { code: string; version?: string }>();
     for (const r of targetRows) {
-      const code = (r.builtin.PartNumber || '').trim();
+      const code = (r.part_number || '').trim();
       if (!code) continue;
       const k = matchKeyOf(r);
       if (!uniq.has(k)) uniq.set(k, { code, version: (r.builtin.Revision || '').trim() || undefined });

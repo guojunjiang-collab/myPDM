@@ -1322,7 +1322,7 @@ def get_assembly_instances(db: Session, assembly_revision_id, glb_url_resolver) 
     return instances
 
 
-def match_cad_bom_items(db: Session, items: list, current_user_id) -> list:
+def match_cad_bom_items(db: Session, items: List[dict], current_user_id: Optional[UUID]) -> List[dict]:
     """
     按 件号+版本 批量匹配 PDM 零部件（CAD 工作台自动匹配）。
     - 件号不存在 → new
@@ -1338,7 +1338,7 @@ def match_cad_bom_items(db: Session, items: list, current_user_id) -> list:
     # 1. 收集去重件号，构建 entry 雏形（保持输入顺序）
     entries: list = []
     codes: list = []  # 需要查询的有效件号列表（保持首次出现的顺序用于去重）
-    code_index_map: dict = {}  # code → 该 code 对应 entries 中首次出现位置的索引列表
+    seen_codes: set = set()
     for item in items:
         code = (item.get("code") or "").strip()
         version = (item.get("version") or "").strip()
@@ -1355,10 +1355,9 @@ def match_cad_bom_items(db: Session, items: list, current_user_id) -> list:
         }
         entries.append(entry)
         if code:
-            if code not in code_index_map:
-                code_index_map[code] = []
+            if code not in seen_codes:
+                seen_codes.add(code)
                 codes.append(code)
-            code_index_map[code].append(len(entries) - 1)
 
     if not codes:
         return entries
