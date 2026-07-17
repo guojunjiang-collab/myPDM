@@ -47,7 +47,7 @@ function getPropertyColumns(userProps: Record<string, string>): string[] {
 const BUILTIN_COLUMNS: { label: string; attr: string; width?: string }[] = [
   { label: '版本', attr: 'Revision', width: 'w-14' },
   { label: '定义', attr: 'Definition' },
-  { label: '术语', attr: 'Nomenclature' },
+  { label: '术语/中文名称', attr: 'Nomenclature' },
   { label: '描述', attr: 'DescriptionRef' },
 ];
 
