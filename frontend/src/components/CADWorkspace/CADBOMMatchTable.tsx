@@ -373,25 +373,22 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
     }
   };
 
+  const [uploadingPdf, setUploadingPdf] = useState<string | null>(null);
+
   const handleUploadPDF = async (row: BOMRow) => {
     if (!row.pdm_match?.revision_id) return;
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.pdf';
-    input.onchange = async (e: any) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      try {
-        const { v2UploadApi } = await import('../../services/api');
-        const entityType = row.is_assembly ? 'assembly' : 'part';
-        await v2UploadApi.uploadSmallFile(file, entityType, row.pdm_match!.revision_id!, undefined, 'production');
-        toast.success('PDF 上传成功');
-        refreshAttCount(row.pdm_match!.revision_id);
-      } catch (e: any) {
-        toast.error(e?.response?.data?.detail || '上传失败');
-      }
-    };
-    input.click();
+    // 通过桥接程序将零部件工程图(CATDrawing)转 PDF 并上传到生产附件，同名覆盖
+    setUploadingPdf(row.path);
+    try {
+      const fileName = `${(row.part_number || 'drawing').trim()}.pdf`;
+      await bridge.exportPdfUpload(row.path, fileName, row.pdm_match.revision_id);
+      toast.success(`工程图 PDF 已上传: ${fileName}`);
+      refreshAttCount(row.pdm_match.revision_id);
+    } catch (e: any) {
+      toast.error(e.message || '工程图 PDF 导出上传失败');
+    } finally {
+      setUploadingPdf(null);
+    }
   };
 
   const [uploadingStp, setUploadingStp] = useState<string | null>(null);
@@ -551,7 +548,14 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
                   })()}
                   {isCheckedOutByMe(row) && (
                     <div className="flex gap-1 justify-center mt-1">
-                      <button onClick={() => handleUploadPDF(row)} className="px-2 py-0.5 bg-red-500 text-white rounded text-xs hover:bg-red-600">PDF</button>
+                      <button
+                        onClick={() => handleUploadPDF(row)}
+                        disabled={uploadingPdf === row.path}
+                        title="通过桥接程序将工程图(CATDrawing)转 PDF 并上传（同名覆盖）"
+                        className="px-2 py-0.5 bg-red-500 text-white rounded text-xs hover:bg-red-600 disabled:bg-gray-300"
+                      >
+                        {uploadingPdf === row.path ? '转换中...' : 'PDF'}
+                      </button>
                       <button
                         onClick={() => handleUploadSTP(row)}
                         disabled={uploadingStp === row.path}

@@ -302,6 +302,76 @@ class CATIAClient:
         logger.info(f"STP 导出完成: {out_path}")
         return {"file_path": out_path, "file_name": file_name}
 
+    def export_drawing_pdf(self, params: dict) -> dict:
+        """将零部件对应的 CATDrawing 工程图导出为 PDF，返回本地文件路径。
+        工程图按存盘约定与零件源文件同目录同名；
+        未打开的工程图后台静默打开导出后关闭，已打开的直接复用且不关闭。"""
+        catia = self._get_catia_app()
+        if catia is None:
+            raise RuntimeError("CATIA_NOT_FOUND")
+
+        product = self._find_product_by_path(catia.ActiveDocument.Product, params.get("path", "0"))
+        if product is None:
+            raise RuntimeError("PRODUCT_NOT_FOUND")
+        ref = self._get_ref_product(product)
+        doc_path = self._get_doc_path(product, ref)
+        if not doc_path:
+            raise RuntimeError("无法获取零部件源文档路径")
+        base, _ = os.path.splitext(doc_path)
+        drawing_path = base + ".CATDrawing"
+        if not os.path.isfile(drawing_path):
+            raise RuntimeError(f"未找到工程图文件: {os.path.basename(drawing_path)}")
+
+        file_name = params.get("file_name") or f"{getattr(ref, 'PartNumber', '') or 'drawing'}.pdf"
+        out_dir = os.path.abspath(params.get("out_dir") or os.path.join("cad_workspace", "pdf_export"))
+        os.makedirs(out_dir, exist_ok=True)
+        out_path = os.path.join(out_dir, file_name)
+        if os.path.exists(out_path):
+            os.remove(out_path)
+
+        # 已打开的工程图直接复用（导出后不关闭），否则静默打开导出后关闭
+        drawing_doc = None
+        was_open = False
+        try:
+            for i in range(1, catia.Documents.Count + 1):
+                d = catia.Documents.Item(i)
+                try:
+                    if str(d.FullName or "").lower() == drawing_path.lower():
+                        drawing_doc = d
+                        was_open = True
+                        break
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        if drawing_doc is None:
+            prev_alerts = None
+            try:
+                prev_alerts = catia.DisplayFileAlerts
+                catia.DisplayFileAlerts = False
+            except Exception:
+                pass
+            drawing_doc = catia.Documents.Open(drawing_path)
+            try:
+                if prev_alerts is not None:
+                    catia.DisplayFileAlerts = prev_alerts
+            except Exception:
+                pass
+
+        try:
+            drawing_doc.ExportData(out_path, "pdf")
+        finally:
+            if not was_open:
+                try:
+                    drawing_doc.Close()
+                except Exception:
+                    pass
+
+        if not os.path.exists(out_path):
+            raise RuntimeError("PDF 导出失败：CATIA 未生成文件")
+        logger.info(f"PDF 导出完成: {out_path}")
+        return {"file_path": out_path, "file_name": file_name}
+
     def write_property(self, params: dict) -> dict:
         """写入指定零部件的属性"""
         catia = self._get_catia_app()

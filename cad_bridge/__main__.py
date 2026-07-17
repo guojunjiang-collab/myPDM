@@ -71,6 +71,14 @@ def register_handlers(server: BridgeServer, pdm_client: PDMClient):
         )
         return {"file_name": export["file_name"], **(result or {})}
 
+    async def handle_export_pdf_upload(params: dict, token: str) -> dict:
+        # 将零部件工程图(CATDrawing)转 PDF 并上传为 PDM 生产附件（同名覆盖）
+        export = catia_client.export_drawing_pdf(params)
+        result = await pdm_client.upload_attachment(
+            export["file_path"], params["revision_id"], "production", token, overwrite=True
+        )
+        return {"file_name": export["file_name"], **(result or {})}
+
     server.register("catia.ping", handle_ping)
     server.register("catia.detect", handle_detect)
     server.register("catia.assembly.read_tree", handle_read_tree)
@@ -80,6 +88,7 @@ def register_handlers(server: BridgeServer, pdm_client: PDMClient):
     server.register("workspace.download", handle_download)
     server.register("workspace.upload", handle_upload)
     server.register("workspace.export_stp_upload", handle_export_stp_upload)
+    server.register("workspace.export_pdf_upload", handle_export_pdf_upload)
 
 
 def main():
