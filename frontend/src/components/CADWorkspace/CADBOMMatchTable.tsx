@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from '../Toast';
-import { partsApi } from '../../services/api';
+import { partsApi, customFieldsApi } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
 import type { useCADBridge } from '../../hooks/useCADBridge';
 import { syncRowsByPartNumber } from './syncRows';
@@ -48,9 +48,23 @@ const BUILTIN_COLUMNS: { label: string; attr: string }[] = [
   { label: '描述', attr: 'DescriptionRef' },
 ];
 
+// CATIA-PDM 字段映射（单一事实源为桥接端 cad_bridge/catia/field_mapping.json，
+// 通过 mapping.get 获取；桥接服务为旧版本无该方法时回退此默认映射）
+interface FieldMapping {
+  builtin: Record<string, string>;
+  properties: Record<string, string>;
+}
+const DEFAULT_FIELD_MAPPING: FieldMapping = {
+  builtin: { PartNumber: 'code', Revision: 'version', Nomenclature: 'name' },
+  properties: { 规格型号: 'spec' },
+};
+
 export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Props) {
   const [rows, setRows] = useState<BOMRow[]>(initialRows);
   const user = useAuthStore((s) => s.user);
+  // 字段映射与 PDM 自定义字段定义缓存（工作台打开期间有效）
+  const mappingRef = useRef<FieldMapping | null>(null);
+  const fieldDefsRef = useRef<any[] | null>(null);
 
   const propertyColumns = rows.length > 0 ? getPropertyColumns(rows[0].user_properties) : [];
 
@@ -187,14 +201,55 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
   const handlePushToPDM = async (row: BOMRow) => {
     if (!row.pdm_match?.revision_id) return;
     try {
-      // 推送映射与拉取方向对称：件号→code、术语→中文名称(name)、规格型号→spec；
-      // CATIA 规格型号为空时不传 spec，避免清空 PDM 已有值
-      const spec = row.user_properties['规格型号'];
-      await partsApi.update(row.pdm_match.master_id!, {
-        code: row.builtin.PartNumber || row.pdm_match.code,
-        name: row.builtin.Nomenclature || row.pdm_match.name,
-        ...(spec ? { spec } : {}),
-      });
+      // 获取字段映射（每次打开工作台缓存一份）
+      if (!mappingRef.current) {
+        try {
+          mappingRef.current = await bridge.getFieldMapping();
+        } catch {
+          mappingRef.current = DEFAULT_FIELD_MAPPING;
+        }
+      }
+      const mapping = mappingRef.current!;
+
+      // 1) PDM 固定字段（code / name / spec）：CATIA 值为空时不传，避免清空 PDM 已有值
+      const masterData: Record<string, string> = {};
+      for (const [attr, target] of Object.entries(mapping.builtin || {})) {
+        const val = row.builtin[attr];
+        if (val && (target === 'code' || target === 'name')) masterData[target] = val;
+      }
+      for (const [prop, target] of Object.entries(mapping.properties || {})) {
+        if (target === 'spec' && row.user_properties[prop]) masterData.spec = row.user_properties[prop];
+      }
+      if (Object.keys(masterData).length > 0) {
+        await partsApi.update(row.pdm_match.master_id!, masterData);
+      }
+
+      // 2) PDM 自定义字段：映射目标名与字段定义显示名精确匹配，未定义的字段跳过
+      const customTargets = Object.entries(mapping.properties || {}).filter(([, t]) => t !== 'spec');
+      if (customTargets.length > 0) {
+        if (!fieldDefsRef.current) {
+          const res = await customFieldsApi.listDefinitions();
+          fieldDefsRef.current = res.data || [];
+        }
+        const values: { field_id: string; value: string | number }[] = [];
+        for (const [prop, target] of customTargets) {
+          const raw = row.user_properties[prop];
+          if (!raw) continue;
+          const def = fieldDefsRef.current!.find((d: any) => d.name === target);
+          if (!def) continue;
+          if (def.field_type === 'number') {
+            const num = parseFloat(raw);
+            if (Number.isNaN(num)) continue;
+            values.push({ field_id: def.id, value: num });
+          } else {
+            values.push({ field_id: def.id, value: raw });
+          }
+        }
+        if (values.length > 0) {
+          // 零部件自定义字段值挂在版本(revision)上，entity_type 与详情页一致用 component
+          await customFieldsApi.setValues('component', row.pdm_match.revision_id, values);
+        }
+      }
       toast.success('属性已推送到 PDM');
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || '属性推送失败');

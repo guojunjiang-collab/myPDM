@@ -35,6 +35,10 @@ def register_handlers(server: BridgeServer, pdm_client: PDMClient):
     async def handle_write_property(params: dict, token: str) -> dict:
         return catia_client.write_property(params)
 
+    async def handle_mapping_get(params: dict, token: str) -> dict:
+        # 字段映射单一事实源：cad_bridge/catia/field_mapping.json（服务启动时加载）
+        return catia_client.mapping
+
     async def handle_download(params: dict, token: str) -> dict:
         attachment_id = params["attachment_id"]
         revision_code = params.get("code", "unknown")
@@ -53,6 +57,7 @@ def register_handlers(server: BridgeServer, pdm_client: PDMClient):
     server.register("catia.assembly.read_tree", handle_read_tree)
     server.register("catia.assembly.read_properties", handle_read_properties)
     server.register("catia.property.write", handle_write_property)
+    server.register("mapping.get", handle_mapping_get)
     server.register("workspace.download", handle_download)
     server.register("workspace.upload", handle_upload)
 

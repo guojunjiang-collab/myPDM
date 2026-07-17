@@ -80,6 +80,14 @@ export function useCADBridge() {
     return cadBridge.call('catia.property.write', { path, prop_name: propName, value }, tokenRef.current);
   }, [ensureConnected]);
 
+  const getFieldMapping = useCallback(async (): Promise<{
+    builtin: Record<string, string>;
+    properties: Record<string, string>;
+  }> => {
+    await ensureConnected();
+    return cadBridge.call('mapping.get', {}, tokenRef.current);
+  }, [ensureConnected]);
+
   const downloadFile = useCallback(async (attachmentId: string, code: string, version: string): Promise<any> => {
     await ensureConnected();
     return cadBridge.call('workspace.download', { attachment_id: attachmentId, code, version }, tokenRef.current);
@@ -99,6 +107,7 @@ export function useCADBridge() {
     readAssemblyTree,
     readProperties,
     writeProperty,
+    getFieldMapping,
     downloadFile,
     uploadFile,
   };

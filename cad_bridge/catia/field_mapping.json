@@ -2,7 +2,7 @@
   "builtin": {
     "PartNumber": "code",
     "Revision": "version",
-    "Definition": "name"
+    "Nomenclature": "name"
   },
   "properties": {
     "规格型号": "spec",
