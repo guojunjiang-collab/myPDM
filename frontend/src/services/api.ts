@@ -181,6 +181,15 @@ export const partsApi = {
   // CAD 工作台：按 件号+版本 批量匹配 PDM 零部件
   cadBomMatch: (items: { code: string; version?: string }[]) =>
     api.post('/parts/cad/bom-match', { items }).then((r) => r.data),
+  // CAD 工作台：CATIA 装配直接子项 BOM 同步（含实例变换矩阵）
+  cadBomSync: (revisionId: string, children: {
+    code: string;
+    name?: string;
+    spec?: string;
+    quantity: number;
+    instances: { matrix: number[] | null; label: string }[];
+  }[]) =>
+    api.post(`/parts/revisions/${revisionId}/cad/bom-sync`, { children }).then((r) => r.data),
 };
 
 // 图文档 API

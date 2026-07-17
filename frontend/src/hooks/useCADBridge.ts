@@ -16,6 +16,7 @@ export interface AssemblyTreeNode {
   level: number;
   is_assembly: boolean;
   children: AssemblyTreeNode[];
+  matrix?: number[] | null;
   properties?: {
     builtin: Record<string, string>;
     user_properties: Record<string, string>;

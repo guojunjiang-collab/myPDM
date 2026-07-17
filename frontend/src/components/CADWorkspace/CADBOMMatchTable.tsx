@@ -12,6 +12,8 @@ export interface BOMRow {
   level: number;
   is_assembly: boolean;
   quantity: number;
+  /** 该行合并的全部 CATIA 实例（变换矩阵相对父装配，平移单位 mm） */
+  instances: { matrix: number[] | null; label: string }[];
   builtin: Record<string, string>;
   user_properties: Record<string, string>;
   pdm_match: {
@@ -250,7 +252,34 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
           await customFieldsApi.setValues('component', row.pdm_match.revision_id, values);
         }
       }
-      toast.success('属性已推送到 PDM');
+      // 3) 部件：附带推送结构 BOM 直接子项（新子项自动创建零部件，含实例变换矩阵）
+      if (row.is_assembly) {
+        const nameAttr = Object.entries(mapping.builtin || {}).find(([, t]) => t === 'name')?.[0] || 'Nomenclature';
+        const children = rows
+          .filter(r =>
+            r.level === row.level + 1 &&
+            r.path.startsWith(row.path + '.') &&
+            (r.part_number || '').trim() !== ''
+          )
+          .map(r => ({
+            code: r.part_number.trim(),
+            name: r.builtin[nameAttr] || r.instance_name || undefined,
+            spec: r.user_properties['规格型号'] || undefined,
+            quantity: r.quantity,
+            instances: (r.instances || []).map(i => ({ matrix: i.matrix, label: i.label })),
+          }));
+        const bomRes = await partsApi.cadBomSync(row.pdm_match.revision_id, children);
+        const parts: string[] = [];
+        if (bomRes.created_parts?.length) parts.push(`新建零件 ${bomRes.created_parts.length} 个`);
+        if (bomRes.created_items) parts.push(`新增子项 ${bomRes.created_items}`);
+        if (bomRes.updated_items) parts.push(`更新子项 ${bomRes.updated_items}`);
+        if (bomRes.extra_in_pdm?.length) {
+          toast.info(`PDM 中存在 CATIA 没有的子项（已保留）: ${bomRes.extra_in_pdm.join(', ')}`);
+        }
+        toast.success(`属性已推送到 PDM${parts.length ? '；BOM ' + parts.join('，') : '；BOM 无变化'}`);
+      } else {
+        toast.success('属性已推送到 PDM');
+      }
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || '属性推送失败');
     }

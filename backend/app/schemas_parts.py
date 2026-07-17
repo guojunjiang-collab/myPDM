@@ -230,3 +230,30 @@ class CadBomMatchResult(BaseModel):
 
 class CadBomMatchResponse(BaseModel):
     results: List[CadBomMatchResult] = []
+
+
+# === CAD 工作台 装配直接子项 BOM 同步 ===
+
+class CadBomSyncInstance(BaseModel):
+    """CATIA 实例变换矩阵（相对于父装配，平移单位 mm）"""
+    matrix: Optional[List[float]] = None  # 16 元素 4x4 行主序，null=不可用
+    label: str = ""
+
+
+class CadBomSyncChild(BaseModel):
+    code: str
+    name: Optional[str] = None
+    spec: Optional[str] = None
+    quantity: int = 1
+    instances: List[CadBomSyncInstance] = []
+
+
+class CadBomSyncRequest(BaseModel):
+    children: List[CadBomSyncChild] = []
+
+
+class CadBomSyncResponse(BaseModel):
+    created_parts: List[str] = []   # 自动新建的零件件号列表
+    created_items: int = 0          # 新增 BOM 项数
+    updated_items: int = 0          # 更新 BOM 项数
+    extra_in_pdm: List[str] = []    # PDM 中存在但 CATIA 中不存在的直接子项件号

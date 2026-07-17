@@ -102,6 +102,31 @@ class CATIAClient:
             logger.warning(f"读取 UserRefProperties 失败: {e}")
         return user_props
 
+    def _read_position_matrix(self, product):
+        """读取实例的变换矩阵（相对父装配）。
+        CATIA Position.GetComponents 返回 12 分量：
+        [Ux,Uy,Uz, Vx,Vy,Vz, Wx,Wy,Wz, Tx,Ty,Tz]（三个轴向量 + 平移，平移单位 mm）。
+        转为 4x4 行主序矩阵返回（平移保持 mm，单位换算由 PDM 后端负责）；
+        读取失败返回 None（调用方按单位矩阵处理）。
+        """
+        try:
+            import pythoncom
+            from win32com.client import VARIANT
+            arr = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8 | pythoncom.VT_BYREF, [0.0] * 12)
+            product.Position.GetComponents(arr)
+            c = list(arr.value)
+            if len(c) != 12:
+                return None
+            return [
+                c[0], c[3], c[6], c[9],
+                c[1], c[4], c[7], c[10],
+                c[2], c[5], c[8], c[11],
+                0.0, 0.0, 0.0, 1.0,
+            ]
+        except Exception as e:
+            logger.warning(f"读取实例矩阵失败: {e}")
+            return None
+
     def _read_product_tree(self, product, path: str, level: int) -> dict:
         """递归读取产品树节点（含属性）"""
         is_assembly = False
@@ -133,6 +158,7 @@ class CATIAClient:
             "is_assembly": is_assembly,
             "builtin": builtin,
             "user_properties": user_props,
+            "matrix": self._read_position_matrix(product) if level > 0 else None,
             "children": []
         }
 

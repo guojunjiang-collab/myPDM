@@ -1502,3 +1502,123 @@ def get_assembly_tree(db: Session, assembly_revision_id) -> list:
         "is_leaf": len(children) == 0,
         "children": children,
     }]
+
+
+def _mm_matrix_to_m(matrix: List[float]) -> List[float]:
+    """CATIA 矩阵平移分量 mm → m。
+    行主序 4x4，平移分量在索引 3/7/11；与装配 STEP 导入（apply_step_matrices）的
+    cad_instances 存储约定保持一致。"""
+    m = [float(x) for x in matrix]
+    for idx in (3, 7, 11):
+        m[idx] = m[idx] / 1000.0
+    return m
+
+
+def sync_cad_bom_children(
+    db: Session, revision_id: UUID, children: List[dict], user_id: Optional[UUID]
+) -> Optional[dict]:
+    """
+    将 CATIA 装配的直接子项结构同步到 PDM BOM（CAD 工作台属性推送附带）。
+    - 子项件号在 PDM 不存在 → 自动创建零部件（版本 A 并签出给操作者）
+    - 已有 BOM 关系 → 更新用量，替换 source='catia' 的实例矩阵（保留 step/manual 条目）
+    - 无 BOM 关系 → 创建 BOM 项
+    - PDM 中存在但 CATIA 中不存在的直接子项保留不动，仅在 extra_in_pdm 返回提示，
+      删除属危险操作由用户在 PDM 中自行处理
+    矩阵为 CATIA 相对父装配的 4x4 行主序（平移单位 mm），存储时平移转 m。
+    """
+    revision = get_part_revision(db, revision_id)
+    if revision is None:
+        return None
+
+    # 现有直接子项索引：child_code → BOMItem
+    existing_items = (
+        db.query(models.BOMItem)
+        .filter(
+            models.BOMItem.parent_revision_id == revision_id,
+            models.BOMItem.deleted_at.is_(None),
+        )
+        .all()
+    )
+    code_to_item: dict = {}
+    for item in existing_items:
+        child_rev = get_part_revision(db, item.child_revision_id)
+        if child_rev:
+            master = get_part_master(db, child_rev.master_id)
+            if master:
+                code_to_item[master.code] = item
+
+    iteration = _current_iteration(db, revision_id)
+    created_parts: List[str] = []
+    created_items = 0
+    updated_items = 0
+    pushed_codes: set = set()
+
+    for child in children:
+        code = (child.get("code") or "").strip()
+        if not code:
+            continue
+        pushed_codes.add(code)
+        quantity = int(child.get("quantity") or 1)
+        # 构造 catia 来源的实例矩阵条目（矩阵不可用的实例跳过）
+        cad_entries = []
+        for inst in child.get("instances") or []:
+            matrix = inst.get("matrix")
+            if not matrix or len(matrix) != 16:
+                continue
+            cad_entries.append({
+                "matrix": _mm_matrix_to_m(matrix),
+                "source": "catia",
+                "label": inst.get("label") or "",
+            })
+
+        if code in code_to_item:
+            item = code_to_item[code]
+            item.quantity = quantity
+            kept = [c for c in (item.cad_instances or []) if c.get("source") != "catia"]
+            item.cad_instances = kept + cad_entries
+            updated_items += 1
+        else:
+            master = (
+                db.query(models_parts.PartMaster)
+                .filter(
+                    models_parts.PartMaster.code == code,
+                    models_parts.PartMaster.deleted_at.is_(None),
+                )
+                .first()
+            )
+            if master is None:
+                master = create_part_master(
+                    db,
+                    {"code": code, "name": child.get("name") or code, "spec": child.get("spec")},
+                    user_id,
+                )
+                created_parts.append(code)
+            child_rev = (
+                db.query(models_parts.PartRevision)
+                .filter(
+                    models_parts.PartRevision.master_id == master.id,
+                    models_parts.PartRevision.deleted_at.is_(None),
+                )
+                .order_by(models_parts.PartRevision.created_at.desc())
+                .first()
+            )
+            if child_rev is None:
+                continue
+            item = models.BOMItem(
+                iteration_id=iteration.id if iteration else None,
+                parent_revision_id=revision_id,
+                child_revision_id=child_rev.id,
+                quantity=quantity,
+                cad_instances=cad_entries,
+            )
+            db.add(item)
+            created_items += 1
+
+    db.commit()
+    extra_in_pdm = sorted(c for c in code_to_item.keys() if c not in pushed_codes)
+    return {
+        "created_parts": created_parts,
+        "created_items": created_items,
+        "updated_items": updated_items,
+        "extra_in_pdm": extra_in_pdm,
+    }

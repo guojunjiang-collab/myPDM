@@ -70,6 +70,22 @@ def cad_bom_match(
     return {"results": results}
 
 
+@router.post("/revisions/{revision_id}/cad/bom-sync", response_model=schemas_parts.CadBomSyncResponse)
+def cad_bom_sync(
+    revision_id: UUID,
+    data: schemas_parts.CadBomSyncRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("parts:update")),
+):
+    """CAD 工作台：将 CATIA 装配的直接子项结构（含实例变换矩阵）同步到 PDM BOM"""
+    result = crud_parts.sync_cad_bom_children(
+        db, revision_id, [c.model_dump() for c in data.children], current_user.id
+    )
+    if result is None:
+        raise HTTPException(404, "版本不存在")
+    return result
+
+
 @router.get("/{master_id}", response_model=schemas_parts.PartMasterResponse)
 def get_part(
     master_id: UUID,

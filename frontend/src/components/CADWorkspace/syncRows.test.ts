@@ -10,6 +10,7 @@ function makeRow(overrides: Partial<BOMRow>): BOMRow {
     level: 0,
     is_assembly: false,
     quantity: 1,
+    instances: [],
     builtin: {},
     user_properties: {},
     pdm_match: null,
