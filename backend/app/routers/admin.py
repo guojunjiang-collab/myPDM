@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from typing import Optional
+import os
+import shutil
 
 from ..database import get_db
 from ..models import User
@@ -74,6 +76,27 @@ async def purge_soft_deleted(
 
     before_date = body.get("before_date")
 
+    # 删除记录前收集待清理的零部件上传目录（附件文件与文件夹兜底一并删除）
+    purge_dirs = []
+    if "part_masters" in tables:
+        sql = "SELECT code FROM part_masters WHERE deleted_at IS NOT NULL"
+        params = {}
+        if before_date:
+            sql += " AND deleted_at < :before_date"
+            params["before_date"] = before_date
+        for row in db.execute(text(sql), params).fetchall():
+            purge_dirs.append(os.path.join("./uploads/parts", row[0]))
+    if "part_revisions" in tables:
+        sql = ("SELECT m.code, r.version FROM part_revisions r "
+               "JOIN part_masters m ON m.id = r.master_id "
+               "WHERE r.deleted_at IS NOT NULL")
+        params = {}
+        if before_date:
+            sql += " AND r.deleted_at < :before_date"
+            params["before_date"] = before_date
+        for row in db.execute(text(sql), params).fetchall():
+            purge_dirs.append(os.path.join("./uploads/parts", row[0], row[1]))
+
     # 按依赖顺序删除：被引用的父表放在引用它的子表之后，
     # 否则同批清理（如同时选 ecrs + ecos）会因外键顺序失败。
     # 目前唯一的可清理表内依赖：ecos.ecr_id -> ecrs。
@@ -108,6 +131,10 @@ async def purge_soft_deleted(
             )
 
     db.commit()
+
+    # 记录清理成功后删除对应上传目录（rmtree 幂等，目录不存在时忽略）
+    for d in purge_dirs:
+        shutil.rmtree(d, ignore_errors=True)
 
     ip = request.client.host if request.client else None
     from .. import crud

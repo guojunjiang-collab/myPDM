@@ -203,16 +203,76 @@ def update_part_master(db: Session, master_id: UUID, data: dict) -> Optional[mod
     return master
 
 
+def _purge_attachment_files(db: Session, iteration_ids: List[UUID]) -> None:
+    """物理删除指定迭代下的全部附件记录与磁盘文件（不提交事务）"""
+    import os
+    if not iteration_ids:
+        return
+    atts = (
+        db.query(models_parts.PartAttachment)
+        .filter(models_parts.PartAttachment.iteration_id.in_(iteration_ids))
+        .all()
+    )
+    for att in atts:
+        if att.file_path:
+            try:
+                if os.path.exists(att.file_path):
+                    os.remove(att.file_path)
+            except Exception:
+                pass
+        db.delete(att)
+
+
+def purge_revision_attachment_files(db: Session, revision: models_parts.PartRevision) -> None:
+    """物理删除某版本全部迭代的附件记录、磁盘文件及版本上传目录。
+    业务来源：删除零部件时附件与文件夹需一并删除（主数据/版本记录保留软删除可恢复，
+    但附件不保留）。"""
+    import os
+    import shutil
+    it_ids = [
+        row[0]
+        for row in db.query(models_parts.PartIteration.id)
+        .filter(models_parts.PartIteration.revision_id == revision.id)
+        .all()
+    ]
+    _purge_attachment_files(db, it_ids)
+    master = (
+        db.query(models_parts.PartMaster)
+        .filter(models_parts.PartMaster.id == revision.master_id)
+        .first()
+    )
+    db.commit()
+    if master:
+        shutil.rmtree(os.path.join("./uploads/parts", master.code, revision.version), ignore_errors=True)
+
+
 def delete_part_master(db: Session, master_id: UUID) -> bool:
-    """软删除主数据（级联软删除所有版本和迭代）"""
+    """软删除主数据（级联软删除所有版本和迭代）。
+    附件记录与磁盘文件（含件号上传目录）物理删除、不可恢复。"""
+    import os
+    import shutil
     master = get_part_master(db, master_id)
     if not master:
         return False
+    rev_ids = [
+        row[0]
+        for row in db.query(models_parts.PartRevision.id)
+        .filter(models_parts.PartRevision.master_id == master_id)
+        .all()
+    ]
+    it_ids = [
+        row[0]
+        for row in db.query(models_parts.PartIteration.id)
+        .filter(models_parts.PartIteration.revision_id.in_(rev_ids))
+        .all()
+    ] if rev_ids else []
+    _purge_attachment_files(db, it_ids)
     master.deleted_at = datetime.now(timezone.utc)
     db.query(models_parts.PartRevision).filter(
         models_parts.PartRevision.master_id == master_id
     ).update({"deleted_at": datetime.now(timezone.utc)})
     db.commit()
+    shutil.rmtree(os.path.join("./uploads/parts", master.code), ignore_errors=True)
     return True
 
 

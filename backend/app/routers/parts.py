@@ -134,6 +134,8 @@ def delete_revision(
             raise HTTPException(400, f"该零部件是「{parent_info}」的BOM子项，请先在父部件中移除此子项后再删除")
     rev.deleted_at = datetime.now(timezone.utc)
     db.commit()
+    # 版本附件记录与磁盘文件（含版本目录）一并物理删除
+    crud_parts.purge_revision_attachment_files(db, rev)
     # 如果该主数据下所有版本都已软删除，自动删除主数据
     remaining = db.query(crud_parts.models_parts.PartRevision).filter(
         crud_parts.models_parts.PartRevision.master_id == rev.master_id,
