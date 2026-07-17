@@ -4,6 +4,7 @@ import { partsApi, customFieldsApi } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
 import type { useCADBridge } from '../../hooks/useCADBridge';
 import { syncRowsByPartNumber } from './syncRows';
+import PartDetailModal from '../PartDetailModal';
 
 export interface BOMRow {
   instance_name: string;
@@ -100,6 +101,8 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
   }, [bridge]);
 
   const [matching, setMatching] = useState(false);
+  // PDM匹配列点击后弹出的零部件详情
+  const [detailPart, setDetailPart] = useState<{ masterId: string; revisionId?: string } | null>(null);
 
   // 件号+版本 组成去重键；版本 trim 后不区分大小写，与后端匹配规则一致
   const matchKeyOf = (r: BOMRow) =>
@@ -525,6 +528,14 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
                         ? `版本冲突 (PDM最新: v${row.pdm_match.latest_version})`
                         : '版本冲突'}
                     </span>
+                  ) : row.pdm_match?.master_id ? (
+                    <span
+                      onClick={() => setDetailPart({ masterId: row.pdm_match!.master_id!, revisionId: row.pdm_match!.revision_id })}
+                      className="text-blue-600 cursor-pointer hover:underline"
+                      title="查看零部件详情"
+                    >
+                      {row.pdm_match.code} (v{row.pdm_match.version})
+                    </span>
                   ) : row.pdm_match ? (
                     <span className="text-blue-600">{row.pdm_match.code} (v{row.pdm_match.version})</span>
                   ) : (
@@ -574,6 +585,16 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
           </tbody>
         </table>
       </div>
+
+      {/* PDM匹配零部件详情弹窗 */}
+      {detailPart && (
+        <PartDetailModal
+          open={true}
+          masterId={detailPart.masterId}
+          revisionId={detailPart.revisionId}
+          onClose={() => setDetailPart(null)}
+        />
+      )}
     </div>
   );
 }
