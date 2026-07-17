@@ -30,8 +30,11 @@ interface Props {
   onComplete: (count: number) => void;
 }
 
+// CATIA 内置属性不作为用户属性列显示（内置属性有独立列，避免双重显示）
+const BUILTIN_KEYS = new Set(['PartNumber', 'Revision', 'Definition', 'Nomenclature', 'DescriptionRef']);
+
 function getPropertyColumns(userProps: Record<string, string>): string[] {
-  return Object.keys(userProps).filter(k => k !== 'PartNumber' && k !== 'Revision' && k !== 'Definition');
+  return Object.keys(userProps).filter(k => !BUILTIN_KEYS.has(k));
 }
 
 // CATIA 内置属性列：列头中文，写回 CATIA 用英文属性名。
