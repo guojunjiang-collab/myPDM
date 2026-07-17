@@ -163,19 +163,29 @@ class CATIAClient:
             0.0, 0.0, 0.0, 1.0,
         ]
 
-    @staticmethod
-    def _get_doc_path(ref) -> str:
-        """获取引用产品的源文档完整路径（.CATPart/.CATProduct）。
-        未保存的新文档无路径，返回空字符串。"""
-        try:
-            doc = ref.ReferenceProduct.Parent
-            path = str(doc.FullName or "")
-            return path
-        except Exception:
+    def _get_doc_path(self, product, ref) -> str:
+        """获取零部件源文档完整路径（.CATPart/.CATProduct）。
+        依次尝试 ReferenceProduct.Parent / Parent 两条链（pywin32 动态派发下
+        个别属性可能不可用），未保存的新文档无路径，返回空字符串。"""
+        candidates = []
+        for obj in (ref, product):
             try:
-                return str(ref.Parent.FullName or "")
+                candidates.append(obj.ReferenceProduct.Parent)
             except Exception:
-                return ""
+                pass
+            try:
+                candidates.append(obj.Parent)
+            except Exception:
+                pass
+        for doc in candidates:
+            try:
+                path = str(doc.FullName or "")
+                if path:
+                    return path
+            except Exception:
+                continue
+        logger.warning(f"无法获取源文档路径: {getattr(product, 'Name', '?')}")
+        return ""
 
     def _read_product_tree(self, product, path: str, level: int) -> dict:
         """递归读取产品树节点（含属性）"""
@@ -209,7 +219,7 @@ class CATIAClient:
             "builtin": builtin,
             "user_properties": user_props,
             "matrix": self._read_position_matrix(product) if level > 0 else None,
-            "doc_path": self._get_doc_path(ref),
+            "doc_path": self._get_doc_path(product, ref),
             "children": []
         }
 
