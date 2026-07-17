@@ -3,6 +3,7 @@ import { toast } from '../Toast';
 import { partsApi } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
 import type { useCADBridge } from '../../hooks/useCADBridge';
+import { syncRowsByPartNumber } from './syncRows';
 
 export interface BOMRow {
   instance_name: string;
@@ -51,9 +52,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
   const handlePropEdit = useCallback(async (row: BOMRow, key: string, value: string) => {
     try {
       await bridge.writeProperty(row.path, key, value);
-      setRows(prev => prev.map(r =>
-        r.path === row.path ? { ...r, user_properties: { ...r.user_properties, [key]: value } } : r
-      ));
+      setRows(prev => syncRowsByPartNumber(prev, row, key, value));
       toast.success(`已更新 CATIA 属性 ${key}`);
     } catch (e: any) {
       toast.error(e.message || '写入 CATIA 失败');
@@ -120,9 +119,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
       const master = await partsApi.get(rev.master_id);
       if (master?.spec) {
         await bridge.writeProperty(row.path, '规格型号', master.spec);
-        setRows(prev => prev.map(r =>
-          r.path === row.path ? { ...r, user_properties: { ...r.user_properties, '规格型号': master.spec } } : r
-        ));
+        setRows(prev => syncRowsByPartNumber(prev, row, '规格型号', master.spec));
       }
       toast.success('属性已从 PDM 拉取');
     } catch (e: any) {
@@ -280,9 +277,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
                       disabled={!canEditProps(row)}
                       onChange={(e) => {
                         const val = e.target.value;
-                        setRows(prev => prev.map(r =>
-                          r.path === row.path ? { ...r, user_properties: { ...r.user_properties, [col]: val } } : r
-                        ));
+                        setRows(prev => syncRowsByPartNumber(prev, row, col, val));
                         handlePropEdit(row, col, val);
                       }}
                       className="border border-blue-300 rounded px-1.5 py-0.5 w-full text-xs disabled:bg-gray-100 disabled:border-gray-200"
