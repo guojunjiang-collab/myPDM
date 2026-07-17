@@ -32,21 +32,21 @@ describe('buildAssemblyTreeNodes', () => {
     expect(leaf.parentId).toBe('sub');
   });
 
-  it('names single/root nodes by part_code only (no name, no count)', () => {
+  it('names single/root nodes as "件号_名称" (no instance count)', () => {
     const tree: AssemblyTreeNode[] = [
       node({ bom_item_id: 'b', part_code: 'SCREW', part_name: '内六角螺钉', instance_count: 4 }),
     ];
     const root = buildAssemblyTreeNodes(tree, new Map([['b', ['a']]]))!;
-    expect(root.name).toBe('SCREW');
+    expect(root.name).toBe('SCREW_内六角螺钉');
   });
 
-  it('names expanded instances as "件号#序号" (1-based)', () => {
+  it('names expanded instances as "件号_实例顺序号" (1-based)', () => {
     const tree: AssemblyTreeNode[] = [
       node({ bom_item_id: 'b', instance_index: 0, part_code: 'SCREW', is_leaf: true }),
       node({ bom_item_id: 'b', instance_index: 1, part_code: 'SCREW', is_leaf: true }),
     ];
     const root = buildAssemblyTreeNodes(tree, new Map([['b:0', ['m0']], ['b:1', ['m1']]]))!;
-    expect(root.children.map((c) => c.name).sort()).toEqual(['SCREW#1', 'SCREW#2']);
+    expect(root.children.map((c) => c.name).sort()).toEqual(['SCREW_1', 'SCREW_2']);
   });
 
   it('uses "{bom_item_id}:{instance_index}" key for expanded instances (matches bom_path)', () => {
