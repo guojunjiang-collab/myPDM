@@ -187,12 +187,12 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
   const handlePushToPDM = async (row: BOMRow) => {
     if (!row.pdm_match?.revision_id) return;
     try {
-      // 推送映射与拉取方向对称：件号→code、定义→name、规格型号→spec；
+      // 推送映射与拉取方向对称：件号→code、术语→中文名称(name)、规格型号→spec；
       // CATIA 规格型号为空时不传 spec，避免清空 PDM 已有值
       const spec = row.user_properties['规格型号'];
       await partsApi.update(row.pdm_match.master_id!, {
         code: row.builtin.PartNumber || row.pdm_match.code,
-        name: row.builtin.Definition || row.pdm_match.name,
+        name: row.builtin.Nomenclature || row.pdm_match.name,
         ...(spec ? { spec } : {}),
       });
       toast.success('属性已推送到 PDM');
@@ -221,7 +221,8 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
     try {
       const data = {
         code: row.builtin.PartNumber || row.instance_name,
-        name: row.builtin.Definition || row.instance_name,
+        // CATIA 术语(Nomenclature)对应 PDM 中文名称(name)
+        name: row.builtin.Nomenclature || row.instance_name,
         spec: row.user_properties['规格型号'] || '',
         type: (row.is_assembly ? 'assembly' : 'part') as 'part' | 'assembly',
       };
