@@ -88,8 +88,14 @@ def test_assembly_tree_expands_multi_instance(db):
                        ])
     db.add(b); db.commit()
     tree = crud_parts.get_assembly_tree(db, asm_r.id)
-    assert len(tree) == 2
-    assert tree[0]["part_code"] == "b1"
-    assert tree[0]["instance_index"] == 0
-    assert tree[1]["part_code"] == "b2"
-    assert tree[1]["instance_index"] == 1
+    # 5f603dd 起：根节点 = 当前装配体本身（显示其件号），子级为实例展开节点；
+    # 多实例节点 part_code 保持真实件号，序号由 instance_index 承载（前端拼 "件号#序号"）
+    assert len(tree) == 1
+    root = tree[0]
+    assert root["part_code"] == "ASM-MI"
+    children = root["children"]
+    assert len(children) == 2
+    assert children[0]["part_code"] == "BOLT-MI"
+    assert children[0]["instance_index"] == 0
+    assert children[1]["part_code"] == "BOLT-MI"
+    assert children[1]["instance_index"] == 1
