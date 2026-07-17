@@ -34,6 +34,15 @@ function getPropertyColumns(userProps: Record<string, string>): string[] {
   return Object.keys(userProps).filter(k => k !== 'PartNumber' && k !== 'Revision' && k !== 'Definition');
 }
 
+// CATIA 内置属性列：列头中文，写回 CATIA 用英文属性名。
+// 件号（PartNumber）只读不在此列表；属性存于零件文档，编辑后按同 PartNumber 实例同步。
+const BUILTIN_COLUMNS: { label: string; attr: string }[] = [
+  { label: '版本', attr: 'Revision' },
+  { label: '定义', attr: 'Definition' },
+  { label: '术语', attr: 'Nomenclature' },
+  { label: '描述', attr: 'DescriptionRef' },
+];
+
 export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Props) {
   const [rows, setRows] = useState<BOMRow[]>(initialRows);
   const user = useAuthStore((s) => s.user);
@@ -54,6 +63,16 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
       await bridge.writeProperty(row.path, key, value);
       setRows(prev => syncRowsByPartNumber(prev, row, key, value));
       toast.success(`已更新 CATIA 属性 ${key}`);
+    } catch (e: any) {
+      toast.error(e.message || '写入 CATIA 失败');
+    }
+  }, [bridge]);
+
+  const handleBuiltinEdit = useCallback(async (row: BOMRow, attr: string, value: string) => {
+    try {
+      await bridge.writeProperty(row.path, attr, value);
+      setRows(prev => syncRowsByPartNumber(prev, row, attr, value, 'builtin'));
+      toast.success(`已更新 CATIA 属性 ${attr}`);
     } catch (e: any) {
       toast.error(e.message || '写入 CATIA 失败');
     }
@@ -245,8 +264,10 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
           <thead>
             <tr className="bg-gray-50 border-b-2 border-gray-200">
               <th className="p-2 text-left">层级</th>
-              <th className="p-2 text-left">CATIA PartNumber</th>
-              <th className="p-2 text-left">CATIA 名称</th>
+              <th className="p-2 text-left">件号</th>
+              {BUILTIN_COLUMNS.map(col => (
+                <th key={col.attr} className="p-2 text-left bg-sky-50">{col.label}</th>
+              ))}
               {propertyColumns.map(col => (
                 <th key={col} className="p-2 text-left bg-green-50">{col}</th>
               ))}
@@ -268,7 +289,21 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
                   {row.level === 0 ? <strong>{row.level}</strong> : row.path.replace('0.', '')}
                 </td>
                 <td className="p-2">{row.builtin.PartNumber || ''}</td>
-                <td className="p-2">{row.instance_name}</td>
+
+                {BUILTIN_COLUMNS.map(col => (
+                  <td key={col.attr} className="p-2 bg-sky-50">
+                    <input
+                      value={row.builtin[col.attr] || ''}
+                      disabled={!canEditProps(row)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setRows(prev => syncRowsByPartNumber(prev, row, col.attr, val, 'builtin'));
+                        handleBuiltinEdit(row, col.attr, val);
+                      }}
+                      className="border border-sky-300 rounded px-1.5 py-0.5 w-full text-xs disabled:bg-gray-100 disabled:border-gray-200"
+                    />
+                  </td>
+                ))}
 
                 {propertyColumns.map(col => (
                   <td key={col} className="p-2 bg-green-50">
