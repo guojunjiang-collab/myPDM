@@ -1,9 +1,9 @@
-const DEFAULT_BRIDGE_URL = (() => {
-  if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
-    return `wss://${window.location.host}/ws/bridge`;
-  }
-  return `ws://${window.location.hostname}:9527`;
-})();
+// CAD 桥接服务始终运行在用户本机（与 CATIA 同机）。
+// 必须直连 127.0.0.1：浏览器将回环地址视为可信来源，HTTPS 页面允许直连 ws://127.0.0.1
+// （不属于混合内容，Chrome/Edge/Firefox 均支持）。
+// 不能走服务器 nginx 的 /ws/bridge 反代——那指向的是"服务器"的宿主机 9527，
+// 服务器部署场景下服务器上并没有桥接服务，会导致连接一直失败。
+const DEFAULT_BRIDGE_URL = 'ws://127.0.0.1:9527';
 
 interface BridgeRequest {
   id: number;
