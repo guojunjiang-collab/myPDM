@@ -7,6 +7,12 @@ import { syncRowsByPartNumber } from './syncRows';
 import { flattenTree } from './flattenTree';
 import PartDetailModal from '../PartDetailModal';
 
+export interface NamingPrefixes {
+  pdfPartPrefix: string;
+  pdfAssemblyPrefix: string;
+  stpPrefix: string;
+}
+
 export interface BOMRow {
   instance_name: string;
   part_number: string;
@@ -36,6 +42,7 @@ interface Props {
   bridge: ReturnType<typeof useCADBridge>;
   rows: BOMRow[];
   onComplete: (count: number) => void;
+  namingPrefixes: NamingPrefixes;
 }
 
 // CATIA 内置属性不作为用户属性列显示（内置属性有独立列，避免双重显示）
@@ -400,7 +407,10 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
     // 通过桥接程序将零部件工程图(CATDrawing)转 PDF 并上传到生产附件，同名覆盖
     setUploadingPdf(row.path);
     try {
-      const fileName = `${(row.part_number || 'drawing').trim()}.pdf`;
+      const prefix = row.is_assembly ? namingPrefixes.pdfAssemblyPrefix : namingPrefixes.pdfPartPrefix;
+      const code = (row.part_number || 'drawing').trim();
+      const ver = row.pdm_match?.version || '';
+      const fileName = `${prefix}${code}_${ver}.pdf`;
       await bridge.exportPdfUpload(row.path, fileName, row.pdm_match.revision_id);
       toast.success(`工程图 PDF 已上传: ${fileName}`);
       refreshAttCount(row.pdm_match.revision_id);
@@ -418,7 +428,10 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Prop
     // 通过桥接程序将 CATIA 零部件导出为 STP 并上传到生产附件，同名覆盖
     setUploadingStp(row.path);
     try {
-      const fileName = `${(row.part_number || 'export').trim()}.stp`;
+      const prefix = namingPrefixes.stpPrefix;
+      const code = (row.part_number || 'export').trim();
+      const ver = row.pdm_match?.version || '';
+      const fileName = `${prefix}${code}_${ver}.stp`;
       await bridge.exportStpUpload(row.path, fileName, row.pdm_match.revision_id);
       toast.success(`STP 已导出并上传: ${fileName}`);
       refreshAttCount(row.pdm_match.revision_id);
