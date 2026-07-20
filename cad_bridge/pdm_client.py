@@ -17,13 +17,15 @@ class PDMClient:
         # 使用不验证 SSL 证书（本地自签名证书）
         self._client_kwargs = {"verify": False, "timeout": 30.0}
 
-    async def download_attachment(self, attachment_id: str, save_dir: str, token: str) -> dict:
+    async def download_attachment(self, attachment_id: str, save_dir: str, token: str,
+                                  base_url: str = None) -> dict:
         """下载附件到本地目录"""
+        effective_url = (base_url or self.base_url).rstrip("/")
         os.makedirs(save_dir, exist_ok=True)
         async with httpx.AsyncClient(**self._client_kwargs) as client:
             # 获取媒体令牌
             token_resp = await client.get(
-                f"{self.base_url}/v2/attachments/{attachment_id}/media-token",
+                f"{effective_url}/v2/attachments/{attachment_id}/media-token",
                 params={"action": "direct-download"},
                 headers={"Authorization": f"Bearer {token}"}
             )
@@ -32,7 +34,7 @@ class PDMClient:
 
             # 流式下载
             resp = await client.get(
-                f"{self.base_url}/v2/attachments/{attachment_id}/stream",
+                f"{effective_url}/v2/attachments/{attachment_id}/stream",
                 params={"token": media_token},
                 headers={"Authorization": f"Bearer {token}"}
             )
@@ -47,7 +49,7 @@ class PDMClient:
             return {"file_name": filename, "file_path": filepath, "file_size": len(resp.content)}
 
     async def upload_attachment(self, file_path: str, revision_id: str, category: str, token: str,
-                                overwrite: bool = False) -> dict:
+                                overwrite: bool = False, base_url: str = None) -> dict:
         """上传本地文件到 PDM 零部件附件。
         契约与后端一致：init/complete 为 Form 参数（filename/file_size/category、upload_id/overwrite），
         分块本身走通用端点 POST /v2/attachments/chunk/upload。
@@ -57,11 +59,12 @@ class PDMClient:
             raise FileNotFoundError(f"本地文件不存在: {file_path}")
         filename = os.path.basename(file_path)
         file_size = os.path.getsize(file_path)
+        effective_url = (base_url or self.base_url).rstrip("/")
 
         async with httpx.AsyncClient(**self._client_kwargs) as client:
             # 初始化分块上传
             init_resp = await client.post(
-                f"{self.base_url}/parts/revisions/{revision_id}/attachments/chunk/init",
+                f"{effective_url}/parts/revisions/{revision_id}/attachments/chunk/init",
                 data={
                     "filename": filename,
                     "file_size": str(file_size),
@@ -82,7 +85,7 @@ class PDMClient:
                     if not chunk:
                         break
                     resp = await client.post(
-                        f"{self.base_url}/v2/attachments/chunk/upload",
+                        f"{effective_url}/v2/attachments/chunk/upload",
                         data={"upload_id": upload_id, "chunk_index": str(chunk_index)},
                         files={"chunk": (filename, chunk)},
                         headers={"Authorization": f"Bearer {token}"}
@@ -92,7 +95,7 @@ class PDMClient:
 
             # 完成上传
             complete_resp = await client.post(
-                f"{self.base_url}/parts/revisions/{revision_id}/attachments/chunk/complete",
+                f"{effective_url}/parts/revisions/{revision_id}/attachments/chunk/complete",
                 data={"upload_id": upload_id, "overwrite": "true" if overwrite else "false"},
                 headers={"Authorization": f"Bearer {token}"}
             )

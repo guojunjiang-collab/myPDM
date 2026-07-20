@@ -64,37 +64,41 @@ def register_handlers(server: BridgeServer, pdm_client: PDMClient):
         revision_code = params.get("code", "unknown")
         revision_version = params.get("version", "A")
         save_dir = params.get("save_dir") or f"./cad_workspace/{revision_code}/{revision_version}"
-        return await pdm_client.download_attachment(attachment_id, save_dir, token)
+        pdm_url = params.get("pdm_url")
+        return await pdm_client.download_attachment(attachment_id, save_dir, token, base_url=pdm_url)
 
     async def handle_upload(params: dict, token: str) -> dict:
         file_path = params["file_path"]
         revision_id = params["revision_id"]
         category = params.get("category", "cad")
         overwrite = bool(params.get("overwrite", False))
-        result = await pdm_client.upload_attachment(file_path, revision_id, category, token, overwrite=overwrite)
+        pdm_url = params.get("pdm_url")
+        result = await pdm_client.upload_attachment(file_path, revision_id, category, token, overwrite=overwrite, base_url=pdm_url)
         uploaded = [os.path.basename(file_path)]
         # 上传源文件时，同目录同名的 CATDrawing 工程图（若存在）一并上传
         if params.get("include_drawing"):
             base, _ = os.path.splitext(file_path)
             drawing_path = base + ".CATDrawing"
             if os.path.isfile(drawing_path):
-                await pdm_client.upload_attachment(drawing_path, revision_id, category, token, overwrite=overwrite)
+                await pdm_client.upload_attachment(drawing_path, revision_id, category, token, overwrite=overwrite, base_url=pdm_url)
                 uploaded.append(os.path.basename(drawing_path))
         return {"uploaded": uploaded, **(result or {})}
 
     async def handle_export_stp_upload(params: dict, token: str) -> dict:
         # 导出 CATIA 零部件为 STP 并上传为 PDM 生产附件（同名覆盖）
         export = catia_client.export_stp(params)
+        pdm_url = params.get("pdm_url")
         result = await pdm_client.upload_attachment(
-            export["file_path"], params["revision_id"], "production", token, overwrite=True
+            export["file_path"], params["revision_id"], "production", token, overwrite=True, base_url=pdm_url
         )
         return {"file_name": export["file_name"], **(result or {})}
 
     async def handle_export_pdf_upload(params: dict, token: str) -> dict:
         # 将零部件工程图(CATDrawing)转 PDF 并上传为 PDM 生产附件（同名覆盖）
         export = catia_client.export_drawing_pdf(params)
+        pdm_url = params.get("pdm_url")
         result = await pdm_client.upload_attachment(
-            export["file_path"], params["revision_id"], "production", token, overwrite=True
+            export["file_path"], params["revision_id"], "production", token, overwrite=True, base_url=pdm_url
         )
         return {"file_name": export["file_name"], **(result or {})}
 

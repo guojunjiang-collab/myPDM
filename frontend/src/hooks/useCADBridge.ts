@@ -89,27 +89,30 @@ export function useCADBridge() {
     return cadBridge.call('mapping.get', {}, tokenRef.current);
   }, [ensureConnected]);
 
+  const pdmUrlRef = useRef(window.location.origin + '/api');
+  pdmUrlRef.current = window.location.origin + '/api';
+
   const downloadFile = useCallback(async (attachmentId: string, code: string, version: string): Promise<any> => {
     await ensureConnected();
-    return cadBridge.call('workspace.download', { attachment_id: attachmentId, code, version }, tokenRef.current);
+    return cadBridge.call('workspace.download', { attachment_id: attachmentId, code, version, pdm_url: pdmUrlRef.current }, tokenRef.current);
   }, [ensureConnected]);
 
   const uploadFile = useCallback(async (filePath: string, revisionId: string, category: 'cad' | 'production', overwrite = false, includeDrawing = false): Promise<any> => {
     await ensureConnected();
     // 大文件上传较慢，超时放宽到 3 分钟
-    return cadBridge.call('workspace.upload', { file_path: filePath, revision_id: revisionId, category, overwrite, include_drawing: includeDrawing }, tokenRef.current, 180000);
+    return cadBridge.call('workspace.upload', { file_path: filePath, revision_id: revisionId, category, overwrite, include_drawing: includeDrawing, pdm_url: pdmUrlRef.current }, tokenRef.current, 180000);
   }, [ensureConnected]);
 
   const exportStpUpload = useCallback(async (path: string, fileName: string, revisionId: string): Promise<any> => {
     await ensureConnected();
     // STP 导出大装配较慢，超时放宽到 3 分钟
-    return cadBridge.call('workspace.export_stp_upload', { path, file_name: fileName, revision_id: revisionId }, tokenRef.current, 180000);
+    return cadBridge.call('workspace.export_stp_upload', { path, file_name: fileName, revision_id: revisionId, pdm_url: pdmUrlRef.current }, tokenRef.current, 180000);
   }, [ensureConnected]);
 
   const exportPdfUpload = useCallback(async (path: string, fileName: string, revisionId: string): Promise<any> => {
     await ensureConnected();
     // 工程图打开+转 PDF 较慢，超时放宽到 3 分钟
-    return cadBridge.call('workspace.export_pdf_upload', { path, file_name: fileName, revision_id: revisionId }, tokenRef.current, 180000);
+    return cadBridge.call('workspace.export_pdf_upload', { path, file_name: fileName, revision_id: revisionId, pdm_url: pdmUrlRef.current }, tokenRef.current, 180000);
   }, [ensureConnected]);
 
   return {
