@@ -677,6 +677,13 @@ export default function Projects() {
                         project={currentProject ? { code: currentProject.code, name: currentProject.name, status: currentProject.status, owner_name: currentProject.owner_name } : null}
                         hoveredId={hoveredId}
                         onHover={setHoveredId}
+                        dragTask={dragTask}
+                        dragOver={dragOver}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
                       />
                       {viewMode === 'table' ? (
                         <div className="flex-1 bg-white">

@@ -1,4 +1,5 @@
-import type { GanttTask } from '../../types/project';
+import React from 'react';
+import type { GanttTask, ProjectTask } from '../../types/project';
 import { CODE_W, ASSIGNEE_W, STATUS_W, LEFT_W, ROW_H, INDENT } from './gantt/ganttUtils';
 import { TaskCodeCell, TaskNameCell, TaskAssigneeCell } from './TaskRowCells';
 import { STATUS_BADGE } from './gantt/ganttUtils';
@@ -13,9 +14,17 @@ interface Props {
   hoveredId?: string | null;
   onHover?: (taskId: string | null) => void;
   hideHeader?: boolean;
+  /** 拖拽排序支持 */
+  dragTask?: ProjectTask | null;
+  dragOver?: { taskId: string; position: 'above' | 'below' | 'into' } | null;
+  onDragStart?: (t: ProjectTask, e: React.DragEvent) => void;
+  onDragEnd?: (e: React.DragEvent) => void;
+  onDragOver?: (t: ProjectTask, e: React.DragEvent) => void;
+  onDragLeave?: () => void;
+  onDrop?: (t: ProjectTask, e: React.DragEvent) => void;
 }
 
-export default function SharedLeftPanel({ tasks, expanded, childMap, onToggle, onRowClick, project, hoveredId, onHover, hideHeader }: Props) {
+export default function SharedLeftPanel({ tasks, expanded, childMap, onToggle, onRowClick, project, hoveredId, onHover, hideHeader, dragTask, dragOver, onDragStart, onDragEnd, onDragOver, onDragLeave, onDrop }: Props) {
   const hasProject = !!(project?.code);
 
   return (
@@ -49,25 +58,44 @@ export default function SharedLeftPanel({ tasks, expanded, childMap, onToggle, o
       )}
       {tasks.map((t) => {
         const hasChildren = !!childMap[t.id];
+        const isDragAbove = dragOver?.taskId === t.id && dragOver?.position === 'above';
+        const isDragBelow = dragOver?.taskId === t.id && dragOver?.position === 'below';
+        const isDragInto = dragOver?.taskId === t.id && dragOver?.position === 'into';
+        const isDragging = dragTask?.id === t.id;
+        const hasDrag = !!onDragStart;
+        const dragProps = hasDrag ? {
+          draggable: true as const,
+          onDragStart: (e: React.DragEvent) => onDragStart!(t as any, e),
+          onDragEnd: onDragEnd!,
+          onDragOver: (e: React.DragEvent) => onDragOver!(t as any, e),
+          onDragLeave: onDragLeave!,
+          onDrop: (e: React.DragEvent) => onDrop!(t as any, e),
+        } : {};
         return (
-          <div key={t.id}
-            className={`flex items-center border-b border-gray-100 text-sm ${hoveredId === t.id ? 'bg-primary-50' : ''}`}
-            style={{ height: ROW_H }}
-            onMouseEnter={() => onHover?.(t.id)}>
-            <TaskCodeCell code={t.code} depth={t.depth} hasChildren={hasChildren}
-              isExpanded={expanded.has(t.id)}
-              onToggle={(e) => { e.stopPropagation(); onToggle(t.id); }}
-              onClick={() => onRowClick?.(t.id)} variant="gantt" />
-            <TaskNameCell name={t.name} taskType={t.task_type}
-              isCritical={t.is_critical} variant="gantt"
-              onClick={() => onRowClick?.(t.id)} />
-            <TaskAssigneeCell assigneeName={t.assignee_name} variant="gantt"
-              onClick={() => onRowClick?.(t.id)} />
-            <span className="px-1 shrink-0 flex items-center justify-center cursor-pointer" style={{ width: STATUS_W }}
-              onClick={() => onRowClick?.(t.id)}>
-              <span className={`px-1.5 py-0.5 text-xs rounded whitespace-nowrap ${STATUS_BADGE[t.status] || 'bg-gray-100 text-gray-600'}`}>{t.status}</span>
-            </span>
-          </div>
+          <React.Fragment key={t.id}>
+            {isDragAbove && <div className="h-1"><div className="h-1 bg-primary-500 rounded-full mx-1" /></div>}
+            <div
+              {...dragProps}
+              className={`flex items-center border-b border-gray-100 text-sm ${hoveredId === t.id ? 'bg-primary-50' : ''} ${isDragInto ? 'bg-blue-50 ring-2 ring-primary-300 ring-inset' : ''} ${isDragging ? 'opacity-40' : ''} ${hasDrag ? 'cursor-grab' : ''}`}
+              style={{ height: ROW_H }}
+              onMouseEnter={() => onHover?.(t.id)}
+              onClick={(e) => { if (hasDrag) e.stopPropagation(); onRowClick?.(t.id); }}>
+              <TaskCodeCell code={t.code} depth={t.depth} hasChildren={hasChildren}
+                isExpanded={expanded.has(t.id)}
+                onToggle={(e) => { e.stopPropagation(); onToggle(t.id); }}
+                onClick={() => onRowClick?.(t.id)} variant="gantt" />
+              <TaskNameCell name={t.name} taskType={t.task_type}
+                isCritical={t.is_critical} variant="gantt"
+                onClick={() => onRowClick?.(t.id)} />
+              <TaskAssigneeCell assigneeName={t.assignee_name} variant="gantt"
+                onClick={() => onRowClick?.(t.id)} />
+              <span className="px-1 shrink-0 flex items-center justify-center" style={{ width: STATUS_W }}
+                onClick={() => onRowClick?.(t.id)}>
+                <span className={`px-1.5 py-0.5 text-xs rounded whitespace-nowrap ${STATUS_BADGE[t.status] || 'bg-gray-100 text-gray-600'}`}>{t.status}</span>
+              </span>
+            </div>
+            {isDragBelow && <div className="h-1"><div className="h-1 bg-primary-500 rounded-full mx-1" /></div>}
+          </React.Fragment>
         );
       })}
     </div>
