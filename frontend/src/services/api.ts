@@ -781,6 +781,7 @@ export interface AssemblyTreeNode {
   instance_index?: number;
   part_code: string;
   part_name: string;
+  version?: string;
   quantity: number;
   instance_count: number;
   is_leaf: boolean;

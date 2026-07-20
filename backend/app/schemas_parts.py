@@ -167,11 +167,10 @@ class AssemblyInstanceDTO(BaseModel):
 
 class AssemblyTreeNodeDTO(BaseModel):
     bom_item_id: str
-    # 多实例展开时的实例序号；与实例 bom_path 末段 "{bom_item_id}:{idx}" 对应。
-    # 缺此字段会被 response_model 剥离，导致前端 mesh uuid 挂不上树(上色/选中失效)。
     instance_index: Optional[int] = None
     part_code: str
     part_name: str
+    version: Optional[str] = None
     quantity: int
     instance_count: int
     is_leaf: bool

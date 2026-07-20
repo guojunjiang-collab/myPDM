@@ -1522,6 +1522,7 @@ def get_assembly_tree(db: Session, assembly_revision_id) -> list:
             if not child_rev:
                 continue
             master = get_part_master(db, child_rev.master_id)
+            version = child_rev.version if child_rev else ""
             children = build(child_rev.id, visited)
             instances = link.cad_instances or []
             if len(instances) > 1:
@@ -1532,6 +1533,7 @@ def get_assembly_tree(db: Session, assembly_revision_id) -> list:
                         "instance_index": idx,
                         "part_code": master.code if master else "",
                         "part_name": master.name if master else "",
+                        "version": version,
                         "quantity": 1,
                         "instance_count": 1,
                         "is_leaf": len(children) == 0,
@@ -1542,6 +1544,7 @@ def get_assembly_tree(db: Session, assembly_revision_id) -> list:
                     "bom_item_id": str(link.id),
                     "part_code": master.code if master else "",
                     "part_name": master.name if master else "",
+                    "version": version,
                     "quantity": link.quantity,
                     "instance_count": len(instances),
                     "is_leaf": len(children) == 0,
@@ -1557,6 +1560,7 @@ def get_assembly_tree(db: Session, assembly_revision_id) -> list:
         "bom_item_id": f"root:{assembly_revision_id}",
         "part_code": master.code if master else "",
         "part_name": master.name if master else "",
+        "version": rev.version if rev else "",
         "quantity": 1,
         "instance_count": 1,
         "is_leaf": len(children) == 0,
