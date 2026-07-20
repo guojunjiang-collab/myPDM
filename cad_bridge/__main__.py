@@ -11,6 +11,25 @@ from cad_bridge.server import BridgeServer
 from cad_bridge.pdm_client import PDMClient
 from cad_bridge.catia.client import catia_client
 
+
+def _load_dotenv():
+    """加载 cad_bridge 目录下的 .env 文件（系统环境变量优先级更高）"""
+    env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+    if not os.path.isfile(env_file):
+        return
+    with open(env_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            if '=' not in line:
+                continue
+            key, val = line.split('=', 1)
+            key = key.strip()
+            val = val.strip()
+            if key:
+                os.environ.setdefault(key, val)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
@@ -92,6 +111,7 @@ def register_handlers(server: BridgeServer, pdm_client: PDMClient):
 
 
 def main():
+    _load_dotenv()
     parser = argparse.ArgumentParser(description="CAD 桥接服务")
     parser.add_argument("--port", type=int, default=9527, help="WebSocket 监听端口（默认 9527）")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="监听地址（默认 127.0.0.1）")
