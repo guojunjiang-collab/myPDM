@@ -12,9 +12,12 @@ dracoLoader.setDecoderPath('/draco/');
 
 interface ModelLoaderProps {
   url: string;
+  code?: string;
+  version?: string;
+  name?: string;
 }
 
-export function ModelLoader({ url }: ModelLoaderProps) {
+export function ModelLoader({ url, code, version, name }: ModelLoaderProps) {
   const {
     setLoadingState, setModelScale, setTreeData, selectByMesh,
     resetViewTrigger, measureMode,
@@ -54,7 +57,11 @@ export function ModelLoader({ url }: ModelLoaderProps) {
       }
     });
 
-    setTreeData(buildModelTree(gltf.scene));
+    const tree = buildModelTree(gltf.scene);
+    if (tree && (code || version || name)) {
+      tree.name = [code, version, name].filter(Boolean).join('_');
+    }
+    setTreeData(tree);
 
     setLoadingState('ready');
 

@@ -336,7 +336,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
       });
       if (stp) {
         const mt = await mediaApi.token(stp.id, 'gltf');
-        window.open(`/stp-viewer?id=${stp.id}&token=${encodeURIComponent(mt)}`, '_blank');
+        window.open(`/stp-viewer?id=${stp.id}&token=${encodeURIComponent(mt)}&code=${encodeURIComponent(item.child_code || '')}&version=${item.child_version || ''}&name=${encodeURIComponent(item.child_name || '')}`, '_blank');
       } else {
         alert('该零件没有 STP/STEP 附件');
       }
@@ -623,15 +623,15 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                           const n = (a.file_name || '').toLowerCase();
                           return n.endsWith('.stp') || n.endsWith('.step');
                         });
-                        if (stp) {
-                          const mt = await mediaApi.token(stp.id, 'gltf');
-                          window.open(`/stp-viewer?id=${stp.id}&token=${encodeURIComponent(mt)}`, '_blank');
-                        } else {
-                          alert('该零件没有 STP/STEP 附件，请先上传');
-                        }
-                      } catch { alert('预览失败'); }
-                    }}
-                      className="px-3 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700">3D预览</button>
+          if (stp) {
+            const mt = await mediaApi.token(stp.id, 'gltf');
+            window.open(`/stp-viewer?id=${stp.id}&token=${encodeURIComponent(mt)}&code=${encodeURIComponent(editMaster.code)}&version=${revision?.version || ''}&name=${encodeURIComponent(editMaster.name)}`, '_blank');
+          } else {
+            alert('该零件没有 STP/STEP 附件，请先上传');
+          }
+        } catch { alert('预览失败'); }
+      }}
+        className="px-3 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700">3D预览</button>
                   )}
                   {(canCheckout || canCheckin || canUndo || canFreeze || canUnfreeze || canRelease || canUpgrade || canObsolete || canForceCheckin) && (
                     <span className="mx-1 text-gray-300 self-center select-none">|</span>

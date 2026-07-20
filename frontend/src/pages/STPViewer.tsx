@@ -20,6 +20,9 @@ export default function STPViewerPage() {
 
   const params = new URLSearchParams(location.search);
   const assemblyRevId = params.get('assembly');
+  const partCode = params.get('code') || undefined;
+  const partVersion = params.get('version') || undefined;
+  const partName = params.get('name') || undefined;
 
   const [asmInstances, setAsmInstances] = useState<AssemblyInstance[] | null>(null);
   const [asmTree, setAsmTree] = useState<AssemblyTreeNode[]>([]);
@@ -109,7 +112,7 @@ export default function STPViewerPage() {
       source = { kind: 'assembly', instances: asmInstances, tree: asmTree };
     }
   } else if (url) {
-    source = { kind: 'single', url };
+    source = { kind: 'single', url, code: partCode, version: partVersion, name: partName };
   }
 
   // 装配模式的前置态（加载/空/错误）

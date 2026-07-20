@@ -15,7 +15,7 @@ import type { AssemblyInstance, AssemblyTreeNode } from '../../services/api';
 
 /** 查看器数据源：单件(一个 glb) 或 装配(多实例 + BOM 树) */
 export type ViewerSource =
-  | { kind: 'single'; url: string }
+  | { kind: 'single'; url: string; code?: string; version?: string; name?: string }
   | { kind: 'assembly'; instances: AssemblyInstance[]; tree: AssemblyTreeNode[] };
 
 /**
@@ -72,7 +72,7 @@ export function ViewerCanvas({ source }: ViewerCanvasProps) {
       <Suspense fallback={null}>
         <GLTFErrorBoundary>
           {source.kind === 'single' ? (
-            <ModelLoader url={source.url} />
+            <ModelLoader url={source.url} code={source.code} version={source.version} name={source.name} />
           ) : (
             <AssemblyModelLoader instances={source.instances} tree={source.tree} />
           )}
