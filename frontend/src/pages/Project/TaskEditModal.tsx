@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { projectApi } from '../../services/projectApi';
-import { usersApi, partsApi, documentsApi, ecrApi, ecoApi, logsApi, customFieldsApi } from '../../services/api';
+import { partsApi, documentsApi, ecrApi, ecoApi, logsApi, customFieldsApi } from '../../services/api';
 import { useDataStore } from '../../stores/data';
 import type { CustomFieldDefinition, CustomFieldValue } from '../../types';
 import AssemblyPartPicker from '../../components/AssemblyPartPicker';
@@ -114,7 +114,10 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
   useEffect(() => {
     if (!open) return;
     setTab('info');
-    usersApi.list().then((r) => setUsers(r.data.items || r.data)).catch(() => setUsers([]));
+    projectApi.listMembers(projectId).then((r) => {
+      const members = (r.data.items || []).map((m: any) => ({ id: m.user_id, real_name: m.user_name }));
+      setUsers(members);
+    }).catch(() => setUsers([]));
     if (task) {
       setForm({
         name: task.name, task_type: task.task_type, assignee_id: task.assignee_id || '',
