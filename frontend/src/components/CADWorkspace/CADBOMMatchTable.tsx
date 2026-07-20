@@ -72,7 +72,7 @@ const DEFAULT_FIELD_MAPPING: FieldMapping = {
   properties: { 规格型号: 'spec' },
 };
 
-export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete }: Props) {
+export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, namingPrefixes }: Props) {
   const [rows, setRows] = useState<BOMRow[]>(initialRows);
   const user = useAuthStore((s) => s.user);
   // 字段映射与 PDM 自定义字段定义缓存（工作台打开期间有效）

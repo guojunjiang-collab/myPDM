@@ -804,5 +804,5 @@ export const assemblyViewerApi = {
 
 export const settingsApi = {
   cadNaming: () =>
-    api.get<{ pdf_part_prefix: string; pdf_assembly_prefix: string; stp_prefix: string }>('/settings/cad-naming').then((r) => r.data),
+    api.get<{ pdfPartPrefix: string; pdfAssemblyPrefix: string; stpPrefix: string }>('/settings/cad-naming').then((r) => r.data),
 };
