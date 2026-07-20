@@ -289,7 +289,13 @@ class CATIAClient:
         if doc is None:
             raise RuntimeError("无法获取零部件源文档，无法导出 STP")
 
-        file_name = params.get("file_name") or f"{getattr(ref, 'PartNumber', '') or 'export'}.stp"
+        if params.get("file_name"):
+            file_name = params["file_name"]
+        else:
+            code = getattr(ref, 'PartNumber', '') or 'export'
+            ver = getattr(ref, 'Revision', '') or ''
+            prefix = os.environ.get("CAD_STP_PREFIX", "")
+            file_name = f"{prefix}{code}_{ver}.stp"
         out_dir = os.path.abspath(params.get("out_dir") or os.path.join("cad_workspace", "stp_export"))
         os.makedirs(out_dir, exist_ok=True)
         out_path = os.path.join(out_dir, file_name)
@@ -322,7 +328,13 @@ class CATIAClient:
         if not os.path.isfile(drawing_path):
             raise RuntimeError(f"未找到工程图文件: {os.path.basename(drawing_path)}")
 
-        file_name = params.get("file_name") or f"{getattr(ref, 'PartNumber', '') or 'drawing'}.pdf"
+        if params.get("file_name"):
+            file_name = params["file_name"]
+        else:
+            code = getattr(ref, 'PartNumber', '') or 'drawing'
+            ver = getattr(ref, 'Revision', '') or ''
+            prefix = os.environ.get("CAD_PDF_PART_PREFIX", "")
+            file_name = f"{prefix}{code}_{ver}.pdf"
         out_dir = os.path.abspath(params.get("out_dir") or os.path.join("cad_workspace", "pdf_export"))
         os.makedirs(out_dir, exist_ok=True)
         out_path = os.path.join(out_dir, file_name)
