@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from fastapi import APIRouter
 
-router = APIRouter(tags=["settings"])
+router = APIRouter(prefix="/settings", tags=["settings"])
 
 
 @router.get("/cad-naming")
