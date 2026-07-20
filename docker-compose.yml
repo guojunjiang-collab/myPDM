@@ -57,6 +57,9 @@ services:
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET not set}
       - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD not set}
       - CORS_ORIGINS=${CORS_ORIGINS:-https://localhost:8080}
+      - CAD_PDF_PART_PREFIX=${CAD_PDF_PART_PREFIX:-DR_}
+      - CAD_PDF_ASSEMBLY_PREFIX=${CAD_PDF_ASSEMBLY_PREFIX:-ASY_}
+      - CAD_STP_PREFIX=${CAD_STP_PREFIX:-MD_}
     volumes:
       - ${UPLOADS_HOST_PATH:-./uploads}:/app/uploads
       - ./backend/app:/app/app
