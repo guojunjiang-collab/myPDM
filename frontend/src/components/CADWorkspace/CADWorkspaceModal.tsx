@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal } from '../Modal';
 import { CADConnectStep } from './CADConnectStep';
-import { CADBOMMatchTable, type BOMRow } from './CADBOMMatchTable';
+import { CADBOMMatchTable, type BOMRow, type NamingPrefixes } from './CADBOMMatchTable';
 import { CADCompleteStep } from './CADCompleteStep';
 import { useCADBridge } from '../../hooks/useCADBridge';
+import { settingsApi } from '../../services/api';
 
 interface Props {
   open: boolean;
@@ -16,7 +17,18 @@ export function CADWorkspaceModal({ open, onClose }: Props) {
   const [step, setStep] = useState<Step>('connect');
   const [bomRows, setBomRows] = useState<BOMRow[]>([]);
   const [completedCount, setCompletedCount] = useState(0);
+  const [namingPrefixes, setNamingPrefixes] = useState<NamingPrefixes>({
+    pdfPartPrefix: '',
+    pdfAssemblyPrefix: '',
+    stpPrefix: '',
+  });
   const bridge = useCADBridge();
+
+  useEffect(() => {
+    if (open) {
+      settingsApi.cadNaming().then(setNamingPrefixes).catch(() => {});
+    }
+  }, [open]);
 
   const handleClose = () => {
     setStep('connect');
@@ -74,6 +86,7 @@ export function CADWorkspaceModal({ open, onClose }: Props) {
               bridge={bridge}
               rows={bomRows}
               onComplete={handleMatchComplete}
+              namingPrefixes={namingPrefixes}
             />
           )}
           {step === 'complete' && (
