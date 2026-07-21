@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { configurationApi } from '../../services/api';
+import { configurationApi, customFieldsApi } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
+import { useDataStore } from '../../stores/data';
 import type { ConfigurationItemDetail, ConfigurationItemRevision } from '../../types';
 import { Loading } from '../Loading';
 import { toast } from '../Toast';
 import { Modal } from '../Modal';
 import EntityDocumentSection from '../EntityDocumentSection';
+import CustomFieldInput from '../CustomFieldInput';
+import ConfigItemPicker from './ConfigItemPicker';
+import PartDetailModal from '../PartDetailModal';
 
 const statusTag = (s: string) => {
   const map: Record<string, { label: string; cls: string }> = {
@@ -24,10 +28,7 @@ interface Props {
 }
 
 function InfoCard({ label, value, readonly, onChange }: {
-  label: string;
-  value: string;
-  readonly: boolean;
-  onChange?: (v: string) => void;
+  label: string; value: string; readonly: boolean; onChange?: (v: string) => void;
 }) {
   return (
     <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
@@ -35,11 +36,8 @@ function InfoCard({ label, value, readonly, onChange }: {
       {readonly ? (
         <div className="text-sm text-gray-900 font-medium">{value || '—'}</div>
       ) : (
-        <input
-          value={value}
-          onChange={(e) => onChange?.(e.target.value)}
-          className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono"
-        />
+        <input value={value} onChange={(e) => onChange?.(e.target.value)}
+          className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono" />
       )}
     </div>
   );
@@ -47,77 +45,78 @@ function InfoCard({ label, value, readonly, onChange }: {
 
 export default function ConfigItemDetailModal({ revisionId, open, onClose }: Props) {
   const { user } = useAuthStore();
+  const isAdminUser = user?.role === 'admin';
 
+  const [internalRevId, setInternalRevId] = useState(revisionId);
   const [detail, setDetail] = useState<ConfigurationItemDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'info' | 'parts' | 'children' | 'docs' | 'versions'>('info');
+  const tabsKeys = ['info', 'children', 'parts', 'docs', 'versions', 'iterations'] as const;
+  const [activeTab, setActiveTab] = useState<typeof tabsKeys[number]>('info');
   const [checkinNote, setCheckinNote] = useState('');
   const [showCheckinModal, setShowCheckinModal] = useState(false);
-
   const [editCode, setEditCode] = useState('');
   const [editName, setEditName] = useState('');
-  const [editSpec, setEditSpec] = useState('');
-  const [editRemark, setEditRemark] = useState('');
-
   const [parts, setParts] = useState<any[]>([]);
   const [children, setChildren] = useState<any[]>([]);
   const [versions, setVersions] = useState<ConfigurationItemRevision[]>([]);
+  const [iterations, setIterations] = useState<any[]>([]);
+  const [cfDefs, setCfDefs] = useState<any[]>([]);
+  const [cfValues, setCfValues] = useState<Record<string, any>>({});
+  const [selectedPartMasterId, setSelectedPartMasterId] = useState<string | null>(null);
+  const [nestedConfigRevId, setNestedConfigRevId] = useState<string | null>(null);
+  const [cfgPickerOpen, setCfgPickerOpen] = useState(false);
+  const [pickerParentId, setPickerParentId] = useState<string | null>(null);
+  const [viewingIterationData, setViewingIterationData] = useState<any>(null);
+  const [expandedChildren, setExpandedChildren] = useState<Set<string>>(new Set());
+  const [subChildren, setSubChildren] = useState<Record<string, any[]>>({});
+  const masterTimer = useRef<ReturnType<typeof setTimeout>>();
+  const cfTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const loadDetail = useCallback(async () => {
-    if (!revisionId) return;
+    if (!internalRevId) return;
     setDetailLoading(true);
     try {
-      const d = await configurationApi.detail(revisionId);
+      const d = await configurationApi.detail(internalRevId);
       setDetail(d);
       setEditCode(d.master.code || '');
       setEditName(d.revision.name || d.master.name || '');
       setParts(d.parts || []);
       setChildren(d.children || []);
       setVersions(d.versions || []);
+      const allDefs = useDataStore.getState().customFieldDefs || [];
+      setCfDefs(allDefs.filter((def: any) => def.applies_to?.includes('configuration_item')));
+      try {
+        const cfRes = await customFieldsApi.getValues('configuration_item', internalRevId);
+        const vals: Record<string, any> = {};
+        (cfRes.data || []).forEach((v: any) => { vals[v.field_id] = v.value; });
+        setCfValues(vals);
+      } catch {}
     } catch (e) {
-      console.error(e);
-      setDetail(null);
-    } finally {
-      setDetailLoading(false);
-    }
-  }, [revisionId]);
+      console.error(e); setDetail(null);
+    } finally { setDetailLoading(false); }
+  }, [internalRevId]);
 
-  useEffect(() => {
-    if (open) {
-      setDetail(null);
-      setActiveTab('info');
-      loadDetail();
-    }
-  }, [open, loadDetail]);
+  useEffect(() => { setInternalRevId(revisionId); }, [revisionId]);
+  useEffect(() => { if (open) { setDetail(null); setActiveTab('info'); setViewingIterationData(null); setExpandedChildren(new Set()); setSubChildren({}); loadDetail(); } }, [open, loadDetail]);
 
   const loadTabs = useCallback(async () => {
-    if (!revisionId) return;
+    if (!internalRevId) return;
     try {
-      if (activeTab === 'parts' || activeTab === 'children') {
-        const d = await configurationApi.detail(revisionId);
-        setParts(d.parts || []);
-        setChildren(d.children || []);
-      }
-      if (activeTab === 'versions') {
-        setVersions(await configurationApi.versions(revisionId));
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  }, [revisionId, activeTab]);
-
+      if (activeTab === 'parts' || activeTab === 'children') { const d = await configurationApi.detail(internalRevId); setParts(d.parts || []); setChildren(d.children || []); }
+      if (activeTab === 'versions') setVersions(await configurationApi.versions(internalRevId));
+      if (activeTab === 'iterations') setIterations(await configurationApi.iterations(internalRevId));
+    } catch (e) { console.error(e); }
+  }, [internalRevId, activeTab]);
   useEffect(() => { loadTabs(); }, [loadTabs]);
 
   const master = detail?.master;
   const revision = detail?.revision;
-
+  const iterationId = revision?.iteration_id;
   const isCheckedOut = !!revision?.check_out_user_id;
   const isCheckedOutByMe = isCheckedOut && revision?.check_out_user_id === user?.id;
   const isDraft = revision?.status === 'draft';
-  const isAdminUser = user?.role === 'admin';
   const canEdit = isCheckedOutByMe && isDraft;
-
   const canCheckout = isDraft && !isCheckedOut;
   const canCheckin = isDraft && isCheckedOutByMe;
   const canUndo = isDraft && isCheckedOutByMe && (revision?.latest_iteration || 0) > 1;
@@ -127,359 +126,226 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
   const canObsolete = revision?.status === 'released';
   const canForceCheckin = isCheckedOut && isAdminUser;
 
-  const masterTimer = useRef<ReturnType<typeof setTimeout>>();
   const autoSaveMaster = useCallback((data: Record<string, any>) => {
     if (!master?.id) return;
     if (masterTimer.current) clearTimeout(masterTimer.current);
-    masterTimer.current = setTimeout(() => {
-      configurationApi.updateMaster(master.id, data).catch((e: any) => {
-        toast.error(e?.response?.data?.detail || '保存失败');
-      });
-    }, 500);
+    masterTimer.current = setTimeout(() => { configurationApi.updateMaster(master.id, data).catch(() => {}); }, 500);
   }, [master?.id]);
 
-  const remarkTimer = useRef<ReturnType<typeof setTimeout>>();
-  const autoSaveRemark = useCallback((remark: string) => {
-    if (!revisionId) return;
-    if (remarkTimer.current) clearTimeout(remarkTimer.current);
-    remarkTimer.current = setTimeout(() => {
-      configurationApi.update(revisionId, { remark }).catch((e: any) => {
-        toast.error(e?.response?.data?.detail || '保存失败');
-      });
+  const autoSaveCf = useCallback((fieldId: string, value: any) => {
+    if (!internalRevId) return;
+    if (cfTimerRef.current) clearTimeout(cfTimerRef.current);
+    cfTimerRef.current = setTimeout(() => {
+      const fieldValues = cfDefs.map((def: any) => ({ field_id: def.id, value: fieldId === def.id ? value : cfValues[def.id] ?? null })).filter((fv: any) => fv.value !== null && fv.value !== '');
+      if (fieldValues.length > 0) customFieldsApi.setValues('configuration_item', internalRevId, fieldValues).catch(() => {});
     }, 500);
-  }, [revisionId]);
+  }, [internalRevId, cfDefs, cfValues]);
 
   const doAction = async (action: () => Promise<any>, msg: string) => {
-    try {
-      await action();
-      toast.success(msg);
-      loadDetail();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.detail || '操作失败');
-    }
+    try { await action(); toast.success(msg); loadDetail(); } catch (e: any) { toast.error(e?.response?.data?.detail || '操作失败'); }
   };
 
-  const handleClose = () => {
-    setActiveTab('info');
-    onClose();
+  const handleClose = () => { setActiveTab('info'); setViewingIterationData(null); onClose(); };
+
+  const handleViewIteration = async (it: any) => {
+    try {
+      const res = await configurationApi.iterations(internalRevId);
+      const target = res.find((i: any) => i.id === it.id);
+      if (target) { setViewingIterationData(target); setActiveTab('info'); }
+    } catch {}
+  };
+
+  const handleDeleteIteration = async (it: any) => {
+    if (!internalRevId || !confirm(`确定删除迭代 #${it.iteration}？`)) return;
+    try { await configurationApi.deleteIteration(internalRevId, it.id); toast.success('迭代已删除'); setIterations(await configurationApi.iterations(internalRevId)); } catch (e: any) { toast.error(e?.response?.data?.detail || '删除失败'); }
+  };
+
+  const loadSubChildren = async (revId: string) => {
+    if (subChildren[revId]) return;
+    try { const d = await configurationApi.detail(revId); setSubChildren(prev => ({ ...prev, [revId]: d.children || [] })); } catch {}
+  };
+
+  const renderChildRow = (c: any, level: number, parentRevisionId: string): React.ReactNode => {
+    const revId = c.child_detail?.id || c.child_revision_id;
+    const isExpanded = expandedChildren.has(revId);
+    const nested = subChildren[revId] || [];
+    const indent = (level - 1) * 20;
+    const rows: React.ReactNode[] = [];
+    rows.push(
+      <tr key={c.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => { if (revId) setNestedConfigRevId(revId); }}>
+        <td className="px-3 py-2 text-gray-400 text-xs" style={{ paddingLeft: indent + 12 }}>
+          <span className="inline-flex items-center gap-1">
+            {c.has_children ? (
+              <button onClick={(e) => { e.stopPropagation(); if (isExpanded) { setExpandedChildren(prev => { const s = new Set(prev); s.delete(revId); return s; }); } else { setExpandedChildren(prev => new Set(prev).add(revId)); loadSubChildren(revId); } }} className="text-gray-400 hover:text-gray-600 w-4 text-center text-xs">{isExpanded ? '▼' : '▶'}</button>
+            ) : (<span className="w-4" />)}
+            {level}
+          </span>
+        </td>
+        <td className="px-3 py-2 font-mono text-xs">{c.child_detail?.code || '—'}</td>
+        <td className="px-3 py-2">{c.child_detail?.name || '—'}</td>
+        <td className="px-3 py-2 text-center text-gray-500 text-xs">{c.child_detail?.version || '—'}</td>
+        <td className="px-3 py-2 text-center"><span className={`px-1.5 py-0.5 text-xs rounded-full ${statusTag(c.child_detail?.status || 'draft').cls}`}>{statusTag(c.child_detail?.status || 'draft').label}</span></td>
+        <td className="px-3 py-2 text-center">{c.child_detail?.check_out_user_name ? (<span className="text-xs text-orange-600">{c.child_detail.check_out_user_name}</span>) : (<span className="text-xs text-gray-400">—</span>)}</td>
+        <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+          {canEdit ? (
+            <button onClick={async () => { try { await configurationApi.updateChild(parentRevisionId, c.id, { is_required: !c.is_required }); setChildren(prev => prev.map(x => x.id === c.id ? { ...x, is_required: !x.is_required } : x)); } catch {} }} className={`text-xs px-2 py-0.5 rounded ${c.is_required ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>{c.is_required ? '必选' : '可选'}</button>
+          ) : (<span className={`text-xs ${c.is_required ? 'text-green-600' : 'text-gray-400'}`}>{c.is_required ? '必选' : '可选'}</span>)}
+        </td>
+        <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+          {canEdit ? (<input type="number" min={1} defaultValue={c.quantity || 1} className="w-14 text-xs px-1 py-0.5 border border-gray-200 rounded text-center" onBlur={async (e) => { const val = parseInt(e.target.value) || 1; if (val === c.quantity) return; try { await configurationApi.updateChild(parentRevisionId, c.id, { quantity: val }); setChildren(prev => prev.map(x => x.id === c.id ? { ...x, quantity: val } : x)); } catch {} }} />) : (c.quantity || 1)}
+        </td>
+        {canEdit && (
+          <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2">
+              <button onClick={() => { setPickerParentId(revId); setCfgPickerOpen(true); }} className="text-primary-600 hover:text-primary-800 text-xs">+子项</button>
+              <button onClick={async () => { if (!confirm('确定移除此子构型项？')) return; try { await configurationApi.removeChild(parentRevisionId, c.id); setChildren(prev => prev.filter(x => x.id !== c.id)); } catch {} }} className="text-red-500 hover:text-red-700 text-xs">移除</button>
+            </div>
+          </td>
+        )}
+      </tr>
+    );
+    if (isExpanded && nested.length > 0) nested.forEach(nc => rows.push(renderChildRow(nc, level + 1, revId)));
+    return <>{rows}</>;
   };
 
   const tabs = useMemo(() => [
     { key: 'info' as const, label: '基本信息' },
-    { key: 'parts' as const, label: '关联零部件' },
     { key: 'children' as const, label: '子构型项' },
+    { key: 'parts' as const, label: '关联零部件' },
     { key: 'docs' as const, label: '关联图文档' },
     { key: 'versions' as const, label: '版本历史' },
+    { key: 'iterations' as const, label: '迭代历史' },
   ], []);
 
   if (!open) return null;
 
+  const rows = [];
+  for (const c of children) rows.push(renderChildRow(c, 1, internalRevId));
+
   return (
     <Modal open={open} title="构型项详情" onClose={handleClose} width="full">
       <div className="h-[50vh] flex flex-col">
-        {detailLoading && !master ? (
-          <Loading />
-        ) : !master ? (
-          <div className="text-gray-400 text-sm py-8 text-center">加载失败</div>
-        ) : (
-          <>
-            {/* 信息卡片网格 */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0 mb-3">
-              {canEdit ? (
-                <>
-                  <InfoCard label="构型号" value={editCode}
-                    readonly={false}
-                    onChange={(v) => { setEditCode(v); autoSaveMaster({ code: v }); }} />
-                  <InfoCard label="中文名称" value={editName}
-                    readonly={false}
-                    onChange={(v) => { setEditName(v); autoSaveMaster({ name: v }); }} />
-                  <InfoCard label="规格型号" value={editSpec}
-                    readonly={false}
-                    onChange={(v) => { setEditSpec(v); autoSaveMaster({ spec: v }); }} />
-                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                    <div className="text-xs text-gray-500 mb-0.5">类型</div>
-                    <div className="text-sm text-gray-900 font-medium">构型项</div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                    <div className="text-xs text-gray-500 mb-0.5">构型号</div>
-                    <div className="text-sm text-gray-900 font-medium font-mono">{master?.code}</div>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                    <div className="text-xs text-gray-500 mb-0.5">中文名称</div>
-                    <div className="text-sm text-gray-900 font-medium">{master?.name}</div>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                    <div className="text-xs text-gray-500 mb-0.5">类型</div>
-                    <div className="text-sm text-gray-900 font-medium">构型项</div>
-                  </div>
-                </>
+        {detailLoading && !master ? (<Loading />) : !master ? (<div className="text-gray-400 text-sm py-8 text-center">加载失败</div>) : (<>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 shrink-0 mb-3">
+            {canEdit ? (<>
+              <InfoCard label="构型号" value={editCode} readonly={false} onChange={(v) => { setEditCode(v); autoSaveMaster({ code: v }); }} />
+              <InfoCard label="中文名称" value={editName} readonly={false} onChange={(v) => { setEditName(v); autoSaveMaster({ name: v }); }} />
+              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100"><div className="text-xs text-gray-500 mb-0.5">类型</div><div className="text-sm text-gray-900 font-medium">构型项</div></div>
+            </>) : (<>
+              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100"><div className="text-xs text-gray-500 mb-0.5">构型号</div><div className="text-sm text-gray-900 font-medium font-mono">{master?.code}</div></div>
+              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100"><div className="text-xs text-gray-500 mb-0.5">中文名称</div><div className="text-sm text-gray-900 font-medium">{master?.name}</div></div>
+              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100"><div className="text-xs text-gray-500 mb-0.5">类型</div><div className="text-sm text-gray-900 font-medium">构型项</div></div>
+            </>)}
+          </div>
+
+          <div className="bg-white rounded-lg border border-gray-200 p-3 shrink-0 mb-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-3">
+                <span className="font-semibold text-sm">版本：{revision?.version}</span>
+                <span className={`px-2 py-1 text-xs rounded-full ${statusTag(revision?.status || 'draft').cls}`}>{statusTag(revision?.status || 'draft').label}</span>
+                {isCheckedOut && <span className="text-xs text-orange-600">已签出：{revision?.check_out_user_name || revision?.check_out_user_id}</span>}
+              </div>
+              <div className="flex gap-1 flex-wrap items-center">
+                {(canCheckout || canCheckin || canUndo || canFreeze || canRelease || canUpgrade || canObsolete || canForceCheckin) && (<span className="mx-1 text-gray-300 self-center select-none">|</span>)}
+                {canCheckout && <button onClick={() => doAction(() => configurationApi.checkout(internalRevId), '签出成功')} className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">签出</button>}
+                {canCheckin && <button onClick={() => setShowCheckinModal(true)} className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">签入</button>}
+                {canUndo && <button onClick={() => doAction(() => configurationApi.undocheckout(internalRevId), '已撤销签出')} className="px-3 py-1 bg-gray-500 text-white rounded text-xs hover:bg-gray-600">撤销签出</button>}
+                {canFreeze && <button onClick={() => doAction(() => configurationApi.freeze(internalRevId), '已冻结')} className="px-3 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600">冻结</button>}
+                {canRelease && <button onClick={() => doAction(() => configurationApi.release(internalRevId), '已发布')} className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">发布</button>}
+                {canUpgrade && <button onClick={() => doAction(() => configurationApi.upgrade(internalRevId), '已升版')} className="px-3 py-1 bg-purple-600 text-white rounded text-xs hover:bg-purple-700">升版</button>}
+                {canObsolete && <button onClick={() => doAction(() => configurationApi.obsolete(internalRevId), '已作废')} className="px-3 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600">作废</button>}
+                {canForceCheckin && <button onClick={() => doAction(() => configurationApi.forceCheckin(internalRevId), '已强制签入')} className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700">强制签入</button>}
+              </div>
+            </div>
+          </div>
+
+          {viewingIterationData && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1.5 shrink-0 mb-3 text-sm flex items-center justify-between">
+              <span>正在查看 Iteration #{viewingIterationData.iteration} 的历史数据（只读）</span>
+              <button onClick={() => setViewingIterationData(null)} className="text-primary-600 hover:text-primary-800 hover:underline text-xs">返回当前迭代</button>
+            </div>
+          )}
+
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
+            <div className="flex border-b border-gray-200 shrink-0">
+              {tabs.map((t) => (
+                <button key={t.key} onClick={() => setActiveTab(t.key)} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === t.key ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>{t.label}</button>
+              ))}
+            </div>
+            <div className="p-4 overflow-y-auto flex-1">
+              {activeTab === 'info' && (
+                <div className="space-y-4">
+                  <div className="text-xs text-gray-500">Iteration #{revision?.latest_iteration}{revision?.check_out_date && <span className="ml-2">签出时间：{new Date(revision.check_out_date).toLocaleString('zh-CN')}</span>}</div>
+                  {cfDefs.length > 0 ? (
+                    <div><h4 className="text-sm font-semibold mb-2">自定义字段</h4><div className="grid grid-cols-3 gap-3">{cfDefs.map((def: any) => (<div key={def.id}><label className="text-xs text-gray-500">{def.name}</label><div className="mt-0.5"><CustomFieldInput def={def} value={cfValues[def.id]} onChange={(val) => { setCfValues(prev => ({ ...prev, [def.id]: val })); autoSaveCf(def.id, val); }} readOnly={!canEdit} /></div></div>))}</div></div>
+                  ) : (<div className="text-gray-400 text-sm">无</div>)}
+                  <div className="text-xs text-gray-400">创建时间：{master?.created_at ? new Date(master.created_at).toLocaleString('zh-CN') : '—'}</div>
+                </div>
               )}
-            </div>
-
-            {/* 版本/状态/操作栏 */}
-            <div className="bg-white rounded-lg border border-gray-200 p-3 shrink-0 mb-3">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-3">
-                  <span className="font-semibold text-sm">版本：{revision?.version}</span>
-                  <span className={`px-2 py-1 text-xs rounded-full ${statusTag(revision?.status || 'draft').cls}`}>
-                    {statusTag(revision?.status || 'draft').label}
-                  </span>
-                  {isCheckedOut && (
-                    <span className="text-xs text-orange-600">
-                      已签出：{revision?.check_out_user_name || revision?.check_out_user_id}
-                    </span>
-                  )}
-                </div>
-                <div className="flex gap-1 flex-wrap items-center">
-                  {(canCheckout || canCheckin || canUndo || canFreeze || canRelease || canUpgrade || canObsolete || canForceCheckin) && (
-                    <span className="mx-1 text-gray-300 self-center select-none">|</span>
-                  )}
-                  {canCheckout && (
-                    <button onClick={() => doAction(() => configurationApi.checkout(revisionId), '签出成功')}
-                      className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">签出</button>
-                  )}
-                  {canCheckin && (
-                    <button onClick={() => setShowCheckinModal(true)}
-                      className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">签入</button>
-                  )}
-                  {canUndo && (
-                    <button onClick={() => doAction(() => configurationApi.undocheckout(revisionId), '已撤销签出')}
-                      className="px-3 py-1 bg-gray-500 text-white rounded text-xs hover:bg-gray-600">撤销签出</button>
-                  )}
-                  {canFreeze && (
-                    <button onClick={() => doAction(() => configurationApi.freeze(revisionId), '已冻结')}
-                      className="px-3 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600">冻结</button>
-                  )}
-                  {canRelease && (
-                    <button onClick={() => doAction(() => configurationApi.release(revisionId), '已发布')}
-                      className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">发布</button>
-                  )}
-                  {canUpgrade && (
-                    <button onClick={() => doAction(() => configurationApi.upgrade(revisionId), '已升版')}
-                      className="px-3 py-1 bg-purple-600 text-white rounded text-xs hover:bg-purple-700">升版</button>
-                  )}
-                  {canObsolete && (
-                    <button onClick={() => doAction(() => configurationApi.obsolete(revisionId), '已作废')}
-                      className="px-3 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600">作废</button>
-                  )}
-                  {canForceCheckin && (
-                    <button onClick={() => doAction(() => configurationApi.forceCheckin(revisionId), '已强制签入')}
-                      className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700">强制签入</button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Tab 导航 + 内容区 */}
-            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
-              <div className="flex border-b border-gray-200 shrink-0">
-                {tabs.map((t) => (
-                  <button key={t.key} onClick={() => setActiveTab(t.key)}
-                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                      activeTab === t.key
-                        ? 'border-primary-600 text-primary-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
-                    }`}>
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="p-4 overflow-y-auto flex-1">
-                {/* 基本信息 Tab */}
-                {activeTab === 'info' && (
-                  <div className="space-y-4">
-                    <div className="text-xs text-gray-500">
-                      Iteration #{revision?.latest_iteration}
-                      {revision?.check_out_date && (
-                        <span className="ml-2">
-                          签出时间：{new Date(revision.check_out_date).toLocaleString('zh-CN')}
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs text-gray-400">
-                      创建时间：{master?.created_at ? new Date(master.created_at).toLocaleString('zh-CN') : '—'}
-                    </div>
-                  </div>
-                )}
-
-                {/* 关联零部件 Tab */}
-                {activeTab === 'parts' && (
-                  <div>
-                    <h4 className="text-sm font-bold text-gray-700 mb-3">关联零部件</h4>
-                    {parts.length === 0 ? (
-                      <div className="text-gray-400 text-sm py-4 text-center">暂无关联零部件</div>
-                    ) : (
-                      <div className="border rounded-lg overflow-hidden">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="bg-gray-50 border-b">
-                              <th className="px-3 py-2 text-left text-gray-500 font-medium">类型</th>
-                              <th className="px-3 py-2 text-left text-gray-500 font-medium">件号</th>
-                              <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
-                              <th className="px-3 py-2 text-left text-gray-500 font-medium">版本</th>
-                              <th className="px-3 py-2 text-center text-gray-500 font-medium">必选</th>
-                              <th className="px-3 py-2 text-center text-gray-500 font-medium">数量</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-200">
-                            {parts.map((p: any) => (
-                              <tr key={p.id} className="hover:bg-gray-50">
-                                <td className="px-3 py-2">
-                                  <span className="text-xs text-gray-500">{p.part_type === 'assembly' ? '部件' : '零件'}</span>
-                                </td>
-                                <td className="px-3 py-2 font-mono text-xs">{p.part_detail?.code || '—'}</td>
-                                <td className="px-3 py-2">{p.part_detail?.name || '—'}</td>
-                                <td className="px-3 py-2 text-gray-500">{p.part_detail?.version || '—'}</td>
-                                <td className="px-3 py-2 text-center">
-                                  {p.is_required ? (
-                                    <span className="text-green-600 text-xs">是</span>
-                                  ) : (
-                                    <span className="text-gray-400 text-xs">否</span>
-                                  )}
-                                </td>
-                                <td className="px-3 py-2 text-center">{p.quantity || 1}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* 子构型项 Tab */}
-                {activeTab === 'children' && (
-                  <div>
-                    <h4 className="text-sm font-bold text-gray-700 mb-3">子构型项</h4>
-                    {children.length === 0 ? (
-                      <div className="text-gray-400 text-sm py-4 text-center">暂无子构型项</div>
-                    ) : (
-                      <div className="border rounded-lg overflow-hidden">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="bg-gray-50 border-b">
-                              <th className="px-3 py-2 text-left text-gray-500 font-medium">构型号</th>
-                              <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
-                              <th className="px-3 py-2 text-center text-gray-500 font-medium">必选</th>
-                              <th className="px-3 py-2 text-center text-gray-500 font-medium">数量</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-200">
-                            {children.map((c: any) => (
-                              <tr key={c.id} className="hover:bg-gray-50">
-                                <td className="px-3 py-2 font-mono text-xs">{c.child_detail?.code || '—'}</td>
-                                <td className="px-3 py-2">{c.child_detail?.name || '—'}</td>
-                                <td className="px-3 py-2 text-center">
-                                  {c.is_required ? (
-                                    <span className="text-green-600 text-xs">是</span>
-                                  ) : (
-                                    <span className="text-gray-400 text-xs">否</span>
-                                  )}
-                                </td>
-                                <td className="px-3 py-2 text-center">{c.quantity || 1}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* 关联图文档 Tab */}
-                {activeTab === 'docs' && revisionId && (
-                  <EntityDocumentSection
-                    entityType="configuration"
-                    entityId={revisionId}
-                    editable={isCheckedOutByMe && isDraft}
-                    entityCode={master?.code}
-                    entityName={master?.name}
-                  />
-                )}
-
-                {/* 版本历史 Tab */}
-                {activeTab === 'versions' && (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">版本</th>
-                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">状态</th>
-                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">创建时间</th>
-                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">操作</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {versions.map((v: any) => (
-                        <tr key={v.id} className={`hover:bg-gray-50 ${v.id === revision?.id ? 'bg-blue-50' : ''}`}>
-                          <td className="px-4 py-3">{v.version}</td>
-                          <td className="px-4 py-3">
-                            <span className={`px-2 py-1 text-xs rounded-full ${statusTag(v.status).cls}`}>
-                              {statusTag(v.status).label}
-                            </span>
+              {activeTab === 'parts' && (
+                <div><h4 className="text-sm font-bold text-gray-700 mb-3">关联零部件</h4>
+                  {parts.length === 0 ? (<div className="text-gray-400 text-sm py-4 text-center">暂无关联零部件</div>) : (
+                    <div className="border rounded-lg overflow-hidden"><table className="w-full text-sm"><thead><tr className="bg-gray-50 border-b"><th className="px-3 py-2 text-left text-gray-500 font-medium">类型</th><th className="px-3 py-2 text-left text-gray-500 font-medium">件号</th><th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th><th className="px-3 py-2 text-left text-gray-500 font-medium">版本</th><th className="px-3 py-2 text-center text-gray-500 font-medium">必选/可选</th><th className="px-3 py-2 text-center text-gray-500 font-medium">数量</th></tr></thead><tbody className="divide-y divide-gray-200">
+                      {parts.map((p: any) => (
+                        <tr key={p.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => { if (p.part_id) setSelectedPartMasterId(p.part_id); }}>
+                          <td className="px-3 py-2"><span className="text-xs text-gray-500">{p.part_type === 'assembly' ? '部件' : '零件'}</span></td>
+                          <td className="px-3 py-2 font-mono text-xs">{p.part_detail?.code || '—'}</td><td className="px-3 py-2">{p.part_detail?.name || '—'}</td><td className="px-3 py-2 text-gray-500">{p.part_detail?.version || '—'}</td>
+                          <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                            {canEdit ? (<button onClick={async () => { try { await configurationApi.updatePart(internalRevId, p.id, { is_required: !p.is_required }); setParts(prev => prev.map(x => x.id === p.id ? { ...x, is_required: !x.is_required } : x)); } catch {} }} className={`text-xs px-2 py-0.5 rounded ${p.is_required ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>{p.is_required ? '必选' : '可选'}</button>) : (<span className={`text-xs ${p.is_required ? 'text-green-600' : 'text-gray-400'}`}>{p.is_required ? '必选' : '可选'}</span>)}
                           </td>
-                          <td className="px-4 py-3 text-gray-500">
-                            {v.created_at ? new Date(v.created_at).toLocaleDateString('zh-CN') : ''}
-                          </td>
-                          <td className="px-4 py-3">
-                            {v.id === revision?.id ? (
-                              <span className="text-primary-600 text-xs">当前</span>
-                            ) : (
-                              <span className="text-gray-300 text-xs">—</span>
-                            )}
+                          <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                            {canEdit ? (<input type="number" min={1} defaultValue={p.quantity || 1} className="w-14 text-xs px-1 py-0.5 border border-gray-200 rounded text-center" onBlur={async (e) => { const val = parseInt(e.target.value) || 1; if (val === p.quantity) return; try { await configurationApi.updatePart(internalRevId, p.id, { quantity: val }); setParts(prev => prev.map(x => x.id === p.id ? { ...x, quantity: val } : x)); } catch {} }} />) : (p.quantity || 1)}
                           </td>
                         </tr>
                       ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
+                    </tbody></table></div>
+                  )}
+                </div>
+              )}
+              {activeTab === 'children' && (
+                <div>
+                  <div className="flex items-center justify-between mb-3"><h4 className="text-sm font-bold text-gray-700">子构型项</h4>{canEdit && (<button onClick={() => { setPickerParentId(internalRevId); setCfgPickerOpen(true); }} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 添加子项</button>)}</div>
+                  {children.length === 0 ? (<div className="text-gray-400 text-sm py-4 text-center">暂无子构型项</div>) : (
+                    <div className="border rounded-lg overflow-hidden"><table className="w-full text-sm"><thead><tr className="bg-gray-50 border-b"><th className="px-3 py-2 text-left text-gray-500 font-medium w-20">层级</th><th className="px-3 py-2 text-left text-gray-500 font-medium">构型号</th><th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-16">版本</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-20">状态</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-20">签出状态</th><th className="px-3 py-2 text-center text-gray-500 font-medium">必选/可选</th><th className="px-3 py-2 text-center text-gray-500 font-medium">数量</th>{canEdit && <th className="px-3 py-2 text-center text-gray-500 font-medium w-28">操作</th>}</tr></thead><tbody className="divide-y divide-gray-200">{rows}</tbody></table></div>
+                  )}
+                </div>
+              )}
+              {activeTab === 'docs' && revisionId && (<EntityDocumentSection entityType="configuration" entityId={internalRevId} editable={isCheckedOutByMe && isDraft} entityCode={master?.code} entityName={master?.name} />)}
+              {activeTab === 'versions' && (
+                <table className="w-full text-sm"><thead><tr className="bg-gray-50 border-b border-gray-200"><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">版本</th><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">状态</th><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">创建时间</th><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">操作</th></tr></thead><tbody className="divide-y divide-gray-200">
+                  {versions.map((v: any) => (
+                    <tr key={v.id} className={`hover:bg-gray-50 ${v.id === revision?.id ? 'bg-blue-50' : ''}`}><td className="px-4 py-3">{v.version}</td><td className="px-4 py-3"><span className={`px-2 py-1 text-xs rounded-full ${statusTag(v.status).cls}`}>{statusTag(v.status).label}</span></td><td className="px-4 py-3 text-gray-500">{v.created_at ? new Date(v.created_at).toLocaleDateString('zh-CN') : ''}</td><td className="px-4 py-3">{v.id === revision?.id ? (<span className="text-primary-600 text-xs">当前</span>) : (<button onClick={() => setInternalRevId(v.id)} className="text-primary-600 hover:text-primary-800 hover:underline text-xs">切换</button>)}</td></tr>
+                  ))}
+                </tbody></table>
+              )}
+              {activeTab === 'iterations' && (
+                <table className="w-full text-sm"><thead><tr className="bg-gray-50 border-b border-gray-200"><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">迭代</th><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">签入时间</th><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">签入说明</th><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">操作</th></tr></thead><tbody className="divide-y divide-gray-200">
+                  {iterations.map((it: any) => (
+                    <tr key={it.id} className={`hover:bg-gray-50 ${it.iteration === revision?.latest_iteration ? 'bg-blue-50' : ''}`}><td className="px-4 py-3">#{it.iteration}</td><td className="px-4 py-3 text-gray-500">{it.created_at ? new Date(it.created_at).toLocaleString('zh-CN') : '未签入'}</td><td className="px-4 py-3">{it.check_in_note || '—'}</td><td className="px-4 py-3"><div className="flex items-center gap-2">{it.iteration === revision?.latest_iteration ? (<span className="text-primary-600 text-xs">当前</span>) : (<button onClick={() => handleViewIteration(it)} className="text-primary-600 hover:text-primary-800 hover:underline text-xs">查看数据</button>)}{it.iteration > 1 && isAdminUser && (<button onClick={() => handleDeleteIteration(it)} className="text-xs text-red-600 hover:text-red-800 hover:underline">删除</button>)}</div></td></tr>
+                  ))}
+                </tbody></table>
+              )}
             </div>
-          </>
-        )}
+          </div>
+        </>)}
       </div>
 
-      {/* 签入说明弹窗 */}
       {showCheckinModal && (
         <Modal open={showCheckinModal} onClose={() => setShowCheckinModal(false)} title="签入说明" width="md">
-          <div className="p-4">
-            <textarea
-              className="w-full border rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-              rows={3}
-              placeholder="请输入签入说明（选填）..."
-              value={checkinNote}
-              onChange={(e) => setCheckinNote(e.target.value)}
-            />
+          <div className="p-4"><textarea className="w-full border rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" rows={3} placeholder="请输入签入说明（选填）..." value={checkinNote} onChange={(e) => setCheckinNote(e.target.value)} />
             <div className="flex justify-end gap-2 mt-4">
-              <button
-                onClick={() => setShowCheckinModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm"
-              >
-                取消
-              </button>
-              <button
-                onClick={async () => {
-                  setSaving(true);
-                  await doAction(
-                    () => configurationApi.checkin(revisionId, checkinNote || ''),
-                    '签入成功'
-                  );
-                  setSaving(false);
-                  setShowCheckinModal(false);
-                  setCheckinNote('');
-                }}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm disabled:opacity-50"
-                disabled={saving}
-              >
-                {saving ? '保存中...' : '确认签入'}
-              </button>
+              <button onClick={() => setShowCheckinModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">取消</button>
+              <button onClick={async () => { setSaving(true); await doAction(() => configurationApi.checkin(internalRevId, checkinNote || ''), '签入成功'); setSaving(false); setShowCheckinModal(false); setCheckinNote(''); }} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm disabled:opacity-50" disabled={saving}>{saving ? '保存中...' : '确认签入'}</button>
             </div>
           </div>
         </Modal>
       )}
+      {cfgPickerOpen && (
+        <ConfigItemPicker open={cfgPickerOpen} onClose={() => { setCfgPickerOpen(false); setPickerParentId(null); }} excludeId={internalRevId}
+          onConfirm={async (items) => { if (!pickerParentId) return; try { await configurationApi.addChildren(pickerParentId, items); toast.success(`已添加 ${items.length} 个子构型项`); if (pickerParentId !== internalRevId) { setSubChildren(prev => { const s = { ...prev }; delete s[pickerParentId]; return s; }); } setCfgPickerOpen(false); setPickerParentId(null); loadDetail(); } catch {} }} />
+      )}
+      {nestedConfigRevId && (<ConfigItemDetailModal revisionId={nestedConfigRevId} open={!!nestedConfigRevId} onClose={() => setNestedConfigRevId(null)} />)}
+      {selectedPartMasterId && (<PartDetailModal masterId={selectedPartMasterId} open={!!selectedPartMasterId} onClose={() => setSelectedPartMasterId(null)} />)}
     </Modal>
   );
 }
