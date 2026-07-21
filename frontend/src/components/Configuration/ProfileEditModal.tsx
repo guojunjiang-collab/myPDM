@@ -675,6 +675,16 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
             >
               📄 导出PDF
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                window.open(`/stp-viewer?config-profile=${profile.id}`, '_blank');
+              }}
+              className="px-3 py-1.5 text-sm border border-blue-300 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700"
+              title="在新标签页中3D预览配置清单中所有零部件"
+            >
+              🧊 3D预览
+            </button>
           </div>
         ) : undefined}
       >
