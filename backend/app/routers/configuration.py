@@ -5,6 +5,7 @@
 """
 
 import uuid
+from uuid import UUID
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
@@ -19,6 +20,12 @@ from app import schemas_configuration as schemas
 from app import schemas as core_schemas
 from app import crud_configuration as crud
 from app import crud as core_crud
+from app.models_parts import PartIteration, PartAttachment
+from app.stp_converter import is_stp_file
+from app.media_token import mint_media_token
+import os as _os
+import logging
+_logger = logging.getLogger(__name__)
 from ..permissions import require_permission
 
 router = APIRouter(prefix="/configurations", tags=["构型配置"])
@@ -594,6 +601,103 @@ async def get_profile(
     }
 
 
+@router.get("/profiles/{profile_id}/preview-3d", response_model=dict)
+async def get_profile_3d_preview(
+    profile_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("profile:read")),
+):
+    """配置清单3D预览数据：收集所有选中零部件的STP模型"""
+    profile = crud.get_profile(db, profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="配置不存在")
+    if not profile.configuration_item_id:
+        return {
+            "profile_code": profile.code,
+            "profile_name": profile.name,
+            "total_count": 0,
+            "loaded_count": 0,
+            "instances": [],
+            "missing": [],
+            "tree": [],
+        }
+
+    working_items = crud.get_working_items(db, profile_id)
+    entity_map = _build_entity_map(db, working_items)
+    config_tree = _build_config_tree(db, str(profile.configuration_item_id), working_items, entity_map)
+
+    parts = _collect_config_profile_parts(config_tree)
+    if not parts:
+        return {
+            "profile_code": profile.code,
+            "profile_name": profile.name,
+            "total_count": 0,
+            "loaded_count": 0,
+            "instances": [],
+            "missing": [],
+            "tree": [],
+        }
+
+    instances = []
+    missing = []
+    identity_matrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+
+    for idx, p in enumerate(parts):
+        ver = (p.get("item_version") or "").strip()
+        if not ver:
+            from app.crud_parts import list_revisions_by_master
+            revs = list_revisions_by_master(db, UUID(p["item_id"]))
+            if revs:
+                ver = revs[-1].version
+            else:
+                missing.append({
+                    "part_code": p["item_code"],
+                    "part_name": p["item_name"],
+                    "version": "",
+                })
+                continue
+
+        result = _resolve_part_stp_attachment(db, p["item_id"], ver)
+        if result and result.get("glb_urls"):
+            instances.append({
+                "part_code": p["item_code"],
+                "part_name": p["item_name"],
+                "version": ver,
+                "revision_id": result["revision_id"],
+                "glb_urls": result["glb_urls"],
+                "matrix": identity_matrix,
+            })
+        else:
+            missing.append({
+                "part_code": p["item_code"],
+                "part_name": p["item_name"],
+                "version": ver,
+            })
+
+    tree = []
+    for idx, inst in enumerate(instances):
+        tree.append({
+            "bom_item_id": f"instance-{idx}",
+            "part_code": inst["part_code"],
+            "part_name": inst["part_name"],
+            "version": inst["version"],
+            "quantity": 1,
+            "instance_count": 1,
+            "is_leaf": True,
+            "children": [],
+        })
+
+    return {
+        "profile_code": profile.code,
+        "profile_name": profile.name,
+        "total_count": len(parts),
+        "loaded_count": len(instances),
+        "instances": instances,
+        "missing": missing,
+        "tree": tree,
+    }
+
+
 @router.put("/profiles/{profile_id}", response_model=dict)
 async def update_profile(
     profile_id: str,
@@ -955,6 +1059,82 @@ def _build_config_tree(db: Session, config_item_id: str, profile_items: list, en
         "parts": parts,
         "children": child_nodes,
     }
+
+
+def _resolve_part_stp_attachment(db: Session, master_id: str, version: str) -> dict | None:
+    """按 (master_id, version) 查找零部件 STP 附件，返回 glb_urls 或 None"""
+    from uuid import UUID
+    from app.crud_parts import get_part_revision
+    from app.stp_converter import get_lod_glb_paths, get_glb_cache_path
+
+    rev = db.query(PartRevision).filter(
+        PartRevision.master_id == UUID(master_id),
+        PartRevision.version == version,
+        PartRevision.deleted_at.is_(None),
+    ).first()
+    if not rev:
+        return None
+
+    iteration = db.query(PartIteration).filter(
+        PartIteration.revision_id == rev.id,
+        PartIteration.iteration == rev.latest_iteration,
+    ).first()
+    if not iteration:
+        return None
+
+    atts = db.query(PartAttachment).filter(
+        PartAttachment.iteration_id == iteration.id,
+    ).all()
+    att = next((a for a in atts if is_stp_file(a.file_name) and a.category == 'production'), None)
+    if not att:
+        att = next((a for a in atts if is_stp_file(a.file_name)), None)
+    if not att:
+        return None
+
+    token = mint_media_token(str(att.id), "gltf", ttl=3600)
+    paths = get_lod_glb_paths(str(att.id), att.file_path, is_part=True)
+    glb_base = get_glb_cache_path(str(att.id), att.file_path, is_part=True)
+    has_lod = all(_os.path.exists(p) for p in paths.values())
+    urls = {}
+    if has_lod:
+        for tier, p in paths.items():
+            urls[tier] = f"/api/parts/attachments/{att.id}/lod/{tier}?token={token}"
+    elif _os.path.exists(glb_base):
+        fallback = f"/api/v2/attachments/{att.id}/gltf?token={token}"
+        for tier in ("coarse", "normal", "fine"):
+            urls[tier] = fallback
+    else:
+        fallback = f"/api/v2/attachments/{att.id}/gltf?token={token}"
+        for tier in ("coarse", "normal", "fine"):
+            urls[tier] = fallback
+
+    return {
+        "revision_id": str(rev.id),
+        "glb_urls": urls,
+    }
+
+
+def _collect_config_profile_parts(config_tree: dict) -> list[dict]:
+    """递归遍历 config_tree，收集所有选中零部件（跳过构型项行）"""
+    parts = []
+
+    def walk(node: dict):
+        if not node:
+            return
+        for p in node.get("parts", []):
+            if p.get("is_selected") and p.get("item_type") != "config_item":
+                parts.append({
+                    "item_id": p.get("item_id"),
+                    "item_code": p.get("item_code"),
+                    "item_name": p.get("item_name"),
+                    "item_version": p.get("item_version"),
+                })
+        for child in node.get("children", []):
+            if child.get("is_selected"):
+                walk(child)
+
+    walk(config_tree)
+    return parts
 
 
 def _is_config_node_selected(db: Session, config_item_id: str, profile_items: list) -> bool:
