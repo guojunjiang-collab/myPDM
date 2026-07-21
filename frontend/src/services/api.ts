@@ -696,6 +696,16 @@ export const configurationApi = {
     api.delete(`/configurations/items/${id}/children/${childId}`),
 };
 
+export interface ConfigProfilePreviewData {
+  profile_code: string;
+  profile_name: string;
+  total_count: number;
+  loaded_count: number;
+  instances: AssemblyInstance[];
+  missing: { part_code: string; part_name: string; version: string }[];
+  tree: AssemblyTreeNode[];
+}
+
 // ──────────────────────────────────────────
 // 构型配置 API
 // ──────────────────────────────────────────
@@ -763,6 +773,9 @@ export const configurationProfileApi = {
 
   updateStatus: (profileId: string, status: string) =>
     api.put(`/configurations/profiles/${profileId}/status`, { status }),
+
+  preview3d: (profileId: string) =>
+    api.get<ConfigProfilePreviewData>(`/configurations/profiles/${profileId}/preview-3d`).then((r) => r.data),
 };
 
 export interface AssemblyInstance {
