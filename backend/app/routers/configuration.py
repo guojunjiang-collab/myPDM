@@ -22,7 +22,7 @@ from app import schemas as core_schemas
 from app import crud_configuration as crud
 from app import crud as core_crud
 from app.models_parts import PartIteration, PartAttachment
-from app.stp_converter import is_stp_file
+from app.stp_converter import is_stp_file, get_lod_glb_paths, get_glb_cache_path
 from app.media_token import mint_media_token
 import os as _os
 import logging
@@ -342,7 +342,7 @@ async def update_config_item(
         raise HTTPException(status_code=400, detail="当前迭代不存在")
 
     update_dict = data.model_dump(exclude_none=True)
-    field_map = {"spec": "version_spec", "remark": "version_remark"}
+    field_map = {"name": "version_name", "spec": "version_spec", "remark": "version_remark"}
     mapped = {}
     for k, v in update_dict.items():
         mapped[field_map.get(k, k)] = v
@@ -548,13 +548,7 @@ async def update_config_item_master(
     if not rev:
         raise HTTPException(status_code=404, detail="构型项版本不存在")
 
-    # code 唯一性检查
     update_dict = data.model_dump(exclude_none=True)
-    if "code" in update_dict and update_dict["code"]:
-        existing = crud.get_config_item_master_by_code(db, update_dict["code"])
-        if existing and existing.id != rev.master_id and existing.deleted_at is None:
-            raise HTTPException(status_code=400, detail=f"构型号 {update_dict['code']} 已存在")
-
     master = crud.update_config_item_master(db, rev.master_id, update_dict)
     if not master:
         raise HTTPException(status_code=404, detail="主数据不存在")
