@@ -521,7 +521,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   if (!open) return null;
 
   return (
-    <Modal open={open} title="零部件详情" onClose={handleClose} width="full">
+    <Modal open={open} title="零部件详情" onClose={handleClose} width="3xl">
       <div className="h-[50vh] flex flex-col">
         {detailLoading && !master ? (
           <Loading />
