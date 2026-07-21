@@ -123,17 +123,6 @@ async def startup_event():
             db.commit()
             print("✓ Added column revisions to documents table")
 
-        # 检查 configuration_items 表是否有 document_links 列
-        result = db.execute(text("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'configuration_items' AND column_name = 'document_links'
-        """))
-        if not result.fetchone():
-            db.execute(text("ALTER TABLE configuration_items ADD COLUMN document_links JSONB NOT NULL DEFAULT '[]'"))
-            db.commit()
-            print("✓ Added column document_links to configuration_items table")
-
         # 检查 configuration_profiles 表是否存在
         result = db.execute(text("""
             SELECT table_name FROM information_schema.tables 
@@ -145,7 +134,7 @@ async def startup_event():
                     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                     code VARCHAR(64) UNIQUE NOT NULL,
                     name VARCHAR(255) NOT NULL,
-                    configuration_item_id UUID REFERENCES configuration_items(id),
+                    configuration_item_revision_id UUID REFERENCES configuration_item_revisions(id),
                     status VARCHAR(16) NOT NULL DEFAULT 'draft',
                     effectivity_start VARCHAR(32),
                     effectivity_end VARCHAR(32),
@@ -155,7 +144,7 @@ async def startup_event():
                     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                 )
             """))
-            db.execute(text("CREATE INDEX idx_cp_config_item_id ON configuration_profiles(configuration_item_id)"))
+            db.execute(text("CREATE INDEX idx_cp_config_item_rev_id ON configuration_profiles(configuration_item_revision_id)"))
             db.execute(text("CREATE INDEX idx_cp_status ON configuration_profiles(status)"))
             db.commit()
             print("✓ Created table configuration_profiles")
@@ -170,7 +159,8 @@ async def startup_event():
                 CREATE TABLE configuration_profile_items (
                     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                     profile_id UUID NOT NULL REFERENCES configuration_profiles(id) ON DELETE CASCADE,
-                    source_config_item_id UUID REFERENCES configuration_items(id),
+                    source_config_item_revision_id UUID REFERENCES configuration_item_revisions(id),
+                    source_config_item_iteration_id UUID REFERENCES configuration_item_iterations(id),
                     item_type VARCHAR(16) NOT NULL,
                     item_id UUID NOT NULL,
                     item_code VARCHAR(64),
@@ -196,7 +186,8 @@ async def startup_event():
                 CREATE TABLE configuration_working_items (
                     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                     profile_id UUID NOT NULL REFERENCES configuration_profiles(id) ON DELETE CASCADE,
-                    source_config_item_id UUID REFERENCES configuration_items(id),
+                    source_config_item_revision_id UUID REFERENCES configuration_item_revisions(id),
+                    source_config_item_iteration_id UUID REFERENCES configuration_item_iterations(id),
                     item_type VARCHAR(16) NOT NULL,
                     item_id UUID NOT NULL,
                     item_code VARCHAR(64),
@@ -450,7 +441,7 @@ async def startup_event():
             print(f"✓ Added column {col} to {tbl} table")
 
         # ── 软删除列迁移 ──
-        for tbl in ["parts", "assemblies", "documents", "bom_items", "ecrs", "ecos", "configuration_items"]:
+        for tbl in ["parts", "assemblies", "documents", "bom_items", "ecrs", "ecos"]:
             result = db.execute(text(f"""
                 SELECT column_name FROM information_schema.columns
                 WHERE table_name = '{tbl}' AND column_name = 'deleted_at'

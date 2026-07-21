@@ -15,7 +15,7 @@ ENTITY_MODELS = {
     "custom_field_value": models.CustomFieldValue,
     "ecr": models_ecr.ECR,
     "eco": models_eco.ECO,
-    "configuration_item": models_configuration.ConfigurationItem,
+    "configuration_item": models_configuration.ConfigurationItemMaster,
     "configuration_profile": models_configuration.ConfigurationProfile,
 }
 

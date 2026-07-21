@@ -262,7 +262,10 @@ def reset_business_data(db):
     db.query(mc.ConfigurationProfile).delete()
     db.query(mc.ConfigurationItemPart).delete()
     db.query(mc.ConfigurationItemChild).delete()
-    db.query(mc.ConfigurationItem).delete()
+    db.query(mc.ConfigurationItemIteration).delete()
+    db.query(mc.ConfigurationItemRevision).delete()
+    db.query(mc.ConfigurationItemMaster).delete()
+    db.query(mc.ConfigurationItem).delete()  # 兼容旧版（配置表复用）
 
     db.query(models.DocumentAttachment).delete()
     db.query(models.Document).delete()
