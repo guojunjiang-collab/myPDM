@@ -364,12 +364,19 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
         type: (row.is_assembly ? 'assembly' : 'part') as 'part' | 'assembly',
       };
       const result = await partsApi.create(data);
+      const revisionId = result.latest_revision?.id;
+      // 创建后自动签出（若后端已自动签出则忽略冲突）
+      if (revisionId) {
+        try { await partsApi.checkout(revisionId); } catch { /* 可能已自动签出 */ }
+      }
+      const partNumber = row.builtin.PartNumber;
+      const pdmMatch = { master_id: result.id, revision_id: revisionId, code: result.code, version: 'A', name: result.name };
       setRows(prev => prev.map(r =>
-        r.path === row.path ? {
+        r.builtin.PartNumber === partNumber ? {
           ...r,
           match_status: 'matched' as const,
-          pdm_match: { master_id: result.id, revision_id: result.latest_revision?.id, code: result.code, version: 'A', name: result.name },
-          checkout_status: 'not_checked_out' as const,
+          pdm_match: pdmMatch,
+          checkout_status: 'checked_out' as const,
         } : r
       ));
       toast.success(`已创建零部件: ${result.code}`);
