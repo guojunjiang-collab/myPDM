@@ -696,6 +696,18 @@ export const configurationApi = {
     api.delete(`/configurations/items/${id}/children/${childId}`),
 };
 
+export interface ConfigPreviewTreeNode {
+  bom_item_id: string;
+  name: string;
+  type: 'part' | 'config_item';
+  part_code: string;
+  part_name: string;
+  version?: string;
+  has_model: boolean;
+  is_leaf: boolean;
+  children: ConfigPreviewTreeNode[];
+}
+
 export interface ConfigProfilePreviewData {
   profile_code: string;
   profile_name: string;
@@ -704,6 +716,7 @@ export interface ConfigProfilePreviewData {
   instances: AssemblyInstance[];
   missing: { part_code: string; part_name: string; version: string }[];
   tree: AssemblyTreeNode[];
+  config_tree_nodes: ConfigPreviewTreeNode | null;
 }
 
 // ──────────────────────────────────────────

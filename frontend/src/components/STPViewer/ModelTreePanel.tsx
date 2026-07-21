@@ -40,10 +40,11 @@ function NodeRow({ node, depth }: { node: TreeNode; depth: number }) {
   const toggleExpanded = useViewerStore((s) => s.toggleExpanded);
   const toggleNodeVisibility = useViewerStore((s) => s.toggleNodeVisibility);
 
-  const isGroup = node.type === 'group' && node.children.length > 0;
+  const isGroup = (node.type === 'group' || node.type === 'config_item') && node.children.length > 0;
   const expanded = expandedIds.has(node.id);
   const selected = selectedNodeId === node.id;
   const visible = node.meshUuids.some((u) => !hiddenParts.has(u));
+  const noModel = node.hasModel === false;
   const rowRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -64,7 +65,7 @@ function NodeRow({ node, depth }: { node: TreeNode; depth: number }) {
       )}
       <div
         ref={rowRef}
-        onClick={() => selectNode(node.id)}
+        onClick={() => { if (!noModel) selectNode(node.id); }}
         className={`group flex items-center gap-0.5 py-0.5 pr-2 cursor-pointer select-none text-sm transition-colors relative
           ${selected ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}
         style={{ paddingLeft: indent }}
@@ -95,8 +96,9 @@ function NodeRow({ node, depth }: { node: TreeNode; depth: number }) {
         </button>
 
         {/* Name */}
-        <span className={`truncate flex-1 ml-0.5 ${visible ? '' : 'text-gray-300 line-through'}`}>
+        <span className={`truncate flex-1 ml-0.5 ${noModel ? 'text-gray-400 italic' : ''} ${visible ? '' : 'text-gray-300 line-through'}`}>
           {node.name}
+          {noModel && <span className="text-xs ml-1 text-gray-400">(无模型)</span>}
         </span>
 
         {/* Child count badge */}

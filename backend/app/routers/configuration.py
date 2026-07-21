@@ -674,9 +674,66 @@ async def get_profile_3d_preview(
                 "version": ver,
             })
 
-    tree = []
+    # 解析后的零部件 model map：{ item_id: { "version":..., "part_code":..., "has_model": bool } }
+    part_model_map = {p["item_id"]: {"version": p.get("item_version") or "", "part_code": p["item_code"], "part_name": p["item_name"], "has_model": False} for p in parts}
+    loaded_ids = {inst["part_code"] for inst in instances}
+    # 通过 part_code 反查标记 has_model（同一 item_id 的 code + version 可能对应不上 instances 中的 part_code，以 code 匹配更鲁棒）
+    for p in parts:
+        if p["item_code"] in loaded_ids:
+            part_model_map[p["item_id"]]["has_model"] = True
+
+    def _build_config_tree_nodes(node: dict) -> dict | None:
+        """递归构建构型项树节点，含零部件和子构型项"""
+        if not node:
+            return None
+
+        # 本节点的零部件子节点
+        part_children = []
+        for p in node.get("parts", []):
+            if p.get("is_selected") and p.get("item_type") != "config_item":
+                pid = p.get("item_id")
+                info = part_model_map.get(pid) if pid else None
+                part_children.append({
+                    "bom_item_id": f"part-{pid}" if pid else f"part-{len(part_children)}",
+                    "name": f"{p.get('item_code', '')}_{p.get('item_name', '')}",
+                    "type": "part",
+                    "part_code": p.get("item_code", ""),
+                    "part_name": p.get("item_name", ""),
+                    "version": (info or {}).get("version", "") if info else "",
+                    "has_model": (info or {}).get("has_model", False) if info else False,
+                    "is_leaf": True,
+                    "children": [],
+                })
+
+        # 子构型项
+        config_children = []
+        for child in node.get("children", []):
+            if child.get("is_selected"):
+                child_node = _build_config_tree_nodes(child)
+                if child_node:
+                    config_children.append(child_node)
+
+        # 合并子节点（零部件在前，子构型项在后）
+        all_children = part_children + config_children
+        node_has_model = any(c.get("has_model", False) for c in all_children)
+
+        return {
+            "bom_item_id": f"config-{node.get('id', '')}",
+            "name": f"{node.get('code', '')}_{node.get('name', '')}",
+            "type": "config_item",
+            "part_code": "",
+            "part_name": "",
+            "has_model": node_has_model,
+            "is_leaf": len(all_children) == 0,
+            "children": all_children,
+        }
+
+    root_tree_node = _build_config_tree_nodes(config_tree) if config_tree else None
+
+    # 扁平实例树（供 AssemblyModelLoader 用，仅含已加载模型）
+    flat_tree = []
     for idx, inst in enumerate(instances):
-        tree.append({
+        flat_tree.append({
             "bom_item_id": f"instance-{idx}",
             "part_code": inst["part_code"],
             "part_name": inst["part_name"],
@@ -694,7 +751,8 @@ async def get_profile_3d_preview(
         "loaded_count": len(instances),
         "instances": instances,
         "missing": missing,
-        "tree": tree,
+        "tree": flat_tree,
+        "config_tree_nodes": root_tree_node,
     }
 
 

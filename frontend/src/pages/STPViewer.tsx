@@ -3,10 +3,11 @@ import { ViewerCanvas } from '../components/STPViewer/ViewerCanvas';
 import { Toolbar } from '../components/STPViewer/Toolbar';
 import { ModelTreePanel } from '../components/STPViewer/ModelTreePanel';
 import { ViewCube } from '../components/STPViewer/ViewCube';
-import { useViewerStore } from '../stores/viewerStore';
-import { assemblyViewerApi } from '../services/api';
+import { useViewerStore } from '../stores/viewerStore';import { assemblyViewerApi } from '../services/api';
 import type { AssemblyInstance, AssemblyTreeNode } from '../services/api';
 import { configurationProfileApi, type ConfigProfilePreviewData } from '../services/api';
+import { buildConfigTreeNodes } from '../components/STPViewer/buildConfigTreeNodes';
+import type { TreeNode } from '../components/STPViewer/treeTypes';
 import { toast } from '../components/Toast';
 import axios from 'axios';
 
@@ -19,6 +20,8 @@ export default function STPViewerPage() {
   const loadingState = useViewerStore((s) => s.loadingState);
   const errorMessage = useViewerStore((s) => s.errorMessage);
   const reset = useViewerStore((s) => s.reset);
+  const setTreeData = useViewerStore((s) => s.setTreeData);
+  const setLoadingState = useViewerStore((s) => s.setLoadingState);
 
   const params = new URLSearchParams(location.search);
   const assemblyRevId = params.get('assembly');
@@ -32,6 +35,7 @@ export default function STPViewerPage() {
   const [asmError, setAsmError] = useState<string | null>(null);
   const [configPreviewData, setConfigPreviewData] = useState<ConfigProfilePreviewData | null>(null);
   const [configPreviewTitle, setConfigPreviewTitle] = useState('');
+  const [configDisplayTree, setConfigDisplayTree] = useState<TreeNode | null>(null);
 
   const onResizeDown = useCallback(() => { dragging.current = true; }, []);
   useEffect(() => {
@@ -65,6 +69,12 @@ export default function STPViewerPage() {
         .then((data) => {
           setConfigPreviewData(data);
           setConfigPreviewTitle(`${data.profile_name}（${data.profile_code}）`);
+          if (data.config_tree_nodes) {
+            const tree = buildConfigTreeNodes(data.config_tree_nodes);
+            setConfigDisplayTree(tree);
+            setTreeData(tree);
+            setLoadingState('ready');
+          }
           setState('ready');
           if (data.total_count > data.loaded_count) {
             setTimeout(() => {
@@ -144,7 +154,7 @@ export default function STPViewerPage() {
           配置清单 3D 预览 — {configPreviewTitle}（{configPreviewData.instances.length}/{configPreviewData.total_count} 个模型）
         </div>
       )}
-      {(asmTree.length > 0 || (configPreviewData && configPreviewData.tree.length > 0)) && (
+      {(asmTree.length > 0 || !!configDisplayTree) && (
         <>
           <div style={{ width: treeWidth }} className="shrink-0 h-full">
             <ModelTreePanel />
@@ -159,7 +169,7 @@ export default function STPViewerPage() {
         <Toolbar />
         <div className="flex-1 relative">
           {(state === 'ready' || state === 'loading') && (() => {
-            if (configProfileId && configPreviewData) return <ViewerCanvas source={{ kind: 'assembly', instances: configPreviewData.instances, tree: configPreviewData.tree, applyZUp: false }} />;
+            if (configProfileId && configPreviewData) return <ViewerCanvas source={{ kind: 'assembly', instances: configPreviewData.instances, tree: configPreviewData.tree, applyZUp: false, displayTree: configDisplayTree }} />;
             if (assemblyRevId && asmInstances) return <ViewerCanvas source={{ kind: 'assembly', instances: asmInstances, tree: asmTree }} />;
             if (url) return <ViewerCanvas source={{ kind: 'single', url, code: partCode, version: partVersion, name: partName }} />;
             return null;

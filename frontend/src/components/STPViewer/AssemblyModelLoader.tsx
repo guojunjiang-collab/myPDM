@@ -6,6 +6,8 @@ import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.j
 import { useViewerStore } from '../../stores/viewerStore';
 import { useSceneVisualState } from './useSceneVisualState';
 import { buildAssemblyTreeNodes } from './buildAssemblyTreeNodes';
+import { mergeMeshUuidsIntoConfigTree } from './buildConfigTreeNodes';
+import type { TreeNode } from './treeTypes';
 import type { AssemblyInstance, AssemblyTreeNode } from '../../services/api';
 
 const draco = new DRACOLoader();
@@ -51,6 +53,7 @@ interface Props {
   instances: AssemblyInstance[];
   tree: AssemblyTreeNode[];
   applyZUp?: boolean;
+  displayTree?: TreeNode | null;
 }
 
 /**
@@ -58,7 +61,7 @@ interface Props {
  * 并把结构/几何注册进 viewerStore（与单件 ModelLoader 同构），
  * 从而复用同一套树面板/工具栏/高亮/隔离/剖切/测量/爆炸/重置逻辑。
  */
-export function AssemblyModelLoader({ instances, tree, applyZUp = true }: Props) {
+export function AssemblyModelLoader({ instances, tree, applyZUp = true, displayTree }: Props) {
   const { setTreeData, setModelScale, setLoadingState, selectByMesh, resetViewTrigger, measureMode } =
     useViewerStore();
   const setInitialState = useViewerStore((s) => s.setInitialState);
@@ -141,7 +144,13 @@ export function AssemblyModelLoader({ instances, tree, applyZUp = true }: Props)
       origColorRef.current = origColor;
 
       // 注册装配树（走 viewerStore，树面板/高亮/隔离全部复用）
-      setTreeData(buildAssemblyTreeNodes(tree, meshByBomItem));
+      if (displayTree) {
+        // config 模式：回填 mesh uuid 到配置项树中
+        const merged = mergeMeshUuidsIntoConfigTree(displayTree, tree, meshByBomItem);
+        setTreeData(merged);
+      } else {
+        setTreeData(buildAssemblyTreeNodes(tree, meshByBomItem));
+      }
 
       // 缩放居中 + 保存初始状态（同 ModelLoader）
       rootGroup.updateMatrixWorld(true);
