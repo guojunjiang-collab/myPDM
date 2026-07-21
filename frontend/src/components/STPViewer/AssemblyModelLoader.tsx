@@ -50,6 +50,7 @@ const Z_UP_TO_Y_UP = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
 interface Props {
   instances: AssemblyInstance[];
   tree: AssemblyTreeNode[];
+  applyZUp?: boolean;
 }
 
 /**
@@ -57,7 +58,7 @@ interface Props {
  * 并把结构/几何注册进 viewerStore（与单件 ModelLoader 同构），
  * 从而复用同一套树面板/工具栏/高亮/隔离/剖切/测量/爆炸/重置逻辑。
  */
-export function AssemblyModelLoader({ instances, tree }: Props) {
+export function AssemblyModelLoader({ instances, tree, applyZUp = true }: Props) {
   const { setTreeData, setModelScale, setLoadingState, selectByMesh, resetViewTrigger, measureMode } =
     useViewerStore();
   const setInitialState = useViewerStore((s) => s.setInitialState);
@@ -73,7 +74,11 @@ export function AssemblyModelLoader({ instances, tree }: Props) {
   useEffect(() => {
     let cancelled = false;
     rootGroup.matrixAutoUpdate = false;
-    rootGroup.matrix.copy(Z_UP_TO_Y_UP);
+    if (applyZUp) {
+      rootGroup.matrix.copy(Z_UP_TO_Y_UP);
+    } else {
+      rootGroup.matrix.identity();
+    }
     rootGroup.clear();
     setLoadingState('loading');
 

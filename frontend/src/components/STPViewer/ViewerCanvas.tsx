@@ -16,7 +16,7 @@ import type { AssemblyInstance, AssemblyTreeNode } from '../../services/api';
 /** 查看器数据源：单件(一个 glb) 或 装配(多实例 + BOM 树) */
 export type ViewerSource =
   | { kind: 'single'; url: string; code?: string; version?: string; name?: string }
-  | { kind: 'assembly'; instances: AssemblyInstance[]; tree: AssemblyTreeNode[] };
+  | { kind: 'assembly'; instances: AssemblyInstance[]; tree: AssemblyTreeNode[]; applyZUp?: boolean };
 
 /**
  * 程序化室内环境光（three 内置 RoomEnvironment + PMREMGenerator）。
@@ -74,7 +74,7 @@ export function ViewerCanvas({ source }: ViewerCanvasProps) {
           {source.kind === 'single' ? (
             <ModelLoader url={source.url} code={source.code} version={source.version} name={source.name} />
           ) : (
-            <AssemblyModelLoader instances={source.instances} tree={source.tree} />
+            <AssemblyModelLoader instances={source.instances} tree={source.tree} applyZUp={source.applyZUp ?? true} />
           )}
           {/* 选中包围盒高亮：遍历实时场景，单件/装配通用 */}
           <PartHighlighter />
