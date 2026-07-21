@@ -8,7 +8,7 @@ import uuid
 import base64
 
 from ..database import get_db
-from ..models import User, Document, DocumentAttachment, DocumentGroupLink, UserGroup, DocumentIteration, CustomFieldValue
+from ..models import User, DocumentMaster, DocumentRevision, DocumentIteration, DocumentAttachment, DocumentGroupLink, UserGroup, CustomFieldValue
 from ..models_parts import PartMaster, PartRevision
 from .. import crud, schemas, crud_groups
 from ..permissions import require_permission, check_object_policy

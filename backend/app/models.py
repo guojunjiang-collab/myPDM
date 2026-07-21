@@ -213,3 +213,7 @@ class DashboardFolderShare(Base):
     permission = Column(String(16), nullable=False, default="view")  # view / edit
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     folder = relationship("DashboardFolder", back_populates="shares")
+
+
+# ===== 过渡期兼容别名（Task 3/4 完成后移除） =====
+Document = DocumentRevision

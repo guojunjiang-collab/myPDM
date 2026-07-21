@@ -267,8 +267,11 @@ def reset_business_data(db):
     db.query(mc.ConfigurationItemMaster).delete()
     db.query(mc.ConfigurationItem).delete()  # 兼容旧版（配置表复用）
 
+    db.query(models.DocumentGroupLink).delete()
     db.query(models.DocumentAttachment).delete()
-    db.query(models.Document).delete()
+    db.query(models.DocumentIteration).delete()
+    db.query(models.DocumentRevision).delete()
+    db.query(models.DocumentMaster).delete()
     db.query(models.CustomFieldDefinition).delete()
     db.query(models.OperationLog).delete()
 
@@ -475,94 +478,73 @@ def _copy_iteration_custom_fields(db, source_iteration_id, target_iteration_id):
 
 
 def upgrade_document(db, doc_id, user_id: UUID, user_name: str = None):
-    """图文档升版：创建新版本图文档，自动签出，复制自定义字段和附件（对齐零部件）"""
-    from datetime import datetime, timezone
-    source = db.query(models.Document).filter(models.Document.id == doc_id).first()
-    if not source:
-        return None, "图文档不存在"
-    if source.status not in ('released', 'obsolete'):
+    """图文档升版：创建新版本 Revision + Iteration(1)，复制附件和自定义字段，自动签出"""
+    now = datetime.now(timezone.utc)
+    source_rev = db.query(models.DocumentRevision).filter(
+        models.DocumentRevision.id == doc_id,
+        models.DocumentRevision.deleted_at.is_(None),
+    ).first()
+    if not source_rev:
+        return None, "图文档版本不存在"
+    if source_rev.status not in ('released', 'obsolete'):
         return None, "仅发布或作废状态的图文档允许升版"
 
-    new_version = _get_next_version(db, models.Document, source.code)
-    new_doc = models.Document(
-        code=source.code,
-        name=source.name,
+    from . import crud_documents
+    new_version = crud_documents._get_next_version(db, source_rev.master_id)
+
+    source_iter = crud_documents._get_current_iteration(db, source_rev.id)
+
+    new_rev = models.DocumentRevision(
+        master_id=source_rev.master_id,
         version=new_version,
         status='draft',
-        remark=source.remark,
-        revision_parent_id=source.id,
-        creator_id=user_id,
         latest_iteration=1,
-        revisions=[{
-            'version': new_version,
-            'parent_version': source.version,
-            'action': 'upgraded_from',
-            'user': user_name,
-            'timestamp': datetime.now(timezone.utc).isoformat(),
-        }],
+        revision_parent_id=source_rev.id,
+        creator_id=user_id,
+        check_out_user_id=user_id,
+        check_out_date=now,
     )
-    db.add(new_doc)
+    db.add(new_rev)
     db.flush()
 
-    # 自动建首个迭代并签出给操作者（对齐零部件升版逻辑）
-    first_iter = models.DocumentIteration(
-        document_id=new_doc.id,
+    new_iter = models.DocumentIteration(
+        revision_id=new_rev.id,
         iteration=1,
     )
-    db.add(first_iter)
+    db.add(new_iter)
     db.flush()
 
-    new_doc.check_out_user_id = user_id
-    new_doc.check_out_date = datetime.now(timezone.utc)
-
-    # 复制源文档最后一次迭代的附件和自定义字段到新迭代
-    from . import crud_documents
-    source_iter = crud_documents.get_current_iteration(db, source)
-    if not source_iter:
-        source_iter = db.query(models.DocumentIteration).filter(
-            models.DocumentIteration.document_id == source.id,
-        ).order_by(models.DocumentIteration.iteration.desc()).first()
     if source_iter:
-        source_atts = db.query(models.DocumentAttachment).filter(
-            models.DocumentAttachment.iteration_id == source_iter.id,
-        ).all()
-        from .file_storage import file_storage
-        for att in source_atts:
-            new_path = f"document/{new_doc.code}/{new_doc.version}/1/{att.file_name}"
-            if att.file_path:
-                try:
-                    old_full = file_storage._safe_resolve(att.file_path)
-                    if old_full.exists():
-                        new_full = file_storage._safe_resolve(new_path)
-                        new_full.parent.mkdir(parents=True, exist_ok=True)
-                        import shutil
-                        shutil.copy2(str(old_full), str(new_full))
-                except Exception:
-                    new_path = att.file_path
-            new_att = models.DocumentAttachment(
-                document_id=new_doc.id,
-                iteration_id=first_iter.id,
-                file_name=att.file_name,
-                file_size=att.file_size,
-                file_path=new_path,
-                file_hash=att.file_hash,
-            )
-            db.add(new_att)
-        _copy_iteration_custom_fields(db, source_iter.id, first_iter.id)
-        # 复制文档级别的自定义字段值
-        _copy_custom_field_values(db, 'document', source.id, new_doc.id)
+        crud_documents._copy_attachments_to_iteration(db, source_iter, new_iter)
+        _copy_iteration_custom_fields(db, source_iter.id, new_iter.id)
+
+    # 更新 master 的 revisions JSONB 记录
+    master = crud_documents.get_document_master(db, source_rev.master_id)
+    if master:
+        revs = list(master.revisions or [])
+        revs.append({
+            'version': new_version,
+            'parent_version': source_rev.version,
+            'action': 'upgraded_from',
+            'user': user_name,
+            'timestamp': now.isoformat(),
+        })
+        master.revisions = revs
 
     db.commit()
-    db.refresh(new_doc)
-    return new_doc, None
+    db.refresh(new_rev)
+    return new_rev, None
 
 
 def get_document_versions(db, doc_id):
-    """获取指定图文档的所有版本（同编码）"""
-    doc = db.query(models.Document).filter(models.Document.id == doc_id).first()
-    if not doc:
+    """获取指定图文档的所有版本（通过 revision_id 反查 master → 全部版本）"""
+    revision = db.query(models.DocumentRevision).filter(
+        models.DocumentRevision.id == doc_id,
+        models.DocumentRevision.deleted_at.is_(None),
+    ).first()
+    if not revision:
         return []
-    return db.query(models.Document).filter(
-        models.Document.code == doc.code,
-        models.Document.deleted_at.is_(None),
-    ).order_by(models.Document.created_at).all()
+    return db.query(models.DocumentRevision).filter(
+        models.DocumentRevision.master_id == revision.master_id,
+        models.DocumentRevision.deleted_at.is_(None),
+    ).order_by(models.DocumentRevision.created_at).all()
