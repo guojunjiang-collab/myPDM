@@ -162,14 +162,20 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
         } catch {}
       }
       if (parts.length > 0) {
-        await configurationApi.addParts(configId, parts.map(p => ({
-          part_type: p.part_type, part_id: p.part_id, is_required: p.is_required, quantity: p.quantity ?? 1,
-        })));
+        const validParts = parts.filter(p => p.part_type && p.part_id);
+        if (validParts.length > 0) {
+          await configurationApi.addParts(configId, validParts.map(p => ({
+            part_type: p.part_type, part_id: p.part_id, is_required: p.is_required, quantity: p.quantity ?? 1,
+          })));
+        }
       }
       if (children.length > 0) {
-        await configurationApi.addChildren(configId, children.map(c => ({
-          child_revision_id: c.child_id, is_required: c.is_required, quantity: c.quantity,
-        })));
+        const validChildren = children.filter(c => c.child_id);
+        if (validChildren.length > 0) {
+          await configurationApi.addChildren(configId, validChildren.map(c => ({
+            child_revision_id: c.child_id, is_required: c.is_required, quantity: c.quantity,
+          })));
+        }
       }
       // 保存自定义字段值
       if (cfDefs.length > 0) {
@@ -183,7 +189,16 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
       }
       onSaved();
     } catch (e: any) {
-      setError(e.response?.data?.detail || '保存失败');
+      const detail = e.response?.data?.detail;
+      if (Array.isArray(detail)) {
+        setError(detail.map((d: any) => d.msg || d.message || JSON.stringify(d)).join('; '));
+      } else if (typeof detail === 'string') {
+        setError(detail);
+      } else if (detail) {
+        setError(JSON.stringify(detail));
+      } else {
+        setError('保存失败');
+      }
     } finally { setSaving(false); }
   };
 
@@ -721,12 +736,15 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
               ver = rev.version || '';
               status = rev.status || '';
               masterId = rev.master_id;
+              if (!masterId) continue;
               const master = await partsApi.get(masterId);
               code = master.code || '';
               name = master.name || '';
               spec = master.spec || '';
               type = master.type || 'part';
-            } catch {}
+            } catch {
+              continue;
+            }
             const key = `${type}_${masterId}`;
             const exists = parts.some(p => `${p.part_type}_${p.part_id}` === key);
             if (exists) continue;
