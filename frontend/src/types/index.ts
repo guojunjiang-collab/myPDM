@@ -726,6 +726,9 @@ export interface ConfigurationItemMaster {
 export interface ConfigurationItemRevision {
   id: string;
   master_id: string;
+  code?: string;      // joined from master in list response
+  name?: string;      // joined from master in list response
+  spec?: string;      // joined from master in list response
   version: string;
   status: 'draft' | 'frozen' | 'released' | 'obsolete';
   check_out_user_id?: string;
@@ -814,7 +817,7 @@ export interface ConfigurationProfile {
   id: string;
   code: string;
   name: string;
-  configuration_item_id: string;
+  configuration_item_revision_id: string;
   status: ProfileStatus;
   effectivity_start?: string;
   effectivity_end?: string;

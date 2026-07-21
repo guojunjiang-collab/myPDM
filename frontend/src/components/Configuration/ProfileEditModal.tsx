@@ -95,7 +95,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
   const [form, setForm] = useState({
     code: '',
     name: '',
-    configuration_item_id: '',
+    configuration_item_revision_id: '',
     effectivity_start: '',
     effectivity_end: '',
     remark: '',
@@ -169,7 +169,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
       setForm({
         code: data.code,
         name: data.name,
-        configuration_item_id: data.configuration_item_id,
+        configuration_item_revision_id: data.configuration_item_revision_id,
         effectivity_start: data.effectivity_start || '',
         effectivity_end: data.effectivity_end || '',
         remark: data.remark || '',
@@ -188,7 +188,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
     if (open) {
       setError('');
       if (isCreate) {
-        setForm({ code: '', name: '', configuration_item_id: '', effectivity_start: '', effectivity_end: '', remark: '' });
+        setForm({ code: '', name: '', configuration_item_revision_id: '', effectivity_start: '', effectivity_end: '', remark: '' });
         setProfile(null);
         setConfigTree(null);
         setExpandedNodes(new Set());
@@ -223,7 +223,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
       await configurationProfileApi.create({
         code: form.code.trim(),
         name: form.name.trim(),
-        configuration_item_id: form.configuration_item_id || undefined,
+        configuration_item_revision_id: form.configuration_item_revision_id || undefined,
         effectivity_start: form.effectivity_start || undefined,
         effectivity_end: form.effectivity_end || undefined,
         remark: form.remark || undefined,
@@ -247,7 +247,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
       await configurationProfileApi.update(profileId!, {
         code: form.code.trim(),
         name: form.name.trim(),
-        configuration_item_id: form.configuration_item_id || null,
+        configuration_item_revision_id: form.configuration_item_revision_id || null,
         effectivity_start: form.effectivity_start || undefined,
         effectivity_end: form.effectivity_end || undefined,
         remark: form.remark || undefined,
@@ -320,10 +320,10 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
 
   // Change associated config item (called from ConfigItemPicker onConfirm)
   const handleChangeConfigItem = async (item: { id: string; code: string; name: string }) => {
-    if (item.id === form.configuration_item_id) return;
-    setForm(prev => ({ ...prev, configuration_item_id: item.id }));
+    if (item.id === form.configuration_item_revision_id) return;
+    setForm(prev => ({ ...prev, configuration_item_revision_id: item.id }));
     try {
-      await configurationProfileApi.update(profileId!, { configuration_item_id: item.id } as any);
+      await configurationProfileApi.update(profileId!, { configuration_item_revision_id: item.id } as any);
       await loadProfile();
     } catch (e: any) {
       setError(e?.response?.data?.detail || '关联构型项失败');
@@ -332,7 +332,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
 
   // Force regenerate checklist from latest config item content
   const handleRegenerate = async () => {
-    if (!profileId || !form.configuration_item_id) return;
+    if (!profileId || !form.configuration_item_revision_id) return;
     setSaving(true);
     try {
       const r = await configurationProfileApi.regenerate(profileId);
@@ -352,8 +352,8 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
     if (!profileId) return;
     setSaving(true);
     try {
-      await configurationProfileApi.update(profileId, { configuration_item_id: null } as any);
-      setForm(prev => ({ ...prev, configuration_item_id: '' }));
+      await configurationProfileApi.update(profileId, { configuration_item_revision_id: null } as any);
+      setForm(prev => ({ ...prev, configuration_item_revision_id: '' }));
       setConfigTree(null);
       setExpandedNodes(new Set());
       setError('');
@@ -872,7 +872,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                 <div className="flex items-center justify-between">
                   <h4 className="text-sm font-bold text-gray-700">配置清单</h4>
                   <div className="flex items-center gap-2">
-                    {form.configuration_item_id && (
+                    {form.configuration_item_revision_id && (
                       <>
                         <button type="button" onClick={handleRegenerate} disabled={saving}
                           className="text-xs text-blue-600 hover:text-blue-700 border border-blue-200 px-2 py-1 rounded hover:bg-blue-50 disabled:opacity-50">
@@ -889,7 +889,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                       onClick={() => setCfgPickOpen(true)}
                       className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700"
                     >
-                      {form.configuration_item_id ? '更换构型项' : '+ 关联构型项'}
+                      {form.configuration_item_revision_id ? '更换构型项' : '+ 关联构型项'}
                     </button>
                   </div>
                 </div>
@@ -897,7 +897,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                   open={cfgPickOpen}
                   onClose={() => setCfgPickOpen(false)}
                   onConfirm={handleChangeConfigItem}
-                  excludeId={form.configuration_item_id || undefined}
+                  excludeId={form.configuration_item_revision_id || undefined}
                 />
 
                 {/* Table-based checklist */}
@@ -924,7 +924,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                 ) : (
                   <div className="border border-gray-200 rounded-lg p-4 text-center">
                     <p className="text-xs text-gray-400">
-                      {form.configuration_item_id ? '请先关联构型项以展开配置清单' : '暂无关联构型项，无法生成配置清单'}
+                      {form.configuration_item_revision_id ? '请先关联构型项以展开配置清单' : '暂无关联构型项，无法生成配置清单'}
                     </p>
                   </div>
                 )}

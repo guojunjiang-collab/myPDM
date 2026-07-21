@@ -3973,7 +3973,7 @@ export async function executeConfigurationProfilesImport(preview: ImportPreview)
     const payload: Record<string, unknown> = {
       code: data.code,
       name: data.name,
-      configuration_item_id: ciId ?? null,
+      configuration_item_revision_id: ciId ?? null,
       effectivity_start: (data.effectivity_start as string) || undefined,
       effectivity_end: (data.effectivity_end as string) || undefined,
       remark: (data.remark as string) || undefined,

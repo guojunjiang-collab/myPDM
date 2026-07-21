@@ -39,9 +39,9 @@ export default function ConfigItemPicker({
   useEffect(() => {
     if (!open) return;
     setLoading(true);
-    configurationApi.listItems({ page: 1, page_size: 100 })
+    configurationApi.list({ page: 1, page_size: 100 })
       .then((r) => {
-        const all = (r.data.items || []) as ConfigItem[];
+        const all = (r.items || []) as ConfigItem[];
         setItems(excludeId ? all.filter(i => i.id !== excludeId) : all);
       })
       .catch(() => setItems([]))

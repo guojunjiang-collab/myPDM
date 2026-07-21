@@ -121,11 +121,10 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
       setExpandedChild({}); setNoChildren(new Set()); setLoadingChild(null);
       // Load existing parts and children for edit mode
       if (item?.id) {
-        configurationApi.getItem(item.id).then(r => {
-          const d = r.data;
-          setForm({ code: d.code, name: d.name, spec: d.spec || '', remark: d.remark || '' });
-          setCreatorName(d.creator_name || '');
-          setParts((r.data.parts || []).map((p: any) => ({
+        configurationApi.detail(item.id).then(r => {
+          setForm({ code: r.master.code, name: r.revision.name || r.master.name, spec: r.revision.spec || r.master.spec || '', remark: r.revision.remark || r.master.remark || '' });
+          setCreatorName(r.master.creator_id || '');
+          setParts((r.parts || []).map((p: any) => ({
             id: p.id, part_type: p.part_type, part_id: p.part_id,
             revision_id: p.part_detail?.revision_id || '',
             part_code: p.part_detail?.code || '', part_name: p.part_detail?.name || '',
@@ -133,7 +132,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
             part_status: p.part_detail?.status || '', is_required: p.is_required,
             quantity: p.quantity ?? 1,
           })));
-          setChildren(sortByCode((r.data.children || []).map((c: any) => ({
+          setChildren(sortByCode((r.children || []).map((c: any) => ({
             id: c.id, child_id: c.child_id,
             child_code: c.child_detail?.code || '', child_name: c.child_detail?.name || '',
             child_remark: c.child_detail?.remark || '',
@@ -155,7 +154,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
     try {
       let configId: string;
       if (isEdit) {
-        await configurationApi.updateItem(item!.id, form);
+        await configurationApi.update(item!.id, form);
         configId = item!.id;
       } else {
         const r = await configurationApi.create(form);
@@ -165,9 +164,9 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
       if (isEdit) {
         // Full replace: fetch existing data, remove all, then re-add current state
         try {
-          const current = await configurationApi.getItem(configId);
-          const existingParts = current.data?.parts || [];
-          const existingChildren = current.data?.children || [];
+          const current = await configurationApi.detail(configId);
+          const existingParts = current?.parts || [];
+          const existingChildren = current?.children || [];
           for (const p of existingParts) {
             try { await configurationApi.removePart(configId, p.id); } catch {}
           }
@@ -219,8 +218,8 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
   const refreshParentChildren = (parentId: string) => {
     for (const [key, rows] of Object.entries(expandedChild)) {
       if (rows.length > 0 && rows[0].parent_id === parentId) {
-        configurationApi.getItem(parentId).then(r => {
-          const fresh = (r.data.children || []).map((c: any) => ({
+        configurationApi.detail(parentId).then(r => {
+          const fresh = (r.children || []).map((c: any) => ({
             id: c.id, child_id: c.child_id,
             child_code: c.child_detail?.code || '', child_name: c.child_detail?.name || '',
             child_remark: c.child_detail?.remark || '',
@@ -299,8 +298,8 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
     if (noChildren.has(idx)) return;
     setLoadingChild(idx);
     try {
-      const r = await configurationApi.getItem(childId);
-      const subChildren = (r.data.children || []).map((c: any) => ({
+      const r = await configurationApi.detail(childId);
+      const subChildren = (r.children || []).map((c: any) => ({
         id: c.id,
         child_id: c.child_id,
         child_code: c.child_detail?.code || '',
@@ -396,8 +395,8 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
     if (item?.id && excludeId) params.exclude_ancestors_of = excludeId;
     const kw = search.trim();
     if (kw) params.search = kw;
-    configurationApi.listItems(params)
-      .then(r => { if (reqId === cfgReqId.current) setCfgResults(r.data.items || []); })
+    configurationApi.list(params)
+      .then(r => { if (reqId === cfgReqId.current) setCfgResults(r.items || []); })
       .catch(() => { if (reqId === cfgReqId.current) setCfgResults([]); })
       .finally(() => { if (reqId === cfgReqId.current) setCfgSearching(false); });
   };
@@ -621,8 +620,8 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                             if (!quickForm.code.trim() || !quickForm.name.trim()) return;
                             setQuickCreating(true);
                             try {
-                              const r = await configurationApi.createItem({ code: quickForm.code.trim(), name: quickForm.name.trim(), remark: quickForm.remark.trim() || undefined });
-                              const newItem = { id: r.data.id, code: r.data.code, name: r.data.name, spec: r.data.spec || '', remark: r.data.remark || '' };
+                               const r = await configurationApi.create({ code: quickForm.code.trim(), name: quickForm.name.trim(), remark: quickForm.remark.trim() || undefined });
+                               const newItem = { id: r.id, code: quickForm.code.trim(), name: quickForm.name.trim(), remark: quickForm.remark.trim() || '' };
                               setPickerSelected(prev => [...prev, newItem]);
                               setQuickForm({ code: '', name: '', remark: '' });
                             } catch (e: any) { /* 失败静默，用户可重试 */ }
@@ -794,8 +793,8 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
           setNestedEditItem(null);
           // 刷新父级及所有已展开子项列表
           if (item?.id) {
-            configurationApi.getItem(item.id).then(r => {
-              setChildren(sortByCode((r.data.children || []).map((c: any) => ({
+            configurationApi.detail(item.id).then(r => {
+          setChildren(sortByCode((r.children || []).map((c: any) => ({
                 id: c.id, child_id: c.child_id,
                 child_code: c.child_detail?.code || '', child_name: c.child_detail?.name || '',
                 child_remark: c.child_detail?.remark || '',
@@ -808,10 +807,10 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
             // 刷新所有展开的深层子项
             for (const [key, rows] of Object.entries(expandedChild)) {
               if (rows.length > 0 && rows[0].parent_id) {
-                configurationApi.getItem(rows[0].parent_id).then(r2 => {
+                configurationApi.detail(rows[0].parent_id).then(r2 => {
                   setExpandedChild(prev => ({
                     ...prev,
-                    [key]: sortByCode((r2.data.children || []).map((c: any) => ({
+                    [key]: sortByCode((r2.children || []).map((c: any) => ({
                       id: c.id, child_id: c.child_id,
                       child_code: c.child_detail?.code || '', child_name: c.child_detail?.name || '',
                       child_remark: c.child_detail?.remark || '',

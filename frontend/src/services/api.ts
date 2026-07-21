@@ -764,13 +764,13 @@ export const configurationProfileApi = {
     api.get(`/configurations/profiles/${id}`),
 
   create: (data: {
-    code: string; name: string; configuration_item_id?: string;
+    code: string; name: string; configuration_item_revision_id?: string;
     effectivity_start?: string; effectivity_end?: string; remark?: string;
   }) =>
     api.post('/configurations/profiles', data),
 
   update: (id: string, data: {
-    code?: string; name?: string; configuration_item_id?: string | null;
+    code?: string; name?: string; configuration_item_revision_id?: string | null;
     effectivity_start?: string; effectivity_end?: string; remark?: string;
   }) =>
     api.put(`/configurations/profiles/${id}`, data),
