@@ -83,7 +83,10 @@ export function AssemblyModelLoader({ instances, tree, applyZUp = true, displayT
       rootGroup.matrix.identity();
     }
     rootGroup.clear();
-    setLoadingState('loading');
+    // config 模式有 displayTree 时，树数据已由 STPViewer 预设好，不覆盖 loadingState
+    if (!displayTree) {
+      setLoadingState('loading');
+    }
 
     (async () => {
       const meshByBomItem = new Map<string, string[]>();

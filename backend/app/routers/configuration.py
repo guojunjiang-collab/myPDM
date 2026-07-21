@@ -642,6 +642,9 @@ async def get_profile_3d_preview(
     missing = []
     identity_matrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
 
+    # 零部件 model map：{ item_id: { "version":..., "part_code":..., "has_model": bool } }
+    part_model_map = {p["item_id"]: {"version": p.get("item_version") or "", "part_code": p["item_code"], "part_name": p["item_name"], "has_model": False} for p in parts}
+
     for idx, p in enumerate(parts):
         ver = (p.get("item_version") or "").strip()
         if not ver:
@@ -656,16 +659,22 @@ async def get_profile_3d_preview(
                     "version": "",
                 })
                 continue
+        # 回写解析后的版本，供模型树显示使用
+        if p.get("item_id") in part_model_map:
+            part_model_map[p["item_id"]]["version"] = ver
 
         result = _resolve_part_stp_attachment(db, p["item_id"], ver)
         if result and result.get("glb_urls"):
             instances.append({
+                "path": f"instance-{len(instances)}",
+                "bom_path": [f"instance-{len(instances)}"],
                 "part_code": p["item_code"],
                 "part_name": p["item_name"],
                 "version": ver,
                 "revision_id": result["revision_id"],
                 "glb_urls": result["glb_urls"],
                 "matrix": identity_matrix,
+                "bbox": None,
             })
         else:
             missing.append({
@@ -674,10 +683,8 @@ async def get_profile_3d_preview(
                 "version": ver,
             })
 
-    # 解析后的零部件 model map：{ item_id: { "version":..., "part_code":..., "has_model": bool } }
-    part_model_map = {p["item_id"]: {"version": p.get("item_version") or "", "part_code": p["item_code"], "part_name": p["item_name"], "has_model": False} for p in parts}
+    # 通过 part_code 标记 has_model
     loaded_ids = {inst["part_code"] for inst in instances}
-    # 通过 part_code 反查标记 has_model（同一 item_id 的 code + version 可能对应不上 instances 中的 part_code，以 code 匹配更鲁棒）
     for p in parts:
         if p["item_code"] in loaded_ids:
             part_model_map[p["item_id"]]["has_model"] = True
@@ -695,7 +702,7 @@ async def get_profile_3d_preview(
                 info = part_model_map.get(pid) if pid else None
                 part_children.append({
                     "bom_item_id": f"part-{pid}" if pid else f"part-{len(part_children)}",
-                    "name": f"{p.get('item_code', '')}_{p.get('item_name', '')}",
+                    "name": f"{p.get('item_code', '')}_{(info or {}).get('version', '')}_{p.get('item_name', '')}".strip("_"),
                     "type": "part",
                     "part_code": p.get("item_code", ""),
                     "part_name": p.get("item_name", ""),

@@ -149,11 +149,6 @@ export default function STPViewerPage() {
 
   return (
     <div className="w-screen h-screen relative flex">
-      {configProfileId && configPreviewData && (
-        <div className="absolute top-3 left-4 z-20 bg-white/85 backdrop-blur-sm rounded-lg px-3 py-1.5 text-sm font-medium shadow border border-gray-200 pointer-events-none select-none">
-          配置清单 3D 预览 — {configPreviewTitle}（{configPreviewData.instances.length}/{configPreviewData.total_count} 个模型）
-        </div>
-      )}
       {(asmTree.length > 0 || !!configDisplayTree) && (
         <>
           <div style={{ width: treeWidth }} className="shrink-0 h-full">

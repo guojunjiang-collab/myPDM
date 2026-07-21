@@ -43,7 +43,7 @@ function NodeRow({ node, depth }: { node: TreeNode; depth: number }) {
   const isGroup = (node.type === 'group' || node.type === 'config_item') && node.children.length > 0;
   const expanded = expandedIds.has(node.id);
   const selected = selectedNodeId === node.id;
-  const visible = node.meshUuids.some((u) => !hiddenParts.has(u));
+  const visible = node.meshUuids.length === 0 ? true : node.meshUuids.some((u) => !hiddenParts.has(u));
   const noModel = node.hasModel === false;
   const rowRef = useRef<HTMLDivElement>(null);
 
@@ -87,13 +87,17 @@ function NodeRow({ node, depth }: { node: TreeNode; depth: number }) {
         )}
 
         {/* Visibility toggle */}
-        <button
-          onClick={(e) => { e.stopPropagation(); toggleNodeVisibility(node); }}
-          className={`w-4 h-4 flex items-center justify-center shrink-0 rounded transition-colors
-            ${visible ? 'text-gray-400 hover:text-blue-500 hover:bg-blue-50' : 'text-gray-300 hover:text-gray-400'}`}
-        >
-          <EyeIcon visible={visible} />
-        </button>
+        {node.meshUuids.length > 0 ? (
+          <button
+            onClick={(e) => { e.stopPropagation(); toggleNodeVisibility(node); }}
+            className={`w-4 h-4 flex items-center justify-center shrink-0 rounded transition-colors
+              ${visible ? 'text-gray-400 hover:text-blue-500 hover:bg-blue-50' : 'text-gray-300 hover:text-gray-400'}`}
+          >
+            <EyeIcon visible={visible} />
+          </button>
+        ) : (
+          <span className="w-4 shrink-0" />
+        )}
 
         {/* Name */}
         <span className={`truncate flex-1 ml-0.5 ${noModel ? 'text-gray-400 italic' : ''} ${visible ? '' : 'text-gray-300 line-through'}`}>
