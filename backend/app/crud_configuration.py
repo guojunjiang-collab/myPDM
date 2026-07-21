@@ -1,12 +1,15 @@
 """
 构型配置 - CRUD Operations
 ==============================
+三层模型：Master → Revision → Iteration
+签入签出模式参照 crud_parts.py
 """
 
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func as sqlfunc
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Any, Dict
 from datetime import datetime, timezone
+from uuid import UUID
 from fastapi import HTTPException
 
 from . import models_configuration as models
@@ -14,8 +17,138 @@ from . import schemas_configuration as schemas
 from . import notifications as _notif
 
 
+# ====== 版本号工具（参照 crud_parts.py） ======
+
+VERSION_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ"
+
+
+def _to_version_string(index: int) -> str:
+    """将索引转为版本字符串 A=0, B=1, ...（24进制，不含I/O）"""
+    if index < 0:
+        index = 0
+    result = ""
+    num = index
+    while True:
+        result = VERSION_CHARS[num % 24] + result
+        num = num // 24 - 1
+        if num < 0:
+            break
+    return result
+
+
+def _get_next_version(db: Session, master_id: UUID) -> str:
+    """根据同一 master 下已有版本数，生成下一版本号"""
+    count = (
+        db.query(models.ConfigurationItemRevision)
+        .filter(
+            models.ConfigurationItemRevision.master_id == master_id,
+            models.ConfigurationItemRevision.deleted_at.is_(None),
+        )
+        .count()
+    )
+    return _to_version_string(count)
+
+
+def _get_current_iteration(db: Session, revision_id: UUID) -> Optional[models.ConfigurationItemIteration]:
+    """获取版本的最新迭代"""
+    revision = get_config_item_revision(db, revision_id)
+    if not revision:
+        return None
+    return (
+        db.query(models.ConfigurationItemIteration)
+        .filter(
+            models.ConfigurationItemIteration.revision_id == revision_id,
+            models.ConfigurationItemIteration.iteration == revision.latest_iteration,
+        )
+        .first()
+    )
+
+
 # ============================================================
-# 构型项 CRUD
+# 构型项 Master CRUD
+# ============================================================
+
+def get_config_item_master(db: Session, master_id: UUID) -> Optional[models.ConfigurationItemMaster]:
+    """按主数据 ID 查询（排除软删除）"""
+    return (
+        db.query(models.ConfigurationItemMaster)
+        .filter(
+            models.ConfigurationItemMaster.id == master_id,
+            models.ConfigurationItemMaster.deleted_at.is_(None),
+        )
+        .first()
+    )
+
+
+def get_config_item_master_by_code(db: Session, code: str) -> Optional[models.ConfigurationItemMaster]:
+    """按件号查询主数据（包含软删除，用于复活检测）"""
+    return db.query(models.ConfigurationItemMaster).filter(
+        models.ConfigurationItemMaster.code == code
+    ).first()
+
+
+def update_config_item_master(db: Session, master_id: UUID, data: dict) -> Optional[models.ConfigurationItemMaster]:
+    """更新主数据字段（code / name / spec）"""
+    master = get_config_item_master(db, master_id)
+    if not master:
+        return None
+    for field in ("code", "name", "spec"):
+        if field in data and data[field] is not None:
+            setattr(master, field, data[field])
+    db.commit()
+    db.refresh(master)
+    return master
+
+
+# ============================================================
+# 构型项 Revision CRUD
+# ============================================================
+
+def get_config_item_revision(db: Session, revision_id: UUID) -> Optional[models.ConfigurationItemRevision]:
+    """按版本 ID 查询（排除软删除）"""
+    return (
+        db.query(models.ConfigurationItemRevision)
+        .filter(
+            models.ConfigurationItemRevision.id == revision_id,
+            models.ConfigurationItemRevision.deleted_at.is_(None),
+        )
+        .first()
+    )
+
+
+def get_config_item_revision_with_iteration(
+    db: Session, revision_id: UUID
+) -> Optional[Tuple[models.ConfigurationItemRevision, Optional[models.ConfigurationItemIteration]]]:
+    """获取版本 + 当前最新迭代"""
+    revision = get_config_item_revision(db, revision_id)
+    if not revision:
+        return None
+    iteration = _get_current_iteration(db, revision_id)
+    return revision, iteration
+
+
+def list_revisions_by_master(db: Session, master_id: UUID) -> List[models.ConfigurationItemRevision]:
+    """获取某主数据下所有版本（按创建时间排序）"""
+    return (
+        db.query(models.ConfigurationItemRevision)
+        .filter(
+            models.ConfigurationItemRevision.master_id == master_id,
+            models.ConfigurationItemRevision.deleted_at.is_(None),
+        )
+        .order_by(models.ConfigurationItemRevision.created_at)
+        .all()
+    )
+
+
+def _get_iteration(db: Session, iteration_id: UUID) -> Optional[models.ConfigurationItemIteration]:
+    """按迭代 ID 查询"""
+    return db.query(models.ConfigurationItemIteration).filter(
+        models.ConfigurationItemIteration.id == iteration_id
+    ).first()
+
+
+# ============================================================
+# 列表查询（聚合到 master 层）
 # ============================================================
 
 def get_config_items(
@@ -25,128 +158,613 @@ def get_config_items(
     include_deleted: bool = False,
     updated_since: Optional[float] = None,
     top_level: bool = False,
-) -> Tuple[List[models.ConfigurationItem], int]:
-    """构型项列表"""
-    q = db.query(models.ConfigurationItem)
+    status: Optional[str] = None,
+) -> Tuple[List[Dict[str, Any]], int]:
+    """构型项列表：按 master 聚合，返回每个 master 的最新 revision 摘要"""
+    q = db.query(models.ConfigurationItemMaster)
     if not include_deleted:
-        q = q.filter(models.ConfigurationItem.deleted_at.is_(None))
+        q = q.filter(models.ConfigurationItemMaster.deleted_at.is_(None))
     if exclude_ids:
-        q = q.filter(models.ConfigurationItem.id.notin_(exclude_ids))
+        q = q.filter(models.ConfigurationItemMaster.id.notin_(exclude_ids))
     if top_level:
-        # 仅顶层构型项：id 未作为任何“存活父项”的子项出现。
-        # 注意软删除父项的关联边仍残留在表中，故需排除已删除父项，避免误判。
-        live_parent_ids = db.query(models.ConfigurationItem.id).filter(
-            models.ConfigurationItem.deleted_at.is_(None)
+        # 仅顶层构型项：master.id 未作为任何存活父项的子项出现
+        live_master_ids = db.query(models.ConfigurationItemMaster.id).filter(
+            models.ConfigurationItemMaster.deleted_at.is_(None)
         )
-        parented_child_ids = db.query(models.ConfigurationItemChild.child_id).filter(
-            models.ConfigurationItemChild.parent_id.in_(live_parent_ids)
+        # 子项通过 parent_iteration_id 关联，需先找到所有迭代对应的 revision→master
+        parented_rev_ids = (
+            db.query(models.ConfigurationItemChild.child_revision_id)
+            .join(
+                models.ConfigurationItemIteration,
+                models.ConfigurationItemIteration.id == models.ConfigurationItemChild.parent_iteration_id,
+            )
+            .join(
+                models.ConfigurationItemRevision,
+                models.ConfigurationItemRevision.id == models.ConfigurationItemIteration.revision_id,
+            )
+            .filter(models.ConfigurationItemRevision.deleted_at.is_(None))
         )
-        q = q.filter(models.ConfigurationItem.id.notin_(parented_child_ids))
+        parented_master_ids = db.query(models.ConfigurationItemRevision.master_id).filter(
+            models.ConfigurationItemRevision.id.in_(parented_rev_ids)
+        )
+        q = q.filter(models.ConfigurationItemMaster.id.notin_(parented_master_ids))
     if search:
         like = f"%{search}%"
         q = q.filter(or_(
-            models.ConfigurationItem.code.ilike(like),
-            models.ConfigurationItem.name.ilike(like),
-            models.ConfigurationItem.spec.ilike(like),
+            models.ConfigurationItemMaster.code.ilike(like),
+            models.ConfigurationItemMaster.name.ilike(like),
+            models.ConfigurationItemMaster.spec.ilike(like),
         ))
     if updated_since:
-        from datetime import datetime, timezone as tz
-        since_dt = datetime.fromtimestamp(updated_since, tz=tz.utc)
+        since_dt = datetime.fromtimestamp(updated_since, tz=timezone.utc)
         q = q.filter(
-            (models.ConfigurationItem.updated_at >= since_dt) |
-            (models.ConfigurationItem.deleted_at >= since_dt)
+            (models.ConfigurationItemMaster.updated_at >= since_dt) |
+            (models.ConfigurationItemMaster.deleted_at >= since_dt)
         )
     total = q.count()
-    items = q.order_by(models.ConfigurationItem.code).offset(skip).limit(limit).all()
+    masters = q.order_by(models.ConfigurationItemMaster.code).offset(skip).limit(limit).all()
+
+    items = []
+    from . import models as core_models
+    for master in masters:
+        revisions_query = (
+            db.query(models.ConfigurationItemRevision)
+            .filter(
+                models.ConfigurationItemRevision.master_id == master.id,
+                models.ConfigurationItemRevision.deleted_at.is_(None),
+            )
+            .order_by(models.ConfigurationItemRevision.created_at.desc())
+        )
+        if status:
+            revisions_query = revisions_query.filter(models.ConfigurationItemRevision.status == status)
+        revisions = revisions_query.all()
+
+        for rev in revisions:
+            checkout_user_name = None
+            if rev.check_out_user_id:
+                user = db.query(core_models.User).filter(
+                    core_models.User.id == rev.check_out_user_id
+                ).first()
+                if user:
+                    checkout_user_name = user.real_name
+
+            items.append({
+                "master_id": str(master.id),
+                "code": master.code,
+                "name": master.name,
+                "spec": master.spec,
+                "remark": master.remark,
+                "revision_id": str(rev.id),
+                "version": rev.version,
+                "status": rev.status,
+                "check_out_user_id": str(rev.check_out_user_id) if rev.check_out_user_id else None,
+                "check_out_user_name": checkout_user_name,
+                "check_out_date": rev.check_out_date.isoformat() if rev.check_out_date else None,
+                "latest_iteration": rev.latest_iteration,
+                "creator_id": str(rev.creator_id) if rev.creator_id else None,
+                "created_at": rev.created_at.isoformat() if rev.created_at else None,
+                "updated_at": master.updated_at.isoformat() if master.updated_at else None,
+            })
     return items, total
 
 
-def get_config_item(db: Session, config_id: str) -> Optional[models.ConfigurationItem]:
-    return db.query(models.ConfigurationItem).filter(
-        models.ConfigurationItem.id == config_id,
-        models.ConfigurationItem.deleted_at.is_(None)
+# ============================================================
+# 创建构型项（Master + Revision A + Iteration 1，自动签出）
+# ============================================================
+
+def create_config_item(db: Session, data: dict, user_id: UUID) -> Tuple[models.ConfigurationItemMaster, models.ConfigurationItemRevision, models.ConfigurationItemIteration]:
+    """创建构型项：同时创建 Master + Revision(A) + Iteration(1)，自动签出"""
+    code = data["code"]
+
+    # 预检：code 是否已被软删除的 master 占用 → 复活
+    existing = db.query(models.ConfigurationItemMaster).filter(
+        models.ConfigurationItemMaster.code == code,
+        models.ConfigurationItemMaster.deleted_at.is_(None),
     ).first()
+    if existing:
+        has_rev = db.query(models.ConfigurationItemRevision).filter(
+            models.ConfigurationItemRevision.master_id == existing.id,
+            models.ConfigurationItemRevision.deleted_at.is_(None),
+        ).count()
+        if has_rev > 0:
+            raise ValueError(f"构型号「{code}」已存在，请更换构型号")
 
+    master = models.ConfigurationItemMaster(
+        code=code,
+        name=data["name"],
+        spec=data.get("spec", ""),
+        remark=data.get("remark", ""),
+        creator_id=user_id,
+    )
+    db.add(master)
+    db.flush()
 
-def get_config_item_by_code(db: Session, code: str) -> Optional[models.ConfigurationItem]:
-    return db.query(models.ConfigurationItem).filter(models.ConfigurationItem.code == code).first()
+    revision = models.ConfigurationItemRevision(
+        master_id=master.id, version="A", status="draft",
+        creator_id=user_id, latest_iteration=1,
+        check_out_user_id=user_id,
+        check_out_date=func.now(),
+    )
+    db.add(revision)
+    db.flush()
 
-
-def create_config_item(db: Session, data: schemas.ConfigurationItemCreate) -> models.ConfigurationItem:
-    item = models.ConfigurationItem(**data.model_dump())
-    db.add(item)
+    iteration = models.ConfigurationItemIteration(
+        revision_id=revision.id, iteration=1,
+        version_spec=master.spec,
+        version_remark=master.remark,
+        version_name=master.name,
+        document_links=[],
+    )
+    db.add(iteration)
     db.commit()
-    db.refresh(item)
-    return item
+    db.refresh(master)
+    db.refresh(revision)
+    db.refresh(iteration)
+    return master, revision, iteration
 
 
 def revive_config_item(
-    db: Session, item: models.ConfigurationItem, data: schemas.ConfigurationItemCreate,
-) -> models.ConfigurationItem:
-    """复活已软删除的构型项：撤销删除、以新数据覆盖基本字段，并清空其自身旧关联（等价全新创建）。
+    db: Session, master: models.ConfigurationItemMaster, data: dict, user_id: UUID,
+) -> Tuple[models.ConfigurationItemMaster, models.ConfigurationItemRevision, models.ConfigurationItemIteration]:
+    """复活已软删除的构型项：撤销删除、以新数据覆盖基本字段，创建新版本 A + Iteration 1，自动签出"""
+    master.deleted_at = None
+    master.name = data.get("name", master.name)
+    master.spec = data.get("spec", master.spec or "")
+    master.remark = data.get("remark", master.remark or "")
 
-    code 列有唯一约束，软删除行仍占用该 code，故再次创建同 code 时复用此行而非插入新行。
-    """
-    item.deleted_at = None
-    item.name = data.name
-    item.spec = data.spec
-    item.remark = data.remark
-    item.document_links = []
-    # 清空该构型项自身的关联零部件
-    db.query(models.ConfigurationItemPart).filter(
-        models.ConfigurationItemPart.configuration_item_id == item.id
-    ).delete()
-    # 清空该构型项作为父项的子构型关联（不动其它父项对它的引用）
-    db.query(models.ConfigurationItemChild).filter(
-        models.ConfigurationItemChild.parent_id == item.id
-    ).delete()
+    revision = models.ConfigurationItemRevision(
+        master_id=master.id, version="A", status="draft",
+        creator_id=user_id, latest_iteration=1,
+        check_out_user_id=user_id,
+        check_out_date=func.now(),
+    )
+    db.add(revision)
+    db.flush()
+
+    iteration = models.ConfigurationItemIteration(
+        revision_id=revision.id, iteration=1,
+        version_spec=master.spec,
+        version_remark=master.remark,
+        version_name=master.name,
+        document_links=[],
+    )
+    db.add(iteration)
     db.commit()
-    db.refresh(item)
-    return item
+    db.refresh(master)
+    db.refresh(revision)
+    db.refresh(iteration)
+    return master, revision, iteration
 
 
-def update_config_item(db: Session, config_id: str, data: schemas.ConfigurationItemUpdate) -> Optional[models.ConfigurationItem]:
-    item = get_config_item(db, config_id)
-    if not item:
+# ============================================================
+# 更新构型项（迭代层数据，需签出校验）
+# ============================================================
+
+def update_config_item_iteration(
+    db: Session, iteration_id: UUID, data: dict,
+) -> Optional[models.ConfigurationItemIteration]:
+    """更新迭代层可编辑字段（version_spec / version_remark / version_name / document_links）"""
+    iteration = _get_iteration(db, iteration_id)
+    if not iteration:
         return None
-    update_data = data.model_dump(exclude_unset=True)
-    for k, v in update_data.items():
-        setattr(item, k, v)
+    for field in ("version_spec", "version_remark", "version_name", "document_links"):
+        if field in data and data[field] is not None:
+            setattr(iteration, field, data[field])
     db.commit()
-    db.refresh(item)
-    return item
+    db.refresh(iteration)
+    return iteration
 
 
-def delete_config_item(db: Session, config_id: str) -> bool:
-    """Soft delete configuration item"""
-    from sqlalchemy.sql import func
-    item = db.query(models.ConfigurationItem).filter(
-        models.ConfigurationItem.id == config_id,
-        models.ConfigurationItem.deleted_at.is_(None)
-    ).first()
-    if not item:
+# ============================================================
+# 删除（软删除 Revision）
+# ============================================================
+
+def delete_config_item_revision(db: Session, revision_id: UUID) -> bool:
+    """软删除版本"""
+    revision = get_config_item_revision(db, revision_id)
+    if not revision:
         return False
-    item.deleted_at = func.now()
+    revision.deleted_at = func.now()
     db.commit()
     return True
 
 
 # ============================================================
-# 关联零部件 CRUD
+# 签出
 # ============================================================
 
-def get_config_parts(db: Session, config_id: str) -> List[models.ConfigurationItemPart]:
+def checkout_config_item(
+    db: Session, revision_id: UUID, user_id: UUID,
+) -> Tuple[Optional[models.ConfigurationItemRevision], Optional[str]]:
+    """签出构型项：创建新迭代(+1)，复制上一迭代数据，设置签出锁"""
+    rev = get_config_item_revision(db, revision_id)
+    if not rev:
+        return None, "版本不存在"
+    if rev.status not in ("draft", "frozen"):
+        return None, f"当前状态 {rev.status} 不允许签出"
+    if rev.check_out_user_id:
+        return None, "该版本已被他人签出"
+
+    current_iter = _get_current_iteration(db, revision_id)
+
+    new_iter = models.ConfigurationItemIteration(
+        revision_id=revision_id,
+        iteration=rev.latest_iteration + 1,
+        version_spec=(current_iter.version_spec if current_iter else ""),
+        version_remark=(current_iter.version_remark if current_iter else ""),
+        version_name=(current_iter.version_name if current_iter else ""),
+        document_links=(current_iter.document_links if current_iter else []),
+    )
+    db.add(new_iter)
+    db.flush()
+
+    # 复制当前迭代的关联零部件到新迭代
+    if current_iter:
+        parts = (
+            db.query(models.ConfigurationItemPart)
+            .filter(models.ConfigurationItemPart.iteration_id == current_iter.id)
+            .order_by(models.ConfigurationItemPart.sort_order)
+            .all()
+        )
+        for p in parts:
+            new_part = models.ConfigurationItemPart(
+                iteration_id=new_iter.id,
+                part_type=p.part_type,
+                part_id=p.part_id,
+                is_required=p.is_required,
+                quantity=p.quantity,
+                sort_order=p.sort_order,
+            )
+            db.add(new_part)
+
+        # 复制当前迭代的子构型项关联到新迭代
+        children = (
+            db.query(models.ConfigurationItemChild)
+            .filter(models.ConfigurationItemChild.parent_iteration_id == current_iter.id)
+            .order_by(models.ConfigurationItemChild.sort_order)
+            .all()
+        )
+        for c in children:
+            new_child = models.ConfigurationItemChild(
+                parent_iteration_id=new_iter.id,
+                child_revision_id=c.child_revision_id,
+                is_required=c.is_required,
+                quantity=c.quantity,
+                sort_order=c.sort_order,
+            )
+            db.add(new_child)
+
+    rev.latest_iteration += 1
+    rev.check_out_user_id = user_id
+    rev.check_out_date = func.now()
+    db.commit()
+    db.refresh(rev)
+    return rev, None
+
+
+# ============================================================
+# 签入
+# ============================================================
+
+def checkin_config_item(
+    db: Session, revision_id: UUID, user_id: UUID, note: Optional[str] = None,
+) -> Tuple[Optional[models.ConfigurationItemRevision], Optional[str]]:
+    """签入构型项：记录签入说明，清除签出锁"""
+    rev = get_config_item_revision(db, revision_id)
+    if not rev:
+        return None, "版本不存在"
+    if rev.check_out_user_id is None:
+        return None, "该版本未被签出"
+    if str(rev.check_out_user_id) != str(user_id):
+        return None, "只有签出者本人才能签入"
+
+    iteration = _get_current_iteration(db, revision_id)
+    if iteration:
+        iteration.check_in_note = note
+
+    rev.check_out_user_id = None
+    rev.check_out_date = None
+    db.commit()
+    db.refresh(rev)
+    return rev, None
+
+
+# ============================================================
+# 撤销签出
+# ============================================================
+
+def undocheckout_config_item(
+    db: Session, revision_id: UUID, user_id: UUID,
+) -> Tuple[Optional[models.ConfigurationItemRevision], Optional[str]]:
+    """撤销签出：删除最新迭代，回退 latest_iteration，清除签出锁"""
+    rev = get_config_item_revision(db, revision_id)
+    if not rev:
+        return None, "版本不存在"
+    if rev.check_out_user_id is None:
+        return None, "该版本未被签出"
+    if str(rev.check_out_user_id) != str(user_id):
+        return None, "只有签出者本人才能撤销签出"
+    if rev.latest_iteration <= 1:
+        return None, "至少需保留一个迭代"
+
+    latest_iter = (
+        db.query(models.ConfigurationItemIteration)
+        .filter(
+            models.ConfigurationItemIteration.revision_id == revision_id,
+            models.ConfigurationItemIteration.iteration == rev.latest_iteration,
+        )
+        .first()
+    )
+    if latest_iter:
+        # 删除迭代关联的零部件和子项引用
+        db.query(models.ConfigurationItemPart).filter(
+            models.ConfigurationItemPart.iteration_id == latest_iter.id
+        ).delete(synchronize_session=False)
+        db.query(models.ConfigurationItemChild).filter(
+            models.ConfigurationItemChild.parent_iteration_id == latest_iter.id
+        ).delete(synchronize_session=False)
+        db.delete(latest_iter)
+
+    rev.latest_iteration -= 1
+    rev.check_out_user_id = None
+    rev.check_out_date = None
+    db.commit()
+    db.refresh(rev)
+    return rev, None
+
+
+# ============================================================
+# 强制签入（管理员）
+# ============================================================
+
+def force_checkin_config_item(
+    db: Session, revision_id: UUID,
+) -> Tuple[Optional[models.ConfigurationItemRevision], Optional[str]]:
+    """管理员强制签入：清除签出锁，保留当前迭代"""
+    rev = get_config_item_revision(db, revision_id)
+    if not rev:
+        return None, "版本不存在"
+    if rev.check_out_user_id is None:
+        return None, "该版本未被签出"
+
+    rev.check_out_user_id = None
+    rev.check_out_date = None
+    db.commit()
+    db.refresh(rev)
+    return rev, None
+
+
+# ============================================================
+# 升版
+# ============================================================
+
+def upgrade_config_item(
+    db: Session, revision_id: UUID, user_id: UUID,
+) -> Tuple[Optional[models.ConfigurationItemRevision], Optional[str]]:
+    """升版：创建新版本（B/C/...），复制迭代数据，自动签出"""
+    source_rev = get_config_item_revision(db, revision_id)
+    if not source_rev:
+        return None, "源版本不存在"
+    if source_rev.status not in ("released", "obsolete"):
+        return None, "仅已发布或已作废版本可升版"
+
+    source_iter = _get_current_iteration(db, revision_id)
+
+    new_version = _get_next_version(db, source_rev.master_id)
+    new_rev = models.ConfigurationItemRevision(
+        master_id=source_rev.master_id,
+        version=new_version,
+        status="draft",
+        latest_iteration=1,
+        creator_id=user_id,
+    )
+    db.add(new_rev)
+    db.flush()
+
+    new_iter = models.ConfigurationItemIteration(
+        revision_id=new_rev.id,
+        iteration=1,
+        version_spec=(source_iter.version_spec if source_iter else ""),
+        version_remark=(source_iter.version_remark if source_iter else ""),
+        version_name=(source_iter.version_name if source_iter else ""),
+        document_links=(source_iter.document_links if source_iter else []),
+    )
+    db.add(new_iter)
+    db.flush()
+
+    # 复制源迭代的关联零部件
+    if source_iter:
+        parts = (
+            db.query(models.ConfigurationItemPart)
+            .filter(models.ConfigurationItemPart.iteration_id == source_iter.id)
+            .order_by(models.ConfigurationItemPart.sort_order)
+            .all()
+        )
+        for p in parts:
+            new_part = models.ConfigurationItemPart(
+                iteration_id=new_iter.id,
+                part_type=p.part_type,
+                part_id=p.part_id,
+                is_required=p.is_required,
+                quantity=p.quantity,
+                sort_order=p.sort_order,
+            )
+            db.add(new_part)
+
+        # 复制源迭代的子构型项关联
+        children = (
+            db.query(models.ConfigurationItemChild)
+            .filter(models.ConfigurationItemChild.parent_iteration_id == source_iter.id)
+            .order_by(models.ConfigurationItemChild.sort_order)
+            .all()
+        )
+        for c in children:
+            new_child = models.ConfigurationItemChild(
+                parent_iteration_id=new_iter.id,
+                child_revision_id=c.child_revision_id,
+                is_required=c.is_required,
+                quantity=c.quantity,
+                sort_order=c.sort_order,
+            )
+            db.add(new_child)
+
+    new_rev.check_out_user_id = user_id
+    new_rev.check_out_date = func.now()
+    db.commit()
+    db.refresh(new_rev)
+    return new_rev, None
+
+
+# ============================================================
+# 状态变更
+# ============================================================
+
+def freeze_config_item(
+    db: Session, revision_id: UUID,
+) -> Tuple[Optional[models.ConfigurationItemRevision], Optional[str]]:
+    """冻结构型项版本：draft → frozen"""
+    rev = get_config_item_revision(db, revision_id)
+    if not rev:
+        return None, "版本不存在"
+    if rev.status != "draft":
+        return None, "仅草稿状态可冻结"
+    if rev.check_out_user_id is not None:
+        return None, "版本被签出，请先签入后再冻结"
+    rev.status = "frozen"
+    db.commit()
+    db.refresh(rev)
+    return rev, None
+
+
+def release_config_item(
+    db: Session, revision_id: UUID,
+) -> Tuple[Optional[models.ConfigurationItemRevision], Optional[str]]:
+    """发布构型项版本：draft / frozen → released"""
+    rev = get_config_item_revision(db, revision_id)
+    if not rev:
+        return None, "版本不存在"
+    if rev.status not in ("draft", "frozen"):
+        return None, "仅草稿或冻结状态可发布"
+    if rev.check_out_user_id is not None:
+        return None, "版本被签出，请先签入后再发布"
+    rev.status = "released"
+    db.commit()
+    db.refresh(rev)
+    return rev, None
+
+
+def obsolete_config_item(
+    db: Session, revision_id: UUID,
+) -> Tuple[Optional[models.ConfigurationItemRevision], Optional[str]]:
+    """作废构型项版本：released / frozen → obsolete"""
+    rev = get_config_item_revision(db, revision_id)
+    if not rev:
+        return None, "版本不存在"
+    if rev.status not in ("released", "frozen"):
+        return None, "仅已发布或冻结状态可作废"
+    rev.status = "obsolete"
+    db.commit()
+    db.refresh(rev)
+    return rev, None
+
+
+# ============================================================
+# 向后兼容别名（Task 3 完成后移除）
+# ============================================================
+
+def get_config_item(db: Session, config_id: str) -> Optional[models.ConfigurationItemRevision]:
+    """向后兼容：按 revision_id 获取版本"""
+    return get_config_item_revision(db, UUID(config_id) if isinstance(config_id, str) else config_id)
+
+
+def get_config_item_by_code(db: Session, code: str) -> Optional[models.ConfigurationItemMaster]:
+    """向后兼容：按 code 获取 master"""
+    return get_config_item_master_by_code(db, code)
+
+
+# ============================================================
+# 关联零部件 CRUD（基于 iteration_id）
+# ============================================================
+
+def get_iteration_parts(db: Session, iteration_id: UUID) -> List[models.ConfigurationItemPart]:
+    """获取某迭代关联的全部零部件"""
     return (
         db.query(models.ConfigurationItemPart)
-        .filter(models.ConfigurationItemPart.configuration_item_id == config_id)
-        .order_by(models.ConfigurationItemPart.sort_order).all()
+        .filter(models.ConfigurationItemPart.iteration_id == iteration_id)
+        .order_by(models.ConfigurationItemPart.sort_order)
+        .all()
     )
 
 
-def add_config_parts(db: Session, config_id: str, items: List[schemas.ConfigPartCreate]) -> List[models.ConfigurationItemPart]:
+def add_part_to_iteration(
+    db: Session, iteration_id: UUID, part_type: str, part_id: UUID,
+    is_required: bool = True, quantity: int = 1, sort_order: int = 0,
+) -> models.ConfigurationItemPart:
+    """向迭代添加关联零部件"""
+    part = models.ConfigurationItemPart(
+        iteration_id=iteration_id,
+        part_type=part_type,
+        part_id=part_id,
+        is_required=is_required,
+        quantity=quantity,
+        sort_order=sort_order,
+    )
+    db.add(part)
+    db.commit()
+    db.refresh(part)
+    return part
+
+
+def update_config_part(
+    db: Session, part_id: UUID, data: dict,
+) -> Optional[models.ConfigurationItemPart]:
+    """更新关联零部件字段"""
+    part = db.query(models.ConfigurationItemPart).filter(
+        models.ConfigurationItemPart.id == part_id
+    ).first()
+    if not part:
+        return None
+    for k, v in data.items():
+        if v is not None:
+            setattr(part, k, v)
+    db.commit()
+    db.refresh(part)
+    return part
+
+
+def remove_part_from_iteration(db: Session, link_id: UUID) -> bool:
+    """从迭代中移除关联零部件"""
+    part = db.query(models.ConfigurationItemPart).filter(
+        models.ConfigurationItemPart.id == link_id
+    ).first()
+    if not part:
+        return False
+    db.delete(part)
+    db.commit()
+    return True
+
+
+# 向后兼容别名
+def get_config_parts(db: Session, config_id: str) -> List[models.ConfigurationItemPart]:
+    """向后兼容：config_id 实际为 iteration_id"""
+    return get_iteration_parts(db, UUID(config_id) if isinstance(config_id, str) else config_id)
+
+
+def add_config_parts(
+    db: Session, config_id: str, items: List[schemas.ConfigPartCreate],
+) -> List[models.ConfigurationItemPart]:
+    """向后兼容：config_id 实际为 iteration_id"""
+    iteration_id = UUID(config_id) if isinstance(config_id, str) else config_id
     parts = []
     for it in items:
-        part = models.ConfigurationItemPart(configuration_item_id=config_id, **it.model_dump())
+        part = models.ConfigurationItemPart(
+            iteration_id=iteration_id,
+            part_type=it.part_type,
+            part_id=it.part_id,
+            is_required=it.is_required,
+            quantity=it.quantity,
+            sort_order=it.sort_order,
+        )
         db.add(part)
         parts.append(part)
     db.commit()
@@ -155,42 +773,92 @@ def add_config_parts(db: Session, config_id: str, items: List[schemas.ConfigPart
     return parts
 
 
-def update_config_part(db: Session, part_id: str, data: schemas.ConfigPartUpdate) -> Optional[models.ConfigurationItemPart]:
-    part = db.query(models.ConfigurationItemPart).filter(models.ConfigurationItemPart.id == part_id).first()
-    if not part:
-        return None
-    for k, v in data.model_dump(exclude_unset=True).items():
-        setattr(part, k, v)
-    db.commit()
-    db.refresh(part)
-    return part
-
-
 def remove_config_part(db: Session, part_id: str) -> bool:
-    part = db.query(models.ConfigurationItemPart).filter(models.ConfigurationItemPart.id == part_id).first()
-    if not part:
+    """向后兼容"""
+    return remove_part_from_iteration(db, UUID(part_id) if isinstance(part_id, str) else part_id)
+
+
+# ============================================================
+# 子构型项 CRUD（基于 iteration_id + revision_id）
+# ============================================================
+
+def get_iteration_children(db: Session, iteration_id: UUID) -> List[models.ConfigurationItemChild]:
+    """获取某迭代下全部子构型项"""
+    return (
+        db.query(models.ConfigurationItemChild)
+        .filter(models.ConfigurationItemChild.parent_iteration_id == iteration_id)
+        .order_by(models.ConfigurationItemChild.sort_order)
+        .all()
+    )
+
+
+def add_child_to_iteration(
+    db: Session, parent_iteration_id: UUID, child_revision_id: UUID,
+    is_required: bool = True, quantity: int = 1, sort_order: int = 0,
+) -> models.ConfigurationItemChild:
+    """向迭代添加子构型项"""
+    child = models.ConfigurationItemChild(
+        parent_iteration_id=parent_iteration_id,
+        child_revision_id=child_revision_id,
+        is_required=is_required,
+        quantity=quantity,
+        sort_order=sort_order,
+    )
+    db.add(child)
+    db.commit()
+    db.refresh(child)
+    return child
+
+
+def update_config_child(
+    db: Session, child_id: UUID, data: dict,
+) -> Optional[models.ConfigurationItemChild]:
+    """更新子构型项字段"""
+    child = db.query(models.ConfigurationItemChild).filter(
+        models.ConfigurationItemChild.id == child_id
+    ).first()
+    if not child:
+        return None
+    for k, v in data.items():
+        if v is not None:
+            setattr(child, k, v)
+    db.commit()
+    db.refresh(child)
+    return child
+
+
+def remove_child_from_iteration(db: Session, link_id: UUID) -> bool:
+    """从迭代中移除子构型项"""
+    child = db.query(models.ConfigurationItemChild).filter(
+        models.ConfigurationItemChild.id == link_id
+    ).first()
+    if not child:
         return False
-    db.delete(part)
+    db.delete(child)
     db.commit()
     return True
 
 
-# ============================================================
-# 子构型项 CRUD
-# ============================================================
-
+# 向后兼容别名
 def get_config_children(db: Session, config_id: str) -> List[models.ConfigurationItemChild]:
-    return (
-        db.query(models.ConfigurationItemChild)
-        .filter(models.ConfigurationItemChild.parent_id == config_id)
-        .order_by(models.ConfigurationItemChild.sort_order).all()
-    )
+    """向后兼容：config_id 实际为 iteration_id"""
+    return get_iteration_children(db, UUID(config_id) if isinstance(config_id, str) else config_id)
 
 
-def add_config_children(db: Session, parent_id: str, items: List[schemas.ConfigChildCreate]) -> List[models.ConfigurationItemChild]:
+def add_config_children(
+    db: Session, parent_id: str, items: List[schemas.ConfigChildCreate],
+) -> List[models.ConfigurationItemChild]:
+    """向后兼容：parent_id 实际为 iteration_id"""
+    parent_iteration_id = UUID(parent_id) if isinstance(parent_id, str) else parent_id
     children = []
     for it in items:
-        child = models.ConfigurationItemChild(parent_id=parent_id, **it.model_dump())
+        child = models.ConfigurationItemChild(
+            parent_iteration_id=parent_iteration_id,
+            child_revision_id=it.child_id,
+            is_required=it.is_required,
+            quantity=it.quantity,
+            sort_order=it.sort_order,
+        )
         db.add(child)
         children.append(child)
     db.commit()
@@ -199,36 +867,69 @@ def add_config_children(db: Session, parent_id: str, items: List[schemas.ConfigC
     return children
 
 
-def update_config_child(db: Session, child_id: str, data: schemas.ConfigChildUpdate) -> Optional[models.ConfigurationItemChild]:
-    child = db.query(models.ConfigurationItemChild).filter(models.ConfigurationItemChild.id == child_id).first()
-    if not child:
-        return None
-    for k, v in data.model_dump(exclude_unset=True).items():
-        setattr(child, k, v)
-    db.commit()
-    db.refresh(child)
-    return child
-
-
 def remove_config_child(db: Session, child_id: str) -> bool:
-    child = db.query(models.ConfigurationItemChild).filter(models.ConfigurationItemChild.id == child_id).first()
-    if not child:
-        return False
-    db.delete(child)
+    """向后兼容"""
+    return remove_child_from_iteration(db, UUID(child_id) if isinstance(child_id, str) else child_id)
+
+
+# ============================================================
+# 迭代文档链接操作（JSONB document_links）
+# ============================================================
+
+def add_document_to_iteration(
+    db: Session, iteration_id: UUID, document_id: str, document_name: str = "",
+) -> Optional[models.ConfigurationItemIteration]:
+    """向迭代的 document_links JSONB 数组中追加文档引用"""
+    from sqlalchemy.orm.attributes import flag_modified
+    iteration = _get_iteration(db, iteration_id)
+    if not iteration:
+        return None
+    links = list(iteration.document_links or [])
+    if not any(l.get("document_id") == document_id for l in links):
+        links.append({"document_id": document_id, "document_name": document_name})
+        iteration.document_links = links
+        flag_modified(iteration, "document_links")
+        db.commit()
+        db.refresh(iteration)
+    return iteration
+
+
+def remove_document_from_iteration(
+    db: Session, iteration_id: UUID, document_id: str,
+) -> Optional[models.ConfigurationItemIteration]:
+    """从迭代的 document_links JSONB 数组中移除文档引用"""
+    from sqlalchemy.orm.attributes import flag_modified
+    iteration = _get_iteration(db, iteration_id)
+    if not iteration:
+        return None
+    links = list(iteration.document_links or [])
+    iteration.document_links = [l for l in links if l.get("document_id") != document_id]
+    flag_modified(iteration, "document_links")
     db.commit()
-    return True
+    db.refresh(iteration)
+    return iteration
 
 
 # ============================================================
-# 构型配置 CRUD
+# 构型配置 (Configuration Profile) CRUD
 # ============================================================
 
-def _generate_checklist(db: Session, profile_id: str, config_item_id: str, source_type: str = "direct"):
-    """递归展开构型项，生成配置清单 → 写入工作表"""
+def _generate_checklist(db: Session, profile_id: str, revision_id: str, source_type: str = "direct"):
+    """递归展开构型项（基于 revision→iteration），生成配置清单 → 写入工作表"""
     from app.models_parts import PartMaster
 
+    rev_id = UUID(revision_id) if isinstance(revision_id, str) else revision_id
+    rev = get_config_item_revision(db, rev_id)
+    if not rev:
+        return
+
+    current_iter = _get_current_iteration(db, rev_id)
+    if not current_iter:
+        return
+
+    # 关联零部件
     parts = db.query(models.ConfigurationItemPart).filter(
-        models.ConfigurationItemPart.configuration_item_id == config_item_id
+        models.ConfigurationItemPart.iteration_id == current_iter.id
     ).order_by(models.ConfigurationItemPart.sort_order).all()
 
     for p in parts:
@@ -240,8 +941,9 @@ def _generate_checklist(db: Session, profile_id: str, config_item_id: str, sourc
             item_name = entity.name
 
         item = models.ConfigurationWorkingItem(
-            profile_id=profile_id,
-            source_config_item_id=config_item_id,
+            profile_id=UUID(profile_id) if isinstance(profile_id, str) else profile_id,
+            source_config_item_revision_id=rev_id,
+            source_config_item_iteration_id=current_iter.id,
             item_type=p.part_type,
             item_id=p.part_id,
             item_code=item_code,
@@ -254,12 +956,13 @@ def _generate_checklist(db: Session, profile_id: str, config_item_id: str, sourc
         )
         db.add(item)
 
+    # 子构型项
     children = db.query(models.ConfigurationItemChild).filter(
-        models.ConfigurationItemChild.parent_id == config_item_id
+        models.ConfigurationItemChild.parent_iteration_id == current_iter.id
     ).order_by(models.ConfigurationItemChild.sort_order).all()
 
     for child in children:
-        _generate_checklist(db, profile_id, str(child.child_id), source_type="child")
+        _generate_checklist(db, profile_id, str(child.child_revision_id), source_type="child")
 
 
 def get_profiles(
@@ -298,7 +1001,7 @@ def create_profile(
 ) -> models.ConfigurationProfile:
     profile = models.ConfigurationProfile(
         code=data.code, name=data.name,
-        configuration_item_id=data.configuration_item_id,
+        configuration_item_revision_id=data.configuration_item_id,
         effectivity_start=data.effectivity_start,
         effectivity_end=data.effectivity_end,
         remark=data.remark,
@@ -329,7 +1032,7 @@ def update_profile(
 
     # 处理构型项变更（仅当值变化时才清除并重建工作表）
     new_cfg_id = str(data.configuration_item_id) if data.configuration_item_id else None
-    old_cfg_id = str(profile.configuration_item_id) if profile.configuration_item_id else None
+    old_cfg_id = str(profile.configuration_item_revision_id) if profile.configuration_item_revision_id else None
     if new_cfg_id != old_cfg_id:
         db.query(models.ConfigurationWorkingItem).filter(
             models.ConfigurationWorkingItem.profile_id == profile_id
@@ -337,7 +1040,7 @@ def update_profile(
         db.query(models.ConfigurationProfileItem).filter(
             models.ConfigurationProfileItem.profile_id == profile_id
         ).delete()
-        profile.configuration_item_id = data.configuration_item_id
+        profile.configuration_item_revision_id = data.configuration_item_id
         if data.configuration_item_id:
             _generate_checklist(db, profile_id, str(data.configuration_item_id))
 
@@ -403,7 +1106,8 @@ def sync_working_to_formal(db: Session, profile_id: str):
         if wi.is_selected or wi.is_required:
             formal_item = models.ConfigurationProfileItem(
                 profile_id=wi.profile_id,
-                source_config_item_id=wi.source_config_item_id,
+                source_config_item_revision_id=wi.source_config_item_revision_id,
+                source_config_item_iteration_id=wi.source_config_item_iteration_id,
                 item_type=wi.item_type,
                 item_id=wi.item_id,
                 item_code=wi.item_code,
@@ -424,7 +1128,7 @@ def regenerate_profile_checklist(
     profile = get_profile(db, profile_id)
     if not profile:
         return None
-    if not profile.configuration_item_id:
+    if not profile.configuration_item_revision_id:
         return None
 
     # 清除旧工作表
@@ -432,7 +1136,7 @@ def regenerate_profile_checklist(
         models.ConfigurationWorkingItem.profile_id == profile_id
     ).delete()
     # 重新生成到工作表
-    _generate_checklist(db, profile_id, str(profile.configuration_item_id))
+    _generate_checklist(db, profile_id, str(profile.configuration_item_revision_id))
     db.flush()
     # 同步到正式清单
     sync_working_to_formal(db, profile_id)
@@ -670,7 +1374,6 @@ def add_profile_cc(db, profile, user_id, user_name):
             body=None, target_type="configuration_profile", target_id=profile.id, exclude_sender=True,
         )
     return profile
-
 
 
 def remove_profile_cc(db, profile, user_id):
