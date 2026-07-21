@@ -1,11 +1,8 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { configurationApi, customFieldsApi } from '../../services/api';
-import type { ConfigurationItem } from '../../types';
+import { configurationApi } from '../../services/api';
 import { canEdit, isAdmin, canDownload } from '../../stores/auth';
-import { Modal, ConfirmModal } from '../Modal';
+import { ConfirmModal } from '../Modal';
 import ConfigurationCreateModal from './ConfigurationCreateModal';
-import ConfigurationDetailModal from './ConfigurationDetailModal';
-import { useDataStore } from '../../stores/data';
 import {
   exportConfigurationItems,
   previewConfigurationItemsImport,
@@ -14,26 +11,39 @@ import {
 import type { ImportPreview } from '../../services/importExport';
 import ImportPreviewModal from '../ImportPreviewModal';
 
-export default function ConfigurationList() {
-  const [items, setItems] = useState<ConfigurationItem[]>([]);
-  const [cfValuesMap, setCfValuesMap] = useState<Record<string, Record<string, any>>>({});
+interface ConfigItemRow {
+  revision_id: string;
+  master_id: string;
+  code: string;
+  name: string;
+  spec?: string;
+  remark?: string;
+  version: string;
+  status: string;
+  check_out_user_id?: string;
+  check_out_user_name?: string;
+  check_out_date?: string;
+  latest_iteration: number;
+  creator_id?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface Props {
+  onOpenDetail: (revisionId: string) => void;
+}
+
+export default function ConfigurationList({ onOpenDetail }: Props) {
+  const [items, setItems] = useState<ConfigItemRow[]>([]);
   const [search, setSearch] = useState('');
   const [searchField, setSearchField] = useState('all');
   const [loading, setLoading] = useState(false);
-  // 仅显示顶层构型项（不作为任何其它构型项的子项）。由服务端按父子关系筛选。
   const [topLevelOnly, setTopLevelOnly] = useState(false);
 
-  // 弹窗
   const [createOpen, setCreateOpen] = useState(false);
-  const [editItem, setEditItem] = useState<ConfigurationItem | null>(null);
-  const [detailItem, setDetailItem] = useState<ConfigurationItem | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const storeCustomDefs = useDataStore((s) => s.customFieldDefs);
-  const configCustomDefs = storeCustomDefs.filter((d) => d.applies_to?.includes('configuration_item'));
-
-  // 导入导出
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
   const [importPreviewOpen, setImportPreviewOpen] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
@@ -46,24 +56,32 @@ export default function ConfigurationList() {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await configurationApi.listItems({ page: 1, page_size: PAGE_CAP, top_level: topLevelOnly || undefined });
-      setItems(res.data.items || []);
-      // 批量加载构型项自定义字段值
-      if (configCustomDefs.length > 0) {
-        const itemIds = (res.data.items || []).map((i: ConfigurationItem) => i.id);
-        if (itemIds.length > 0) {
-          customFieldsApi.getValuesBatch({ type: 'configuration_item', ids: itemIds.join(',') }).then(res => {
-            setCfValuesMap(res.data || {});
-          }).catch(() => {});
-        }
-      }
-      setServerTotal(res.data.total ?? (res.data.items || []).length);
+      const result = await configurationApi.list({ page: 1, page_size: PAGE_CAP, top_level: topLevelOnly || undefined });
+      const rawItems = result.items || [];
+      const rows: ConfigItemRow[] = rawItems.map((item: any) => ({
+        revision_id: item.revision_id || item.id,
+        master_id: item.master_id,
+        code: item.code || '',
+        name: item.name || '',
+        spec: item.spec || undefined,
+        remark: item.remark || undefined,
+        version: item.version || '',
+        status: item.status || 'draft',
+        check_out_user_id: item.check_out_user_id,
+        check_out_user_name: item.check_out_user_name,
+        check_out_date: item.check_out_date,
+        latest_iteration: item.latest_iteration || 1,
+        creator_id: item.creator_id,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+      }));
+      setItems(rows);
+      setServerTotal(result.total ?? rawItems.length);
     } catch { } finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, [topLevelOnly]);
 
-  // 客户端筛选
   const filteredData = useMemo(() => {
     if (!search) return items;
     const keyword = search.toLowerCase();
@@ -71,21 +89,7 @@ export default function ConfigurationList() {
 
     return items.filter(item => {
       if (searchField === 'all') {
-        if (match(item.code) || match(item.name) || match(item.spec) || match(item.remark)) return true;
-        const cfVals = cfValuesMap[item.id] || {};
-        return Object.values(cfVals).some(v => {
-          if (v === null || v === undefined) return false;
-          if (Array.isArray(v)) return v.some(s => String(s).toLowerCase().includes(keyword));
-          return String(v).toLowerCase().includes(keyword);
-        });
-      }
-      if (searchField.startsWith('cf_')) {
-        const fieldId = searchField.slice(3);
-        const cfVals = cfValuesMap[item.id] || {};
-        const v = cfVals[fieldId];
-        if (v === null || v === undefined) return false;
-        if (Array.isArray(v)) return v.some(s => String(s).toLowerCase().includes(keyword));
-        return String(v).toLowerCase().includes(keyword);
+        return match(item.code) || match(item.name) || match(item.spec) || match(item.remark);
       }
       if (searchField === 'code') return match(item.code);
       if (searchField === 'name') return match(item.name);
@@ -93,14 +97,13 @@ export default function ConfigurationList() {
       if (searchField === 'remark') return match(item.remark);
       return true;
     });
-  }, [items, search, searchField, cfValuesMap]);
-
+  }, [items, search, searchField]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
     setDeleteError(null);
     try {
-      await configurationApi.deleteItem(deleteId);
+      await configurationApi.delete(deleteId);
       setDeleteId(null);
       load();
     } catch (err: any) {
@@ -152,7 +155,7 @@ export default function ConfigurationList() {
       let msg = `导入成功（新增 ${result.created}，更新 ${result.updated}）`;
       if (result.warnings.length > 0) {
         msg += `\n\n⚠️ ${result.warnings.length} 条告警：\n` + result.warnings.slice(0, 20).join('\n');
-        if (result.warnings.length > 20) msg += `\n… 其余 ${result.warnings.length - 20} 条见控制台`;
+        if (result.warnings.length > 20) msg += `\n... 其余 ${result.warnings.length - 20} 条见控制台`;
       }
       alert(msg);
     } catch (err: any) {
@@ -162,9 +165,25 @@ export default function ConfigurationList() {
     }
   };
 
+  const statusTagLabel = (s: string) => {
+    const map: Record<string, string> = {
+      draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废',
+    };
+    return map[s] || s;
+  };
+
+  const statusTagClass = (s: string) => {
+    const map: Record<string, string> = {
+      draft: 'bg-blue-100 text-blue-800',
+      frozen: 'bg-orange-100 text-orange-800',
+      released: 'bg-green-100 text-green-800',
+      obsolete: 'bg-red-100 text-red-800',
+    };
+    return map[s] || 'bg-gray-100 text-gray-800';
+  };
+
   return (
     <div className="flex-1 min-h-0 flex flex-col">
-      {/* 搜索 + 新建 */}
       <div className="flex gap-2 mb-4 shrink-0">
         <select
           value={searchField}
@@ -176,14 +195,11 @@ export default function ConfigurationList() {
           <option value="name">名称</option>
           <option value="spec">规格型号</option>
           <option value="remark">备注</option>
-          {configCustomDefs.map(def => (
-            <option key={def.id} value={`cf_${def.id}`}>{def.name}</option>
-          ))}
         </select>
         <input
           type="text"
           value={search} onChange={(e) => setSearch(e.target.value)}
-          placeholder={searchField === 'all' ? '搜索全部字段...' : searchField.startsWith('cf_') ? `搜索${configCustomDefs.find(d => d.id === searchField.replace('cf_', ''))?.name || '自定义字段'}...` : `搜索${searchField === 'code' ? '构型号' : searchField === 'name' ? '名称' : searchField === 'spec' ? '规格型号' : '备注'}...`}
+          placeholder={searchField === 'all' ? '搜索全部字段...' : `搜索${searchField === 'code' ? '构型号' : searchField === 'name' ? '名称' : searchField === 'spec' ? '规格型号' : '备注'}...`}
           className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
         <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm whitespace-nowrap" title="只显示没有父项的最顶层构型项">
@@ -210,42 +226,54 @@ export default function ConfigurationList() {
         )}
       </div>
 
-      {/* 数据超过加载上限时提示（避免静默截断） */}
       {serverTotal > items.length && (
         <div className="mb-3 px-4 py-2 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-700">
           共 {serverTotal} 条，当前仅加载前 {items.length} 条。请用上方搜索缩小范围以定位目标构型项。
         </div>
       )}
 
-      {/* 表格（滚动容器，不分页） */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">构型号</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">名称</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">当前版本</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">签出状态</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">备注</th>
               <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
             ) : items.length === 0 ? (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
             ) : filteredData.length === 0 ? (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
             ) : filteredData.map((item) => (
-              <tr key={item.id} onClick={() => setDetailItem(item)} className="hover:bg-gray-50 cursor-pointer">
+              <tr key={item.revision_id} onClick={() => onOpenDetail(item.revision_id)} className="hover:bg-gray-50 cursor-pointer">
                 <td className="px-4 py-3 text-sm font-medium">{item.code}</td>
                 <td className="px-4 py-3 text-sm">{item.name}</td>
+                <td className="px-4 py-3 text-sm">
+                  <span className={`px-2 py-0.5 text-xs rounded-full ${statusTagClass(item.status)}`}>
+                    {item.version} · {statusTagLabel(item.status)}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-sm">
+                  {item.check_out_user_name ? (
+                    <span className="text-xs text-orange-600">{item.check_out_user_name}</span>
+                  ) : (
+                    <span className="text-xs text-gray-400">—</span>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-sm">{item.remark || '-'}</td>
                 <td className="px-4 py-3 text-right text-sm" onClick={(e) => e.stopPropagation()}>
                   {canEdit() && (
-                    <button onClick={(e) => { e.stopPropagation(); setEditItem(item); }} className="text-primary-600 hover:text-primary-800 mr-3">编辑</button>
+                    <button onClick={(e) => { e.stopPropagation(); onOpenDetail(item.revision_id); }} className="text-primary-600 hover:text-primary-800 mr-3">详情</button>
                   )}
                   {isAdmin() && (
-                    <button onClick={(e) => { e.stopPropagation(); setDeleteId(item.id); }} className="text-red-600 hover:text-red-800">删除</button>
+                    <button onClick={(e) => { e.stopPropagation(); setDeleteId(item.revision_id); }} className="text-red-600 hover:text-red-800">删除</button>
                   )}
                 </td>
               </tr>
@@ -254,29 +282,12 @@ export default function ConfigurationList() {
         </table>
       </div>
 
-
-      {/* 新建弹窗 */}
       <ConfigurationCreateModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onSaved={() => { setCreateOpen(false); load(); }}
       />
 
-      {/* 编辑弹窗 */}
-      <ConfigurationCreateModal
-        open={!!editItem}
-        item={editItem || undefined}
-        onClose={() => setEditItem(null)}
-        onSaved={() => { setEditItem(null); load(); }}
-      />
-
-      {/* 详情弹窗 */}
-      <ConfigurationDetailModal
-        itemId={detailItem?.id || null}
-        onClose={() => setDetailItem(null)}
-      />
-
-      {/* 删除确认 */}
       <ConfirmModal
         open={!!deleteId}
         title={deleteError ? "无法删除" : "删除构型项"}
@@ -287,7 +298,6 @@ export default function ConfigurationList() {
         onCancel={() => { setDeleteId(null); setDeleteError(null); }}
       />
 
-      {/* 导入预览弹窗 */}
       <ImportPreviewModal
         open={importPreviewOpen}
         preview={importPreview}

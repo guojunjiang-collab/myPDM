@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import ConfigurationList from '../components/Configuration/ConfigurationList';
 import ProfileList from '../components/Configuration/ProfileList';
+import ConfigItemDetailModal from '../components/Configuration/ConfigItemDetailModal';
 import { useHeaderTabs } from '../hooks/useHeaderTabs';
 import { usePersistedTabState } from '../hooks/usePersistedTabState';
 
@@ -14,10 +16,20 @@ export default function Configuration() {
   const [activeTab, setActiveTab] = usePersistedTabState<TabKey>('effectivity');
   useHeaderTabs(tabs, activeTab, setActiveTab);
 
+  const [selectedRevisionId, setSelectedRevisionId] = useState<string | null>(null);
+
   return (
     <div className="flex flex-col h-full">
-      {activeTab === 'effectivity' && <ConfigurationList />}
+      {activeTab === 'effectivity' && (
+        <ConfigurationList onOpenDetail={setSelectedRevisionId} />
+      )}
       {activeTab === 'single-config' && <ProfileList />}
+
+      <ConfigItemDetailModal
+        revisionId={selectedRevisionId || ''}
+        open={!!selectedRevisionId}
+        onClose={() => setSelectedRevisionId(null)}
+      />
     </div>
   );
 }

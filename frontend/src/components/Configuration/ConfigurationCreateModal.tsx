@@ -158,8 +158,8 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
         await configurationApi.updateItem(item!.id, form);
         configId = item!.id;
       } else {
-        const r = await configurationApi.createItem(form);
-        configId = r.data.id;
+        const r = await configurationApi.create(form);
+        configId = r.id;
       }
       // Save parts
       if (isEdit) {
