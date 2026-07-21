@@ -46,6 +46,7 @@ interface ViewerCanvasProps {
 
 export function ViewerCanvas({ source }: ViewerCanvasProps) {
   const selectNode = useViewerStore((s) => s.selectNode);
+  const measureMode = useViewerStore((s) => s.measureMode);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -65,6 +66,7 @@ export function ViewerCanvas({ source }: ViewerCanvasProps) {
         antialias: false,
         stencil: false,
       }}
+      onPointerMissed={() => { if (measureMode === 'off') selectNode(null); }}
     >
       <LocalEnvironment />
       <ambientLight intensity={0.25} />
