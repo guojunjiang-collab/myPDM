@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { useAuthStore } from '../stores/auth';
-import type { ECRListParams, ECRCreateData, PartMaster } from '../types';
+import type { ECRListParams, ECRCreateData, PartMaster, ConfigurationItemDetail, ConfigurationItemRevision } from '../types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -668,8 +668,6 @@ export const ecoApi = {
 // ──────────────────────────────────────────
 // 构型项管理 API
 // ──────────────────────────────────────────
-
-import type { ConfigurationItemDetail, ConfigurationItemRevision } from '../types';
 
 export const configurationApi = {
   // ── 旧接口（v1.6 兼容，Tasks 5-6 后移除）──
