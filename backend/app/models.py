@@ -45,44 +45,52 @@ class OperationLog(Base):
     ip_address = Column(String(64))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-class Document(Base):
-    """图文档主表"""
-    __tablename__ = "documents"
-    # Unique constraint managed by DB partial index: uix_doc_code_version WHERE deleted_at IS NULL
-    __table_args__ = ()
+class DocumentMaster(Base):
+    """图文档主表（三层模型：Master → Revision → Iteration）"""
+    __tablename__ = "document_masters"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    code = Column(String(64), nullable=False)
+    code = Column(String(64), unique=True, nullable=False)
     name = Column(String(255), nullable=False)
-    version = Column(String(32), default="A")
-    status = Column(String(32), nullable=False, default="draft")
-    remark = Column(Text)
-    file_name = Column(String(255))
-    file_id = Column(UUID(as_uuid=True), ForeignKey('document_attachments.id', ondelete='SET NULL'))
     revisions = Column(JSONB, default=[])
-    revision_parent_id = Column(UUID(as_uuid=True), nullable=True)
     creator_id = Column(UUID(as_uuid=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
-    # 签入签出字段
+
+    doc_revisions = relationship("DocumentRevision", back_populates="master", lazy="dynamic")
+
+
+class DocumentRevision(Base):
+    """图文档版本层"""
+    __tablename__ = "document_revisions"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    master_id = Column(UUID(as_uuid=True), ForeignKey("document_masters.id", ondelete="CASCADE"), nullable=False)
+    version = Column(String(32), nullable=False, default="A")
+    status = Column(String(32), nullable=False, default="draft")
+    remark = Column(Text)
+    revision_parent_id = Column(UUID(as_uuid=True), nullable=True)
     check_out_user_id = Column(UUID(as_uuid=True), nullable=True)
     check_out_date = Column(DateTime(timezone=True), nullable=True)
     latest_iteration = Column(Integer, nullable=False, default=0)
-    
-    iterations = relationship("DocumentIteration", back_populates="document", lazy="dynamic",
-                              order_by="DocumentIteration.iteration")
+    creator_id = Column(UUID(as_uuid=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
+
+    master = relationship("DocumentMaster", back_populates="doc_revisions")
+    doc_iterations = relationship("DocumentIteration", back_populates="revision", lazy="dynamic",
+                                  order_by="DocumentIteration.iteration")
 
 class DocumentIteration(Base):
     """文档迭代（签入签出循环）"""
     __tablename__ = "document_iterations"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    document_id = Column(UUID(as_uuid=True), ForeignKey('documents.id', ondelete='CASCADE'), nullable=False)
+    revision_id = Column(UUID(as_uuid=True), ForeignKey('document_revisions.id', ondelete='CASCADE'), nullable=False)
     iteration = Column(Integer, nullable=False, default=1)
     check_in_date = Column(DateTime(timezone=True), nullable=True)
     check_in_note = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
-    document = relationship("Document", back_populates="iterations")
+    revision = relationship("DocumentRevision", back_populates="doc_iterations")
     attachments = relationship("DocumentAttachment", back_populates="iteration", lazy="dynamic",
                                order_by="DocumentAttachment.created_at")
 
@@ -90,7 +98,7 @@ class DocumentAttachment(Base):
     """图文档独立附件表（文件存储在文件系统）"""
     __tablename__ = "document_attachments"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    document_id = Column(UUID(as_uuid=True), ForeignKey('documents.id', ondelete='CASCADE'), nullable=False)
+    revision_id = Column(UUID(as_uuid=True), ForeignKey('document_revisions.id', ondelete='CASCADE'), nullable=False)
     file_name = Column(String(255))
     file_size = Column(Integer)
     file_path = Column(String(512))  # 文件系统路径
@@ -191,7 +199,7 @@ class UserGroupMember(Base):
 class DocumentGroupLink(Base):
     """文档 ↔ 组（多对多）"""
     __tablename__ = "document_group_links"
-    document_id = Column(UUID(as_uuid=True), ForeignKey('documents.id', ondelete='CASCADE'), primary_key=True)
+    document_id = Column(UUID(as_uuid=True), ForeignKey('document_masters.id', ondelete='CASCADE'), primary_key=True)
     group_id = Column(UUID(as_uuid=True), ForeignKey('user_groups.id', ondelete='CASCADE'), primary_key=True)
 
 

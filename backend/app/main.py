@@ -97,7 +97,7 @@ async def startup_event():
             print("✓ Added column file_hash to document_attachments table")
 
         # 检查并添加 revision_parent_id 列（版本控制）
-        for table_name in ['parts', 'assemblies', 'documents']:
+        for table_name in ['parts', 'assemblies']:
             result = db.execute(text(f"""
                 SELECT column_name 
                 FROM information_schema.columns 
@@ -111,17 +111,6 @@ async def startup_event():
                 except Exception:
                     db.rollback()
                     pass
-
-        # 检查 documents 表是否有 revisions 列
-        result = db.execute(text("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'documents' AND column_name = 'revisions'
-        """))
-        if not result.fetchone():
-            db.execute(text("ALTER TABLE documents ADD COLUMN revisions JSONB DEFAULT '[]'"))
-            db.commit()
-            print("✓ Added column revisions to documents table")
 
         # 检查 configuration_profiles 表是否存在
         result = db.execute(text("""
@@ -441,7 +430,7 @@ async def startup_event():
             print(f"✓ Added column {col} to {tbl} table")
 
         # ── 软删除列迁移 ──
-        for tbl in ["parts", "assemblies", "documents", "bom_items", "ecrs", "ecos"]:
+        for tbl in ["parts", "assemblies", "bom_items", "ecrs", "ecos"]:
             result = db.execute(text(f"""
                 SELECT column_name FROM information_schema.columns
                 WHERE table_name = '{tbl}' AND column_name = 'deleted_at'
@@ -465,9 +454,10 @@ async def startup_event():
             db.commit()
             print("✓ Added column updated_at to bom_items table")
 
+
         # ── 软删除 → 唯一约束改为 partial index ──
-        for tbl in ["parts", "assemblies", "documents"]:
-            idx_name = {"parts": "uix_part_code_version", "assemblies": "uix_assembly_code_version", "documents": "uix_doc_code_version"}[tbl]
+        for tbl in ["parts", "assemblies"]:
+            idx_name = {"parts": "uix_part_code_version", "assemblies": "uix_assembly_code_version"}[tbl]
             try:
                 # 检查是否已经是 partial index
                 result = db.execute(text(f"""
@@ -562,33 +552,6 @@ async def startup_event():
         except Exception as _re:
             db.rollback()
             print(f"⚠ Parent date rollup skipped: {_re}")
-
-        # 图文档签入签出：为 latest_iteration=0 的存量文档补建首个迭代并回填附件
-        try:
-            legacy_docs = db.execute(text(
-                "SELECT id FROM documents WHERE latest_iteration = 0 AND deleted_at IS NULL"
-            )).fetchall()
-            for row in legacy_docs:
-                doc_id = row[0]
-                new_iter_id = db.execute(text("""
-                    INSERT INTO document_iterations (id, document_id, iteration, created_at)
-                    VALUES (gen_random_uuid(), :doc_id, 1, now())
-                    RETURNING id
-                """), {"doc_id": doc_id}).fetchone()[0]
-                db.execute(text("""
-                    UPDATE document_attachments SET iteration_id = :iter_id
-                    WHERE document_id = :doc_id AND iteration_id IS NULL
-                """), {"iter_id": new_iter_id, "doc_id": doc_id})
-                db.execute(text(
-                    "UPDATE documents SET latest_iteration = 1 WHERE id = :doc_id"
-                ), {"doc_id": doc_id})
-            if legacy_docs:
-                db.commit()
-                print(f"✓ Initialized iteration=1 for {len(legacy_docs)} legacy documents")
-        except Exception as _dme:
-            db.rollback()
-            print(f"⚠ Document iteration migration skipped: {_dme}")
-
 
 
         print("✓ Database migration completed successfully")
