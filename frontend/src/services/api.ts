@@ -192,38 +192,79 @@ export const partsApi = {
     api.post(`/parts/revisions/${revisionId}/cad/bom-sync`, { children }).then((r) => r.data),
 };
 
-// 图文档 API
+// 图文档 API（三层模型：Master → Revision → Iteration）
 export const documentsApi = {
-  list: (params?: { page?: number; page_size?: number; keyword?: string; status?: string; brief?: boolean; updated_since?: number }) =>
+  // 列表（返回 raw axios response，调用方自行取 .data）
+  list: (params?: Record<string, any>) =>
     api.get('/documents/', { params }),
-  get: (id: string) => api.get(`/documents/${id}`),
-  create: (data: unknown) => api.post('/documents/', data),
-  update: (id: string, data: unknown) => api.put(`/documents/${id}`, data),
-  delete: (id: string) => api.delete(`/documents/${id}`),
-  upgrade: (id: string, note?: string) => api.post(`/documents/${id}/upgrade`, { note }),
-  versions: (id: string) => api.get(`/documents/${id}/versions`),
-  // 签入签出
-  checkout: (docId: string) => api.post(`/documents/${docId}/checkout`),
-  checkin: (docId: string, note?: string) =>
-    api.post(`/documents/${docId}/checkin`, null, { params: note ? { note } : {} }),
-  undocheckout: (docId: string) => api.post(`/documents/${docId}/undo-checkout`),
-  forceCheckin: (docId: string) => api.post(`/documents/${docId}/force-checkin`),
-  iterations: (docId: string) => api.get(`/documents/${docId}/iterations`),
-  deleteIteration: (docId: string, iterationId: string) => api.delete(`/documents/${docId}/iterations/${iterationId}`),
+
+  // 创建（自动生成 Master + Revision(A) + Iteration(1) + 签出）
+  create: (data: { code: string; name: string; remark?: string; group_ids?: string[] }) =>
+    api.post('/documents/', data),
+
+  // 详情（以 revision_id 为主键）
+  detail: (revisionId: string) =>
+    api.get(`/documents/${revisionId}`),
+
+  // 更新（签出后编辑）
+  update: (revisionId: string, data: { code?: string; name?: string; remark?: string; group_ids?: string[] }) =>
+    api.put(`/documents/${revisionId}`, data),
+
+  // 删除（软删除版本，含引用检查）
+  del: (revisionId: string) =>
+    api.delete(`/documents/${revisionId}`),
+
+  // 签出/签入
+  checkout: (revisionId: string) =>
+    api.post(`/documents/${revisionId}/checkout`),
+  checkin: (revisionId: string, note?: string) =>
+    api.post(`/documents/${revisionId}/checkin`, null, { params: note ? { note } : {} }),
+  undocheckout: (revisionId: string) =>
+    api.post(`/documents/${revisionId}/undocheckout`),
+  forceCheckin: (revisionId: string) =>
+    api.post(`/documents/${revisionId}/force-checkin`),
+
+  // 升版（自动生成下一版本 revision + iteration 1 + 签出）
+  upgrade: (revisionId: string, note?: string) =>
+    api.post(`/documents/${revisionId}/upgrade`, { note }),
+
   // 状态变更
-  freeze: (docId: string) => api.post(`/documents/${docId}/freeze`),
-  unfreeze: (docId: string) => api.post(`/documents/${docId}/unfreeze`),
-  release: (docId: string) => api.post(`/documents/${docId}/release`),
-  obsolete: (docId: string) => api.post(`/documents/${docId}/obsolete`),
-  // 图文档附件
-  uploadAttachment: (docId: string, data: { id?: string; file_name: string; file_data: string }) =>
-    api.post(`/documents/${docId}/attachments`, data),
-  listAttachments: (docId: string, iterationId?: string) =>
-    api.get(`/documents/${docId}/attachments/`, { params: iterationId ? { iteration_id: iterationId } : {} }),
-  getAttachment: (docId: string, attId: string) => api.get(`/documents/${docId}/attachments/${attId}`),
-  deleteAttachment: (docId: string, attId: string) => api.delete(`/documents/${docId}/attachments/${attId}`),
-  /** 图文档反查：查询引用该文档的零件、部件和用户看板 */
-  references: (docId: string) => api.get(`/documents/${docId}/references`),
+  freeze: (revisionId: string) =>
+    api.post(`/documents/${revisionId}/freeze`),
+  release: (revisionId: string) =>
+    api.post(`/documents/${revisionId}/release`),
+  obsolete: (revisionId: string) =>
+    api.post(`/documents/${revisionId}/obsolete`),
+
+  // 版本历史 + 迭代
+  versions: (revisionId: string) =>
+    api.get(`/documents/${revisionId}/versions`),
+  iterations: (revisionId: string) =>
+    api.get(`/documents/${revisionId}/iterations`),
+  deleteIteration: (revisionId: string, iterationId: string) =>
+    api.delete(`/documents/${revisionId}/iterations/${iterationId}`),
+
+  // 附件（base64 上传/列表/下载/删除）
+  uploadAttachment: (revisionId: string, data: { id?: string; file_name: string; file_data: string }) =>
+    api.post(`/documents/${revisionId}/attachments`, data),
+  listAttachments: (revisionId: string, iterationId?: string) =>
+    api.get(`/documents/${revisionId}/attachments/`, { params: iterationId ? { iteration_id: iterationId } : {} }),
+  getAttachment: (revisionId: string, attId: string) =>
+    api.get(`/documents/${revisionId}/attachments/${attId}`),
+  deleteAttachment: (revisionId: string, attId: string) =>
+    api.delete(`/documents/${revisionId}/attachments/${attId}`),
+
+  // 反查
+  references: (revisionId: string) =>
+    api.get(`/documents/${revisionId}/references`),
+
+  // ===== 向后兼容别名（Tasks 6-7 逐步迁移到 detail/del 等新名称） =====
+  /** @deprecated 使用 detail() */
+  get: function(revisionId: string) { return api.get(`/documents/${revisionId}`); },
+  /** @deprecated 使用 del() */
+  delete: function(revisionId: string) { return api.delete(`/documents/${revisionId}`); },
+  /** @deprecated 后端不再支持 unfreeze，仅用于过渡期 */
+  unfreeze: function(revisionId: string) { return api.post(`/documents/${revisionId}/unfreeze`); },
 };
 
 // BOM API
@@ -699,11 +740,11 @@ export const configurationApi = {
   // ── 三层模型接口（v1.7）──
   list: (params?: Record<string, any>) =>
     api.get<{ items: ConfigurationItemRevision[]; total: number }>('/configurations/items', { params }).then(r => r.data),
-  create: (data: { code: string; name: string; spec?: string; remark?: string }) =>
+  create: (data: { code: string; name: string }) =>
     api.post<{ id: string; master_id: string; version: string }>('/configurations/items', data).then(r => r.data),
   detail: (revisionId: string) =>
     api.get<ConfigurationItemDetail>(`/configurations/items/${revisionId}`).then(r => r.data),
-  update: (revisionId: string, data: { spec?: string; remark?: string; name?: string }) =>
+  update: (revisionId: string, data: { remark?: string; name?: string }) =>
     api.put(`/configurations/items/${revisionId}`, data).then(r => r.data),
   delete: (revisionId: string) =>
     api.delete(`/configurations/items/${revisionId}`).then(r => r.data),
@@ -725,8 +766,12 @@ export const configurationApi = {
     api.post(`/configurations/items/${revisionId}/obsolete`).then(r => r.data),
   versions: (revisionId: string) =>
     api.get<ConfigurationItemRevision[]>(`/configurations/items/${revisionId}/versions`).then(r => r.data),
-  updateMaster: (masterId: string, data: { code?: string; name?: string; spec?: string }) =>
+  updateMaster: (masterId: string, data: { code?: string; name?: string }) =>
     api.patch(`/configurations/items/${masterId}/master`, data).then(r => r.data),
+  iterations: (revisionId: string) =>
+    api.get<any[]>(`/configurations/items/${revisionId}/iterations`).then(r => r.data),
+  deleteIteration: (revisionId: string, iterationId: string) =>
+    api.delete(`/configurations/items/${revisionId}/iterations/${iterationId}`).then(r => r.data),
 };
 
 export interface ConfigPreviewTreeNode {

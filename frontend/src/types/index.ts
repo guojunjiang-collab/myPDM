@@ -163,31 +163,54 @@ export interface CascadeResult {
   failed_items: { revision_id: string; version?: string; reason: string }[];
 }
 
-export interface Document {
+// ===== 图文档三层模型类型 =====
+
+export type DocumentStatus = 'draft' | 'frozen' | 'released' | 'obsolete';
+
+export interface DocumentMaster {
   id: string;
   code: string;
   name: string;
-  version?: string;
-  status: 'draft' | 'frozen' | 'released' | 'obsolete';
-  remark?: string;
-  file_name?: string;
-  file_id?: string;
-  revision_parent_id?: string;
+  revisions?: string[];
   creator_id?: string;
-  creator_name?: string;
-  accessible?: boolean;
-  group_ids?: string[];
   created_at?: string;
   updated_at?: string;
-  deleted_at?: string | null;
+}
+
+export interface DocumentRevision {
+  id: string;
+  master_id: string;
+  code: string;
+  name: string;
+  version: string;
+  status: DocumentStatus;
+  remark?: string;
   check_out_user_id?: string | null;
   check_out_user_name?: string | null;
   check_out_date?: string | null;
-  latest_iteration?: number;
+  latest_iteration: number;
+  iteration_count?: number;
+  revision_parent_id?: string | null;
+  creator_id?: string;
+  creator_name?: string;
+  file_name?: string;
+  file_id?: string;
+  file_size?: number;
+  group_ids?: string[];
+  group_names?: string[];
+  accessible?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
 }
+
+/** @deprecated 使用 DocumentRevision 替代（三层模型：Master → Revision → Iteration） */
+export type Document = DocumentRevision;
 
 export interface DocumentAttachmentBrief {
   id: string;
+  revision_id?: string;
+  iteration_id?: string;
   file_name: string;
   file_size: number;
   file_path?: string;
@@ -196,16 +219,17 @@ export interface DocumentAttachmentBrief {
 
 export interface DocumentIteration {
   id: string;
+  revision_id: string;
   iteration: number;
   check_in_date?: string | null;
   check_in_note?: string | null;
   created_at?: string | null;
-  attachments: DocumentAttachmentBrief[];
+  attachments?: DocumentAttachmentBrief[];
 }
 
 export interface DocumentAttachment {
   id: string;
-  document_id: string;
+  revision_id: string;
   file_name?: string;
   file_size?: number;
   created_at?: string;
@@ -268,12 +292,12 @@ export interface CustomFieldDef {
   status: 'active' | 'disabled';
 }
 
-/** 实体-图文档关联记录 */
+/** 实体-图文档关联记录（document_id 在文档三层模型中实际为 revision_id） */
 export interface EntityDocument {
   id: string;
   entity_type: string;
   entity_id: string;
-  document_id: string;
+  document_id: string;    // 即 document_revision_id
   category?: string;
   sort_order: number;
   created_at: string;
@@ -484,6 +508,7 @@ export interface ECRStatusLog {
   created_at: string;
 }
 
+/** document_id 在文档三层模型中实际为 document_revision_id */
 export interface ECRDocumentLink {
   document_id: string;
   document_code: string;
@@ -716,8 +741,6 @@ export interface ConfigurationItemMaster {
   id: string;
   code: string;
   name: string;
-  spec?: string;
-  remark?: string;
   creator_id?: string;
   created_at?: string;
   updated_at?: string;
@@ -726,9 +749,8 @@ export interface ConfigurationItemMaster {
 export interface ConfigurationItemRevision {
   id: string;
   master_id: string;
-  code?: string;      // joined from master in list response
-  name?: string;      // joined from master in list response
-  spec?: string;      // joined from master in list response
+  code?: string;
+  name?: string;
   version: string;
   status: 'draft' | 'frozen' | 'released' | 'obsolete';
   check_out_user_id?: string;
@@ -743,9 +765,8 @@ export interface ConfigurationItemDetail {
   master: ConfigurationItemMaster;
   revision: ConfigurationItemRevision & {
     iteration_id: string;
-    spec?: string;
-    remark?: string;
     name?: string;
+    remark?: string;
     document_links?: any[];
   };
   parts: ConfigPartItem[];
@@ -910,77 +931,8 @@ export interface AssemblyBrief {
   deleted_at?: string | null;
 }
 
-export interface DocumentBrief {
-  id: string;
-  code: string;
-  name: string;
-  version?: string;
-  status: 'draft' | 'frozen' | 'released' | 'obsolete';
-  remark?: string;
-  file_name?: string;
-  file_id?: string;
-  accessible?: boolean;
-  group_ids?: string[];
-  created_at?: string;
-  updated_at?: string;
-  deleted_at?: string | null;
-}
-
-export interface AssemblyBrief {
-  id: string;
-  code: string;
-  name: string;
-  spec?: string;
-  version?: string;
-  status: 'draft' | 'frozen' | 'released' | 'obsolete';
-  remark?: string;
-  created_at?: string;
-  updated_at?: string;
-  deleted_at?: string | null;
-}
-
-export interface DocumentBrief {
-  id: string;
-  code: string;
-  name: string;
-  version?: string;
-  status: 'draft' | 'frozen' | 'released' | 'obsolete';
-  remark?: string;
-  file_name?: string;
-  file_id?: string;
-  accessible?: boolean;
-  group_ids?: string[];
-  created_at?: string;
-  updated_at?: string;
-  deleted_at?: string | null;
-}
-
-export interface AssemblyBrief {
-  id: string;
-  code: string;
-  name: string;
-  spec?: string;
-  version?: string;
-  status: 'draft' | 'frozen' | 'released' | 'obsolete';
-  remark?: string;
-  created_at?: string;
-  updated_at?: string;
-  deleted_at?: string | null;
-}
-
-export interface DocumentBrief {
-  id: string;
-  code: string;
-  name: string;
-  version?: string;
-  status: 'draft' | 'frozen' | 'released' | 'obsolete';
-  remark?: string;
-  file_name?: string;
-  file_id?: string;
-  created_at?: string;
-  updated_at?: string;
-  deleted_at?: string | null;
-}
+/** 图文档简要信息（列表/同步用），等于 DocumentRevision */
+export type DocumentBrief = DocumentRevision;
 
 export interface BOMItemBrief {
   id: string;
