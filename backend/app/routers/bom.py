@@ -157,7 +157,6 @@ async def get_bom_trace(
                 "master_id": str(parent_master.id),
                 "code": parent_master.code,
                 "name": parent_master.name,
-                "spec": parent_master.spec or "",
                 "version": parent_rev.version,
                 "status": parent_rev.status,
             }

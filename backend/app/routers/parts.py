@@ -589,7 +589,6 @@ def _build_master_response(db: Session, master) -> dict:
         "id": str(master.id),
         "code": master.code,
         "name": master.name,
-        "spec": master.spec,
         "type": dynamic_type,
         "creator_id": str(master.creator_id) if master.creator_id else None,
         "created_at": master.created_at.isoformat() if master.created_at else None,

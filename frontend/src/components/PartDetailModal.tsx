@@ -49,7 +49,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const [cfDefs, setCfDefs] = useState<any[]>([]);
   const [editRemark, setEditRemark] = useState('');
   const [cfEditValues, setCfEditValues] = useState<Record<string, any>>({});
-  const [editMaster, setEditMaster] = useState({ code: '', name: '', spec: '' });
+  const [editMaster, setEditMaster] = useState({ code: '', name: '' });
   const [hasBomChildren, setHasBomChildren] = useState(false);
   const [bomPickerOpen, setBomPickerOpen] = useState(false);
   const [nestedPickerRevId, setNestedPickerRevId] = useState<string | null>(null);
@@ -154,7 +154,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
     try {
       const m = await partsApi.get(masterId);
       setMaster(m);
-      setEditMaster({ code: m.code || '', name: m.name || '', spec: m.spec || '' });
+      setEditMaster({ code: m.code || '', name: m.name || '' });
       const revId = internalRevisionId || propRevisionId || (m.latest_revision?.id);
       if (revId) {
         if (!internalRevisionId) setInternalRevisionId(revId);
@@ -529,7 +529,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
           <div className="text-gray-400 text-sm py-8 text-center">加载失败</div>
         ) : (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0 mb-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 shrink-0 mb-3">
               {canEdit ? (
                 <>
                   <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
@@ -542,12 +542,6 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                     <div className="text-xs text-gray-500 mb-0.5">名称</div>
                     <input type="text" value={editMaster.name}
                       onChange={(e) => { setEditMaster(p => ({...p, name: e.target.value})); autoSaveMaster({name: e.target.value}); }}
-                      className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" />
-                  </div>
-                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                    <div className="text-xs text-gray-500 mb-0.5">规格</div>
-                    <input type="text" value={editMaster.spec}
-                      onChange={(e) => { setEditMaster(p => ({...p, spec: e.target.value})); autoSaveMaster({spec: e.target.value}); }}
                       className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" />
                   </div>
                   <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
@@ -564,10 +558,6 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                   <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                     <div className="text-xs text-gray-500 mb-0.5">名称</div>
                     <div className="text-sm text-gray-900 font-medium">{master?.name}</div>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                    <div className="text-xs text-gray-500 mb-0.5">规格</div>
-                    <div className="text-sm text-gray-900 font-medium">{master?.spec || '—'}</div>
                   </div>
                   <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                     <div className="text-xs text-gray-500 mb-0.5">类型</div>

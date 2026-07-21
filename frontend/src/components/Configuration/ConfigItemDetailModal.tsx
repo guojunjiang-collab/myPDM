@@ -188,17 +188,17 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
         <td className="px-3 py-2 text-center">{c.child_detail?.check_out_user_name ? (<span className="text-xs text-orange-600">{c.child_detail.check_out_user_name}</span>) : (<span className="text-xs text-gray-400">—</span>)}</td>
         <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
           {canEdit ? (
-            <button onClick={async () => { try { await configurationApi.updateChild(parentRevisionId, c.id, { is_required: !c.is_required }); setChildren(prev => prev.map(x => x.id === c.id ? { ...x, is_required: !x.is_required } : x)); } catch {} }} className={`text-xs px-2 py-0.5 rounded ${c.is_required ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>{c.is_required ? '必选' : '可选'}</button>
+            <button onClick={async () => { try { await configurationApi.updateChild(parentRevisionId, c.id, { is_required: !c.is_required }); if (level === 1) { setChildren(prev => prev.map(x => x.id === c.id ? { ...x, is_required: !x.is_required } : x)); } else { setSubChildren(prev => { const s = { ...prev }; s[parentRevisionId] = (s[parentRevisionId] || []).map((x: any) => x.id === c.id ? { ...x, is_required: !x.is_required } : x); return s; }); } } catch {} }} className={`text-xs px-2 py-0.5 rounded ${c.is_required ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>{c.is_required ? '必选' : '可选'}</button>
           ) : (<span className={`text-xs ${c.is_required ? 'text-green-600' : 'text-gray-400'}`}>{c.is_required ? '必选' : '可选'}</span>)}
         </td>
         <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
-          {canEdit ? (<input type="number" min={1} defaultValue={c.quantity || 1} className="w-14 text-xs px-1 py-0.5 border border-gray-200 rounded text-center" onBlur={async (e) => { const val = parseInt(e.target.value) || 1; if (val === c.quantity) return; try { await configurationApi.updateChild(parentRevisionId, c.id, { quantity: val }); setChildren(prev => prev.map(x => x.id === c.id ? { ...x, quantity: val } : x)); } catch {} }} />) : (c.quantity || 1)}
+          {canEdit ? (<input type="number" min={1} defaultValue={c.quantity || 1} className="w-14 text-xs px-1 py-0.5 border border-gray-200 rounded text-center" onBlur={async (e) => { const val = parseInt(e.target.value) || 1; if (val === c.quantity) return; try { await configurationApi.updateChild(parentRevisionId, c.id, { quantity: val }); if (level === 1) { setChildren(prev => prev.map(x => x.id === c.id ? { ...x, quantity: val } : x)); } else { setSubChildren(prev => { const s = { ...prev }; s[parentRevisionId] = (s[parentRevisionId] || []).map((x: any) => x.id === c.id ? { ...x, quantity: val } : x); return s; }); } } catch {} }} />) : (c.quantity || 1)}
         </td>
         {canEdit && (
           <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2">
               <button onClick={() => { setPickerParentId(revId); setCfgPickerOpen(true); }} className="text-primary-600 hover:text-primary-800 text-xs">+子项</button>
-              <button onClick={async () => { if (!confirm('确定移除此子构型项？')) return; try { await configurationApi.removeChild(parentRevisionId, c.id); setChildren(prev => prev.filter(x => x.id !== c.id)); } catch {} }} className="text-red-500 hover:text-red-700 text-xs">移除</button>
+              <button onClick={async () => { if (!confirm('确定移除此子构型项？')) return; try { await configurationApi.removeChild(parentRevisionId, c.id); setSubChildren(prev => { const s = { ...prev }; delete s[parentRevisionId]; return s; }); loadDetail(); } catch {} }} className="text-red-500 hover:text-red-700 text-xs">移除</button>
             </div>
           </td>
         )}

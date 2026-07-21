@@ -590,10 +590,16 @@ async def update_config_item_master(
     db: Session = Depends(get_db),
     current_user=Depends(require_permission("configuration:update")),
 ):
-    """更新构型项主数据字段（code/name）"""
+    """更新构型项主数据字段（code/name，需签出）"""
     rev = crud.get_config_item_revision(db, UUID(revision_id))
     if not rev:
         raise HTTPException(status_code=404, detail="构型项版本不存在")
+
+    # 签出校验
+    if rev.check_out_user_id is None:
+        raise HTTPException(status_code=423, detail="请先签出后再编辑")
+    if str(rev.check_out_user_id) != str(current_user.id):
+        raise HTTPException(status_code=423, detail="该版本已被他人签出，无法编辑")
 
     update_dict = data.model_dump(exclude_none=True)
     master = crud.update_config_item_master(db, rev.master_id, update_dict)
@@ -666,6 +672,12 @@ async def remove_part(
     current_user=Depends(require_permission("configuration.item:manage")),
 ):
     """移除关联零部件"""
+    result = crud.get_config_item_revision_with_iteration(db, UUID(revision_id))
+    if not result or not result[1]:
+        raise HTTPException(status_code=404, detail="构型项版本不存在")
+    revision, _ = result
+    if revision.check_out_user_id is None or str(revision.check_out_user_id) != str(current_user.id):
+        raise HTTPException(status_code=423, detail="请先签出后再编辑零部件")
     if not crud.remove_config_part(db, part_id):
         raise HTTPException(status_code=404, detail="关联关系不存在")
     return {"detail": "ok"}
@@ -739,7 +751,13 @@ async def update_child(
     revision_id: str, child_id: str, data: schemas.ConfigChildUpdate, db: Session = Depends(get_db),
     current_user=Depends(require_permission("configuration.item:manage")),
 ):
-    """更新子构型项属性"""
+    """更新子构型项属性（需签出）"""
+    result = crud.get_config_item_revision_with_iteration(db, UUID(revision_id))
+    if not result or not result[1]:
+        raise HTTPException(status_code=404, detail="构型项版本不存在")
+    revision, _ = result
+    if revision.check_out_user_id is None or str(revision.check_out_user_id) != str(current_user.id):
+        raise HTTPException(status_code=423, detail="请先签出后再编辑子构型项")
     child = crud.update_config_child(db, UUID(child_id), data.model_dump(exclude_none=True))
     if not child:
         raise HTTPException(status_code=404, detail="子构型项关系不存在")
@@ -751,7 +769,13 @@ async def remove_child(
     revision_id: str, child_id: str, db: Session = Depends(get_db),
     current_user=Depends(require_permission("configuration.item:manage")),
 ):
-    """移除子构型项"""
+    """移除子构型项（需签出）"""
+    result = crud.get_config_item_revision_with_iteration(db, UUID(revision_id))
+    if not result or not result[1]:
+        raise HTTPException(status_code=404, detail="构型项版本不存在")
+    revision, _ = result
+    if revision.check_out_user_id is None or str(revision.check_out_user_id) != str(current_user.id):
+        raise HTTPException(status_code=423, detail="请先签出后再编辑子构型项")
     if not crud.remove_config_child(db, child_id):
         raise HTTPException(status_code=404, detail="子构型项关系不存在")
     return {"detail": "ok"}
@@ -864,6 +888,9 @@ async def add_config_document(
     revision, iteration = result
     if not iteration:
         raise HTTPException(status_code=400, detail="当前迭代不存在")
+    # 签出校验
+    if revision.check_out_user_id is None or str(revision.check_out_user_id) != str(current_user.id):
+        raise HTTPException(status_code=423, detail="请先签出后再关联图文档")
 
     link_id = str(body.id) if body.id else str(uuid.uuid4())
     link = {
@@ -895,11 +922,14 @@ async def update_config_document(
     result = crud.get_config_item_revision_with_iteration(db, UUID(revision_id))
     if not result:
         raise HTTPException(status_code=404, detail="构型项版本不存在")
-    _, iteration = result
+    revision, iteration = result
     if not iteration:
         raise HTTPException(status_code=404, detail="当前迭代不存在")
+    # 签出校验
+    if revision.check_out_user_id is None or str(revision.check_out_user_id) != str(current_user.id):
+        raise HTTPException(status_code=423, detail="请先签出后再编辑关联图文档")
     links = list(iteration.document_links or [])
-    found = False
+    found = false
     for link in links:
         if link.get("id") == link_id:
             if body.category is not None:
@@ -925,9 +955,12 @@ async def remove_config_document(
     result = crud.get_config_item_revision_with_iteration(db, UUID(revision_id))
     if not result:
         raise HTTPException(status_code=404, detail="构型项版本不存在")
-    _, iteration = result
+    revision, iteration = result
     if not iteration:
         raise HTTPException(status_code=404, detail="当前迭代不存在")
+    # 签出校验
+    if revision.check_out_user_id is None or str(revision.check_out_user_id) != str(current_user.id):
+        raise HTTPException(status_code=423, detail="请先签出后再编辑关联图文档")
     links = list(iteration.document_links or [])
     new_links = [l for l in links if l.get("id") != link_id]
     if len(new_links) == len(links):
