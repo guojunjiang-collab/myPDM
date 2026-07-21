@@ -710,6 +710,47 @@ export interface ConfigurationItem {
   updated_at?: string;
 }
 
+// ── 三层模型（v1.7）──
+
+export interface ConfigurationItemMaster {
+  id: string;
+  code: string;
+  name: string;
+  spec?: string;
+  remark?: string;
+  creator_id?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ConfigurationItemRevision {
+  id: string;
+  master_id: string;
+  version: string;
+  status: 'draft' | 'frozen' | 'released' | 'obsolete';
+  check_out_user_id?: string;
+  check_out_user_name?: string;
+  check_out_date?: string;
+  latest_iteration: number;
+  creator_id?: string;
+  created_at?: string;
+}
+
+export interface ConfigurationItemDetail {
+  master: ConfigurationItemMaster;
+  revision: ConfigurationItemRevision & {
+    iteration_id: string;
+    spec?: string;
+    remark?: string;
+    name?: string;
+    document_links?: any[];
+  };
+  parts: ConfigPartItem[];
+  children: ConfigChildItem[];
+  documents: any[];
+  versions: ConfigurationItemRevision[];
+}
+
 export interface ConfigPartItem {
   id: string;
   configuration_item_id: string;

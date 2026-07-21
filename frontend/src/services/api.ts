@@ -669,7 +669,10 @@ export const ecoApi = {
 // 构型项管理 API
 // ──────────────────────────────────────────
 
+import type { ConfigurationItemDetail, ConfigurationItemRevision } from '../types';
+
 export const configurationApi = {
+  // ── 旧接口（v1.6 兼容，Tasks 5-6 后移除）──
   listItems: (params?: any) =>
     api.get('/configurations/items', { params }),
   getItem: (id: string) =>
@@ -694,6 +697,38 @@ export const configurationApi = {
     api.put(`/configurations/items/${id}/children/${childId}`, data),
   removeChild: (id: string, childId: string) =>
     api.delete(`/configurations/items/${id}/children/${childId}`),
+
+  // ── 三层模型接口（v1.7）──
+  list: (params?: Record<string, any>) =>
+    api.get<{ items: ConfigurationItemRevision[]; total: number }>('/configurations/items', { params }).then(r => r.data),
+  create: (data: { code: string; name: string; spec?: string; remark?: string }) =>
+    api.post<{ id: string; master_id: string; version: string }>('/configurations/items', data).then(r => r.data),
+  detail: (revisionId: string) =>
+    api.get<ConfigurationItemDetail>(`/configurations/items/${revisionId}`).then(r => r.data),
+  update: (revisionId: string, data: { spec?: string; remark?: string; name?: string }) =>
+    api.put(`/configurations/items/${revisionId}`, data).then(r => r.data),
+  delete: (revisionId: string) =>
+    api.delete(`/configurations/items/${revisionId}`).then(r => r.data),
+  checkout: (revisionId: string) =>
+    api.post(`/configurations/items/${revisionId}/checkout`).then(r => r.data),
+  checkin: (revisionId: string, note: string) =>
+    api.post(`/configurations/items/${revisionId}/checkin`, { check_in_note: note }).then(r => r.data),
+  undocheckout: (revisionId: string) =>
+    api.post(`/configurations/items/${revisionId}/undocheckout`).then(r => r.data),
+  forceCheckin: (revisionId: string) =>
+    api.post(`/configurations/items/${revisionId}/force-checkin`).then(r => r.data),
+  upgrade: (revisionId: string) =>
+    api.post(`/configurations/items/${revisionId}/upgrade`).then(r => r.data),
+  freeze: (revisionId: string) =>
+    api.post(`/configurations/items/${revisionId}/freeze`).then(r => r.data),
+  release: (revisionId: string) =>
+    api.post(`/configurations/items/${revisionId}/release`).then(r => r.data),
+  obsolete: (revisionId: string) =>
+    api.post(`/configurations/items/${revisionId}/obsolete`).then(r => r.data),
+  versions: (revisionId: string) =>
+    api.get<ConfigurationItemRevision[]>(`/configurations/items/${revisionId}/versions`).then(r => r.data),
+  updateMaster: (masterId: string, data: { code?: string; name?: string; spec?: string }) =>
+    api.patch(`/configurations/items/${masterId}/master`, data).then(r => r.data),
 };
 
 export interface ConfigPreviewTreeNode {
