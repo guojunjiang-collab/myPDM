@@ -1761,8 +1761,6 @@ export async function previewDocumentsImport(dirHandle?: FileSystemDirectoryHand
       _data: {
         code,
         name,
-        version,
-        status: existing ? existing.status : statusFromZh(String(raw['状态'] || '')),
         remark: String(raw['备注'] || ''),
       } as Record<string, unknown>,
       _customFields: customFields,
@@ -1815,7 +1813,8 @@ export async function executeDocumentsImport(preview: ImportPreview): Promise<vo
           }
         }
       } else {
-        const res = await documentsApi.create(data);
+        const createData = { code: String(data.code || ''), name: String(data.name || ''), remark: data.remark ? String(data.remark) : undefined };
+        const res = await documentsApi.create(createData);
         docId = res.data.id;
 
         if (row._customFields && Object.keys(row._customFields).length > 0) {
@@ -3647,7 +3646,7 @@ export async function executeConfigurationItemsImport(preview: ImportPreview): P
       }
 
       // 解析子构型号→子构型项 id
-      const childrenToAdd: { child_id: string; is_required: boolean; quantity: number }[] = [];
+      const childrenToAdd: { child_revision_id: string; is_required: boolean; quantity: number }[] = [];
       for (const c of children) {
         const childCode = c.child_code as string;
         const childId = codeToId.get(childCode);
@@ -3656,7 +3655,7 @@ export async function executeConfigurationItemsImport(preview: ImportPreview): P
           console.warn(`构型项 ${row.code} 子构型项未找到，跳过: ${childCode}`);
           continue;
         }
-        childrenToAdd.push({ child_id: childId, is_required: c.is_required as boolean, quantity: (c.quantity as number) ?? 1 });
+        childrenToAdd.push({ child_revision_id: childId, is_required: c.is_required as boolean, quantity: (c.quantity as number) ?? 1 });
       }
 
       if (childrenToAdd.length > 0) {

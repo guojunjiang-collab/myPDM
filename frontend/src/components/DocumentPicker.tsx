@@ -10,6 +10,7 @@ import type { Document, CustomFieldDefinition, CustomFieldValue } from '../types
 
 interface SelectedItem {
   id: string;
+  revision_id?: string;
   code: string;
   name: string;
   version: string;
@@ -17,6 +18,7 @@ interface SelectedItem {
 }
 
 interface CandidateItem extends SelectedItem {
+  revision_id?: string;
   customFieldValues: Record<string, unknown>;
 }
 
@@ -159,26 +161,28 @@ export default function DocumentPicker({
     const keyword = search.trim().toLowerCase();
     return documentsList
       .filter((doc) => {
-        if (existingDocIds.has(doc.id)) return false;
+        if (existingDocIds.has(doc.id || doc.revision_id || '')) return false;
         if (statusFilter && doc.status !== statusFilter) return false;
         if (!keyword) return true;
         return doc.code.toLowerCase().includes(keyword) || doc.name.toLowerCase().includes(keyword);
       })
       .map((doc) => ({
-        id: doc.id,
+        id: doc.id || doc.revision_id || '',
+        revision_id: doc.revision_id,
         code: doc.code,
         name: doc.name,
         version: doc.version || 'A',
         status: doc.status,
-        customFieldValues: fieldValues[doc.id] || {},
+        customFieldValues: fieldValues[doc.id || doc.revision_id || ''] || {},
       }));
   }, [documentsList, search, statusFilter, existingDocIds, fieldValues]);
 
   /* ---- 操作 ---- */
 
   const addToSelected = (item: CandidateItem) => {
-    if (selected.has(item.id)) return;
-    setSelected(new Map(selected).set(item.id, { id: item.id, code: item.code, name: item.name, version: item.version, status: item.status }));
+    const docId = item.id || item.revision_id || '';
+    if (selected.has(docId)) return;
+    setSelected(new Map(selected).set(docId, { id: docId, code: item.code, name: item.name, version: item.version, status: item.status }));
   };
 
   const removeFromSelected = (id: string) => {
@@ -360,7 +364,8 @@ export default function DocumentPicker({
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filtered.map((item) => {
-                    const isAdded = selected.has(item.id);
+                    const docId = item.id || item.revision_id || '';
+                    const isAdded = selected.has(docId);
                     return (
                       <tr key={item.id} className="hover:bg-gray-50">
                         <td className="px-3 py-2 font-medium">{item.code}</td>

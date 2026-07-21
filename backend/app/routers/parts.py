@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import User, BOMItem, CustomFieldValue
+from ..models import User, BOMItem, CustomFieldValue, DocumentIteration, DocumentAttachment
 from .. import crud_parts
 from .. import crud
 from .. import schemas_parts
@@ -657,7 +657,7 @@ def _get_doc_iteration(db: Session, revision_id: UUID):
 
 
 def _list_docs(db: Session, revision_id: UUID, iteration_id: Optional[UUID] = None):
-    from ..models import Document as DocModel
+    from ..models import DocumentRevision as DocRevModel, DocumentMaster as DocMasterModel
     if iteration_id:
         iteration = db.query(crud_parts.models_parts.PartIteration).filter(
             crud_parts.models_parts.PartIteration.id == iteration_id
@@ -678,8 +678,22 @@ def _list_docs(db: Session, revision_id: UUID, iteration_id: Optional[UUID] = No
             doc_uuid = _uuid.UUID(str(doc_id))
         except (ValueError, AttributeError):
             continue
-        from ..models import Document as DocModel
-        doc = db.query(DocModel).filter(DocModel.id == doc_uuid).first()
+        doc_rev = db.query(DocRevModel).filter(DocRevModel.id == doc_uuid).first()
+        master = doc_rev.master if doc_rev else None
+        file_name = None
+        file_id = None
+        if doc_rev:
+            latest_iter = db.query(DocumentIteration).filter(
+                DocumentIteration.revision_id == doc_rev.id,
+                DocumentIteration.iteration == doc_rev.latest_iteration,
+            ).first()
+            if latest_iter:
+                first_att = db.query(DocumentAttachment).filter(
+                    DocumentAttachment.iteration_id == latest_iter.id,
+                ).order_by(DocumentAttachment.created_at).first()
+                if first_att:
+                    file_name = first_att.file_name
+                    file_id = str(first_att.id)
         docs.append({
             "id": link.get("id", str(uuid4())),
             "document_id": str(doc_id),
@@ -687,14 +701,14 @@ def _list_docs(db: Session, revision_id: UUID, iteration_id: Optional[UUID] = No
             "sort_order": link.get("sort_order", 0),
             "created_at": link.get("created_at"),
             "document": {
-                "id": str(doc.id) if doc else str(doc_id),
-                "code": doc.code if doc else "未知",
-                "name": doc.name if doc else "未知文档",
-                "version": doc.version if doc else "",
-                "status": doc.status if doc else "draft",
-                "file_id": str(doc.file_id) if doc and doc.file_id else None,
-                "file_name": doc.file_name if doc else None,
-            } if doc else None,
+                "id": str(doc_rev.id) if doc_rev else str(doc_id),
+                "code": master.code if master else "未知",
+                "name": master.name if master else "未知文档",
+                "version": doc_rev.version if doc_rev else "",
+                "status": doc_rev.status if doc_rev else "draft",
+                "file_id": file_id,
+                "file_name": file_name,
+            } if doc_rev else None,
         })
     return docs
 

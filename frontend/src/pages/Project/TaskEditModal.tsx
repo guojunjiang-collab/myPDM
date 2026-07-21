@@ -724,7 +724,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
       {detailDocId && (
         <DocumentDetailModal
           open={!!detailDocId}
-          docId={detailDocId}
+          revisionId={detailDocId}
           onClose={() => setDetailDocId(null)}
           onSaved={() => {}}
         />
@@ -763,8 +763,8 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
         <ConfigItemPicker
           open={showConfigPicker}
           onClose={() => setShowConfigPicker(false)}
-          onConfirm={(item) => {
-            addLinks([{ entity_type: 'config_item', entity_id: item.id }]);
+          onConfirm={(items) => {
+            if (items.length > 0) addLinks([{ entity_type: 'config_item', entity_id: items[0].child_revision_id }]);
             setShowConfigPicker(false);
           }}
         />

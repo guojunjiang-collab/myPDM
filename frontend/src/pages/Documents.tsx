@@ -144,8 +144,13 @@ export default function Documents() {
     setLoading(true);
     try {
       // 直接调 API 取全量（含所有版本），避免依赖 store 缓存导致看不到「多版本」徽标
-      const res = await documentsApi.list({ page_size: 10000, brief: true });
-      const localDocuments: Document[] = Array.isArray(res.data) ? (res.data as Document[]) : [];
+      const res = await documentsApi.list({ page_size: 10000 });
+      const respData = res.data as Record<string, unknown>;
+      const rawItems: Record<string, unknown>[] = Array.isArray(respData) ? respData : (respData?.items || []) as Record<string, unknown>[];
+      const localDocuments: Document[] = rawItems.map((item: Record<string, unknown>) => ({
+        ...item,
+        id: (item.id ?? item.revision_id) as string,
+      })) as Document[];
       setDocuments(localDocuments);
       // 不回写 store：会触发 useEffect 无限循环（storeDocuments 变 → loadDocuments → ...）
       // store 由 syncService 轮询维护，跨页同步仍生效
@@ -209,8 +214,6 @@ export default function Documents() {
       const res = await documentsApi.create({
         code: createCode,
         name: createName,
-        version: 'A',
-        status: 'draft',
         remark: createRemark || undefined,
         group_ids: createGroupIds,
       });
@@ -619,7 +622,7 @@ export default function Documents() {
 
       <DocumentDetailModal
         open={!!detailDocId}
-        docId={detailDocId}
+        revisionId={detailDocId}
         onClose={() => {
           setDetailDocId(null);
           loadDocuments();

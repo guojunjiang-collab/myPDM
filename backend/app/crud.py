@@ -7,13 +7,15 @@ from . import models, schemas
 import bcrypt
 
 def _doc_brief(doc):
+    """doc 为 DocumentRevision 实例（兼容别名 Document = DocumentRevision）"""
+    master = doc.master if hasattr(doc, 'master') else None
     return {
-        "id": str(doc.id), "code": doc.code, "name": doc.name,
+        "id": str(doc.id), "code": master.code if master else "", "name": master.name if master else "",
         "version": doc.version, "status": doc.status,
-        "file_name": doc.file_name, "file_id": str(doc.file_id) if doc.file_id else None,
+        "file_name": None, "file_id": None,
         "remark": doc.remark,
         "created_at": doc.created_at.isoformat() if doc.created_at else None,
-        "updated_at": doc.updated_at.isoformat() if doc.updated_at else None,
+        "updated_at": doc.created_at.isoformat() if doc.created_at else None,
         "deleted_at": doc.deleted_at.isoformat() if doc.deleted_at else None,
     }
 

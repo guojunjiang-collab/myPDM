@@ -725,14 +725,14 @@ export const configurationApi = {
 
   addParts: (id: string, items: { part_type: string; part_id: string; is_required: boolean }[]) =>
     api.post(`/configurations/items/${id}/parts`, { items }),
-  updatePart: (id: string, partId: string, data: { is_required?: boolean }) =>
+  updatePart: (id: string, partId: string, data: { is_required?: boolean; quantity?: number }) =>
     api.put(`/configurations/items/${id}/parts/${partId}`, data),
   removePart: (id: string, partId: string) =>
     api.delete(`/configurations/items/${id}/parts/${partId}`),
 
-  addChildren: (id: string, items: { child_id: string; is_required: boolean }[]) =>
+  addChildren: (id: string, items: { child_revision_id: string; is_required: boolean }[]) =>
     api.post(`/configurations/items/${id}/children`, { items }),
-  updateChild: (id: string, childId: string, data: { is_required?: boolean }) =>
+  updateChild: (id: string, childId: string, data: { is_required?: boolean; quantity?: number }) =>
     api.put(`/configurations/items/${id}/children/${childId}`, data),
   removeChild: (id: string, childId: string) =>
     api.delete(`/configurations/items/${id}/children/${childId}`),

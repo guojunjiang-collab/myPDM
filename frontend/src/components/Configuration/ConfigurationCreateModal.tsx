@@ -44,25 +44,12 @@ interface ChildEntry {
 
 export default function ConfigurationCreateModal({ open, item, onClose, onSaved }: Props) {
   const isEdit = !!item;
-  const [form, setForm] = useState({ code: '', name: '', spec: '', remark: '' });
+  const [form, setForm] = useState({ code: '', name: '' });
   const [creatorName, setCreatorName] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [cfDefs, setCfDefs] = useState<CustomFieldDefinition[]>([]);
   const [cfValues, setCfValues] = useState<Record<string, any>>({});
-  const remarkRef = useRef<HTMLTextAreaElement>(null);
-  // 弹窗打开或备注内容变化时，自适应 textarea 高度
-  useEffect(() => {
-    if (!open) return;
-    const timer = setTimeout(() => {
-      const el = remarkRef.current;
-      if (el) {
-        el.style.height = 'auto';
-        el.style.height = el.scrollHeight + 'px';
-      }
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [open, form.remark]);
 
   // 关联零部件
   const [parts, setParts] = useState<PartEntry[]>([]);
@@ -81,7 +68,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
   const [pickerParentIdx, setPickerParentIdx] = useState<string | null>(null); // 父行的 idx，用于标记 has_children
   // 快速新建构型项
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
-  const [quickForm, setQuickForm] = useState({ code: '', name: '', remark: '' });
+  const [quickForm, setQuickForm] = useState({ code: '', name: '' });
   const [quickCreating, setQuickCreating] = useState(false);
   // 嵌套编辑（子项行点击）
   const [nestedEditItem, setNestedEditItem] = useState<ConfigurationItem | null>(null);
@@ -100,9 +87,8 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
   useEffect(() => {
     if (open) {
       setForm(item ? {
-        code: item.code, name: item.name, spec: item.spec || '',
-        remark: item.remark || '',
-      } : { code: '', name: '', spec: '', remark: '' });
+        code: item.code, name: item.name,
+      } : { code: '', name: '' });
       setCreatorName((item as any)?.creator_name || '');
       setError('');
       // 加载构型项自定义字段定义
@@ -122,7 +108,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
       // Load existing parts and children for edit mode
       if (item?.id) {
         configurationApi.detail(item.id).then(r => {
-          setForm({ code: r.master.code, name: r.revision.name || r.master.name, spec: r.revision.spec || r.master.spec || '', remark: r.revision.remark || r.master.remark || '' });
+          setForm({ code: r.master.code, name: r.revision.name || r.master.name });
           setCreatorName(r.master.creator_id || '');
           setParts((r.parts || []).map((p: any) => ({
             id: p.id, part_type: p.part_type, part_id: p.part_id,
@@ -182,7 +168,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
       }
       if (children.length > 0) {
         await configurationApi.addChildren(configId, children.map(c => ({
-          child_id: c.child_id, is_required: c.is_required, quantity: c.quantity,
+          child_revision_id: c.child_id, is_required: c.is_required, quantity: c.quantity,
         })));
       }
       // 保存自定义字段值
@@ -367,7 +353,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
             <div className="flex items-center justify-center gap-1 whitespace-nowrap">
               <button onClick={() => {
                 setPickerParentId(c.child_id); setPickerParentIdx(idx); setCfgSearch(''); setPickerSelected([]);
-                setQuickCreateOpen(false); setQuickForm({ code: '', name: '', remark: '' });
+                setQuickCreateOpen(false); setQuickForm({ code: '', name: '' });
                 setCfgResults([]);
                 setCfgPickerOpen(true);
               }}
@@ -435,17 +421,12 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
               <div className="text-sm text-gray-700 py-1">{creatorName || '-'}</div>
             </div>
           )}
-          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 col-span-2 md:col-span-4">
-            <label className="block text-xs text-gray-500 mb-0.5">备注</label>
-            <textarea ref={remarkRef} value={form.remark} onChange={(e) => setForm({ ...form, remark: e.target.value })} rows={1}
-              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
-              onInput={(e) => {
-                const el = e.currentTarget;
-                el.style.height = 'auto';
-                el.style.height = el.scrollHeight + 'px';
-              }}
-            />
-          </div>
+          {isEdit && (
+            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 col-span-2 md:col-span-4">
+              <label className="block text-xs text-gray-500 mb-0.5">创建者</label>
+              <div className="text-sm text-gray-700 py-1">{creatorName || '-'}</div>
+            </div>
+          )}
         </div>
 
         {/* 自定义字段 */}
@@ -545,7 +526,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
             <h4 className="text-sm font-bold text-gray-700">子构型项 ({children.length})</h4>
             <button type="button" onClick={() => {
               setPickerParentId(null); setCfgSearch(''); setPickerSelected([]);
-              setQuickCreateOpen(false); setQuickForm({ code: '', name: '', remark: '' });
+              setQuickCreateOpen(false); setQuickForm({ code: '', name: '' });
               setCfgResults([]); setCfgPickerOpen(true);
             }}
               className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">添加子构型项</button>
@@ -600,7 +581,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
 
                   {/* 快速新建构型项 */}
                   <div className="border rounded-lg overflow-hidden mb-3 flex-shrink-0">
-                    <button onClick={() => { setQuickCreateOpen(!quickCreateOpen); if (!quickCreateOpen) setQuickForm({ code: '', name: '', remark: '' }); }}
+                     <button onClick={() => { setQuickCreateOpen(!quickCreateOpen); if (!quickCreateOpen) setQuickForm({ code: '', name: '' }); }}
                       className="w-full px-4 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 flex items-center gap-1">
                       <span className="text-xs">{quickCreateOpen ? '▼' : '▶'}</span>
                       快速新建构型项
@@ -612,19 +593,15 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                             placeholder="构型号 *" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
                           <input value={quickForm.name} onChange={e => setQuickForm({ ...quickForm, name: e.target.value })}
                             placeholder="名称 *" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
-                        </div>
-                        <div className="flex gap-2">
-                          <input value={quickForm.remark} onChange={e => setQuickForm({ ...quickForm, remark: e.target.value })}
-                            placeholder="备注（可选）" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
                           <button onClick={async () => {
                             if (!quickForm.code.trim() || !quickForm.name.trim()) return;
                             setQuickCreating(true);
                             try {
-                               const r = await configurationApi.create({ code: quickForm.code.trim(), name: quickForm.name.trim(), remark: quickForm.remark.trim() || undefined });
-                               const newItem = { id: r.id, code: quickForm.code.trim(), name: quickForm.name.trim(), remark: quickForm.remark.trim() || '' };
+                              const r = await configurationApi.create({ code: quickForm.code.trim(), name: quickForm.name.trim() });
+                              const newItem = { id: r.id, code: quickForm.code.trim(), name: quickForm.name.trim() };
                               setPickerSelected(prev => [...prev, newItem]);
-                              setQuickForm({ code: '', name: '', remark: '' });
-                            } catch (e: any) { /* 失败静默，用户可重试 */ }
+                              setQuickForm({ code: '', name: '' });
+                            } catch (e: any) {}
                             finally { setQuickCreating(false); }
                           }} disabled={quickCreating}
                             className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 whitespace-nowrap">
@@ -675,7 +652,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                       // 向指定父级添加子项 → 即时 API
                       if (pickerSelected.length > 0) {
                         await configurationApi.addChildren(pickerParentId, pickerSelected.map((s: any) => ({
-                          child_id: s.id, is_required: true, quantity: 1,
+                          child_revision_id: s.id, is_required: true, quantity: 1,
                         })));
                         if (pickerParentIdx) markHasChildren(pickerParentIdx);
                         refreshParentChildren(pickerParentId);

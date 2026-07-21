@@ -1,133 +1,228 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Modal } from '../Modal';
 import { configurationApi } from '../../services/api';
-
-/* ----------------------------------------------------------------
-   Types
-   ---------------------------------------------------------------- */
+import { toast } from '../Toast';
 
 interface ConfigItem {
   id: string;
   code: string;
   name: string;
-  spec: string;
+  version: string;
+  status: string;
+}
+
+interface SelectedItem extends ConfigItem {
+  is_required: boolean;
 }
 
 interface ConfigItemPickerProps {
   open: boolean;
   onClose: () => void;
-  onConfirm: (item: ConfigItem) => void;
-  excludeId?: string; // 已有构型项 ID，可排除自身
+  onConfirm: (items: { child_revision_id: string; is_required: boolean }[]) => void;
+  excludeId?: string;
 }
 
-/* ----------------------------------------------------------------
-   Component
-   ---------------------------------------------------------------- */
+const statusTag = (s: string) => {
+  const map: Record<string, string> = {
+    draft: 'bg-blue-100 text-blue-800', frozen: 'bg-orange-100 text-orange-800',
+    released: 'bg-green-100 text-green-800', obsolete: 'bg-red-100 text-red-800',
+  };
+  return map[s] || 'bg-gray-100 text-gray-800';
+};
+const statusLabel = (s: string) => {
+  const map: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' };
+  return map[s] || s;
+};
 
-export default function ConfigItemPicker({
-  open,
-  onClose,
-  onConfirm,
-  excludeId,
-}: ConfigItemPickerProps) {
+export default function ConfigItemPicker({ open, onClose, onConfirm, excludeId }: ConfigItemPickerProps) {
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [items, setItems] = useState<ConfigItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Map<string, SelectedItem>>(new Map());
 
-  // 加载构型项列表
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickForm, setQuickForm] = useState({ code: '', name: '' });
+  const [quickCreating, setQuickCreating] = useState(false);
+
   useEffect(() => {
     if (!open) return;
+    setSelected(new Map());
+    setSearch('');
+    setStatusFilter('');
+    setQuickOpen(false);
+    setQuickForm({ code: '', name: '' });
     setLoading(true);
-    configurationApi.list({ page: 1, page_size: 100 })
+    configurationApi.list({ page: 1, page_size: 200 })
       .then((r) => {
-        const all = (r.items || []) as ConfigItem[];
+        const all = ((r.items || []) as any[]).map((i: any) => ({
+          id: i.revision_id || i.id || '',
+          code: i.code || '',
+          name: i.name || '',
+          version: i.version || 'A',
+          status: i.status || 'draft',
+        } as ConfigItem));
         setItems(excludeId ? all.filter(i => i.id !== excludeId) : all);
       })
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
   }, [open, excludeId]);
 
-  // 搜索过滤
   const filtered = useMemo(() => {
     const kw = search.trim().toLowerCase();
-    if (!kw) return items;
-    return items.filter(i =>
-      i.code.toLowerCase().includes(kw) ||
-      i.name.toLowerCase().includes(kw) ||
-      (i.spec || '').toLowerCase().includes(kw)
-    );
-  }, [items, search]);
+    return items.filter(i => {
+      if (statusFilter && i.status !== statusFilter) return false;
+      if (!kw) return true;
+      return i.code.toLowerCase().includes(kw) || i.name.toLowerCase().includes(kw);
+    });
+  }, [items, search, statusFilter]);
 
-  // 确认选择
-  const handleConfirm = () => {
-    const item = items.find(i => i.id === selectedId);
-    if (item) {
-      onConfirm(item);
-      onClose();
-    }
+  const selectedList = useMemo(() => Array.from(selected.values()), [selected]);
+
+  const addToSelected = (item: ConfigItem) => {
+    if (selected.has(item.id)) return;
+    setSelected(new Map(selected).set(item.id, { ...item, is_required: true }));
+  };
+  const removeFromSelected = (id: string) => {
+    const next = new Map(selected); next.delete(id); setSelected(next);
   };
 
-  const handleCancel = () => {
-    setSelectedId(null);
-    setSearch('');
+  const handleQuickCreate = async () => {
+    if (!quickForm.code.trim() || !quickForm.name.trim()) return;
+    setQuickCreating(true);
+    try {
+      const r = await configurationApi.create({ code: quickForm.code.trim(), name: quickForm.name.trim() });
+      const newItem: ConfigItem = { id: r.id, code: quickForm.code.trim(), name: quickForm.name.trim(), version: 'A', status: 'draft' };
+      setItems(prev => [newItem, ...prev]);
+      setSelected(new Map(selected).set(newItem.id, { ...newItem, is_required: true }));
+      setQuickForm({ code: '', name: '' });
+      setQuickOpen(false);
+    } catch { /* 静默失败 */ }
+    finally { setQuickCreating(false); }
+  };
+
+  const handleConfirm = () => {
+    if (selectedList.length === 0) return;
+    onConfirm(selectedList.map(s => ({ child_revision_id: s.id, is_required: s.is_required })));
     onClose();
   };
 
-  return (
-    <Modal open={open} title="关联构型项" onClose={handleCancel} width="lg" zIndex={60}>
-      <div className="space-y-4 max-h-[70vh] flex flex-col">
-        {/* 搜索 */}
-        <input
-          type="text"
-          placeholder="搜索编号、名称、规格..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
-        />
+  const handleCancel = () => { setSelected(new Map()); onClose(); };
 
-        {/* 列表 */}
+  return (
+    <Modal open={open} title="添加子构型项" onClose={handleCancel} width="xl" zIndex={60}>
+      <div className="space-y-4 max-h-[70vh] flex flex-col">
+        {/* ---- 1. 已选面板 ---- */}
+        {selectedList.length > 0 && (
+          <div>
+            <h4 className="text-sm font-semibold text-gray-600 mb-2">
+              已选子构型项 {selectedList.length > 0 ? `(${selectedList.length})` : ''}
+            </h4>
+            <div className="border rounded-lg overflow-hidden max-h-40 overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-gray-500 font-medium">构型号</th>
+                    <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
+                    <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
+                    <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
+                    <th className="px-3 py-2 text-right text-gray-500 font-medium w-12"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {selectedList.map((item) => (
+                    <tr key={item.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 font-medium">{item.code}</td>
+                      <td className="px-3 py-2">{item.name}</td>
+                      <td className="px-3 py-2 text-gray-500">{item.version}</td>
+                      <td className="px-3 py-2">
+                        <span className={`px-1.5 py-0.5 text-xs rounded-full ${statusTag(item.status)}`}>
+                          {statusLabel(item.status)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <button onClick={() => removeFromSelected(item.id)} className="text-red-500 hover:text-red-700 text-xs" title="移除">✕</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ---- 2. 搜索 & 筛选 ---- */}
+        <div className="flex gap-2 items-center">
+          <input type="text" placeholder="搜索构型号、名称..." value={search} onChange={(e) => setSearch(e.target.value)}
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm" />
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            <option value="">全部状态</option>
+            <option value="draft">草稿</option>
+            <option value="frozen">冻结</option>
+            <option value="released">发布</option>
+            <option value="obsolete">作废</option>
+          </select>
+        </div>
+
+        {/* ---- 快速新建 ---- */}
+        <div className="border rounded-lg overflow-hidden">
+          <button onClick={() => setQuickOpen(!quickOpen)} className="w-full px-4 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 flex items-center gap-1">
+            <span className="text-xs">{quickOpen ? '▼' : '▶'}</span>
+            快速新建构型项
+          </button>
+          {quickOpen && (
+            <div className="px-4 py-3 border-t space-y-2 bg-gray-50">
+              <div className="flex gap-2">
+                <input value={quickForm.code} onChange={e => setQuickForm({ ...quickForm, code: e.target.value })} placeholder="构型号 *" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                <input value={quickForm.name} onChange={e => setQuickForm({ ...quickForm, name: e.target.value })} placeholder="名称 *" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                <button onClick={handleQuickCreate} disabled={quickCreating} className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 whitespace-nowrap">
+                  {quickCreating ? '创建中...' : '新建并添加'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ---- 3. 候选列表 ---- */}
         <div className="border rounded-lg overflow-hidden flex-1 min-h-0">
           <div className="overflow-y-auto max-h-64">
             {loading ? (
               <div className="px-4 py-8 text-center text-sm text-gray-400">加载中...</div>
             ) : filtered.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm text-gray-400">
-                {items.length === 0 ? '无可用构型项' : '无匹配结果'}
-              </div>
+              <div className="px-4 py-8 text-center text-sm text-gray-400">无匹配结果</div>
             ) : (
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b sticky top-0">
                   <tr>
-                    <th className="w-10 px-3 py-2"></th>
                     <th className="px-3 py-2 text-left text-gray-500 font-medium">构型号</th>
                     <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">规格型号</th>
+                    <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
+                    <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
+                    <th className="px-3 py-2 text-center text-gray-500 font-medium w-20">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filtered.map((item) => {
-                    const isSelected = item.id === selectedId;
+                    const isAdded = selected.has(item.id);
                     return (
-                      <tr
-                        key={item.id}
-                        onClick={() => setSelectedId(item.id)}
-                        className={`cursor-pointer transition-colors ${
-                          isSelected
-                            ? 'bg-primary-50 border-l-2 border-primary-500'
-                            : 'hover:bg-gray-50 border-l-2 border-transparent'
-                        }`}
-                      >
-                        <td className="px-3 py-2 text-center">
-                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                            isSelected ? 'border-primary-600' : 'border-gray-300'
-                          }`}>
-                            {isSelected && <div className="w-2 h-2 rounded-full bg-primary-600" />}
-                          </div>
-                        </td>
+                      <tr key={item.id} className="hover:bg-gray-50">
                         <td className="px-3 py-2 font-medium">{item.code}</td>
                         <td className="px-3 py-2">{item.name}</td>
-                        <td className="px-3 py-2 text-gray-500">{item.spec || '-'}</td>
+                        <td className="px-3 py-2 text-gray-500">{item.version}</td>
+                        <td className="px-3 py-2">
+                          <span className={`px-1.5 py-0.5 text-xs rounded-full ${statusTag(item.status)}`}>
+                            {statusLabel(item.status)}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {isAdded ? (
+                            <span className="text-xs text-green-600">已添加</span>
+                          ) : (
+                            <button onClick={() => addToSelected(item)}
+                              className="px-2.5 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">添加</button>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}
@@ -137,27 +232,14 @@ export default function ConfigItemPicker({
           </div>
         </div>
 
-        {/* 底部 */}
         <div className="flex justify-between items-center pt-2 border-t">
           <span className="text-sm text-gray-500">
-            {selectedId ? '已选择 1 项' : '请选择一个构型项'}
+            已选 <span className="font-medium text-gray-700">{selectedList.length}</span> 项
           </span>
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              取消
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirm}
-              disabled={!selectedId}
-              className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
-            >
-              确认关联
-            </button>
+            <button onClick={handleCancel} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
+            <button onClick={handleConfirm} disabled={selectedList.length === 0}
+              className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">确认添加</button>
           </div>
         </div>
       </div>

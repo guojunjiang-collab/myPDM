@@ -21,13 +21,9 @@ class BaseSchema(BaseModel):
 class ConfigItemCreate(BaseSchema):
     code: str
     name: str
-    spec: str = ""
-    remark: str = ""
 
 
 class ConfigItemUpdate(BaseSchema):
-    spec: Optional[str] = None
-    remark: Optional[str] = None
     name: Optional[str] = None
 
 

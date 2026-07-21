@@ -67,14 +67,11 @@ def create_part_master(db: Session, data: dict, user_id: UUID) -> models_parts.P
             raise ValueError(f"件号「{code}」已存在，请更换件号")
         # 孤儿数据：复用并更新名称/规格
         existing.name = data["name"]
-        if data.get("spec"):
-            existing.spec = data["spec"]
         master = existing
     else:
         master = models_parts.PartMaster(
             code=code,
             name=data["name"],
-            spec=data.get("spec"),
             creator_id=user_id,
         )
         db.add(master)
@@ -176,7 +173,6 @@ def list_part_masters(
                     "master_id": master.id,
                     "code": master.code,
                     "name": master.name,
-                    "spec": master.spec,
                     "type": item_type,
                     "revision_id": rev.id,
                     "version": rev.version,
@@ -195,7 +191,7 @@ def update_part_master(db: Session, master_id: UUID, data: dict) -> Optional[mod
     master = get_part_master(db, master_id)
     if not master:
         return None
-    for field in ("code", "name", "spec"):
+    for field in ("code", "name"):
         if field in data and data[field] is not None:
             setattr(master, field, data[field])
     db.commit()
@@ -1014,7 +1010,6 @@ def get_bom_tree(db: Session, revision_id: UUID) -> List[Dict]:
                     "child_master_id": str(child_rev.master_id) if child_rev else "",
                     "child_code": master.code if master else "",
                     "child_name": master.name if master else "",
-                    "child_spec": master.spec if master else "",
                     "child_version": child_rev.version,
                     "child_status": child_rev.status,
                     "child_check_out_user_id": str(child_rev.check_out_user_id) if child_rev.check_out_user_id else None,
@@ -1653,7 +1648,7 @@ def sync_cad_bom_children(
             if master is None:
                 master = create_part_master(
                     db,
-                    {"code": code, "name": child.get("name") or code, "spec": child.get("spec")},
+                    {"code": code, "name": child.get("name") or code},
                     user_id,
                 )
                 created_parts.append(code)

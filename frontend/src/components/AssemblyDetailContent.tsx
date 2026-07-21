@@ -49,7 +49,6 @@ export default function AssemblyDetailContent({ assembly, customFieldDefs, custo
         <InfoItem label="中文名称" value={assembly.name} />
         <InfoItem label="版本" value={assembly.version || '-'} />
         <StatusItem label="状态" status={assembly.status} />
-        <InfoItem label="规格型号" value={assembly.spec || '-'} />
         <InfoItem label="备注" value={assembly.remark || '-'} />
         <InfoItem label="创建人" value={(assembly as any).creator_name || '-'} />
         <InfoItem label="创建时间" value={formatDateTime(assembly.created_at)} />

@@ -96,6 +96,17 @@ async def startup_event():
             db.commit()
             print("✓ Added column file_hash to document_attachments table")
 
+        # 检查 document_revisions 表是否有 updated_at 列（三层模型新增）
+        result = db.execute(text("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'document_revisions' AND column_name = 'updated_at'
+        """))
+        if not result.fetchone():
+            db.execute(text("ALTER TABLE document_revisions ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP"))
+            db.commit()
+            print("✓ Added column updated_at to document_revisions table")
+
         # 检查并添加 revision_parent_id 列（版本控制）
         for table_name in ['parts', 'assemblies']:
             result = db.execute(text(f"""

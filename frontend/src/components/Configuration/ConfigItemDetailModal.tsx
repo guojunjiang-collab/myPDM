@@ -72,8 +72,6 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
       setDetail(d);
       setEditCode(d.master.code || '');
       setEditName(d.revision.name || d.master.name || '');
-      setEditSpec(d.revision.spec || d.master.spec || '');
-      setEditRemark(d.revision.remark || d.master.remark || '');
       setParts(d.parts || []);
       setChildren(d.children || []);
       setVersions(d.versions || []);
@@ -214,10 +212,6 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
                     <div className="text-sm text-gray-900 font-medium">{master?.name}</div>
                   </div>
                   <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                    <div className="text-xs text-gray-500 mb-0.5">规格型号</div>
-                    <div className="text-sm text-gray-900 font-medium">{master?.spec || '—'}</div>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                     <div className="text-xs text-gray-500 mb-0.5">类型</div>
                     <div className="text-sm text-gray-900 font-medium">构型项</div>
                   </div>
@@ -306,25 +300,6 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
                         </span>
                       )}
                     </div>
-                    {canEdit ? (
-                      <div>
-                        <h4 className="text-sm font-semibold mb-1">备注</h4>
-                        <textarea
-                          className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 mt-1 resize-none"
-                          rows={3}
-                          value={editRemark}
-                          onChange={(e) => {
-                            setEditRemark(e.target.value);
-                            autoSaveRemark(e.target.value);
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div>
-                        <h4 className="text-sm font-semibold mb-1">备注</h4>
-                        <div className="text-sm text-gray-600">{master?.remark || '—'}</div>
-                      </div>
-                    )}
                     <div className="text-xs text-gray-400">
                       创建时间：{master?.created_at ? new Date(master.created_at).toLocaleString('zh-CN') : '—'}
                     </div>

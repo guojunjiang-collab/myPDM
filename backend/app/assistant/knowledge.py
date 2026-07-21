@@ -9,7 +9,7 @@ ENTITY_MODELS = {
     "part": models_parts.PartMaster,
     "assembly": models_parts.PartMaster,
     "bom_item": models.BOMItem,
-    "document": models.Document,
+    "document": models.DocumentMaster,
     "attachment": models.DocumentAttachment,
     "custom_field_definition": models.CustomFieldDefinition,
     "custom_field_value": models.CustomFieldValue,

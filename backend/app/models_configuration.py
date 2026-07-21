@@ -15,14 +15,12 @@ from app.database import Base
 
 
 class ConfigurationItemMaster(Base):
-    """构型项主数据（不可变的 code/name/spec/remark）"""
+    """构型项主数据（仅 code/name，其他通过自定义字段补充）"""
     __tablename__ = "configuration_item_masters"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     code = Column(String(64), unique=True, nullable=False)
     name = Column(String(255), nullable=False)
-    spec = Column(String(255))
-    remark = Column(Text)
     creator_id = Column(UUID(as_uuid=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -53,8 +51,6 @@ class ConfigurationItemIteration(Base):
     revision_id = Column(UUID(as_uuid=True), ForeignKey("configuration_item_revisions.id"), nullable=False)
     iteration = Column(Integer, nullable=False)
     check_in_note = Column(Text)
-    version_spec = Column(String(255))
-    version_remark = Column(Text)
     version_name = Column(String(255))
     document_links = Column(JSONB, default=[])
     created_at = Column(DateTime(timezone=True), server_default=func.now())

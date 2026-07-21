@@ -13,6 +13,7 @@ from uuid import UUID
 from fastapi import HTTPException
 
 from . import models_configuration as models
+from . import crud as crud_common
 from . import schemas_configuration as schemas
 from . import notifications as _notif
 
@@ -88,11 +89,11 @@ def get_config_item_master_by_code(db: Session, code: str) -> Optional[models.Co
 
 
 def update_config_item_master(db: Session, master_id: UUID, data: dict) -> Optional[models.ConfigurationItemMaster]:
-    """更新主数据字段（code / name / spec）"""
+    """更新主数据字段（code / name）"""
     master = get_config_item_master(db, master_id)
     if not master:
         return None
-    for field in ("code", "name", "spec"):
+    for field in ("code", "name"):
         if field in data and data[field] is not None:
             setattr(master, field, data[field])
     db.commit()
@@ -193,7 +194,6 @@ def get_config_items(
         q = q.filter(or_(
             models.ConfigurationItemMaster.code.ilike(like),
             models.ConfigurationItemMaster.name.ilike(like),
-            models.ConfigurationItemMaster.spec.ilike(like),
         ))
     if updated_since:
         since_dt = datetime.fromtimestamp(updated_since, tz=timezone.utc)
@@ -232,8 +232,6 @@ def get_config_items(
                 "master_id": str(master.id),
                 "code": master.code,
                 "name": master.name,
-                "spec": master.spec,
-                "remark": master.remark,
                 "revision_id": str(rev.id),
                 "version": rev.version,
                 "status": rev.status,
@@ -272,8 +270,6 @@ def create_config_item(db: Session, data: dict, user_id: UUID) -> Tuple[models.C
     master = models.ConfigurationItemMaster(
         code=code,
         name=data["name"],
-        spec=data.get("spec", ""),
-        remark=data.get("remark", ""),
         creator_id=user_id,
     )
     db.add(master)
@@ -290,8 +286,6 @@ def create_config_item(db: Session, data: dict, user_id: UUID) -> Tuple[models.C
 
     iteration = models.ConfigurationItemIteration(
         revision_id=revision.id, iteration=1,
-        version_spec=master.spec,
-        version_remark=master.remark,
         version_name=master.name,
         document_links=[],
     )
@@ -309,8 +303,6 @@ def revive_config_item(
     """复活已软删除的构型项：撤销删除、以新数据覆盖基本字段，创建新版本 A + Iteration 1，自动签出"""
     master.deleted_at = None
     master.name = data.get("name", master.name)
-    master.spec = data.get("spec", master.spec or "")
-    master.remark = data.get("remark", master.remark or "")
 
     revision = models.ConfigurationItemRevision(
         master_id=master.id, version="A", status="draft",
@@ -323,8 +315,6 @@ def revive_config_item(
 
     iteration = models.ConfigurationItemIteration(
         revision_id=revision.id, iteration=1,
-        version_spec=master.spec,
-        version_remark=master.remark,
         version_name=master.name,
         document_links=[],
     )
@@ -347,7 +337,7 @@ def update_config_item_iteration(
     iteration = _get_iteration(db, iteration_id)
     if not iteration:
         return None
-    for field in ("version_spec", "version_remark", "version_name", "document_links"):
+    for field in ("version_name", "document_links"):
         if field in data and data[field] is not None:
             setattr(iteration, field, data[field])
     db.commit()
@@ -390,8 +380,6 @@ def checkout_config_item(
     new_iter = models.ConfigurationItemIteration(
         revision_id=revision_id,
         iteration=rev.latest_iteration + 1,
-        version_spec=(current_iter.version_spec if current_iter else ""),
-        version_remark=(current_iter.version_remark if current_iter else ""),
         version_name=(current_iter.version_name if current_iter else ""),
         document_links=(current_iter.document_links if current_iter else []),
     )
@@ -433,6 +421,9 @@ def checkout_config_item(
                 sort_order=c.sort_order,
             )
             db.add(new_child)
+
+        # 复制自定义字段值（带 iteration_id，签出快照）
+        crud_common._copy_iteration_custom_fields(db, current_iter.id, new_iter.id)
 
     rev.latest_iteration += 1
     rev.check_out_user_id = user_id
@@ -503,6 +494,11 @@ def undocheckout_config_item(
         db.query(models.ConfigurationItemChild).filter(
             models.ConfigurationItemChild.parent_iteration_id == latest_iter.id
         ).delete(synchronize_session=False)
+        # 清理自定义字段值
+        from app.models import CustomFieldValue
+        db.query(CustomFieldValue).filter(
+            CustomFieldValue.iteration_id == latest_iter.id
+        ).delete(synchronize_session=False)
         db.delete(latest_iter)
 
     rev.latest_iteration -= 1
@@ -564,8 +560,6 @@ def upgrade_config_item(
     new_iter = models.ConfigurationItemIteration(
         revision_id=new_rev.id,
         iteration=1,
-        version_spec=(source_iter.version_spec if source_iter else ""),
-        version_remark=(source_iter.version_remark if source_iter else ""),
         version_name=(source_iter.version_name if source_iter else ""),
         document_links=(source_iter.document_links if source_iter else []),
     )
@@ -854,7 +848,7 @@ def add_config_children(
     for it in items:
         child = models.ConfigurationItemChild(
             parent_iteration_id=parent_iteration_id,
-            child_revision_id=it.child_id,
+            child_revision_id=it.child_revision_id,
             is_required=it.is_required,
             quantity=it.quantity,
             sort_order=it.sort_order,
@@ -1418,3 +1412,18 @@ def get_profiles_for_user(db, user, search=None, status=None, skip=0, limit=20):
     total = q.count()
     items = q.order_by(models.ConfigurationProfile.code).offset(skip).limit(limit).all()
     return items, total
+def list_config_item_iterations(db: Session, revision_id):
+    """列出某版本的所有迭代"""
+    return (
+        db.query(models.ConfigurationItemIteration)
+        .filter(models.ConfigurationItemIteration.revision_id == revision_id)
+        .order_by(models.ConfigurationItemIteration.iteration.desc())
+        .all()
+    )
+
+
+def get_config_item_iteration_detail(db: Session, iteration_id):
+    """获取指定迭代详情"""
+    return db.query(models.ConfigurationItemIteration).filter(
+        models.ConfigurationItemIteration.id == iteration_id
+    ).first()

@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.database import get_db
-from app.models import Document, User as UModel
+from app.models import DocumentRevision, DocumentMaster, DocumentIteration, DocumentAttachment, User as UModel
 from app.models_parts import PartMaster, PartRevision
 from app import models_configuration as models
 from app import schemas_configuration as schemas
@@ -138,7 +138,6 @@ async def list_config_items(
             "items": [{
                 "id": i["revision_id"],
                 "code": i["code"], "name": i["name"],
-                "spec": i.get("spec", ""),
                 "creator_id": str(i.get("creator_id")) if i.get("creator_id") else None,
                 "updated_at": i.get("updated_at"),
                 "deleted_at": None,
@@ -185,7 +184,6 @@ async def get_config_item_detail(
                         "id": str(entity.id), "code": entity.code, "name": entity.name,
                         "version": rev.version if rev else "",
                         "revision_id": str(rev.id) if rev else "",
-                        "spec": entity.spec or "",
                         "status": rev.status if rev else "draft",
                     },
                 })
@@ -227,9 +225,10 @@ async def get_config_item_detail(
                     "master_id": str(child_rev.master_id) if child_rev else "",
                     "code": child_master.code if child_master else "",
                     "name": child_master.name if child_master else "",
-                    "spec": child_master.spec or "" if child_master else "",
                     "version": child_rev.version if child_rev else "",
-                    "remark": child_master.remark or "" if child_master else "",
+                    "status": child_rev.status if child_rev else "",
+                    "check_out_user_id": str(child_rev.check_out_user_id) if (child_rev and child_rev.check_out_user_id) else None,
+                    "check_out_user_name": _resolve_user_name(db, child_rev.check_out_user_id) if child_rev else None,
                 } if child_rev else {},
             })
 
@@ -257,7 +256,6 @@ async def get_config_item_detail(
     return {
         "master": {
             "id": str(master.id), "code": master.code, "name": master.name,
-            "spec": master.spec or "", "remark": master.remark or "",
             "creator_id": str(master.creator_id) if master.creator_id else None,
             "created_at": master.created_at.isoformat() if master.created_at else None,
             "updated_at": master.updated_at.isoformat() if master.updated_at else None,
@@ -272,8 +270,9 @@ async def get_config_item_detail(
             "creator_id": str(revision.creator_id) if revision.creator_id else None,
             "created_at": revision.created_at.isoformat() if revision.created_at else None,
             "iteration_id": str(iteration.id) if iteration else None,
-            "spec": iteration.version_spec if iteration else (master.spec or ""),
-            "remark": iteration.version_remark if iteration else (master.remark or ""),
+            "name": iteration.version_name if iteration else master.name,
+            "remark": iteration.check_in_note if iteration else "",
+            "document_links": iteration.document_links if iteration else [],
             "name": iteration.version_name if iteration else master.name,
             "document_links": iteration.document_links if iteration else [],
         },
@@ -342,7 +341,7 @@ async def update_config_item(
         raise HTTPException(status_code=400, detail="当前迭代不存在")
 
     update_dict = data.model_dump(exclude_none=True)
-    field_map = {"name": "version_name", "spec": "version_spec", "remark": "version_remark"}
+    field_map = {"name": "version_name"}
     mapped = {}
     for k, v in update_dict.items():
         mapped[field_map.get(k, k)] = v
@@ -532,6 +531,54 @@ async def get_config_item_versions(
     return result
 
 
+@router.get("/items/{revision_id}/iterations")
+async def get_config_item_iterations(
+    revision_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("configuration:read")),
+):
+    """获取构型项版本的所有迭代历史"""
+    rev = crud.get_config_item_revision(db, UUID(revision_id))
+    if not rev:
+        raise HTTPException(status_code=404, detail="构型项版本不存在")
+    iterations = crud.list_config_item_iterations(db, UUID(revision_id))
+    result = []
+    for it in iterations:
+        result.append({
+            "id": str(it.id),
+            "iteration": it.iteration,
+            "check_in_note": it.check_in_note or "",
+            "version_name": it.version_name or "",
+            "created_at": it.created_at.isoformat() if it.created_at else None,
+        })
+    return result
+
+
+@router.delete("/items/{revision_id}/iterations/{iteration_id}")
+async def delete_config_item_iteration(
+    revision_id: str,
+    iteration_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("configuration:delete")),
+):
+    """删除构型项迭代（仅管理员，且不能删除唯一迭代）"""
+    rev = crud.get_config_item_revision(db, UUID(revision_id))
+    if not rev:
+        raise HTTPException(status_code=404, detail="构型项版本不存在")
+    if rev.latest_iteration <= 1:
+        raise HTTPException(status_code=400, detail="不能删除唯一迭代")
+    it = crud.get_config_item_iteration_detail(db, UUID(iteration_id))
+    if not it or str(it.revision_id) != revision_id:
+        raise HTTPException(status_code=404, detail="迭代不存在")
+    if it.iteration == rev.latest_iteration:
+        # 删除最新迭代 = 撤销签出
+        crud.undocheckout_config_item(db, UUID(revision_id), current_user.id)
+    else:
+        db.delete(it)
+        db.commit()
+    return {"ok": True}
+
+
 # ════════════════════════════════════════════════════════
 # 主数据更新（code/name 等 master 层字段）
 # ════════════════════════════════════════════════════════
@@ -543,7 +590,7 @@ async def update_config_item_master(
     db: Session = Depends(get_db),
     current_user=Depends(require_permission("configuration:update")),
 ):
-    """更新构型项主数据字段（code/name/spec）"""
+    """更新构型项主数据字段（code/name）"""
     rev = crud.get_config_item_revision(db, UUID(revision_id))
     if not rev:
         raise HTTPException(status_code=404, detail="构型项版本不存在")
@@ -554,7 +601,6 @@ async def update_config_item_master(
         raise HTTPException(status_code=404, detail="主数据不存在")
     return {
         "id": str(master.id), "code": master.code, "name": master.name,
-        "spec": master.spec or "",
     }
 
 
@@ -722,7 +768,13 @@ def _get_iteration_documents(db: Session, iteration: models.ConfigurationItemIte
     links = iteration.document_links or []
     result = []
     doc_ids = [l.get("document_id") for l in links if l.get("document_id")]
-    doc_group_links = db.query(DocumentGroupLink).filter(DocumentGroupLink.document_id.in_(doc_ids)).all() if doc_ids else []
+    # document_id 在 links 中是 revision_id，需解析为 master_id 以查询用户组
+    rev_to_master = {}
+    if doc_ids:
+        revs = db.query(DocumentRevision).filter(DocumentRevision.id.in_(doc_ids)).all()
+        rev_to_master = {str(r.id): str(r.master_id) for r in revs}
+    master_ids = list(set(rev_to_master.values()))
+    doc_group_links = db.query(DocumentGroupLink).filter(DocumentGroupLink.document_id.in_(master_ids)).all() if master_ids else []
     doc_groups = {}
     for dgl in doc_group_links:
         doc_groups.setdefault(dgl.document_id, set()).add(dgl.group_id)
@@ -735,28 +787,44 @@ def _get_iteration_documents(db: Session, iteration: models.ConfigurationItemIte
         group_name_map = {g.id: g.name for g in gs}
     for link in links:
         doc_id = link.get("document_id")
-        doc = db.query(Document).filter(Document.id == doc_id).first()
-        if not doc:
+        doc_rev = db.query(DocumentRevision).filter(DocumentRevision.id == doc_id).first()
+        if not doc_rev:
             continue
-        gids = doc_groups.get(doc.id, set())
+        master = doc_rev.master
+        master_id_str = str(master.id) if master else None
+        gids = doc_groups.get(master_id_str, set()) if master_id_str else set()
+        # 从附件表获取文件信息
+        file_name = None
+        file_id = None
+        latest_iter = db.query(DocumentIteration).filter(
+            DocumentIteration.revision_id == doc_rev.id,
+            DocumentIteration.iteration == doc_rev.latest_iteration,
+        ).first()
+        if latest_iter:
+            first_att = db.query(DocumentAttachment).filter(
+                DocumentAttachment.iteration_id == latest_iter.id,
+            ).order_by(DocumentAttachment.created_at).first()
+            if first_att:
+                file_name = first_att.file_name
+                file_id = str(first_att.id)
         doc_data = {
-            "id": str(doc.id),
-            "code": doc.code,
-            "name": doc.name,
-            "version": doc.version,
-            "status": doc.status,
-            "file_name": doc.file_name,
-            "file_id": str(doc.file_id) if doc.file_id else None,
+            "id": str(doc_rev.id),
+            "code": master.code if master else "",
+            "name": master.name if master else "",
+            "version": doc_rev.version,
+            "status": doc_rev.status,
+            "file_name": file_name,
+            "file_id": file_id,
         }
-        if current_user:
-            doc_data["accessible"] = crud_groups.document_is_accessible(db, current_user, doc)
+        if current_user and master:
+            doc_data["accessible"] = crud_groups.document_is_accessible(db, current_user, master)
             doc_data["group_ids"] = [str(g) for g in gids]
             doc_data["group_names"] = [group_name_map.get(g, str(g)) for g in gids]
         result.append({
             "id": link.get("id"),
             "entity_type": "configuration",
             "entity_id": str(iteration.id),
-            "document_id": str(doc.id),
+            "document_id": str(doc_rev.id),
             "category": link.get("category"),
             "sort_order": link.get("sort_order", 0),
             "created_at": link.get("created_at"),
@@ -787,8 +855,8 @@ async def add_config_document(
     current_user=Depends(require_permission("configuration.doc:manage")),
 ):
     """关联图文档到构型项当前迭代"""
-    doc = db.query(Document).filter(Document.id == body.document_id).first()
-    if not doc:
+    doc_rev = db.query(DocumentRevision).filter(DocumentRevision.id == body.document_id).first()
+    if not doc_rev:
         raise HTTPException(status_code=404, detail="图文档不存在")
     result = crud.get_config_item_revision_with_iteration(db, UUID(revision_id))
     if not result:
@@ -813,7 +881,7 @@ async def add_config_document(
     ip = request.client.host if request.client else None
     core_crud.create_log(db, current_user.id, current_user.username,
                          "关联图文档", "configuration", str(revision_id),
-                         f"文档:{doc.code}", ip)
+                         f"文档:{doc_rev.master.code if doc_rev.master else ''}", ip)
     return {"id": link_id, "message": "图文档关联成功"}
 
 

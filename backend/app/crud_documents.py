@@ -542,6 +542,8 @@ def list_documents(
 
             items.append(
                 {
+                    "id": str(rev.id),
+                    "revision_id": str(rev.id),
                     "master_id": str(master.id),
                     "code": master.code,
                     "name": master.name,

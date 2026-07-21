@@ -1,3 +1,4 @@
+"""图文档管理 API（三层模型：Master → Revision → Iteration）"""
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
@@ -10,11 +11,10 @@ import base64
 from ..database import get_db
 from ..models import User, DocumentMaster, DocumentRevision, DocumentIteration, DocumentAttachment, DocumentGroupLink, UserGroup, CustomFieldValue
 from ..models_parts import PartMaster, PartRevision
-from .. import crud, schemas, crud_groups
+from .. import crud, schemas, crud_groups, crud_documents
 from ..permissions import require_permission, check_object_policy
 from ..stp_converter import is_stp_file, delete_glb_cache
 from ..office_converter import is_office_file, delete_pdf_cache
-from .. import crud_documents
 
 router = APIRouter(prefix="/documents", tags=["图文档管理"])
 
@@ -28,120 +28,150 @@ def _resolve_group_names(db: Session, gids: set) -> list:
 
 
 def _checkout_user_name(db: Session, uid) -> Optional[str]:
-    """解析签出用户的真实姓名"""
     if not uid:
         return None
     u = db.query(User).filter(User.id == uid).first()
     return u.real_name if u else None
 
+
+def _build_revision_response(db: Session, revision: DocumentRevision, iteration: Optional[DocumentIteration] = None, current_user=None) -> dict:
+    """构建版本响应字典"""
+    master = revision.master
+    checkout_user_name = _checkout_user_name(db, revision.check_out_user_id)
+    creator_name = _checkout_user_name(db, revision.creator_id)
+    gids = crud_groups.get_document_group_ids(db, master.id) if master else set()
+    gnames = _resolve_group_names(db, gids)
+
+    first_att = None
+    if iteration:
+        first_att = iteration.attachments.first()
+    elif revision.latest_iteration > 0:
+        cur_iter = crud_documents._get_current_iteration(db, revision.id)
+        if cur_iter:
+            first_att = cur_iter.attachments.first()
+
+    iteration_count = (
+        db.query(DocumentIteration)
+        .filter(DocumentIteration.revision_id == revision.id)
+        .count()
+    )
+
+    result = {
+        "id": str(revision.id),
+        "master_id": str(revision.master_id),
+        "code": master.code if master else "",
+        "name": master.name if master else "",
+        "version": revision.version,
+        "status": revision.status,
+        "remark": revision.remark,
+        "check_out_user_id": str(revision.check_out_user_id) if revision.check_out_user_id else None,
+        "check_out_user_name": checkout_user_name,
+        "check_out_date": revision.check_out_date.isoformat() if revision.check_out_date else None,
+        "latest_iteration": revision.latest_iteration,
+        "iteration_count": iteration_count,
+        "revision_parent_id": str(revision.revision_parent_id) if revision.revision_parent_id else None,
+        "creator_id": str(revision.creator_id) if revision.creator_id else None,
+        "creator_name": creator_name,
+        "file_name": first_att.file_name if first_att else None,
+        "file_id": str(first_att.id) if first_att else None,
+        "file_size": first_att.file_size if first_att else None,
+        "group_ids": list(gids),
+        "group_names": gnames,
+        "accessible": crud_groups.document_is_accessible(db, current_user, master) if (master and current_user) else True,
+        "created_at": revision.created_at.isoformat() if revision.created_at else None,
+        "updated_at": revision.created_at.isoformat() if revision.created_at else None,
+        "deleted_at": revision.deleted_at.isoformat() if revision.deleted_at else None,
+    }
+    if iteration:
+        result["current_iteration"] = {
+            "id": str(iteration.id),
+            "iteration": iteration.iteration,
+            "check_in_date": iteration.check_in_date.isoformat() if iteration.check_in_date else None,
+            "check_in_note": iteration.check_in_note,
+            "created_at": iteration.created_at.isoformat() if iteration.created_at else None,
+        }
+    return result
+
+
+# ===== 列表 =====
+
 @router.get("/")
-async def list_documents(skip: int = 0, limit: int = 100, keyword: str = None, status: str = None, updated_since: float = None, brief: bool = False, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents:read"))):
-    query = db.query(Document)
-    if not updated_since:  # 非增量模式排除已删除
-        query = query.filter(Document.deleted_at.is_(None))
-    if keyword:
-        kw = f"%{keyword.strip().lower()}%"
-        query = query.filter(
-            (Document.code.ilike(kw)) | (Document.name.ilike(kw))
+async def list_documents(
+    search: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    check_out_user_id: Optional[uuid.UUID] = Query(None),
+    show_all_versions: bool = Query(False),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=10000),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:read")),
+):
+    items, total = crud_documents.list_documents(
+        db, search=search, status=status,
+        check_out_user_id=check_out_user_id,
+        show_all_versions=show_all_versions,
+        page=page, page_size=page_size,
+    )
+    return {"items": items, "total": total, "page": page, "page_size": page_size}
+
+
+# ===== 创建 =====
+
+@router.post("/")
+async def create_document(
+    doc: schemas.DocumentCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:create")),
+):
+    try:
+        master = crud_documents.create_document(db, doc.model_dump(), current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    group_ids = doc.group_ids or []
+    for gid in set(group_ids):
+        db.add(DocumentGroupLink(document_id=master.id, group_id=gid))
+    if group_ids:
+        db.commit()
+
+    revision = (
+        db.query(DocumentRevision)
+        .filter(
+            DocumentRevision.master_id == master.id,
+            DocumentRevision.version == "A",
+            DocumentRevision.deleted_at.is_(None),
         )
-    if status:
-        query = query.filter(Document.status == status)
-    if updated_since:
-        from datetime import datetime, timezone
-        since_dt = datetime.fromtimestamp(updated_since, tz=timezone.utc)
-        query = query.filter(
-            (Document.updated_at >= since_dt) |
-            (Document.deleted_at >= since_dt)
-        )
-    docs = query.offset(skip).limit(limit).all()
+        .first()
+    )
+    iteration = crud_documents._get_current_iteration(db, revision.id) if revision else None
 
-    user_group_ids = crud_groups.get_user_group_ids(db, current_user.id)
-    doc_ids = [d.id for d in docs]
-    links = db.query(DocumentGroupLink).filter(DocumentGroupLink.document_id.in_(doc_ids)).all() if doc_ids else []
-    doc_groups = {}
-    for l in links:
-        doc_groups.setdefault(l.document_id, set()).add(l.group_id)
+    ip = request.client.host if request.client else None
+    crud.create_log(db, current_user.id, current_user.username, "创建图文档", "document", str(revision.id) if revision else str(master.id), f"编号:{master.code}", ip)
+    return _build_revision_response(db, revision, iteration, current_user)
 
-    creator_ids = {d.creator_id for d in docs if d.creator_id}
-    creator_map = {}
-    if creator_ids:
-        users = db.query(User).filter(User.id.in_(creator_ids)).all()
-        creator_map = {u.id: u.real_name for u in users}
 
-    checkout_ids = {d.check_out_user_id for d in docs if d.check_out_user_id}
-    checkout_map = {}
-    if checkout_ids:
-        cus = db.query(User).filter(User.id.in_(checkout_ids)).all()
-        checkout_map = {u.id: u.real_name for u in cus}
+# ===== 引用检查 =====
 
-    all_gids = set()
-    for gids in doc_groups.values():
-        all_gids.update(gids)
-    group_name_map = {}
-    if all_gids:
-        gs = db.query(UserGroup).filter(UserGroup.id.in_(all_gids)).all()
-        group_name_map = {g.id: g.name for g in gs}
+@router.get("/{revision_id}/references")
+async def get_document_references(
+    revision_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:read_refs")),
+):
+    revision = crud_documents.get_document_revision(db, revision_id)
+    if not revision:
+        raise HTTPException(status_code=404, detail="文档版本不存在")
 
-    def _accessible(d):
-        return check_object_policy(
-            "document_content_access", current_user, d,
-            user_group_ids=user_group_ids,
-            doc_group_ids=doc_groups.get(d.id, set()),
-        )
+    doc_id_str = str(revision_id)
 
-    if brief:
-        return JSONResponse(content=[{
-            "id": str(d.id), "code": d.code, "name": d.name,
-            "version": d.version, "status": d.status, "file_name": d.file_name,
-            "file_id": str(d.file_id) if d.file_id else None,
-            "remark": d.remark,
-            "accessible": _accessible(d),
-            "group_ids": [str(g) for g in doc_groups.get(d.id, set())],
-            "group_names": [group_name_map.get(g, str(g)) for g in doc_groups.get(d.id, set())],
-            "creator_id": str(d.creator_id) if d.creator_id else None,
-            "creator_name": creator_map.get(d.creator_id, "") if d.creator_id else "",
-            "created_at": d.created_at.isoformat() if d.created_at else None,
-            "updated_at": d.updated_at.isoformat() if d.updated_at else None,
-            "deleted_at": d.deleted_at.isoformat() if d.deleted_at else None,
-            "check_out_user_id": str(d.check_out_user_id) if d.check_out_user_id else None,
-            "check_out_user_name": checkout_map.get(d.check_out_user_id) if d.check_out_user_id else None,
-            "check_out_date": d.check_out_date.isoformat() if d.check_out_date else None,
-            "latest_iteration": d.latest_iteration,
-        } for d in docs])
-    return [{
-        "id": d.id, "code": d.code, "name": d.name,
-        "version": d.version, "status": d.status,
-        "remark": d.remark,
-        "file_name": d.file_name, "file_id": d.file_id,
-        "creator_id": d.creator_id,
-        "creator_name": creator_map.get(d.creator_id, "") if d.creator_id else "",
-        "accessible": _accessible(d),
-        "group_ids": list(doc_groups.get(d.id, set())),
-        "group_names": [group_name_map.get(g, str(g)) for g in doc_groups.get(d.id, set())],
-        "created_at": d.created_at, "updated_at": d.updated_at,
-        "deleted_at": d.deleted_at,
-        "check_out_user_id": str(d.check_out_user_id) if d.check_out_user_id else None,
-        "check_out_user_name": checkout_map.get(d.check_out_user_id) if d.check_out_user_id else None,
-        "check_out_date": d.check_out_date.isoformat() if d.check_out_date else None,
-        "latest_iteration": d.latest_iteration,
-    } for d in docs]
-
-@router.get("/{doc_id}/references")
-async def get_document_references(doc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents:read_refs"))):
-    """
-    获取图文档的引用信息（扫描 document_links JSONB）
-    """
-    from ..models import DashboardItem, DashboardFolder, User, UserDashboard
-    doc_id_str = str(doc_id)
-
-    # 扫描 document_links（字段实际在 PartIteration 上：iteration -> revision -> master）
+    from ..models import DashboardItem, DashboardFolder, UserDashboard
     from ..models_parts import PartIteration
     references = []
     for it in db.query(PartIteration).all():
         for link in (it.document_links or []):
             if link.get("document_id") != doc_id_str:
                 continue
-            # 跳过已软删除的父级：软删除的零部件不应构成引用
             rev = db.query(PartRevision).filter(PartRevision.id == it.revision_id).first()
             if not rev or rev.deleted_at is not None:
                 break
@@ -160,17 +190,15 @@ async def get_document_references(doc_id: uuid.UUID, db: Session = Depends(get_d
             })
             break
 
-    # 查询用户看板中引用该图文档的记录
     dashboard_refs = db.query(DashboardItem).filter(
         DashboardItem.entity_type == 'document',
-        DashboardItem.entity_id == doc_id
+        DashboardItem.entity_id == revision.master_id,
     ).all()
-    
+
     dashboard_folders = []
     for item in dashboard_refs:
         folder = db.query(DashboardFolder).filter(DashboardFolder.id == item.folder_id).first()
         if folder:
-            # 获取文件夹完整路径
             path_parts = []
             current_folder = folder
             while current_folder:
@@ -179,12 +207,11 @@ async def get_document_references(doc_id: uuid.UUID, db: Session = Depends(get_d
                     current_folder = db.query(DashboardFolder).filter(DashboardFolder.id == current_folder.parent_id).first()
                 else:
                     current_folder = None
-            
-            # 获取用户信息（通过 dashboard 关系）
+
             dashboard = db.query(UserDashboard).filter(UserDashboard.id == folder.dashboard_id).first()
             user_id = dashboard.user_id if dashboard else None
             user = db.query(User).filter(User.id == user_id).first() if user_id else None
-            
+
             dashboard_folders.append({
                 "folder_id": str(folder.id),
                 "folder_name": folder.name,
@@ -192,148 +219,89 @@ async def get_document_references(doc_id: uuid.UUID, db: Session = Depends(get_d
                 "user_id": str(user_id) if user_id else None,
                 "user_name": user.real_name if user else "未知用户",
             })
-    
+
     return {
-        "document_id": str(doc_id),
+        "document_id": str(revision_id),
         "reference_count": len(references),
         "references": references,
         "dashboard_folder_count": len(dashboard_folders),
         "dashboard_folders": dashboard_folders,
     }
 
-@router.post("/")
-async def create_document(doc: schemas.DocumentCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents:create"))):
-    existing = db.query(Document).filter(
-        Document.code == doc.code,
-        Document.version == doc.version,
-        Document.deleted_at.is_(None),
-    ).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="该编号和版本的组合已存在")
-    data = doc.model_dump()
-    group_ids = data.pop("group_ids", None) or []
-    d = Document(**data, creator_id=current_user.id)
-    db.add(d)
-    db.flush()
-    # 自动建首个迭代并签出给创建者（对齐零件：创建即可编辑/传附件）
-    first_iter = DocumentIteration(document_id=d.id, iteration=1)
-    db.add(first_iter)
-    d.latest_iteration = 1
-    d.check_out_user_id = current_user.id
-    d.check_out_date = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(d)
-    for gid in set(group_ids):
-        db.add(DocumentGroupLink(document_id=d.id, group_id=gid))
-    if group_ids:
-        db.commit()
-    ip = request.client.host if request.client else None
-    crud.create_log(db, current_user.id, current_user.username, "创建图文档", "document", str(d.id), f"编号:{d.code}", ip)
-    return {
-        "id": d.id, "code": d.code, "name": d.name,
-        "version": d.version, "status": d.status,
-        "remark": d.remark,
-        "file_name": d.file_name, "file_id": d.file_id,
-        "creator_id": d.creator_id,
-        "creator_name": current_user.real_name,
-        "group_ids": list(set(group_ids)),
-        "created_at": d.created_at, "updated_at": d.updated_at,
-        "check_out_user_id": str(d.check_out_user_id) if d.check_out_user_id else None,
-        "check_out_user_name": current_user.real_name,
-        "check_out_date": d.check_out_date.isoformat() if d.check_out_date else None,
-        "latest_iteration": d.latest_iteration,
-    }
 
-@router.get("/{doc_id}")
-async def get_document(doc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents:read"))):
-    d = db.query(Document).filter(Document.id == doc_id).first()
-    if not d:
-        raise HTTPException(status_code=404, detail="图文档不存在")
-    creator_name = ""
-    if d.creator_id:
-        creator = db.query(User).filter(User.id == d.creator_id).first()
-        creator_name = creator.real_name if creator else ""
-    gids = crud_groups.get_document_group_ids(db, d.id)
-    return {
-        "id": d.id, "code": d.code, "name": d.name,
-        "version": d.version, "status": d.status,
-        "remark": d.remark,
-        "file_name": d.file_name, "file_id": d.file_id,
-        "creator_id": d.creator_id,
-        "creator_name": creator_name,
-        "accessible": crud_groups.document_is_accessible(db, current_user, d),
-        "group_ids": list(gids),
-        "group_names": _resolve_group_names(db, gids),
-        "created_at": d.created_at, "updated_at": d.updated_at,
-        "check_out_user_id": d.check_out_user_id,
-        "check_out_user_name": _checkout_user_name(db, d.check_out_user_id),
-        "check_out_date": d.check_out_date.isoformat() if d.check_out_date else None,
-        "latest_iteration": d.latest_iteration,
-    }
+# ===== 详情 =====
 
-@router.put("/{doc_id}")
-async def update_document(doc_id: uuid.UUID, body: schemas.DocumentUpdate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents:update"))):
-    d = db.query(Document).filter(Document.id == doc_id).first()
-    if not d:
+@router.get("/{revision_id}")
+async def get_document(
+    revision_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:read")),
+):
+    result = crud_documents.get_document_revision_with_current_iteration(db, revision_id)
+    if not result:
         raise HTTPException(status_code=404, detail="图文档不存在")
-    # 编辑门槛：仅本人已签出且草稿态可编辑（对齐零件）
-    if d.status != "draft":
-        raise HTTPException(status_code=400, detail="仅草稿状态可编辑")
-    if d.check_out_user_id is None:
+    revision, iteration = result
+    return _build_revision_response(db, revision, iteration, current_user)
+
+
+# ===== 更新 =====
+
+@router.put("/{revision_id}")
+async def update_document(
+    revision_id: uuid.UUID,
+    body: schemas.DocumentUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:update")),
+):
+    revision = crud_documents.get_document_revision(db, revision_id)
+    if not revision:
+        raise HTTPException(status_code=404, detail="图文档不存在")
+    if revision.check_out_user_id is None:
         raise HTTPException(status_code=400, detail="请先签出后再编辑")
-    if str(d.check_out_user_id) != str(current_user.id):
+    if str(revision.check_out_user_id) != str(current_user.id):
         raise HTTPException(status_code=400, detail="该文档被他人签出，无法编辑")
-    # 修改编号后须保证 (编号+版本) 仍唯一（version 不可改，按当前版本校验 code 冲突）
-    if body.code and body.code != d.code:
-        if d.version != 'A':
-            raise HTTPException(status_code=400, detail="仅 A 版允许修改编号，升版后的版本不可修改编号")
-        existing = db.query(Document).filter(
-            Document.code == body.code,
-            Document.version == d.version,
-            Document.deleted_at.is_(None),
-            Document.id != doc_id,
-        ).first()
-        if existing:
-            raise HTTPException(status_code=400, detail="该编号和版本的组合已存在")
+
     update_data = body.model_dump(exclude_unset=True)
     group_ids = update_data.pop("group_ids", None)
+
+    # 更新 master 字段
+    master = revision.master
+    master_data = {}
+    if "code" in update_data:
+        master_data["code"] = update_data.pop("code")
+    if "name" in update_data:
+        master_data["name"] = update_data.pop("name")
+    if master_data:
+        crud_documents.update_document_master(db, master.id, master_data)
+
+    # 更新 revision 字段
+    if "remark" in update_data:
+        revision.remark = update_data["remark"]
+
     if group_ids is not None:
-        db.query(DocumentGroupLink).filter(DocumentGroupLink.document_id == doc_id).delete()
+        db.query(DocumentGroupLink).filter(DocumentGroupLink.document_id == master.id).delete()
         for gid in set(group_ids):
-            db.add(DocumentGroupLink(document_id=doc_id, group_id=gid))
-    for field, value in update_data.items():
-        setattr(d, field, value)
+            db.add(DocumentGroupLink(document_id=master.id, group_id=gid))
+
     db.commit()
-    db.refresh(d)
+    db.refresh(revision)
+
     ip = request.client.host if request.client else None
-    crud.create_log(db, current_user.id, current_user.username, "更新图文档", "document", str(doc_id), None, ip)
-    creator_name = ""
-    if d.creator_id:
-        c = db.query(User).filter(User.id == d.creator_id).first()
-        creator_name = c.real_name if c else ""
-    return {
-        "id": d.id, "code": d.code, "name": d.name,
-        "version": d.version, "status": d.status,
-        "remark": d.remark,
-        "file_name": d.file_name, "file_id": d.file_id,
-        "creator_id": d.creator_id,
-        "creator_name": creator_name,
-        "group_ids": list(crud_groups.get_document_group_ids(db, d.id)),
-        "created_at": d.created_at, "updated_at": d.updated_at,
-        "check_out_user_id": d.check_out_user_id,
-        "check_out_date": d.check_out_date.isoformat() if d.check_out_date else None,
-        "latest_iteration": d.latest_iteration,
-    }
+    crud.create_log(db, current_user.id, current_user.username, "更新图文档", "document", str(revision_id), None, ip)
+
+    iteration = crud_documents._get_current_iteration(db, revision_id)
+    return _build_revision_response(db, revision, iteration)
+
+
+# ===== 删除 =====
 
 def _find_doc_refs(db, doc_id_str):
-    """精确扫描 document_links JSONB（字段位于 PartIteration），找出引用指定图文档的零部件"""
     from ..models_parts import PartIteration
     references = []
-    # document_links 字段实际在 PartIteration 上：通过 iteration -> revision -> master 关联拿 master 信息
     for it in db.query(PartIteration).all():
         for link in (it.document_links or []):
             if link.get("document_id") == doc_id_str:
-                # 跳过已软删除的父级：软删除的零部件不应构成引用限制
                 rev = db.query(PartRevision).filter(PartRevision.id == it.revision_id).first()
                 if not rev or rev.deleted_at is not None:
                     break
@@ -356,66 +324,84 @@ def _find_doc_refs(db, doc_id_str):
                 break
     return references
 
-@router.get("/{doc_id}/can-delete")
-async def check_document_can_delete(doc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents:read"))):
-    """检查图文档是否可以被删除（扫描 document_links JSONB）"""
-    d = db.query(Document).filter(Document.id == doc_id).first()
-    if not d:
+
+@router.get("/{revision_id}/can-delete")
+async def check_document_can_delete(
+    revision_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:read")),
+):
+    revision = crud_documents.get_document_revision(db, revision_id)
+    if not revision:
         raise HTTPException(status_code=404, detail="图文档不存在")
-    refs = _find_doc_refs(db, str(doc_id))
+    refs = _find_doc_refs(db, str(revision_id))
     return {
         "can_delete": len(refs) == 0,
         "ref_count": len(refs),
         "references": refs
     }
 
-@router.delete("/{doc_id}")
-async def delete_document(doc_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents:delete"))):
-    # 扫描 document_links JSONB 检查引用
-    refs = _find_doc_refs(db, str(doc_id))
+
+@router.delete("/{revision_id}")
+async def delete_document(
+    revision_id: uuid.UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:delete")),
+):
+    refs = _find_doc_refs(db, str(revision_id))
     if refs:
         labels = [f"{'零件' if r['entity_type']=='part' else '部件'} {r['code']}" for r in refs[:5]]
         raise HTTPException(status_code=400, detail=f"该图文档被 {len(refs)} 个零部件引用: {', '.join(labels)}，无法删除")
-    d = db.query(Document).filter(Document.id == doc_id).first()
-    if not d:
+
+    revision = crud_documents.get_document_revision(db, revision_id)
+    if not revision:
         raise HTTPException(status_code=404, detail="图文档不存在")
-    
-    # 删除文件系统中的附件文件
-    attachments = db.query(DocumentAttachment).filter(DocumentAttachment.document_id == doc_id).all()
-    for att in attachments:
-        if hasattr(att, 'file_path') and att.file_path:
+
+    # 删除所有迭代的附件物理文件
+    atts = db.query(DocumentAttachment).filter(DocumentAttachment.revision_id == revision_id).all()
+    for att in atts:
+        if att.file_path:
             try:
                 from ..file_storage import file_storage
                 file_storage.delete_file(att.file_path)
-                # 同步删除 glb 缓存
                 if is_stp_file(att.file_name):
                     delete_glb_cache(str(att.id))
             except Exception as e:
                 print(f"[WARNING] Failed to delete file {att.file_path}: {e}")
-    
-    # 删除数据库中的附件记录
-    db.query(DocumentAttachment).filter(DocumentAttachment.document_id == doc_id).delete()
-    # 软删除图文档元数据（保留记录用于同步感知删除）
-    d.deleted_at = func.now()
-    db.commit()
+    db.query(DocumentAttachment).filter(DocumentAttachment.revision_id == revision_id).delete()
+
+    ok = crud_documents.delete_document_revision(db, revision_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="图文档不存在")
+
     ip = request.client.host if request.client else None
-    crud.create_log(db, current_user.id, current_user.username, "软删除图文档", "document", str(doc_id), f"编号:{d.code}", ip)
+    crud.create_log(db, current_user.id, current_user.username, "软删除图文档", "document", str(revision_id), f"编号:{revision.master.code if revision.master else ''}", ip)
     return {"message": "图文档已软删除"}
 
-@router.post("/{doc_id}/attachments")
-async def upload_document_attachment(doc_id: uuid.UUID, body: schemas.DocumentAttachmentCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents.attachment:upload"))):
+
+# ===== 附件管理 =====
+
+@router.post("/{revision_id}/attachments")
+async def upload_document_attachment(
+    revision_id: uuid.UUID,
+    body: schemas.DocumentAttachmentCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents.attachment:upload")),
+):
     from ..file_storage import file_storage
-    d = db.query(Document).filter(Document.id == doc_id).first()
-    if not d:
+    revision = crud_documents.get_document_revision(db, revision_id)
+    if not revision:
         raise HTTPException(status_code=404, detail="图文档不存在")
-    # 签出校验
-    if d.check_out_user_id is None or str(d.check_out_user_id) != str(current_user.id):
+    if revision.check_out_user_id is None or str(revision.check_out_user_id) != str(current_user.id):
         raise HTTPException(status_code=400, detail="请先签出后再上传附件")
-    current_iter = crud_documents.get_current_iteration(db, d)
+
+    current_iter = crud_documents._get_current_iteration(db, revision_id)
 
     # 图文档仅允许一个附件：删除当前迭代的已有附件
     existing_atts = db.query(DocumentAttachment).filter(
-        DocumentAttachment.document_id == doc_id,
+        DocumentAttachment.revision_id == revision_id,
         DocumentAttachment.iteration_id == current_iter.id,
     ).all() if current_iter else []
     for ea in existing_atts:
@@ -430,18 +416,17 @@ async def upload_document_attachment(doc_id: uuid.UUID, body: schemas.DocumentAt
                 pass
         db.delete(ea)
 
-    # 文件校验失败（非法 base64 / 不允许的扩展名 / 文件名非法 / 超大）属于客户端数据问题，
-    # 返回 400 并带上原因，而不是裸 ValueError 冒泡成 500。binascii.Error 是 ValueError 子类，一并捕获。
     try:
         file_data_bytes = base64.b64decode(body.file_data)
-        folder_name = f"{d.code}/{d.version}/{current_iter.iteration}" if current_iter else f"{d.code}_{d.version}"
-        result = file_storage.save_file(file_data_bytes, "document", str(doc_id), body.file_name, folder_name=folder_name)
+        master = revision.master
+        folder_name = f"{master.code}/{revision.version}/{current_iter.iteration}" if current_iter else f"{master.code}_{revision.version}"
+        result = file_storage.save_file(file_data_bytes, "document", str(revision_id), body.file_name, folder_name=folder_name)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"附件上传失败: {e}")
 
     att = DocumentAttachment(
         id=body.id,
-        document_id=doc_id,
+        revision_id=revision_id,
         file_name=body.file_name,
         file_size=result["file_size"],
         file_path=result["file_path"],
@@ -450,27 +435,28 @@ async def upload_document_attachment(doc_id: uuid.UUID, body: schemas.DocumentAt
     db.add(att)
     db.commit()
     db.refresh(att)
-    d.file_name = body.file_name
-    d.file_id = att.id
-    db.commit()
-
-    # STP 文件不再自动转换，改为预览时按需转换（避免批量导入卡死）
 
     ip = request.client.host if request.client else None
-    crud.create_log(db, current_user.id, current_user.username, "上传附件", "document_att", str(doc_id), f"文件:{body.file_name}", ip)
-    return {"id": att.id, "file_name": att.file_name, "file_size": att.file_size, "created_at": att.created_at}
+    crud.create_log(db, current_user.id, current_user.username, "上传附件", "document_att", str(revision_id), f"文件:{body.file_name}", ip)
+    return {"id": str(att.id), "file_name": att.file_name, "file_size": att.file_size, "created_at": att.created_at.isoformat() if att.created_at else None}
 
-@router.get("/{doc_id}/attachments/{att_id}")
-async def download_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents.attachment:download"))):
+
+@router.get("/{revision_id}/attachments/{att_id}")
+async def download_attachment(
+    revision_id: uuid.UUID,
+    att_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents.attachment:download")),
+):
     from ..file_storage import file_storage
-    att = db.query(DocumentAttachment).filter(DocumentAttachment.id == att_id, DocumentAttachment.document_id == doc_id).first()
+    att = db.query(DocumentAttachment).filter(DocumentAttachment.id == att_id, DocumentAttachment.revision_id == revision_id).first()
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
-    
-    doc = db.query(Document).filter(Document.id == doc_id).first()
-    if doc:
-        crud_groups.enforce_document_content_access(db, current_user, doc)
-    
+
+    revision = crud_documents.get_document_revision(db, revision_id)
+    if revision:
+        crud_groups.enforce_document_content_access(db, current_user, revision.master)
+
     file_data = None
     if att.file_path:
         try:
@@ -479,41 +465,56 @@ async def download_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, db: Session 
                 file_data = base64.b64encode(data).decode('utf-8')
         except Exception as e:
             print(f"[WARNING] {e}")
-    
+
     return {
-        "id": att.id, "document_id": att.document_id,
+        "id": str(att.id), "revision_id": str(att.revision_id),
         "file_name": att.file_name, "file_size": att.file_size,
         "file_data": file_data,
-        "created_at": att.created_at,
+        "created_at": att.created_at.isoformat() if att.created_at else None,
     }
 
-@router.get("/{doc_id}/attachments/")
-async def list_attachments(doc_id: uuid.UUID, iteration_id: Optional[uuid.UUID] = None, skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents.attachment:download"))):
-    """列出文档附件。iteration_id 可选：传入时只返回该迭代的附件。"""
-    # 与单附件下载保持一致的内容访问控制：非共享成员/非创建者/非管理员不得列出附件
-    doc = db.query(Document).filter(Document.id == doc_id).first()
-    if doc:
-        crud_groups.enforce_document_content_access(db, current_user, doc)
-    query = db.query(DocumentAttachment).filter(DocumentAttachment.document_id == doc_id)
+
+@router.get("/{revision_id}/attachments/")
+async def list_attachments(
+    revision_id: uuid.UUID,
+    iteration_id: Optional[uuid.UUID] = None,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents.attachment:download")),
+):
+    revision = crud_documents.get_document_revision(db, revision_id)
+    if revision:
+        crud_groups.enforce_document_content_access(db, current_user, revision.master)
+
+    query = db.query(DocumentAttachment).filter(DocumentAttachment.revision_id == revision_id)
     if iteration_id is not None:
         query = query.filter(DocumentAttachment.iteration_id == iteration_id)
     atts = query.offset(skip).limit(limit).all()
     return [{
-        "id": a.id, "document_id": a.document_id, "iteration_id": str(a.iteration_id) if a.iteration_id else None,
-        "file_name": a.file_name, "file_size": a.file_size, "created_at": a.created_at,
+        "id": str(a.id), "revision_id": str(a.revision_id), "iteration_id": str(a.iteration_id) if a.iteration_id else None,
+        "file_name": a.file_name, "file_size": a.file_size, "created_at": a.created_at.isoformat() if a.created_at else None,
     } for a in atts]
 
-@router.delete("/{doc_id}/attachments/{att_id}")
-async def delete_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents.attachment:delete"))):
+
+@router.delete("/{revision_id}/attachments/{att_id}")
+async def delete_attachment(
+    revision_id: uuid.UUID,
+    att_id: uuid.UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents.attachment:delete")),
+):
     from ..file_storage import file_storage
-    att = db.query(DocumentAttachment).filter(DocumentAttachment.id == att_id, DocumentAttachment.document_id == doc_id).first()
+    att = db.query(DocumentAttachment).filter(DocumentAttachment.id == att_id, DocumentAttachment.revision_id == revision_id).first()
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
-    d_lock = db.query(Document).filter(Document.id == doc_id).first()
-    if d_lock:
-        if d_lock.check_out_user_id is None or str(d_lock.check_out_user_id) != str(current_user.id):
+
+    revision = crud_documents.get_document_revision(db, revision_id)
+    if revision:
+        if revision.check_out_user_id is None or str(revision.check_out_user_id) != str(current_user.id):
             raise HTTPException(status_code=400, detail="请先签出后再删除附件")
-        current_iter = crud_documents.get_current_iteration(db, d_lock)
+        current_iter = crud_documents._get_current_iteration(db, revision_id)
         if current_iter and att.iteration_id and str(att.iteration_id) != str(current_iter.id):
             raise HTTPException(status_code=400, detail="只能删除当前迭代的附件")
 
@@ -522,321 +523,208 @@ async def delete_attachment(doc_id: uuid.UUID, att_id: uuid.UUID, request: Reque
             file_storage.delete_file(att.file_path)
         except Exception as e:
             print(f"[WARNING] {e}")
-    
-    # 删除对应的 glb 缓存
+
     if is_stp_file(att.file_name):
         delete_glb_cache(str(att.id))
-
-    # 删除对应的 PDF 缓存（Office 预览）
     if is_office_file(att.file_name):
         delete_pdf_cache(str(att.id), att.file_path)
 
-    d = db.query(Document).filter(Document.id == doc_id).first()
-    if d and d.file_id == att.id:
-        d.file_id = None
-        d.file_name = None
     db.delete(att)
     db.commit()
     ip = request.client.host if request.client else None
-    crud.create_log(db, current_user.id, current_user.username, "删除附件", "document_att", str(doc_id), f"文件ID:{att_id}", ip)
+    crud.create_log(db, current_user.id, current_user.username, "删除附件", "document_att", str(revision_id), f"文件ID:{att_id}", ip)
     return {"message": "附件已删除"}
 
 
-# ===== 版本控制 (升版) =====
+# ===== 签出/签入 =====
 
-@router.post("/{doc_id}/upgrade")
-async def upgrade_document_endpoint(doc_id: uuid.UUID, body: schemas.UpgradeRequest, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents:create"))):
-    db_doc, err = crud.upgrade_document(db, doc_id, current_user.id, current_user.real_name or current_user.username)
-    if err:
-        raise HTTPException(status_code=400, detail=err)
-    ip = request.client.host if request.client else None
-    crud.create_log(db, current_user.id, current_user.username, "图文档升版", "document", str(db_doc.id), f"编号:{db_doc.code} 版本:{db_doc.version}", ip)
-    return {
-        "id": db_doc.id, "code": db_doc.code, "name": db_doc.name,
-        "version": db_doc.version, "status": db_doc.status,
-        "remark": db_doc.remark,
-        "file_name": db_doc.file_name, "file_id": db_doc.file_id,
-        "created_at": db_doc.created_at, "updated_at": db_doc.updated_at,
-    }
-
-
-# ====== 状态变更 ======
-
-@router.post("/{doc_id}/freeze")
-def freeze_document(
-    doc_id: uuid.UUID,
-    request: Request,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("documents:update")),
-):
-    doc = db.query(Document).filter(Document.id == doc_id).first()
-    if not doc:
-        raise HTTPException(status_code=404, detail="文档不存在")
-    if doc.status != "draft":
-        raise HTTPException(status_code=400, detail="仅草稿状态可冻结")
-    if doc.check_out_user_id is not None:
-        raise HTTPException(status_code=400, detail="已被签出，请先签入再冻结")
-    doc.status = "frozen"
-    db.commit()
-    db.refresh(doc)
-    ip = request.client.host if request.client else None
-    crud.create_log(db, current_user.id, current_user.username, "图文档冻结", "document", str(doc_id), f"编号:{doc.code}", ip)
-    return {"id": str(doc.id), "code": doc.code, "version": doc.version, "status": doc.status}
-
-
-@router.post("/{doc_id}/unfreeze")
-def unfreeze_document(
-    doc_id: uuid.UUID,
-    request: Request,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("documents:update")),
-):
-    doc = db.query(Document).filter(Document.id == doc_id).first()
-    if not doc:
-        raise HTTPException(status_code=404, detail="文档不存在")
-    if doc.status != "frozen":
-        raise HTTPException(status_code=400, detail="仅冻结状态可解冻")
-    doc.status = "draft"
-    db.commit()
-    db.refresh(doc)
-    ip = request.client.host if request.client else None
-    crud.create_log(db, current_user.id, current_user.username, "图文档解冻", "document", str(doc_id), f"编号:{doc.code}", ip)
-    return {"id": str(doc.id), "code": doc.code, "version": doc.version, "status": doc.status}
-
-
-@router.post("/{doc_id}/release")
-def release_document(
-    doc_id: uuid.UUID,
-    request: Request,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("documents:update")),
-):
-    doc = db.query(Document).filter(Document.id == doc_id).first()
-    if not doc:
-        raise HTTPException(status_code=404, detail="文档不存在")
-    if doc.status not in ("draft", "frozen"):
-        raise HTTPException(status_code=400, detail="仅草稿或冻结状态可发布")
-    if doc.check_out_user_id is not None:
-        raise HTTPException(status_code=400, detail="已被签出，请先签入再发布")
-    doc.status = "released"
-    db.commit()
-    db.refresh(doc)
-    ip = request.client.host if request.client else None
-    crud.create_log(db, current_user.id, current_user.username, "图文档发布", "document", str(doc_id), f"编号:{doc.code}", ip)
-    return {"id": str(doc.id), "code": doc.code, "version": doc.version, "status": doc.status}
-
-
-@router.post("/{doc_id}/obsolete")
-def obsolete_document(
-    doc_id: uuid.UUID,
-    request: Request,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("documents:update")),
-):
-    doc = db.query(Document).filter(Document.id == doc_id).first()
-    if not doc:
-        raise HTTPException(status_code=404, detail="文档不存在")
-    if doc.status != "released":
-        raise HTTPException(status_code=400, detail="仅发布状态可作废")
-    doc.status = "obsolete"
-    db.commit()
-    db.refresh(doc)
-    ip = request.client.host if request.client else None
-    crud.create_log(db, current_user.id, current_user.username, "图文档作废", "document", str(doc_id), f"编号:{doc.code}", ip)
-    return {"id": str(doc.id), "code": doc.code, "version": doc.version, "status": doc.status}
-
-
-@router.get("/{doc_id}/versions")
-async def get_document_versions_endpoint(doc_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(require_permission("documents:read"))):
-    versions = crud.get_document_versions(db, doc_id)
-    return [{
-        "id": v.id, "code": v.code, "name": v.name,
-        "version": v.version, "status": v.status,
-        "remark": v.remark,
-        "file_name": v.file_name, "file_id": v.file_id,
-        "created_at": v.created_at, "updated_at": v.updated_at,
-    } for v in versions]
-
-
-# ====== 文档签入签出 ======
-
-
-@router.post("/{doc_id}/checkout")
+@router.post("/{revision_id}/checkout")
 def checkout_document(
-    doc_id: uuid.UUID,
+    revision_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("documents:checkout")),
 ):
-    doc, err = crud_documents.checkout_document(db, doc_id, current_user.id)
+    revision, err = crud_documents.checkout_document(db, revision_id, current_user.id)
     if err:
         raise HTTPException(status_code=400, detail=err)
-    from .. import crud as crud_common
-    crud_common.create_log(db, current_user.id, current_user.username,
-                           "图文档签出", "document", str(doc.id),
-                           f"编号:{doc.code} 版本:{doc.version}", None)
-    return {
-        "id": str(doc.id),
-        "code": doc.code,
-        "name": doc.name,
-        "version": doc.version,
-        "status": doc.status,
-        "check_out_user_id": str(doc.check_out_user_id) if doc.check_out_user_id else None,
-        "check_out_user_name": current_user.real_name,
-        "check_out_date": doc.check_out_date.isoformat() if doc.check_out_date else None,
-        "latest_iteration": doc.latest_iteration,
-    }
+    crud.create_log(db, current_user.id, current_user.username,
+                    "图文档签出", "document", str(revision.id),
+                    f"编号:{revision.master.code} 版本:{revision.version}", None)
+    iteration = crud_documents._get_current_iteration(db, revision_id)
+    return _build_revision_response(db, revision, iteration)
 
 
-@router.post("/{doc_id}/checkin")
+@router.post("/{revision_id}/checkin")
 def checkin_document(
-    doc_id: uuid.UUID,
+    revision_id: uuid.UUID,
     note: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("documents:checkin")),
 ):
-    doc, err = crud_documents.checkin_document(db, doc_id, current_user.id, note)
+    revision, err = crud_documents.checkin_document(db, revision_id, current_user.id, note)
     if err:
         raise HTTPException(status_code=400, detail=err)
-    from .. import crud as crud_common
-    crud_common.create_log(db, current_user.id, current_user.username,
-                           "图文档签入", "document", str(doc.id),
-                           f"编号:{doc.code} 版本:{doc.version} 备注:{note or ''}", None)
-    return {
-        "id": str(doc.id),
-        "code": doc.code,
-        "name": doc.name,
-        "version": doc.version,
-        "status": doc.status,
-        "check_out_user_id": None,
-        "check_out_user_name": None,
-        "check_out_date": None,
-        "latest_iteration": doc.latest_iteration,
-    }
+    crud.create_log(db, current_user.id, current_user.username,
+                    "图文档签入", "document", str(revision.id),
+                    f"编号:{revision.master.code} 版本:{revision.version} 备注:{note or ''}", None)
+    iteration = crud_documents._get_current_iteration(db, revision_id)
+    return _build_revision_response(db, revision, iteration)
 
 
-@router.post("/{doc_id}/undo-checkout")
+@router.post("/{revision_id}/undocheckout")
 def undo_checkout_document(
-    doc_id: uuid.UUID,
+    revision_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("documents:undocheckout")),
 ):
-    doc, err = crud_documents.undo_checkout_document(db, doc_id, current_user.id)
+    revision, err = crud_documents.undocheckout_document(db, revision_id, current_user.id)
     if err:
         raise HTTPException(status_code=400, detail=err)
-    from .. import crud as crud_common
-    crud_common.create_log(db, current_user.id, current_user.username,
-                           "图文档撤销签出", "document", str(doc.id),
-                           f"编号:{doc.code} 版本:{doc.version}", None)
-    return {
-        "id": str(doc.id),
-        "code": doc.code,
-        "name": doc.name,
-        "version": doc.version,
-        "status": doc.status,
-        "check_out_user_id": None,
-        "check_out_user_name": None,
-        "check_out_date": None,
-        "latest_iteration": doc.latest_iteration,
-    }
+    crud.create_log(db, current_user.id, current_user.username,
+                    "图文档撤销签出", "document", str(revision.id),
+                    f"编号:{revision.master.code} 版本:{revision.version}", None)
+    iteration = crud_documents._get_current_iteration(db, revision_id)
+    return _build_revision_response(db, revision, iteration)
 
 
-@router.post("/{doc_id}/force-checkin")
+@router.post("/{revision_id}/force-checkin")
 def force_checkin_document_endpoint(
-    doc_id: uuid.UUID,
+    revision_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("documents:force_checkin")),
 ):
-    doc, err = crud_documents.force_checkin_document(db, doc_id)
+    revision, err = crud_documents.force_checkin_document(db, revision_id)
     if err:
         raise HTTPException(status_code=400, detail=err)
-    from .. import crud as crud_common
-    crud_common.create_log(db, current_user.id, current_user.username,
-                           "图文档强制签入", "document", str(doc.id),
-                           f"编号:{doc.code} 版本:{doc.version}", None)
-    return {
-        "id": str(doc.id),
-        "code": doc.code,
-        "name": doc.name,
-        "version": doc.version,
-        "status": doc.status,
-        "check_out_user_id": None,
-        "check_out_user_name": None,
-        "check_out_date": None,
-        "latest_iteration": doc.latest_iteration,
-    }
+    crud.create_log(db, current_user.id, current_user.username,
+                    "图文档强制签入", "document", str(revision.id),
+                    f"编号:{revision.master.code} 版本:{revision.version}", None)
+    iteration = crud_documents._get_current_iteration(db, revision_id)
+    return _build_revision_response(db, revision, iteration)
 
 
-@router.get("/{doc_id}/iterations")
-def get_document_iterations(
-    doc_id: uuid.UUID,
+# ===== 升版 =====
+
+@router.post("/{revision_id}/upgrade")
+async def upgrade_document_endpoint(
+    revision_id: uuid.UUID,
+    body: schemas.UpgradeRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:create")),
+):
+    new_rev, err = crud_documents.upgrade_document(db, revision_id, current_user.id)
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    ip = request.client.host if request.client else None
+    crud.create_log(db, current_user.id, current_user.username, "图文档升版", "document", str(new_rev.id), f"编号:{new_rev.master.code} 版本:{new_rev.version}", ip)
+    iteration = crud_documents._get_current_iteration(db, new_rev.id)
+    return _build_revision_response(db, new_rev, iteration)
+
+
+# ===== 状态变更 =====
+
+@router.post("/{revision_id}/freeze")
+def freeze_document(
+    revision_id: uuid.UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:update")),
+):
+    revision, err = crud_documents.freeze_document(db, revision_id)
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    ip = request.client.host if request.client else None
+    crud.create_log(db, current_user.id, current_user.username, "图文档冻结", "document", str(revision_id), f"编号:{revision.master.code}", ip)
+    iteration = crud_documents._get_current_iteration(db, revision_id)
+    return _build_revision_response(db, revision, iteration)
+
+
+@router.post("/{revision_id}/release")
+def release_document(
+    revision_id: uuid.UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:update")),
+):
+    revision, err = crud_documents.release_document(db, revision_id)
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    ip = request.client.host if request.client else None
+    crud.create_log(db, current_user.id, current_user.username, "图文档发布", "document", str(revision_id), f"编号:{revision.master.code}", ip)
+    iteration = crud_documents._get_current_iteration(db, revision_id)
+    return _build_revision_response(db, revision, iteration)
+
+
+@router.post("/{revision_id}/obsolete")
+def obsolete_document(
+    revision_id: uuid.UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:update")),
+):
+    revision, err = crud_documents.obsolete_document(db, revision_id)
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    ip = request.client.host if request.client else None
+    crud.create_log(db, current_user.id, current_user.username, "图文档作废", "document", str(revision_id), f"编号:{revision.master.code}", ip)
+    iteration = crud_documents._get_current_iteration(db, revision_id)
+    return _build_revision_response(db, revision, iteration)
+
+
+# ===== 版本历史 =====
+
+@router.get("/{revision_id}/versions")
+async def get_document_versions_endpoint(
+    revision_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("documents:read")),
 ):
-    return crud_documents.list_iterations(db, doc_id)
+    revision = crud_documents.get_document_revision(db, revision_id)
+    if not revision:
+        raise HTTPException(status_code=404, detail="文档版本不存在")
+    versions = crud_documents.list_revisions_by_master(db, revision.master_id)
+    master = revision.master
+    return [{
+        "id": str(v.id),
+        "code": master.code if master else "",
+        "name": master.name if master else "",
+        "version": v.version,
+        "status": v.status,
+        "remark": v.remark,
+        "created_at": v.created_at.isoformat() if v.created_at else None,
+    } for v in versions]
 
 
-@router.delete("/{doc_id}/iterations/{iteration_id}")
+# ===== 迭代列表 =====
+
+@router.get("/{revision_id}/iterations")
+def get_document_iterations(
+    revision_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:read")),
+):
+    revision = crud_documents.get_document_revision(db, revision_id)
+    if not revision:
+        raise HTTPException(status_code=404, detail="文档版本不存在")
+    return crud_documents.list_iterations(db, revision_id)
+
+
+@router.delete("/{revision_id}/iterations/{iteration_id}")
 def delete_document_iteration(
-    doc_id: uuid.UUID,
+    revision_id: uuid.UUID,
     iteration_id: uuid.UUID,
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("documents:delete")),
 ):
-    """管理员删除指定迭代（含物理附件文件）"""
-    from ..file_storage import file_storage
-    d = db.query(Document).filter(Document.id == doc_id).first()
-    if not d:
-        raise HTTPException(status_code=404, detail="文档不存在")
-    target = db.query(DocumentIteration).filter(
-        DocumentIteration.id == iteration_id,
-        DocumentIteration.document_id == doc_id,
-    ).first()
-    if not target:
-        raise HTTPException(status_code=404, detail="迭代不存在")
-
-    total = db.query(DocumentIteration).filter(
-        DocumentIteration.document_id == doc_id,
-    ).count()
-    if total <= 1:
-        raise HTTPException(status_code=400, detail="至少需保留一个迭代")
-
-    # 删除该迭代的附件及物理文件
-    atts = db.query(DocumentAttachment).filter(
-        DocumentAttachment.iteration_id == iteration_id,
-    ).all()
-    for att in atts:
-        if att.file_path:
-            try:
-                file_storage.delete_file(att.file_path)
-                if is_stp_file(att.file_name):
-                    delete_glb_cache(str(att.id))
-            except Exception:
-                pass
-        db.delete(att)
-
-    # 清理该迭代的自定义字段值
-    db.query(CustomFieldValue).filter(
-        CustomFieldValue.iteration_id == iteration_id,
-    ).delete(synchronize_session=False)
-
-    # 如果删除的是当前最新迭代，回退 latest_iteration
-    if target.iteration == d.latest_iteration:
-        prev = db.query(DocumentIteration).filter(
-            DocumentIteration.document_id == doc_id,
-            DocumentIteration.iteration < target.iteration,
-        ).order_by(DocumentIteration.iteration.desc()).first()
-        d.latest_iteration = prev.iteration if prev else 1
-        # 如果文档被这个迭代签出，也解除
-        if d.check_out_user_id is not None:
-            d.check_out_user_id = None
-            d.check_out_date = None
-
-    db.delete(target)
-    db.commit()
+    ok, err = crud_documents.delete_iteration(db, revision_id, iteration_id)
+    if err:
+        raise HTTPException(status_code=400 if err != "版本不存在" else 404, detail=err)
+    revision = crud_documents.get_document_revision(db, revision_id)
 
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username,
                     "删除图文档迭代", "document_iteration", str(iteration_id),
-                    f"编号:{d.code} 迭代:{target.iteration}", ip)
-    return {"message": "迭代已删除", "latest_iteration": d.latest_iteration}
+                    f"编号:{revision.master.code if revision and revision.master else ''}", ip)
+    return {"message": "迭代已删除", "latest_iteration": revision.latest_iteration if revision else 0}

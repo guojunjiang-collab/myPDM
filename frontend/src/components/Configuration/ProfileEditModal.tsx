@@ -896,7 +896,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                 <ConfigItemPicker
                   open={cfgPickOpen}
                   onClose={() => setCfgPickOpen(false)}
-                  onConfirm={handleChangeConfigItem}
+                  onConfirm={(items) => { if (items.length > 0) handleChangeConfigItem({ id: items[0].child_revision_id, code: '', name: '' }); }}
                   excludeId={form.configuration_item_revision_id || undefined}
                 />
 

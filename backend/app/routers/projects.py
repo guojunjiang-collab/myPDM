@@ -485,7 +485,7 @@ def _task_dict(db, t):
             "sort_order": t.sort_order, "description": t.description}
 
 
-_ENTITY_TABLE = {"part": "part_masters", "assembly": "part_masters", "component": "part_masters", "document": "documents", "config_item": "configuration_items"}
+_ENTITY_TABLE = {"part": "part_masters", "assembly": "part_masters", "component": "part_masters", "document": "document_revisions", "config_item": "configuration_item_masters"}
 
 
 def _link_dict(db, l):
@@ -500,10 +500,13 @@ def _link_dict(db, l):
             ).fetchone()
             if row:
                 code, name, spec, remark, master_id = row[0], row[1], row[2] if len(row) > 2 else None, row[3] if len(row) > 3 else None, row[4] if len(row) > 4 else None
-        elif table == "documents":
+        elif table == "document_revisions":
             row = db.execute(
-                text(f"SELECT code, name, NULL AS spec, remark FROM {table} WHERE id = :id"), {"id": str(l.entity_id)}
+                text("SELECT dm.code, dm.name, NULL AS spec, dr.remark, dm.id as master_id FROM document_revisions dr JOIN document_masters dm ON dm.id = dr.master_id WHERE dr.id = :id"),
+                {"id": str(l.entity_id)}
             ).fetchone()
+            if row:
+                code, name, spec, remark, master_id = row[0], row[1], row[2] if len(row) > 2 else None, row[3] if len(row) > 3 else None, row[4] if len(row) > 4 else None
         else:
             row = db.execute(
                 text(f"SELECT code, name, spec, remark FROM {table} WHERE id = :id"), {"id": str(l.entity_id)}

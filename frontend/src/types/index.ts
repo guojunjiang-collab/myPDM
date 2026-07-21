@@ -16,7 +16,6 @@ export interface Part {
   id: string;
   code: string;
   name: string;
-  spec?: string;
   version?: string;
   status: 'draft' | 'frozen' | 'released' | 'obsolete';
   remark?: string;
@@ -30,7 +29,6 @@ export interface Assembly {
   id: string;
   code: string;
   name: string;
-  spec?: string;
   version?: string;
   status: 'draft' | 'frozen' | 'released' | 'obsolete';
   remark?: string;
@@ -179,6 +177,7 @@ export interface DocumentMaster {
 
 export interface DocumentRevision {
   id: string;
+  revision_id?: string;
   master_id: string;
   code: string;
   name: string;

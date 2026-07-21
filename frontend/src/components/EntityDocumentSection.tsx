@@ -377,6 +377,16 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
                         <span className="inline-flex items-center gap-2">
                           {hasEditableAction ? (
                             <>
+                              {ed.document.file_id && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); handlePreviewAttachment(ed.document.file_id!, ed.document.file_name!); }}
+                                  className="text-blue-600 hover:text-blue-800 text-xs"
+                                  title="预览"
+                                >
+                                  预览
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); setVersionSelectState({ edocId: ed.id, documentId: ed.document_id, docCode: ed.document.code }); }}
@@ -564,7 +574,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
       {/* 图文档详情弹窗（复用 DocumentDetailModal） */}
       <DocumentDetailModal
         open={!!viewingDocId}
-        docId={viewingDocId}
+        revisionId={viewingDocId}
         onClose={() => setViewingDocId(null)}
         onSaved={() => {}}
       />

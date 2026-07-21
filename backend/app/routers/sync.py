@@ -36,9 +36,9 @@ async def sync_status(
     """
     return {
         "parts": _max_ts(db, "part_masters"),
-        "documents": _max_ts(db, "documents"),
+        "documents": _max_ts(db, "document_revisions"),
         "bom_items": _max_ts(db, "bom_items"),
         "ecrs": _max_ts(db, "ecrs"),
         "ecos": _max_ts(db, "ecos"),
-        "config_items": _max_ts(db, "configuration_items"),
+        "config_items": _max_ts(db, "configuration_item_masters"),
     }

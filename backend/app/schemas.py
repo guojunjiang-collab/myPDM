@@ -209,34 +209,53 @@ class CustomFieldValueResponse(BaseSchema):
     iteration_id: Optional[uuid.UUID] = None
 
 
-# ===== 图文档 Schema =====
+# ===== 图文档 Schema（三层模型：Master → Revision → Iteration） =====
 
-class DocumentBase(BaseSchema):
+class DocumentCreate(BaseSchema):
+    """创建文档：自动生成 Master + Revision(A=draft) + Iteration(1)，并签出"""
     code: str = Field(..., min_length=1, max_length=64)
     name: str = Field(..., min_length=1, max_length=255)
-    version: str = "A"
-    status: str = "draft"
     remark: Optional[str] = None
-
-
-class DocumentCreate(DocumentBase):
-    id: Optional[uuid.UUID] = None
     group_ids: Optional[List[uuid.UUID]] = None
 
 class DocumentUpdate(BaseSchema):
+    """更新文档主数据/版本（仅草稿态+本人签出）"""
     code: Optional[str] = None
     name: Optional[str] = None
-    version: Optional[str] = None
-    status: Optional[str] = None
     remark: Optional[str] = None
     group_ids: Optional[List[uuid.UUID]] = None
 
-class DocumentResponse(DocumentBase):
+class DocumentRevisionOut(BaseSchema):
+    """版本响应（列表/详情共用）"""
     id: uuid.UUID
+    master_id: uuid.UUID
+    code: str
+    name: str
+    version: str
+    status: str
+    remark: Optional[str] = None
+    check_out_user_id: Optional[uuid.UUID] = None
+    check_out_user_name: Optional[str] = None
+    check_out_date: Optional[datetime] = None
+    latest_iteration: int
+    iteration_count: Optional[int] = None
+    revision_parent_id: Optional[uuid.UUID] = None
+    creator_id: Optional[uuid.UUID] = None
+    creator_name: Optional[str] = None
     file_name: Optional[str] = None
     file_id: Optional[uuid.UUID] = None
-    created_at: datetime
-    updated_at: datetime
+    file_size: Optional[int] = None
+    group_ids: Optional[List[uuid.UUID]] = None
+    group_names: Optional[List[str]] = None
+    accessible: Optional[bool] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    deleted_at: Optional[datetime] = None
+
+class DocumentDetailOut(DocumentRevisionOut):
+    """文档详情响应（含当前迭代的 document_links / attachments）"""
+    current_iteration: Optional[dict] = None
+    iterations: Optional[List[dict]] = None
 
 class DocumentAttachmentCreate(BaseSchema):
     id: Optional[uuid.UUID] = None
@@ -245,7 +264,8 @@ class DocumentAttachmentCreate(BaseSchema):
 
 class DocumentAttachmentResponse(BaseSchema):
     id: uuid.UUID
-    document_id: uuid.UUID
+    revision_id: uuid.UUID
+    iteration_id: Optional[uuid.UUID] = None
     file_name: Optional[str] = None
     file_size: Optional[int] = None
     created_at: datetime
@@ -256,7 +276,7 @@ class DocumentAttachmentFull(DocumentAttachmentResponse):
 class EntityDocumentCreate(BaseSchema):
     """关联图文档到零件/部件的请求体"""
     id: Optional[uuid.UUID] = None
-    document_id: uuid.UUID
+    document_id: uuid.UUID  # 此字段使用 document_revision_id（历史命名保留）
     category: Optional[str] = None
     sort_order: int = 0
 

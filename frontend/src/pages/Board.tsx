@@ -542,7 +542,7 @@ export default function Board() {
       {detailDocId && (
         <DocumentDetailModal
           open={!!detailDocId}
-          docId={detailDocId}
+          revisionId={detailDocId}
           onClose={() => setDetailDocId(null)}
           onSaved={() => {}}
         />

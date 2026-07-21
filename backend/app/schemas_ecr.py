@@ -48,7 +48,7 @@ class ECRReviewRecordItem(BaseModel):
 
 class ECRDocumentLinkItem(BaseModel):
     """关联图文档项"""
-    document_id: str
+    document_id: str  # 现为 DocumentRevision.id（历史命名保留）
     document_code: str
     document_name: str
     document_version: str

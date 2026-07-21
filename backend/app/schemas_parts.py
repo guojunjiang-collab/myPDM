@@ -11,7 +11,6 @@ from pydantic import BaseModel
 class PartMasterBase(BaseModel):
     code: str
     name: str
-    spec: Optional[str] = None
 
 
 class PartMasterCreate(PartMasterBase):

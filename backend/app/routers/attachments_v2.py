@@ -11,7 +11,7 @@ import asyncio
 from pathlib import Path
 
 from ..database import get_db
-from ..models import User, DocumentAttachment, Document, DocumentIteration
+from ..models import User, DocumentAttachment, DocumentRevision, DocumentIteration
 from ..models_parts import PartMaster
 from ..file_storage import file_storage, chunked_uploader, MAX_FILE_SIZE, CHUNK_SIZE
 from .auth import get_current_active_user
@@ -144,24 +144,23 @@ async def upload_file(
     try:
         # 保存文件到文件系统（图文档使用 编号/版本/迭代 分层路径，对齐零部件）
         folder_name = None
-        doc = None
+        doc_rev = None
         current_iter = None
         if entity_type in ("document", "documents"):
-            doc = db.query(Document).filter(Document.id == uuid.UUID(entity_id)).first()
-            if doc:
-                # 签出校验
-                if doc.check_out_user_id is None or str(doc.check_out_user_id) != str(current_user.id):
+            doc_rev = db.query(DocumentRevision).filter(DocumentRevision.id == uuid.UUID(entity_id)).first()
+            if doc_rev:
+                if doc_rev.check_out_user_id is None or str(doc_rev.check_out_user_id) != str(current_user.id):
                     raise HTTPException(status_code=400, detail="请先签出后再上传附件")
-                if doc.latest_iteration and doc.latest_iteration > 0:
+                if doc_rev.latest_iteration and doc_rev.latest_iteration > 0:
                     current_iter = db.query(DocumentIteration).filter(
-                        DocumentIteration.document_id == doc.id,
-                        DocumentIteration.iteration == doc.latest_iteration,
+                        DocumentIteration.revision_id == doc_rev.id,
+                        DocumentIteration.iteration == doc_rev.latest_iteration,
                     ).first()
-                folder_name = f"{doc.code}/{doc.version}/{current_iter.iteration}" if current_iter else f"{doc.code}_{doc.version}"
-                # 图文档仅允许一个附件
+                master = doc_rev.master
+                folder_name = f"{master.code}/{doc_rev.version}/{current_iter.iteration}" if current_iter else f"{master.code}_{doc_rev.version}"
                 if current_iter:
                     old_atts = db.query(DocumentAttachment).filter(
-                        DocumentAttachment.document_id == doc.id,
+                        DocumentAttachment.revision_id == doc_rev.id,
                         DocumentAttachment.iteration_id == current_iter.id,
                     ).all()
                     for oa in old_atts:
@@ -189,23 +188,16 @@ async def upload_file(
         att_id = str(uuid.uuid4())
         new_att = DocumentAttachment(
             id=att_id,
-            document_id=uuid.UUID(entity_id) if entity_type in ("document", "documents") else None,
+            revision_id=uuid.UUID(entity_id) if entity_type in ("document", "documents") else None,
             file_name=result["filename"],
             file_size=result["file_size"],
-            file_path=result["file_path"],  # 保存文件路径
-            file_hash=result.get("file_hash", ""),  # 保存文件哈希
+            file_path=result["file_path"],
+            file_hash=result.get("file_hash", ""),
             iteration_id=current_iter.id if current_iter else None,
         )
         
         db.add(new_att)
-        db.flush()  # 先刷新到数据库，确保记录被创建
-        
-        # 如果是图文档，更新 documents 表的 file_name 和 file_id
-        if entity_type in ("document", "documents"):
-            doc = db.query(Document).filter(Document.id == uuid.UUID(entity_id)).first()
-            if doc:
-                doc.file_name = result["filename"]
-                doc.file_id = uuid.UUID(att_id)
+        db.flush()
         
         db.commit()
         db.refresh(new_att)
@@ -259,15 +251,17 @@ async def init_chunked_upload(
         # 图文档使用 编号/版本/迭代 分层路径（对齐零部件）
         folder_name = None
         if entity_type in ("document", "documents"):
-            doc = db.query(Document).filter(Document.id == uuid.UUID(entity_id)).first()
-            if doc and doc.latest_iteration and doc.latest_iteration > 0:
+            doc_rev = db.query(DocumentRevision).filter(DocumentRevision.id == uuid.UUID(entity_id)).first()
+            if doc_rev and doc_rev.latest_iteration and doc_rev.latest_iteration > 0:
                 current_iter = db.query(DocumentIteration).filter(
-                    DocumentIteration.document_id == doc.id,
-                    DocumentIteration.iteration == doc.latest_iteration,
+                    DocumentIteration.revision_id == doc_rev.id,
+                    DocumentIteration.iteration == doc_rev.latest_iteration,
                 ).first()
-                folder_name = f"{doc.code}/{doc.version}/{current_iter.iteration}" if current_iter else f"{doc.code}_{doc.version}"
-            elif doc:
-                folder_name = f"{doc.code}_{doc.version}"
+                master = doc_rev.master
+                folder_name = f"{master.code}/{doc_rev.version}/{current_iter.iteration}" if current_iter else f"{master.code}_{doc_rev.version}"
+            elif doc_rev:
+                master = doc_rev.master
+                folder_name = f"{master.code}_{doc_rev.version}"
         elif entity_type in ("component", "components"):
             from ..models_parts import PartMaster
             comp = db.query(PartMaster).filter(PartMaster.id == uuid.UUID(entity_id)).first()
@@ -355,22 +349,21 @@ async def complete_chunked_upload(
         file_info = result["file_info"]
 
         # 图文档签出校验 + 绑定当前迭代
-        doc = None
+        doc_rev = None
         current_iter = None
         if file_info["entity_type"] in ("document", "documents"):
-            doc = db.query(Document).filter(Document.id == uuid.UUID(file_info["entity_id"])).first()
-            if doc:
-                if doc.check_out_user_id is None or str(doc.check_out_user_id) != str(current_user.id):
+            doc_rev = db.query(DocumentRevision).filter(DocumentRevision.id == uuid.UUID(file_info["entity_id"])).first()
+            if doc_rev:
+                if doc_rev.check_out_user_id is None or str(doc_rev.check_out_user_id) != str(current_user.id):
                     raise HTTPException(status_code=400, detail="请先签出后再上传附件")
-                if doc.latest_iteration and doc.latest_iteration > 0:
+                if doc_rev.latest_iteration and doc_rev.latest_iteration > 0:
                     current_iter = db.query(DocumentIteration).filter(
-                        DocumentIteration.document_id == doc.id,
-                        DocumentIteration.iteration == doc.latest_iteration,
+                        DocumentIteration.revision_id == doc_rev.id,
+                        DocumentIteration.iteration == doc_rev.latest_iteration,
                     ).first()
-                # 图文档仅允许一个附件：删除已有附件
                 if current_iter:
                     old_atts = db.query(DocumentAttachment).filter(
-                        DocumentAttachment.document_id == doc.id,
+                        DocumentAttachment.revision_id == doc_rev.id,
                         DocumentAttachment.iteration_id == current_iter.id,
                     ).all()
                     for oa in old_atts:
@@ -383,26 +376,16 @@ async def complete_chunked_upload(
         att_id = str(uuid.uuid4())
         new_att = DocumentAttachment(
             id=att_id,
-            document_id=uuid.UUID(file_info["entity_id"]) if file_info["entity_type"] in ("document", "documents") else None,
+            revision_id=uuid.UUID(file_info["entity_id"]) if file_info["entity_type"] in ("document", "documents") else None,
             file_name=file_info["filename"],
             file_size=file_info["file_size"],
-            file_path=file_info["file_path"],  # 保存文件路径
-            file_hash=file_info.get("file_hash", ""),  # 保存文件哈希
+            file_path=file_info["file_path"],
+            file_hash=file_info.get("file_hash", ""),
             iteration_id=current_iter.id if current_iter else None,
         )
         
         db.add(new_att)
-        db.flush()  # 先刷新到数据库，确保记录被创建
-        
-        # 如果是图文档，更新 documents 表的 file_name 和 file_id
-        print(f"[DEBUG] entity_type: {file_info['entity_type']}, entity_id: {file_info['entity_id']}")
-        if file_info["entity_type"] in ("document", "documents"):
-            doc = db.query(Document).filter(Document.id == uuid.UUID(file_info["entity_id"])).first()
-            print(f"[DEBUG] doc query result: {doc}")
-            if doc:
-                doc.file_name = file_info["filename"]
-                doc.file_id = uuid.UUID(att_id)
-                print(f"[DEBUG] Updated doc: file_name={doc.file_name}, file_id={doc.file_id}")
+        db.flush()
         
         db.commit()
         db.refresh(new_att)

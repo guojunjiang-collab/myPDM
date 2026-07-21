@@ -2,17 +2,17 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Modal } from './Modal';
 import { Loading } from './Loading';
 import { toast } from './Toast';
-import { useAuthStore, isAdmin } from '../stores/auth';
+import { useAuthStore, isAdmin as checkIsAdmin } from '../stores/auth';
 import { documentsApi, customFieldsApi, mediaApi, v2UploadApi, CHUNK_SIZE, CHUNK_THRESHOLD, userGroupsApi } from '../services/api';
 import CustomFieldInput from './CustomFieldInput';
 import { previewAttachment } from '../utils/attachmentPreview';
 import ArchiveTreeModal from './ArchiveTreeModal';
 import { formatDateTime } from '../utils/date';
-import type { Document, DocumentIteration, DocumentAttachment, CustomFieldDefinition } from '../types';
+import type { DocumentRevision, DocumentIteration, CustomFieldDefinition } from '../types';
 
 interface Props {
   open: boolean;
-  docId: string | null;
+  revisionId: string | null;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -33,58 +33,53 @@ const statusTag = (s: string) => {
   return tags[s] || { label: s, class: 'bg-gray-100 text-gray-800' };
 };
 
-type TabKey = 'info' | 'versions' | 'iterations';
+type TabKey = 'attachments' | 'versions' | 'iterations' | 'custom-fields';
 
-export default function DocumentDetailModal({ open, docId, onClose, onSaved }: Props) {
+interface AttInfo {
+  id: string;
+  file_name: string;
+  file_size: number;
+  created_at: string;
+}
+
+export default function DocumentDetailModal({ open, revisionId, onClose, onSaved }: Props) {
   const user = useAuthStore((s) => s.user);
-  const [doc, setDoc] = useState<Document | null>(null);
+  const [doc, setDoc] = useState<DocumentRevision | null>(null);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabKey>('info');
-  const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
+  const [activeTab, setActiveTab] = useState<TabKey>('attachments');
+  const [attachments, setAttachments] = useState<AttInfo[]>([]);
   const [iterations, setIterations] = useState<DocumentIteration[]>([]);
-  const [versions, setVersions] = useState<Document[]>([]);
-  // 自定义字段定义与值
+  const [versions, setVersions] = useState<DocumentRevision[]>([]);
   const [cfDefs, setCfDefs] = useState<CustomFieldDefinition[]>([]);
   const [cfValues, setCfValues] = useState<Record<string, any>>({});
-  // 当前正在查看的迭代 id（null=查看当前最新迭代）
   const [viewingIterationId, setViewingIterationId] = useState<string | null>(null);
-  // 当前正在查看的版本 id（null=查看 prop 传入的当前版本）
   const [viewingVersionId, setViewingVersionId] = useState<string | null>(null);
-  // 切换版本时显示的附件迭代过滤器（不与 viewingIterationId 互锁）
   const [editForm, setEditForm] = useState({ code: '', name: '', remark: '' });
   const [showCheckinModal, setShowCheckinModal] = useState(false);
   const [checkinNote, setCheckinNote] = useState('');
   const [uploading, setUploading] = useState(false);
-  // 压缩包预览弹窗
   const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
-
-  // 用户组
   const [allGroups, setAllGroups] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+
+  const effectiveRevisionId = viewingVersionId || revisionId;
+  const isViewingOtherVersion = !!viewingVersionId && viewingVersionId !== revisionId;
+  const currentRevisionId = revisionId;
 
   const isCheckedOut = !!doc?.check_out_user_id;
   const isCheckedOutByMe = isCheckedOut && doc?.check_out_user_id === user?.id;
   const isDraft = doc?.status === 'draft';
-
-  // 实际加载/展示的文档 id：viewingVersionId 优先，否则用 prop 传入的 docId
-  const effectiveDocId = viewingVersionId || docId;
-  // 是否在查看历史版本（不是打开时传入的那个版本）
-  const isViewingOtherVersion = !!viewingVersionId && viewingVersionId !== docId;
-  // 当前版本 id（即 prop 传入的 docId）
-  const currentVersionId = docId;
-
   const canEdit = isCheckedOutByMe && isDraft && !isViewingOtherVersion;
   const canCheckout = isDraft && !isCheckedOut && !isViewingOtherVersion;
   const canCheckin = isDraft && isCheckedOutByMe && !isViewingOtherVersion;
   const canUndo = isDraft && isCheckedOutByMe && (doc?.latest_iteration || 0) > 1 && !isViewingOtherVersion;
-  const canRelease = (doc?.status === 'draft' || doc?.status === 'frozen') && !isCheckedOut && !isViewingOtherVersion;
   const canFreeze = doc?.status === 'draft' && !isCheckedOut && !isViewingOtherVersion;
-  const canUnfreeze = doc?.status === 'frozen' && isAdmin();
+  const canUnfreeze = doc?.status === 'frozen' && checkIsAdmin();
+  const canRelease = (doc?.status === 'draft' || doc?.status === 'frozen') && !isCheckedOut && !isViewingOtherVersion;
   const canUpgrade = (doc?.status === 'released' || doc?.status === 'obsolete') && !isViewingOtherVersion;
   const canObsolete = doc?.status === 'released' && !isViewingOtherVersion;
-  const canForceCheckin = isCheckedOut && isAdmin() && !isViewingOtherVersion;
+  const canForceCheckin = isCheckedOut && checkIsAdmin() && !isViewingOtherVersion;
 
-  // 当前迭代 id：未签入的迭代（最新且无 check_in_date）；若都已签入则取 iteration 最大的
   const currentIterationId = useMemo(() => {
     const ongoing = iterations.find((it) => !it.check_in_date);
     if (ongoing) return ongoing.id;
@@ -92,15 +87,14 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
     return iterations.reduce((max, it) => (it.iteration > max.iteration ? it : max)).id;
   }, [iterations]);
 
-  // 请求序号：用于丢弃过期（乱序返回）的附件请求结果，避免竞态
   const loadSeq = useRef(0);
 
   const loadDoc = useCallback(async () => {
-    if (!effectiveDocId) return;
+    if (!effectiveRevisionId) return;
     setLoading(true);
     try {
-      const res = await documentsApi.get(effectiveDocId);
-      const d = (res.data ?? res) as Document;
+      const res = await documentsApi.detail(effectiveRevisionId);
+      const d = (res.data ?? res) as DocumentRevision;
       setDoc(d);
       setEditForm({ code: d.code || '', name: d.name || '', remark: d.remark || '' });
     } catch (e) {
@@ -108,55 +102,51 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
     } finally {
       setLoading(false);
     }
-  }, [effectiveDocId]);
+  }, [effectiveRevisionId]);
 
   const loadAttachments = useCallback(async (iterId?: string | null) => {
-    if (!effectiveDocId) return;
+    if (!effectiveRevisionId) return;
     const seq = ++loadSeq.current;
     try {
-      // 始终按迭代过滤：传入 iterId 用指定，否则用当前迭代
       const finalIterId = iterId ?? viewingIterationId ?? currentIterationId;
-      const res = await documentsApi.listAttachments(effectiveDocId, finalIterId || undefined);
-      // 丢弃过期请求：仅最后一次发起的请求可写入状态，避免乱序返回覆盖正确结果
+      const res = await documentsApi.listAttachments(effectiveRevisionId, finalIterId || undefined);
       if (seq !== loadSeq.current) return;
-      setAttachments((res.data || []) as DocumentAttachment[]);
+      setAttachments((res.data || []) as AttInfo[]);
     } catch {
       if (seq !== loadSeq.current) return;
       setAttachments([]);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveDocId, viewingIterationId, currentIterationId]);
+  }, [effectiveRevisionId, viewingIterationId, currentIterationId]);
 
   const loadIterations = useCallback(async () => {
-    if (!effectiveDocId) return;
+    if (!effectiveRevisionId) return;
     try {
-      const res = await documentsApi.iterations(effectiveDocId);
+      const res = await documentsApi.iterations(effectiveRevisionId);
       setIterations((res.data || []) as DocumentIteration[]);
     } catch {
       setIterations([]);
     }
-  }, [effectiveDocId]);
+  }, [effectiveRevisionId]);
 
   const loadVersions = useCallback(async () => {
-    if (!effectiveDocId) return;
+    if (!effectiveRevisionId) return;
     try {
-      const res = await documentsApi.versions(effectiveDocId);
-      setVersions((res.data || []) as Document[]);
+      const res = await documentsApi.versions(effectiveRevisionId);
+      setVersions((res.data || []) as DocumentRevision[]);
     } catch {
       setVersions([]);
     }
-  }, [effectiveDocId]);
+  }, [effectiveRevisionId]);
 
-  // 加载文档适用的自定义字段定义 + 当前文档的字段值
   const loadCustomFields = useCallback(async () => {
-    if (!effectiveDocId) return;
+    if (!effectiveRevisionId) return;
     try {
       const defsRes = await customFieldsApi.listDefinitions();
       const defs: CustomFieldDefinition[] = ((defsRes.data || defsRes || []) as CustomFieldDefinition[]).filter(
         (d) => d.applies_to?.includes('document')
       );
       setCfDefs(defs);
-      const valsRes = await customFieldsApi.getValues('document', effectiveDocId);
+      const valsRes = await customFieldsApi.getValues('document', effectiveRevisionId);
       const map: Record<string, any> = {};
       ((valsRes.data || []) as any[]).forEach((v: any) => {
         map[v.field_id] = v.value;
@@ -165,23 +155,22 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
     } catch (e) {
       console.error(e);
     }
-  }, [effectiveDocId]);
+  }, [effectiveRevisionId]);
 
-  // 加载全部用户组 + 当前文档的用户组选择
   const loadGroups = useCallback(async () => {
-    if (!effectiveDocId) return;
+    if (!effectiveRevisionId) return;
     try {
       const res = await userGroupsApi.list();
-      setAllGroups(Array.isArray(res.data) ? res.data : []);
-      const d = await documentsApi.get(effectiveDocId);
+      const groups: Array<{ id: string; name: string }> = Array.isArray(res.data) ? res.data : [];
+      setAllGroups(groups);
+      const d = await documentsApi.detail(effectiveRevisionId);
       const docData: any = (d.data ?? d);
       setSelectedGroupIds((docData.group_ids || []).map(String));
     } catch (e) {
       console.error(e);
     }
-  }, [effectiveDocId]);
+  }, [effectiveRevisionId]);
 
-  // 查看的迭代对象
   const viewingIteration = useMemo(
     () => iterations.find((it) => it.id === viewingIterationId) ?? null,
     [iterations, viewingIterationId]
@@ -189,10 +178,9 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
   const isViewingHistorical = !!viewingIterationId;
 
   useEffect(() => {
-    if (open && docId) {
+    if (open && revisionId) {
       setViewingIterationId(null);
       setViewingVersionId(null);
-      // 清除上一个文档遗留的迭代/附件，避免用脏迭代 id 过滤导致附件加载为空
       setIterations([]);
       setAttachments([]);
       loadDoc();
@@ -202,30 +190,23 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
       loadCustomFields();
       loadGroups();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, docId]);
+  }, [open, revisionId]);
 
-  // 切换查看的迭代时重拉附件（传指定迭代 id）
   useEffect(() => {
-    if (open && docId) {
+    if (open && revisionId) {
       loadAttachments(viewingIterationId);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewingIterationId]);
 
-  // 当前迭代确定后重拉附件（初始加载 iterations 完成后）
   useEffect(() => {
-    if (open && docId && currentIterationId && !viewingIterationId) {
+    if (open && revisionId && currentIterationId && !viewingIterationId) {
       loadAttachments();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIterationId]);
 
-  // 切换查看的版本时重拉所有数据，并清空迭代选择（不同版本的迭代不互通）
   useEffect(() => {
-    if (open && docId) {
+    if (open && revisionId) {
       setViewingIterationId(null);
-      // 不同版本的迭代不互通，清除旧迭代/附件避免脏迭代过滤
       setIterations([]);
       setAttachments([]);
       loadDoc();
@@ -234,14 +215,12 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
       loadCustomFields();
       loadGroups();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewingVersionId]);
 
-  // 防抖保存自定义字段
   const cfSaveTimer = useRef<ReturnType<typeof setTimeout>>();
   const debouncedCfSave = useCallback(
     (next: Record<string, any>) => {
-      if (!effectiveDocId) return;
+      if (!effectiveRevisionId) return;
       if (cfSaveTimer.current) clearTimeout(cfSaveTimer.current);
       cfSaveTimer.current = setTimeout(async () => {
         try {
@@ -249,34 +228,33 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
             field_id: def.id,
             value: next[def.id] ?? null,
           })).filter((fv) => fv.value !== null && fv.value !== '');
-          await customFieldsApi.setValues('document', effectiveDocId, fieldValues);
+          await customFieldsApi.setValues('document', effectiveRevisionId, fieldValues);
           onSaved();
         } catch (e: any) {
           toast.error(e?.response?.data?.detail || '自定义字段保存失败');
         }
       }, 500);
     },
-    [effectiveDocId, cfDefs, onSaved]
+    [effectiveRevisionId, cfDefs, onSaved]
   );
 
-  // 字段自动保存（防抖）
   const saveTimer = useRef<ReturnType<typeof setTimeout>>();
   const autoSave = useCallback(
     (patch: Partial<{ code: string; name: string; remark: string }>) => {
-      if (!docId) return;
+      if (!revisionId) return;
       const next = { ...editForm, ...patch };
       setEditForm(next);
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(async () => {
         try {
-          await documentsApi.update(docId, patch);
+          await documentsApi.update(revisionId, patch);
           onSaved();
         } catch (e: any) {
           toast.error(e?.response?.data?.detail || '保存失败');
         }
       }, 600);
     },
-    [docId, editForm, onSaved]
+    [revisionId, editForm, onSaved]
   );
 
   const doAction = async (fn: () => Promise<any>, okMsg: string) => {
@@ -293,9 +271,9 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
     }
   };
 
-  const uploadLargeFile = async (file: File, docId: string, onProgress: (p: number) => void) => {
+  const uploadLargeFile = async (file: File, revId: string, onProgress: (p: number) => void) => {
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-    const initResult: any = await v2UploadApi.initChunkedUpload(file.name, file.size, 'documents', docId);
+    const initResult: any = await v2UploadApi.initChunkedUpload(file.name, file.size, 'documents', revId);
     const uploadId = initResult.upload_id ?? initResult.data?.upload_id;
     for (let i = 0; i < totalChunks; i++) {
       const start = i * CHUNK_SIZE;
@@ -309,13 +287,13 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !docId) return;
+    if (!file || !revisionId) return;
     setUploading(true);
     try {
       if (file.size > CHUNK_THRESHOLD) {
-        await uploadLargeFile(file, docId, () => {});
+        await uploadLargeFile(file, revisionId, () => {});
       } else {
-        await v2UploadApi.uploadSmallFile(file, 'documents', docId, () => {});
+        await v2UploadApi.uploadSmallFile(file, 'documents', revisionId, () => {});
       }
       await loadAttachments();
       toast.success('上传成功');
@@ -329,9 +307,9 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
   };
 
   const handleDeleteAtt = async (attId: string) => {
-    if (!docId || !confirm('确定删除该附件？')) return;
+    if (!revisionId || !confirm('确定删除该附件？')) return;
     try {
-      await documentsApi.deleteAttachment(docId, attId);
+      await documentsApi.deleteAttachment(revisionId, attId);
       await loadAttachments();
       toast.success('已删除');
     } catch (e: any) {
@@ -356,7 +334,8 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
 
   const tabs = useMemo(
     () => [
-      { key: 'info' as const, label: '基本信息' },
+      { key: 'attachments' as const, label: '附件管理' },
+      { key: 'custom-fields' as const, label: '自定义字段' },
       { key: 'versions' as const, label: '版本历史' },
       { key: 'iterations' as const, label: '迭代历史' },
     ],
@@ -375,10 +354,10 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
           <div className="text-gray-400 text-sm py-8 text-center">加载失败</div>
         ) : (
           <>
-            {/* 顶部核心信息（不含版本/状态/更新时间 — 版本状态放入操作行，更新时间见版本/迭代历史） */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0 mb-3">
-              <Field label="图文档编号">
-                {canEdit && doc.version === 'A' ? (
+            {/* 信息卡片 */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 shrink-0 mb-3">
+              <InfoCard label="图文档编号" readonly={!canEdit}>
+                {canEdit ? (
                   <input
                     value={editForm.code}
                     onChange={(e) => autoSave({ code: e.target.value })}
@@ -387,8 +366,8 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                 ) : (
                   <div className="text-sm text-gray-900 font-medium font-mono">{doc.code}</div>
                 )}
-              </Field>
-              <Field label="名称">
+              </InfoCard>
+              <InfoCard label="名称" readonly={!canEdit}>
                 {canEdit ? (
                   <input
                     value={editForm.name}
@@ -398,257 +377,144 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                 ) : (
                   <div className="text-sm text-gray-900 font-medium">{doc.name}</div>
                 )}
-              </Field>
-              <Field label="备注" className="col-span-2">
+              </InfoCard>
+              <InfoCard label="用户组" readonly={!canEdit}>
                 {canEdit ? (
-                  <input
-                    value={editForm.remark}
-                    onChange={(e) => autoSave({ remark: e.target.value })}
-                    className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 py-0.5">
+                    {allGroups.length === 0 ? (
+                      <span className="text-sm text-gray-400">加载中...</span>
+                    ) : (
+                      allGroups.map((g) => (
+                        <label key={g.id} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="w-3 h-3"
+                            checked={selectedGroupIds.includes(String(g.id))}
+                            onChange={async (e) => {
+                              const next = e.target.checked
+                                ? [...selectedGroupIds, String(g.id)]
+                                : selectedGroupIds.filter((x) => x !== String(g.id));
+                              setSelectedGroupIds(next);
+                              try {
+                                await documentsApi.update(doc.id, { group_ids: next });
+                                await loadDoc();
+                                onSaved();
+                              } catch (err: any) {
+                                toast.error(err?.response?.data?.detail || '用户组更新失败');
+                              }
+                            }}
+                          />
+                          {g.name}
+                        </label>
+                      ))
+                    )}
+                  </div>
                 ) : (
-                  <div className="text-sm text-gray-900 font-medium whitespace-pre-wrap">
-                    {doc.remark || '-'}
+                  <div className="text-sm text-gray-900 font-medium break-all">
+                    {(doc as any).group_names?.length ? (doc as any).group_names.join('、') : '-'}
                   </div>
                 )}
-              </Field>
+              </InfoCard>
             </div>
 
-            {/* 中部操作区：版本/状态/签出状态 与 签入签出等按钮同一行（参考零部件详情） */}
+            {/* 操作栏 */}
             <div className="bg-white rounded-lg border border-gray-200 p-3 mb-3 shrink-0">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className="font-semibold text-sm">版本：{doc.version || '-'}</span>
                   <span className={`px-2 py-0.5 text-xs rounded-full ${tag.class}`}>{tag.label}</span>
                   {isCheckedOut ? (
-                    <span className="text-xs text-orange-600">🔒 已签出：{doc.check_out_user_name || '未知'}</span>
+                    <span className="text-xs text-orange-600">已签出：{doc.check_out_user_name || '未知'}</span>
                   ) : (
                     <span className="text-xs text-gray-400">未签出</span>
                   )}
                 </div>
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex gap-1 flex-wrap items-center">
                   {canCheckout && (
-                    <button
-                      onClick={() => doAction(() => documentsApi.checkout(doc.id), '签出成功')}
-                      className="px-3 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700"
-                    >
-                      签出
-                    </button>
+                    <button onClick={() => doAction(() => documentsApi.checkout(doc.id), '签出成功')}
+                      className="px-3 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">签出</button>
                   )}
                   {canCheckin && (
-                    <button
-                      onClick={() => setShowCheckinModal(true)}
-                      className="px-3 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700"
-                    >
-                      检入
-                    </button>
+                    <button onClick={() => setShowCheckinModal(true)}
+                      className="px-3 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">签入</button>
                   )}
                   {canUndo && (
-                    <button
-                      onClick={() => doAction(() => documentsApi.undocheckout(doc.id), '已撤销签出')}
-                      className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600"
-                    >
-                      撤销签出
-                    </button>
+                    <button onClick={() => doAction(() => documentsApi.undocheckout(doc.id), '已撤销签出')}
+                      className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600">撤销签出</button>
                   )}
                   {canFreeze && (
-                    <button
-                      onClick={() => doAction(() => documentsApi.freeze(doc.id), '已冻结')}
-                      className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
-                    >
-                      冻结
-                    </button>
+                    <button onClick={() => doAction(() => documentsApi.freeze(doc.id), '已冻结')}
+                      className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600">冻结</button>
                   )}
                   {canUnfreeze && (
-                    <button
-                      onClick={() => doAction(() => documentsApi.unfreeze(doc.id), '已解冻')}
-                      className="px-3 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600"
-                    >
-                      解冻
-                    </button>
+                    <button onClick={() => doAction(() => documentsApi.unfreeze(doc.id), '已解冻')}
+                      className="px-3 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">解冻</button>
                   )}
                   {canRelease && (
-                    <button
-                      onClick={() => doAction(() => documentsApi.release(doc.id), '已发布')}
-                      className="px-3 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700"
-                    >
-                      发布
-                    </button>
+                    <button onClick={() => doAction(() => documentsApi.release(doc.id), '已发布')}
+                      className="px-3 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">发布</button>
                   )}
                   {canUpgrade && (
-                    <button
-                      onClick={() => doAction(() => documentsApi.upgrade(doc.id), '已升版')}
-                      className="px-3 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
-                    >
-                      升版
-                    </button>
+                    <button onClick={() => doAction(() => documentsApi.upgrade(doc.id), '已升版')}
+                      className="px-3 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700">升版</button>
                   )}
                   {canObsolete && (
-                    <button
-                      onClick={() => doAction(() => documentsApi.obsolete(doc.id), '已作废')}
-                      className="px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
-                    >
-                      作废
-                    </button>
+                    <button onClick={() => doAction(() => documentsApi.obsolete(doc.id), '已作废')}
+                      className="px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600">作废</button>
                   )}
                   {canForceCheckin && (
-                    <button
-                      onClick={() => doAction(() => documentsApi.forceCheckin(doc.id), '已强制签入')}
-                      className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
-                    >
-                      强制签入
-                    </button>
+                    <button onClick={() => doAction(() => documentsApi.forceCheckin(doc.id), '已强制签入')}
+                      className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700">强制签入</button>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* 查看历史版本提示 */}
+            {/* 历史版本/迭代提示 */}
             {isViewingOtherVersion && doc && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1.5 shrink-0 mb-3 text-sm flex items-center justify-between">
                 <span>正在查看版本 {doc.version}（只读）</span>
-                <button
-                  onClick={() => setViewingVersionId(null)}
-                  className="text-primary-600 hover:text-primary-800 hover:underline text-xs"
-                >
-                  返回当前
-                </button>
+                <button onClick={() => setViewingVersionId(null)}
+                  className="text-primary-600 hover:text-primary-800 hover:underline text-xs">返回当前</button>
               </div>
             )}
-
-            {/* 查看历史迭代提示 */}
             {isViewingHistorical && viewingIteration && !isViewingOtherVersion && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1.5 shrink-0 mb-3 text-sm flex items-center justify-between">
                 <span>正在查看 Iteration #{viewingIteration.iteration} 历史数据（只读）</span>
-                <button
-                  onClick={() => setViewingIterationId(null)}
-                  className="text-primary-600 hover:text-primary-800 hover:underline text-xs"
-                >
-                  返回当前
-                </button>
+                <button onClick={() => setViewingIterationId(null)}
+                  className="text-primary-600 hover:text-primary-800 hover:underline text-xs">返回当前</button>
               </div>
             )}
 
-            {/* 底部 Tab（外框，参考零部件详情） */}
+            {/* Tab 导航 + 内容 */}
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
               <div className="flex border-b border-gray-200 shrink-0">
                 {tabs.map((t) => (
-                  <button
-                    key={t.key}
-                    onClick={() => setActiveTab(t.key)}
+                  <button key={t.key} onClick={() => setActiveTab(t.key)}
                     className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                       activeTab === t.key
                         ? 'border-primary-600 text-primary-600'
                         : 'border-transparent text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
+                    }`}>
                     {t.label}
                   </button>
                 ))}
               </div>
               <div className="p-4 overflow-y-auto flex-1">
-              {activeTab === 'info' && (
-                <div className="space-y-5">
-                  {/* 1. 自有字段（无标题） */}
+                {/* 附件管理 Tab */}
+                {activeTab === 'attachments' && (
                   <div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                        <div className="text-xs text-gray-500 mb-0.5">创建人</div>
-                        <div className="text-sm text-gray-900 font-medium">{doc.creator_name || '-'}</div>
-                      </div>
-                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                        <div className="text-xs text-gray-500 mb-0.5">用户组</div>
-                        {canEdit ? (
-                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 py-0.5">
-                            {allGroups.length === 0 ? (
-                              <span className="text-sm text-gray-400">加载中...</span>
-                            ) : (
-                              allGroups.map((g) => (
-                                <label key={g.id} className="flex items-center gap-1.5 text-sm cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    className="w-3 h-3"
-                                    checked={selectedGroupIds.includes(String(g.id))}
-                                    onChange={async (e) => {
-                                      const next = e.target.checked
-                                        ? [...selectedGroupIds, String(g.id)]
-                                        : selectedGroupIds.filter((x) => x !== String(g.id));
-                                      setSelectedGroupIds(next);
-                                      try {
-                                        await documentsApi.update(doc.id, { group_ids: next });
-                                        await loadDoc();
-                                        onSaved();
-                                      } catch (err: any) {
-                                        toast.error(err?.response?.data?.detail || '用户组更新失败');
-                                      }
-                                    }}
-                                  />
-                                  {g.name}
-                                </label>
-                              ))
-                            )}
-                          </div>
-                        ) : (
-                          <div className="text-sm text-gray-900 font-medium break-all">
-                            {(doc as any).group_names?.length ? (doc as any).group_names.join('、') : '-'}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 2. 自定义字段 */}
-                  <div>
-                    <h4 className="text-sm font-semibold mb-2 text-gray-700">自定义字段</h4>
-                    {cfDefs.length === 0 ? (
-                      <div className="text-sm text-gray-400 border border-dashed border-gray-200 rounded-lg py-3 text-center">无</div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        {cfDefs.map((def) => {
-                          const val = cfValues[def.id] ?? '';
-                          const handleChange = (newVal: any) => {
-                            const next = { ...cfValues, [def.id]: newVal };
-                            setCfValues(next);
-                            if (canEdit && !isViewingHistorical && !isViewingOtherVersion) {
-                              debouncedCfSave(next);
-                            }
-                          };
-                          return (
-                            <div key={def.id}>
-                              <label className="text-xs text-gray-500">{def.name}</label>
-                              <div className="mt-0.5">
-                                <CustomFieldInput
-                                  def={def}
-                                  value={val}
-                                  onChange={handleChange}
-                                  readOnly={!canEdit || isViewingHistorical || isViewingOtherVersion}
-                                />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 3. 附件 */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-sm font-semibold text-gray-700">附件</h4>
-                      {canEdit && !isViewingHistorical && !isViewingOtherVersion && attachments.length === 0 && (
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-semibold text-gray-700">附件列表</h4>
+                      {canEdit && !isViewingHistorical && !isViewingOtherVersion && (
                         <label className="inline-block px-3 py-1 text-sm bg-primary-600 text-white rounded cursor-pointer hover:bg-primary-700">
-                          {uploading ? '上传中...' : '上传附件'}
-                          <input
-                            type="file"
-                            className="hidden"
-                            onChange={handleUpload}
-                            disabled={uploading}
-                          />
+                          {uploading ? '上传中...' : '+ 上传附件'}
+                          <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} />
                         </label>
                       )}
                     </div>
                     {attachments.length === 0 ? (
-                      <div className="text-sm text-gray-400 py-4 text-center border border-dashed border-gray-300 rounded-lg">
+                      <div className="text-sm text-gray-400 py-8 text-center border border-dashed border-gray-300 rounded-lg">
                         {isViewingHistorical ? '该迭代暂无附件' : '暂无附件'}
                       </div>
                     ) : (
@@ -666,34 +532,20 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                             {attachments.map((att) => (
                               <tr key={att.id} className="hover:bg-gray-50">
                                 <td className="px-3 py-2 text-primary-600">{att.file_name}</td>
-                                <td className="px-3 py-2 text-gray-500">
-                                  {formatFileSize(att.file_size || 0)}
-                                </td>
+                                <td className="px-3 py-2 text-gray-500">{formatFileSize(att.file_size || 0)}</td>
                                 <td className="px-3 py-2 text-gray-500">{formatDateTime(att.created_at)}</td>
                                 <td className="px-3 py-2 text-right">
                                   <button
-                                    onClick={() =>
-                                      previewAttachment(att.id, att.file_name || 'preview', {
-                                        onArchive: (id, name) => setArchivePreview({ attId: id, fileName: name }),
-                                      })
-                                    }
-                                    className="text-blue-600 hover:text-blue-800 mr-2"
-                                  >
-                                    预览
-                                  </button>
+                                    onClick={() => previewAttachment(att.id, att.file_name || 'preview', {
+                                      onArchive: (id, name) => setArchivePreview({ attId: id, fileName: name }),
+                                    })}
+                                    className="text-blue-600 hover:text-blue-800 mr-2">预览</button>
                                   <button
                                     onClick={() => handleDownload(att.id, att.file_name || 'download')}
-                                    className="text-primary-600 hover:text-primary-800 mr-2"
-                                  >
-                                    下载
-                                  </button>
+                                    className="text-primary-600 hover:text-primary-800 mr-2">下载</button>
                                   {canEdit && !isViewingHistorical && (
-                                    <button
-                                      onClick={() => handleDeleteAtt(att.id)}
-                                      className="text-red-600 hover:text-red-800"
-                                    >
-                                      删除
-                                    </button>
+                                    <button onClick={() => handleDeleteAtt(att.id)}
+                                      className="text-red-600 hover:text-red-800">删除</button>
                                   )}
                                 </td>
                               </tr>
@@ -703,107 +555,129 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                       </div>
                     )}
                   </div>
-                </div>
-              )}
-              {activeTab === 'versions' && (
-                <div className="border rounded-lg overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 border-b">
-                      <tr>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">状态</th>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium w-44">更新时间</th>
-                        <th className="px-3 py-2 text-right text-gray-500 font-medium w-24">操作</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {versions.map((v) => {
-                        const isCurrent = v.id === currentVersionId;
-                        const isViewing = v.id === viewingVersionId;
-                        return (
-                          <tr
-                            key={v.id}
-                            className={`hover:bg-gray-50 ${isViewing ? 'bg-blue-50' : ''}`}
-                          >
-                            <td className="px-3 py-2">{v.version}</td>
-                            <td className="px-3 py-2">
-                              <span className={`px-1.5 py-0.5 text-xs rounded-full ${statusTag(v.status).class}`}>
-                                {statusTag(v.status).label}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2 text-gray-500">{formatDateTime(v.updated_at)}</td>
-                            <td className="px-3 py-2 text-right">
-                              {isCurrent ? (
-                                <span className="text-primary-600 text-xs">当前</span>
-                              ) : (
-                                <button
-                                  onClick={() => setViewingVersionId(v.id)}
-                                  className={`text-xs hover:underline ${
-                                    isViewing ? 'text-orange-600' : 'text-primary-600 hover:text-primary-800'
-                                  }`}
-                                >
-                                  {isViewing ? '查看中' : '切换'}
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {versions.length === 0 && (
+                )}
+
+                {/* 自定义字段 Tab */}
+                {activeTab === 'custom-fields' && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3">自定义字段</h4>
+                    {cfDefs.length === 0 ? (
+                      <div className="text-sm text-gray-400 border border-dashed border-gray-200 rounded-lg py-8 text-center">无</div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          {cfDefs.map((def) => {
+                            const val = cfValues[def.id] ?? '';
+                            const handleChange = (newVal: any) => {
+                              const next = { ...cfValues, [def.id]: newVal };
+                              setCfValues(next);
+                              if (canEdit && !isViewingHistorical && !isViewingOtherVersion) {
+                                debouncedCfSave(next);
+                              }
+                            };
+                            return (
+                              <div key={def.id}>
+                                <CustomFieldInput
+                                  def={def}
+                                  value={val}
+                                  onChange={handleChange}
+                                  readOnly={!canEdit || isViewingHistorical || isViewingOtherVersion}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    <div className="mt-4 text-xs text-gray-400">
+                      创建人：{doc.creator_name || '-'} | 创建时间：{doc.created_at ? new Date(doc.created_at).toLocaleString('zh-CN') : '-'}
+                    </div>
+                  </div>
+                )}
+
+                {/* 版本历史 Tab */}
+                {activeTab === 'versions' && (
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 border-b">
                         <tr>
-                          <td colSpan={4} className="px-3 py-4 text-center text-gray-400">
-                            暂无版本历史
-                          </td>
+                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
+                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">状态</th>
+                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-44">创建时间</th>
+                          <th className="px-3 py-2 text-right text-gray-500 font-medium w-24">操作</th>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              {activeTab === 'iterations' && (
-                <div className="border rounded-lg overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 border-b">
-                      <tr>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">迭代</th>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium w-44">签入时间</th>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium">签入说明</th>
-                        <th className="px-3 py-2 text-right text-gray-500 font-medium w-24">操作</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {iterations.map((it) => {
-                        const isCurrent = it.id === currentIterationId;
-                        const isViewing = it.id === viewingIterationId;
-                        return (
-                          <tr
-                            key={it.id}
-                            className={`hover:bg-gray-50 ${isViewing ? 'bg-blue-50' : ''}`}
-                          >
-                            <td className="px-3 py-2">#{it.iteration}</td>
-                            <td className="px-3 py-2 text-gray-500">
-                              {(it.check_in_date || it.created_at)
-                                ? new Date(it.check_in_date || it.created_at as string).toLocaleString('zh-CN', { hour12: false })
-                                : '-'}
-                            </td>
-                            <td className="px-3 py-2 text-gray-700">{it.check_in_note || '-'}</td>
-                            <td className="px-3 py-2 text-right">
-                              <div className="flex items-center justify-end gap-2">
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {versions.map((v) => {
+                          const isCurrent = v.id === currentRevisionId;
+                          const isViewing = v.id === viewingVersionId;
+                          return (
+                            <tr key={v.id} className={`hover:bg-gray-50 ${isViewing ? 'bg-blue-50' : ''}`}>
+                              <td className="px-3 py-2">{v.version}</td>
+                              <td className="px-3 py-2">
+                                <span className={`px-1.5 py-0.5 text-xs rounded-full ${statusTag(v.status).class}`}>
+                                  {statusTag(v.status).label}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-gray-500">{formatDateTime(v.created_at)}</td>
+                              <td className="px-3 py-2 text-right">
                                 {isCurrent ? (
                                   <span className="text-primary-600 text-xs">当前</span>
                                 ) : (
-                                  <button
-                                    onClick={() => setViewingIterationId(it.id)}
-                                    className={`text-xs hover:underline ${
-                                      isViewing ? 'text-orange-600' : 'text-primary-600 hover:text-primary-800'
-                                    }`}
-                                  >
-                                    {isViewing ? '查看中' : '查看数据'}
+                                  <button onClick={() => setViewingVersionId(v.id)}
+                                    className={`text-xs hover:underline ${isViewing ? 'text-orange-600' : 'text-primary-600 hover:text-primary-800'}`}>
+                                    {isViewing ? '查看中' : '切换'}
                                   </button>
                                 )}
-                                {it.iteration > 1 && isAdmin() && (
-                                  <button
-                                    onClick={async () => {
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {versions.length === 0 && (
+                          <tr><td colSpan={4} className="px-3 py-4 text-center text-gray-400">暂无版本历史</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* 迭代历史 Tab */}
+                {activeTab === 'iterations' && (
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 border-b">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">迭代</th>
+                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-44">签入时间</th>
+                          <th className="px-3 py-2 text-left text-gray-500 font-medium">签入说明</th>
+                          <th className="px-3 py-2 text-right text-gray-500 font-medium w-24">操作</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {iterations.map((it) => {
+                          const isCurrent = it.id === currentIterationId;
+                          const isViewing = it.id === viewingIterationId;
+                          return (
+                            <tr key={it.id} className={`hover:bg-gray-50 ${isViewing ? 'bg-blue-50' : ''}`}>
+                              <td className="px-3 py-2">#{it.iteration}</td>
+                              <td className="px-3 py-2 text-gray-500">
+                                {(it.check_in_date || it.created_at)
+                                  ? new Date(it.check_in_date || it.created_at as string).toLocaleString('zh-CN', { hour12: false })
+                                  : '-'}
+                              </td>
+                              <td className="px-3 py-2 text-gray-700">{it.check_in_note || '-'}</td>
+                              <td className="px-3 py-2 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  {isCurrent ? (
+                                    <span className="text-primary-600 text-xs">当前</span>
+                                  ) : (
+                                    <button onClick={() => setViewingIterationId(it.id)}
+                                      className={`text-xs hover:underline ${isViewing ? 'text-orange-600' : 'text-primary-600 hover:text-primary-800'}`}>
+                                      {isViewing ? '查看中' : '查看数据'}
+                                    </button>
+                                  )}
+                                  {it.iteration > 1 && checkIsAdmin() && (
+                                    <button onClick={async () => {
                                       if (!doc || !confirm(`确定删除迭代 #${it.iteration}？该迭代的附件也将被删除。`)) return;
                                       try {
                                         await documentsApi.deleteIteration(doc.id, it.id);
@@ -814,41 +688,29 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
                                       } catch (e: any) {
                                         toast.error(e?.response?.data?.detail || '删除失败');
                                       }
-                                    }}
-                                    className="text-xs text-red-600 hover:text-red-800 hover:underline"
-                                  >
-                                    删除
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {iterations.length === 0 && (
-                        <tr>
-                          <td colSpan={4} className="px-3 py-4 text-center text-gray-400">
-                            暂无迭代记录
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
+                                    }} className="text-xs text-red-600 hover:text-red-800 hover:underline">删除</button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {iterations.length === 0 && (
+                          <tr><td colSpan={4} className="px-3 py-4 text-center text-gray-400">暂无迭代记录</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}
       </div>
 
+      {/* 签入说明弹窗 */}
       {showCheckinModal && (
-        <Modal
-          open={showCheckinModal}
-          title="签入说明"
-          onClose={() => setShowCheckinModal(false)}
-          width="md"
-        >
+        <Modal open={showCheckinModal} title="签入说明" onClose={() => setShowCheckinModal(false)} width="md">
           <textarea
             value={checkinNote}
             onChange={(e) => setCheckinNote(e.target.value)}
@@ -857,29 +719,18 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
             className="w-full text-sm px-3 py-2 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
           <div className="flex justify-end gap-2 mt-3">
-            <button
-              onClick={() => setShowCheckinModal(false)}
-              className="px-3 py-1 text-sm border border-gray-300 rounded text-gray-600"
-            >
-              取消
-            </button>
-            <button
-              onClick={async () => {
-                if (!doc) return;
-                await doAction(
-                  () => documentsApi.checkin(doc.id, checkinNote || undefined),
-                  '签入成功'
-                );
-                setShowCheckinModal(false);
-                setCheckinNote('');
-              }}
-              className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
-            >
-              确认签入
-            </button>
+            <button onClick={() => setShowCheckinModal(false)}
+              className="px-3 py-1 text-sm border border-gray-300 rounded text-gray-600">取消</button>
+            <button onClick={async () => {
+              if (!doc) return;
+              await doAction(() => documentsApi.checkin(doc.id, checkinNote || undefined), '签入成功');
+              setShowCheckinModal(false);
+              setCheckinNote('');
+            }} className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700">确认签入</button>
           </div>
         </Modal>
       )}
+
       {archivePreview && (
         <ArchiveTreeModal
           open={!!archivePreview}
@@ -892,17 +743,9 @@ export default function DocumentDetailModal({ open, docId, onClose, onSaved }: P
   );
 }
 
-function Field({
-  label,
-  children,
-  className,
-}: {
-  label: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
+function InfoCard({ label, readonly, children }: { label: string; readonly: boolean; children: React.ReactNode }) {
   return (
-    <div className={`bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 ${className || ''}`}>
+    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
       <div className="text-xs text-gray-500 mb-0.5">{label}</div>
       {children}
     </div>

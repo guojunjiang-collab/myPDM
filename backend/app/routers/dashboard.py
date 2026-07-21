@@ -4,7 +4,7 @@ import uuid
 
 from ..database import get_db
 from ..models import (
-    User, Document, UserDashboard, DashboardFolder,
+    User, DocumentMaster, DocumentRevision, UserDashboard, DashboardFolder,
     DashboardItem, DashboardFolderShare
 )
 from ..models_parts import PartMaster, PartRevision
@@ -70,16 +70,23 @@ def _folder_to_dict(folder, db: Session, include_items=False, include_children=F
                 if entity:
                     item_list.append(_build_component_item(item, entity, db))
             elif item.entity_type == "document":
-                entity = db.query(Document).filter(Document.id == item.entity_id).first()
+                entity = db.query(DocumentMaster).filter(
+                    DocumentMaster.id == item.entity_id,
+                    DocumentMaster.deleted_at.is_(None),
+                ).first()
                 if entity:
+                    latest_rev = db.query(DocumentRevision).filter(
+                        DocumentRevision.master_id == entity.id,
+                        DocumentRevision.deleted_at.is_(None),
+                    ).order_by(DocumentRevision.created_at.desc()).first()
                     item_list.append({
                         "id": item.id,
                         "entity_type": "document",
                         "entity_id": str(entity.id),
                         "code": entity.code,
                         "name": entity.name,
-                        "version": entity.version,
-                        "status": entity.status,
+                        "version": latest_rev.version if latest_rev else "",
+                        "status": latest_rev.status if latest_rev else "draft",
                     })
             elif item.entity_type == "configuration":
                 entity = db.query(ConfigurationItemMaster).filter(
@@ -443,7 +450,10 @@ async def add_items(data: dict, request: Request, db: Session = Depends(get_db),
                 PartMaster.deleted_at.is_(None),
             ).first()
         elif entity_type == "document":
-            entity = db.query(Document).filter(Document.id == entity_id).first()
+            entity = db.query(DocumentMaster).filter(
+                DocumentMaster.id == entity_id,
+                DocumentMaster.deleted_at.is_(None),
+            ).first()
         elif entity_type == "configuration":
             entity = db.query(ConfigurationItemMaster).filter(
                 ConfigurationItemMaster.id == entity_id,
@@ -820,7 +830,7 @@ async def export_all_dashboards(
                 comp_ver_map.setdefault(str(r.master_id), r.version)
         doc_map = {}
         if doc_ids:
-            docs = db.query(Document).filter(Document.id.in_(doc_ids)).all()
+            docs = db.query(DocumentMaster).filter(DocumentMaster.id.in_(doc_ids)).all()
             doc_map = {str(d.id): d for d in docs}
         config_map = {}
         if config_ids:
@@ -837,6 +847,9 @@ async def export_all_dashboards(
                 return "", "", ""
             elif entity_type == "document":
                 e = doc_map.get(eid)
+                if e:
+                    return e.code or "", e.name or "", ""
+                return "", "", ""
             elif entity_type == "configuration":
                 e = config_map.get(eid)
                 if e:
@@ -1028,7 +1041,7 @@ async def import_all_dashboards(
                 if entity_type == "component":
                     exists = db.query(PartMaster).filter(PartMaster.id == entity_id).first() is not None
                 elif entity_type == "document":
-                    exists = db.query(Document).filter(Document.id == entity_id).first() is not None
+                    exists = db.query(DocumentMaster).filter(DocumentMaster.id == entity_id).first() is not None
                 elif entity_type == "configuration":
                     exists = db.query(ConfigurationItemMaster).filter(
                         ConfigurationItemMaster.id == entity_id,
@@ -1042,7 +1055,7 @@ async def import_all_dashboards(
                 if entity_type == "component":
                     e = db.query(PartMaster).filter(PartMaster.code == entity_code).first()
                 elif entity_type == "document":
-                    e = db.query(Document).filter(Document.code == entity_code).first()
+                    e = db.query(DocumentMaster).filter(DocumentMaster.code == entity_code).first()
                 elif entity_type == "configuration":
                     e = db.query(ConfigurationItemMaster).filter(
                         ConfigurationItemMaster.code == entity_code,
