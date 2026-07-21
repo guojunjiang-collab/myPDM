@@ -1,11 +1,12 @@
 """
 构型配置 - API Router
 ========================
-构型项 CRUD + 关联零部件 + 子构型项 + 构型方案
+构型项三层模型 CRUD + 签入签出 + 关联零部件 + 子构型项 + 构型方案
 """
 
 import uuid
 from uuid import UUID
+from typing import Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
@@ -13,7 +14,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.database import get_db
-from app.models import Document
+from app.models import Document, User as UModel
 from app.models_parts import PartMaster, PartRevision
 from app import models_configuration as models
 from app import schemas_configuration as schemas
@@ -34,13 +35,24 @@ router = APIRouter(prefix="/configurations", tags=["构型配置"])
 def _resolve_creator(db: Session, creator_id):
     if not creator_id:
         return ""
-    from ..models import User as UModel
     u = db.query(UModel).filter(UModel.id == creator_id).first()
     return u.real_name if u else ""
 
 
+def _resolve_user_name(db: Session, user_id) -> Optional[str]:
+    if not user_id:
+        return None
+    u = db.query(UModel).filter(UModel.id == user_id).first()
+    return u.real_name if u else None
+
+
+def _get_current_iteration(db: Session, revision_id: UUID) -> Optional[models.ConfigurationItemIteration]:
+    """获取版本的最新迭代"""
+    return crud._get_current_iteration(db, revision_id)
+
+
 # ════════════════════════════════════════════════════════
-# 构型项 CRUD
+# 构型项 CRUD（三层模型）
 # ════════════════════════════════════════════════════════
 
 @router.get("/items", response_model=dict)
@@ -51,236 +63,566 @@ async def list_config_items(
     updated_since: float = Query(None),
     brief: bool = Query(False),
     top_level: bool = Query(False),
+    status: str = Query(None),
     db: Session = Depends(get_db),
     current_user=Depends(require_permission("configuration:read")),
 ):
-    """构型项列表"""
+    """构型项列表（按 master 聚合，返回最新 revision 摘要）"""
     skip = (page - 1) * page_size
     exclude_ids: set[str] = set()
     if exclude_ancestors_of:
-        exclude_ids.add(exclude_ancestors_of)  # 排除自身
-        # BFS向上查找所有祖先（防止循环引用）
-        from app.models_configuration import ConfigurationItemChild
-        child_to_parents: dict = {}
-        all_children = db.query(ConfigurationItemChild).all()
-        for c in all_children:
-            cid = str(c.child_id)
-            if cid not in child_to_parents:
-                child_to_parents[cid] = []
-            child_to_parents[cid].append(str(c.parent_id))
-        queue = [exclude_ancestors_of]
-        while queue:
-            cid = queue.pop(0)
-            parents = child_to_parents.get(cid, [])
-            for pid in parents:
-                if pid not in exclude_ids:
-                    exclude_ids.add(pid)
-                    queue.append(pid)
-    crud_kwargs = dict(search=search, skip=skip, limit=page_size, exclude_ids=exclude_ids, top_level=top_level)
+        exclude_ids.add(exclude_ancestors_of)
+        # BFS向上查找所有祖先master（防止循环引用）
+        # exclude_ancestors_of 是 master_id，需找出其 revision 被引用为 child 的所有 parent master
+        revs_of_target = crud.list_revisions_by_master(db, UUID(exclude_ancestors_of))
+        child_rev_ids = [r.id for r in revs_of_target]
+        if child_rev_ids:
+            child_links = db.query(models.ConfigurationItemChild).filter(
+                models.ConfigurationItemChild.child_revision_id.in_(child_rev_ids)
+            ).all()
+            parent_iteration_ids = set(l.parent_iteration_id for l in child_links)
+            parent_rev_ids = set()
+            if parent_iteration_ids:
+                parent_iters = db.query(models.ConfigurationItemIteration).filter(
+                    models.ConfigurationItemIteration.id.in_(parent_iteration_ids)
+                ).all()
+                parent_rev_ids = set(it.revision_id for it in parent_iters)
+            if parent_rev_ids:
+                parent_masters = db.query(models.ConfigurationItemRevision).filter(
+                    models.ConfigurationItemRevision.id.in_(parent_rev_ids),
+                    models.ConfigurationItemRevision.deleted_at.is_(None),
+                ).all()
+                for pm in parent_masters:
+                    mid = str(pm.master_id)
+                    if mid not in exclude_ids:
+                        exclude_ids.add(mid)
+                        # BFS 继续向上
+                        more_exclude_ids: set[str] = set()
+                        queue = [mid]
+                        while queue:
+                            current_mid = queue.pop(0)
+                            current_revs = crud.list_revisions_by_master(db, UUID(current_mid))
+                            c_rev_ids = [r.id for r in current_revs]
+                            if not c_rev_ids:
+                                continue
+                            c_links = db.query(models.ConfigurationItemChild).filter(
+                                models.ConfigurationItemChild.child_revision_id.in_(c_rev_ids)
+                            ).all()
+                            p_iter_ids = set(l.parent_iteration_id for l in c_links)
+                            if not p_iter_ids:
+                                continue
+                            p_iters = db.query(models.ConfigurationItemIteration).filter(
+                                models.ConfigurationItemIteration.id.in_(p_iter_ids)
+                            ).all()
+                            p_r_ids = set(it.revision_id for it in p_iters)
+                            if not p_r_ids:
+                                continue
+                            p_masters = db.query(models.ConfigurationItemRevision).filter(
+                                models.ConfigurationItemRevision.id.in_(p_r_ids),
+                                models.ConfigurationItemRevision.deleted_at.is_(None),
+                            ).all()
+                            for pm in p_masters:
+                                pmid = str(pm.master_id)
+                                if pmid not in exclude_ids and pmid not in more_exclude_ids:
+                                    more_exclude_ids.add(pmid)
+                                    queue.append(pmid)
+                        exclude_ids.update(more_exclude_ids)
+    crud_kwargs = dict(search=search, skip=skip, limit=page_size, exclude_ids=exclude_ids, top_level=top_level, status=status)
     if updated_since is not None:
         crud_kwargs["include_deleted"] = True
         crud_kwargs["updated_since"] = updated_since
     items, total = crud.get_config_items(db, **crud_kwargs)
+
     if brief:
         return {
             "items": [{
-                "id": str(i.id), "code": i.code, "name": i.name,
-                "spec": i.spec or "",
-                "creator_id": str(i.creator_id) if i.creator_id else None,
-                "updated_at": i.updated_at.isoformat() if i.updated_at else None,
-                "deleted_at": i.deleted_at.isoformat() if i.deleted_at else None,
+                "id": i["revision_id"],
+                "code": i["code"], "name": i["name"],
+                "spec": i.get("spec", ""),
+                "creator_id": str(i.get("creator_id")) if i.get("creator_id") else None,
+                "updated_at": i.get("updated_at"),
+                "deleted_at": None,
             } for i in items],
             "total": total, "page": page, "page_size": page_size,
         }
     return {
-        "items": [{
-            "id": str(i.id), "code": i.code, "name": i.name,
-            "spec": i.spec or "", "remark": i.remark or "",
-            "creator_id": str(i.creator_id) if i.creator_id else None,
-            "created_at": i.created_at.isoformat() if i.created_at else None,
-            "updated_at": i.updated_at.isoformat() if i.updated_at else None,
-        } for i in items],
-        "total": total, "page": page, "page_size": page_size,
-    }
-    return {
-        "items": [{
-            "id": str(i.id), "code": i.code, "name": i.name,
-            "spec": i.spec or "", "remark": i.remark or "",
-            "created_at": i.created_at.isoformat() if i.created_at else None,
-            "updated_at": i.updated_at.isoformat() if i.updated_at else None,
-        } for i in items],
+        "items": items,
         "total": total, "page": page, "page_size": page_size,
     }
 
 
-@router.get("/items/{config_id}", response_model=dict)
-async def get_config_item(
-    config_id: str, db: Session = Depends(get_db),
+@router.get("/items/{revision_id}", response_model=dict)
+async def get_config_item_detail(
+    revision_id: str, db: Session = Depends(get_db),
     current_user=Depends(require_permission("configuration:read")),
 ):
-    """构型项详情（含关联零部件 + 子构型项 + 构型方案）"""
-    item = crud.get_config_item(db, config_id)
-    if not item:
-        raise HTTPException(status_code=404, detail="构型项不存在")
+    """构型项详情：master + revision + current iteration + parts + children + documents + versions"""
+    result = crud.get_config_item_revision_with_iteration(db, UUID(revision_id))
+    if not result:
+        raise HTTPException(status_code=404, detail="构型项版本不存在")
+    revision, iteration = result
+    master = crud.get_config_item_master(db, revision.master_id)
+    if not master:
+        raise HTTPException(status_code=404, detail="构型项主数据不存在")
 
-    # 关联零部件
+    checkout_user_name = _resolve_user_name(db, revision.check_out_user_id)
+
+    # 关联零部件（当前迭代）
     parts_data = []
-    for p in crud.get_config_parts(db, config_id):
-        entity = db.query(PartMaster).filter(PartMaster.id == p.part_id).first()
-        if entity:
-            rev = db.query(PartRevision).filter(
-                PartRevision.master_id == entity.id,
-                PartRevision.deleted_at.is_(None)
-            ).order_by(PartRevision.created_at.desc()).first()
-            parts_data.append({
-                "id": str(p.id), "part_type": p.part_type, "part_id": str(p.part_id),
-                "is_required": p.is_required, "quantity": p.quantity, "sort_order": p.sort_order,
-                "part_detail": {
-                    "id": str(entity.id), "code": entity.code, "name": entity.name,
-                    "version": rev.version if rev else "",
-                    "revision_id": str(rev.id) if rev else "",
-                    "spec": entity.spec or "",
-                    "status": rev.status if rev else "draft",
-                },
-            })
-        else:
-            parts_data.append({
-                "id": str(p.id), "part_type": p.part_type, "part_id": str(p.part_id),
-                "is_required": p.is_required, "quantity": p.quantity, "sort_order": p.sort_order,
-                "part_detail": {},
+    if iteration:
+        for p in crud.get_iteration_parts(db, iteration.id):
+            entity = db.query(PartMaster).filter(PartMaster.id == p.part_id).first()
+            if entity:
+                rev = db.query(PartRevision).filter(
+                    PartRevision.master_id == entity.id,
+                    PartRevision.deleted_at.is_(None)
+                ).order_by(PartRevision.created_at.desc()).first()
+                parts_data.append({
+                    "id": str(p.id), "iteration_id": str(p.iteration_id),
+                    "part_type": p.part_type, "part_id": str(p.part_id),
+                    "is_required": p.is_required, "quantity": p.quantity, "sort_order": p.sort_order,
+                    "part_detail": {
+                        "id": str(entity.id), "code": entity.code, "name": entity.name,
+                        "version": rev.version if rev else "",
+                        "revision_id": str(rev.id) if rev else "",
+                        "spec": entity.spec or "",
+                        "status": rev.status if rev else "draft",
+                    },
+                })
+            else:
+                parts_data.append({
+                    "id": str(p.id), "iteration_id": str(p.iteration_id),
+                    "part_type": p.part_type, "part_id": str(p.part_id),
+                    "is_required": p.is_required, "quantity": p.quantity, "sort_order": p.sort_order,
+                    "part_detail": {},
+                })
+
+    # 子构型项（当前迭代）
+    children_data = []
+    if iteration:
+        for c in crud.get_iteration_children(db, iteration.id):
+            child_rev = crud.get_config_item_revision(db, c.child_revision_id)
+            child_master = crud.get_config_item_master(db, child_rev.master_id) if child_rev else None
+            # 检查子构型项是否有下级
+            child_iter = _get_current_iteration(db, c.child_revision_id) if child_rev else None
+            has_children = False
+            has_parts = False
+            if child_iter:
+                has_children = db.query(models.ConfigurationItemChild).filter(
+                    models.ConfigurationItemChild.parent_iteration_id == child_iter.id
+                ).limit(1).count() > 0
+                has_parts = db.query(models.ConfigurationItemPart).filter(
+                    models.ConfigurationItemPart.iteration_id == child_iter.id
+                ).limit(1).count() > 0
+            children_data.append({
+                "id": str(c.id),
+                "parent_iteration_id": str(c.parent_iteration_id),
+                "child_revision_id": str(c.child_revision_id),
+                "is_required": c.is_required, "sort_order": c.sort_order,
+                "quantity": c.quantity,
+                "has_children": has_children,
+                "has_parts": has_parts,
+                "child_detail": {
+                    "id": str(child_rev.id) if child_rev else "",
+                    "master_id": str(child_rev.master_id) if child_rev else "",
+                    "code": child_master.code if child_master else "",
+                    "name": child_master.name if child_master else "",
+                    "spec": child_master.spec or "" if child_master else "",
+                    "version": child_rev.version if child_rev else "",
+                    "remark": child_master.remark or "" if child_master else "",
+                } if child_rev else {},
             })
 
-    # 子构型项
-    children_data = []
-    for c in crud.get_config_children(db, config_id):
-        child = db.query(models.ConfigurationItem).filter(models.ConfigurationItem.id == c.child_id).first()
-        has_children = db.query(models.ConfigurationItemChild).filter(
-            models.ConfigurationItemChild.parent_id == c.child_id
-        ).limit(1).count() > 0 if child else False
-        has_parts = db.query(models.ConfigurationItemPart).filter(
-            models.ConfigurationItemPart.configuration_item_id == c.child_id
-        ).limit(1).count() > 0 if child else False
-        children_data.append({
-            "id": str(c.id), "child_id": str(c.child_id),
-            "is_required": c.is_required, "sort_order": c.sort_order,
-            "quantity": c.quantity,
-            "has_children": has_children,
-            "has_parts": has_parts,
-            "child_detail": {
-                "id": str(child.id), "code": child.code, "name": child.name,
-                "spec": child.spec or "", "remark": child.remark or "",
-            } if child else {},
+    # 关联图文档（当前迭代的 document_links）
+    documents_data = _get_iteration_documents(db, iteration, current_user) if iteration else []
+
+    # 版本历史
+    versions = crud.list_revisions_by_master(db, master.id)
+    versions_data = []
+    for v in versions:
+        v_checkout_name = _resolve_user_name(db, v.check_out_user_id)
+        versions_data.append({
+            "id": str(v.id),
+            "master_id": str(v.master_id),
+            "version": v.version,
+            "status": v.status,
+            "check_out_user_id": str(v.check_out_user_id) if v.check_out_user_id else None,
+            "check_out_user_name": v_checkout_name,
+            "check_out_date": v.check_out_date.isoformat() if v.check_out_date else None,
+            "latest_iteration": v.latest_iteration,
+            "creator_id": str(v.creator_id) if v.creator_id else None,
+            "created_at": v.created_at.isoformat() if v.created_at else None,
         })
 
     return {
-        "id": str(item.id), "code": item.code, "name": item.name,
-        "spec": item.spec or "", "remark": item.remark or "",
-        "creator_id": str(item.creator_id) if item.creator_id else None,
-        "creator_name": _resolve_creator(db, item.creator_id) if item.creator_id else "",
-        "created_at": item.created_at.isoformat() if item.created_at else None,
-        "updated_at": item.updated_at.isoformat() if item.updated_at else None,
-        "parts": parts_data, "children": children_data,
-        "documents": _get_config_documents(db, item, current_user),
+        "master": {
+            "id": str(master.id), "code": master.code, "name": master.name,
+            "spec": master.spec or "", "remark": master.remark or "",
+            "creator_id": str(master.creator_id) if master.creator_id else None,
+            "created_at": master.created_at.isoformat() if master.created_at else None,
+            "updated_at": master.updated_at.isoformat() if master.updated_at else None,
+        },
+        "revision": {
+            "id": str(revision.id), "master_id": str(revision.master_id),
+            "version": revision.version, "status": revision.status,
+            "check_out_user_id": str(revision.check_out_user_id) if revision.check_out_user_id else None,
+            "check_out_user_name": checkout_user_name,
+            "check_out_date": revision.check_out_date.isoformat() if revision.check_out_date else None,
+            "latest_iteration": revision.latest_iteration,
+            "creator_id": str(revision.creator_id) if revision.creator_id else None,
+            "created_at": revision.created_at.isoformat() if revision.created_at else None,
+            "iteration_id": str(iteration.id) if iteration else None,
+            "spec": iteration.version_spec if iteration else (master.spec or ""),
+            "remark": iteration.version_remark if iteration else (master.remark or ""),
+            "name": iteration.version_name if iteration else master.name,
+            "document_links": iteration.document_links if iteration else [],
+        },
+        "parts": parts_data,
+        "children": children_data,
+        "documents": documents_data,
+        "versions": versions_data,
     }
 
 
 @router.post("/items", response_model=dict)
 async def create_config_item(
-    data: schemas.ConfigurationItemCreate, db: Session = Depends(get_db),
+    data: schemas.ConfigItemCreate, db: Session = Depends(get_db),
     current_user=Depends(require_permission("configuration:create")),
 ):
-    """创建构型项"""
-    existing = crud.get_config_item_by_code(db, data.code)
-    if existing:
-        if existing.deleted_at is None:
-            raise HTTPException(status_code=400, detail=f"构型号 {data.code} 已存在")
-        item = crud.revive_config_item(db, existing, data)
-        return {"id": str(item.id), "code": item.code, "name": item.name}
-    item = crud.create_config_item(db, data)
-    item.creator_id = current_user.id
-    db.commit()
-    return {"id": str(item.id), "code": item.code, "name": item.name}
+    """创建构型项：同时创建 Master + Revision(A) + Iteration(1)，自动签出"""
+    # 检查 code 是否已被未删除的 master 占用
+    existing_master = crud.get_config_item_master_by_code(db, data.code)
+    if existing_master:
+        if existing_master.deleted_at is None:
+            # 未删除 → 真正冲突
+            has_active_rev = db.query(models.ConfigurationItemRevision).filter(
+                models.ConfigurationItemRevision.master_id == existing_master.id,
+                models.ConfigurationItemRevision.deleted_at.is_(None),
+            ).count()
+            if has_active_rev > 0:
+                raise HTTPException(status_code=400, detail=f"构型号 {data.code} 已存在")
+        # 已软删除 → 复活
+        master, revision, iteration = crud.revive_config_item(
+            db, existing_master, data.model_dump(), current_user.id
+        )
+        return {
+            "id": str(revision.id), "master_id": str(master.id),
+            "code": master.code, "name": master.name, "version": revision.version,
+        }
+
+    try:
+        master, revision, iteration = crud.create_config_item(db, data.model_dump(), current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return {
+        "id": str(revision.id), "master_id": str(master.id),
+        "code": master.code, "name": master.name, "version": revision.version,
+    }
 
 
-@router.put("/items/{config_id}", response_model=dict)
+@router.put("/items/{revision_id}", response_model=dict)
 async def update_config_item(
-    config_id: str, data: schemas.ConfigurationItemUpdate, db: Session = Depends(get_db),
+    revision_id: str, data: schemas.ConfigItemUpdate, db: Session = Depends(get_db),
     current_user=Depends(require_permission("configuration:update")),
 ):
-    """更新构型项"""
-    # 允许修改构型号：保存时做唯一性检查
-    if data.code:
-        current = crud.get_config_item(db, config_id)
-        if not current:
-            raise HTTPException(status_code=404, detail="构型项不存在")
-        if data.code != current.code:
-            existing = crud.get_config_item_by_code(db, data.code)
-            if existing and str(existing.id) != str(config_id):
-                raise HTTPException(status_code=400, detail=f"构型号 {data.code} 已存在")
-    item = crud.update_config_item(db, config_id, data)
-    if not item:
-        raise HTTPException(status_code=404, detail="构型项不存在")
-    return {"id": str(item.id), "code": item.code, "name": item.name}
+    """更新迭代层数据（需签出校验）"""
+    result = crud.get_config_item_revision_with_iteration(db, UUID(revision_id))
+    if not result:
+        raise HTTPException(status_code=404, detail="构型项版本不存在")
+    revision, iteration = result
+
+    # 签出校验
+    if revision.check_out_user_id is None:
+        raise HTTPException(status_code=423, detail="请先签出后再编辑")
+    if str(revision.check_out_user_id) != str(current_user.id):
+        raise HTTPException(status_code=423, detail="该版本已被他人签出，无法编辑")
+
+    if not iteration:
+        raise HTTPException(status_code=400, detail="当前迭代不存在")
+
+    update_dict = data.model_dump(exclude_none=True)
+    field_map = {"spec": "version_spec", "remark": "version_remark"}
+    mapped = {}
+    for k, v in update_dict.items():
+        mapped[field_map.get(k, k)] = v
+
+    if mapped:
+        crud.update_config_item_iteration(db, iteration.id, mapped)
+
+    return {"id": str(revision.id), "version": revision.version, "detail": "已保存"}
 
 
-@router.delete("/items/{config_id}")
+@router.delete("/items/{revision_id}")
 async def delete_config_item(
-    config_id: str, db: Session = Depends(get_db),
+    revision_id: str, db: Session = Depends(get_db),
     current_user=Depends(require_permission("configuration:delete")),
 ):
-    """删除构型项（检查父项引用）"""
-    # 检查是否被其他构型项引用为子项（仅统计未被软删除的父构型项）
+    """软删除构型项版本（检查父项引用）"""
+    rev = crud.get_config_item_revision(db, UUID(revision_id))
+    if not rev:
+        raise HTTPException(status_code=404, detail="构型项版本不存在")
+
+    # 检查是否被其他构型项的迭代引用为子项
     parent_refs = db.query(models.ConfigurationItemChild).filter(
-        models.ConfigurationItemChild.child_id == config_id
+        models.ConfigurationItemChild.child_revision_id == UUID(revision_id)
     ).all()
     if parent_refs:
-        parent_ids = [str(r.parent_id) for r in parent_refs]
-        parents = db.query(models.ConfigurationItem).filter(
-            models.ConfigurationItem.id.in_(parent_ids),
-            models.ConfigurationItem.deleted_at.is_(None),
+        parent_iter_ids = [r.parent_iteration_id for r in parent_refs]
+        parent_iters = db.query(models.ConfigurationItemIteration).filter(
+            models.ConfigurationItemIteration.id.in_(parent_iter_ids)
         ).all()
-        if parents:
-            parent_codes = [p.code for p in parents]
+        parent_rev_ids = [it.revision_id for it in parent_iters]
+        parent_revs = db.query(models.ConfigurationItemRevision).filter(
+            models.ConfigurationItemRevision.id.in_(parent_rev_ids),
+            models.ConfigurationItemRevision.deleted_at.is_(None),
+        ).all()
+        parent_master_ids = [pr.master_id for pr in parent_revs]
+        parent_masters = db.query(models.ConfigurationItemMaster).filter(
+            models.ConfigurationItemMaster.id.in_(parent_master_ids),
+            models.ConfigurationItemMaster.deleted_at.is_(None),
+        ).all()
+        if parent_masters:
+            parent_codes = [m.code for m in parent_masters]
             raise HTTPException(
                 status_code=400,
-                detail=f"该构型项被 {len(parents)} 个父构型项引用: {', '.join(parent_codes)}，无法删除"
+                detail=f"该构型项被 {len(parent_masters)} 个父构型项引用: {', '.join(parent_codes)}，无法删除"
             )
 
-    if not crud.delete_config_item(db, config_id):
-        raise HTTPException(status_code=404, detail="构型项不存在")
+    if not crud.delete_config_item_revision(db, UUID(revision_id)):
+        raise HTTPException(status_code=404, detail="构型项版本不存在")
     return {"detail": "ok"}
 
 
 # ════════════════════════════════════════════════════════
-# 关联零部件
+# 签出/签入/版本操作
 # ════════════════════════════════════════════════════════
 
-@router.post("/items/{config_id}/parts", response_model=dict)
+@router.post("/items/{revision_id}/checkout")
+async def checkout_config_item(
+    revision_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("configuration:checkout")),
+):
+    """签出构型项：创建新迭代，设置签出锁"""
+    rev, err = crud.checkout_config_item(db, UUID(revision_id), current_user.id)
+    if err:
+        raise HTTPException(status_code=409 if "已被他人" in err else 400, detail=err)
+    return {"ok": True, "latest_iteration": rev.latest_iteration}
+
+
+@router.post("/items/{revision_id}/checkin")
+async def checkin_config_item(
+    revision_id: str,
+    data: schemas.ConfigItemCheckin,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("configuration:checkin")),
+):
+    """签入构型项：记录签入说明，清除签出锁"""
+    rev, err = crud.checkin_config_item(db, UUID(revision_id), current_user.id, data.check_in_note)
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    return {"ok": True}
+
+
+@router.post("/items/{revision_id}/undocheckout")
+async def undocheckout_config_item(
+    revision_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("configuration:undocheckout")),
+):
+    """撤销签出：删除最新迭代，回退 latest_iteration，清除签出锁"""
+    rev, err = crud.undocheckout_config_item(db, UUID(revision_id), current_user.id)
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    return {"ok": True}
+
+
+@router.post("/items/{revision_id}/force-checkin")
+async def force_checkin_config_item(
+    revision_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("configuration:force_checkin")),
+):
+    """管理员强制签入：清除签出锁"""
+    rev, err = crud.force_checkin_config_item(db, UUID(revision_id))
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    return {"ok": True}
+
+
+@router.post("/items/{revision_id}/upgrade")
+async def upgrade_config_item(
+    revision_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("configuration:create")),
+):
+    """升版：创建新版本，自动签出"""
+    new_rev, err = crud.upgrade_config_item(db, UUID(revision_id), current_user.id)
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    return {"id": str(new_rev.id), "version": new_rev.version}
+
+
+@router.post("/items/{revision_id}/freeze")
+async def freeze_config_item(
+    revision_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("configuration:update")),
+):
+    """冻结构型项版本"""
+    rev, err = crud.freeze_config_item(db, UUID(revision_id))
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    return {"ok": True, "status": rev.status}
+
+
+@router.post("/items/{revision_id}/release")
+async def release_config_item(
+    revision_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("configuration:update")),
+):
+    """发布构型项版本"""
+    rev, err = crud.release_config_item(db, UUID(revision_id))
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    return {"ok": True, "status": rev.status}
+
+
+@router.post("/items/{revision_id}/obsolete")
+async def obsolete_config_item(
+    revision_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("configuration:update")),
+):
+    """作废构型项版本"""
+    rev, err = crud.obsolete_config_item(db, UUID(revision_id))
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    return {"ok": True, "status": rev.status}
+
+
+@router.get("/items/{revision_id}/versions")
+async def get_config_item_versions(
+    revision_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("configuration:read")),
+):
+    """获取构型项所有版本历史"""
+    rev = crud.get_config_item_revision(db, UUID(revision_id))
+    if not rev:
+        raise HTTPException(status_code=404, detail="构型项版本不存在")
+    versions = crud.list_revisions_by_master(db, rev.master_id)
+    result = []
+    for v in versions:
+        v_checkout_name = _resolve_user_name(db, v.check_out_user_id)
+        result.append({
+            "id": str(v.id),
+            "master_id": str(v.master_id),
+            "version": v.version,
+            "status": v.status,
+            "check_out_user_id": str(v.check_out_user_id) if v.check_out_user_id else None,
+            "check_out_user_name": v_checkout_name,
+            "check_out_date": v.check_out_date.isoformat() if v.check_out_date else None,
+            "latest_iteration": v.latest_iteration,
+            "creator_id": str(v.creator_id) if v.creator_id else None,
+            "created_at": v.created_at.isoformat() if v.created_at else None,
+        })
+    return result
+
+
+# ════════════════════════════════════════════════════════
+# 主数据更新（code/name 等 master 层字段）
+# ════════════════════════════════════════════════════════
+
+@router.patch("/items/{revision_id}/master", response_model=dict)
+async def update_config_item_master(
+    revision_id: str,
+    data: schemas.ConfigItemUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("configuration:update")),
+):
+    """更新构型项主数据字段（code/name/spec）"""
+    rev = crud.get_config_item_revision(db, UUID(revision_id))
+    if not rev:
+        raise HTTPException(status_code=404, detail="构型项版本不存在")
+
+    # code 唯一性检查
+    update_dict = data.model_dump(exclude_none=True)
+    if "code" in update_dict and update_dict["code"]:
+        existing = crud.get_config_item_master_by_code(db, update_dict["code"])
+        if existing and existing.id != rev.master_id and existing.deleted_at is None:
+            raise HTTPException(status_code=400, detail=f"构型号 {update_dict['code']} 已存在")
+
+    master = crud.update_config_item_master(db, rev.master_id, update_dict)
+    if not master:
+        raise HTTPException(status_code=404, detail="主数据不存在")
+    return {
+        "id": str(master.id), "code": master.code, "name": master.name,
+        "spec": master.spec or "",
+    }
+
+
+# ════════════════════════════════════════════════════════
+# 关联零部件（迭代级）
+# ════════════════════════════════════════════════════════
+
+@router.get("/items/{revision_id}/parts", response_model=dict)
+async def get_iteration_parts_endpoint(
+    revision_id: str, db: Session = Depends(get_db),
+    current_user=Depends(require_permission("configuration:read")),
+):
+    """获取当前迭代的关联零部件列表"""
+    result = crud.get_config_item_revision_with_iteration(db, UUID(revision_id))
+    if not result:
+        raise HTTPException(status_code=404, detail="构型项版本不存在")
+    _, iteration = result
+    if not iteration:
+        return {"parts": []}
+    parts = crud.get_iteration_parts(db, iteration.id)
+    return {"parts": [{
+        "id": str(p.id), "iteration_id": str(p.iteration_id),
+        "part_type": p.part_type, "part_id": str(p.part_id),
+        "is_required": p.is_required, "quantity": p.quantity, "sort_order": p.sort_order,
+    } for p in parts]}
+
+
+@router.post("/items/{revision_id}/parts", response_model=dict)
 async def add_parts(
-    config_id: str, data: schemas.ConfigPartBulkCreate, db: Session = Depends(get_db),
+    revision_id: str, data: schemas.ConfigPartBulkCreate, db: Session = Depends(get_db),
     current_user=Depends(require_permission("configuration.item:manage")),
 ):
-    """批量关联零部件"""
-    if not crud.get_config_item(db, config_id):
-        raise HTTPException(status_code=404, detail="构型项不存在")
-    return {"added": len(crud.add_config_parts(db, config_id, data.items))}
+    """批量关联零部件到当前迭代"""
+    result = crud.get_config_item_revision_with_iteration(db, UUID(revision_id))
+    if not result:
+        raise HTTPException(status_code=404, detail="构型项版本不存在")
+    revision, iteration = result
+    if not iteration:
+        raise HTTPException(status_code=400, detail="当前迭代不存在")
+    # 签出校验
+    if revision.check_out_user_id is None or str(revision.check_out_user_id) != str(current_user.id):
+        raise HTTPException(status_code=423, detail="请先签出后再编辑零部件")
+
+    parts = crud.add_config_parts(db, str(iteration.id), data.items)
+    return {"added": len(parts)}
 
 
-@router.put("/items/{config_id}/parts/{part_id}", response_model=dict)
+@router.put("/items/{revision_id}/parts/{part_id}", response_model=dict)
 async def update_part(
-    config_id: str, part_id: str, data: schemas.ConfigPartUpdate, db: Session = Depends(get_db),
+    revision_id: str, part_id: str, data: schemas.ConfigPartUpdate, db: Session = Depends(get_db),
     current_user=Depends(require_permission("configuration.item:manage")),
 ):
     """更新关联零部件属性"""
-    part = crud.update_config_part(db, part_id, data)
+    part = crud.update_config_part(db, UUID(part_id), data.model_dump(exclude_none=True))
     if not part:
         raise HTTPException(status_code=404, detail="关联关系不存在")
     return {"id": str(part.id), "is_required": part.is_required, "quantity": part.quantity}
 
 
-@router.delete("/items/{config_id}/parts/{part_id}")
+@router.delete("/items/{revision_id}/parts/{part_id}")
 async def remove_part(
-    config_id: str, part_id: str, db: Session = Depends(get_db),
+    revision_id: str, part_id: str, db: Session = Depends(get_db),
     current_user=Depends(require_permission("configuration.item:manage")),
 ):
     """移除关联零部件"""
@@ -290,38 +632,83 @@ async def remove_part(
 
 
 # ════════════════════════════════════════════════════════
-# 子构型项
+# 子构型项（迭代级）
 # ════════════════════════════════════════════════════════
 
-@router.post("/items/{config_id}/children", response_model=dict)
+@router.get("/items/{revision_id}/children", response_model=dict)
+async def get_iteration_children_endpoint(
+    revision_id: str, db: Session = Depends(get_db),
+    current_user=Depends(require_permission("configuration:read")),
+):
+    """获取当前迭代的子构型项列表"""
+    result = crud.get_config_item_revision_with_iteration(db, UUID(revision_id))
+    if not result:
+        raise HTTPException(status_code=404, detail="构型项版本不存在")
+    _, iteration = result
+    if not iteration:
+        return {"children": []}
+    children = crud.get_iteration_children(db, iteration.id)
+    children_list = []
+    for c in children:
+        child_rev = crud.get_config_item_revision(db, c.child_revision_id)
+        child_master = crud.get_config_item_master(db, child_rev.master_id) if child_rev else None
+        children_list.append({
+            "id": str(c.id),
+            "parent_iteration_id": str(c.parent_iteration_id),
+            "child_revision_id": str(c.child_revision_id),
+            "is_required": c.is_required,
+            "quantity": c.quantity,
+            "sort_order": c.sort_order,
+            "child_detail": {
+                "id": str(child_rev.id) if child_rev else "",
+                "code": child_master.code if child_master else "",
+                "name": child_master.name if child_master else "",
+                "version": child_rev.version if child_rev else "",
+            } if child_rev else {},
+        })
+    return {"children": children_list}
+
+
+@router.post("/items/{revision_id}/children", response_model=dict)
 async def add_children(
-    config_id: str, data: schemas.ConfigChildBulkCreate, db: Session = Depends(get_db),
+    revision_id: str, data: schemas.ConfigChildBulkCreate, db: Session = Depends(get_db),
     current_user=Depends(require_permission("configuration.item:manage")),
 ):
-    """批量添加子构型项"""
-    if not crud.get_config_item(db, config_id):
-        raise HTTPException(status_code=404, detail="构型项不存在")
+    """批量添加子构型项到当前迭代"""
+    result = crud.get_config_item_revision_with_iteration(db, UUID(revision_id))
+    if not result:
+        raise HTTPException(status_code=404, detail="构型项版本不存在")
+    revision, iteration = result
+    if not iteration:
+        raise HTTPException(status_code=400, detail="当前迭代不存在")
+    # 签出校验
+    if revision.check_out_user_id is None or str(revision.check_out_user_id) != str(current_user.id):
+        raise HTTPException(status_code=423, detail="请先签出后再编辑子构型项")
+    # 防止自引用
     for c in data.items:
-        if str(c.child_id) == config_id:
+        child_rev = crud.get_config_item_revision(db, c.child_revision_id)
+        if child_rev and child_rev.master_id == revision.master_id:
             raise HTTPException(status_code=400, detail="不能将构型项添加为自身的子项")
-    return {"added": len(crud.add_config_children(db, config_id, data.items))}
+
+    children = crud.add_config_children(db, str(iteration.id), data.items)
+    return {"added": len(children)}
 
 
-@router.put("/items/{config_id}/children/{child_id}", response_model=dict)
+@router.put("/items/{revision_id}/children/{child_id}", response_model=dict)
 async def update_child(
-    config_id: str, child_id: str, data: schemas.ConfigChildUpdate, db: Session = Depends(get_db),
+    revision_id: str, child_id: str, data: schemas.ConfigChildUpdate, db: Session = Depends(get_db),
     current_user=Depends(require_permission("configuration.item:manage")),
 ):
     """更新子构型项属性"""
-    child = crud.update_config_child(db, child_id, data)
+    child = crud.update_config_child(db, UUID(child_id), data.model_dump(exclude_none=True))
     if not child:
         raise HTTPException(status_code=404, detail="子构型项关系不存在")
     return {"id": str(child.id), "is_required": child.is_required}
 
 
-@router.delete("/items/{config_id}/children/{child_id}")
+@router.delete("/items/{revision_id}/children/{child_id}")
 async def remove_child(
-    config_id: str, child_id: str, db: Session = Depends(get_db),
+    revision_id: str, child_id: str, db: Session = Depends(get_db),
     current_user=Depends(require_permission("configuration.item:manage")),
 ):
     """移除子构型项"""
@@ -331,14 +718,14 @@ async def remove_child(
 
 
 # ════════════════════════════════════════════════════════
-# 关联图文档
+# 关联图文档（迭代级 document_links JSONB）
 # ════════════════════════════════════════════════════════
 
-def _get_config_documents(db: Session, item: models.ConfigurationItem, current_user=None) -> list:
-    """从 document_links JSONB 读取关联图文档"""
+def _get_iteration_documents(db: Session, iteration: models.ConfigurationItemIteration, current_user=None) -> list:
+    """从迭代的 document_links JSONB 读取关联图文档"""
     from .. import crud_groups
     from ..models import UserGroup, DocumentGroupLink
-    links = item.document_links or []
+    links = iteration.document_links or []
     result = []
     doc_ids = [l.get("document_id") for l in links if l.get("document_id")]
     doc_group_links = db.query(DocumentGroupLink).filter(DocumentGroupLink.document_id.in_(doc_ids)).all() if doc_ids else []
@@ -374,7 +761,7 @@ def _get_config_documents(db: Session, item: models.ConfigurationItem, current_u
         result.append({
             "id": link.get("id"),
             "entity_type": "configuration",
-            "entity_id": str(item.id),
+            "entity_id": str(iteration.id),
             "document_id": str(doc.id),
             "category": link.get("category"),
             "sort_order": link.get("sort_order", 0),
@@ -384,31 +771,37 @@ def _get_config_documents(db: Session, item: models.ConfigurationItem, current_u
     return result
 
 
-@router.get("/items/{config_id}/documents")
+@router.get("/items/{revision_id}/documents")
 async def get_config_documents(
-    config_id: str, db: Session = Depends(get_db),
+    revision_id: str, db: Session = Depends(get_db),
     current_user=Depends(require_permission("configuration:read")),
 ):
-    """获取构型项关联的图文档列表"""
-    item = crud.get_config_item(db, config_id)
-    if not item:
-        raise HTTPException(status_code=404, detail="构型项不存在")
-    return _get_config_documents(db, item, current_user)
+    """获取构型项当前迭代关联的图文档列表"""
+    result = crud.get_config_item_revision_with_iteration(db, UUID(revision_id))
+    if not result:
+        raise HTTPException(status_code=404, detail="构型项版本不存在")
+    _, iteration = result
+    if not iteration:
+        return []
+    return _get_iteration_documents(db, iteration, current_user)
 
 
-@router.post("/items/{config_id}/documents")
+@router.post("/items/{revision_id}/documents")
 async def add_config_document(
-    config_id: str, body: core_schemas.EntityDocumentCreate, request: Request,
+    revision_id: str, body: core_schemas.EntityDocumentCreate, request: Request,
     db: Session = Depends(get_db),
     current_user=Depends(require_permission("configuration.doc:manage")),
 ):
-    """关联图文档到构型项"""
+    """关联图文档到构型项当前迭代"""
     doc = db.query(Document).filter(Document.id == body.document_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="图文档不存在")
-    item = crud.get_config_item(db, config_id)
-    if not item:
-        raise HTTPException(status_code=404, detail="构型项不存在")
+    result = crud.get_config_item_revision_with_iteration(db, UUID(revision_id))
+    if not result:
+        raise HTTPException(status_code=404, detail="构型项版本不存在")
+    revision, iteration = result
+    if not iteration:
+        raise HTTPException(status_code=400, detail="当前迭代不存在")
 
     link_id = str(body.id) if body.id else str(uuid.uuid4())
     link = {
@@ -418,29 +811,32 @@ async def add_config_document(
         "sort_order": body.sort_order,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    links = item.document_links or []
+    links = list(iteration.document_links or [])
     links.append(link)
-    item.document_links = links
-    flag_modified(item, 'document_links')
+    iteration.document_links = links
+    flag_modified(iteration, 'document_links')
     db.commit()
     ip = request.client.host if request.client else None
     core_crud.create_log(db, current_user.id, current_user.username,
-                         "关联图文档", "configuration", str(config_id),
+                         "关联图文档", "configuration", str(revision_id),
                          f"文档:{doc.code}", ip)
     return {"id": link_id, "message": "图文档关联成功"}
 
 
-@router.put("/items/{config_id}/documents/{link_id}")
+@router.put("/items/{revision_id}/documents/{link_id}")
 async def update_config_document(
-    config_id: str, link_id: str, body: core_schemas.EntityDocumentUpdate,
+    revision_id: str, link_id: str, body: core_schemas.EntityDocumentUpdate,
     db: Session = Depends(get_db),
     current_user=Depends(require_permission("configuration.doc:manage")),
 ):
     """更新构型项关联图文档信息（类别/排序）"""
-    item = crud.get_config_item(db, config_id)
-    if not item:
-        raise HTTPException(status_code=404, detail="构型项不存在")
-    links = item.document_links or []
+    result = crud.get_config_item_revision_with_iteration(db, UUID(revision_id))
+    if not result:
+        raise HTTPException(status_code=404, detail="构型项版本不存在")
+    _, iteration = result
+    if not iteration:
+        raise HTTPException(status_code=404, detail="当前迭代不存在")
+    links = list(iteration.document_links or [])
     found = False
     for link in links:
         if link.get("id") == link_id:
@@ -452,27 +848,30 @@ async def update_config_document(
             break
     if not found:
         raise HTTPException(status_code=404, detail="关联关系不存在")
-    item.document_links = links
-    flag_modified(item, 'document_links')
+    iteration.document_links = links
+    flag_modified(iteration, 'document_links')
     db.commit()
     return {"id": link_id, "message": "更新成功"}
 
 
-@router.delete("/items/{config_id}/documents/{link_id}")
+@router.delete("/items/{revision_id}/documents/{link_id}")
 async def remove_config_document(
-    config_id: str, link_id: str, db: Session = Depends(get_db),
+    revision_id: str, link_id: str, db: Session = Depends(get_db),
     current_user=Depends(require_permission("configuration.doc:manage")),
 ):
     """移除构型项关联的图文档"""
-    item = crud.get_config_item(db, config_id)
-    if not item:
-        raise HTTPException(status_code=404, detail="构型项不存在")
-    links = item.document_links or []
+    result = crud.get_config_item_revision_with_iteration(db, UUID(revision_id))
+    if not result:
+        raise HTTPException(status_code=404, detail="构型项版本不存在")
+    _, iteration = result
+    if not iteration:
+        raise HTTPException(status_code=404, detail="当前迭代不存在")
+    links = list(iteration.document_links or [])
     new_links = [l for l in links if l.get("id") != link_id]
     if len(new_links) == len(links):
         raise HTTPException(status_code=404, detail="关联关系不存在")
-    item.document_links = new_links
-    flag_modified(item, 'document_links')
+    iteration.document_links = new_links
+    flag_modified(iteration, 'document_links')
     db.commit()
     return {"detail": "ok"}
 
@@ -496,7 +895,7 @@ async def list_profiles(
     return {
         "items": [{
             "id": str(p.id), "code": p.code, "name": p.name,
-            "configuration_item_id": str(p.configuration_item_id) if p.configuration_item_id else "",
+            "configuration_item_revision_id": str(p.configuration_item_revision_id) if p.configuration_item_revision_id else "",
             "status": p.status,
             "effectivity_start": p.effectivity_start or "",
             "effectivity_end": p.effectivity_end or "",
@@ -522,21 +921,23 @@ async def create_profile(
     if existing:
         raise HTTPException(status_code=400, detail="配置编号已存在")
 
-    if data.configuration_item_id:
-        config_item = crud.get_config_item(db, str(data.configuration_item_id))
+    if data.configuration_item_revision_id:
+        config_item = crud.get_config_item_revision(db, data.configuration_item_revision_id)
         if not config_item:
-            raise HTTPException(status_code=404, detail="构型项不存在")
+            raise HTTPException(status_code=404, detail="构型项版本不存在")
 
     profile = crud.create_profile(db, data, str(current_user.id))
     items = crud.get_working_items(db, str(profile.id))
     entity_map = _build_entity_map(db, items)
 
-    config_item = crud.get_config_item(db, str(profile.configuration_item_id)) if profile.configuration_item_id else None
+    config_item = crud.get_config_item_revision(db, profile.configuration_item_revision_id) if profile.configuration_item_revision_id else None
+    config_master = crud.get_config_item_master(db, config_item.master_id) if config_item else None
     return {
         "id": str(profile.id), "code": profile.code, "name": profile.name,
-        "configuration_item_id": str(profile.configuration_item_id) if profile.configuration_item_id else "",
+        "configuration_item_revision_id": str(profile.configuration_item_revision_id) if profile.configuration_item_revision_id else "",
         "configuration_item": {
-            "id": str(config_item.id), "code": config_item.code, "name": config_item.name,
+            "id": str(config_item.id), "code": config_master.code if config_master else "",
+            "name": config_master.name if config_master else "",
         } if config_item else None,
         "status": profile.status,
         "effectivity_start": profile.effectivity_start or "",
@@ -560,16 +961,18 @@ async def get_profile(
     if not profile:
         raise HTTPException(status_code=404, detail="配置不存在")
 
-    config_item = crud.get_config_item(db, str(profile.configuration_item_id)) if profile.configuration_item_id else None
+    config_item = crud.get_config_item_revision(db, profile.configuration_item_revision_id) if profile.configuration_item_revision_id else None
+    config_master = crud.get_config_item_master(db, config_item.master_id) if config_item else None
     working_items = crud.get_working_items(db, profile_id)
     formal_items = crud.get_profile_items(db, profile_id)
     entity_map = _build_entity_map(db, working_items)
 
     return {
         "id": str(profile.id), "code": profile.code, "name": profile.name,
-        "configuration_item_id": str(profile.configuration_item_id) if profile.configuration_item_id else "",
+        "configuration_item_revision_id": str(profile.configuration_item_revision_id) if profile.configuration_item_revision_id else "",
         "configuration_item": {
-            "id": str(config_item.id), "code": config_item.code, "name": config_item.name,
+            "id": str(config_item.id), "code": config_master.code if config_master else "",
+            "name": config_master.name if config_master else "",
         } if config_item else None,
         "status": profile.status,
         "effectivity_start": profile.effectivity_start or "",
@@ -579,7 +982,7 @@ async def get_profile(
         "created_at": profile.created_at.isoformat() if profile.created_at else None,
         "updated_at": profile.updated_at.isoformat() if profile.updated_at else None,
         "items": [_format_profile_item(item, entity_map) for item in working_items],
-        "config_tree": _build_config_tree(db, str(profile.configuration_item_id), working_items, entity_map) if profile.configuration_item_id else None,
+        "config_tree": _build_config_tree(db, str(profile.configuration_item_revision_id), working_items, entity_map) if profile.configuration_item_revision_id else None,
         "formal_items": [_format_profile_item(item) for item in formal_items],
         "reviewers": profile.reviewers or [],
         "review_mode": profile.review_mode,
@@ -611,7 +1014,7 @@ async def get_profile_3d_preview(
     profile = crud.get_profile(db, profile_id)
     if not profile:
         raise HTTPException(status_code=404, detail="配置不存在")
-    if not profile.configuration_item_id:
+    if not profile.configuration_item_revision_id:
         return {
             "profile_code": profile.code,
             "profile_name": profile.name,
@@ -624,7 +1027,7 @@ async def get_profile_3d_preview(
 
     working_items = crud.get_working_items(db, profile_id)
     entity_map = _build_entity_map(db, working_items)
-    config_tree = _build_config_tree(db, str(profile.configuration_item_id), working_items, entity_map)
+    config_tree = _build_config_tree(db, str(profile.configuration_item_revision_id), working_items, entity_map)
 
     parts = _collect_config_profile_parts(config_tree)
     if not parts:
@@ -642,7 +1045,6 @@ async def get_profile_3d_preview(
     missing = []
     identity_matrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
 
-    # 零部件 model map：{ item_id: { "version":..., "part_code":..., "has_model": bool } }
     part_model_map = {p["item_id"]: {"version": p.get("item_version") or "", "part_code": p["item_code"], "part_name": p["item_name"], "has_model": False} for p in parts}
 
     for idx, p in enumerate(parts):
@@ -659,20 +1061,19 @@ async def get_profile_3d_preview(
                     "version": "",
                 })
                 continue
-        # 回写解析后的版本，供模型树显示使用
         if p.get("item_id") in part_model_map:
             part_model_map[p["item_id"]]["version"] = ver
 
-        result = _resolve_part_stp_attachment(db, p["item_id"], ver)
-        if result and result.get("glb_urls"):
+        result_3d = _resolve_part_stp_attachment(db, p["item_id"], ver)
+        if result_3d and result_3d.get("glb_urls"):
             instances.append({
                 "path": f"instance-{len(instances)}",
                 "bom_path": [f"instance-{len(instances)}"],
                 "part_code": p["item_code"],
                 "part_name": p["item_name"],
                 "version": ver,
-                "revision_id": result["revision_id"],
-                "glb_urls": result["glb_urls"],
+                "revision_id": result_3d["revision_id"],
+                "glb_urls": result_3d["glb_urls"],
                 "matrix": identity_matrix,
                 "bbox": None,
             })
@@ -683,18 +1084,14 @@ async def get_profile_3d_preview(
                 "version": ver,
             })
 
-    # 通过 part_code 标记 has_model
     loaded_ids = {inst["part_code"] for inst in instances}
     for p in parts:
         if p["item_code"] in loaded_ids:
             part_model_map[p["item_id"]]["has_model"] = True
 
     def _build_config_tree_nodes(node: dict) -> dict | None:
-        """递归构建构型项树节点，含零部件和子构型项"""
         if not node:
             return None
-
-        # 本节点的零部件子节点
         part_children = []
         for p in node.get("parts", []):
             if p.get("is_selected") and p.get("item_type") != "config_item":
@@ -711,19 +1108,14 @@ async def get_profile_3d_preview(
                     "is_leaf": True,
                     "children": [],
                 })
-
-        # 子构型项
         config_children = []
         for child in node.get("children", []):
             if child.get("is_selected"):
                 child_node = _build_config_tree_nodes(child)
                 if child_node:
                     config_children.append(child_node)
-
-        # 合并子节点（零部件在前，子构型项在后）
         all_children = part_children + config_children
         node_has_model = any(c.get("has_model", False) for c in all_children)
-
         return {
             "bom_item_id": f"config-{node.get('id', '')}",
             "name": f"{node.get('code', '')}_{node.get('name', '')}",
@@ -737,7 +1129,6 @@ async def get_profile_3d_preview(
 
     root_tree_node = _build_config_tree_nodes(config_tree) if config_tree else None
 
-    # 扁平实例树（供 AssemblyModelLoader 用，仅含已加载模型）
     flat_tree = []
     for idx, inst in enumerate(instances):
         flat_tree.append({
@@ -975,11 +1366,7 @@ async def restore_profile_checklist(
     db: Session = Depends(get_db),
     current_user=Depends(require_permission("profile.bom:manage")),
 ):
-    """按导入数据强制还原工作清单勾选（含必选件，用于导入恢复），再同步正式清单。仅 draft。
-
-    逐项 updateItem 无法还原"被取消的可选子构型项下的必选件"（接口拦截必选件），
-    故此处直接强制设置工作表项的 is_selected，完整还原整棵树（含子构型项节点的取消级联）。
-    """
+    """按导入数据强制还原工作清单勾选（仅 draft）"""
     profile = crud.get_profile(db, profile_id)
     if not profile:
         raise HTTPException(status_code=404, detail="配置不存在")
@@ -988,14 +1375,17 @@ async def restore_profile_checklist(
 
     working = crud.get_working_items(db, profile_id)
 
-    # 工作表项的来源构型项 id→code
-    ci_ids = {str(wi.source_config_item_id) for wi in working if wi.source_config_item_id}
+    # 工作表项的来源构型项 revision_id→code
+    ci_ids = {str(wi.source_config_item_revision_id) for wi in working if wi.source_config_item_revision_id}
     code_by_id: dict[str, str] = {}
     if ci_ids:
-        for ci in db.query(models.ConfigurationItem).filter(
-            models.ConfigurationItem.id.in_(ci_ids)
+        for rev in db.query(models.ConfigurationItemRevision).filter(
+            models.ConfigurationItemRevision.id.in_(ci_ids)
         ).all():
-            code_by_id[str(ci.id)] = ci.code
+            master = db.query(models.ConfigurationItemMaster).filter(
+                models.ConfigurationItemMaster.id == rev.master_id
+            ).first()
+            code_by_id[str(rev.id)] = master.code if master else ""
 
     def _key(item_type: str, item_code: str, source_code: str) -> str:
         return f"{item_type}|{item_code}|{source_code}"
@@ -1004,10 +1394,10 @@ async def restore_profile_checklist(
     matched: set[str] = set()
 
     for wi in working:
-        src_code = code_by_id.get(str(wi.source_config_item_id), "") if wi.source_config_item_id else ""
+        src_code = code_by_id.get(str(wi.source_config_item_revision_id), "") if wi.source_config_item_revision_id else ""
         k = _key(wi.item_type, wi.item_code or "", src_code)
         if k in target:
-            wi.is_selected = target[k]  # 强制设置，含必选件
+            wi.is_selected = target[k]
             matched.add(k)
 
     db.flush()
@@ -1052,7 +1442,8 @@ def _format_profile_item(item, entity_map: dict = None) -> dict:
     result = {
         "id": str(item.id),
         "profile_id": str(item.profile_id),
-        "source_config_item_id": str(item.source_config_item_id) if item.source_config_item_id else None,
+        "source_config_item_revision_id": str(item.source_config_item_revision_id) if item.source_config_item_revision_id else None,
+        "source_config_item_iteration_id": str(item.source_config_item_iteration_id) if item.source_config_item_iteration_id else None,
         "item_type": item.item_type,
         "item_id": str(item.item_id),
         "item_code": item.item_code or "",
@@ -1088,38 +1479,43 @@ def _build_entity_map(db: Session, items: list) -> dict:
     return entity_map
 
 
-def _build_config_tree(db: Session, config_item_id: str, profile_items: list, entity_map: dict = None) -> dict:
-    """构建构型项树形结构，含零部件和子构型项"""
-    item = crud.get_config_item(db, config_item_id)
-    if not item:
+def _build_config_tree(db: Session, revision_id: str, profile_items: list, entity_map: dict = None) -> dict:
+    """构建构型项树形结构，含零部件和子构型项（revision_id 参数）"""
+    result = crud.get_config_item_revision_with_iteration(db, UUID(revision_id))
+    if not result:
+        return None
+    revision, iteration = result
+    master = crud.get_config_item_master(db, revision.master_id)
+    if not master:
         return None
 
     # 本层级关联的零部件（含 direct 和 child 来源）
     parts = [
         _format_profile_item(pi, entity_map) for pi in profile_items
-        if pi.source_config_item_id and str(pi.source_config_item_id) == config_item_id
+        if pi.source_config_item_revision_id and str(pi.source_config_item_revision_id) == revision_id
     ]
 
-    # 子构型项
-    children = db.query(models.ConfigurationItemChild).filter(
-        models.ConfigurationItemChild.parent_id == config_item_id
-    ).order_by(models.ConfigurationItemChild.sort_order).all()
+    # 子构型项（通过当前迭代）
+    children = []
+    if iteration:
+        children = db.query(models.ConfigurationItemChild).filter(
+            models.ConfigurationItemChild.parent_iteration_id == iteration.id
+        ).order_by(models.ConfigurationItemChild.sort_order).all()
 
     child_nodes = []
     for child in children:
-        child_tree = _build_config_tree(db, str(child.child_id), profile_items, entity_map)
+        child_tree = _build_config_tree(db, str(child.child_revision_id), profile_items, entity_map)
         if child_tree:
             child_tree["is_required"] = child.is_required
             child_tree["quantity"] = child.quantity
-            # 子构型项的选中态：必选项始终选中；可选节点由子零件决定
-            child_tree["is_selected"] = child.is_required or _is_config_node_selected(db, str(child.child_id), profile_items)
+            child_tree["is_selected"] = child.is_required or _is_config_node_selected(db, str(child.child_revision_id), profile_items)
             child_nodes.append(child_tree)
 
     return {
-        "id": str(item.id),
-        "code": item.code,
-        "name": item.name,
-        "is_required": True,  # 根节点始终必选
+        "id": str(revision.id),
+        "code": master.code,
+        "name": master.name,
+        "is_required": True,
         "is_selected": True,
         "parts": parts,
         "children": child_nodes,
@@ -1128,10 +1524,6 @@ def _build_config_tree(db: Session, config_item_id: str, profile_items: list, en
 
 def _resolve_part_stp_attachment(db: Session, master_id: str, version: str) -> dict | None:
     """按 (master_id, version) 查找零部件 STP 附件，返回 glb_urls 或 None"""
-    from uuid import UUID
-    from app.crud_parts import get_part_revision
-    from app.stp_converter import get_lod_glb_paths, get_glb_cache_path
-
     rev = db.query(PartRevision).filter(
         PartRevision.master_id == UUID(master_id),
         PartRevision.version == version,
@@ -1180,7 +1572,7 @@ def _resolve_part_stp_attachment(db: Session, master_id: str, version: str) -> d
 
 
 def _collect_config_profile_parts(config_tree: dict) -> list[dict]:
-    """递归遍历 config_tree，收集所有选中零部件（跳过构型项行）"""
+    """递归遍历 config_tree，收集所有选中零部件"""
     parts = []
 
     def walk(node: dict):
@@ -1202,17 +1594,23 @@ def _collect_config_profile_parts(config_tree: dict) -> list[dict]:
     return parts
 
 
-def _is_config_node_selected(db: Session, config_item_id: str, profile_items: list) -> bool:
+def _is_config_node_selected(db: Session, revision_id: str, profile_items: list) -> bool:
     """判断构型项节点是否已选（其下所有非可选部件有任意选中即算选中）"""
     for pi in profile_items:
-        if pi.source_config_item_id and str(pi.source_config_item_id) == config_item_id and pi.is_selected:
+        if pi.source_config_item_revision_id and str(pi.source_config_item_revision_id) == revision_id and pi.is_selected:
             return True
     # 递归检查子节点
+    result = crud.get_config_item_revision_with_iteration(db, UUID(revision_id))
+    if not result:
+        return False
+    _, iteration = result
+    if not iteration:
+        return False
     children = db.query(models.ConfigurationItemChild).filter(
-        models.ConfigurationItemChild.parent_id == config_item_id
+        models.ConfigurationItemChild.parent_iteration_id == iteration.id
     ).all()
     for child in children:
-        if _is_config_node_selected(db, str(child.child_id), profile_items):
+        if _is_config_node_selected(db, str(child.child_revision_id), profile_items):
             return True
     return False
 
@@ -1233,30 +1631,31 @@ async def toggle_config_item_node(
 
     all_items = crud.get_working_items(db, profile_id)
 
-    # 判断当前节点状态：如果其下所有零部件都已勾选，则视为"已选"
+    # config_item_id 是 revision_id
     node_selected = _is_config_node_selected(db, config_item_id, all_items)
 
-    # 收集该节点及其子节点下所有零部件
     target_ids = _collect_descendant_config_item_ids(db, config_item_id)
     target_ids.add(config_item_id)
 
     toggled = []
     for pi in all_items:
-        if pi.source_config_item_id and str(pi.source_config_item_id) in target_ids:
+        if pi.source_config_item_revision_id and str(pi.source_config_item_revision_id) in target_ids:
             crud.update_working_item(db, str(pi.id), not node_selected, force=True)
             toggled.append(str(pi.id))
 
     # 如果该可选节点下没有任何零部件，创建合成条目记录节点级选中态
     if len(toggled) == 0 and not node_selected:
-        config_item = crud.get_config_item(db, config_item_id)
-        if config_item:
+        rev = crud.get_config_item_revision(db, UUID(config_item_id))
+        master = crud.get_config_item_master(db, rev.master_id) if rev else None
+        if rev and master:
             node_item = models.ConfigurationWorkingItem(
-                profile_id=uuid.UUID(profile_id),
-                source_config_item_id=uuid.UUID(config_item_id),
+                profile_id=UUID(profile_id),
+                source_config_item_revision_id=UUID(config_item_id),
+                source_config_item_iteration_id=None,
                 item_type='config_item',
-                item_id=uuid.UUID(config_item_id),
-                item_code=config_item.code,
-                item_name=config_item.name,
+                item_id=UUID(config_item_id),
+                item_code=master.code,
+                item_name=master.name,
                 is_required=False,
                 is_selected=True,
                 source_type='child',
@@ -1291,18 +1690,24 @@ async def regenerate_profile_checklist(
     return {
         "detail": "ok",
         "items": [_format_profile_item(item, entity_map) for item in items],
-        "config_tree": _build_config_tree(db, str(profile.configuration_item_id), items, entity_map),
+        "config_tree": _build_config_tree(db, str(profile.configuration_item_revision_id), items, entity_map),
     }
 
 
-def _collect_descendant_config_item_ids(db: Session, config_item_id: str) -> set:
-    """递归收集所有子孙构型项 ID"""
+def _collect_descendant_config_item_ids(db: Session, revision_id: str) -> set:
+    """递归收集所有子孙构型项 revision_id（通过迭代→child 关系）"""
     ids = set()
+    result = crud.get_config_item_revision_with_iteration(db, UUID(revision_id))
+    if not result:
+        return ids
+    _, iteration = result
+    if not iteration:
+        return ids
     children = db.query(models.ConfigurationItemChild).filter(
-        models.ConfigurationItemChild.parent_id == config_item_id
+        models.ConfigurationItemChild.parent_iteration_id == iteration.id
     ).all()
     for child in children:
-        cid = str(child.child_id)
+        cid = str(child.child_revision_id)
         ids.add(cid)
         ids.update(_collect_descendant_config_item_ids(db, cid))
     return ids

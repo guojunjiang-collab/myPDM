@@ -8,7 +8,7 @@ from ..models import (
     DashboardItem, DashboardFolderShare
 )
 from ..models_parts import PartMaster, PartRevision
-from ..models_configuration import ConfigurationItem
+from ..models_configuration import ConfigurationItemMaster
 from ..permissions import require_permission, enforce_object_policy
 
 router = APIRouter(prefix="/dashboard", tags=["用户看板"])
@@ -82,9 +82,9 @@ def _folder_to_dict(folder, db: Session, include_items=False, include_children=F
                         "status": entity.status,
                     })
             elif item.entity_type == "configuration":
-                entity = db.query(ConfigurationItem).filter(
-                    ConfigurationItem.id == item.entity_id,
-                    ConfigurationItem.deleted_at.is_(None)
+                entity = db.query(ConfigurationItemMaster).filter(
+                    ConfigurationItemMaster.id == item.entity_id,
+                    ConfigurationItemMaster.deleted_at.is_(None)
                 ).first()
                 if entity:
                     item_list.append({
@@ -445,9 +445,9 @@ async def add_items(data: dict, request: Request, db: Session = Depends(get_db),
         elif entity_type == "document":
             entity = db.query(Document).filter(Document.id == entity_id).first()
         elif entity_type == "configuration":
-            entity = db.query(ConfigurationItem).filter(
-                ConfigurationItem.id == entity_id,
-                ConfigurationItem.deleted_at.is_(None)
+            entity = db.query(ConfigurationItemMaster).filter(
+                ConfigurationItemMaster.id == entity_id,
+                ConfigurationItemMaster.deleted_at.is_(None)
             ).first()
         if not entity:
             continue
@@ -824,7 +824,7 @@ async def export_all_dashboards(
             doc_map = {str(d.id): d for d in docs}
         config_map = {}
         if config_ids:
-            configs = db.query(ConfigurationItem).filter(ConfigurationItem.id.in_(config_ids)).all()
+            configs = db.query(ConfigurationItemMaster).filter(ConfigurationItemMaster.id.in_(config_ids)).all()
             config_map = {str(c.id): c for c in configs}
 
         def _get_entity_info(entity_type, entity_id):
@@ -1030,9 +1030,9 @@ async def import_all_dashboards(
                 elif entity_type == "document":
                     exists = db.query(Document).filter(Document.id == entity_id).first() is not None
                 elif entity_type == "configuration":
-                    exists = db.query(ConfigurationItem).filter(
-                        ConfigurationItem.id == entity_id,
-                        ConfigurationItem.deleted_at.is_(None)
+                    exists = db.query(ConfigurationItemMaster).filter(
+                        ConfigurationItemMaster.id == entity_id,
+                        ConfigurationItemMaster.deleted_at.is_(None)
                     ).first() is not None
                 if exists:
                     resolved_entity_id = entity_id
@@ -1044,9 +1044,9 @@ async def import_all_dashboards(
                 elif entity_type == "document":
                     e = db.query(Document).filter(Document.code == entity_code).first()
                 elif entity_type == "configuration":
-                    e = db.query(ConfigurationItem).filter(
-                        ConfigurationItem.code == entity_code,
-                        ConfigurationItem.deleted_at.is_(None)
+                    e = db.query(ConfigurationItemMaster).filter(
+                        ConfigurationItemMaster.code == entity_code,
+                        ConfigurationItemMaster.deleted_at.is_(None)
                     ).first()
                 else:
                     e = None

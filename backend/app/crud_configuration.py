@@ -283,7 +283,7 @@ def create_config_item(db: Session, data: dict, user_id: UUID) -> Tuple[models.C
         master_id=master.id, version="A", status="draft",
         creator_id=user_id, latest_iteration=1,
         check_out_user_id=user_id,
-        check_out_date=func.now(),
+        check_out_date=sqlfunc.now(),
     )
     db.add(revision)
     db.flush()
@@ -316,7 +316,7 @@ def revive_config_item(
         master_id=master.id, version="A", status="draft",
         creator_id=user_id, latest_iteration=1,
         check_out_user_id=user_id,
-        check_out_date=func.now(),
+        check_out_date=sqlfunc.now(),
     )
     db.add(revision)
     db.flush()
@@ -364,7 +364,7 @@ def delete_config_item_revision(db: Session, revision_id: UUID) -> bool:
     revision = get_config_item_revision(db, revision_id)
     if not revision:
         return False
-    revision.deleted_at = func.now()
+    revision.deleted_at = sqlfunc.now()
     db.commit()
     return True
 
@@ -436,7 +436,7 @@ def checkout_config_item(
 
     rev.latest_iteration += 1
     rev.check_out_user_id = user_id
-    rev.check_out_date = func.now()
+    rev.check_out_date = sqlfunc.now()
     db.commit()
     db.refresh(rev)
     return rev, None
@@ -609,7 +609,7 @@ def upgrade_config_item(
             db.add(new_child)
 
     new_rev.check_out_user_id = user_id
-    new_rev.check_out_date = func.now()
+    new_rev.check_out_date = sqlfunc.now()
     db.commit()
     db.refresh(new_rev)
     return new_rev, None
@@ -1001,7 +1001,7 @@ def create_profile(
 ) -> models.ConfigurationProfile:
     profile = models.ConfigurationProfile(
         code=data.code, name=data.name,
-        configuration_item_revision_id=data.configuration_item_id,
+        configuration_item_revision_id=data.configuration_item_revision_id,
         effectivity_start=data.effectivity_start,
         effectivity_end=data.effectivity_end,
         remark=data.remark,
@@ -1013,8 +1013,8 @@ def create_profile(
     db.add(profile)
     db.flush()
 
-    if data.configuration_item_id:
-        _generate_checklist(db, str(profile.id), str(data.configuration_item_id))
+    if data.configuration_item_revision_id:
+        _generate_checklist(db, str(profile.id), str(data.configuration_item_revision_id))
         db.flush()
         sync_working_to_formal(db, str(profile.id))
 
@@ -1031,7 +1031,7 @@ def update_profile(
         return None
 
     # 处理构型项变更（仅当值变化时才清除并重建工作表）
-    new_cfg_id = str(data.configuration_item_id) if data.configuration_item_id else None
+    new_cfg_id = str(data.configuration_item_revision_id) if data.configuration_item_revision_id else None
     old_cfg_id = str(profile.configuration_item_revision_id) if profile.configuration_item_revision_id else None
     if new_cfg_id != old_cfg_id:
         db.query(models.ConfigurationWorkingItem).filter(
@@ -1040,13 +1040,13 @@ def update_profile(
         db.query(models.ConfigurationProfileItem).filter(
             models.ConfigurationProfileItem.profile_id == profile_id
         ).delete()
-        profile.configuration_item_revision_id = data.configuration_item_id
-        if data.configuration_item_id:
-            _generate_checklist(db, profile_id, str(data.configuration_item_id))
+        profile.configuration_item_revision_id = data.configuration_item_revision_id
+        if data.configuration_item_revision_id:
+            _generate_checklist(db, profile_id, str(data.configuration_item_revision_id))
 
     # 更新其他字段
     update_data = data.model_dump(exclude_unset=True)
-    update_data.pop("configuration_item_id", None)
+    update_data.pop("configuration_item_revision_id", None)
     for k, v in update_data.items():
         if v is None and k in ("reviewers", "cc_users", "review_mode"):
             continue

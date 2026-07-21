@@ -1,6 +1,7 @@
 """
 构型配置 - Pydantic Schemas
 ==============================
+三层模型：Master → Revision → Iteration
 """
 
 from pydantic import BaseModel, ConfigDict
@@ -14,35 +15,41 @@ class BaseSchema(BaseModel):
 
 
 # ============================================================
-# 构型项（库）
+# 构型项（库）— 三层模型 Schemas
 # ============================================================
 
-class ConfigurationItemCreate(BaseSchema):
+class ConfigItemCreate(BaseSchema):
     code: str
     name: str
+    spec: str = ""
+    remark: str = ""
+
+
+class ConfigItemUpdate(BaseSchema):
     spec: Optional[str] = None
     remark: Optional[str] = None
-
-
-class ConfigurationItemUpdate(BaseSchema):
-    code: Optional[str] = None
     name: Optional[str] = None
-    spec: Optional[str] = None
-    remark: Optional[str] = None
 
 
-class ConfigurationItemResponse(BaseSchema):
-    id: uuid.UUID
-    code: str
-    name: str
-    spec: Optional[str] = None
-    remark: Optional[str] = None
-    created_at: datetime
-    updated_at: Optional[datetime] = None
+class ConfigItemCheckin(BaseSchema):
+    check_in_note: str = ""
+
+
+class ConfigItemRevisionOut(BaseSchema):
+    id: str
+    master_id: str
+    version: str
+    status: str
+    check_out_user_id: Optional[str] = None
+    check_out_user_name: Optional[str] = None
+    check_out_date: Optional[str] = None
+    latest_iteration: int = 1
+    creator_id: Optional[str] = None
+    created_at: Optional[str] = None
 
 
 # ============================================================
-# 关联零部件
+# 关联零部件（迭代级）
 # ============================================================
 
 class ConfigPartCreate(BaseSchema):
@@ -61,7 +68,7 @@ class ConfigPartUpdate(BaseSchema):
 
 class ConfigPartResponse(BaseSchema):
     id: uuid.UUID
-    configuration_item_id: uuid.UUID
+    iteration_id: uuid.UUID
     part_type: str
     part_id: uuid.UUID
     is_required: bool
@@ -76,11 +83,11 @@ class ConfigPartBulkCreate(BaseSchema):
 
 
 # ============================================================
-# 子构型项
+# 子构型项（parent→iteration, child→revision）
 # ============================================================
 
 class ConfigChildCreate(BaseSchema):
-    child_id: uuid.UUID
+    child_revision_id: uuid.UUID
     is_required: bool = True
     quantity: int = 1
     sort_order: int = 0
@@ -94,8 +101,8 @@ class ConfigChildUpdate(BaseSchema):
 
 class ConfigChildResponse(BaseSchema):
     id: uuid.UUID
-    parent_id: uuid.UUID
-    child_id: uuid.UUID
+    parent_iteration_id: uuid.UUID
+    child_revision_id: uuid.UUID
     is_required: bool
     quantity: int
     sort_order: int
@@ -126,7 +133,7 @@ class CcUserItem(BaseSchema):
 class ConfigurationProfileCreate(BaseSchema):
     code: str
     name: str
-    configuration_item_id: Optional[uuid.UUID] = None
+    configuration_item_revision_id: Optional[uuid.UUID] = None
     effectivity_start: Optional[str] = None
     effectivity_end: Optional[str] = None
     remark: Optional[str] = None
@@ -138,7 +145,7 @@ class ConfigurationProfileCreate(BaseSchema):
 class ConfigurationProfileUpdate(BaseSchema):
     code: Optional[str] = None
     name: Optional[str] = None
-    configuration_item_id: Optional[uuid.UUID] = None
+    configuration_item_revision_id: Optional[uuid.UUID] = None
     effectivity_start: Optional[str] = None
     effectivity_end: Optional[str] = None
     remark: Optional[str] = None
@@ -151,7 +158,7 @@ class ConfigurationProfileResponse(BaseSchema):
     id: uuid.UUID
     code: str
     name: str
-    configuration_item_id: uuid.UUID
+    configuration_item_revision_id: Optional[uuid.UUID] = None
     status: str
     effectivity_start: Optional[str] = None
     effectivity_end: Optional[str] = None
@@ -169,13 +176,15 @@ class ConfigurationProfileItemUpdate(BaseSchema):
 class ConfigurationProfileItemResponse(BaseSchema):
     id: uuid.UUID
     profile_id: uuid.UUID
-    source_config_item_id: Optional[uuid.UUID] = None
+    source_config_item_revision_id: Optional[uuid.UUID] = None
+    source_config_item_iteration_id: Optional[uuid.UUID] = None
     item_type: str
     item_id: uuid.UUID
     item_code: Optional[str] = None
     item_name: Optional[str] = None
     is_required: bool
     is_selected: bool
+    quantity: int = 1
     source_type: str
     sort_order: int
     created_at: datetime
