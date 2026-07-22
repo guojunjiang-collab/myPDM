@@ -104,7 +104,8 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
   }, [internalRevId, activeIterationId]);
 
   useEffect(() => { setInternalRevId(revisionId); }, [revisionId]);
-  useEffect(() => { if (open) { setDetail(null); setActiveTab('info'); setViewingIterationData(null); setActiveIterationId(null); setExpandedChildren(new Set()); setSubChildren({}); loadDetail(); } }, [open]);
+  useEffect(() => { if (open) { setDetail(null); setActiveTab('info'); setViewingIterationData(null); setActiveIterationId(null); setExpandedChildren(new Set()); setSubChildren({}); } }, [open]);
+  useEffect(() => { if (open) loadDetail(); }, [open, loadDetail]);
 
   const loadTabs = useCallback(async () => {
     if (!internalRevId) return;
