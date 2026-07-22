@@ -346,7 +346,21 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
   const tag = doc ? statusTag(doc.status) : { label: '', class: '' };
 
   return (
-    <Modal open={open} title="图文档详情" onClose={onClose} width="full">
+    <Modal open={open} title="图文档详情" onClose={onClose} width="full"
+      headerAction={(isViewingOtherVersion && doc) ? (
+        <span className="flex items-center gap-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 px-2 py-0.5 rounded">
+          正在查看版本 {doc.version}（只读）
+          <button onClick={() => setViewingVersionId(null)}
+            className="text-primary-600 hover:text-primary-800 hover:underline">返回当前</button>
+        </span>
+      ) : (isViewingHistorical && viewingIteration && !isViewingOtherVersion) ? (
+        <span className="flex items-center gap-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 px-2 py-0.5 rounded">
+          正在查看 Iteration #{viewingIteration.iteration} 历史数据（只读）
+          <button onClick={() => setViewingIterationId(null)}
+            className="text-primary-600 hover:text-primary-800 hover:underline">返回当前</button>
+        </span>
+      ) : undefined}
+    >
       <div className="h-[50vh] flex flex-col">
         {loading && !doc ? (
           <Loading />
@@ -469,22 +483,6 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                 </div>
               </div>
             </div>
-
-            {/* 历史版本/迭代提示 */}
-            {isViewingOtherVersion && doc && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1.5 shrink-0 mb-3 text-sm flex items-center justify-between">
-                <span>正在查看版本 {doc.version}（只读）</span>
-                <button onClick={() => setViewingVersionId(null)}
-                  className="text-primary-600 hover:text-primary-800 hover:underline text-xs">返回当前</button>
-              </div>
-            )}
-            {isViewingHistorical && viewingIteration && !isViewingOtherVersion && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1.5 shrink-0 mb-3 text-sm flex items-center justify-between">
-                <span>正在查看 Iteration #{viewingIteration.iteration} 历史数据（只读）</span>
-                <button onClick={() => setViewingIterationId(null)}
-                  className="text-primary-600 hover:text-primary-800 hover:underline text-xs">返回当前</button>
-              </div>
-            )}
 
             {/* Tab 导航 + 内容 */}
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
