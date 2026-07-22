@@ -96,20 +96,26 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
     }).catch(() => {});
   }, []);
 
-  // 同步右表行高到左表（两个独立table需要手动对齐行高）
+  // 同步左右表行高（两个独立table需要手动对齐行高，取较大值）
   useEffect(() => {
     const syncRowHeights = () => {
       const leftRows = leftTableRef.current?.querySelectorAll('tbody tr');
       const rightRows = rightTableRef.current?.querySelectorAll('tbody tr');
       if (!leftRows || !rightRows || leftRows.length !== rightRows.length) return;
-      rightRows.forEach(r => { (r as HTMLElement).style.height = ''; });
+      leftRows.forEach(lr => { (lr as HTMLElement).style.height = ''; });
+      rightRows.forEach(rr => { (rr as HTMLElement).style.height = ''; });
       leftRows.forEach((lr, i) => {
-        (rightRows[i] as HTMLElement).style.height = `${lr.getBoundingClientRect().height}px`;
+        const lh = lr.getBoundingClientRect().height;
+        const rh = rightRows[i].getBoundingClientRect().height;
+        const h = Math.max(lh, rh);
+        (lr as HTMLElement).style.height = `${h}px`;
+        (rightRows[i] as HTMLElement).style.height = `${h}px`;
       });
     };
     syncRowHeights();
     const observer = new ResizeObserver(syncRowHeights);
     if (leftTableRef.current) observer.observe(leftTableRef.current);
+    if (rightTableRef.current) observer.observe(rightTableRef.current);
     return () => observer.disconnect();
   }, [rows]);
 
@@ -131,6 +137,35 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
   const isCheckedOutByMe = (row: BOMRow) => row.checkout_status === 'checked_out';
   const isCheckedOutByOther = (row: BOMRow) => row.checkout_status === 'other_checked_out';
   const canEditProps = (row: BOMRow) => !isCheckedOutByOther(row);
+
+  const hoverClass = (row: BOMRow) => {
+    if (row.match_status === 'new') return 'bg-yellow-100';
+    if (row.checkout_status === 'checked_out') return 'bg-blue-100';
+    return 'bg-gray-100';
+  };
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  // 折叠状态
+  const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(new Set());
+  const toggleCollapse = (path: string) => {
+    setCollapsedPaths(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path); else next.add(path);
+      return next;
+    });
+  };
+  const visibleRows = rows.filter(row => {
+    if (row.level === 0) return true;
+    const parts = row.path.split('.');
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (collapsedPaths.has(parts.slice(0, i + 1).join('.'))) return false;
+    }
+    return true;
+  });
+  const hasChildren = (row: BOMRow) => {
+    const idx = rows.indexOf(row);
+    return idx >= 0 && idx < rows.length - 1 && rows[idx + 1].level > row.level;
+  };
 
   const handlePropEdit = useCallback(async (row: BOMRow, key: string, value: string) => {
     try {
@@ -551,13 +586,26 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                 </tr>
               </thead>
               <tbody>
-                {rows.map(row => (
-                  <tr key={row.path} className={`border-b border-gray-200 transition-colors ${
-                    row.match_status === 'new' ? 'hover:bg-yellow-100' :
-                    row.checkout_status === 'checked_out' ? 'hover:bg-blue-100' : 'hover:bg-gray-100'
-                  }`}>
-                    <td className="p-2">
-                      {row.level === 0 ? <strong>{row.level}</strong> : row.path.replace('0.', '')}
+                {visibleRows.map((row, vi) => {
+                  const ri = rows.indexOf(row);
+                  const collapsed = collapsedPaths.has(row.path);
+                  const expandable = hasChildren(row);
+                  const indent = '-'.repeat(row.level);
+                  return (
+                  <tr key={row.path}
+                    onMouseEnter={() => setHoveredIndex(ri)}
+                    onMouseLeave={() => setHoveredIndex(null)}
+                    className={`border-b border-gray-200 transition-colors ${hoveredIndex === ri ? hoverClass(row) : ''}`}>
+                    <td className="p-2 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-0.5">
+                        {expandable && (
+                          <button onClick={() => toggleCollapse(row.path)} className="text-gray-400 hover:text-gray-700 w-4 h-4 flex items-center justify-center text-[10px] leading-none select-none">
+                            {collapsed ? '▶' : '▼'}
+                          </button>
+                        )}
+                        {!expandable && <span className="w-4 inline-block" />}
+                        <span className="font-mono text-xs">{indent}{row.level}</span>
+                      </span>
                     </td>
                     <td className="p-2">{row.builtin.PartNumber || ''}</td>
                     <td className="p-2 text-center">{row.quantity}</td>
@@ -703,13 +751,14 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
 
             {/* ====== 右表：自定义字段滚动区 ====== */}
-            <div className="flex-1 overflow-x-auto" style={{ maxWidth: '50%' }}>
-              <table ref={rightTableRef} className="border-collapse text-xs whitespace-nowrap w-full">
+            <div className="flex-1 overflow-x-auto min-w-0" style={{ scrollbarGutter: 'stable' }}>
+              <table ref={rightTableRef} className="border-separate border-spacing-0 text-xs whitespace-nowrap w-full h-full">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
                     {propertyColumns.map(col => (
@@ -718,18 +767,20 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map(row => (
-                    <tr key={row.path} className={`border-b border-gray-200 transition-colors ${
-                      row.match_status === 'new' ? 'hover:bg-yellow-100' :
-                      row.checkout_status === 'checked_out' ? 'hover:bg-blue-100' : 'hover:bg-gray-100'
-                    }`}>
+                  {visibleRows.map((row, vi) => {
+                    const ri = rows.indexOf(row);
+                    return (
+                    <tr key={row.path}
+                      onMouseEnter={() => setHoveredIndex(ri)}
+                      onMouseLeave={() => setHoveredIndex(null)}
+                      className={`transition-colors ${hoveredIndex === ri ? hoverClass(row) : ''}`}>
                       {propertyColumns.map(col => {
                         const catiaProp = getCatiaPropForPdmField(col);
                         const value = catiaProp ? (row.user_properties[catiaProp] || '') : '';
                         const fieldDef = fieldDefs.find((d: any) => d.name === col);
                         const isSelect = fieldDef?.field_type === 'select' && fieldDef?.options?.length > 0;
                         return (
-                          <td key={col} className="p-2 align-top">
+                          <td key={col} className="p-2 align-middle border-b border-gray-200">
                             {isSelect ? (
                               <select
                                 value={value}
@@ -764,7 +815,8 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                         );
                       })}
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
