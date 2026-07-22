@@ -242,9 +242,6 @@ export default function PartsPage() {
               <th onClick={() => handleSort('name' as keyof PartListItem)} className="w-80 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
                 中文名称 {getSortIcon('name' as keyof PartListItem)}
               </th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">
-                规格型号
-              </th>
               <th onClick={() => handleSort('version' as keyof PartListItem)} className="w-16 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
                 版本 {getSortIcon('version' as keyof PartListItem)}
               </th>
@@ -265,13 +262,13 @@ export default function PartsPage() {
           <tbody className="divide-y divide-gray-200">
             {loading ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                   加载中...
                 </td>
               </tr>
             ) : sortedData.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                   无匹配数据
                 </td>
               </tr>
@@ -287,7 +284,6 @@ export default function PartsPage() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm truncate">{item.name}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500 break-words whitespace-normal">{item.spec || '-'}</td>
                   <td className="px-4 py-3 text-sm text-gray-500">{item.version}</td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-1 text-xs rounded-full ${item.type === 'assembly' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'}`}>
