@@ -705,14 +705,18 @@ def cascade_checkin(db: Session, revision_id: UUID, user_id: UUID) -> Dict[str, 
 
     def _collect_checked_out_children(rev_id: UUID, user_uid: UUID, visited: set) -> List[models_parts.PartRevision]:
         children = []
-        bom_items = (
-            db.query(models.BOMItem)
-            .filter(
-                models.BOMItem.parent_revision_id == rev_id,
-                models.BOMItem.deleted_at.is_(None),
+        it = _current_iteration(db, rev_id)
+        if it:
+            bom_items = (
+                db.query(models.BOMItem)
+                .filter(
+                    models.BOMItem.iteration_id == it.id,
+                    models.BOMItem.deleted_at.is_(None),
+                )
+                .all()
             )
-            .all()
-        )
+        else:
+            bom_items = []
         for bom in bom_items:
             child_rev = get_part_revision(db, bom.child_revision_id)
             if (
@@ -754,14 +758,18 @@ def cascade_undocheckout(db: Session, revision_id: UUID, user_id: UUID) -> Dict[
 
     def _collect_checked_out_children(rev_id: UUID, user_uid: UUID, visited: set) -> List[models_parts.PartRevision]:
         children = []
-        bom_items = (
-            db.query(models.BOMItem)
-            .filter(
-                models.BOMItem.parent_revision_id == rev_id,
-                models.BOMItem.deleted_at.is_(None),
+        it = _current_iteration(db, rev_id)
+        if it:
+            bom_items = (
+                db.query(models.BOMItem)
+                .filter(
+                    models.BOMItem.iteration_id == it.id,
+                    models.BOMItem.deleted_at.is_(None),
+                )
+                .all()
             )
-            .all()
-        )
+        else:
+            bom_items = []
         for bom in bom_items:
             child_rev = get_part_revision(db, bom.child_revision_id)
             if (
@@ -876,14 +884,18 @@ def get_bom_descendants(db: Session, revision_id: UUID) -> List[Dict[str, Any]]:
             "check_out_user_id": str(rev.check_out_user_id) if rev.check_out_user_id else None,
         })
         # 查询子项并入队
-        bom_items = (
-            db.query(models.BOMItem)
-            .filter(
-                models.BOMItem.parent_revision_id == rid,
-                models.BOMItem.deleted_at.is_(None),
+        it = _current_iteration(db, rid)
+        if it:
+            bom_items = (
+                db.query(models.BOMItem)
+                .filter(
+                    models.BOMItem.iteration_id == it.id,
+                    models.BOMItem.deleted_at.is_(None),
+                )
+                .all()
             )
-            .all()
-        )
+        else:
+            bom_items = []
         for bom in bom_items:
             if bom.child_revision_id not in seen:
                 queue.append(bom.child_revision_id)
@@ -976,33 +988,61 @@ def match_cad_files(
 
 # ====== BOM 操作 ======
 
-def get_bom_tree(db: Session, revision_id: UUID) -> List[Dict]:
-    """获取版本的 BOM 树（当前迭代的 BOM 关系）"""
-    revision = get_part_revision(db, revision_id)
-    if not revision:
-        return []
-
-    bom_items = (
-        db.query(models.BOMItem)
-        .filter(
-            models.BOMItem.iteration_id == (
-                db.query(models_parts.PartIteration.id)
-                .filter(
-                    models_parts.PartIteration.revision_id == revision_id,
-                    models_parts.PartIteration.iteration == revision.latest_iteration,
-                )
-                .scalar_subquery()
-            ),
-            models.BOMItem.deleted_at.is_(None),
+def get_bom_tree(db: Session, revision_id: UUID, iteration_id: Optional[UUID] = None) -> List[Dict]:
+    """获取版本的 BOM 树。传入 iteration_id 时查询指定迭代，否则取当前最新迭代"""
+    if iteration_id:
+        bom_items = (
+            db.query(models.BOMItem)
+            .filter(
+                models.BOMItem.iteration_id == iteration_id,
+                models.BOMItem.deleted_at.is_(None),
+            )
+            .all()
         )
-        .all()
-    )
+    else:
+        revision = get_part_revision(db, revision_id)
+        if not revision:
+            return []
+        bom_items = (
+            db.query(models.BOMItem)
+            .filter(
+                models.BOMItem.iteration_id == (
+                    db.query(models_parts.PartIteration.id)
+                    .filter(
+                        models_parts.PartIteration.revision_id == revision_id,
+                        models_parts.PartIteration.iteration == revision.latest_iteration,
+                    )
+                    .scalar_subquery()
+                ),
+                models.BOMItem.deleted_at.is_(None),
+            )
+            .all()
+        )
 
     result = []
     for item in bom_items:
         child_rev = get_part_revision(db, item.child_revision_id)
         if child_rev:
             master = get_part_master(db, child_rev.master_id)
+            # 检查子 revision 的当前迭代是否还有子项
+            child_iter = (
+                db.query(models_parts.PartIteration)
+                .filter(
+                    models_parts.PartIteration.revision_id == child_rev.id,
+                    models_parts.PartIteration.iteration == child_rev.latest_iteration,
+                )
+                .first()
+            )
+            has_children = False
+            if child_iter:
+                has_children = (
+                    db.query(models.BOMItem)
+                    .filter(
+                        models.BOMItem.iteration_id == child_iter.id,
+                        models.BOMItem.deleted_at.is_(None),
+                    )
+                    .count() > 0
+                )
             result.append(
                 {
                     "id": str(item.id),
@@ -1017,22 +1057,8 @@ def get_bom_tree(db: Session, revision_id: UUID) -> List[Dict]:
                         db.query(models.User).filter(models.User.id == child_rev.check_out_user_id).first().real_name
                         if child_rev.check_out_user_id else None
                     ),
-                    "child_type": "assembly" if (
-                        db.query(models.BOMItem)
-                        .filter(
-                            models.BOMItem.parent_revision_id == child_rev.id,
-                            models.BOMItem.deleted_at.is_(None),
-                        )
-                        .count() > 0
-                    ) else "part",
-                    "has_children": (
-                        db.query(models.BOMItem)
-                        .filter(
-                            models.BOMItem.parent_revision_id == child_rev.id,
-                            models.BOMItem.deleted_at.is_(None),
-                        )
-                        .count() > 0
-                    ),
+                    "child_type": "assembly" if has_children else "part",
+                    "has_children": has_children,
                     "quantity": item.quantity,
                     "sort_order": item.sort_order,
                     "cad_instances": item.cad_instances or [],
@@ -1041,20 +1067,27 @@ def get_bom_tree(db: Session, revision_id: UUID) -> List[Dict]:
     return result
 
 
-def add_bom_item(db: Session, revision_id: UUID, data: dict) -> Tuple[Optional[models.BOMItem], Optional[str]]:
-    """在当前迭代中添加 BOM 子项"""
+def add_bom_item(db: Session, revision_id: UUID, data: dict, iteration_id: Optional[UUID] = None) -> Tuple[Optional[models.BOMItem], Optional[str]]:
+    """在指定迭代中添加 BOM 子项；不传 iteration_id 时使用当前最新迭代"""
     revision = get_part_revision(db, revision_id)
     if not revision:
         return None, "版本不存在"
 
-    iteration = (
-        db.query(models_parts.PartIteration)
-        .filter(
-            models_parts.PartIteration.revision_id == revision_id,
-            models_parts.PartIteration.iteration == revision.latest_iteration,
+    if iteration_id:
+        iteration = (
+            db.query(models_parts.PartIteration)
+            .filter(models_parts.PartIteration.id == iteration_id)
+            .first()
         )
-        .first()
-    )
+    else:
+        iteration = (
+            db.query(models_parts.PartIteration)
+            .filter(
+                models_parts.PartIteration.revision_id == revision_id,
+                models_parts.PartIteration.iteration == revision.latest_iteration,
+            )
+            .first()
+        )
     if not iteration:
         return None, "当前迭代不存在"
 

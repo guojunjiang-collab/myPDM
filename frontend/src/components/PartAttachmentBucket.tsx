@@ -16,6 +16,7 @@ interface PartAttachmentItem {
 
 interface Props {
   revisionId: string;
+  iterationId?: string | null;
   category: 'cad' | 'production';
   label: string;
   editable: boolean;
@@ -26,7 +27,7 @@ interface Props {
 const fmtSize = (n: number | null) =>
   n == null ? '-' : n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`;
 
-export default function PartAttachmentBucket({ revisionId, category, label, editable, hideWhenEmpty, showDownloadAll }: Props) {
+export default function PartAttachmentBucket({ revisionId, iterationId, category, label, editable, hideWhenEmpty, showDownloadAll }: Props) {
   const [items, setItems] = useState<PartAttachmentItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -39,14 +40,14 @@ export default function PartAttachmentBucket({ revisionId, category, label, edit
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await partsApi.listAttachments(revisionId, category);
+      const res = await partsApi.listAttachments(revisionId, category, iterationId || undefined);
       setItems(Array.isArray(res) ? res : []);
     } catch {
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, [revisionId, category]);
+  }, [revisionId, category, iterationId]);
 
   useEffect(() => { load(); }, [load]);
 

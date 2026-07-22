@@ -165,7 +165,8 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
           setEditRemark(rev.current_iteration.remark || '');
         }
         try {
-          const bomData = await partsApi.getBOM(revId);
+          const iterId = viewingIterationId || iteration?.id;
+          const bomData = await partsApi.getBOM(revId, iterId);
           setHasBomChildren(bomData.length > 0);
         } catch { setHasBomChildren(false); }
       }
@@ -174,11 +175,17 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
 
   useEffect(() => { if (open) { loadDetail(); } }, [loadDetail, open]);
 
+  useEffect(() => {
+    setViewingIterationId(null);
+    setViewingIteration(null);
+  }, [internalRevisionId]);
+
   const loadTabs = useCallback(async () => {
     if (!revisionId || !masterId) return;
     try {
       if (activeTab === 'bom') {
-        const bomData = await partsApi.getBOM(revisionId);
+        const iterId = viewingIterationId || iteration?.id;
+        const bomData = await partsApi.getBOM(revisionId, iterId);
         setBomItems(bomData);
         setHasBomChildren(bomData.length > 0);
       }
@@ -380,7 +387,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
             ) : <span className="text-gray-400">—</span>}
           </td>
           <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-            {canEdit ? (
+            {canEdit && !viewingIterationId ? (
               <input type="number" min={1} defaultValue={item.quantity}
                 onBlur={async (e) => {
                   const v = parseInt(e.target.value);
@@ -401,7 +408,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
             <button type="button" onClick={(e) => { e.stopPropagation(); preview3D(item); }}
               className="text-primary-600 hover:text-primary-800 text-xs whitespace-nowrap">3D预览</button>
           </td>
-          {canEdit && (
+          {canEdit && !viewingIterationId && (
             <td className="px-3 py-2 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
               <span className="inline-flex items-center gap-1">
                 <button type="button" onClick={(e) => {
@@ -795,18 +802,20 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="text-sm font-bold text-gray-700">子项清单</h4>
                       <div className="flex gap-2">
-                        {canEdit && (
+                        {canEdit && !viewingIterationId && (
                           <button onClick={() => setBomPickerOpen(true)}
                             className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700">
                             + 添加子项
                           </button>
                         )}
+                        {!viewingIterationId && (<>
                         <button onClick={() => handleCascade('checkout')}
                           className="px-3 py-1.5 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">级联签出</button>
                         <button onClick={() => handleCascade('checkin')}
                           className="px-3 py-1.5 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">级联检入</button>
                         <button onClick={() => handleCascade('undo')}
                           className="px-3 py-1.5 bg-gray-500 text-white rounded text-xs hover:bg-gray-600">级联撤销</button>
+                        </>)}
                       </div>
                     </div>
                     {bomItems.length === 0 ? (
@@ -851,8 +860,8 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
 
                 {activeTab === 'attachments' && revisionId && (
                   <div className="space-y-4">
-                    <PartAttachmentBucket key={`cad-${attachmentReloadKey}`} revisionId={revisionId} category="cad" label="CAD 附件" editable={isCheckedOutByMe && isDraft && !viewingIterationId} showDownloadAll={hasBomChildren} />
-                    <PartAttachmentBucket key={`prod-${attachmentReloadKey}`} revisionId={revisionId} category="production" label="生产附件" editable={isCheckedOutByMe && isDraft && !viewingIterationId} showDownloadAll={hasBomChildren} />
+                    <PartAttachmentBucket key={`cad-${attachmentReloadKey}`} revisionId={revisionId} iterationId={viewingIterationId || iteration?.id} category="cad" label="CAD 附件" editable={isCheckedOutByMe && isDraft && !viewingIterationId} showDownloadAll={hasBomChildren} />
+                    <PartAttachmentBucket key={`prod-${attachmentReloadKey}`} revisionId={revisionId} iterationId={viewingIterationId || iteration?.id} category="production" label="生产附件" editable={isCheckedOutByMe && isDraft && !viewingIterationId} showDownloadAll={hasBomChildren} />
                   </div>
                 )}
 
@@ -970,7 +979,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
           let failed = 0;
           for (const item of items) {
             try {
-              await partsApi.addBOMItem(revisionId, { child_revision_id: item.child_id, quantity: item.quantity || 1 });
+              await partsApi.addBOMItem(revisionId, { child_revision_id: item.child_id, quantity: item.quantity || 1 }, iteration?.id);
             } catch (e: any) {
               failed++;
               console.error(e);

@@ -782,7 +782,7 @@ export interface ConfigPartItem {
   is_required: boolean;
   quantity?: number;
   sort_order: number;
-  part_detail?: { id: string; code: string; name: string; version?: string; spec?: string; status?: string };
+  part_detail?: { id: string; code: string; name: string; version?: string; revision_id?: string; spec?: string; status?: string; check_out_user_id?: string | null; check_out_user_name?: string | null; has_3d?: boolean };
 }
 
 export interface ConfigChildItem {

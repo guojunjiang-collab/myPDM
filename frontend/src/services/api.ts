@@ -151,18 +151,18 @@ export const partsApi = {
     api.post(`/parts/revisions/${revisionId}/cascade-undocheckout`).then((r) => r.data),
 
   // BOM
-  getBOM: (revisionId: string) =>
-    api.get(`/parts/revisions/${revisionId}/bom`).then((r) => r.data),
-  addBOMItem: (revisionId: string, data: { child_revision_id: string; quantity?: number; sort_order?: number }) =>
-    api.post(`/parts/revisions/${revisionId}/bom/items`, data).then((r) => r.data),
+  getBOM: (revisionId: string, iterationId?: string) =>
+    api.get(`/parts/revisions/${revisionId}/bom`, { params: iterationId ? { iteration_id: iterationId } : {} }).then((r) => r.data),
+  addBOMItem: (revisionId: string, data: { child_revision_id: string; quantity?: number; sort_order?: number }, iterationId?: string) =>
+    api.post(`/parts/revisions/${revisionId}/bom/items`, data, { params: iterationId ? { iteration_id: iterationId } : {} }).then((r) => r.data),
   updateBOMItem: (revisionId: string, itemId: string, data: { quantity?: number; sort_order?: number; child_revision_id?: string }) =>
     api.put(`/parts/revisions/${revisionId}/bom/items/${itemId}`, data).then((r) => r.data),
   deleteBOMItem: (revisionId: string, itemId: string) =>
     api.delete(`/parts/revisions/${revisionId}/bom/items/${itemId}`).then((r) => r.data),
 
   // 附件
-  listAttachments: (revisionId: string, category?: string) =>
-    api.get(`/parts/revisions/${revisionId}/attachments`, { params: category ? { category } : {} }).then((r) => r.data),
+  listAttachments: (revisionId: string, category?: string, iterationId?: string) =>
+    api.get(`/parts/revisions/${revisionId}/attachments`, { params: { ...(category ? { category } : {}), ...(iterationId ? { iteration_id: iterationId } : {}) } }).then((r) => r.data),
   addAttachment: (revisionId: string, data: { category: string; file_name: string; file_size: number; file_path: string; file_hash: string }) =>
     api.post(`/parts/revisions/${revisionId}/attachments`, data).then((r) => r.data),
   deleteAttachment: (revisionId: string, attachmentId: string) =>
@@ -742,8 +742,8 @@ export const configurationApi = {
     api.get<{ items: ConfigurationItemRevision[]; total: number }>('/configurations/items', { params }).then(r => r.data),
   create: (data: { code: string; name: string }) =>
     api.post<{ id: string; master_id: string; version: string }>('/configurations/items', data).then(r => r.data),
-  detail: (revisionId: string) =>
-    api.get<ConfigurationItemDetail>(`/configurations/items/${revisionId}`).then(r => r.data),
+  detail: (revisionId: string, params?: { iteration_id?: string }) =>
+    api.get<ConfigurationItemDetail>(`/configurations/items/${revisionId}`, { params }).then(r => r.data),
   update: (revisionId: string, data: { remark?: string; name?: string }) =>
     api.put(`/configurations/items/${revisionId}`, data).then(r => r.data),
   delete: (revisionId: string) =>

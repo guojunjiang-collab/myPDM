@@ -15,7 +15,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.database import get_db
 from app.models import DocumentRevision, DocumentMaster, DocumentIteration, DocumentAttachment, User as UModel
-from app.models_parts import PartMaster, PartRevision
+from app.models_parts import PartMaster, PartRevision, PartIteration, PartAttachment
 from app import models_configuration as models
 from app import schemas_configuration as schemas
 from app import schemas as core_schemas
@@ -152,14 +152,21 @@ async def list_config_items(
 
 @router.get("/items/{revision_id}", response_model=dict)
 async def get_config_item_detail(
-    revision_id: str, db: Session = Depends(get_db),
+    revision_id: str, iteration_id: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
     current_user=Depends(require_permission("configuration:read")),
 ):
-    """构型项详情：master + revision + current iteration + parts + children + documents + versions"""
-    result = crud.get_config_item_revision_with_iteration(db, UUID(revision_id))
-    if not result:
+    """构型项详情：master + revision + iteration + parts + children + documents + versions
+    可传入 iteration_id 查看历史迭代的子构型项/零部件数据"""
+    revision = crud.get_config_item_revision(db, UUID(revision_id))
+    if not revision:
         raise HTTPException(status_code=404, detail="构型项版本不存在")
-    revision, iteration = result
+    if iteration_id:
+        iteration = crud._get_iteration(db, UUID(iteration_id))
+        if not iteration or str(iteration.revision_id) != revision_id:
+            raise HTTPException(status_code=404, detail="迭代不存在或不属于该版本")
+    else:
+        _, iteration = crud.get_config_item_revision_with_iteration(db, UUID(revision_id))
     master = crud.get_config_item_master(db, revision.master_id)
     if not master:
         raise HTTPException(status_code=404, detail="构型项主数据不存在")
@@ -176,6 +183,20 @@ async def get_config_item_detail(
                     PartRevision.master_id == entity.id,
                     PartRevision.deleted_at.is_(None)
                 ).order_by(PartRevision.created_at.desc()).first()
+                checkout_user_name = _resolve_user_name(db, rev.check_out_user_id) if rev else None
+                # 检查当前迭代是否有STP生产附件（用于3D预览）
+                has_3d = entity.type == 'assembly'
+                if not has_3d and rev:
+                    latest_iter = db.query(PartIteration).filter(
+                        PartIteration.revision_id == rev.id,
+                        PartIteration.iteration == rev.latest_iteration,
+                    ).first()
+                    if latest_iter:
+                        has_3d = db.query(PartAttachment).filter(
+                            PartAttachment.iteration_id == latest_iter.id,
+                            PartAttachment.category == 'production',
+                            PartAttachment.file_name.ilike('%.stp') | PartAttachment.file_name.ilike('%.step'),
+                        ).limit(1).count() > 0
                 parts_data.append({
                     "id": str(p.id), "iteration_id": str(p.iteration_id),
                     "part_type": p.part_type, "part_id": str(p.part_id),
@@ -185,6 +206,9 @@ async def get_config_item_detail(
                         "version": rev.version if rev else "",
                         "revision_id": str(rev.id) if rev else "",
                         "status": rev.status if rev else "draft",
+                        "check_out_user_id": str(rev.check_out_user_id) if (rev and rev.check_out_user_id) else None,
+                        "check_out_user_name": checkout_user_name,
+                        "has_3d": has_3d,
                     },
                 })
             else:

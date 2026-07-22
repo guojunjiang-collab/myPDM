@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { configurationApi, customFieldsApi } from '../../services/api';
+import { configurationApi, customFieldsApi, partsApi, mediaApi } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
 import { useDataStore } from '../../stores/data';
 import type { ConfigurationItemDetail, ConfigurationItemRevision } from '../../types';
@@ -10,6 +10,8 @@ import EntityDocumentSection from '../EntityDocumentSection';
 import CustomFieldInput from '../CustomFieldInput';
 import ConfigItemPicker from './ConfigItemPicker';
 import PartDetailModal from '../PartDetailModal';
+import AssemblyPartPicker from '../AssemblyPartPicker';
+import VersionSelectModal from '../VersionSelectModal';
 
 const statusTag = (s: string) => {
   const map: Record<string, { label: string; cls: string }> = {
@@ -68,16 +70,20 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
   const [cfgPickerOpen, setCfgPickerOpen] = useState(false);
   const [pickerParentId, setPickerParentId] = useState<string | null>(null);
   const [viewingIterationData, setViewingIterationData] = useState<any>(null);
+  const [activeIterationId, setActiveIterationId] = useState<string | null>(null);
   const [expandedChildren, setExpandedChildren] = useState<Set<string>>(new Set());
   const [subChildren, setSubChildren] = useState<Record<string, any[]>>({});
   const masterTimer = useRef<ReturnType<typeof setTimeout>>();
   const cfTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const [partPickerOpen, setPartPickerOpen] = useState(false);
+  const [versionSelectIdx, setVersionSelectIdx] = useState<number | null>(null);
 
   const loadDetail = useCallback(async () => {
     if (!internalRevId) return;
     setDetailLoading(true);
     try {
-      const d = await configurationApi.detail(internalRevId);
+      const params = activeIterationId ? { iteration_id: activeIterationId } : undefined;
+      const d = await configurationApi.detail(internalRevId, params);
       setDetail(d);
       setEditCode(d.master.code || '');
       setEditName(d.revision.name || d.master.name || '');
@@ -95,19 +101,20 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
     } catch (e) {
       console.error(e); setDetail(null);
     } finally { setDetailLoading(false); }
-  }, [internalRevId]);
+  }, [internalRevId, activeIterationId]);
 
   useEffect(() => { setInternalRevId(revisionId); }, [revisionId]);
-  useEffect(() => { if (open) { setDetail(null); setActiveTab('info'); setViewingIterationData(null); setExpandedChildren(new Set()); setSubChildren({}); loadDetail(); } }, [open, loadDetail]);
+  useEffect(() => { if (open) { setDetail(null); setActiveTab('info'); setViewingIterationData(null); setActiveIterationId(null); setExpandedChildren(new Set()); setSubChildren({}); loadDetail(); } }, [open, loadDetail]);
 
   const loadTabs = useCallback(async () => {
     if (!internalRevId) return;
     try {
-      if (activeTab === 'parts' || activeTab === 'children') { const d = await configurationApi.detail(internalRevId); setParts(d.parts || []); setChildren(d.children || []); }
+      const params = activeIterationId ? { iteration_id: activeIterationId } : undefined;
+      if (activeTab === 'parts' || activeTab === 'children') { const d = await configurationApi.detail(internalRevId, params); setParts(d.parts || []); setChildren(d.children || []); }
       if (activeTab === 'versions') setVersions(await configurationApi.versions(internalRevId));
       if (activeTab === 'iterations') setIterations(await configurationApi.iterations(internalRevId));
     } catch (e) { console.error(e); }
-  }, [internalRevId, activeTab]);
+  }, [internalRevId, activeTab, activeIterationId]);
   useEffect(() => { loadTabs(); }, [loadTabs]);
 
   const master = detail?.master;
@@ -142,17 +149,14 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
   }, [internalRevId, cfDefs, cfValues]);
 
   const doAction = async (action: () => Promise<any>, msg: string) => {
-    try { await action(); toast.success(msg); loadDetail(); } catch (e: any) { toast.error(e?.response?.data?.detail || '操作失败'); }
+    try { await action(); toast.success(msg); setActiveIterationId(null); setViewingIterationData(null); loadDetail(); } catch (e: any) { toast.error(e?.response?.data?.detail || '操作失败'); }
   };
 
-  const handleClose = () => { setActiveTab('info'); setViewingIterationData(null); onClose(); };
+  const handleClose = () => { setActiveTab('info'); setViewingIterationData(null); setActiveIterationId(null); onClose(); };
 
   const handleViewIteration = async (it: any) => {
-    try {
-      const res = await configurationApi.iterations(internalRevId);
-      const target = res.find((i: any) => i.id === it.id);
-      if (target) { setViewingIterationData(target); setActiveTab('info'); }
-    } catch {}
+    const target = iterations.find((i: any) => i.id === it.id);
+    if (target) { setViewingIterationData(target); setActiveIterationId(target.id); setActiveTab('info'); }
   };
 
   const handleDeleteIteration = async (it: any) => {
@@ -164,6 +168,29 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
     if (subChildren[revId]) return;
     try { const d = await configurationApi.detail(revId); setSubChildren(prev => ({ ...prev, [revId]: d.children || [] })); } catch {}
   };
+
+  const handlePart3DPreview = useCallback(async (p: any) => {
+    const pd = p.part_detail || {};
+    const revId = pd.revision_id || p.part_id;
+    if (!revId) return;
+    if (p.part_type === 'assembly') {
+      window.open(`/stp-viewer?assembly=${revId}&code=${encodeURIComponent(pd.code || '')}&name=${encodeURIComponent(pd.name || '')}`, '_blank');
+      return;
+    }
+    try {
+      const atts = await partsApi.listAttachments(revId, 'production');
+      const stp = (Array.isArray(atts) ? atts : []).find((a: any) => {
+        const n = (a.file_name || '').toLowerCase();
+        return n.endsWith('.stp') || n.endsWith('.step');
+      });
+      if (stp) {
+        const mt = await mediaApi.token(stp.id, 'gltf');
+        window.open(`/stp-viewer?id=${stp.id}&token=${encodeURIComponent(mt)}&code=${encodeURIComponent(pd.code || '')}&version=${encodeURIComponent(pd.version || '')}&name=${encodeURIComponent(pd.name || '')}`, '_blank');
+      } else {
+        alert('该零件没有 STP/STEP 附件');
+      }
+    } catch { alert('打开预览失败'); }
+  }, []);
 
   const renderChildRow = (c: any, level: number, parentRevisionId: string): React.ReactNode => {
     const revId = c.child_detail?.id || c.child_revision_id;
@@ -261,7 +288,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
           {viewingIterationData && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1.5 shrink-0 mb-3 text-sm flex items-center justify-between">
               <span>正在查看 Iteration #{viewingIterationData.iteration} 的历史数据（只读）</span>
-              <button onClick={() => setViewingIterationData(null)} className="text-primary-600 hover:text-primary-800 hover:underline text-xs">返回当前迭代</button>
+              <button onClick={() => { setViewingIterationData(null); setActiveIterationId(null); }} className="text-primary-600 hover:text-primary-800 hover:underline text-xs">返回当前迭代</button>
             </div>
           )}
 
@@ -282,22 +309,80 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
                 </div>
               )}
               {activeTab === 'parts' && (
-                <div><h4 className="text-sm font-bold text-gray-700 mb-3">关联零部件</h4>
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-bold text-gray-700">关联零部件 ({parts.length})</h4>
+                    {canEdit && (
+                      <button onClick={() => setPartPickerOpen(true)}
+                        className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">关联零部件</button>
+                    )}
+                  </div>
                   {parts.length === 0 ? (<div className="text-gray-400 text-sm py-4 text-center">暂无关联零部件</div>) : (
-                    <div className="border rounded-lg overflow-hidden"><table className="w-full text-sm"><thead><tr className="bg-gray-50 border-b"><th className="px-3 py-2 text-left text-gray-500 font-medium">类型</th><th className="px-3 py-2 text-left text-gray-500 font-medium">件号</th><th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th><th className="px-3 py-2 text-left text-gray-500 font-medium">版本</th><th className="px-3 py-2 text-center text-gray-500 font-medium">必选/可选</th><th className="px-3 py-2 text-center text-gray-500 font-medium">数量</th></tr></thead><tbody className="divide-y divide-gray-200">
-                      {parts.map((p: any) => (
-                        <tr key={p.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => { if (p.part_id) setSelectedPartMasterId(p.part_id); }}>
-                          <td className="px-3 py-2"><span className="text-xs text-gray-500">{p.part_type === 'assembly' ? '部件' : '零件'}</span></td>
-                          <td className="px-3 py-2 font-mono text-xs">{p.part_detail?.code || '—'}</td><td className="px-3 py-2">{p.part_detail?.name || '—'}</td><td className="px-3 py-2 text-gray-500">{p.part_detail?.version || '—'}</td>
-                          <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
-                            {canEdit ? (<button onClick={async () => { try { await configurationApi.updatePart(internalRevId, p.id, { is_required: !p.is_required }); setParts(prev => prev.map(x => x.id === p.id ? { ...x, is_required: !x.is_required } : x)); } catch {} }} className={`text-xs px-2 py-0.5 rounded ${p.is_required ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>{p.is_required ? '必选' : '可选'}</button>) : (<span className={`text-xs ${p.is_required ? 'text-green-600' : 'text-gray-400'}`}>{p.is_required ? '必选' : '可选'}</span>)}
-                          </td>
-                          <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
-                            {canEdit ? (<input type="number" min={1} defaultValue={p.quantity || 1} className="w-14 text-xs px-1 py-0.5 border border-gray-200 rounded text-center" onBlur={async (e) => { const val = parseInt(e.target.value) || 1; if (val === p.quantity) return; try { await configurationApi.updatePart(internalRevId, p.id, { quantity: val }); setParts(prev => prev.map(x => x.id === p.id ? { ...x, quantity: val } : x)); } catch {} }} />) : (p.quantity || 1)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody></table></div>
+                    <div className="border rounded-lg overflow-hidden"><table className="w-full text-sm">
+                      <thead><tr className="bg-gray-50 border-b">
+                        <th className="px-3 py-2 text-left text-gray-500 font-medium">件号</th>
+                        <th className="px-3 py-2 text-left text-gray-500 font-medium">中文名称</th>
+                        <th className="px-3 py-2 text-center text-gray-500 font-medium w-14">版本</th>
+                        <th className="px-3 py-2 text-center text-gray-500 font-medium w-16">状态</th>
+                        <th className="px-3 py-2 text-center text-gray-500 font-medium w-20">签出状态</th>
+                        <th className="px-3 py-2 text-center text-gray-500 font-medium w-20 whitespace-nowrap">可选/必选</th>
+                        <th className="px-3 py-2 text-center text-gray-500 font-medium w-14">数量</th>
+                        <th className="px-3 py-2 text-center text-gray-500 font-medium w-14">预览</th>
+                        <th className="px-3 py-2 text-center text-gray-500 font-medium w-24">操作</th>
+                      </tr></thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {parts.map((p: any, i: number) => {
+                          const pd = p.part_detail || {};
+                          const isAssembly = p.part_type === 'assembly';
+                          const canPreview = isAssembly || pd.has_3d;
+                          return (
+                            <tr key={p.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => { if (p.part_id) setSelectedPartMasterId(p.part_id); }}>
+                              <td className="px-3 py-2 font-mono text-xs">{pd.code || '—'}</td>
+                              <td className="px-3 py-2">{pd.name || '—'}</td>
+                              <td className="px-3 py-2 text-center text-gray-500">{pd.version || '—'}</td>
+                              <td className="px-3 py-2 text-center">
+                                <span className={`px-1.5 py-0.5 text-xs rounded-full ${statusTag(pd.status || 'draft').cls}`}>{statusTag(pd.status || 'draft').label}</span>
+                              </td>
+                              <td className="px-3 py-2 text-center">
+                                {pd.check_out_user_name ? (<span className="text-xs text-orange-600">{pd.check_out_user_name}</span>) : (<span className="text-xs text-gray-400">—</span>)}
+                              </td>
+                              <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                {canEdit ? (
+                                  <button onClick={async () => { try { await configurationApi.updatePart(internalRevId, p.id, { is_required: !p.is_required }); setParts(prev => prev.map(x => x.id === p.id ? { ...x, is_required: !x.is_required } : x)); } catch {} }}
+                                    className={`text-xs px-2 py-0.5 rounded ${p.is_required ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                                    {p.is_required ? '必选' : '可选'}
+                                  </button>
+                                ) : (<span className={`text-xs ${p.is_required ? 'text-green-600' : 'text-gray-400'}`}>{p.is_required ? '必选' : '可选'}</span>)}
+                              </td>
+                              <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                {canEdit ? (
+                                  <input type="number" min={1} defaultValue={p.quantity || 1} className="w-14 text-xs px-1 py-0.5 border border-gray-200 rounded text-center"
+                                    onBlur={async (e) => { const val = parseInt(e.target.value) || 1; if (val === p.quantity) return; try { await configurationApi.updatePart(internalRevId, p.id, { quantity: val }); setParts(prev => prev.map(x => x.id === p.id ? { ...x, quantity: val } : x)); } catch {} }} />
+                                ) : (p.quantity || 1)}
+                              </td>
+                              <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                <button onClick={() => handlePart3DPreview(p)}
+                                  disabled={!canPreview}
+                                  className={`text-xs px-2 py-0.5 rounded ${canPreview ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}>
+                                  3D
+                                </button>
+                              </td>
+                              <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center justify-center gap-1 whitespace-nowrap">
+                                  {canEdit && (
+                                    <>
+                                      <button onClick={() => setVersionSelectIdx(i)} className="text-xs text-blue-600 hover:text-blue-800">选择</button>
+                                      <button onClick={async () => { if (!confirm('确定移除此关联零部件？')) return; try { await configurationApi.removePart(internalRevId, p.id); setParts(prev => prev.filter(x => x.id !== p.id)); } catch {} }}
+                                        className="text-xs text-red-500 hover:text-red-700">移除</button>
+                                    </>
+                                  )}
+                                  {!canEdit && <span className="text-xs text-gray-400">—</span>}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody></table></div>
                   )}
                 </div>
               )}
@@ -343,6 +428,73 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
         <ConfigItemPicker open={cfgPickerOpen} onClose={() => { setCfgPickerOpen(false); setPickerParentId(null); }} excludeId={internalRevId}
           onConfirm={async (items) => { if (!pickerParentId) return; try { await configurationApi.addChildren(pickerParentId, items); toast.success(`已添加 ${items.length} 个子构型项`); if (pickerParentId !== internalRevId) { setSubChildren(prev => { const s = { ...prev }; delete s[pickerParentId]; return s; }); } setCfgPickerOpen(false); setPickerParentId(null); loadDetail(); } catch {} }} />
       )}
+
+      {/* 零部件选择器 */}
+      <AssemblyPartPicker open={partPickerOpen} onClose={() => setPartPickerOpen(false)}
+        existingChildIds={new Set(parts.map(p => p.part_id))}
+        onConfirm={async (items) => {
+          const itemsToAdd: { part_type: string; part_id: string; quantity: number }[] = [];
+          for (const it of items) {
+            if (parts.some(p => p.part_id === it.child_id)) continue;
+            let masterId = ''; let pType = 'part';
+            try {
+              const rev = await partsApi.getRevision(it.child_id);
+              masterId = rev.master_id;
+              if (!masterId) continue;
+              const master = await partsApi.get(masterId);
+              pType = master.type || 'part';
+            } catch { continue; }
+            if (parts.some(p => p.part_id === masterId)) continue;
+            itemsToAdd.push({ part_type: pType, part_id: masterId, quantity: it.quantity ?? 1 });
+          }
+          if (itemsToAdd.length === 0) { setPartPickerOpen(false); return; }
+          try {
+            await configurationApi.addParts(internalRevId, itemsToAdd.map(it => ({
+              part_type: it.part_type,
+              part_id: it.part_id,
+              is_required: true,
+              quantity: it.quantity,
+            })));
+            toast.success(`已关联 ${itemsToAdd.length} 个零部件`);
+            setPartPickerOpen(false);
+            loadDetail();
+          } catch (e: any) {
+            const detail = e?.response?.data?.detail;
+            const msg = Array.isArray(detail) ? detail.map((d: any) => d.msg).join('; ') : (typeof detail === 'string' ? detail : '操作失败');
+            toast.error(msg);
+          }
+        }}
+      />
+
+      {/* 版本选择器 */}
+      {versionSelectIdx !== null && parts[versionSelectIdx] && (
+        <VersionSelectModal
+          open={versionSelectIdx !== null}
+          entityType="part"
+          entityId={parts[versionSelectIdx].part_id}
+          entityName={parts[versionSelectIdx].part_detail?.name || ''}
+          currentVersionId={parts[versionSelectIdx].part_detail?.revision_id || parts[versionSelectIdx].part_id}
+          onSelect={(versionId: string) => {
+            const pd = parts[versionSelectIdx].part_detail || {};
+            partsApi.getRevision(versionId).then(r => {
+              setParts(prev => prev.map((p, i) => i === versionSelectIdx ? {
+                ...p,
+                part_detail: {
+                  ...pd,
+                  revision_id: r.id,
+                  version: r.version || '',
+                  status: r.status || '',
+                  check_out_user_id: r.check_out_user_id || null,
+                  check_out_user_name: r.check_out_user_name || null,
+                },
+              } : p));
+            }).catch(() => {});
+            setVersionSelectIdx(null);
+          }}
+          onClose={() => setVersionSelectIdx(null)}
+        />
+      )}
+
       {nestedConfigRevId && (<ConfigItemDetailModal revisionId={nestedConfigRevId} open={!!nestedConfigRevId} onClose={() => setNestedConfigRevId(null)} />)}
       {selectedPartMasterId && (<PartDetailModal masterId={selectedPartMasterId} open={!!selectedPartMasterId} onClose={() => setSelectedPartMasterId(null)} />)}
     </Modal>

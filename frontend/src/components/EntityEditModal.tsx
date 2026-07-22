@@ -39,6 +39,9 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
   const specRef = useRef<HTMLTextAreaElement>(null);
   const remarkRef = useRef<HTMLTextAreaElement>(null);
 
+  // 当前版本的迭代ID（BOM 操作需要迭代级别）
+  const [iterationId, setIterationId] = useState<string | undefined>();
+
   // 子项清单（部件专用）
   const [editParts, setEditParts] = useState<AssemblyPartItem[]>([]);
   const [loadingEditParts, setLoadingEditParts] = useState(false);
@@ -77,7 +80,9 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
   const loadEditParts = useCallback(async (revisionId: string) => {
     setLoadingEditParts(true);
     try {
-      const rows = await partsApi.getBOM(revisionId);
+      const rev = await partsApi.getRevision(revisionId);
+      const iterId = rev?.current_iteration?.id;
+      const rows = await partsApi.getBOM(revisionId, iterId);
       setEditParts(mapBom(rows as any[], revisionId) as any);
     } catch {
       setEditParts([]);
@@ -100,6 +105,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
         remark: rev.current_iteration?.remark || '',
         version: rev.version || '-', status: rev.status || 'draft',
       });
+      setIterationId(rev.current_iteration?.id);
       setLocked((rev.status === 'frozen' || rev.status === 'released') && !isAdmin());
     }).catch(() => { setSaveError('加载失败'); }).finally(() => setLoading(false));
 
@@ -136,7 +142,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
   const handleAddParts = async (items: { child_type: string; child_id: string; quantity: number }[]) => {
     try {
       const targetId = pickerTargetId || entityId;
-      await Promise.all(items.map((it) => partsApi.addBOMItem(targetId, { child_revision_id: it.child_id, quantity: it.quantity })));
+      await Promise.all(items.map((it) => partsApi.addBOMItem(targetId, { child_revision_id: it.child_id, quantity: it.quantity }, iterationId)));
       if (pickerTargetId) {
         refreshParentParts(pickerTargetId);
       } else {
@@ -164,7 +170,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
     if (!item) return;
     try {
       await partsApi.deleteBOMItem(entityId, versionSelectState.itemId);
-      await partsApi.addBOMItem(entityId, { child_revision_id: selectedVersionId, quantity: item.quantity });
+      await partsApi.addBOMItem(entityId, { child_revision_id: selectedVersionId, quantity: item.quantity }, iterationId);
       await loadEditParts(entityId);
     } catch {
       alert('切换版本失败');

@@ -511,20 +511,22 @@ def cascade_undocheckout(
 @router.get("/revisions/{revision_id}/bom")
 def get_bom(
     revision_id: UUID,
+    iteration_id: Optional[UUID] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("bom:tree")),
 ):
-    return crud_parts.get_bom_tree(db, revision_id)
+    return crud_parts.get_bom_tree(db, revision_id, iteration_id)
 
 
 @router.post("/revisions/{revision_id}/bom/items")
 def add_bom_item(
     revision_id: UUID,
     data: schemas_parts.BOMItemCreate,
+    iteration_id: Optional[UUID] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("bom:create_relation")),
 ):
-    item, err = crud_parts.add_bom_item(db, revision_id, data.model_dump())
+    item, err = crud_parts.add_bom_item(db, revision_id, data.model_dump(), iteration_id)
     if err:
         raise HTTPException(400, err)
     return {"id": str(item.id), "detail": "已添加"}
@@ -579,10 +581,15 @@ def _build_master_response(db: Session, master) -> dict:
 
     child_count = 0
     if latest_revision:
-        child_count = db.query(crud_parts.models.BOMItem).filter(
-            crud_parts.models.BOMItem.parent_revision_id == latest_revision.id,
-            crud_parts.models.BOMItem.deleted_at.is_(None),
-        ).count()
+        latest_iter = db.query(crud_parts.models_parts.PartIteration).filter(
+            crud_parts.models_parts.PartIteration.revision_id == latest_revision.id,
+            crud_parts.models_parts.PartIteration.iteration == latest_revision.latest_iteration,
+        ).first()
+        if latest_iter:
+            child_count = db.query(crud_parts.models.BOMItem).filter(
+                crud_parts.models.BOMItem.iteration_id == latest_iter.id,
+                crud_parts.models.BOMItem.deleted_at.is_(None),
+            ).count()
     dynamic_type = "assembly" if child_count > 0 else "part"
 
     return {
@@ -806,13 +813,22 @@ def remove_doc(revision_id: UUID, link_id: str, db: Session = Depends(get_db),
 def list_attachments(
     revision_id: UUID,
     category: Optional[str] = Query(None),
+    iteration_id: Optional[UUID] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("attachments:list")),
 ):
-    result = crud_parts.get_part_revision_with_current_iteration(db, revision_id)
-    if not result:
-        raise HTTPException(404, "版本不存在")
-    revision, iteration = result
+    if iteration_id:
+        iteration = db.query(crud_parts.models_parts.PartIteration).filter(
+            crud_parts.models_parts.PartIteration.id == iteration_id,
+            crud_parts.models_parts.PartIteration.revision_id == revision_id,
+        ).first()
+        if not iteration:
+            raise HTTPException(404, "迭代不存在或不属于该版本")
+    else:
+        result = crud_parts.get_part_revision_with_current_iteration(db, revision_id)
+        if not result:
+            raise HTTPException(404, "版本不存在")
+        revision, iteration = result
     if not iteration:
         return []
 
