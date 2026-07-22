@@ -68,7 +68,8 @@ export function useCADBridge() {
 
   const readAssemblyTree = useCallback(async (): Promise<AssemblyTreeNode> => {
     await ensureConnected();
-    return cadBridge.call('catia.assembly.read_tree', {}, tokenRef.current);
+    // 大装配体递归读取耗时长，超时放宽到 5 分钟
+    return cadBridge.call('catia.assembly.read_tree', {}, tokenRef.current, 300000);
   }, [ensureConnected]);
 
   const readProperties = useCallback(async (path: string): Promise<AssemblyTreeNode['properties']> => {

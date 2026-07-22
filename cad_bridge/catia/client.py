@@ -103,6 +103,11 @@ class CATIAClient:
     def _read_user_props(self, ref) -> dict:
         """读取引用产品的 UserRefProperties，key 为属性短名"""
         user_props = {}
+        prod_name = ""
+        try:
+            prod_name = str(ref.Name)
+        except Exception:
+            pass
         try:
             for prop in ref.UserRefProperties:
                 try:
@@ -111,7 +116,8 @@ class CATIAClient:
                 except Exception:
                     pass
         except Exception as e:
-            logger.warning(f"读取 UserRefProperties 失败: {e}")
+            # CATIA 某些特殊产品（如工艺特征）不支持 UserRefProperties，忽略即可
+            logger.info(f"跳过 UserRefProperties ({prod_name}): {e}")
         return user_props
 
     def _read_position_matrix(self, product):
@@ -166,7 +172,7 @@ class CATIAClient:
     def _get_doc_path(self, product, ref) -> str:
         """获取零部件源文档完整路径（.CATPart/.CATProduct）。
         依次尝试 ReferenceProduct.Parent / Parent 两条链（pywin32 动态派发下
-        个别属性可能不可用），未保存的新文档无路径，返回空字符串。"""
+        个别属性可能不可用），未保存的新文档或无源文件的元素返回空字符串。"""
         candidates = []
         for obj in (ref, product):
             try:
@@ -184,7 +190,8 @@ class CATIAClient:
                     return path
             except Exception:
                 continue
-        logger.warning(f"无法获取源文档路径: {getattr(product, 'Name', '?')}")
+        # 工艺特征、虚拟部件等无源文件的元素属于正常情况，降级为 info
+        logger.info(f"未获取到源文档路径: {getattr(product, 'Name', '?')} (path={getattr(product, 'path', '?')})")
         return ""
 
     def _read_product_tree(self, product, path: str, level: int) -> dict:

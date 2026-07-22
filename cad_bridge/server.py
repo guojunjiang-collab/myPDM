@@ -63,6 +63,7 @@ class BridgeServer:
 
     async def start(self):
         """启动服务"""
-        async with serve(self._connection_handler, self.host, self.port):
+        async with serve(self._connection_handler, self.host, self.port,
+                         ping_interval=20, ping_timeout=10, open_timeout=5):
             logger.info(f"桥接服务启动: ws://{self.host}:{self.port}")
             await asyncio.get_running_loop().create_future()  # 永久运行
