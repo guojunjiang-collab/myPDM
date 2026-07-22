@@ -851,7 +851,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                 {activeTab === 'docs' && revisionId && (
                     <EntityDocumentSection
                       entityType="part"
-                      entityId={viewingIterationId ? `${revisionId}?iteration_id=${viewingIterationId}` : revisionId}
+                      entityId={revisionId}
                       editable={isCheckedOutByMe && isDraft && !viewingIterationId}
                       entityCode={master?.code}
                       entityName={master?.name}
