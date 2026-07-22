@@ -222,25 +222,25 @@ export default function PartsPage() {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
-              <th onClick={() => handleSort('code' as keyof PartListItem)} className="w-56 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+              <th onClick={() => handleSort('code' as keyof PartListItem)} className="w-40 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
                 件号 {getSortIcon('code' as keyof PartListItem)}
               </th>
-              <th onClick={() => handleSort('name' as keyof PartListItem)} className="w-80 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+              <th onClick={() => handleSort('name' as keyof PartListItem)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
                 中文名称 {getSortIcon('name' as keyof PartListItem)}
               </th>
-              <th onClick={() => handleSort('version' as keyof PartListItem)} className="w-16 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+              <th onClick={() => handleSort('version' as keyof PartListItem)} className="w-16 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
                 版本 {getSortIcon('version' as keyof PartListItem)}
               </th>
-              <th onClick={() => handleSort('type' as keyof PartListItem)} className="w-20 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+              <th onClick={() => handleSort('type' as keyof PartListItem)} className="w-16 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
                 类型 {getSortIcon('type' as keyof PartListItem)}
               </th>
-              <th onClick={() => handleSort('status' as keyof PartListItem)} className="w-20 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+              <th onClick={() => handleSort('status' as keyof PartListItem)} className="w-16 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
                 状态 {getSortIcon('status' as keyof PartListItem)}
               </th>
-              <th className="w-28 px-4 py-3 text-left text-sm font-medium text-gray-500">
+              <th className="w-20 px-4 py-3 text-center text-sm font-medium text-gray-500 select-none whitespace-nowrap">
                 签出状态
               </th>
-              <th className="w-32 px-4 py-3 text-right text-sm font-medium text-gray-500">
+              <th className="w-16 px-4 py-3 text-center text-sm font-medium text-gray-500 select-none whitespace-nowrap">
                 操作
               </th>
             </tr>
@@ -270,23 +270,23 @@ export default function PartsPage() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm truncate">{item.name}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{item.version}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 text-sm text-gray-500 text-center">{item.version}</td>
+                  <td className="px-4 py-3 text-center">
                     <span className={`px-2 py-1 text-xs rounded-full ${item.type === 'assembly' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'}`}>
                       {item.type === 'assembly' ? '部件' : '零件'}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 text-center">
                     <span className={`px-2 py-1 text-xs rounded-full ${statusTag(item.status).cls}`}>
                       {statusTag(item.status).label}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm">
+                  <td className="px-4 py-3 text-sm text-center">
                     {item.check_out_user_name ? (
                       <span className="text-orange-600">{item.check_out_user_name}</span>
                     ) : <span className="text-gray-400">—</span>}
                   </td>
-                  <td className="px-4 py-3 text-right text-sm" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-4 py-3 text-center text-sm" onClick={(e) => e.stopPropagation()}>
                     {user?.role === 'admin' && (
                       <button
                         onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); }}
