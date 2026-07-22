@@ -495,11 +495,11 @@ def _link_dict(db, l):
     if table:
         if table == "part_masters":
             row = db.execute(
-                text("SELECT pm.code, pm.name, pm.spec, pi.remark, pm.id as master_id FROM part_masters pm JOIN part_revisions pr ON pr.master_id = pm.id LEFT JOIN part_iterations pi ON pi.revision_id = pr.id AND pi.iteration = pr.latest_iteration WHERE pr.id = :id"),
+                text("SELECT pm.code, pm.name, pm.spec, pm.id as master_id FROM part_masters pm JOIN part_revisions pr ON pr.master_id = pm.id WHERE pr.id = :id"),
                 {"id": str(l.entity_id)}
             ).fetchone()
             if row:
-                code, name, spec, remark, master_id = row[0], row[1], row[2] if len(row) > 2 else None, row[3] if len(row) > 3 else None, row[4] if len(row) > 4 else None
+                code, name, spec, master_id = row[0], row[1], row[2] if len(row) > 2 else None, row[3] if len(row) > 3 else None
         elif table == "document_revisions":
             row = db.execute(
                 text("SELECT dm.code, dm.name, NULL AS spec, dr.remark, dm.id as master_id FROM document_revisions dr JOIN document_masters dm ON dm.id = dr.master_id WHERE dr.id = :id"),

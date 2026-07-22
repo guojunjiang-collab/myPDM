@@ -69,7 +69,6 @@ class PartIterationResponse(BaseModel):
     check_in_date: Optional[datetime] = None
     check_in_note: Optional[str] = None
     document_links: Optional[List[Dict[str, Any]]] = []
-    remark: Optional[str] = None
     created_at: Optional[datetime] = None
 
     class Config:

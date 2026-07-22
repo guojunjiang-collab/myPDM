@@ -56,7 +56,6 @@ class PartIteration(Base):
     check_in_date = Column(DateTime(timezone=True), nullable=True)
     check_in_note = Column(Text)
     document_links = Column(JSONB, default=[])
-    remark = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     revision = relationship("PartRevision", back_populates="iterations")

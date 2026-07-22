@@ -47,7 +47,6 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const [iterationsList, setIterationsList] = useState<any[]>([]);
 
   const [cfDefs, setCfDefs] = useState<any[]>([]);
-  const [editRemark, setEditRemark] = useState('');
   const [cfEditValues, setCfEditValues] = useState<Record<string, any>>({});
   const [editMaster, setEditMaster] = useState({ code: '', name: '' });
   const [hasBomChildren, setHasBomChildren] = useState(false);
@@ -162,7 +161,6 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
         setRevision(rev);
         if (rev.current_iteration) {
           setIteration(rev.current_iteration);
-          setEditRemark(rev.current_iteration.remark || '');
         }
         try {
           const iterId = viewingIterationId || iteration?.id;
@@ -755,18 +753,6 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                             )}
                           </div>
                         </div>
-                         <div>
-                          <h4 className="text-sm font-semibold mb-1">备注</h4>
-                          <textarea
-                            className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 mt-1 resize-none"
-                            rows={3}
-                            value={editRemark}
-                            onChange={(e) => {
-                              setEditRemark(e.target.value);
-                              autoSave({ remark: e.target.value });
-                            }}
-                          />
-                        </div>
                       </>
                     ) : (
                       <>
@@ -787,10 +773,6 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                               })
                             )}
                           </div>
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-semibold mb-1">备注</h4>
-                          <div className="text-sm text-gray-600">{currentDisplay.remark || '—'}</div>
                         </div>
                       </>
                     )}

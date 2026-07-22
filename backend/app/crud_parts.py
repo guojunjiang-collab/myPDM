@@ -338,7 +338,6 @@ def _copy_iteration_data(db: Session, source_iter: models_parts.PartIteration, n
     """复制上一迭代的全部数据到新迭代"""
     import os, shutil
     new_iter.document_links = source_iter.document_links or []
-    new_iter.remark = source_iter.remark
     db.flush()
 
     # 复制附件引用，并复制文件到新迭代目录

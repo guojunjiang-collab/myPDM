@@ -342,7 +342,6 @@ def list_iterations(
             "iteration": it.iteration,
             "check_in_date": it.check_in_date.isoformat() if it.check_in_date else None,
             "check_in_note": it.check_in_note,
-            "remark": it.remark,
             "created_at": it.created_at.isoformat() if it.created_at else None,
         }
         for it in iterations
@@ -356,23 +355,8 @@ def update_current_iteration(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("parts:update")),
 ):
-    """更新当前迭代的可变数据（remark）"""
-    result = crud_parts.get_part_revision_with_current_iteration(db, revision_id)
-    if not result:
-        raise HTTPException(404, "版本不存在")
-    revision, iteration = result
-    if not iteration:
-        raise HTTPException(400, "当前迭代不存在")
-    if str(revision.check_out_user_id) != str(current_user.id):
-        raise HTTPException(400, "请先签出后再编辑")
-
-    updated = {}
-    if "remark" in data and data["remark"] is not None:
-        iteration.remark = data["remark"]
-        updated["remark"] = data["remark"]
-    if updated:
-        db.commit()
-    return {"detail": "已保存", "updated": updated}
+    """更新当前迭代的可变数据"""
+    return {"detail": "已保存", "updated": {}}
 
 
 @router.get("/revisions/{revision_id}/iterations/{iteration_id}")
@@ -392,7 +376,6 @@ def get_iteration(
         "check_in_date": iteration.check_in_date.isoformat() if iteration.check_in_date else None,
         "check_in_note": iteration.check_in_note,
         "document_links": iteration.document_links or [],
-        "remark": iteration.remark,
         "created_at": iteration.created_at.isoformat() if iteration.created_at else None,
     }
 
@@ -644,7 +627,6 @@ def _build_revision_response(db: Session, revision, iteration) -> dict:
             "check_in_date": iteration.check_in_date.isoformat() if iteration.check_in_date else None,
             "check_in_note": iteration.check_in_note,
             "document_links": iteration.document_links or [],
-            "remark": iteration.remark,
             "created_at": iteration.created_at.isoformat() if iteration.created_at else None,
         }
     return resp

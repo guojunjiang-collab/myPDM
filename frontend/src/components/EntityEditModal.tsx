@@ -27,7 +27,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function EntityEditModal({ open, entityType, entityId, entityCode, entityName, onClose, onSaved }: EntityEditModalProps) {
-  const [formData, setFormData] = useState({ code: '', name: '', spec: '', remark: '', version: '-', status: 'draft' });
+  const [formData, setFormData] = useState({ code: '', name: '', spec: '', version: '-', status: 'draft' });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -37,7 +37,6 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
   // 审批锁定：加载时若该零部件已冻结/发布且当前用户非管理员，则整个表单只读
   const [locked, setLocked] = useState(false);
   const specRef = useRef<HTMLTextAreaElement>(null);
-  const remarkRef = useRef<HTMLTextAreaElement>(null);
 
   // 当前版本的迭代ID（BOM 操作需要迭代级别）
   const [iterationId, setIterationId] = useState<string | undefined>();
@@ -102,7 +101,6 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
       setMasterId(rev.master_id || '');
       setFormData({
         code: master.code || '', name: master.name || '', spec: master.spec || '',
-        remark: rev.current_iteration?.remark || '',
         version: rev.version || '-', status: rev.status || 'draft',
       });
       setIterationId(rev.current_iteration?.id);
@@ -131,13 +129,13 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
   useEffect(() => {
     if (!open) return;
     const timer = setTimeout(() => {
-      [specRef, remarkRef].forEach(ref => {
+      [specRef].forEach(ref => {
         const el = ref.current;
         if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
       });
     }, 0);
     return () => clearTimeout(timer);
-  }, [open, formData.spec, formData.remark]);
+  }, [open, formData.spec]);
 
   const handleAddParts = async (items: { child_type: string; child_id: string; quantity: number }[]) => {
     try {
@@ -231,8 +229,6 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
         name: formData.name,
         spec: formData.spec || undefined,
       });
-      // 备注在当前迭代上
-      try { await partsApi.updateIteration(entityId, { remark: formData.remark || '' }); } catch { /* ignore */ }
       // 保存自定义字段值
       const fieldDefs = customFieldDefs.filter(d => d.applies_to?.includes(cfType));
       const fieldValues = fieldDefs.map(def => ({
@@ -356,10 +352,6 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
             <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">规格型号</label>
               <textarea ref={specRef} value={formData.spec} onChange={e => setFormData({ ...formData, spec: e.target.value })} disabled={locked} onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none disabled:bg-gray-100 disabled:text-gray-500" rows={1} />
-            </div>
-            <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">备注</label>
-              <textarea ref={remarkRef} value={formData.remark} onChange={e => setFormData({ ...formData, remark: e.target.value })} disabled={locked} onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none disabled:bg-gray-100 disabled:text-gray-500" rows={1} placeholder="可选" />
             </div>
           </div>
 
