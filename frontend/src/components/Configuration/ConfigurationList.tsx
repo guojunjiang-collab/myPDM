@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
+import { useTableSort } from '../../hooks/useTableSort';
 import { configurationApi } from '../../services/api';
 import { canEdit, isAdmin, canDownload } from '../../stores/auth';
 import { ConfirmModal } from '../Modal';
@@ -98,6 +99,8 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
       return true;
     });
   }, [items, search, searchField]);
+
+  const { sortedData, handleSort, getSortIcon } = useTableSort<ConfigItemRow>(filteredData, 'code', 'asc');
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -230,11 +233,11 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
-              <th className="text-left px-3 py-3 text-sm font-medium text-gray-500">构型号</th>
-              <th className="text-left px-3 py-3 text-sm font-medium text-gray-500">名称</th>
+              <th onClick={() => handleSort('code' as keyof ConfigItemRow)} className="text-left px-3 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap">构型号 {getSortIcon('code' as keyof ConfigItemRow)}</th>
+              <th onClick={() => handleSort('name' as keyof ConfigItemRow)} className="text-left px-3 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap">名称 {getSortIcon('name' as keyof ConfigItemRow)}</th>
               <th className="text-left px-3 py-3 text-sm font-medium text-gray-500">备注</th>
-              <th className="text-center px-2 py-3 text-sm font-medium text-gray-500 w-16">版本</th>
-              <th className="text-center px-2 py-3 text-sm font-medium text-gray-500 w-20">状态</th>
+              <th onClick={() => handleSort('version' as keyof ConfigItemRow)} className="text-center px-2 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-16">版本 {getSortIcon('version' as keyof ConfigItemRow)}</th>
+              <th onClick={() => handleSort('status' as keyof ConfigItemRow)} className="text-center px-2 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-20">状态 {getSortIcon('status' as keyof ConfigItemRow)}</th>
               <th className="text-center px-2 py-3 text-sm font-medium text-gray-500 w-20">签出状态</th>
               <th className="text-center px-2 py-3 text-sm font-medium text-gray-500 w-20">操作</th>
             </tr>
@@ -246,7 +249,7 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
               <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
             ) : filteredData.length === 0 ? (
               <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
-            ) : filteredData.map((item) => (
+            ) : sortedData.map((item) => (
               <tr key={item.revision_id} onClick={() => onOpenDetail(item.revision_id)} className="hover:bg-gray-50 cursor-pointer">
                 <td className="px-3 py-3 text-sm font-medium">{item.code}</td>
                 <td className="px-3 py-3 text-sm">{item.name}</td>
