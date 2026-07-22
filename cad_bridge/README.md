@@ -82,16 +82,11 @@ python -m cad_bridge
 ```
 CAD 桥接服务启动中...
   WebSocket: ws://127.0.0.1:9527
-  PDM 后端: https://localhost:8080/api
+  PDM 地址由浏览器前端动态提供（无需手动指定）
 ```
 
-**重要**：PDM 部署在远程服务器时，必须通过 `--pdm-url` 指向该服务器，否则附件会传到错误的地址：
-
-**亿航PDM桥接启动指令**
-
-```powershell
-python -m cad_bridge --pdm-url https://192.168.50.62:8080/api
-```
+> **注意**：PDM 地址由浏览器前端自动传入（基于当前浏览器地址栏），无需也不应手动指定 `--pdm-url`。
+> 无论 PDM 部署在本机还是远程服务器，前端会自动将正确的地址传给桥接服务。
 
 ### 命令行参数
 
@@ -99,7 +94,7 @@ python -m cad_bridge --pdm-url https://192.168.50.62:8080/api
 | ----------- | ---------------------------- | ------------------ |
 | `--port`    | `9527`                       | WebSocket 监听端口     |
 | `--host`    | `127.0.0.1`                  | 监听地址（仅本机访问）        |
-| `--pdm-url` | `https://localhost:8080/api` | PDM 后端地址，附件上传/下载使用 |
+| `--pdm-url` | （空）                      | PDM 后端回退地址（通常无需指定） |
 
 
 
@@ -118,7 +113,7 @@ Get-CimInstance Win32_Process -Filter "Name like 'python%'" |
 ## 5. 使用流程
 
 1. **启动 CATIA**，打开要处理的装配体（CATProduct）
-2. **启动桥接服务**（见上文，远程 PDM 记得带 `--pdm-url`）
+2. **启动桥接服务**：`python -m cad_bridge`（PDM 地址由浏览器自动传入，无需额外参数）
 3. 浏览器登录 myPDM，进入 **零部件管理** 页面
 4. 点击工具栏 **"CAD入口"** 按钮，打开 CAD 工作台
 5. 按三步流程操作：

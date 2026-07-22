@@ -1,5 +1,6 @@
 """CAD 桥接服务入口
-用法: python -m cad_bridge --port 9527 --pdm-url https://localhost:8080/api
+用法: python -m cad_bridge
+PDM 地址由浏览器前端自动传入（无需手动指定 --pdm-url）
 """
 import sys
 import os
@@ -119,8 +120,8 @@ def main():
     parser = argparse.ArgumentParser(description="CAD 桥接服务")
     parser.add_argument("--port", type=int, default=9527, help="WebSocket 监听端口（默认 9527）")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="监听地址（默认 127.0.0.1）")
-    parser.add_argument("--pdm-url", type=str, default="https://localhost:8080/api",
-                        help="PDM 后端地址（默认 https://localhost:8080/api）")
+    parser.add_argument("--pdm-url", type=str, default="",
+                        help="PDM 后端地址（可选回退值；实际地址由浏览器前端动态提供）")
     args = parser.parse_args()
 
     pdm_client = PDMClient(base_url=args.pdm_url)
@@ -129,7 +130,10 @@ def main():
 
     logger.info(f"CAD 桥接服务启动中...")
     logger.info(f"  WebSocket: ws://{args.host}:{args.port}")
-    logger.info(f"  PDM 后端: {args.pdm_url}")
+    if args.pdm_url:
+        logger.info(f"  PDM 后端（回退值）: {args.pdm_url}")
+    else:
+        logger.info(f"  PDM 地址由浏览器前端动态提供（无需手动指定）")
 
     try:
         asyncio.run(server.start())

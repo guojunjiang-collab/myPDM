@@ -5,22 +5,27 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_PDM_URL = "https://localhost:8080/api"
 DEFAULT_WORKSPACE = os.path.join(os.getcwd(), "cad_workspace")
 
 
 class PDMClient:
     """PDM API 代理，透传 JWT，处理附件上传/下载"""
 
-    def __init__(self, base_url: str = DEFAULT_PDM_URL):
-        self.base_url = base_url.rstrip("/")
-        # 使用不验证 SSL 证书（本地自签名证书）
+    def __init__(self, base_url: str = ""):
+        self.base_url = base_url.rstrip("/") if base_url else ""
         self._client_kwargs = {"verify": False, "timeout": 30.0}
+
+    def _resolve_url(self, override_base: str = None) -> str:
+        """解析有效的 PDM 地址，优先使用动态传入的地址"""
+        effective = (override_base or self.base_url).rstrip("/")
+        if not effective:
+            raise RuntimeError("PDM 服务地址未提供：请确保通过浏览器前端连接（地址自动传入）")
+        return effective
 
     async def download_attachment(self, attachment_id: str, save_dir: str, token: str,
                                   base_url: str = None) -> dict:
         """下载附件到本地目录"""
-        effective_url = (base_url or self.base_url).rstrip("/")
+        effective_url = self._resolve_url(base_url)
         os.makedirs(save_dir, exist_ok=True)
         async with httpx.AsyncClient(**self._client_kwargs) as client:
             # 获取媒体令牌
@@ -59,7 +64,7 @@ class PDMClient:
             raise FileNotFoundError(f"本地文件不存在: {file_path}")
         filename = os.path.basename(file_path)
         file_size = os.path.getsize(file_path)
-        effective_url = (base_url or self.base_url).rstrip("/")
+        effective_url = self._resolve_url(base_url)
 
         async with httpx.AsyncClient(**self._client_kwargs) as client:
             # 初始化分块上传
