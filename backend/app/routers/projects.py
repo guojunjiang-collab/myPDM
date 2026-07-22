@@ -492,27 +492,37 @@ def _link_dict(db, l):
     from sqlalchemy import text
     code = name = spec = remark = master_id = None
     table = _ENTITY_TABLE.get(l.entity_type)
-    if table:
-        if table == "part_masters":
-            row = db.execute(
-                text("SELECT pm.code, pm.name, pm.spec, pm.id as master_id FROM part_masters pm JOIN part_revisions pr ON pr.master_id = pm.id WHERE pr.id = :id"),
-                {"id": str(l.entity_id)}
-            ).fetchone()
-            if row:
-                code, name, spec, master_id = row[0], row[1], row[2] if len(row) > 2 else None, row[3] if len(row) > 3 else None
-        elif table == "document_revisions":
-            row = db.execute(
-                text("SELECT dm.code, dm.name, NULL AS spec, dr.remark, dm.id as master_id FROM document_revisions dr JOIN document_masters dm ON dm.id = dr.master_id WHERE dr.id = :id"),
-                {"id": str(l.entity_id)}
-            ).fetchone()
-            if row:
-                code, name, spec, remark, master_id = row[0], row[1], row[2] if len(row) > 2 else None, row[3] if len(row) > 3 else None, row[4] if len(row) > 4 else None
-        else:
-            row = db.execute(
-                text(f"SELECT code, name, spec, remark FROM {table} WHERE id = :id"), {"id": str(l.entity_id)}
-            ).fetchone()
+    if table == "part_masters":
+        row = db.execute(
+            text("SELECT pm.code, pm.name, NULL AS spec, pm.id as master_id FROM part_masters pm JOIN part_revisions pr ON pr.master_id = pm.id WHERE pr.id = :id"),
+            {"id": str(l.entity_id)}
+        ).fetchone()
         if row:
-            code, name, spec, remark = row[0], row[1], row[2] if len(row) > 2 else None, row[3] if len(row) > 3 else None
+            code, name, spec, master_id = row[0], row[1], row[2], row[3]
+    elif table == "document_revisions":
+        row = db.execute(
+            text("SELECT dm.code, dm.name, NULL AS spec, dr.remark, dm.id as master_id FROM document_revisions dr JOIN document_masters dm ON dm.id = dr.master_id WHERE dr.id = :id"),
+            {"id": str(l.entity_id)}
+        ).fetchone()
+        if row:
+            code, name, spec, remark, master_id = row[0], row[1], row[2], row[3], row[4]
+    elif table == "configuration_item_masters":
+        # 关联存的是版本(revision)id，需 JOIN 版本表取主数据 code/name（主表仅 code/name，无 spec/remark 列）
+        row = db.execute(
+            text("SELECT cim.code, cim.name, cim.id AS master_id "
+                 "FROM configuration_item_masters cim "
+                 "JOIN configuration_item_revisions cir ON cir.master_id = cim.id "
+                 "WHERE cir.id = :id"),
+            {"id": str(l.entity_id)}
+        ).fetchone()
+        if row:
+            code, name, master_id = row[0], row[1], row[2]
+    elif table:
+        row = db.execute(
+            text(f"SELECT code, name FROM {table} WHERE id = :id"), {"id": str(l.entity_id)}
+        ).fetchone()
+        if row:
+            code, name = row[0], row[1]
     elif l.entity_type == "ec":
         row = db.execute(
             text("SELECT ecr_number, title, description FROM ecrs WHERE id = :id UNION ALL SELECT eco_number, title, description FROM ecos WHERE id = :id LIMIT 1"),

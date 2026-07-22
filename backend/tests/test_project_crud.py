@@ -107,6 +107,27 @@ def test_task_links_add_list_remove(db):
     assert len(crud_project.list_links(db, t.id)) == 0
 
 
+def test_link_dict_config_item_serializes_without_error(db):
+    """构型项(config_item)任务关联序列化不应 500：关联存 revision id，需 JOIN 版本表取主数据。"""
+    from app.routers.projects import _link_dict
+    from app import models_configuration
+    owner = _make_user(db)
+    p = crud_project.create_project(db, ProjectCreate(name="A"), owner.id)
+    t = crud_project.create_task(db, p, TaskCreate(name="T"))
+    ci = models_configuration.ConfigurationItemMaster(id=uuid.uuid4(), code="CI-1", name="构型项1")
+    rev = models_configuration.ConfigurationItemRevision(id=uuid.uuid4(), master_id=ci.id, version="A")
+    db.add(ci); db.add(rev); db.commit()
+    # 关联对象存的是版本 id（与 ConfigItemPicker/ConfigItemDetailModal 一致）
+    link = crud_project.add_link(db, t.id, TaskLinkAdd(entity_type="config_item", entity_id=str(rev.id)))
+    # 回归点：此前 SELECT spec/remark 触发 "no such column" 500；应正常返回 dict。
+    # 注：SQLite 的 UUID 存为无连字符 hex，raw SQL 按连字符字符串匹配不到行（生产 Postgres 可匹配），
+    # 故此处只断言不再抛错并回显基础字段，不断言 code/name 解析结果。
+    d = _link_dict(db, link)
+    assert d["entity_type"] == "config_item"
+    assert d["entity_id"] == str(rev.id)
+    assert d["entity_spec"] is None
+
+
 def test_task_comments_add_list_delete(db):
     owner = _make_user(db)
     p = crud_project.create_project(db, ProjectCreate(name="A"), owner.id)

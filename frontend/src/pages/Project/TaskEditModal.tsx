@@ -10,7 +10,7 @@ import ConfigItemPicker from '../../components/Configuration/ConfigItemPicker';
 import ECPicker from '../../components/ECPicker';
 import PartDetailModal from '../../components/PartDetailModal';
 import DocumentDetailModal from '../../components/DocumentDetailModal';
-import ConfigurationDetailModal from '../../components/Configuration/ConfigurationDetailModal';
+import ConfigItemDetailModal from '../../components/Configuration/ConfigItemDetailModal';
 import ArchiveTreeModal from '../../components/ArchiveTreeModal';
 import { ECRDetailModal } from '../../components/ECR/ECRDetailModal';
 import { ECODetailModal } from '../../components/ECO/ECODetailModal';
@@ -703,7 +703,11 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
 
       {/* ===== 所有子 Modal 保持不变 ===== */}
       {detailEntityId && detailEntityType === 'config_item' && (
-        <ConfigurationDetailModal itemId={detailEntityId} onClose={() => { setDetailEntityId(null); setDetailEntityType(null); }} />
+        <ConfigItemDetailModal
+          open
+          revisionId={detailEntityId}
+          onClose={() => { setDetailEntityId(null); setDetailEntityType(null); }}
+        />
       )}
 
       {ecView?.kind === 'ecr' && (
