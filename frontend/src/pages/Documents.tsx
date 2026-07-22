@@ -391,7 +391,7 @@ export default function Documents() {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
-              <th onClick={() => handleSort('code' as keyof Document)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">编号 {getSortIcon('code' as keyof Document)}</th>
+              <th onClick={() => handleSort('code' as keyof Document)} className="w-60 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">编号 {getSortIcon('code' as keyof Document)}</th>
               <th onClick={() => handleSort('name' as keyof Document)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">名称 {getSortIcon('name' as keyof Document)}</th>
               <th onClick={() => handleSort('version' as keyof Document)} className="w-16 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">版本 {getSortIcon('version' as keyof Document)}</th>
               <th onClick={() => handleSort('status' as keyof Document)} className="w-20 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">状态 {getSortIcon('status' as keyof Document)}</th>

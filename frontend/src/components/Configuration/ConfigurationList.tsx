@@ -1,16 +1,9 @@
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useTableSort } from '../../hooks/useTableSort';
 import { configurationApi } from '../../services/api';
-import { canEdit, isAdmin, canDownload } from '../../stores/auth';
+import { canEdit, isAdmin } from '../../stores/auth';
 import { ConfirmModal } from '../Modal';
 import ConfigurationCreateModal from './ConfigurationCreateModal';
-import {
-  exportConfigurationItems,
-  previewConfigurationItemsImport,
-  executeConfigurationItemsImport,
-} from '../../services/importExport';
-import type { ImportPreview } from '../../services/importExport';
-import ImportPreviewModal from '../ImportPreviewModal';
 
 interface ConfigItemRow {
   revision_id: string;
@@ -45,14 +38,7 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
-  const [importPreviewOpen, setImportPreviewOpen] = useState(false);
-  const [importLoading, setImportLoading] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   const PAGE_CAP = 10000;
-  const [serverTotal, setServerTotal] = useState(0);
 
   const load = async () => {
     setLoading(true);
@@ -77,7 +63,6 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
         updated_at: item.updated_at,
       }));
       setItems(rows);
-      setServerTotal(result.total ?? rawItems.length);
     } catch { } finally { setLoading(false); }
   };
 
@@ -116,55 +101,6 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
       } else {
         setDeleteError('删除失败，请重试');
       }
-    }
-  };
-
-  const handleExport = async () => {
-    try {
-      await exportConfigurationItems();
-    } catch (err: any) {
-      alert(err.message || '导出失败');
-    }
-  };
-
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImportLoading(true);
-    try {
-      const preview = await previewConfigurationItemsImport(file);
-      setImportPreview(preview);
-      setImportPreviewOpen(true);
-    } catch (err: any) {
-      alert(err.message || '导入解析失败');
-    } finally {
-      setImportLoading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  const handleImportConfirm = async () => {
-    if (!importPreview) return;
-    setImporting(true);
-    try {
-      const result = await executeConfigurationItemsImport(importPreview);
-      setImportPreviewOpen(false);
-      setImportPreview(null);
-      load();
-      let msg = `导入成功（新增 ${result.created}，更新 ${result.updated}）`;
-      if (result.warnings.length > 0) {
-        msg += `\n\n⚠️ ${result.warnings.length} 条告警：\n` + result.warnings.slice(0, 20).join('\n');
-        if (result.warnings.length > 20) msg += `\n... 其余 ${result.warnings.length - 20} 条见控制台`;
-      }
-      alert(msg);
-    } catch (err: any) {
-      alert(err.message || '导入执行失败');
-    } finally {
-      setImporting(false);
     }
   };
 
@@ -215,15 +151,6 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
           仅顶层构型项
         </label>
         <div className="flex-1" />
-        {canDownload() && (
-          <button onClick={handleExport} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">导出全部</button>
-        )}
-        {canEdit() && (
-          <>
-            <button onClick={handleImportClick} disabled={importLoading} className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm disabled:opacity-50">{importLoading ? '解析中...' : '导入'}</button>
-            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange} />
-          </>
-        )}
         {canEdit() && (
           <button onClick={() => setCreateOpen(true)} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建构型</button>
         )}
@@ -292,13 +219,6 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
         onCancel={() => { setDeleteId(null); setDeleteError(null); }}
       />
 
-      <ImportPreviewModal
-        open={importPreviewOpen}
-        preview={importPreview}
-        loading={importing}
-        onClose={() => { setImportPreviewOpen(false); setImportPreview(null); }}
-        onConfirm={handleImportConfirm}
-      />
     </div>
   );
 }
