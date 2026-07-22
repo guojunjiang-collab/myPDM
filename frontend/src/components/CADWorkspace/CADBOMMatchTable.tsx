@@ -77,6 +77,8 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
   const fieldDefsRef = useRef<any[] | null>(null);
   const [fieldDefs, setFieldDefs] = useState<any[]>([]);
   const [fieldMapping, setFieldMapping] = useState<FieldMapping>(DEFAULT_FIELD_MAPPING);
+  const leftTableRef = useRef<HTMLTableElement>(null);
+  const rightTableRef = useRef<HTMLTableElement>(null);
 
   // 加载 PDM 自定义字段定义（筛选适用于零部件的）与 CATIA-PDM 字段映射
   useEffect(() => {
@@ -93,6 +95,23 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
       mappingRef.current = m;
     }).catch(() => {});
   }, []);
+
+  // 同步右表行高到左表（两个独立table需要手动对齐行高）
+  useEffect(() => {
+    const syncRowHeights = () => {
+      const leftRows = leftTableRef.current?.querySelectorAll('tbody tr');
+      const rightRows = rightTableRef.current?.querySelectorAll('tbody tr');
+      if (!leftRows || !rightRows || leftRows.length !== rightRows.length) return;
+      rightRows.forEach(r => { (r as HTMLElement).style.height = ''; });
+      leftRows.forEach((lr, i) => {
+        (rightRows[i] as HTMLElement).style.height = `${lr.getBoundingClientRect().height}px`;
+      });
+    };
+    syncRowHeights();
+    const observer = new ResizeObserver(syncRowHeights);
+    if (leftTableRef.current) observer.observe(leftTableRef.current);
+    return () => observer.disconnect();
+  }, [rows]);
 
   // CATIA 属性名 → PDM 字段名反向查找
   const getCatiaPropForPdmField = useCallback((pdmFieldName: string): string | undefined => {
@@ -514,28 +533,28 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
         <div className="h-full overflow-y-auto overflow-x-hidden">
           <div className="flex">
             {/* ====== 左表：固定列 ====== */}
-            <table className="shrink-0 border-collapse text-xs whitespace-nowrap">
+            <table ref={leftTableRef} className="shrink-0 border-collapse text-xs whitespace-nowrap">
               <thead className="sticky top-0 z-10">
                 <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
-                  <th className="p-2 text-left bg-gray-50">层级</th>
-                  <th className="p-2 text-left bg-gray-50">件号</th>
-                  <th className="p-2 text-center bg-gray-50">用量</th>
+                  <th className="p-2 text-left">层级</th>
+                  <th className="p-2 text-left">件号</th>
+                  <th className="p-2 text-center">用量</th>
                   {BUILTIN_COLUMNS.map(col => (
-                    <th key={col.attr} className={`p-2 text-left bg-sky-50 ${col.width || ''}`}>{col.label}</th>
+                    <th key={col.attr} className={`p-2 text-left ${col.width || ''}`}>{col.label}</th>
                   ))}
-                  <th className="p-2 text-center bg-blue-50">CAD附件</th>
-                  <th className="p-2 text-center bg-amber-50">生产附件</th>
-                  <th className="p-2 text-left bg-gray-50">PDM匹配</th>
-                  <th className="p-2 text-left bg-gray-50">匹配状态</th>
-                  <th className="p-2 text-left bg-gray-50">签出状态</th>
-                  <th className="p-2 text-center bg-gray-50">操作</th>
+                  <th className="p-2 text-center">CAD附件</th>
+                  <th className="p-2 text-center">生产附件</th>
+                  <th className="p-2 text-left">PDM匹配</th>
+                  <th className="p-2 text-left">匹配状态</th>
+                  <th className="p-2 text-left">签出状态</th>
+                  <th className="p-2 text-center">操作</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map(row => (
                   <tr key={row.path} className={`border-b border-gray-200 transition-colors ${
-                    row.match_status === 'new' ? 'bg-yellow-50 hover:bg-yellow-100' :
-                    row.checkout_status === 'checked_out' ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-100'
+                    row.match_status === 'new' ? 'hover:bg-yellow-100' :
+                    row.checkout_status === 'checked_out' ? 'hover:bg-blue-100' : 'hover:bg-gray-100'
                   }`}>
                     <td className="p-2">
                       {row.level === 0 ? <strong>{row.level}</strong> : row.path.replace('0.', '')}
@@ -544,7 +563,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                     <td className="p-2 text-center">{row.quantity}</td>
 
                     {BUILTIN_COLUMNS.map(col => (
-                      <td key={col.attr} className={`p-2 bg-sky-50 ${col.width || ''}`}>
+                      <td key={col.attr} className={`p-2 ${col.width || ''}`}>
                         <input
                           value={row.builtin[col.attr] || ''}
                           disabled={!canEditProps(row)}
@@ -558,7 +577,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                       </td>
                     ))}
 
-                    <td className="p-2 text-center bg-blue-50">
+                    <td className="p-2 text-center">
                       {(() => {
                         const n = row.pdm_match?.revision_id ? attCounts[row.pdm_match.revision_id]?.cad : undefined;
                         return (
@@ -586,7 +605,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                       )}
                     </td>
 
-                    <td className="p-2 text-center bg-amber-50">
+                    <td className="p-2 text-center">
                       {(() => {
                         const n = row.pdm_match?.revision_id ? attCounts[row.pdm_match.revision_id]?.production : undefined;
                         return (
@@ -690,36 +709,57 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
 
             {/* ====== 右表：自定义字段滚动区 ====== */}
             <div className="flex-1 overflow-x-auto" style={{ maxWidth: '50%' }}>
-              <table className="border-collapse text-xs whitespace-nowrap w-full">
+              <table ref={rightTableRef} className="border-collapse text-xs whitespace-nowrap w-full">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
                     {propertyColumns.map(col => (
-                      <th key={col} className="p-2 text-left bg-green-50">{col}</th>
+                      <th key={col} className="p-2 text-left">{col}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map(row => (
                     <tr key={row.path} className={`border-b border-gray-200 transition-colors ${
-                      row.match_status === 'new' ? 'bg-yellow-50 hover:bg-yellow-100' :
-                      row.checkout_status === 'checked_out' ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-100'
+                      row.match_status === 'new' ? 'hover:bg-yellow-100' :
+                      row.checkout_status === 'checked_out' ? 'hover:bg-blue-100' : 'hover:bg-gray-100'
                     }`}>
                       {propertyColumns.map(col => {
                         const catiaProp = getCatiaPropForPdmField(col);
                         const value = catiaProp ? (row.user_properties[catiaProp] || '') : '';
+                        const fieldDef = fieldDefs.find((d: any) => d.name === col);
+                        const isSelect = fieldDef?.field_type === 'select' && fieldDef?.options?.length > 0;
                         return (
-                          <td key={col} className="p-2 bg-green-50">
-                            <input
-                              value={value}
-                              disabled={!canEditProps(row) || !catiaProp}
-                              onChange={(e) => {
-                                if (!catiaProp) return;
-                                const val = e.target.value;
-                                setRows(prev => syncRowsByPartNumber(prev, row, catiaProp, val));
-                                handlePropEdit(row, catiaProp, val);
-                              }}
-                              className="border border-blue-300 rounded px-1.5 py-0.5 w-full text-xs disabled:bg-gray-100 disabled:border-gray-200"
-                            />
+                          <td key={col} className="p-2 align-top">
+                            {isSelect ? (
+                              <select
+                                value={value}
+                                disabled={!canEditProps(row) || !catiaProp}
+                                onChange={(e) => {
+                                  if (!catiaProp) return;
+                                  const val = e.target.value;
+                                  setRows(prev => syncRowsByPartNumber(prev, row, catiaProp, val));
+                                  handlePropEdit(row, catiaProp, val);
+                                }}
+                                className="border border-blue-300 rounded px-1.5 py-0.5 w-full text-xs disabled:bg-gray-100 disabled:border-gray-200"
+                              >
+                                <option value="">—</option>
+                                {fieldDef.options.map((opt: string) => (
+                                  <option key={opt} value={opt}>{opt}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                value={value}
+                                disabled={!canEditProps(row) || !catiaProp}
+                                onChange={(e) => {
+                                  if (!catiaProp) return;
+                                  const val = e.target.value;
+                                  setRows(prev => syncRowsByPartNumber(prev, row, catiaProp, val));
+                                  handlePropEdit(row, catiaProp, val);
+                                }}
+                                className="border border-blue-300 rounded px-1.5 py-0.5 w-full text-xs disabled:bg-gray-100 disabled:border-gray-200"
+                              />
+                            )}
                           </td>
                         );
                       })}
