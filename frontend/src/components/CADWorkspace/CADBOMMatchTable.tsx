@@ -152,14 +152,18 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
       if (!lr || !rr || lr.length !== rr.length) return;
       lr.forEach((l, i) => {
         const h = l.getBoundingClientRect().height;
-        if (h > 0) (rr[i] as HTMLElement).style.height = `${h}px`;
+        const rt = rr[i] as HTMLElement;
+        // 仅在高度确有差异时写入，避免 ResizeObserver 反复触发导致行高不断累加
+        if (h > 0 && Math.abs(rt.getBoundingClientRect().height - h) > 0.5) {
+          rt.style.height = `${h}px`;
+        }
       });
     };
     requestAnimationFrame(() => requestAnimationFrame(sync));
     const obs = new ResizeObserver(() => requestAnimationFrame(() => requestAnimationFrame(sync)));
     if (leftBodyRef.current) obs.observe(leftBodyRef.current);
     return () => obs.disconnect();
-  }, [visibleRows]);
+  }, [visibleRows, propertyColumns.length]);
 
   const handlePropEdit = useCallback(async (row: BOMRow, key: string, value: string) => {
     try {
@@ -560,7 +564,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
       {/* 表格：左侧固定列 + 右侧自定义字段独立水平滚动 */}
       <div className="flex-1 min-h-0">
         <div className="h-full overflow-y-auto overflow-x-hidden">
-          <div className="flex">
+          <div className="flex items-start">
             {/* ====== 左表：固定列 ====== */}
             <table className="shrink-0 border-collapse text-xs whitespace-nowrap">
               <thead className="sticky top-0 z-10">
@@ -579,7 +583,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                   <th className="p-2 text-center" style={{ width: 160 }}>操作</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody ref={leftBodyRef}>
                 {visibleRows.map((row, vi) => {
                   const ri = rows.indexOf(row);
                   const collapsed = collapsedPaths.has(row.path);
@@ -656,7 +660,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
             </table>
 
             {/* ====== 右区：自定义字段 ====== */}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 border-l-2 border-gray-200">
               {/* 表头：在overflow外，sticky top-0 生效 */}
               <div className="sticky top-0 z-10">
                 <table className="border-collapse text-xs whitespace-nowrap w-full">
