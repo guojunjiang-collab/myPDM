@@ -429,24 +429,6 @@ export default function Documents() {
                       : <span className="text-gray-400">—</span>}
                   </td>
                   <td className="px-4 py-3 text-right text-sm" onClick={(e) => e.stopPropagation()}>
-                    {doc.status === 'draft' && !doc.check_out_user_id && (
-                      <button
-                        onClick={async () => {
-                          try {
-                            await documentsApi.checkout(doc.id);
-                            toast.success('签出成功');
-                            setDetailDocId(doc.id);
-                            loadDocuments();
-                          } catch (e: any) {
-                            const detail = e?.response?.data?.detail;
-                            toast.error(typeof detail === 'string' ? detail : '签出失败');
-                          }
-                        }}
-                        className="text-primary-600 hover:text-primary-800 mr-3"
-                      >
-                        签出
-                      </button>
-                    )}
                     {(() => {
                       const isCreator = (doc as any).creator_id === useAuthStore.getState().user?.id;
                       const canManage = isAdmin() || isCreator;
