@@ -598,13 +598,12 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                     className={`border-b border-gray-200 transition-colors ${hoveredIndex === ri ? hoverClass(row) : ''}`}>
                     <td className="p-2 whitespace-nowrap">
                       <span className="inline-flex items-center gap-0.5">
+                        <span className="font-mono text-xs">{indent}{row.level}</span>
                         {expandable && (
                           <button onClick={() => toggleCollapse(row.path)} className="text-gray-400 hover:text-gray-700 w-4 h-4 flex items-center justify-center text-[10px] leading-none select-none">
                             {collapsed ? '▶' : '▼'}
                           </button>
                         )}
-                        {!expandable && <span className="w-4 inline-block" />}
-                        <span className="font-mono text-xs">{indent}{row.level}</span>
                       </span>
                     </td>
                     <td className="p-2">{row.builtin.PartNumber || ''}</td>
