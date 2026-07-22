@@ -503,7 +503,6 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                               <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-20 whitespace-nowrap">类型</th>
                               <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-36 whitespace-nowrap">件号</th>
                               <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">名称</th>
-                              <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">规格/备注</th>
                               <th className="text-right px-3 py-2 text-xs font-medium text-gray-500 w-12">操作</th>
                             </tr>
                           </thead>
@@ -524,7 +523,6 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                                 </td>
                                 <td className="px-3 py-2 font-mono text-gray-700 whitespace-nowrap">{l.entity_code || '—'}</td>
                                 <td className="px-3 py-2 text-gray-700">{l.entity_name || '—'}</td>
-                                <td className="px-3 py-2 text-gray-500">{l.entity_spec || l.entity_remark || '—'}</td>
                                 <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                                   <button onClick={() => removeLink(l.id)} className="text-gray-400 hover:text-red-600 text-sm">×</button>
                                 </td>
