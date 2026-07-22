@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { documentsApi, customFieldsApi, bomApi, userGroupsApi } from '../services/api';
 import type { Document, CustomFieldDefinition, CustomFieldValue } from '../types';
-import { canEdit, isAdmin, canDownload, useAuthStore } from '../stores/auth';
+import { canEdit, isAdmin, useAuthStore } from '../stores/auth';
 import { compareVersions } from '../constants';
 import { Modal, ConfirmModal } from '../components/Modal';
 import DocumentDetailContent from '../components/DocumentDetailContent';
@@ -10,13 +10,6 @@ import { toast } from '../components/Toast';
 import VersionHistory from '../components/VersionHistory';
 import { useDataStore } from '../stores/data';
 import { useTableSort } from '../hooks/useTableSort';
-import {
-  exportDocumentsToFolder,
-  previewDocumentsImport,
-  executeDocumentsImport,
-} from '../services/importExport';
-import type { ImportPreview } from '../services/importExport';
-import ImportPreviewModal from '../components/ImportPreviewModal';
 import ArchiveTreeModal from '../components/ArchiveTreeModal';
 
 export default function Documents() {
@@ -56,12 +49,6 @@ export default function Documents() {
   const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDefinition[]>([]);
   // 自定义字段值映射：{ entityId: { fieldId: value } }
   const [customFieldValuesMap, setCustomFieldValuesMap] = useState<Record<string, Record<string, any>>>({});
-
-  // 导入导出
-  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
-  const [importPreviewOpen, setImportPreviewOpen] = useState(false);
-  const [importLoading, setImportLoading] = useState(false);
-  const [importing, setImporting] = useState(false);
 
   // 用户组关联
   const [allGroups, setAllGroups] = useState<Array<{ id: string; name: string }>>([]);
@@ -268,47 +255,6 @@ export default function Documents() {
     }
   };
 
-  // ===== 导入导出 =====
-  const handleExportDocuments = async () => {
-    try {
-      await exportDocumentsToFolder();
-    } catch (err: any) {
-      if (err.name !== 'AbortError' && !err.message?.includes('abort')) {
-        alert(err.message || '导出失败');
-      }
-    }
-  };
-
-  const handleImportDocumentsClick = async () => {
-    setImportLoading(true);
-    try {
-      const preview = await previewDocumentsImport();
-      setImportPreview(preview);
-      setImportPreviewOpen(true);
-    } catch (err: any) {
-      if (err.name !== 'AbortError' && !err.message?.includes('abort')) {
-        alert(err.message || '导入解析失败');
-      }
-    } finally {
-      setImportLoading(false);
-    }
-  };
-
-  const handleImportDocumentsConfirm = async () => {
-    if (!importPreview) return;
-    setImporting(true);
-    try {
-      await executeDocumentsImport(importPreview);
-      setImportPreviewOpen(false);
-      setImportPreview(null);
-      alert('导入成功');
-    } catch (err: any) {
-      alert(err.message || '导入执行失败');
-    } finally {
-      setImporting(false);
-    }
-  };
-
   const getStatusTag = (s: string) => {
     const tags: Record<string, { label: string; class: string }> = {
       draft: { label: '草稿', class: 'bg-blue-100 text-blue-800' },
@@ -376,12 +322,6 @@ export default function Documents() {
           可查看
         </label>
         <div className="flex-1" />
-        {canDownload() && (
-          <button onClick={handleExportDocuments} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">📥 导出全部</button>
-        )}
-        {canEdit() && (
-          <button onClick={handleImportDocumentsClick} disabled={importLoading} className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm disabled:opacity-50">{importLoading ? '解析中...' : '📤 导入'}</button>
-        )}
         {canEdit() && (
           <button onClick={handleAdd} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新增图文档</button>
         )}
@@ -580,18 +520,6 @@ export default function Documents() {
           </div>
         )}
       </Modal>
-
-      {/* 导入预览弹窗 */}
-      <ImportPreviewModal
-        open={importPreviewOpen}
-        preview={importPreview}
-        loading={importLoading}
-        onClose={() => {
-          setImportPreviewOpen(false);
-          setImportPreview(null);
-        }}
-        onConfirm={handleImportDocumentsConfirm}
-      />
 
       {archivePreview && (
         <ArchiveTreeModal
