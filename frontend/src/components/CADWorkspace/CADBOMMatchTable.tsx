@@ -757,7 +757,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
 
             {/* ====== 右表：自定义字段滚动区 ====== */}
             <div className="flex-1 overflow-x-auto min-w-0" style={{ scrollbarGutter: 'stable' }}>
-              <table ref={rightTableRef} className="border-separate border-spacing-0 text-xs whitespace-nowrap w-full h-full">
+              <table ref={rightTableRef} className="border-collapse text-xs whitespace-nowrap w-full">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
                     {propertyColumns.map(col => (
@@ -772,14 +772,14 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                     <tr key={row.path}
                       onMouseEnter={() => setHoveredIndex(ri)}
                       onMouseLeave={() => setHoveredIndex(null)}
-                      className={`transition-colors ${hoveredIndex === ri ? hoverClass(row) : ''}`}>
+                      className={`border-b border-gray-200 transition-colors ${hoveredIndex === ri ? hoverClass(row) : ''}`}>
                       {propertyColumns.map(col => {
                         const catiaProp = getCatiaPropForPdmField(col);
                         const value = catiaProp ? (row.user_properties[catiaProp] || '') : '';
                         const fieldDef = fieldDefs.find((d: any) => d.name === col);
                         const isSelect = fieldDef?.field_type === 'select' && fieldDef?.options?.length > 0;
                         return (
-                          <td key={col} className="p-2 align-middle border-b border-gray-200">
+                          <td key={col} className="p-2 align-middle">
                             {isSelect ? (
                               <select
                                 value={value}
