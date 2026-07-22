@@ -233,27 +233,25 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
-              <th onClick={() => handleSort('code' as keyof ConfigItemRow)} className="text-left px-3 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap">构型号 {getSortIcon('code' as keyof ConfigItemRow)}</th>
-              <th onClick={() => handleSort('name' as keyof ConfigItemRow)} className="text-left px-3 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap">名称 {getSortIcon('name' as keyof ConfigItemRow)}</th>
-              <th className="text-left px-3 py-3 text-sm font-medium text-gray-500">备注</th>
-              <th onClick={() => handleSort('version' as keyof ConfigItemRow)} className="text-center px-2 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-16">版本 {getSortIcon('version' as keyof ConfigItemRow)}</th>
-              <th onClick={() => handleSort('status' as keyof ConfigItemRow)} className="text-center px-2 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-20">状态 {getSortIcon('status' as keyof ConfigItemRow)}</th>
-              <th className="text-center px-2 py-3 text-sm font-medium text-gray-500 w-20">签出状态</th>
+              <th className="text-left px-3 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap">构型号 {getSortIcon('code' as keyof ConfigItemRow)}</th>
+              <th className="text-left px-3 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap">名称 {getSortIcon('name' as keyof ConfigItemRow)}</th>
+              <th className="text-center px-2 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-16">版本 {getSortIcon('version' as keyof ConfigItemRow)}</th>
+              <th className="text-center px-2 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-20">状态 {getSortIcon('status' as keyof ConfigItemRow)}</th>
+              <th onClick={() => handleSort('check_out_user_name')} className="text-center px-2 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-20">签出状态 {getSortIcon('check_out_user_name')}</th>
               <th className="text-center px-2 py-3 text-sm font-medium text-gray-500 w-20">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
             ) : items.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
             ) : filteredData.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
             ) : sortedData.map((item) => (
               <tr key={item.revision_id} onClick={() => onOpenDetail(item.revision_id)} className="hover:bg-gray-50 cursor-pointer">
                 <td className="px-3 py-3 text-sm font-medium">{item.code}</td>
                 <td className="px-3 py-3 text-sm">{item.name}</td>
-                <td className="px-3 py-3 text-sm">{item.remark || '-'}</td>
                 <td className="px-2 py-3 text-sm font-mono text-center">{item.version}</td>
                 <td className="px-2 py-3 text-sm text-center">
                   <span className={`px-2 py-0.5 text-xs rounded-full ${statusTagClass(item.status)}`}>
