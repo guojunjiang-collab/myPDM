@@ -294,6 +294,9 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
       }
       const newRows = flattenTree(tree);
       setRows(newRows);
+      // 重新读取装配树后重置折叠状态,与全新展开一致
+      setCollapsedPaths(new Set());
+      setExpandSel('all');
       await runPdmMatch(newRows);
     } catch (e: any) {
       toast.error(e.message || '读取装配结构失败');
