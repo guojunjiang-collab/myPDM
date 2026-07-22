@@ -5,6 +5,7 @@ import { useAuthStore } from '../../stores/auth';
 import type { useCADBridge } from '../../hooks/useCADBridge';
 import { syncRowsByPartNumber } from './syncRows';
 import { flattenTree } from './flattenTree';
+import { maxLevelOf, buildCollapsedForLevel } from './expandLevel';
 import PartDetailModal from '../PartDetailModal';
 
 export interface NamingPrefixes {
@@ -125,12 +126,23 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
 
   // 折叠状态
   const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(new Set());
+  // 工具栏「展开层级」下拉的受控值:'collapsed' | 'all' | 数字字符串 | 'custom'
+  const [expandSel, setExpandSel] = useState<string>('all');
   const toggleCollapse = (path: string) => {
     setCollapsedPaths(prev => {
       const next = new Set(prev);
       if (next.has(path)) next.delete(path); else next.add(path);
       return next;
     });
+    // 手动增删偏离批量层级 → 下拉显示"自定义"
+    setExpandSel('custom');
+  };
+  const maxLevel = maxLevelOf(rows);
+  const applyExpandSel = (value: string) => {
+    setExpandSel(value);
+    if (value === 'custom') return;
+    const k = value === 'all' ? Infinity : value === 'collapsed' ? 0 : Number(value);
+    setCollapsedPaths(buildCollapsedForLevel(rows, k));
   };
   const visibleRows = rows.filter(row => {
     if (row.level === 0) return true;
@@ -549,6 +561,22 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
         <span className="bg-yellow-100 text-yellow-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">可新建 {totalNew}</span>
         <span className="bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">冲突 {totalConflict}</span>
         <span className="bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">已签出 {totalCheckedOut}</span>
+        <label className="flex items-center gap-1 text-xs text-gray-600 ml-1">
+          展开层级
+          <select
+            value={expandSel}
+            disabled={maxLevel === 0}
+            onChange={e => applyExpandSel(e.target.value)}
+            className="border border-gray-300 rounded px-1.5 py-1 text-xs disabled:bg-gray-100 disabled:text-gray-400"
+          >
+            <option value="collapsed">全部折叠</option>
+            {Array.from({ length: Math.max(0, maxLevel - 1) }, (_, i) => i + 1).map(k => (
+              <option key={k} value={String(k)}>L{k}</option>
+            ))}
+            <option value="all">全部展开</option>
+            {expandSel === 'custom' && <option value="custom">自定义</option>}
+          </select>
+        </label>
         <div className="flex-1" />
         <button
           onClick={handleRefreshAndMatch}
