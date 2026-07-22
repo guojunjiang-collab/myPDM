@@ -670,8 +670,8 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                 </table>
               </div>
               {/* 数据：在overflow内，可水平滚动 */}
-              <div className="overflow-x-auto" style={{ scrollbarGutter: 'stable' }}>
-                <table className="border-collapse text-xs whitespace-nowrap w-full">
+              <div className="overflow-x-auto" style={{ scrollbarGutter: 'stable', overflowY: 'clip' }}>
+                <table className="border-separate border-spacing-0 text-xs whitespace-nowrap w-full">
                   <tbody ref={rightBodyRef}>
                     {visibleRows.map((row, vi) => {
                       const ri = rows.indexOf(row);
@@ -679,14 +679,14 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                       <tr key={row.path}
                         onMouseEnter={() => setHoveredIndex(ri)}
                         onMouseLeave={() => setHoveredIndex(null)}
-                        className={`border-b border-gray-200 transition-colors ${hoveredIndex === ri ? hoverClass(row) : ''}`}>
+                        className={`transition-colors ${hoveredIndex === ri ? hoverClass(row) : ''}`}>
                         {propertyColumns.map(col => {
                           const catiaProp = getCatiaPropForPdmField(col);
                           const value = catiaProp ? (row.user_properties[catiaProp] || '') : '';
                           const fieldDef = fieldDefs.find((d: any) => d.name === col);
                           const isSelect = fieldDef?.field_type === 'select' && fieldDef?.options?.length > 0;
                           return (
-                            <td key={col} className="p-2" style={{ minWidth: 100 }}>
+                            <td key={col} className="p-2 border-b border-gray-200" style={{ minWidth: 100 }}>
                               {isSelect ? (
                                 <select value={value} disabled={!canEditProps(row) || !catiaProp}
                                   onChange={e => { if (!catiaProp) return; const v = e.target.value; setRows(prev => syncRowsByPartNumber(prev, row, catiaProp, v)); handlePropEdit(row, catiaProp, v); }}
