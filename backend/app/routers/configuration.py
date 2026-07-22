@@ -157,26 +157,28 @@ async def get_config_item_detail(
     current_user=Depends(require_permission("configuration:read")),
 ):
     """构型项详情：master + revision + iteration + parts + children + documents + versions
-    可传入 iteration_id 查看历史迭代的子构型项/零部件数据"""
+    可传入 iteration_id 查看历史迭代的子构型项数据（关联零部件始终取当前迭代）"""
     revision = crud.get_config_item_revision(db, UUID(revision_id))
     if not revision:
         raise HTTPException(status_code=404, detail="构型项版本不存在")
+    # 子构型项可用指定迭代，关联零部件始终取当前迭代
     if iteration_id:
-        iteration = crud._get_iteration(db, UUID(iteration_id))
-        if not iteration or str(iteration.revision_id) != revision_id:
+        child_iter = crud._get_iteration(db, UUID(iteration_id))
+        if not child_iter or str(child_iter.revision_id) != revision_id:
             raise HTTPException(status_code=404, detail="迭代不存在或不属于该版本")
     else:
-        _, iteration = crud.get_config_item_revision_with_iteration(db, UUID(revision_id))
+        child_iter = None
+    _, current_iter = crud.get_config_item_revision_with_iteration(db, UUID(revision_id))
     master = crud.get_config_item_master(db, revision.master_id)
     if not master:
         raise HTTPException(status_code=404, detail="构型项主数据不存在")
 
     checkout_user_name = _resolve_user_name(db, revision.check_out_user_id)
 
-    # 关联零部件（当前迭代）
+    # 关联零部件（始终取当前迭代）
     parts_data = []
-    if iteration:
-        for p in crud.get_iteration_parts(db, iteration.id):
+    if current_iter:
+        for p in crud.get_iteration_parts(db, current_iter.id):
             entity = db.query(PartMaster).filter(PartMaster.id == p.part_id).first()
             if entity:
                 rev = db.query(PartRevision).filter(
@@ -219,10 +221,11 @@ async def get_config_item_detail(
                     "part_detail": {},
                 })
 
-    # 子构型项（当前迭代）
+    # 子构型项（可用指定迭代或当前迭代）
+    children_iter = child_iter if child_iter else current_iter
     children_data = []
-    if iteration:
-        for c in crud.get_iteration_children(db, iteration.id):
+    if children_iter:
+        for c in crud.get_iteration_children(db, children_iter.id):
             child_rev = crud.get_config_item_revision(db, c.child_revision_id)
             child_master = crud.get_config_item_master(db, child_rev.master_id) if child_rev else None
             # 检查子构型项是否有下级
@@ -257,7 +260,7 @@ async def get_config_item_detail(
             })
 
     # 关联图文档（当前迭代的 document_links）
-    documents_data = _get_iteration_documents(db, iteration, current_user) if iteration else []
+    documents_data = _get_iteration_documents(db, current_iter, current_user) if current_iter else []
 
     # 版本历史
     versions = crud.list_revisions_by_master(db, master.id)
@@ -293,12 +296,10 @@ async def get_config_item_detail(
             "latest_iteration": revision.latest_iteration,
             "creator_id": str(revision.creator_id) if revision.creator_id else None,
             "created_at": revision.created_at.isoformat() if revision.created_at else None,
-            "iteration_id": str(iteration.id) if iteration else None,
-            "name": iteration.version_name if iteration else master.name,
-            "remark": iteration.check_in_note if iteration else "",
-            "document_links": iteration.document_links if iteration else [],
-            "name": iteration.version_name if iteration else master.name,
-            "document_links": iteration.document_links if iteration else [],
+            "iteration_id": str(current_iter.id) if current_iter else None,
+            "name": current_iter.version_name if current_iter else master.name,
+            "remark": current_iter.check_in_note if current_iter else "",
+            "document_links": current_iter.document_links if current_iter else [],
         },
         "parts": parts_data,
         "children": children_data,

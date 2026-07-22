@@ -156,7 +156,16 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
 
   const handleViewIteration = async (it: any) => {
     const target = iterations.find((i: any) => i.id === it.id);
-    if (target) { setViewingIterationData(target); setActiveIterationId(target.id); setActiveTab('info'); }
+    if (!target) return;
+    setViewingIterationData(target);
+    setActiveIterationId(target.id);
+    setActiveTab('info');
+    // 直接按目标迭代重新加载子构型项和零部件数据
+    try {
+      const d = await configurationApi.detail(internalRevId, { iteration_id: target.id });
+      setChildren(d.children || []);
+      setParts(d.parts || []);
+    } catch {}
   };
 
   const handleDeleteIteration = async (it: any) => {
