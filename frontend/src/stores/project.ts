@@ -31,7 +31,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
     set({ currentProject: res.data });
   },
   loadTasks: async (id) => {
-    set({ loading: true });
+    set({ loading: true, tasks: [] });
     try {
       const res = await projectApi.listTasks(id);
       set({ tasks: res.data.items });

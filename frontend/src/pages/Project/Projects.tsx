@@ -84,6 +84,8 @@ export default function Projects() {
   const [dragTask, setDragTask] = useState<ProjectTask | null>(null);
   const [dragOver, setDragOver] = useState<{ taskId: string; position: 'above' | 'below' | 'into' } | null>(null);
   const expandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const selectedProjectIdRef = useRef<string | null>(null);
+  useEffect(() => { selectedProjectIdRef.current = selectedProjectId; }, [selectedProjectId]);
 
   useEffect(() => {
     return () => { if (expandTimerRef.current) clearTimeout(expandTimerRef.current); };
@@ -273,6 +275,7 @@ export default function Projects() {
     setExpanded(new Set());
     setEditTask(null);
     setEditOpen(false);
+    useProjectStore.setState({ tasks: [] });
     setTabState('detail');
     setSelectedProjectId(projectId);
   };
