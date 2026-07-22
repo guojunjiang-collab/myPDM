@@ -756,8 +756,9 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
             </table>
 
             {/* ====== 右表：自定义字段滚动区 ====== */}
-            <div className="flex-1 overflow-x-auto min-w-0" style={{ scrollbarGutter: 'stable' }}>
-              <table ref={rightTableRef} className="border-collapse text-xs whitespace-nowrap w-full">
+            <div className="flex-1 min-w-0">
+              {/* 抬头表：sticky 在垂直滚动容器内生效 */}
+              <table className="border-collapse text-xs whitespace-nowrap w-full">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
                     {propertyColumns.map(col => (
@@ -765,62 +766,67 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                     ))}
                   </tr>
                 </thead>
-                <tbody>
-                  {visibleRows.map((row, vi) => {
-                    const ri = rows.indexOf(row);
-                    return (
-                    <tr key={row.path}
-                      onMouseEnter={() => setHoveredIndex(ri)}
-                      onMouseLeave={() => setHoveredIndex(null)}
-                      className={`border-b border-gray-200 transition-colors ${hoveredIndex === ri ? hoverClass(row) : ''}`}>
-                      {propertyColumns.map(col => {
-                        const catiaProp = getCatiaPropForPdmField(col);
-                        const value = catiaProp ? (row.user_properties[catiaProp] || '') : '';
-                        const fieldDef = fieldDefs.find((d: any) => d.name === col);
-                        const isSelect = fieldDef?.field_type === 'select' && fieldDef?.options?.length > 0;
-                        return (
-                          <td key={col} className="p-2 align-middle">
-                            {isSelect ? (
-                              <select
-                                value={value}
-                                disabled={!canEditProps(row) || !catiaProp}
-                                onChange={(e) => {
-                                  if (!catiaProp) return;
-                                  const val = e.target.value;
-                                  setRows(prev => syncRowsByPartNumber(prev, row, catiaProp, val));
-                                  handlePropEdit(row, catiaProp, val);
-                                }}
-                                className="border border-blue-300 rounded px-1.5 py-0.5 w-full text-xs disabled:bg-gray-100 disabled:border-gray-200"
-                              >
-                                <option value="">—</option>
-                                {fieldDef.options.map((opt: string) => (
-                                  <option key={opt} value={opt}>{opt}</option>
-                                ))}
-                              </select>
-                            ) : (
-                              <input
-                                value={value}
-                                disabled={!canEditProps(row) || !catiaProp}
-                                onChange={(e) => {
-                                  if (!catiaProp) return;
-                                  const val = e.target.value;
-                                  setRows(prev => syncRowsByPartNumber(prev, row, catiaProp, val));
-                                  handlePropEdit(row, catiaProp, val);
-                                }}
-                                className="border border-blue-300 rounded px-1.5 py-0.5 w-full text-xs disabled:bg-gray-100 disabled:border-gray-200"
-                              />
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                    );
-                  })}
-                </tbody>
               </table>
+              {/* 数据表：水平滚动 */}
+              <div className="overflow-x-auto" style={{ scrollbarGutter: 'stable' }}>
+                <table ref={rightTableRef} className="border-collapse text-xs whitespace-nowrap w-full">
+                  <tbody>
+                    {visibleRows.map((row, vi) => {
+                      const ri = rows.indexOf(row);
+                      return (
+                      <tr key={row.path}
+                        onMouseEnter={() => setHoveredIndex(ri)}
+                        onMouseLeave={() => setHoveredIndex(null)}
+                        className={`border-b border-gray-200 transition-colors ${hoveredIndex === ri ? hoverClass(row) : ''}`}>
+                        {propertyColumns.map(col => {
+                          const catiaProp = getCatiaPropForPdmField(col);
+                          const value = catiaProp ? (row.user_properties[catiaProp] || '') : '';
+                          const fieldDef = fieldDefs.find((d: any) => d.name === col);
+                          const isSelect = fieldDef?.field_type === 'select' && fieldDef?.options?.length > 0;
+                          return (
+                            <td key={col} className="p-2 align-middle">
+                              {isSelect ? (
+                                <select
+                                  value={value}
+                                  disabled={!canEditProps(row) || !catiaProp}
+                                  onChange={(e) => {
+                                    if (!catiaProp) return;
+                                    const val = e.target.value;
+                                    setRows(prev => syncRowsByPartNumber(prev, row, catiaProp, val));
+                                    handlePropEdit(row, catiaProp, val);
+                                  }}
+                                  className="border border-blue-300 rounded px-1.5 py-0.5 w-full text-xs disabled:bg-gray-100 disabled:border-gray-200"
+                                >
+                                  <option value="">—</option>
+                                  {fieldDef.options.map((opt: string) => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <input
+                                  value={value}
+                                  disabled={!canEditProps(row) || !catiaProp}
+                                  onChange={(e) => {
+                                    if (!catiaProp) return;
+                                    const val = e.target.value;
+                                    setRows(prev => syncRowsByPartNumber(prev, row, catiaProp, val));
+                                    handlePropEdit(row, catiaProp, val);
+                                  }}
+                                  className="border border-blue-300 rounded px-1.5 py-0.5 w-full text-xs disabled:bg-gray-100 disabled:border-gray-200"
+                                />
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
         </div>
+      </div>
       </div>
 
       {/* PDM匹配零部件详情弹窗 */}
