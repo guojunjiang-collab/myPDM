@@ -104,7 +104,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
   }, [internalRevId, activeIterationId]);
 
   useEffect(() => { setInternalRevId(revisionId); }, [revisionId]);
-  useEffect(() => { if (open) { setDetail(null); setActiveTab('info'); setViewingIterationData(null); setActiveIterationId(null); setExpandedChildren(new Set()); setSubChildren({}); loadDetail(); } }, [open, loadDetail]);
+  useEffect(() => { if (open) { setDetail(null); setActiveTab('info'); setViewingIterationData(null); setActiveIterationId(null); setExpandedChildren(new Set()); setSubChildren({}); loadDetail(); } }, [open]);
 
   const loadTabs = useCallback(async () => {
     if (!internalRevId) return;
@@ -258,7 +258,15 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
   for (const c of children) rows.push(renderChildRow(c, 1, internalRevId));
 
   return (
-    <Modal open={open} title="构型项详情" onClose={handleClose} width="3xl">
+    <Modal open={open} title="构型项详情" onClose={handleClose} width="3xl"
+      headerAction={viewingIterationData ? (
+        <span className="flex items-center gap-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 px-2 py-0.5 rounded">
+          正在查看 Iteration #{viewingIterationData.iteration} 的历史数据（只读）
+          <button onClick={() => { setViewingIterationData(null); setActiveIterationId(null); }}
+            className="text-primary-600 hover:text-primary-800 hover:underline">返回当前迭代</button>
+        </span>
+      ) : undefined}
+    >
       <div className="h-[50vh] flex flex-col">
         {detailLoading && !master ? (<Loading />) : !master ? (<div className="text-gray-400 text-sm py-8 text-center">加载失败</div>) : (<>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 shrink-0 mb-3">
@@ -293,13 +301,6 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
               </div>
             </div>
           </div>
-
-          {viewingIterationData && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1.5 shrink-0 mb-3 text-sm flex items-center justify-between">
-              <span>正在查看 Iteration #{viewingIterationData.iteration} 的历史数据（只读）</span>
-              <button onClick={() => { setViewingIterationData(null); setActiveIterationId(null); }} className="text-primary-600 hover:text-primary-800 hover:underline text-xs">返回当前迭代</button>
-            </div>
-          )}
 
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
             <div className="flex border-b border-gray-200 shrink-0">
