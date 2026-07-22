@@ -116,20 +116,6 @@ export default function PartsPage() {
 
   const { sortedData, handleSort, getSortIcon } = useTableSort<PartListItem>(items, 'code', 'asc');
 
-  const handleCheckout = async (revId: string) => {
-    try {
-      await partsApi.checkout(revId);
-      toast.success('签出成功');
-      loadData();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.detail || '签出失败');
-    }
-  };
-
-  const showCheckoutButton = (item: PartListItem) => {
-    return item.status === 'draft' && !item.check_out_user_id;
-  };
-
   const openDetail = (masterId: string, revisionId: string) => {
     setDetailMasterId(masterId);
     setDetailRevisionId(revisionId);
@@ -301,14 +287,6 @@ export default function PartsPage() {
                     ) : <span className="text-gray-400">—</span>}
                   </td>
                   <td className="px-4 py-3 text-right text-sm" onClick={(e) => e.stopPropagation()}>
-                    {showCheckoutButton(item) && (
-                      <button
-                        onClick={() => handleCheckout(item.revision_id)}
-                        className="text-primary-600 hover:text-primary-800 mr-3"
-                      >
-                        签出
-                      </button>
-                    )}
                     {user?.role === 'admin' && (
                       <button
                         onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); }}
