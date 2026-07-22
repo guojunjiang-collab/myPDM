@@ -116,6 +116,7 @@ def list_part_masters(
     status: Optional[str] = None,
     check_out_user_id: Optional[UUID] = None,
     show_all_versions: bool = False,
+    top_level: bool = False,
     page: int = 1,
     page_size: int = 50,
 ) -> Tuple[List[Dict], int]:
@@ -124,6 +125,16 @@ def list_part_masters(
         db.query(models_parts.PartMaster)
         .filter(models_parts.PartMaster.deleted_at.is_(None))
     )
+    if top_level:
+        child_rev_ids = (
+            db.query(models.BOMItem.child_revision_id)
+            .filter(models.BOMItem.deleted_at.is_(None))
+        )
+        child_master_ids = db.query(models_parts.PartRevision.master_id).filter(
+            models_parts.PartRevision.id.in_(child_rev_ids),
+            models_parts.PartRevision.deleted_at.is_(None),
+        )
+        query = query.filter(models_parts.PartMaster.id.notin_(child_master_ids))
     if search:
         query = query.filter(
             models_parts.PartMaster.code.ilike(f"%{search}%")

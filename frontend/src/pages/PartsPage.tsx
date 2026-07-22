@@ -28,6 +28,7 @@ export default function PartsPage() {
   const [searchField, setSearchField] = useState('all');
   const [statusFilter, setStatusFilter] = useState('');
   const [showAllVersions, setShowAllVersions] = useState(false);
+  const [topLevelOnly, setTopLevelOnly] = useState(false);
   const [allData, setAllData] = useState<PartListItem[]>([]);
 
   const [cfValuesMap, setCfValuesMap] = useState<Record<string, Record<string, any>>>({});
@@ -51,6 +52,7 @@ export default function PartsPage() {
     try {
       const params: Record<string, any> = { page_size: 200, show_all_versions: true };
       if (statusFilter) params.status = statusFilter;
+      if (topLevelOnly) params.top_level = true;
       if (search && searchField === 'all') params.search = search;
       else if (searchField === 'code') params.search = search;
       else if (searchField === 'name') params.search = search;
@@ -103,7 +105,7 @@ export default function PartsPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, searchField, statusFilter, showAllVersions]);
+  }, [search, searchField, statusFilter, showAllVersions, topLevelOnly]);
 
   useEffect(() => {
     loadData();
@@ -198,6 +200,15 @@ export default function PartsPage() {
             className="w-3.5 h-3.5"
           />
           全部版本
+        </label>
+        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm whitespace-nowrap" title="只显示没有父项的最顶层零部件">
+          <input
+            type="checkbox"
+            checked={topLevelOnly}
+            onChange={(e) => setTopLevelOnly(e.target.checked)}
+            className="w-3.5 h-3.5"
+          />
+          仅顶层零部件
         </label>
         <button
           onClick={() => setShowCADWorkspace(true)}

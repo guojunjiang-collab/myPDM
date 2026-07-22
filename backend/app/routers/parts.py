@@ -33,13 +33,14 @@ def list_parts(
     status: Optional[str] = Query(None),
     check_out_user_id: Optional[UUID] = Query(None),
     show_all_versions: bool = Query(False),
+    top_level: bool = Query(False),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=10000),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("parts:read")),
 ):
     items, total = crud_parts.list_part_masters(
-        db, search, status, check_out_user_id, show_all_versions, page, page_size
+        db, search, status, check_out_user_id, show_all_versions, top_level, page, page_size
     )
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
