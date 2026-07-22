@@ -1,7 +1,7 @@
 """自生数据字典：内省 SQLAlchemy 模型 + 人工词汇表。"""
 from sqlalchemy import inspect as sa_inspect
 
-from .. import models, models_ecr, models_eco, models_configuration, models_parts
+from .. import models, models_ecr, models_eco, models_configuration, models_parts, models_project
 from .knowledge_glossary import GLOSSARY, OVERVIEW
 
 ENTITY_MODELS = {
@@ -17,6 +17,8 @@ ENTITY_MODELS = {
     "eco": models_eco.ECO,
     "configuration_item": models_configuration.ConfigurationItemMaster,
     "configuration_profile": models_configuration.ConfigurationProfile,
+    "project": models_project.Project,
+    "project_task": models_project.ProjectTask,
 }
 
 

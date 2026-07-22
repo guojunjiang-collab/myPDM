@@ -34,11 +34,13 @@ def _entity_brief(obj, etype):
 
 
 def search_entity(db: Session, user: User, keyword: str, type: Optional[str] = None):
+    """按关键词搜索零部件（零件/部件统一为零部件）。"""
     keyword = (keyword or "").strip()
     if not keyword:
         return {"results": []}
     results = []
-    if type in (None, "part", "component", "assembly"):
+    # component/part/assembly 统一走 part_masters 表
+    if type in (None, "component", "part", "assembly"):
         q = db.query(PartMaster)
         if keyword:
             pattern = f"%{keyword}%"
@@ -70,23 +72,26 @@ def _latest_revision_id(db, entity_id):
     return rev.id if rev else None
 
 
-def get_part_detail(db: Session, user: User, part_id: str):
-    p = _get_part_master(db, uuid.UUID(part_id))
+def get_component_detail(db: Session, user: User, component_id: str):
+    """获取单个零部件详情（零件/部件统一）。"""
+    p = _get_part_master(db, uuid.UUID(component_id))
     if not p:
         return {"error": "零部件不存在"}
     return {"detail": _entity_brief(p, "component")}
 
 
+def get_part_detail(db: Session, user: User, part_id: str):
+    return get_component_detail(db, user, part_id)
+
+
 def get_assembly_detail(db: Session, user: User, assembly_id: str):
-    a = _get_part_master(db, uuid.UUID(assembly_id))
-    if not a:
-        return {"error": "零部件不存在"}
-    return {"detail": _entity_brief(a, "component")}
+    return get_component_detail(db, user, assembly_id)
 
 
 def get_bom_tree(db: Session, user: User, type: str, id: str):
-    if type not in ("part", "assembly"):
-        return {"error": "无效的类型，仅支持 part 或 assembly"}
+    # component/part/assembly 统一处理
+    if type not in ("component", "part", "assembly"):
+        return {"error": "无效的类型，仅支持 component、part 或 assembly"}
     revision_id = _latest_revision_id(db, id)
     if not revision_id:
         return {"error": "零部件不存在"}
@@ -107,7 +112,7 @@ def get_bom_tree(db: Session, user: User, type: str, id: str):
 
 
 def _flatten_tree(db, etype, eid):
-    if etype != "assembly":
+    if etype not in ("assembly", "component"):
         return []
     revision_id = _latest_revision_id(db, eid)
     if not revision_id:
@@ -264,18 +269,28 @@ REGISTRY = {
         "execute": search_entity,
         "schema": {"type": "function", "function": {
             "name": "search_entity",
-            "description": "按关键词搜索零件或部件，把名称/编码解析为真实 ID。",
+            "description": "按关键词搜索零部件（零件和部件统一称为零部件），把名称/编码解析为真实 ID。",
             "parameters": {"type": "object", "properties": {
                 "keyword": {"type": "string", "description": "搜索关键词（编码或名称）"},
-                "type": {"type": "string", "enum": ["part", "assembly"], "description": "可选，限定类型"},
+                "type": {"type": "string", "enum": ["component", "part", "assembly"], "description": "可选，限定类型"},
             }, "required": ["keyword"]},
+        }},
+    },
+    "get_component_detail": {
+        "execute": get_component_detail,
+        "schema": {"type": "function", "function": {
+            "name": "get_component_detail",
+            "description": "获取单个零件或部件（统称零部件）详情。",
+            "parameters": {"type": "object", "properties": {
+                "component_id": {"type": "string"},
+            }, "required": ["component_id"]},
         }},
     },
     "get_part_detail": {
         "execute": get_part_detail,
         "schema": {"type": "function", "function": {
             "name": "get_part_detail",
-            "description": "获取单个零件详情。",
+            "description": "获取单个零件详情（已统一为零部件的别名）。",
             "parameters": {"type": "object", "properties": {
                 "part_id": {"type": "string"},
             }, "required": ["part_id"]},
@@ -285,7 +300,7 @@ REGISTRY = {
         "execute": get_assembly_detail,
         "schema": {"type": "function", "function": {
             "name": "get_assembly_detail",
-            "description": "获取单个部件详情。",
+            "description": "获取单个部件详情（已统一为零部件的别名）。",
             "parameters": {"type": "object", "properties": {
                 "assembly_id": {"type": "string"},
             }, "required": ["assembly_id"]},
@@ -295,9 +310,9 @@ REGISTRY = {
         "execute": get_bom_tree,
         "schema": {"type": "function", "function": {
             "name": "get_bom_tree",
-            "description": "获取零件或部件的 BOM 树（直接子项），返回原始数据供分析。",
+            "description": "获取零部件（零件/部件）的 BOM 树（直接子项），返回原始数据供分析。",
             "parameters": {"type": "object", "properties": {
-                "type": {"type": "string", "enum": ["part", "assembly"]},
+                "type": {"type": "string", "enum": ["component", "part", "assembly"]},
                 "id": {"type": "string"},
             }, "required": ["type", "id"]},
         }},
@@ -311,8 +326,8 @@ REGISTRY = {
             "parameters": {"type": "object", "properties": {
                 "left_id": {"type": "string"},
                 "right_id": {"type": "string"},
-                "left_type": {"type": "string", "enum": ["assembly"], "default": "assembly"},
-                "right_type": {"type": "string", "enum": ["assembly"], "default": "assembly"},
+                "left_type": {"type": "string", "enum": ["component", "assembly"], "default": "assembly"},
+                "right_type": {"type": "string", "enum": ["component", "assembly"], "default": "assembly"},
             }, "required": ["left_id", "right_id"]},
         }},
     },
@@ -320,9 +335,9 @@ REGISTRY = {
         "execute": trace_bom,
         "schema": {"type": "function", "function": {
             "name": "trace_bom",
-            "description": "BOM 反查：查找使用了某零件/部件的所有上层部件。",
+            "description": "BOM 反查：查找使用了某零部件（零件/部件）的所有上层部件。",
             "parameters": {"type": "object", "properties": {
-                "entity_type": {"type": "string", "enum": ["part", "assembly"]},
+                "entity_type": {"type": "string", "enum": ["component", "part", "assembly"]},
                 "entity_id": {"type": "string"},
             }, "required": ["entity_type", "entity_id"]},
         }},
@@ -331,9 +346,9 @@ REGISTRY = {
         "execute": export_bom,
         "schema": {"type": "function", "function": {
             "name": "export_bom",
-            "description": "导出零件/部件的 BOM，返回下载链接。需下载权限。",
+            "description": "导出零部件（零件/部件）的 BOM，返回下载链接。需下载权限。",
             "parameters": {"type": "object", "properties": {
-                "type": {"type": "string", "enum": ["part", "assembly"]},
+                "type": {"type": "string", "enum": ["component", "part", "assembly"]},
                 "id": {"type": "string"},
             }, "required": ["type", "id"]},
         }},
@@ -399,7 +414,8 @@ REGISTRY = {
         "schema": {"type": "function", "function": {
             "name": "get_data_dictionary",
             "description": ("查询 PDM 数据字典：不带参返回所有实体清单与词汇表；"
-                            "带 entity（如 part/assembly/bom_item/document/ecr/eco/configuration_item）"
+                            "带 entity（如 component/part/assembly/bom_item/document/ecr/eco/"
+                            "configuration_item/configuration_profile/project/project_task）"
                             "返回该实体的字段含义。"),
             "parameters": {"type": "object", "properties": {
                 "entity": {"type": "string", "description": "实体名（可选）"},

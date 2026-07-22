@@ -245,10 +245,10 @@ async def export_bom_csv(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("bom:export")),
 ):
-    """导出零件/部件 BOM 为 CSV（供 AI 助手与前端下载）。"""
+    """导出零部件 BOM 为 CSV（供 AI 助手与前端下载）。"""
     if item_type not in ("component", "part", "assembly"):
         raise HTTPException(status_code=400, detail="无效的类型")
-    nodes = compare.get_bom_tree_recursive(db, item_id) if item_type == "assembly" else []
+    nodes = compare.get_bom_tree_recursive(db, item_id) if item_type in ("assembly", "component") else []
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow(["层级", "类型", "编码", "名称", "规格", "数量"])

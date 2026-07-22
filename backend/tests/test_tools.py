@@ -177,7 +177,7 @@ def test_list_api_endpoints_filtered_by_role(db, guest_user, engineer_user):
 
 
 def test_download_document_label_includes_filename(db, engineer_user):
-    att = models.DocumentAttachment(id=uuid.uuid4(), document_id=uuid.uuid4(),
+    att = models.DocumentAttachment(id=uuid.uuid4(), revision_id=uuid.uuid4(),
                                     file_name="图纸A.pdf")
     db.add(att); db.commit()
     out = tools.REGISTRY["download_document"]["execute"](
@@ -192,7 +192,7 @@ def test_download_document_label_fallback_when_missing(db, engineer_user):
 
 
 def _make_attachment(db, file_name, file_path="doc/x/file.md"):
-    att = models.DocumentAttachment(id=uuid.uuid4(), document_id=uuid.uuid4(),
+    att = models.DocumentAttachment(id=uuid.uuid4(), revision_id=uuid.uuid4(),
                                     file_name=file_name, file_path=file_path)
     db.add(att); db.commit(); db.refresh(att)
     return att
