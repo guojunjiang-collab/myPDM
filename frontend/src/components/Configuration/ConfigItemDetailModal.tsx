@@ -312,7 +312,11 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
             <div className="p-4 overflow-y-auto flex-1">
               {activeTab === 'info' && (
                 <div className="space-y-4">
-                  <div className="text-xs text-gray-500">Iteration #{revision?.latest_iteration}{revision?.check_out_date && <span className="ml-2">签出时间：{new Date(revision.check_out_date).toLocaleString('zh-CN')}</span>}</div>
+                  <div className="text-xs text-gray-500">
+                    Iteration #{viewingIterationData ? viewingIterationData.iteration : revision?.latest_iteration}
+                    {viewingIterationData && viewingIterationData.check_in_note && <span className="ml-2">签入说明：{viewingIterationData.check_in_note}</span>}
+                    {revision?.check_out_date && !viewingIterationData && <span className="ml-2">签出时间：{new Date(revision.check_out_date).toLocaleString('zh-CN')}</span>}
+                  </div>
                   {cfDefs.length > 0 ? (
                     <div><h4 className="text-sm font-semibold mb-2">自定义字段</h4><div className="grid grid-cols-3 gap-3">{cfDefs.map((def: any) => (<div key={def.id}><label className="text-xs text-gray-500">{def.name}</label><div className="mt-0.5"><CustomFieldInput def={def} value={cfValues[def.id]} onChange={(val) => { setCfValues(prev => ({ ...prev, [def.id]: val })); autoSaveCf(def.id, val); }} readOnly={!canEdit} /></div></div>))}</div></div>
                   ) : (<div className="text-gray-400 text-sm">无</div>)}
