@@ -226,12 +226,6 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
         )}
       </div>
 
-      {serverTotal > items.length && (
-        <div className="mb-3 px-4 py-2 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-700">
-          共 {serverTotal} 条，当前仅加载前 {items.length} 条。请用上方搜索缩小范围以定位目标构型项。
-        </div>
-      )}
-
       <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
