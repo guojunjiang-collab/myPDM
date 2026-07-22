@@ -56,9 +56,7 @@ function getPropertyColumns(userProps: Record<string, string>): string[] {
 // 件号（PartNumber）只读不在此列表；属性存于零件文档，编辑后按同 PartNumber 实例同步。
 const BUILTIN_COLUMNS: { label: string; attr: string; width?: string }[] = [
   { label: '版本', attr: 'Revision', width: 'w-14' },
-  { label: '定义', attr: 'Definition' },
   { label: '术语/中文名称', attr: 'Nomenclature' },
-  { label: '描述', attr: 'DescriptionRef' },
 ];
 
 // CATIA-PDM 字段映射（单一事实源为桥接端 cad_bridge/catia/field_mapping.json，
@@ -75,11 +73,36 @@ const DEFAULT_FIELD_MAPPING: FieldMapping = {
 export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, namingPrefixes }: Props) {
   const [rows, setRows] = useState<BOMRow[]>(initialRows);
   const user = useAuthStore((s) => s.user);
-  // 字段映射与 PDM 自定义字段定义缓存（工作台打开期间有效）
   const mappingRef = useRef<FieldMapping | null>(null);
   const fieldDefsRef = useRef<any[] | null>(null);
+  const [fieldDefs, setFieldDefs] = useState<any[]>([]);
+  const [fieldMapping, setFieldMapping] = useState<FieldMapping>(DEFAULT_FIELD_MAPPING);
 
-  const propertyColumns = rows.length > 0 ? getPropertyColumns(rows[0].user_properties) : [];
+  // 加载 PDM 自定义字段定义（筛选适用于零部件的）与 CATIA-PDM 字段映射
+  useEffect(() => {
+    customFieldsApi.listDefinitions().then(res => {
+      const defs = (res.data || []).filter((d: any) => {
+        const applies = d.applies_to || [];
+        return applies.includes('component') || applies.includes('part') || applies.includes('assembly');
+      });
+      setFieldDefs(defs);
+      fieldDefsRef.current = defs;
+    }).catch(() => {});
+    bridge.getFieldMapping().then(m => {
+      setFieldMapping(m);
+      mappingRef.current = m;
+    }).catch(() => {});
+  }, []);
+
+  // CATIA 属性名 → PDM 字段名反向查找
+  const getCatiaPropForPdmField = useCallback((pdmFieldName: string): string | undefined => {
+    return Object.entries(fieldMapping.properties || {}).find(([, t]) => t === pdmFieldName)?.[0];
+  }, [fieldMapping]);
+
+  // propertyColumns 来自 PDM 自定义字段定义；加载中回退到 CATIA 用户属性
+  const pdmPropertyColumns = fieldDefs.map((d: any) => d.name);
+  const catiaPropertyColumns = rows.length > 0 ? getPropertyColumns(rows[0].user_properties) : [];
+  const propertyColumns = pdmPropertyColumns.length > 0 ? pdmPropertyColumns : catiaPropertyColumns;
 
   const totalMatched = rows.filter(r => r.match_status === 'matched').length;
   const totalNew = rows.filter(r => r.match_status === 'new').length;
@@ -486,199 +509,227 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
         <button onClick={handleBatchCheckin} className="px-3 py-1.5 bg-emerald-500 text-white rounded text-xs hover:bg-emerald-600">全部签入</button>
       </div>
 
-      {/* 表格：仅列表内容垂直滚动，表头 sticky 固定 */}
-      <div className="flex-1 min-h-0 overflow-auto">
-        <table className="w-full text-xs border-collapse whitespace-nowrap">
-          <thead className="sticky top-0 z-10">
-            <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
-              <th className="p-2 text-left bg-gray-50">层级</th>
-              <th className="p-2 text-left bg-gray-50">件号</th>
-              <th className="p-2 text-center bg-gray-50">用量</th>
-              {BUILTIN_COLUMNS.map(col => (
-                <th key={col.attr} className={`p-2 text-left bg-sky-50 ${col.width || ''}`}>{col.label}</th>
-              ))}
-              {propertyColumns.map(col => (
-                <th key={col} className="p-2 text-left bg-green-50">{col}</th>
-              ))}
-              <th className="p-2 text-center bg-blue-50">CAD附件</th>
-              <th className="p-2 text-center bg-amber-50">生产附件</th>
-              <th className="p-2 text-left bg-gray-50">PDM匹配</th>
-              <th className="p-2 text-left bg-gray-50">匹配状态</th>
-              <th className="p-2 text-left bg-gray-50">签出状态</th>
-              <th className="p-2 text-center bg-gray-50">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(row => (
-              <tr key={row.path} className={`border-b border-gray-200 transition-colors ${
-                row.match_status === 'new' ? 'bg-yellow-50 hover:bg-yellow-100' :
-                row.checkout_status === 'checked_out' ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-100'
-              }`}>
-                <td className="p-2">
-                  {row.level === 0 ? <strong>{row.level}</strong> : row.path.replace('0.', '')}
-                </td>
-                <td className="p-2">{row.builtin.PartNumber || ''}</td>
-                <td className="p-2 text-center">{row.quantity}</td>
+      {/* 表格：固定列左侧 + 自定义字段右侧滚动 */}
+      <div className="flex-1 min-h-0">
+        <div className="h-full overflow-y-auto overflow-x-hidden">
+          <div className="flex">
+            {/* ====== 左表：固定列 ====== */}
+            <table className="shrink-0 border-collapse text-xs whitespace-nowrap">
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
+                  <th className="p-2 text-left bg-gray-50">层级</th>
+                  <th className="p-2 text-left bg-gray-50">件号</th>
+                  <th className="p-2 text-center bg-gray-50">用量</th>
+                  {BUILTIN_COLUMNS.map(col => (
+                    <th key={col.attr} className={`p-2 text-left bg-sky-50 ${col.width || ''}`}>{col.label}</th>
+                  ))}
+                  <th className="p-2 text-center bg-blue-50">CAD附件</th>
+                  <th className="p-2 text-center bg-amber-50">生产附件</th>
+                  <th className="p-2 text-left bg-gray-50">PDM匹配</th>
+                  <th className="p-2 text-left bg-gray-50">匹配状态</th>
+                  <th className="p-2 text-left bg-gray-50">签出状态</th>
+                  <th className="p-2 text-center bg-gray-50">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(row => (
+                  <tr key={row.path} className={`border-b border-gray-200 transition-colors ${
+                    row.match_status === 'new' ? 'bg-yellow-50 hover:bg-yellow-100' :
+                    row.checkout_status === 'checked_out' ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-100'
+                  }`}>
+                    <td className="p-2">
+                      {row.level === 0 ? <strong>{row.level}</strong> : row.path.replace('0.', '')}
+                    </td>
+                    <td className="p-2">{row.builtin.PartNumber || ''}</td>
+                    <td className="p-2 text-center">{row.quantity}</td>
 
-                {BUILTIN_COLUMNS.map(col => (
-                  <td key={col.attr} className={`p-2 bg-sky-50 ${col.width || ''}`}>
-                    <input
-                      value={row.builtin[col.attr] || ''}
-                      disabled={!canEditProps(row)}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setRows(prev => syncRowsByPartNumber(prev, row, col.attr, val, 'builtin'));
-                        handleBuiltinEdit(row, col.attr, val);
-                      }}
-                      className="border border-sky-300 rounded px-1.5 py-0.5 w-full text-xs disabled:bg-gray-100 disabled:border-gray-200"
-                    />
-                  </td>
-                ))}
+                    {BUILTIN_COLUMNS.map(col => (
+                      <td key={col.attr} className={`p-2 bg-sky-50 ${col.width || ''}`}>
+                        <input
+                          value={row.builtin[col.attr] || ''}
+                          disabled={!canEditProps(row)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setRows(prev => syncRowsByPartNumber(prev, row, col.attr, val, 'builtin'));
+                            handleBuiltinEdit(row, col.attr, val);
+                          }}
+                          className="border border-sky-300 rounded px-1.5 py-0.5 w-full text-xs disabled:bg-gray-100 disabled:border-gray-200"
+                        />
+                      </td>
+                    ))}
 
-                {propertyColumns.map(col => (
-                  <td key={col} className="p-2 bg-green-50">
-                    <input
-                      value={row.user_properties[col] || ''}
-                      disabled={!canEditProps(row)}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setRows(prev => syncRowsByPartNumber(prev, row, col, val));
-                        handlePropEdit(row, col, val);
-                      }}
-                      className="border border-blue-300 rounded px-1.5 py-0.5 w-full text-xs disabled:bg-gray-100 disabled:border-gray-200"
-                    />
-                  </td>
-                ))}
+                    <td className="p-2 text-center bg-blue-50">
+                      {(() => {
+                        const n = row.pdm_match?.revision_id ? attCounts[row.pdm_match.revision_id]?.cad : undefined;
+                        return (
+                          <div className={`text-xs ${n ? 'font-semibold text-blue-600' : 'text-gray-500'}`}>
+                            {n !== undefined ? n : '—'}
+                          </div>
+                        );
+                      })()}
+                      {isCheckedOutByMe(row) && (
+                        <button
+                          onClick={() => handleUploadCAD(row)}
+                          disabled={uploadingCad === row.path}
+                          title={row.doc_path || 'CATIA 源文件路径未知'}
+                          className="mt-1 px-2 py-0.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 disabled:bg-gray-300"
+                        >
+                          {uploadingCad === row.path ? '上传中...' : '上传源文件'}
+                        </button>
+                      )}
+                      {!row.pdm_match && <span className="text-gray-400 text-xs">—</span>}
+                      {row.pdm_match && !isCheckedOutByMe(row) && !isCheckedOutByOther(row) && (
+                        <button disabled className="mt-1 px-2 py-0.5 bg-gray-200 text-gray-400 rounded text-xs cursor-not-allowed">需签出</button>
+                      )}
+                      {isCheckedOutByOther(row) && (
+                        <button disabled className="mt-1 px-2 py-0.5 bg-gray-200 text-gray-400 rounded text-xs cursor-not-allowed">他人签出</button>
+                      )}
+                    </td>
 
-                <td className="p-2 text-center bg-blue-50">
-                  {(() => {
-                    const n = row.pdm_match?.revision_id ? attCounts[row.pdm_match.revision_id]?.cad : undefined;
-                    return (
-                      <div className={`text-xs ${n ? 'font-semibold text-blue-600' : 'text-gray-500'}`}>
-                        {n !== undefined ? n : '—'}
+                    <td className="p-2 text-center bg-amber-50">
+                      {(() => {
+                        const n = row.pdm_match?.revision_id ? attCounts[row.pdm_match.revision_id]?.production : undefined;
+                        return (
+                          <div className={`text-xs ${n ? 'font-semibold text-amber-600' : 'text-gray-500'}`}>
+                            {n !== undefined ? n : '—'}
+                          </div>
+                        );
+                      })()}
+                      {isCheckedOutByMe(row) && (
+                        <div className="flex gap-1 justify-center mt-1">
+                          <button
+                            onClick={() => handleUploadPDF(row)}
+                            disabled={uploadingPdf === row.path}
+                            title="通过桥接程序将工程图(CATDrawing)转 PDF 并上传（同名覆盖）"
+                            className="px-2 py-0.5 bg-red-500 text-white rounded text-xs hover:bg-red-600 disabled:bg-gray-300"
+                          >
+                            {uploadingPdf === row.path ? '转换中...' : 'PDF'}
+                          </button>
+                          <button
+                            onClick={() => handleUploadSTP(row)}
+                            disabled={uploadingStp === row.path}
+                            title="通过桥接程序将 CATIA 零部件导出为 STP 并上传（同名覆盖）"
+                            className="px-2 py-0.5 bg-purple-500 text-white rounded text-xs hover:bg-purple-600 disabled:bg-gray-300"
+                          >
+                            {uploadingStp === row.path ? '导出中...' : 'STP'}
+                          </button>
+                        </div>
+                      )}
+                      {!row.pdm_match && <span className="text-gray-400 text-xs">—</span>}
+                      {row.pdm_match && !isCheckedOutByMe(row) && !isCheckedOutByOther(row) && (
+                        <button disabled className="mt-1 px-2 py-0.5 bg-gray-200 text-gray-400 rounded text-xs cursor-not-allowed">需签出</button>
+                      )}
+                      {isCheckedOutByOther(row) && (
+                        <button disabled className="mt-1 px-2 py-0.5 bg-gray-200 text-gray-400 rounded text-xs cursor-not-allowed">他人签出</button>
+                      )}
+                    </td>
+
+                    <td className="p-2">
+                      {row.match_status === 'conflict' && row.pdm_match ? (
+                        <span className="text-red-600">
+                          {row.pdm_match.latest_version
+                            ? `版本冲突 (PDM最新: v${row.pdm_match.latest_version})`
+                            : '版本冲突'}
+                        </span>
+                      ) : row.pdm_match?.master_id ? (
+                        <span
+                          onClick={() => setDetailPart({ masterId: row.pdm_match!.master_id!, revisionId: row.pdm_match!.revision_id })}
+                          className="text-blue-600 cursor-pointer hover:underline"
+                          title="查看零部件详情"
+                        >
+                          {row.pdm_match.code} (v{row.pdm_match.version})
+                        </span>
+                      ) : row.pdm_match ? (
+                        <span className="text-blue-600">{row.pdm_match.code} (v{row.pdm_match.version})</span>
+                      ) : (
+                        <span className="text-amber-600">— 无 —</span>
+                      )}
+                    </td>
+
+                    <td className="p-2">
+                      {row.match_status === 'matched' && <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs">已匹配</span>}
+                      {row.match_status === 'new' && <span className="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full text-xs">可新建</span>}
+                      {row.match_status === 'conflict' && <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs">冲突</span>}
+                      {row.match_status === 'unknown' && <span className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full text-xs">未知</span>}
+                    </td>
+
+                    <td className="p-2">
+                      {row.checkout_status === 'not_checked_out' && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs">未签出</span>}
+                      {row.checkout_status === 'checked_out' && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs">已签出</span>}
+                      {row.checkout_status === 'other_checked_out' && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs">他人签出</span>}
+                      {row.checkout_status === null && <span className="text-gray-400 text-xs">—</span>}
+                    </td>
+
+                    <td className="p-2 text-center">
+                      <div className="flex gap-1 flex-wrap justify-center">
+                        {row.match_status === 'new' && (
+                          <button onClick={() => handleCreatePart(row)} className="px-2 py-1 bg-amber-500 text-white rounded text-xs hover:bg-amber-600">创建零件</button>
+                        )}
+                        {row.match_status === 'matched' && row.checkout_status === 'not_checked_out' && (
+                          <>
+                            <button onClick={() => handleCheckout(row)} className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">签出</button>
+                            <button onClick={() => handlePullFromPDM(row)} className="px-2 py-1 bg-amber-50 text-amber-700 border border-amber-300 rounded text-xs hover:bg-amber-100">属性←</button>
+                          </>
+                        )}
+                        {row.match_status === 'matched' && row.checkout_status === 'checked_out' && (
+                          <>
+                            <button onClick={() => handleCheckin(row)} className="px-2 py-1 bg-emerald-500 text-white rounded text-xs hover:bg-emerald-600">签入</button>
+                            <button onClick={() => handlePushToPDM(row)} className="px-2 py-1 bg-blue-100 text-blue-700 border border-blue-300 rounded text-xs hover:bg-blue-200">属性→</button>
+                            <button onClick={() => handleUndoCheckout(row)} className="px-2 py-1 bg-red-50 text-red-700 border border-red-300 rounded text-xs hover:bg-red-100">撤销</button>
+                          </>
+                        )}
+                        {row.match_status === 'matched' && row.checkout_status === 'other_checked_out' && (
+                          <button onClick={() => handlePullFromPDM(row)} className="px-2 py-1 bg-amber-50 text-amber-700 border border-amber-300 rounded text-xs hover:bg-amber-100">属性←</button>
+                        )}
                       </div>
-                    );
-                  })()}
-                  {isCheckedOutByMe(row) && (
-                    <button
-                      onClick={() => handleUploadCAD(row)}
-                      disabled={uploadingCad === row.path}
-                      title={row.doc_path || 'CATIA 源文件路径未知'}
-                      className="mt-1 px-2 py-0.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 disabled:bg-gray-300"
-                    >
-                      {uploadingCad === row.path ? '上传中...' : '上传源文件'}
-                    </button>
-                  )}
-                  {!row.pdm_match && <span className="text-gray-400 text-xs">—</span>}
-                  {row.pdm_match && !isCheckedOutByMe(row) && !isCheckedOutByOther(row) && (
-                    <button disabled className="mt-1 px-2 py-0.5 bg-gray-200 text-gray-400 rounded text-xs cursor-not-allowed">需签出</button>
-                  )}
-                  {isCheckedOutByOther(row) && (
-                    <button disabled className="mt-1 px-2 py-0.5 bg-gray-200 text-gray-400 rounded text-xs cursor-not-allowed">他人签出</button>
-                  )}
-                </td>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
-                <td className="p-2 text-center bg-amber-50">
-                  {(() => {
-                    const n = row.pdm_match?.revision_id ? attCounts[row.pdm_match.revision_id]?.production : undefined;
-                    return (
-                      <div className={`text-xs ${n ? 'font-semibold text-amber-600' : 'text-gray-500'}`}>
-                        {n !== undefined ? n : '—'}
-                      </div>
-                    );
-                  })()}
-                  {isCheckedOutByMe(row) && (
-                    <div className="flex gap-1 justify-center mt-1">
-                      <button
-                        onClick={() => handleUploadPDF(row)}
-                        disabled={uploadingPdf === row.path}
-                        title="通过桥接程序将工程图(CATDrawing)转 PDF 并上传（同名覆盖）"
-                        className="px-2 py-0.5 bg-red-500 text-white rounded text-xs hover:bg-red-600 disabled:bg-gray-300"
-                      >
-                        {uploadingPdf === row.path ? '转换中...' : 'PDF'}
-                      </button>
-                      <button
-                        onClick={() => handleUploadSTP(row)}
-                        disabled={uploadingStp === row.path}
-                        title="通过桥接程序将 CATIA 零部件导出为 STP 并上传（同名覆盖）"
-                        className="px-2 py-0.5 bg-purple-500 text-white rounded text-xs hover:bg-purple-600 disabled:bg-gray-300"
-                      >
-                        {uploadingStp === row.path ? '导出中...' : 'STP'}
-                      </button>
-                    </div>
-                  )}
-                  {!row.pdm_match && <span className="text-gray-400 text-xs">—</span>}
-                  {row.pdm_match && !isCheckedOutByMe(row) && !isCheckedOutByOther(row) && (
-                    <button disabled className="mt-1 px-2 py-0.5 bg-gray-200 text-gray-400 rounded text-xs cursor-not-allowed">需签出</button>
-                  )}
-                  {isCheckedOutByOther(row) && (
-                    <button disabled className="mt-1 px-2 py-0.5 bg-gray-200 text-gray-400 rounded text-xs cursor-not-allowed">他人签出</button>
-                  )}
-                </td>
-
-                <td className="p-2">
-                  {row.match_status === 'conflict' && row.pdm_match ? (
-                    <span className="text-red-600">
-                      {row.pdm_match.latest_version
-                        ? `版本冲突 (PDM最新: v${row.pdm_match.latest_version})`
-                        : '版本冲突'}
-                    </span>
-                  ) : row.pdm_match?.master_id ? (
-                    <span
-                      onClick={() => setDetailPart({ masterId: row.pdm_match!.master_id!, revisionId: row.pdm_match!.revision_id })}
-                      className="text-blue-600 cursor-pointer hover:underline"
-                      title="查看零部件详情"
-                    >
-                      {row.pdm_match.code} (v{row.pdm_match.version})
-                    </span>
-                  ) : row.pdm_match ? (
-                    <span className="text-blue-600">{row.pdm_match.code} (v{row.pdm_match.version})</span>
-                  ) : (
-                    <span className="text-amber-600">— 无 —</span>
-                  )}
-                </td>
-
-                <td className="p-2">
-                  {row.match_status === 'matched' && <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs">已匹配</span>}
-                  {row.match_status === 'new' && <span className="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full text-xs">可新建</span>}
-                  {row.match_status === 'conflict' && <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs">冲突</span>}
-                  {row.match_status === 'unknown' && <span className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full text-xs">未知</span>}
-                </td>
-
-                <td className="p-2">
-                  {row.checkout_status === 'not_checked_out' && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs">未签出</span>}
-                  {row.checkout_status === 'checked_out' && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs">已签出</span>}
-                  {row.checkout_status === 'other_checked_out' && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs">他人签出</span>}
-                  {row.checkout_status === null && <span className="text-gray-400 text-xs">—</span>}
-                </td>
-
-                <td className="p-2 text-center">
-                  <div className="flex gap-1 flex-wrap justify-center">
-                    {row.match_status === 'new' && (
-                      <button onClick={() => handleCreatePart(row)} className="px-2 py-1 bg-amber-500 text-white rounded text-xs hover:bg-amber-600">创建零件</button>
-                    )}
-                    {row.match_status === 'matched' && row.checkout_status === 'not_checked_out' && (
-                      <>
-                        <button onClick={() => handleCheckout(row)} className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">签出</button>
-                        <button onClick={() => handlePullFromPDM(row)} className="px-2 py-1 bg-amber-50 text-amber-700 border border-amber-300 rounded text-xs hover:bg-amber-100">属性←</button>
-                      </>
-                    )}
-                    {row.match_status === 'matched' && row.checkout_status === 'checked_out' && (
-                      <>
-                        <button onClick={() => handleCheckin(row)} className="px-2 py-1 bg-emerald-500 text-white rounded text-xs hover:bg-emerald-600">签入</button>
-                        <button onClick={() => handlePushToPDM(row)} className="px-2 py-1 bg-blue-100 text-blue-700 border border-blue-300 rounded text-xs hover:bg-blue-200">属性→</button>
-                        <button onClick={() => handleUndoCheckout(row)} className="px-2 py-1 bg-red-50 text-red-700 border border-red-300 rounded text-xs hover:bg-red-100">撤销</button>
-                      </>
-                    )}
-                    {row.match_status === 'matched' && row.checkout_status === 'other_checked_out' && (
-                      <button onClick={() => handlePullFromPDM(row)} className="px-2 py-1 bg-amber-50 text-amber-700 border border-amber-300 rounded text-xs hover:bg-amber-100">属性←</button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            {/* ====== 右表：自定义字段滚动区 ====== */}
+            <div className="flex-1 overflow-x-auto" style={{ maxWidth: '50%' }}>
+              <table className="border-collapse text-xs whitespace-nowrap w-full">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
+                    {propertyColumns.map(col => (
+                      <th key={col} className="p-2 text-left bg-green-50">{col}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(row => (
+                    <tr key={row.path} className={`border-b border-gray-200 transition-colors ${
+                      row.match_status === 'new' ? 'bg-yellow-50 hover:bg-yellow-100' :
+                      row.checkout_status === 'checked_out' ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-100'
+                    }`}>
+                      {propertyColumns.map(col => {
+                        const catiaProp = getCatiaPropForPdmField(col);
+                        const value = catiaProp ? (row.user_properties[catiaProp] || '') : '';
+                        return (
+                          <td key={col} className="p-2 bg-green-50">
+                            <input
+                              value={value}
+                              disabled={!canEditProps(row) || !catiaProp}
+                              onChange={(e) => {
+                                if (!catiaProp) return;
+                                const val = e.target.value;
+                                setRows(prev => syncRowsByPartNumber(prev, row, catiaProp, val));
+                                handlePropEdit(row, catiaProp, val);
+                              }}
+                              className="border border-blue-300 rounded px-1.5 py-0.5 w-full text-xs disabled:bg-gray-100 disabled:border-gray-200"
+                            />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* PDM匹配零部件详情弹窗 */}
