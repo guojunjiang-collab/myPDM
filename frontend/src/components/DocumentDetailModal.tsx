@@ -3,6 +3,7 @@ import { Modal } from './Modal';
 import { Loading } from './Loading';
 import { toast } from './Toast';
 import { useAuthStore, isAdmin as checkIsAdmin } from '../stores/auth';
+import { useDataStore } from '../stores/data';
 import { documentsApi, customFieldsApi, mediaApi, v2UploadApi, CHUNK_SIZE, CHUNK_THRESHOLD, userGroupsApi } from '../services/api';
 import CustomFieldInput from './CustomFieldInput';
 import { previewAttachment } from '../utils/attachmentPreview';
@@ -141,10 +142,8 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
   const loadCustomFields = useCallback(async () => {
     if (!effectiveRevisionId) return;
     try {
-      const defsRes = await customFieldsApi.listDefinitions();
-      const defs: CustomFieldDefinition[] = ((defsRes.data || defsRes || []) as CustomFieldDefinition[]).filter(
-        (d) => d.applies_to?.includes('document')
-      );
+      const allDefs = useDataStore.getState().customFieldDefs || [];
+      const defs = allDefs.filter((d: any) => d.applies_to?.includes('document'));
       setCfDefs(defs);
       const valsRes = await customFieldsApi.getValues('document', effectiveRevisionId);
       const map: Record<string, any> = {};
