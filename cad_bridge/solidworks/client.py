@@ -168,6 +168,22 @@ class SolidWorksClient:
                 is_assembly = model_doc.GetType == 2
             except Exception:
                 pass
+        if not is_assembly:
+            # 轻量化组件无 model_doc，通过文件扩展名判断是否为装配体
+            try:
+                path_name = comp.GetPathName or ""
+                if path_name.lower().endswith('.sldasm'):
+                    is_assembly = True
+            except Exception:
+                pass
+
+        # 轻量化装配体：解析后读取子组件
+        if is_assembly and model_doc is None:
+            try:
+                comp.SetSuppression2(0)  # 0 = 完全解析
+                model_doc = comp.GetModelDoc2()
+            except Exception:
+                pass
 
         builtin = self._read_builtin_props(model_doc)
         if not builtin.get("PartNumber"):
