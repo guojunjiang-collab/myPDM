@@ -213,10 +213,11 @@ class SolidWorksClient:
                         return str(val)
             return ""
 
-        # PartNumber: 优先自定义属性，回退文件名
+        # PartNumber: 优先自定义属性，回退文件名（不含扩展名）
         part_number = ""
         try:
-            part_number = model_doc.GetTitle or ""
+            title = model_doc.GetTitle or ""
+            part_number = os.path.splitext(str(title))[0]
         except Exception as e:
             logger.debug(f"读取 GetTitle 失败: {e}")
         if part_number:
