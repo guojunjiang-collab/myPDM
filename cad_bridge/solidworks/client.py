@@ -189,8 +189,9 @@ class SolidWorksClient:
             try:
                 comp.SetSuppression2(0)  # 0 = 完全解析
                 model_doc = comp.GetModelDoc2()
-            except Exception:
-                pass
+                logger.info(f"  解析轻量化组件 [{name}]: model_doc={'OK' if model_doc else '仍然为None'}")
+            except Exception as e:
+                logger.warning(f"  解析轻量化组件 [{name}] 失败: {e}")
 
         builtin = self._read_builtin_props(model_doc)
         if not builtin.get("PartNumber"):
