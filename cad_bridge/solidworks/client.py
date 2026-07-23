@@ -177,8 +177,8 @@ class SolidWorksClient:
             except Exception:
                 pass
 
-        # 轻量化装配体：解析后读取子组件
-        if is_assembly and model_doc is None:
+        # 轻量化组件：解析后读取属性
+        if model_doc is None:
             try:
                 comp.SetSuppression2(0)  # 0 = 完全解析
                 model_doc = comp.GetModelDoc2()
