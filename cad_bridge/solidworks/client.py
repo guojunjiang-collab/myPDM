@@ -267,13 +267,15 @@ class SolidWorksClient:
 
         product = self._find_component_by_path(sw.ActiveDoc, params.get("path", "0"))
         if product is None:
-            raise RuntimeError("COMPONENT_NOT_FOUND")
+            model_doc = sw.ActiveDoc
+        else:
+            model_doc = product.GetModelDoc2()
+
+        if model_doc is None:
+            raise RuntimeError("无法获取模型文档")
 
         prop_name = params["prop_name"]
         value = params["value"]
-        model_doc = product.GetModelDoc2()
-        if model_doc is None:
-            raise RuntimeError("无法获取模型文档")
 
         # 尝试内置属性 setattr
         if prop_name in self.BUILTIN_ATTRS:
