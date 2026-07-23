@@ -11,6 +11,7 @@ import argparse
 from cad_bridge.server import BridgeServer
 from cad_bridge.pdm_client import PDMClient
 from cad_bridge.catia.client import catia_client
+from cad_bridge.solidworks.client import sw_client
 
 
 def _load_dotenv():
@@ -39,26 +40,12 @@ logger = logging.getLogger("cad_bridge")
 
 
 def register_handlers(server: BridgeServer, pdm_client: PDMClient):
-    """注册所有 JSON-RPC 方法处理器"""
+    """注册所有 JSON-RPC 方法处理器（CATIA + SolidWorks 并行）"""
+
+    # --- 共用 handler ---
 
     async def handle_ping(params: dict, token: str) -> dict:
         return {"status": "ok"}
-
-    async def handle_detect(params: dict, token: str) -> dict:
-        return catia_client.detect()
-
-    async def handle_read_tree(params: dict, token: str) -> dict:
-        return catia_client.read_assembly_tree(params)
-
-    async def handle_read_properties(params: dict, token: str) -> dict:
-        return catia_client.read_properties(params)
-
-    async def handle_write_property(params: dict, token: str) -> dict:
-        return catia_client.write_property(params)
-
-    async def handle_mapping_get(params: dict, token: str) -> dict:
-        # 字段映射单一事实源：cad_bridge/catia/field_mapping.json（服务启动时加载）
-        return catia_client.mapping
 
     async def handle_download(params: dict, token: str) -> dict:
         attachment_id = params["attachment_id"]
@@ -76,17 +63,35 @@ def register_handlers(server: BridgeServer, pdm_client: PDMClient):
         pdm_url = params.get("pdm_url")
         result = await pdm_client.upload_attachment(file_path, revision_id, category, token, overwrite=overwrite, base_url=pdm_url)
         uploaded = [os.path.basename(file_path)]
-        # 上传源文件时，同目录同名的 CATDrawing 工程图（若存在）一并上传
+        # 上传源文件时，同目录同名的工程图（若存在）一并上传
         if params.get("include_drawing"):
             base, _ = os.path.splitext(file_path)
-            drawing_path = base + ".CATDrawing"
-            if os.path.isfile(drawing_path):
-                await pdm_client.upload_attachment(drawing_path, revision_id, category, token, overwrite=overwrite, base_url=pdm_url)
-                uploaded.append(os.path.basename(drawing_path))
+            # CATIA 工程图
+            for ext in (".CATDrawing", ".SLDDRW"):
+                drawing_path = base + ext
+                if os.path.isfile(drawing_path):
+                    await pdm_client.upload_attachment(drawing_path, revision_id, category, token, overwrite=overwrite, base_url=pdm_url)
+                    uploaded.append(os.path.basename(drawing_path))
         return {"uploaded": uploaded, **(result or {})}
 
-    async def handle_export_stp_upload(params: dict, token: str) -> dict:
-        # 导出 CATIA 零部件为 STP 并上传为 PDM 生产附件（同名覆盖）
+    # --- CATIA handler ---
+
+    async def handle_catia_detect(params: dict, token: str) -> dict:
+        return catia_client.detect()
+
+    async def handle_catia_read_tree(params: dict, token: str) -> dict:
+        return catia_client.read_assembly_tree(params)
+
+    async def handle_catia_read_properties(params: dict, token: str) -> dict:
+        return catia_client.read_properties(params)
+
+    async def handle_catia_write_property(params: dict, token: str) -> dict:
+        return catia_client.write_property(params)
+
+    async def handle_catia_mapping_get(params: dict, token: str) -> dict:
+        return catia_client.mapping
+
+    async def handle_catia_export_stp_upload(params: dict, token: str) -> dict:
         export = catia_client.export_stp(params)
         pdm_url = params.get("pdm_url")
         result = await pdm_client.upload_attachment(
@@ -94,8 +99,7 @@ def register_handlers(server: BridgeServer, pdm_client: PDMClient):
         )
         return {"file_name": export["file_name"], **(result or {})}
 
-    async def handle_export_pdf_upload(params: dict, token: str) -> dict:
-        # 将零部件工程图(CATDrawing)转 PDF 并上传为 PDM 生产附件（同名覆盖）
+    async def handle_catia_export_pdf_upload(params: dict, token: str) -> dict:
         export = catia_client.export_drawing_pdf(params)
         pdm_url = params.get("pdm_url")
         result = await pdm_client.upload_attachment(
@@ -103,16 +107,62 @@ def register_handlers(server: BridgeServer, pdm_client: PDMClient):
         )
         return {"file_name": export["file_name"], **(result or {})}
 
+    # --- SolidWorks handler ---
+
+    async def handle_sw_detect(params: dict, token: str) -> dict:
+        return sw_client.detect()
+
+    async def handle_sw_read_tree(params: dict, token: str) -> dict:
+        return sw_client.read_assembly_tree(params)
+
+    async def handle_sw_read_properties(params: dict, token: str) -> dict:
+        return sw_client.read_properties(params)
+
+    async def handle_sw_write_property(params: dict, token: str) -> dict:
+        return sw_client.write_property(params)
+
+    async def handle_sw_mapping_get(params: dict, token: str) -> dict:
+        return sw_client.mapping
+
+    async def handle_sw_export_stp_upload(params: dict, token: str) -> dict:
+        export = sw_client.export_stp(params)
+        pdm_url = params.get("pdm_url")
+        result = await pdm_client.upload_attachment(
+            export["file_path"], params["revision_id"], "production", token, overwrite=True, base_url=pdm_url
+        )
+        return {"file_name": export["file_name"], **(result or {})}
+
+    async def handle_sw_export_pdf_upload(params: dict, token: str) -> dict:
+        export = sw_client.export_drawing_pdf(params)
+        pdm_url = params.get("pdm_url")
+        result = await pdm_client.upload_attachment(
+            export["file_path"], params["revision_id"], "production", token, overwrite=True, base_url=pdm_url
+        )
+        return {"file_name": export["file_name"], **(result or {})}
+
+    # --- 注册：CATIA 专用 ---
     server.register("catia.ping", handle_ping)
-    server.register("catia.detect", handle_detect)
-    server.register("catia.assembly.read_tree", handle_read_tree)
-    server.register("catia.assembly.read_properties", handle_read_properties)
-    server.register("catia.property.write", handle_write_property)
-    server.register("mapping.get", handle_mapping_get)
+    server.register("catia.detect", handle_catia_detect)
+    server.register("catia.assembly.read_tree", handle_catia_read_tree)
+    server.register("catia.assembly.read_properties", handle_catia_read_properties)
+    server.register("catia.property.write", handle_catia_write_property)
+    server.register("catia.mapping.get", handle_catia_mapping_get)
+    server.register("catia.workspace.export_stp_upload", handle_catia_export_stp_upload)
+    server.register("catia.workspace.export_pdf_upload", handle_catia_export_pdf_upload)
+
+    # --- 注册：SolidWorks 专用 ---
+    server.register("sw.ping", handle_ping)
+    server.register("sw.detect", handle_sw_detect)
+    server.register("sw.assembly.read_tree", handle_sw_read_tree)
+    server.register("sw.assembly.read_properties", handle_sw_read_properties)
+    server.register("sw.property.write", handle_sw_write_property)
+    server.register("sw.mapping.get", handle_sw_mapping_get)
+    server.register("sw.workspace.export_stp_upload", handle_sw_export_stp_upload)
+    server.register("sw.workspace.export_pdf_upload", handle_sw_export_pdf_upload)
+
+    # --- 注册：共用 ---
     server.register("workspace.download", handle_download)
     server.register("workspace.upload", handle_upload)
-    server.register("workspace.export_stp_upload", handle_export_stp_upload)
-    server.register("workspace.export_pdf_upload", handle_export_pdf_upload)
 
 
 def main():
