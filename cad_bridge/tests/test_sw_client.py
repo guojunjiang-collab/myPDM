@@ -234,6 +234,50 @@ def test_write_property_on_lightweight_child():
     assert part_x_doc.saved is True
 
 
+class FakeTransform:
+    def __init__(self, array_data):
+        self.ArrayData = list(array_data)
+
+
+class CompWithTransform:
+    def __init__(self, array_data):
+        self._t = FakeTransform(array_data)
+
+    @property
+    def Transform2(self):
+        return self._t
+
+
+def test_transform_translation_meters_to_mm():
+    """SW ArrayData 平移在索引 9~11 且单位为米；应重排到 3/7/11 并转 mm。"""
+    client = SolidWorksClient()
+    # 单位旋转 + 平移 (0.1, 0.2, 0.3) 米
+    array = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1, 0.2, 0.3, 1, 0, 0, 0]
+    m = client._read_component_transform(CompWithTransform(array))
+    assert m == [
+        1, 0, 0, 100,
+        0, 1, 0, 200,
+        0, 0, 1, 300,
+        0, 0, 0, 1,
+    ]
+
+
+def test_transform_rotation_basis_as_columns():
+    """绕 Z 轴 +90°：子 X 轴→父 (0,1,0)。基向量按列排入行主序 4×4。"""
+    client = SolidWorksClient()
+    # d0..2 = 子X轴=(0,1,0), d3..5 = 子Y轴=(-1,0,0), d6..8 = 子Z轴=(0,0,1)
+    array = [0, 1, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]
+    m = client._read_component_transform(CompWithTransform(array))
+    assert m == [
+        0, -1, 0, 0,
+        1, 0, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1,
+    ]
+    # 子系原点 X 轴方向 (1,0,0) 经该矩阵应映射到父系 (0,1,0)
+    assert (m[0], m[4], m[8]) == (0, 1, 0)
+
+
 def test_write_property_on_level2_node():
     """缺陷2+3：写 2 级子项(path 0.1.1)需经 GetChildren 逐级定位到轻量化零件。"""
     client = SolidWorksClient()

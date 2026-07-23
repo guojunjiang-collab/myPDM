@@ -420,7 +420,18 @@ class SolidWorksClient:
         return result
 
     def _read_component_transform(self, comp) -> list | None:
-        """读取组件实例变换矩阵（相对父装配，4×4 行主序）"""
+        """读取组件实例变换矩阵（相对父装配），输出与 CATIA/后端一致的
+        4×4 行主序、16 元素、平移单位 mm 的列表。
+
+        SolidWorks IMathTransform.ArrayData 的布局与通用 4×4 矩阵不同：
+          [0..8]  三个基向量依次排列：d0..2=子系 X 轴、d3..5=Y 轴、d6..8=Z 轴
+                  在父系中的方向分量（即列向量约定下旋转矩阵的三列）
+          [9..11] 平移向量（SolidWorks 内部单位为米）
+          [12]    缩放因子，[13..15] 保留未用
+        因此需重排为「基向量作列」的行主序 4×4，并把平移由米转毫米
+        （后端 _mm_matrix_to_m 会再按 mm→m 处理，最终落为 SW 原生的米）。
+        直接透传 ArrayData 会让后端把旋转分量当平移误除以 1000、真正平移
+        （索引 9~11）被忽略，导致装配子项矩阵错误。"""
         try:
             transform = comp.Transform2
             if transform is None:
@@ -428,13 +439,19 @@ class SolidWorksClient:
             data = transform.ArrayData
             if data is None:
                 return None
-            matrix = list(data)
-            if len(matrix) != 16:
+            d = list(data)
+            if len(d) < 12:
                 return None
-            # 至少有一个轴分量非零才是合法矩阵
-            if all(abs(v) < 1e-12 for v in matrix[:12]):
+            # 旋转部分全零视为无效矩阵
+            if all(abs(v) < 1e-12 for v in d[:9]):
                 return None
-            return matrix
+            mm = 1000.0
+            return [
+                d[0], d[3], d[6], d[9] * mm,
+                d[1], d[4], d[7], d[10] * mm,
+                d[2], d[5], d[8], d[11] * mm,
+                0.0, 0.0, 0.0, 1.0,
+            ]
         except Exception as e:
             logger.debug(f"读取组件矩阵失败: {e}")
             return None
