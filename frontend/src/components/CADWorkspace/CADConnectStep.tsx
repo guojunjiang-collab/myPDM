@@ -1,33 +1,37 @@
 ﻿import { useState } from 'react';
-import type { useCADBridge } from '../../hooks/useCADBridge';
+import type { useCADBridge, CADType } from '../../hooks/useCADBridge';
 import type { BOMRow } from './CADBOMMatchTable';
 import { flattenTree } from './flattenTree';
 
 interface Props {
   bridge: ReturnType<typeof useCADBridge>;
+  cadType: CADType;
+  onCadTypeChange: (type: CADType) => void;
   onAssemblyLoaded: (rows: BOMRow[]) => void;
   onClose: () => void;
 }
 
-export function CADConnectStep({ bridge, onAssemblyLoaded, onClose }: Props) {
-  const [catiaDetected, setCatiaDetected] = useState(false);
+export function CADConnectStep({ bridge, cadType, onCadTypeChange, onAssemblyLoaded, onClose }: Props) {
+  const [cadDetected, setCadDetected] = useState(false);
   const [docInfo, setDocInfo] = useState<{ name: string; type: string } | null>(null);
   const [detecting, setDetecting] = useState(false);
   const [loadingTree, setLoadingTree] = useState(false);
   const [error, setError] = useState('');
 
+  const cadLabel = cadType === 'catia' ? 'CATIA' : 'SolidWorks';
+
   const handleDetect = async () => {
     setDetecting(true);
     setError('');
     try {
-      const status = await bridge.detectCATIA();
-      setCatiaDetected(status.active && !!status.has_document);
+      const status = await bridge.detectCAD();
+      setCadDetected(status.active && !!status.has_document);
       if (status.active && status.has_document) {
         setDocInfo({ name: status.doc_name || '', type: status.doc_type || '' });
       } else if (status.active) {
-        setError('CATIA 已运行但未打开任何文档，请打开一个装配体');
+        setError(`${cadLabel} 已运行但未打开任何文档，请打开一个装配体`);
       } else {
-        setError('未检测到 CATIA 进程，请先启动 CATIA');
+        setError(`未检测到 ${cadLabel} 进程，请先启动 ${cadLabel}`);
       }
     } catch (e: any) {
       setError(e.message || '桥接服务连接失败');
@@ -55,7 +59,6 @@ export function CADConnectStep({ bridge, onAssemblyLoaded, onClose }: Props) {
 
   return (
     <div className="flex flex-col items-center py-8">
-      {/* 状态卡片 */}
       <div className="flex gap-4 mb-6">
         <div className={`flex-1 border rounded-lg p-4 text-center min-w-[200px] ${
           bridge.connected ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-200'
@@ -67,10 +70,10 @@ export function CADConnectStep({ bridge, onAssemblyLoaded, onClose }: Props) {
         </div>
 
         <div className={`flex-1 border rounded-lg p-4 text-center min-w-[200px] ${
-          catiaDetected ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-200'
+          cadDetected ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-200'
         }`}>
-          <div className={`font-bold ${catiaDetected ? 'text-green-700' : 'text-gray-400'}`}>
-            {catiaDetected ? 'CATIA 已连接' : 'CATIA 未连接'}
+          <div className={`font-bold ${cadDetected ? 'text-green-700' : 'text-gray-400'}`}>
+            {cadDetected ? `${cadLabel} 已连接` : `${cadLabel} 未连接`}
           </div>
           {docInfo && (
             <div className="text-xs text-gray-500 mt-1">{docInfo.name} ({docInfo.type})</div>
@@ -85,15 +88,23 @@ export function CADConnectStep({ bridge, onAssemblyLoaded, onClose }: Props) {
       )}
 
       <div className="flex gap-3">
+        <select
+          value={cadType}
+          onChange={(e) => onCadTypeChange(e.target.value as CADType)}
+          className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-500"
+        >
+          <option value="catia">CATIA V5</option>
+          <option value="solidworks">SolidWorks</option>
+        </select>
         <button
           onClick={handleDetect}
           disabled={detecting}
           className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-gray-300 text-sm"
         >
-          {detecting ? '检测中...' : '检测 CATIA'}
+          {detecting ? '检测中...' : `检测 ${cadLabel}`}
         </button>
 
-        {catiaDetected && (
+        {cadDetected && (
           <button
             onClick={handleLoadAssembly}
             disabled={loadingTree}

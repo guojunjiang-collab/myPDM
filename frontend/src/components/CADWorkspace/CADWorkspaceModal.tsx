@@ -3,7 +3,7 @@ import { Modal } from '../Modal';
 import { CADConnectStep } from './CADConnectStep';
 import { CADBOMMatchTable, type BOMRow, type NamingPrefixes } from './CADBOMMatchTable';
 import { CADCompleteStep } from './CADCompleteStep';
-import { useCADBridge } from '../../hooks/useCADBridge';
+import { useCADBridge, type CADType } from '../../hooks/useCADBridge';
 import { settingsApi } from '../../services/api';
 
 interface Props {
@@ -15,6 +15,7 @@ type Step = 'connect' | 'match' | 'complete';
 
 export function CADWorkspaceModal({ open, onClose }: Props) {
   const [step, setStep] = useState<Step>('connect');
+  const [cadType, setCadType] = useState<CADType>('catia');
   const [bomRows, setBomRows] = useState<BOMRow[]>([]);
   const [completedCount, setCompletedCount] = useState(0);
   const [namingPrefixes, setNamingPrefixes] = useState<NamingPrefixes>({
@@ -22,7 +23,7 @@ export function CADWorkspaceModal({ open, onClose }: Props) {
     pdfAssemblyPrefix: '',
     stpPrefix: '',
   });
-  const bridge = useCADBridge();
+  const bridge = useCADBridge(cadType);
 
   useEffect(() => {
     if (open) {
@@ -47,14 +48,13 @@ export function CADWorkspaceModal({ open, onClose }: Props) {
   };
 
   const stepLabels: Record<Step, string> = {
-    connect: '连接CATIA',
+    connect: '连接CAD',
     match: 'BOM匹配',
     complete: '完成',
   };
 
   return (
     <Modal open={open} onClose={handleClose} title="CAD 入口 · 工作台" width="max" height="85vh">
-      {/* 满高 flex 布局：步骤标签固定，步骤内容占余下高度（内部自行滚动） */}
       <div className="flex flex-col h-full">
         {/* 步骤标签 */}
         <div className="flex border-b border-gray-200 mb-4 shrink-0">
@@ -72,11 +72,12 @@ export function CADWorkspaceModal({ open, onClose }: Props) {
           ))}
         </div>
 
-        {/* 步骤内容 */}
         <div className="flex-1 min-h-0">
           {step === 'connect' && (
             <CADConnectStep
               bridge={bridge}
+              cadType={cadType}
+              onCadTypeChange={setCadType}
               onAssemblyLoaded={handleAssemblyLoaded}
               onClose={handleClose}
             />
