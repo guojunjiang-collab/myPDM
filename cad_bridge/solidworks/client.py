@@ -194,7 +194,6 @@ class SolidWorksClient:
 
         builtin = self._read_builtin_props(model_doc)
         if not builtin.get("PartNumber"):
-            # 轻量化组件无 model_doc，从文件路径或实例名推断件号
             part_number = ""
             try:
                 path_name = comp.GetPathName or ""
@@ -205,6 +204,11 @@ class SolidWorksClient:
             if not part_number:
                 part_number = str(name)
             builtin["PartNumber"] = part_number
+        # 补充 CAD 原生属性名，供映射 Part Number → code 等查找
+        if builtin.get("PartNumber") and "Part Number" not in builtin:
+            builtin["Part Number"] = builtin["PartNumber"]
+        if builtin.get("Revision") and "Revision" not in builtin:
+            builtin["Revision"] = builtin["Revision"]  # 同名字段，无需重复
 
         user_props = self._read_custom_props(model_doc)
         matrix = self._read_component_transform(comp) if level > 0 else None
@@ -271,6 +275,7 @@ class SolidWorksClient:
                                 val = cpm.Get(n)
                                 if val and str(val).strip():
                                     props["Nomenclature"] = str(val).strip()
+                                    props["中文名称"] = str(val).strip()
                             except Exception:
                                 pass
         except Exception as e:
