@@ -178,29 +178,51 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
     return () => obs.disconnect();
   }, [visibleRows, propertyColumns.length]);
 
-  const handlePropEdit = useCallback(async (row: BOMRow, key: string, value: string) => {
+  // 行内编辑写回 CAD：防抖处理。
+  // 单元格值由 onChange 的乐观 setRows 立即更新（唯一显示事实源）；写回 CAD 用
+  // 防抖，避免每敲一键就发一次 COM 写入——SolidWorks 写入含重建/保存(轻量化件还要
+  // 打开-保存-关闭)，逐键调用很慢，且慢写入回调携带旧值二次 setRows 会把输入框
+  // 回退成旧值造成闪烁。这里不在写回后再 setRows，从根上消除闪烁。
+  const writeTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const pendingWrites = useRef<Record<string, { path: string; key: string; value: string }>>({});
+  const flushWrite = useCallback(async (id: string) => {
+    const timer = writeTimers.current[id];
+    if (timer) { clearTimeout(timer); delete writeTimers.current[id]; }
+    const p = pendingWrites.current[id];
+    if (!p) return;
+    delete pendingWrites.current[id];
     try {
-      await bridge.writeProperty(row.path, key, value);
-      setRows(prev => syncRowsByPartNumber(prev, row, key, value));
-      toast.success(`已更新 CATIA 属性 ${key}`);
+      await bridge.writeProperty(p.path, p.key, p.value);
     } catch (e: any) {
-      toast.error(e.message || '写入 CATIA 失败');
+      toast.error(e.message || '写入 CAD 失败');
     }
   }, [bridge]);
+  const scheduleWrite = useCallback((path: string, key: string, value: string) => {
+    const id = `${path}|${key}`;
+    pendingWrites.current[id] = { path, key, value };
+    if (writeTimers.current[id]) clearTimeout(writeTimers.current[id]);
+    writeTimers.current[id] = setTimeout(() => { void flushWrite(id); }, 400);
+  }, [flushWrite]);
+  // 卸载/关闭工作台时冲刷未落盘的编辑，避免丢失最后一次输入
+  useEffect(() => () => {
+    Object.keys(pendingWrites.current).forEach(id => { void flushWrite(id); });
+  }, [flushWrite]);
 
-  const handleBuiltinEdit = useCallback(async (row: BOMRow, attr: string, value: string) => {
-    try {
-      await bridge.writeProperty(row.path, attr, value);
-      setRows(prev => syncRowsByPartNumber(prev, row, attr, value, 'builtin'));
-      toast.success(`已更新 CATIA 属性 ${attr}`);
-    } catch (e: any) {
-      toast.error(e.message || '写入 CATIA 失败');
-    }
-  }, [bridge]);
+  // 提交一次编辑：乐观更新表格 + 防抖写回 CAD
+  const commitEdit = useCallback((row: BOMRow, key: string, value: string, target: 'user' | 'builtin' = 'user') => {
+    setRows(prev => syncRowsByPartNumber(prev, row, key, value, target));
+    scheduleWrite(row.path, key, value);
+  }, [scheduleWrite]);
+  // 输入法(IME)组合态：拼音逐键的 onChange 不提交，待选定汉字(compositionend)才算一次输入，
+  // 避免组合中反复 setRows 触发重渲染打断输入法、造成闪烁
+  const composingRef = useRef(false);
 
   const [matching, setMatching] = useState(false);
   // 各版本附件计数（cad/production），显示在附件列按钮上方
   const [attCounts, setAttCounts] = useState<Record<string, { cad: number; production: number }>>({});
+  // 已匹配版本的 PDM 自定义字段值（revision_id → field_id → value）；
+  // 当 CAD 该字段为空时，右侧自定义字段列回退显示 PDM 已有值（绿色）
+  const [pdmCfValues, setPdmCfValues] = useState<Record<string, Record<string, any>>>({});
 
   const refreshAttCount = useCallback(async (revisionId?: string) => {
     if (!revisionId) return;
@@ -270,6 +292,13 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
           .map((res: any) => res.revision_id as string)
       )];
       matchedRevIds.forEach(id => { refreshAttCount(id); });
+      // 拉取已匹配版本的 PDM 自定义字段值，供右侧字段列对比/回退显示
+      if (matchedRevIds.length > 0) {
+        try {
+          const cfRes = await customFieldsApi.getValuesBatch({ type: 'component', ids: matchedRevIds.join(',') });
+          setPdmCfValues(prev => ({ ...prev, ...(cfRes.data || {}) }));
+        } catch { /* 自定义字段值拉取失败不影响主流程 */ }
+      }
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || 'PDM 匹配失败');
     } finally {
@@ -343,6 +372,28 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
       toast.error(e?.response?.data?.detail || '撤销签出失败');
     }
   };
+
+  // 推送/拉取后刷新对比基准：重新读取该版本的 PDM 自定义字段值与名称，
+  // 使右侧字段列与内置名称列的绿/红色状态按最新 PDM 数据重算（此时应与 CAD 一致→常态色）
+  const refreshPdmCompare = useCallback(async (row: BOMRow) => {
+    const revId = row.pdm_match?.revision_id;
+    const masterId = row.pdm_match?.master_id;
+    if (!revId) return;
+    try {
+      const cfRes = await customFieldsApi.getValuesBatch({ type: 'component', ids: revId });
+      setPdmCfValues(prev => ({ ...prev, ...(cfRes.data || {}) }));
+    } catch { /* 忽略 */ }
+    if (masterId) {
+      try {
+        const master = await partsApi.get(masterId);
+        if (master) {
+          setRows(prev => prev.map(r => r.pdm_match?.revision_id === revId
+            ? { ...r, pdm_match: { ...r.pdm_match!, name: master.name ?? r.pdm_match!.name } }
+            : r));
+        }
+      } catch { /* 忽略 */ }
+    }
+  }, []);
 
   const handlePushToPDM = async (row: BOMRow) => {
     if (!row.pdm_match?.revision_id) return;
@@ -424,24 +475,70 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
       } else {
         toast.success('属性已推送到 PDM');
       }
+      // 推送后 PDM 已与 CAD 一致，刷新对比基准使字段颜色恢复常态
+      await refreshPdmCompare(row);
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || '属性推送失败');
     }
   };
 
+  // PDM → CAD：把 PDM 固定字段(名称/规格)与自定义字段值按映射拉回并覆盖 CAD 属性。
+  // 件号(PartNumber)是匹配主键不覆盖；PDM 该字段为空则跳过（不清空 CAD 已有值）。
   const handlePullFromPDM = async (row: BOMRow) => {
-    if (!row.pdm_match?.revision_id) return;
+    if (!row.pdm_match?.revision_id || !row.pdm_match?.master_id) return;
     try {
-      const rev = await partsApi.getRevision(row.pdm_match.revision_id);
-      if (!rev) return;
-      const master = await partsApi.get(rev.master_id);
-      if (master?.spec) {
-        await bridge.writeProperty(row.path, '规格型号', master.spec);
-        setRows(prev => syncRowsByPartNumber(prev, row, '规格型号', master.spec));
+      if (!mappingRef.current) {
+        try { mappingRef.current = await bridge.getFieldMapping(); }
+        catch { mappingRef.current = DEFAULT_FIELD_MAPPING; }
       }
-      toast.success('属性已从 PDM 拉取');
+      const mapping = mappingRef.current!;
+      if (!fieldDefsRef.current) {
+        const res = await customFieldsApi.listDefinitions();
+        fieldDefsRef.current = res.data || [];
+      }
+      const defs = fieldDefsRef.current!;
+
+      // 待写入 CAD 的 (CAD属性名, 值, 是否内置属性)
+      const writes: { prop: string; value: string; builtin: boolean }[] = [];
+
+      // 1) 固定字段：master 提供 name/spec；version 用匹配结果
+      const master = await partsApi.get(row.pdm_match.master_id);
+      for (const [attr, target] of Object.entries(mapping.builtin || {})) {
+        if (attr === 'PartNumber') continue; // 件号不覆盖
+        let val = '';
+        if (target === 'name') val = master?.name || '';
+        else if (target === 'version') val = row.pdm_match.version || '';
+        if (val) writes.push({ prop: attr, value: val, builtin: true });
+      }
+      const specProp = Object.entries(mapping.properties || {}).find(([, t]) => t === 'spec')?.[0];
+      if (specProp && master?.spec) writes.push({ prop: specProp, value: master.spec, builtin: false });
+
+      // 2) 自定义字段：getValues → field_id→value，按 PDM 字段名映射回 CAD 属性名
+      const cfRes = await customFieldsApi.getValues('component', row.pdm_match.revision_id);
+      const cfMap: Record<string, any> = {};
+      (cfRes.data || []).forEach((v: any) => { cfMap[v.field_id] = v.value; });
+      for (const [prop, target] of Object.entries(mapping.properties || {})) {
+        if (target === 'spec') continue;
+        const def = defs.find((d: any) => d.name === target);
+        if (!def) continue;
+        const raw = cfMap[def.id];
+        if (raw == null || raw === '') continue;
+        writes.push({ prop, value: Array.isArray(raw) ? raw.join(', ') : String(raw), builtin: false });
+      }
+
+      if (writes.length === 0) {
+        toast.info('PDM 无可拉取的字段值');
+        return;
+      }
+      for (const w of writes) {
+        await bridge.writeProperty(row.path, w.prop, w.value);
+        setRows(prev => syncRowsByPartNumber(prev, row, w.prop, w.value, w.builtin ? 'builtin' : 'user'));
+      }
+      // 拉取后 CAD 已与 PDM 一致，刷新对比基准使字段颜色恢复常态
+      await refreshPdmCompare(row);
+      toast.success(`已从 PDM 拉取并覆盖 ${writes.length} 个 CAD 属性`);
     } catch (e: any) {
-      toast.error(e.message || '属性拉取失败');
+      toast.error(e?.response?.data?.detail || e.message || '属性拉取失败');
     }
   };
 
@@ -638,13 +735,28 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                     </td>
                     <td className="p-2" style={{ width: 110 }}>{row.builtin.PartNumber || ''}</td>
                     <td className="p-2 text-center" style={{ width: 40 }}>{row.quantity}</td>
-                    {BUILTIN_COLUMNS.map(col => (
-                      <td key={col.attr} className="p-2" style={{ width: col.attr === 'Revision' ? 56 : 100 }}>
-                        <input value={row.builtin[col.attr] || ''} disabled={!canEditProps(row)}
-                          onChange={e => { const v = e.target.value; setRows(prev => syncRowsByPartNumber(prev, row, col.attr, v, 'builtin')); handleBuiltinEdit(row, col.attr, v); }}
-                          className="border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200" />
+                    {BUILTIN_COLUMNS.map(col => {
+                      // 内置列同样对比 PDM：术语/中文名称↔name、版本↔version
+                      const cadVal = row.builtin[col.attr] || '';
+                      const pdmVal = col.attr === 'Nomenclature' ? (row.pdm_match?.name || '')
+                        : col.attr === 'Revision' ? (row.pdm_match?.version || '') : '';
+                      const fromPdm = cadVal === '' && pdmVal !== '';
+                      const conflict = cadVal !== '' && pdmVal !== '' && cadVal.trim() !== pdmVal.trim();
+                      const value = fromPdm ? pdmVal : cadVal;
+                      const toneCls = fromPdm ? ' text-green-600 border-green-400'
+                        : conflict ? ' text-red-600 border-red-400' : '';
+                      const title = fromPdm ? `PDM 值（CAD 为空）: ${pdmVal}`
+                        : conflict ? `与 PDM 不同 — CAD: ${cadVal} / PDM: ${pdmVal}` : undefined;
+                      return (
+                      <td key={col.attr} className="p-2" style={{ width: col.attr === 'Revision' ? 56 : 100 }} title={title}>
+                        <input value={value} disabled={!canEditProps(row)}
+                          onCompositionStart={() => { composingRef.current = true; }}
+                          onCompositionEnd={e => { composingRef.current = false; commitEdit(row, col.attr, e.currentTarget.value, 'builtin'); }}
+                          onChange={e => { if (composingRef.current) return; commitEdit(row, col.attr, e.target.value, 'builtin'); }}
+                          className={`border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200${toneCls}`} />
                       </td>
-                    ))}
+                      );
+                    })}
                     <td className="p-2 text-center" style={{ width: 90 }}>
                       {(() => { const n = row.pdm_match?.revision_id ? attCounts[row.pdm_match.revision_id]?.cad : undefined; return (<div className={`${n ? 'font-semibold text-blue-600' : 'text-gray-500'}`}>{n !== undefined ? n : '—'}</div>); })()}
                       {isCheckedOutByMe(row) && <button onClick={() => handleUploadCAD(row)} disabled={uploadingCad === row.path} title={row.doc_path || 'CATIA 源文件路径未知'} className="mt-1 px-2 py-0.5 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300">{uploadingCad === row.path ? '上传中...' : '上传源文件'}</button>}
@@ -681,7 +793,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                       <div className="flex gap-1 flex-wrap justify-center">
                         {row.match_status === 'new' && <button onClick={() => handleCreatePart(row)} className="px-2 py-1 bg-amber-500 text-white rounded hover:bg-amber-600">创建零件</button>}
                         {row.match_status === 'matched' && row.checkout_status === 'not_checked_out' && (<><button onClick={() => handleCheckout(row)} className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">签出</button><button onClick={() => handlePullFromPDM(row)} className="px-2 py-1 bg-amber-50 text-amber-700 border border-amber-300 rounded hover:bg-amber-100">属性←</button></>)}
-                        {row.match_status === 'matched' && row.checkout_status === 'checked_out' && (<><button onClick={() => handleCheckin(row)} className="px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600">签入</button><button onClick={() => handlePushToPDM(row)} className="px-2 py-1 bg-blue-100 text-blue-700 border border-blue-300 rounded hover:bg-blue-200">属性→</button><button onClick={() => handleUndoCheckout(row)} className="px-2 py-1 bg-red-50 text-red-700 border border-red-300 rounded hover:bg-red-100">撤销</button></>)}
+                        {row.match_status === 'matched' && row.checkout_status === 'checked_out' && (<><button onClick={() => handleCheckin(row)} className="px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600">签入</button><button onClick={() => handlePushToPDM(row)} title="CAD 属性推送到 PDM" className="px-2 py-1 bg-blue-100 text-blue-700 border border-blue-300 rounded hover:bg-blue-200">属性→</button><button onClick={() => handlePullFromPDM(row)} title="PDM 字段拉取覆盖 CAD 属性" className="px-2 py-1 bg-amber-50 text-amber-700 border border-amber-300 rounded hover:bg-amber-100">属性←</button><button onClick={() => handleUndoCheckout(row)} className="px-2 py-1 bg-red-50 text-red-700 border border-red-300 rounded hover:bg-red-100">撤销</button></>)}
                         {row.match_status === 'matched' && row.checkout_status === 'other_checked_out' && <button onClick={() => handlePullFromPDM(row)} className="px-2 py-1 bg-amber-50 text-amber-700 border border-amber-300 rounded hover:bg-amber-100">属性←</button>}
                       </div>
                     </td>
@@ -720,22 +832,40 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                         className={`transition-colors ${hoveredIndex === ri ? hoverClass(row) : ''}`}>
                         {propertyColumns.map(col => {
                           const catiaProp = getCatiaPropForPdmField(col);
-                          const value = catiaProp ? (row.user_properties[catiaProp] || '') : '';
                           const fieldDef = fieldDefs.find((d: any) => d.name === col);
+                          const cadValue = catiaProp ? (row.user_properties[catiaProp] || '') : '';
+                          const revId = row.pdm_match?.revision_id;
+                          // 批量接口返回值按 field_key 索引（非 field_id）
+                          const pdmRaw = revId && fieldDef ? pdmCfValues[revId]?.[fieldDef.field_key] : undefined;
+                          const pdmValue = pdmRaw == null ? '' : (Array.isArray(pdmRaw) ? pdmRaw.join(', ') : String(pdmRaw));
+                          // CAD 有值显示 CAD；CAD 空且 PDM 有值→回退显示 PDM（绿色）；
+                          // CAD/PDM 都有但不同→显示 CAD（红色，提示冲突）
+                          const fromPdm = cadValue === '' && pdmValue !== '';
+                          const sameVal = fieldDef?.field_type === 'number'
+                            ? Number(cadValue) === Number(pdmValue)
+                            : cadValue.trim() === pdmValue.trim();
+                          const conflict = cadValue !== '' && pdmValue !== '' && !sameVal;
+                          const value = fromPdm ? pdmValue : cadValue;
+                          const toneCls = fromPdm ? ' text-green-600 border-green-400'
+                            : conflict ? ' text-red-600 border-red-400' : '';
+                          const title = fromPdm ? `PDM 值（CAD 为空）: ${pdmValue}`
+                            : conflict ? `与 PDM 不同 — CAD: ${cadValue} / PDM: ${pdmValue}` : undefined;
                           const isSelect = fieldDef?.field_type === 'select' && fieldDef?.options?.length > 0;
                           return (
-                            <td key={col} className="p-2 border-b border-gray-200" style={{ minWidth: 100 }}>
+                            <td key={col} className="p-2 border-b border-gray-200" style={{ minWidth: 100 }} title={title}>
                               {isSelect ? (
                                 <select value={value} disabled={!canEditProps(row) || !catiaProp}
-                                  onChange={e => { if (!catiaProp) return; const v = e.target.value; setRows(prev => syncRowsByPartNumber(prev, row, catiaProp, v)); handlePropEdit(row, catiaProp, v); }}
-                                  className="border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200">
+                                  onChange={e => { if (!catiaProp) return; commitEdit(row, catiaProp, e.target.value); }}
+                                  className={`border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200${toneCls}`}>
                                   <option value="">—</option>
                                   {fieldDef.options.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
                                 </select>
                               ) : (
                                 <input value={value} disabled={!canEditProps(row) || !catiaProp}
-                                  onChange={e => { if (!catiaProp) return; const v = e.target.value; setRows(prev => syncRowsByPartNumber(prev, row, catiaProp, v)); handlePropEdit(row, catiaProp, v); }}
-                                  className="border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200" />
+                                  onCompositionStart={() => { composingRef.current = true; }}
+                                  onCompositionEnd={e => { composingRef.current = false; if (!catiaProp) return; commitEdit(row, catiaProp, e.currentTarget.value); }}
+                                  onChange={e => { if (composingRef.current || !catiaProp) return; commitEdit(row, catiaProp, e.target.value); }}
+                                  className={`border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200${toneCls}`} />
                               )}
                             </td>
                           );
