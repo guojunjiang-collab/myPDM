@@ -5,6 +5,11 @@
     "Description": "name"
   },
   "properties": {
+    "Part Number": "code",
+    "代号": "code",
+    "版本": "version",
+    "名称": "name",
+    "Description": "name",
     "零部件类型": "零部件类型",
     "零部件尺寸": "零部件尺寸",
     "材料名称": "材料名称",
