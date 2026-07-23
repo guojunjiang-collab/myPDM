@@ -9,7 +9,8 @@ logger = logging.getLogger(__name__)
 class SolidWorksClient:
     """SolidWorks COM 自动化接口封装（与 CATIAClient 接口对齐）"""
 
-    BUILTIN_ATTRS = {"PartNumber", "Revision", "Description", "Material", "Weight", "Density", "Cost", "Vendor", "DocumentName"}
+    # SW 中除标题/描述/材质等少量 SummaryInfo 属性外，绝大部分属性都走 CustomPropertyManager
+    BUILTIN_ATTRS = {"Title", "Subject", "Author", "Keywords", "Comments"}
 
     def __init__(self, mapping_path: str = None):
         if mapping_path is None:
@@ -197,18 +198,25 @@ class SolidWorksClient:
         return node
 
     def _read_builtin_props(self, model_doc) -> dict:
-        """读取内置属性（SummaryInfo / CustomInfo）"""
+        """读取内置属性。SW 无 PartNumber/Revision 的直接属性，从文件名和自定义属性中提取。"""
         if model_doc is None:
             return {}
         props = {}
-        for attr in self.BUILTIN_ATTRS:
-            try:
-                val = getattr(model_doc, attr, None)
-                if val is not None and val != "":
-                    props[attr] = str(val)
-            except Exception:
-                pass
-        # 补充 CustomInfo2 中的 ConfigurationName
+        # SolidWorks 件号来自文件名（不含扩展名）或自定义属性中的 PartNumber
+        try:
+            part_number = model_doc.GetTitle
+            if part_number:
+                props["PartNumber"] = str(part_number)
+        except Exception:
+            pass
+        # 尝试从 SummaryInfo 读取 Description
+        try:
+            desc = model_doc.SummaryInfo[2] if model_doc.SummaryInfo else None
+            if desc:
+                props["Description"] = str(desc)
+        except Exception:
+            pass
+        # 尝试读取配置名称
         try:
             configs = model_doc.GetConfigurationNames
             if configs and len(configs) > 0:
