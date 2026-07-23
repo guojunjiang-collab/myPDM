@@ -260,23 +260,39 @@ class SolidWorksClient:
                 self._close_opened_doc(sw, entry["doc"])
 
     @staticmethod
-    def _get_children(comp) -> list:
-        """获取组件的直接子组件。
-
-        IComponent2.GetChildren 不依赖已加载的 model_doc，轻量化组件下同样
-        返回子实例，是可靠的装配树遍历方式（替代旧的 model_doc.GetComponents，
-        后者在 model_doc 为 None 时读不到任何子级）。"""
+    def _safe_pathname(comp) -> str:
         try:
-            ch = comp.GetChildren()
-        except Exception as e:
-            logger.debug(f"GetChildren 失败: {e}")
-            return []
-        if ch is None:
-            return []
-        try:
-            return list(ch)
+            return comp.GetPathName or ""
         except Exception:
-            return []
+            return ""
+
+    def _child_components(self, comp, model_doc) -> list:
+        """列出组件的直接子组件。
+
+        关键：轻量化子装配的组件实例在父装配上下文里 GetChildren 常枚举不到子级；
+        真正可靠的是从"已加载/后台打开的装配文档"上 GetComponents(True) 枚举。
+        因此优先用 model_doc.GetComponents(True)，再回退 IComponent2.GetChildren。"""
+        if model_doc is not None:
+            try:
+                ch = model_doc.GetComponents(True)  # True = 仅直接子级
+                if ch is not None:
+                    lst = list(ch)
+                    if lst:
+                        return lst
+            except Exception as e:
+                logger.debug(f"model_doc.GetComponents 失败: {e}")
+        # 回退：GetChildren（方法/属性两种 COM 绑定都尝试）
+        for as_call in (True, False):
+            try:
+                ch = comp.GetChildren() if as_call else comp.GetChildren
+                if ch is None or callable(ch):
+                    continue
+                lst = list(ch)
+                if lst:
+                    return lst
+            except Exception:
+                pass
+        return []
 
     def _read_component_tree(self, sw, comp, path: str, level: int, cache: dict) -> dict | None:
         """递归读取组件树节点（含属性/矩阵/子组件）"""
@@ -327,11 +343,13 @@ class SolidWorksClient:
             "children": []
         }
 
-        # 通过 GetChildren 递归子级（不依赖 model_doc，可读全部层级）
+        # 从已加载/后台打开的装配文档枚举直接子级并递归（可读全部层级）
         if is_assembly:
-            children = self._get_children(comp)
+            children = self._child_components(comp, model_doc)
             if children:
                 logger.info(f"  [{name}] 子组件数: {len(children)}")
+            else:
+                logger.warning(f"  [{name}] 装配体但未枚举到子级 (model_doc={'有' if model_doc else '无'})")
             for i, child in enumerate(children):
                 child_node = self._read_component_tree(sw, child, f"{path}.{i+1}", level + 1, cache)
                 if child_node is not None:
@@ -421,33 +439,48 @@ class SolidWorksClient:
             logger.debug(f"读取组件矩阵失败: {e}")
             return None
 
-    def _resolve_doc_for_op(self, sw, path: str):
-        """为读/写/导出定位指定路径的模型文档。
-        返回 (model_doc, opened)；opened=True 表示本方法后台打开，调用方用完须关闭。
-        轻量化组件 GetModelDoc2 返回 None，回退按源文件路径后台静默打开。"""
+    def _locate_component(self, sw, path: str, cache: dict):
+        """按路径逐级定位组件，返回目标 IComponent2（根路径返回 None）。
+        每下钻一级都用该(子装配)组件的模型文档 GetComponents(True) 枚举下一级，
+        与 read_assembly_tree 的遍历方式一致（索引对齐），轻量化子装配同样可用。
+        沿途后台打开的文档记入 cache，由调用方统一关闭。"""
         active = self._get_active_doc(sw)
-        product = self._find_component_by_path(active, path)
-        if product is None:
-            return active, False  # 根路径用活动文档
-        md = None
-        try:
-            md = product.GetModelDoc2()
-        except Exception:
-            md = None
-        if md is not None:
-            return md, False
-        path_name = ""
-        try:
-            path_name = product.GetPathName or ""
-        except Exception:
-            pass
-        existing = self._find_open_doc(sw, path_name)
-        if existing is not None:
-            return existing, False
-        if path_name:
-            md = self._open_model_doc(sw, path_name)
-            return md, (md is not None)
-        return None, False
+        if active is None:
+            return None
+        parts = path.split(".")
+        if len(parts) <= 1:
+            return None  # 根路径由调用方用活动文档处理
+        current = list(active.GetComponents(True) or [])
+        steps = parts[1:]
+        comp = None
+        for i, idx_str in enumerate(steps):
+            try:
+                idx = int(idx_str)
+            except ValueError:
+                return None
+            if idx < 1 or idx > len(current):
+                return None
+            comp = current[idx - 1]
+            if i < len(steps) - 1:  # 还需继续下钻
+                md = self._resolve_model_doc(sw, comp, self._safe_pathname(comp), cache)
+                current = self._child_components(comp, md)
+        return comp
+
+    def _resolve_doc_for_op(self, sw, path: str, cache: dict):
+        """为读/写/导出定位指定路径的模型文档；后台打开的文档记入 cache。
+        根路径用活动文档；子项优先 GetModelDoc2，轻量化时按源文件后台静默打开。"""
+        comp = self._locate_component(sw, path, cache)
+        if comp is None:
+            return self._get_active_doc(sw)  # 根路径
+        return self._resolve_model_doc(sw, comp, self._safe_pathname(comp), cache)
+
+    @staticmethod
+    def _is_owned(cache: dict, doc) -> bool:
+        """判断某文档是否由本次操作后台打开（需保存/关闭）"""
+        for e in cache.values():
+            if e.get("doc") is doc:
+                return bool(e.get("owned"))
+        return False
 
     def read_properties(self, params: dict) -> dict:
         """读取指定路径零部件的所有属性"""
@@ -455,16 +488,16 @@ class SolidWorksClient:
         if sw is None:
             raise RuntimeError("SW_NOT_FOUND")
 
-        model_doc, opened = self._resolve_doc_for_op(sw, params.get("path", "0"))
-        if model_doc is None:
-            raise RuntimeError("COMPONENT_NOT_FOUND")
+        cache: dict = {}
         try:
+            model_doc = self._resolve_doc_for_op(sw, params.get("path", "0"), cache)
+            if model_doc is None:
+                raise RuntimeError("COMPONENT_NOT_FOUND")
             builtin = self._read_builtin_props(model_doc)
             user_props = self._read_custom_props(model_doc)
             return {"builtin": builtin, "user_properties": user_props}
         finally:
-            if opened:
-                self._close_opened_doc(sw, model_doc)
+            self._close_cached_docs(sw, cache)
 
     # 前端内部键 → SW 自定义属性别名（读取时反向映射，写入时按此定位/新建）
     REVISION_ALIASES = ("版本", "Revision", "Rev")
@@ -510,13 +543,15 @@ class SolidWorksClient:
         if sw is None:
             raise RuntimeError("SW_NOT_FOUND")
 
-        model_doc, opened = self._resolve_doc_for_op(sw, params.get("path", "0"))
-        if model_doc is None:
-            raise RuntimeError("无法获取模型文档")
-
-        prop_name = params["prop_name"]
-        value = params["value"]
+        cache: dict = {}
         try:
+            model_doc = self._resolve_doc_for_op(sw, params.get("path", "0"), cache)
+            if model_doc is None:
+                raise RuntimeError("无法获取模型文档")
+            opened = self._is_owned(cache, model_doc)
+
+            prop_name = params["prop_name"]
+            value = params["value"]
             # 真正的文档内置属性（Title/Author 等）走 setattr，其余走自定义属性
             if prop_name in self.BUILTIN_ATTRS:
                 try:
@@ -538,8 +573,7 @@ class SolidWorksClient:
                     pass
             return {"success": True, "prop_name": prop_name}
         finally:
-            if opened:
-                self._close_opened_doc(sw, model_doc)
+            self._close_cached_docs(sw, cache)
 
     def export_stp(self, params: dict) -> dict:
         """将指定路径零部件导出为 STP 文件，返回本地文件路径"""
@@ -547,11 +581,12 @@ class SolidWorksClient:
         if sw is None:
             raise RuntimeError("SW_NOT_FOUND")
 
-        model_doc, opened = self._resolve_doc_for_op(sw, params.get("path", "0"))
-        if model_doc is None:
-            raise RuntimeError("无法获取组件模型文档，不能导出 STP")
-
+        cache: dict = {}
         try:
+            model_doc = self._resolve_doc_for_op(sw, params.get("path", "0"), cache)
+            if model_doc is None:
+                raise RuntimeError("无法获取组件模型文档，不能导出 STP")
+
             if params.get("file_name"):
                 file_name = params["file_name"]
             else:
@@ -575,8 +610,7 @@ class SolidWorksClient:
             logger.info(f"STP 导出完成: {out_path}")
             return {"file_path": out_path, "file_name": file_name}
         finally:
-            if opened:
-                self._close_opened_doc(sw, model_doc)
+            self._close_cached_docs(sw, cache)
 
     @staticmethod
     def _get_builtin_val(model_doc, attr: str) -> str:
@@ -592,18 +626,19 @@ class SolidWorksClient:
         if sw is None:
             raise RuntimeError("SW_NOT_FOUND")
 
-        model_doc, opened = self._resolve_doc_for_op(sw, params.get("path", "0"))
-        if model_doc is None:
-            raise RuntimeError("无法获取组件模型文档")
-
-        doc_path = ""
+        cache: dict = {}
         try:
-            doc_path = model_doc.GetPathName
-        except Exception:
-            pass
-        # 源模型文档定位工程图后即可释放（工程图是另一份文件，不再需要它）
-        if opened:
-            self._close_opened_doc(sw, model_doc)
+            model_doc = self._resolve_doc_for_op(sw, params.get("path", "0"), cache)
+            if model_doc is None:
+                raise RuntimeError("无法获取组件模型文档")
+            doc_path = ""
+            try:
+                doc_path = model_doc.GetPathName
+            except Exception:
+                pass
+        finally:
+            # 源模型文档定位到路径后即可释放（工程图是另一份文件，不再需要它）
+            self._close_cached_docs(sw, cache)
 
         if not doc_path:
             raise RuntimeError("无法获取零部件源文档路径")
@@ -616,10 +651,10 @@ class SolidWorksClient:
         if params.get("file_name"):
             file_name = params["file_name"]
         else:
-            code = self._get_builtin_val(model_doc, 'PartNumber') or 'drawing'
-            ver = self._get_builtin_val(model_doc, 'Revision') or ''
+            # 源文档已释放，件号取自文件名（工程图导出通常由前端传入 file_name）
+            code = os.path.splitext(os.path.basename(doc_path))[0] or 'drawing'
             prefix = os.environ.get("CAD_PDF_PART_PREFIX", "")
-            file_name = f"{prefix}{code}_{ver}.pdf"
+            file_name = f"{prefix}{code}.pdf"
 
         out_dir = os.path.abspath(params.get("out_dir") or os.path.join("cad_workspace", "pdf_export"))
         os.makedirs(out_dir, exist_ok=True)
@@ -661,32 +696,6 @@ class SolidWorksClient:
             raise RuntimeError("PDF 导出失败：SolidWorks 未生成文件")
         logger.info(f"PDF 导出完成: {out_path}")
         return {"file_path": out_path, "file_name": file_name}
-
-    def _find_component_by_path(self, doc, path: str):
-        """根据路径在装配体树中查找组件，根路径返回 None（调用方需自行使用 ActiveDoc）"""
-        if doc is None:
-            return None
-        parts = path.split(".")
-        if len(parts) <= 1:
-            return None  # 根路径 "0" 返回 None，由调用方处理
-
-        top = doc.GetComponents(True)
-        if top is None:
-            return None
-        current = list(top)
-        comp = None
-        for idx_str in parts[1:]:
-            try:
-                idx = int(idx_str)
-            except ValueError:
-                return None
-            if idx < 1 or idx > len(current):
-                return None
-            comp = current[idx - 1]
-            # 用 GetChildren 下钻，与 read_assembly_tree 遍历方式一致（索引对齐），
-            # 且不依赖 model_doc，轻量化子装配同样可用
-            current = self._get_children(comp)
-        return comp
 
 
 # 全局实例，__main__.py 中注册使用
