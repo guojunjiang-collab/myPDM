@@ -198,33 +198,38 @@ class SolidWorksClient:
         return node
 
     def _read_builtin_props(self, model_doc) -> dict:
-        """读取内置属性。SW 无 PartNumber 的直接属性，优先取自定义属性 "Part Number"，回退文件名。"""
+        """读取内置属性。SW 中 PartNumber/Revision 来自自定义属性。"""
         if model_doc is None:
             return {}
         props = {}
-        # PartNumber: 优先读取自定义属性 "Part Number"，不存在则用文件名（不含扩展名）
-        part_number = ""
+
+        def _get_custom_prop(cpm, names, *keys):
+            """从 CustomPropertyManager 读取指定键的值"""
+            if cpm is None or not names:
+                return ""
+            for key in keys:
+                if key in names:
+                    _, val, _ = cpm.Get5(key, False, False)
+                    if val:
+                        return str(val)
+            return ""
+
         try:
             ext = model_doc.Extension
             cpm = ext.CustomPropertyManager("")
-            if cpm is not None:
-                names = cpm.GetNames
-                # 兼容带空格和不带空格两种写法
-                for key in ("Part Number", "PartNumber"):
-                    if names and key in names:
-                        _, val, _ = cpm.Get5(key, False, False)
-                        if val:
-                            part_number = str(val)
-                            break
+            names = cpm.GetNames if cpm is not None else None
+            # PartNumber: 优先 "Part Number"，回退 "PartNumber"，再回退文件名
+            part_number = _get_custom_prop(cpm, names, "Part Number", "PartNumber")
+            if not part_number:
+                part_number = model_doc.GetTitle or ""
+            if part_number:
+                props["PartNumber"] = str(part_number)
+            # Revision: 从自定义属性读取
+            revision = _get_custom_prop(cpm, names, "Revision", "Rev")
+            if revision:
+                props["Revision"] = revision
         except Exception:
             pass
-        if not part_number:
-            try:
-                part_number = model_doc.GetTitle or ""
-            except Exception:
-                pass
-        if part_number:
-            props["PartNumber"] = str(part_number)
         # Description 从 SummaryInfo 读取
         try:
             desc = model_doc.SummaryInfo[2] if model_doc.SummaryInfo else None
