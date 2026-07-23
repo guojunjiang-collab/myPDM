@@ -66,7 +66,7 @@ def register_handlers(server: BridgeServer, pdm_client: PDMClient):
         # 上传源文件时，同目录同名的工程图（若存在）一并上传
         if params.get("include_drawing"):
             base, _ = os.path.splitext(file_path)
-            # CATIA 工程图
+            # CATIA/SolidWorks 工程图
             for ext in (".CATDrawing", ".SLDDRW"):
                 drawing_path = base + ext
                 if os.path.isfile(drawing_path):

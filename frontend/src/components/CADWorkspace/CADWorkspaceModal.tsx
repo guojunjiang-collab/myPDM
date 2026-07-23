@@ -53,8 +53,6 @@ export function CADWorkspaceModal({ open, onClose }: Props) {
     complete: '完成',
   };
 
-  const cadLabel = cadType === 'catia' ? 'CATIA V5' : 'SolidWorks';
-
   return (
     <Modal open={open} onClose={handleClose} title="CAD 入口 · 工作台" width="max" height="85vh">
       <div className="flex flex-col h-full">

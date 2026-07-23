@@ -333,7 +333,8 @@ class SolidWorksClient:
         if os.path.exists(out_path):
             os.remove(out_path)
 
-        # swSTEP: 保存类型常量值 214（STEP AP214）
+        # SaveAs3 通过文件扩展名 .stp 判断导出为 STEP 格式
+        # Version=0 使用当前 SW 版本，Options=0 默认选项
         ret = model_doc.SaveAs3(out_path, 0, 0)
         if ret != 0:
             raise RuntimeError(f"SolidWorks STP 导出失败，错误码: {ret}")
