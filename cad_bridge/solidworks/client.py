@@ -38,13 +38,25 @@ class SolidWorksClient:
             return None
 
     def _get_active_doc(self, sw):
-        """获取当前活动文档。ActiveDoc 在 SW 失去焦点时可能返回 None，回退 GetFirstDocument。"""
+        """获取当前活动文档。ActiveDoc 在 SW 失去焦点时可能返回 None，回退遍历文档集合。"""
         doc = sw.ActiveDoc
         if doc is None:
             try:
-                count = sw.GetDocumentCount()
-                if count > 0:
-                    doc = sw.GetFirstDocument()
+                docs = sw.GetDocuments()
+                if docs is not None:
+                    for d in docs:
+                        try:
+                            if d.GetType() == 2:  # 优先取装配体
+                                doc = d
+                                break
+                        except Exception:
+                            pass
+                    if doc is None:
+                        # 无装配体，取第一个文档（零件或工程图）
+                        try:
+                            doc = docs[0]
+                        except Exception:
+                            pass
             except Exception:
                 pass
         return doc
