@@ -218,11 +218,11 @@ class SolidWorksClient:
                     for name in names:
                         name_str = str(name)
                         if name_str in ("Part Number", "PartNumber"):
-                            _, val, _ = cpm.Get5(name_str, False, "")
+                            _, val, _ = cpm.Get5(name_str, 0, "")
                             if val:
                                 props["PartNumber"] = str(val)
                         elif name_str in ("Revision", "Rev"):
-                            _, val, _ = cpm.Get5(name_str, False, "")
+                            _, val, _ = cpm.Get5(name_str, 0, "")
                             if val:
                                 props["Revision"] = str(val)
         except Exception as e:
@@ -258,7 +258,7 @@ class SolidWorksClient:
                 return {}
             for name in names:
                 try:
-                    _, val, _ = cpm.Get5(name, False, "")
+                    _, val, _ = cpm.Get5(str(name), 0, "")
                     result[str(name)] = str(val) if val is not None else ""
                 except Exception:
                     pass
