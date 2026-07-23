@@ -126,7 +126,7 @@ class SolidWorksClient:
             "children": []
         }
 
-        components = doc.GetComponents(False)  # False = 仅顶层组件
+        components = doc.GetComponents(True)  # True = 仅顶层组件
         if components is not None:
             for comp in components:
                 child = self._read_component_tree(comp, "0.1", 1, [1])
@@ -187,7 +187,7 @@ class SolidWorksClient:
             pass
 
         if is_assembly and model_doc is not None:
-            children = model_doc.GetComponents(False)
+            children = model_doc.GetComponents(True)
             if children is not None:
                 for child in children:
                     counter[0] += 1
@@ -476,7 +476,7 @@ class SolidWorksClient:
         if len(parts) <= 1:
             return None  # 根路径 "0" 返回 None，由调用方处理
 
-        current = doc.GetComponents(False)
+        current = doc.GetComponents(True)
         if current is None:
             return None
         for idx_str in parts[1:]:
@@ -489,7 +489,7 @@ class SolidWorksClient:
             comp = current[idx - 1]
             model = comp.GetModelDoc2()
             if model is not None and model.GetType == 2:
-                current = model.GetComponents(False)
+                current = model.GetComponents(True)
             else:
                 current = []
         return comp
