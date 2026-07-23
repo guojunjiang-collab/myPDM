@@ -204,7 +204,6 @@ class SolidWorksClient:
         props = {}
 
         def _get_custom_prop(cpm, names, *keys):
-            """从 CustomPropertyManager 读取指定键的值"""
             if cpm is None or not names:
                 return ""
             for key in keys:
@@ -214,22 +213,31 @@ class SolidWorksClient:
                         return str(val)
             return ""
 
+        # PartNumber: 优先自定义属性，回退文件名
+        part_number = ""
+        try:
+            part_number = model_doc.GetTitle or ""
+        except Exception as e:
+            logger.debug(f"读取 GetTitle 失败: {e}")
+        if part_number:
+            props["PartNumber"] = str(part_number)
+
+        # Revision: 尝试从自定义属性读取
         try:
             ext = model_doc.Extension
             cpm = ext.CustomPropertyManager("")
-            names = cpm.GetNames if cpm is not None else None
-            # PartNumber: 优先 "Part Number"，回退 "PartNumber"，再回退文件名
-            part_number = _get_custom_prop(cpm, names, "Part Number", "PartNumber")
-            if not part_number:
-                part_number = model_doc.GetTitle or ""
-            if part_number:
-                props["PartNumber"] = str(part_number)
-            # Revision: 从自定义属性读取
-            revision = _get_custom_prop(cpm, names, "Revision", "Rev")
-            if revision:
-                props["Revision"] = revision
-        except Exception:
-            pass
+            if cpm is not None:
+                names = cpm.GetNames
+                # 用自定义属性覆盖默认值
+                pn = _get_custom_prop(cpm, names, "Part Number", "PartNumber")
+                if pn:
+                    props["PartNumber"] = pn
+                rev = _get_custom_prop(cpm, names, "Revision", "Rev")
+                if rev:
+                    props["Revision"] = rev
+        except Exception as e:
+            logger.debug(f"读取 SW 自定义属性失败: {e}")
+
         # Description 从 SummaryInfo 读取
         try:
             desc = model_doc.SummaryInfo[2] if model_doc.SummaryInfo else None
