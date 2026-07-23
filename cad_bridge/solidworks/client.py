@@ -111,6 +111,13 @@ class SolidWorksClient:
         if doc.GetType != 2:  # swDocASSEMBLY
             raise RuntimeError("当前文档不是装配体")
 
+        # 一次性解析所有轻量化组件（含子装配体），避免逐级递归时读不到属性
+        try:
+            doc.ResolveAllLightWeightComponents(True)
+            logger.info("SW 已解析所有轻量化组件")
+        except Exception as e:
+            logger.info(f"SW 解析轻量化组件失败（可能已是完全解析状态）: {e}")
+
         root_name = doc.GetTitle
         root_path = doc.GetPathName or ""
 
