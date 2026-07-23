@@ -202,43 +202,31 @@ class SolidWorksClient:
         if model_doc is None:
             return {}
         props = {}
-
-        def _get_custom_prop(cpm, names, *keys):
-            if cpm is None or not names:
-                return ""
-            for key in keys:
-                if key in names:
-                    _, val, _ = cpm.Get5(key, False, False)
-                    if val:
-                        return str(val)
-            return ""
-
         # PartNumber: 优先自定义属性，回退文件名（不含扩展名）
-        part_number = ""
         try:
             title = model_doc.GetTitle or ""
-            part_number = os.path.splitext(str(title))[0]
-        except Exception as e:
-            logger.debug(f"读取 GetTitle 失败: {e}")
-        if part_number:
-            props["PartNumber"] = str(part_number)
-
-        # Revision: 尝试从自定义属性读取
+            props["PartNumber"] = str(os.path.splitext(str(title))[0])
+        except Exception:
+            pass
+        # Revision/自定义属性覆盖: 与 _read_custom_props 相同方式遍历 GetNames
         try:
             ext = model_doc.Extension
             cpm = ext.CustomPropertyManager("")
             if cpm is not None:
                 names = cpm.GetNames
-                # 用自定义属性覆盖默认值
-                pn = _get_custom_prop(cpm, names, "Part Number", "PartNumber")
-                if pn:
-                    props["PartNumber"] = pn
-                rev = _get_custom_prop(cpm, names, "Revision", "Rev")
-                if rev:
-                    props["Revision"] = rev
+                if names is not None:
+                    for name in names:
+                        name_str = str(name)
+                        if name_str in ("Part Number", "PartNumber"):
+                            _, val, _ = cpm.Get5(name_str, False, "")
+                            if val:
+                                props["PartNumber"] = str(val)
+                        elif name_str in ("Revision", "Rev"):
+                            _, val, _ = cpm.Get5(name_str, False, "")
+                            if val:
+                                props["Revision"] = str(val)
         except Exception as e:
-            logger.debug(f"读取 SW 自定义属性失败: {e}")
-
+            logger.debug(f"读取 SW 内置属性(自定义)失败: {e}")
         # Description 从 SummaryInfo 读取
         try:
             desc = model_doc.SummaryInfo[2] if model_doc.SummaryInfo else None
@@ -270,7 +258,7 @@ class SolidWorksClient:
                 return {}
             for name in names:
                 try:
-                    _, val, _ = cpm.Get5(name, False, False)
+                    _, val, _ = cpm.Get5(name, False, "")
                     result[str(name)] = str(val) if val is not None else ""
                 except Exception:
                     pass
