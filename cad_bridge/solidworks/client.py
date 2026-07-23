@@ -266,6 +266,13 @@ class SolidWorksClient:
                                     props["Revision"] = str(val).strip()
                             except Exception:
                                 pass
+                        elif n == "中文名称":
+                            try:
+                                val = cpm.Get(n)
+                                if val and str(val).strip():
+                                    props["Nomenclature"] = str(val).strip()
+                            except Exception:
+                                pass
         except Exception as e:
             logger.debug(f"提取 SW 内置属性失败: {e}")
         return props
