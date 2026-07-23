@@ -6,11 +6,12 @@ import { flattenTree } from './flattenTree';
 interface Props {
   bridge: ReturnType<typeof useCADBridge>;
   cadType: CADType;
+  onCadTypeChange: (type: CADType) => void;
   onAssemblyLoaded: (rows: BOMRow[]) => void;
   onClose: () => void;
 }
 
-export function CADConnectStep({ bridge, cadType, onAssemblyLoaded, onClose }: Props) {
+export function CADConnectStep({ bridge, cadType, onCadTypeChange, onAssemblyLoaded, onClose }: Props) {
   const [cadDetected, setCadDetected] = useState(false);
   const [docInfo, setDocInfo] = useState<{ name: string; type: string } | null>(null);
   const [detecting, setDetecting] = useState(false);
@@ -87,6 +88,14 @@ export function CADConnectStep({ bridge, cadType, onAssemblyLoaded, onClose }: P
       )}
 
       <div className="flex gap-3">
+        <select
+          value={cadType}
+          onChange={(e) => onCadTypeChange(e.target.value as CADType)}
+          className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-500"
+        >
+          <option value="catia">CATIA V5</option>
+          <option value="solidworks">SolidWorks</option>
+        </select>
         <button
           onClick={handleDetect}
           disabled={detecting}
