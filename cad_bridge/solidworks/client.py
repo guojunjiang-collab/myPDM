@@ -115,8 +115,19 @@ class SolidWorksClient:
         try:
             doc.ResolveAllLightWeightComponents(True)
             logger.info("SW 已解析所有轻量化组件")
-        except Exception as e:
-            logger.info(f"SW 解析轻量化组件失败（可能已是完全解析状态）: {e}")
+        except Exception:
+            pass
+        # 备选：ResolveAllLightWeight（不同 SW 版本 API 名不同）
+        try:
+            doc.ResolveAllLightWeight(True)
+            logger.info("SW ResolveAllLightWeight 成功")
+        except Exception:
+            pass
+        try:
+            doc.EditRebuild3()
+            logger.info("SW EditRebuild3 完成")
+        except Exception:
+            pass
 
         root_name = doc.GetTitle
         root_path = doc.GetPathName or ""
@@ -184,14 +195,12 @@ class SolidWorksClient:
             except Exception:
                 pass
 
-        # 轻量化组件：解析后读取属性
+        # 轻量化组件：再次尝试获取 model_doc（全局解析后通常已可用）
         if model_doc is None:
             try:
-                comp.SetSuppression2(0)  # 0 = 完全解析
                 model_doc = comp.GetModelDoc2()
-                logger.info(f"  解析轻量化组件 [{name}]: model_doc={'OK' if model_doc else '仍然为None'}")
-            except Exception as e:
-                logger.warning(f"  解析轻量化组件 [{name}] 失败: {e}")
+            except Exception:
+                pass
 
         builtin = self._read_builtin_props(model_doc)
         if not builtin.get("PartNumber"):
