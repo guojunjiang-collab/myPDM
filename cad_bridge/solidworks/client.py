@@ -210,7 +210,7 @@ class SolidWorksClient:
                 pass
         # 补充 CustomInfo2 中的 ConfigurationName
         try:
-            configs = model_doc.GetConfigurationNames()
+            configs = model_doc.GetConfigurationNames
             if configs and len(configs) > 0:
                 props["ConfigurationName"] = str(configs[0])
         except Exception:
@@ -227,7 +227,7 @@ class SolidWorksClient:
             cpm = ext.CustomPropertyManager("")  # 空字符串获取配置无关属性
             if cpm is None:
                 return {}
-            names = cpm.GetNames()
+            names = cpm.GetNames
             if names is None:
                 return {}
             for name in names:
@@ -316,7 +316,7 @@ class SolidWorksClient:
             if cpm is None:
                 raise RuntimeError("无法获取 CustomPropertyManager")
             # 检查属性是否已存在
-            names = cpm.GetNames()
+            names = cpm.GetNames
             if names and prop_name in names:
                 cpm.Set2(prop_name, str(value))
             else:
