@@ -107,21 +107,7 @@ async def startup_event():
             db.commit()
             print("✓ Added column updated_at to document_revisions table")
 
-        # 检查并添加 revision_parent_id 列（版本控制）
-        for table_name in ['parts', 'assemblies']:
-            result = db.execute(text(f"""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = '{table_name}' AND column_name = 'revision_parent_id'
-            """))
-            if not result.fetchone():
-                try:
-                    db.execute(text(f"ALTER TABLE {table_name} ADD COLUMN revision_parent_id UUID"))
-                    db.commit()
-                    print(f"✓ Added column revision_parent_id to {table_name} table")
-                except Exception:
-                    db.rollback()
-                    pass
+        # parts/assemblies 表已迁移至三层模型 (part_masters/part_revisions/part_iterations)，跳过旧表迁移
 
         # 检查 configuration_profiles 表是否存在
         result = db.execute(text("""
@@ -440,8 +426,8 @@ async def startup_event():
             db.commit()
             print(f"✓ Added column {col} to {tbl} table")
 
-        # ── 软删除列迁移 ──
-        for tbl in ["parts", "assemblies", "bom_items", "ecrs", "ecos"]:
+        # ── 软删除列迁移 ── (parts/assemblies 已迁移至三层模型)
+        for tbl in ["bom_items", "ecrs", "ecos"]:
             result = db.execute(text(f"""
                 SELECT column_name FROM information_schema.columns
                 WHERE table_name = '{tbl}' AND column_name = 'deleted_at'
@@ -466,27 +452,7 @@ async def startup_event():
             print("✓ Added column updated_at to bom_items table")
 
 
-        # ── 软删除 → 唯一约束改为 partial index ──
-        for tbl in ["parts", "assemblies"]:
-            idx_name = {"parts": "uix_part_code_version", "assemblies": "uix_assembly_code_version"}[tbl]
-            try:
-                # 检查是否已经是 partial index
-                result = db.execute(text(f"""
-                    SELECT 1 FROM pg_indexes
-                    WHERE indexname = '{idx_name}' AND indexdef ILIKE '%WHERE deleted_at IS NULL%'
-                """))
-                if not result.fetchone():
-                    # 删除旧唯一约束（若有）
-                    db.execute(text(f"ALTER TABLE {tbl} DROP CONSTRAINT IF EXISTS {idx_name}"))
-                    db.execute(text(f"""
-                        CREATE UNIQUE INDEX {idx_name} ON {tbl} (code, version) WHERE deleted_at IS NULL
-                    """))
-                    db.commit()
-                    print(f"✓ Converted {idx_name} to partial unique index on {tbl}")
-            except Exception as e:
-                db.rollback()
-                # 约束/索引可能已不存在，忽略错误
-                pass
+        # parts/assemblies 唯一索引已随三层模型迁移移除
 
         # ── 通用列对账：模型已声明但表中缺失的列，自动 ADD COLUMN（幂等）──
         # 防止"模型加了列但忘了写迁移"导致旧库 SELECT 时 UndefinedColumn 500。
@@ -572,23 +538,8 @@ async def startup_event():
     finally:
         db.close()
 
-    # 独立迁移块：bom_items 旧字段去除 NOT NULL 约束（幂等，使用独立 session）。
-    # 必须独立于上面的大 try——旧库中 parts/assemblies 表已被删除，会导致大 try 提前抛错
-    # 而跳过后续所有迁移。新的零部件 BOM 模型只写 *_revision_id，旧列
-    # parent_type/parent_id/child_type/child_id 保留兼容但必须可空，否则插入新 BOM 子项报 500。
-    try:
-        _db2 = SessionLocal()
-        for _legacy_col in ("parent_type", "parent_id", "child_type", "child_id"):
-            _db2.execute(text(f"ALTER TABLE bom_items ALTER COLUMN {_legacy_col} DROP NOT NULL"))
-        _db2.commit()
-        print("✓ Dropped NOT NULL on legacy bom_items columns")
-    except Exception as _be:
-        print(f"⚠ bom_items NOT NULL drop skipped: {_be}")
-    finally:
-        try:
-            _db2.close()
-        except Exception:
-            pass
+    # bom_items 旧列 (parent_type/parent_id/child_type/child_id) 已在三层模型迁移中移除，
+    # 不再需要遗留列的 NOT NULL 兼容处理
 
 @app.get("/")
 async def root():
