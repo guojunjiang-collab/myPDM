@@ -198,25 +198,41 @@ class SolidWorksClient:
         return node
 
     def _read_builtin_props(self, model_doc) -> dict:
-        """读取内置属性。SW 无 PartNumber/Revision 的直接属性，从文件名和自定义属性中提取。"""
+        """读取内置属性。SW 无 PartNumber 的直接属性，优先取自定义属性 "Part Number"，回退文件名。"""
         if model_doc is None:
             return {}
         props = {}
-        # SolidWorks 件号来自文件名（不含扩展名）或自定义属性中的 PartNumber
+        # PartNumber: 优先读取自定义属性 "Part Number"，不存在则用文件名（不含扩展名）
+        part_number = ""
         try:
-            part_number = model_doc.GetTitle
-            if part_number:
-                props["PartNumber"] = str(part_number)
+            ext = model_doc.Extension
+            cpm = ext.CustomPropertyManager("")
+            if cpm is not None:
+                names = cpm.GetNames
+                # 兼容带空格和不带空格两种写法
+                for key in ("Part Number", "PartNumber"):
+                    if names and key in names:
+                        _, val, _ = cpm.Get5(key, False, False)
+                        if val:
+                            part_number = str(val)
+                            break
         except Exception:
             pass
-        # 尝试从 SummaryInfo 读取 Description
+        if not part_number:
+            try:
+                part_number = model_doc.GetTitle or ""
+            except Exception:
+                pass
+        if part_number:
+            props["PartNumber"] = str(part_number)
+        # Description 从 SummaryInfo 读取
         try:
             desc = model_doc.SummaryInfo[2] if model_doc.SummaryInfo else None
             if desc:
                 props["Description"] = str(desc)
         except Exception:
             pass
-        # 尝试读取配置名称
+        # 配置名称
         try:
             configs = model_doc.GetConfigurationNames
             if configs and len(configs) > 0:
