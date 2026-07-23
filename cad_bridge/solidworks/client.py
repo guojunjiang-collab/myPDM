@@ -198,16 +198,17 @@ class SolidWorksClient:
         return node
 
     def _read_builtin_props(self, model_doc) -> dict:
-        """从自定义属性中提取 PartNumber / Revision（供前端件号+版本匹配）。"""
+        """提取 PartNumber（文件名）和 Revision（自定义属性），供前端件号+版本匹配。"""
         if model_doc is None:
             return {}
         props = {}
-        # 文件名兜底
+        # PartNumber: 始终从文件名提取（不含扩展名）
         try:
             title = model_doc.GetTitle or ""
             props["PartNumber"] = str(os.path.splitext(str(title))[0])
         except Exception:
             pass
+        # Revision: 从自定义属性读取
         try:
             ext = model_doc.Extension
             cpm = ext.CustomPropertyManager("")
@@ -216,16 +217,13 @@ class SolidWorksClient:
                 if names is not None:
                     for name in names:
                         n = str(name)
-                        try:
-                            val = cpm.Get(n)
-                            if val and str(val).strip():
-                                # PartNumber: 覆盖文件名兜底
-                                if n in ("Part Number", "PartNumber", "代号"):
-                                    props["PartNumber"] = str(val).strip()
-                                elif n in ("版本", "Revision", "Rev"):
+                        if n in ("版本", "Revision", "Rev"):
+                            try:
+                                val = cpm.Get(n)
+                                if val and str(val).strip():
                                     props["Revision"] = str(val).strip()
-                        except Exception:
-                            pass
+                            except Exception:
+                                pass
         except Exception as e:
             logger.debug(f"提取 SW 内置属性失败: {e}")
         return props
