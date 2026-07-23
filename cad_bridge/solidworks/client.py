@@ -149,7 +149,7 @@ class SolidWorksClient:
             comp_list = list(components)
             logger.info(f"SW 顶层组件数: {len(comp_list)}")
             for i, comp in enumerate(comp_list):
-                child = self._read_component_tree(comp, f"0.{i+1}", 1, [i+1])
+                child = self._read_component_tree(sw, comp, f"0.{i+1}", 1)
                 if child is not None:
                     tree["children"].append(child)
         else:
@@ -167,7 +167,30 @@ class SolidWorksClient:
         logger.info(f"装配树读取完成: 实例 {total[0]} 个, 矩阵读取成功 {ok[0]} 个")
         return tree
 
-    def _read_component_tree(self, comp, path: str, level: int, counter: list) -> dict | None:
+    def _open_model_doc(self, sw, path_name: str):
+        """后台静默打开 SW 文件，返回 model_doc（用完需 close_opened_doc）"""
+        try:
+            if path_name.lower().endswith('.sldprt'):
+                doc_type = 1
+            elif path_name.lower().endswith('.sldasm'):
+                doc_type = 2
+            elif path_name.lower().endswith('.slddrw'):
+                doc_type = 3
+            else:
+                return None
+            return sw.OpenDoc6(path_name, doc_type, 1, "", 0, 0)  # 1=Silent
+        except Exception:
+            return None
+
+    @staticmethod
+    def _close_opened_doc(sw, model_doc):
+        """关闭后台静默打开的 SW 文件"""
+        try:
+            sw.CloseDoc(model_doc.GetTitle)
+        except Exception:
+            pass
+
+    def _read_component_tree(self, sw, comp, path: str, level: int) -> dict | None:
         """递归读取组件树节点（含属性/矩阵/子组件）"""
         try:
             name = comp.Name2
@@ -179,6 +202,17 @@ class SolidWorksClient:
             model_doc = comp.GetModelDoc2()
         except Exception:
             pass
+
+        # model_doc 为 None（轻量化）：尝试后台静默打开文件读取属性
+        temp_opened = False
+        if model_doc is None:
+            try:
+                path_name = comp.GetPathName or ""
+            except Exception:
+                path_name = ""
+        if model_doc is None and path_name:
+            model_doc = self._open_model_doc(sw, path_name)
+            temp_opened = model_doc is not None
 
         is_assembly = False
         if model_doc is not None:
@@ -223,6 +257,11 @@ class SolidWorksClient:
         user_props = self._read_custom_props(model_doc)
         matrix = self._read_component_transform(comp) if level > 0 else None
 
+        # 清理后台静默打开的文件
+        if temp_opened and model_doc is not None:
+            self._close_opened_doc(sw, model_doc)
+            temp_opened = False
+
         node = {
             "instance_name": name,
             "path": path,
@@ -247,7 +286,7 @@ class SolidWorksClient:
                 if child_list:
                     logger.info(f"  [{name}] 子组件数: {len(child_list)}")
                 for i, child in enumerate(child_list):
-                    child_node = self._read_component_tree(child, f"{path}.{i+1}", level + 1, counter)
+                    child_node = self._read_component_tree(sw, child, f"{path}.{i+1}", level + 1)
                     if child_node is not None:
                         node["children"].append(child_node)
 
