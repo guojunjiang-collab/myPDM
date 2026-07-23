@@ -75,9 +75,9 @@ class SolidWorksClient:
             return {
                 "active": True,
                 "has_document": True,
-                "doc_name": doc.GetTitle(),
+                "doc_name": doc.GetTitle,
                 "doc_type": doc_type,
-                "doc_path": doc.GetPathName() or ""
+                "doc_path": doc.GetPathName or ""
             }
         except Exception as e:
             logger.error(f"检测 SolidWorks 文档失败: {e}")
@@ -110,8 +110,8 @@ class SolidWorksClient:
         if doc.GetType != 2:  # swDocASSEMBLY
             raise RuntimeError("当前文档不是装配体")
 
-        root_name = doc.GetTitle()
-        root_path = doc.GetPathName() or ""
+        root_name = doc.GetTitle
+        root_path = doc.GetPathName or ""
 
         tree = {
             "instance_name": root_name,
@@ -181,7 +181,7 @@ class SolidWorksClient:
         }
 
         try:
-            node["doc_path"] = comp.GetPathName() or ""
+            node["doc_path"] = comp.GetPathName or ""
         except Exception:
             pass
 
@@ -391,12 +391,12 @@ class SolidWorksClient:
 
         doc_path = ""
         try:
-            doc_path = model_doc.GetPathName()
+            doc_path = model_doc.GetPathName
         except Exception:
             pass
         if not doc_path:
             try:
-                doc_path = product.GetPathName()
+                doc_path = product.GetPathName
             except Exception:
                 pass
 
@@ -429,7 +429,7 @@ class SolidWorksClient:
             if docs is not None:
                 for d in docs:
                     try:
-                        if (d.GetPathName() or "").lower() == drawing_path.lower():
+                        if (d.GetPathName or "").lower() == drawing_path.lower():
                             drawing_doc = d
                             was_open = True
                             break
@@ -448,7 +448,7 @@ class SolidWorksClient:
         finally:
             if not was_open and drawing_doc is not None:
                 try:
-                    sw.CloseDoc(drawing_doc.GetTitle())
+                    sw.CloseDoc(drawing_doc.GetTitle)
                 except Exception:
                     pass
 
