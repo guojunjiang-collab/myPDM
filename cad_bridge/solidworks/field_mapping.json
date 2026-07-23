@@ -1,10 +1,8 @@
 {
   "builtin": {
-    "Part Number": "code",
+    "PartNumber": "code",
     "Revision": "version",
     "Nomenclature": "name"
   },
-  "properties": {
-    "中文名称": "name"
-  }
+  "properties": {}
 }
