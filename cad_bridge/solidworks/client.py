@@ -37,6 +37,18 @@ class SolidWorksClient:
             logger.debug(traceback.format_exc())
             return None
 
+    def _get_active_doc(self, sw):
+        """获取当前活动文档。ActiveDoc 在 SW 失去焦点时可能返回 None，回退 GetFirstDocument。"""
+        doc = sw.ActiveDoc
+        if doc is None:
+            try:
+                count = sw.GetDocumentCount()
+                if count > 0:
+                    doc = sw.GetFirstDocument()
+            except Exception:
+                pass
+        return doc
+
     def detect(self) -> dict:
         """检测 SolidWorks 是否运行，返回活动文档信息"""
         sw = self._get_sw_app()
@@ -44,7 +56,7 @@ class SolidWorksClient:
             return {"active": False}
 
         try:
-            doc = sw.ActiveDoc
+            doc = self._get_active_doc(sw)
             if doc is None:
                 return {"active": True, "has_document": False}
             doc_type = self._get_doc_type(doc)
@@ -79,7 +91,7 @@ class SolidWorksClient:
         if sw is None:
             raise RuntimeError("SW_NOT_FOUND")
 
-        doc = sw.ActiveDoc
+        doc = self._get_active_doc(sw)
         if doc is None:
             raise RuntimeError("NO_ACTIVE_DOC")
 
@@ -242,9 +254,9 @@ class SolidWorksClient:
         if sw is None:
             raise RuntimeError("SW_NOT_FOUND")
 
-        product = self._find_component_by_path(sw.ActiveDoc, params.get("path", "0"))
+        product = self._find_component_by_path(self._get_active_doc(sw), params.get("path", "0"))
         if product is None:
-            model_doc = sw.ActiveDoc
+            model_doc = self._get_active_doc(sw)
         else:
             model_doc = None
             try:
@@ -265,9 +277,9 @@ class SolidWorksClient:
         if sw is None:
             raise RuntimeError("SW_NOT_FOUND")
 
-        product = self._find_component_by_path(sw.ActiveDoc, params.get("path", "0"))
+        product = self._find_component_by_path(self._get_active_doc(sw), params.get("path", "0"))
         if product is None:
-            model_doc = sw.ActiveDoc
+            model_doc = self._get_active_doc(sw)
         else:
             model_doc = product.GetModelDoc2()
 
@@ -312,9 +324,9 @@ class SolidWorksClient:
         if sw is None:
             raise RuntimeError("SW_NOT_FOUND")
 
-        product = self._find_component_by_path(sw.ActiveDoc, params.get("path", "0"))
+        product = self._find_component_by_path(self._get_active_doc(sw), params.get("path", "0"))
         if product is None:
-            model_doc = sw.ActiveDoc
+            model_doc = self._get_active_doc(sw)
         else:
             model_doc = product.GetModelDoc2()
         if model_doc is None:
@@ -357,9 +369,9 @@ class SolidWorksClient:
         if sw is None:
             raise RuntimeError("SW_NOT_FOUND")
 
-        product = self._find_component_by_path(sw.ActiveDoc, params.get("path", "0"))
+        product = self._find_component_by_path(self._get_active_doc(sw), params.get("path", "0"))
         if product is None:
-            model_doc = sw.ActiveDoc
+            model_doc = self._get_active_doc(sw)
         else:
             model_doc = product.GetModelDoc2()
         if model_doc is None:
