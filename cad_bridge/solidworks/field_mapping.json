@@ -1,8 +1,8 @@
 {
   "builtin": {},
   "properties": {
+    "中文名称": "name",
     "Part Number": "code",
-    "Revision": "version",
-    "名称": "name"
+    "Revision": "version"
   }
 }
