@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { cadBridge } from '../services/cadBridge';
 import { useAuthStore } from '../stores/auth';
 
-export interface CATIAStatus {
+export interface CADStatus {
   active: boolean;
   has_document?: boolean;
   doc_name?: string;
@@ -23,13 +23,17 @@ export interface AssemblyTreeNode {
   };
 }
 
-export function useCADBridge() {
+export type CADType = 'catia' | 'solidworks';
+
+export function useCADBridge(cadType: CADType = 'catia') {
   const [connected, setConnected] = useState(false);
-  const [catiaStatus, setCatiaStatus] = useState<CATIAStatus | null>(null);
+  const [cadStatus, setCadStatus] = useState<CADStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const token = useAuthStore((s) => s.token) || '';
   const tokenRef = useRef(token);
   tokenRef.current = token;
+
+  const ns = cadType === 'catia' ? 'catia' : 'sw';
 
   useEffect(() => {
     cadBridge.setStatusCallback(setConnected);
@@ -52,43 +56,42 @@ export function useCADBridge() {
 
   const ping = useCallback(async (): Promise<boolean> => {
     try {
-      const result = await cadBridge.call('catia.ping', {}, tokenRef.current);
+      const result = await cadBridge.call(`${ns}.ping`, {}, tokenRef.current);
       return result?.status === 'ok';
     } catch {
       return false;
     }
-  }, []);
+  }, [ns]);
 
-  const detectCATIA = useCallback(async (): Promise<CATIAStatus> => {
+  const detectCAD = useCallback(async (): Promise<CADStatus> => {
     await ensureConnected();
-    const result = await cadBridge.call('catia.detect', {}, tokenRef.current);
-    setCatiaStatus(result);
+    const result = await cadBridge.call(`${ns}.detect`, {}, tokenRef.current);
+    setCadStatus(result);
     return result;
-  }, [ensureConnected]);
+  }, [ensureConnected, ns]);
 
   const readAssemblyTree = useCallback(async (): Promise<AssemblyTreeNode> => {
     await ensureConnected();
-    // 大装配体递归读取耗时长，超时放宽到 5 分钟
-    return cadBridge.call('catia.assembly.read_tree', {}, tokenRef.current, 300000);
-  }, [ensureConnected]);
+    return cadBridge.call(`${ns}.assembly.read_tree`, {}, tokenRef.current, 300000);
+  }, [ensureConnected, ns]);
 
   const readProperties = useCallback(async (path: string): Promise<AssemblyTreeNode['properties']> => {
     await ensureConnected();
-    return cadBridge.call('catia.assembly.read_properties', { path }, tokenRef.current);
-  }, [ensureConnected]);
+    return cadBridge.call(`${ns}.assembly.read_properties`, { path }, tokenRef.current);
+  }, [ensureConnected, ns]);
 
   const writeProperty = useCallback(async (path: string, propName: string, value: string): Promise<void> => {
     await ensureConnected();
-    return cadBridge.call('catia.property.write', { path, prop_name: propName, value }, tokenRef.current);
-  }, [ensureConnected]);
+    return cadBridge.call(`${ns}.property.write`, { path, prop_name: propName, value }, tokenRef.current);
+  }, [ensureConnected, ns]);
 
   const getFieldMapping = useCallback(async (): Promise<{
     builtin: Record<string, string>;
     properties: Record<string, string>;
   }> => {
     await ensureConnected();
-    return cadBridge.call('mapping.get', {}, tokenRef.current);
-  }, [ensureConnected]);
+    return cadBridge.call(`${ns}.mapping.get`, {}, tokenRef.current);
+  }, [ensureConnected, ns]);
 
   const pdmUrlRef = useRef(window.location.origin + '/api');
   pdmUrlRef.current = window.location.origin + '/api';
@@ -100,28 +103,25 @@ export function useCADBridge() {
 
   const uploadFile = useCallback(async (filePath: string, revisionId: string, category: 'cad' | 'production', overwrite = false, includeDrawing = false): Promise<any> => {
     await ensureConnected();
-    // 大文件上传较慢，超时放宽到 3 分钟
     return cadBridge.call('workspace.upload', { file_path: filePath, revision_id: revisionId, category, overwrite, include_drawing: includeDrawing, pdm_url: pdmUrlRef.current }, tokenRef.current, 180000);
   }, [ensureConnected]);
 
   const exportStpUpload = useCallback(async (path: string, fileName: string, revisionId: string): Promise<any> => {
     await ensureConnected();
-    // STP 导出大装配较慢，超时放宽到 3 分钟
-    return cadBridge.call('workspace.export_stp_upload', { path, file_name: fileName, revision_id: revisionId, pdm_url: pdmUrlRef.current }, tokenRef.current, 180000);
-  }, [ensureConnected]);
+    return cadBridge.call(`${ns}.workspace.export_stp_upload`, { path, file_name: fileName, revision_id: revisionId, pdm_url: pdmUrlRef.current }, tokenRef.current, 180000);
+  }, [ensureConnected, ns]);
 
   const exportPdfUpload = useCallback(async (path: string, fileName: string, revisionId: string): Promise<any> => {
     await ensureConnected();
-    // 工程图打开+转 PDF 较慢，超时放宽到 3 分钟
-    return cadBridge.call('workspace.export_pdf_upload', { path, file_name: fileName, revision_id: revisionId, pdm_url: pdmUrlRef.current }, tokenRef.current, 180000);
-  }, [ensureConnected]);
+    return cadBridge.call(`${ns}.workspace.export_pdf_upload`, { path, file_name: fileName, revision_id: revisionId, pdm_url: pdmUrlRef.current }, tokenRef.current, 180000);
+  }, [ensureConnected, ns]);
 
   return {
     connected,
-    catiaStatus,
+    cadStatus,
     loading,
     ping,
-    detectCATIA,
+    detectCAD,
     readAssemblyTree,
     readProperties,
     writeProperty,

@@ -20,7 +20,7 @@ export function CADConnectStep({ bridge, onAssemblyLoaded, onClose }: Props) {
     setDetecting(true);
     setError('');
     try {
-      const status = await bridge.detectCATIA();
+      const status = await bridge.detectCAD();
       setCatiaDetected(status.active && !!status.has_document);
       if (status.active && status.has_document) {
         setDocInfo({ name: status.doc_name || '', type: status.doc_type || '' });
