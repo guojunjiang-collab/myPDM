@@ -46,7 +46,7 @@ class SolidWorksClient:
                 if docs is not None:
                     for d in docs:
                         try:
-                            if d.GetType() == 2:  # 优先取装配体
+                            if d.GetType == 2:  # 优先取装配体
                                 doc = d
                                 break
                         except Exception:
@@ -87,7 +87,7 @@ class SolidWorksClient:
     def _get_doc_type(doc) -> str:
         """获取文档类型（Part / Assembly / Drawing）"""
         try:
-            t = doc.GetType()
+            t = doc.GetType
             type_map = {
                 1: "Part",
                 2: "Assembly",
@@ -107,7 +107,7 @@ class SolidWorksClient:
         if doc is None:
             raise RuntimeError("NO_ACTIVE_DOC")
 
-        if doc.GetType() != 2:  # swDocASSEMBLY
+        if doc.GetType != 2:  # swDocASSEMBLY
             raise RuntimeError("当前文档不是装配体")
 
         root_name = doc.GetTitle()
@@ -160,7 +160,7 @@ class SolidWorksClient:
         is_assembly = False
         if model_doc is not None:
             try:
-                is_assembly = model_doc.GetType() == 2
+                is_assembly = model_doc.GetType == 2
             except Exception:
                 pass
 
@@ -477,7 +477,7 @@ class SolidWorksClient:
                 return None
             comp = current[idx - 1]
             model = comp.GetModelDoc2()
-            if model is not None and model.GetType() == 2:
+            if model is not None and model.GetType == 2:
                 current = model.GetComponents(False)
             else:
                 current = []
