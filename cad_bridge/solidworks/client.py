@@ -128,10 +128,14 @@ class SolidWorksClient:
 
         components = doc.GetComponents(True)  # True = 仅顶层组件
         if components is not None:
-            for comp in components:
-                child = self._read_component_tree(comp, "0.1", 1, [1])
+            comp_list = list(components)
+            logger.info(f"SW 顶层组件数: {len(comp_list)}")
+            for i, comp in enumerate(comp_list):
+                child = self._read_component_tree(comp, f"0.{i+1}", 1, [i+1])
                 if child is not None:
                     tree["children"].append(child)
+        else:
+            logger.warning("SW doc.GetComponents(True) 返回 None")
 
         total, ok = [0], [0]
         def _count(node):
@@ -189,9 +193,11 @@ class SolidWorksClient:
         if is_assembly and model_doc is not None:
             children = model_doc.GetComponents(True)
             if children is not None:
-                for child in children:
-                    counter[0] += 1
-                    child_node = self._read_component_tree(child, f"{path}.{counter[0]}", level + 1, counter)
+                child_list = list(children)
+                if child_list:
+                    logger.info(f"  [{name}] 子组件数: {len(child_list)}")
+                for i, child in enumerate(child_list):
+                    child_node = self._read_component_tree(child, f"{path}.{i+1}", level + 1, counter)
                     if child_node is not None:
                         node["children"].append(child_node)
 
