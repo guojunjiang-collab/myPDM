@@ -45,7 +45,10 @@ class FakeExt:
 
 
 class FakeModelDoc:
-    """模拟已打开的 SW 文档（零件或装配体）。"""
+    """模拟已打开的 SW 文档（零件或装配体）。
+
+    关键：子级只能从"已加载的装配文档" GetComponents(True) 枚举得到，
+    模拟真实环境下轻量化父组件 comp.GetChildren() 枚举不到子级的行为。"""
 
     def __init__(self, title, doc_type, path, props):
         self._title = title
@@ -53,6 +56,7 @@ class FakeModelDoc:
         self._path = path
         self.cpm = FakeCPM(props)
         self.saved = False
+        self.top_components = []  # 本装配文档的直接子组件
 
     @property
     def GetTitle(self):
@@ -70,9 +74,9 @@ class FakeModelDoc:
     def Extension(self):
         return FakeExt(self.cpm)
 
-    # 根装配体额外暴露的方法（顶层组件枚举 + 解析/重建，均为 no-op）
+    # 装配文档枚举直接子组件（top_only=True）
     def GetComponents(self, top_only):
-        return list(getattr(self, "top_components", []))
+        return list(self.top_components)
 
     def ResolveAllLightWeightComponents(self, arg):
         return 0
@@ -89,12 +93,14 @@ class FakeModelDoc:
 
 
 class FakeComponent:
-    """模拟装配体中的组件实例（轻量化：GetModelDoc2 返回 None）。"""
+    """模拟装配体中的组件实例。
 
-    def __init__(self, name, path_name, children=None, lightweight=True):
+    轻量化：GetModelDoc2 返回 None，且 GetChildren 在父装配上下文中枚举不到
+    子级（返回空）——子结构必须由后台打开的装配文档 GetComponents(True) 提供。"""
+
+    def __init__(self, name, path_name, lightweight=True):
         self._name = name
         self._path_name = path_name
-        self._children = children or []
         self._lightweight = lightweight
 
     @property
@@ -109,7 +115,7 @@ class FakeComponent:
         return None if self._lightweight else self._model_doc
 
     def GetChildren(self):
-        return list(self._children)
+        return []  # 轻量化父组件枚举不到子级
 
     @property
     def Transform2(self):
@@ -150,9 +156,11 @@ def _build_scene():
                             {"版本": "R1", "中文名称": "总装"})
 
     part_y_comp = FakeComponent("partY-1", r"C:\a\partY.SLDPRT")
-    sub_asm_comp = FakeComponent("subA-1", r"C:\a\subA.SLDASM", children=[part_y_comp])
+    sub_asm_comp = FakeComponent("subA-1", r"C:\a\subA.SLDASM")
     part_x_comp = FakeComponent("partX-1", r"C:\a\partX.SLDPRT")
+    # 子级只经"已加载装配文档"暴露：根 → [子装配, 零件X]，子装配 → [零件Y]
     root_doc.top_components = [sub_asm_comp, part_x_comp]
+    sub_asm_doc.top_components = [part_y_comp]
 
     file_map = {
         r"C:\a\subA.SLDASM": sub_asm_doc,
