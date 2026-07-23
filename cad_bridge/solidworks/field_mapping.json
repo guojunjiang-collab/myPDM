@@ -3,6 +3,6 @@
   "properties": {
     "Part Number": "code",
     "Revision": "version",
-    "中文名称": "name"
+    "名称": "name"
   }
 }
