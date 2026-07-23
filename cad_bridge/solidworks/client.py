@@ -198,17 +198,16 @@ class SolidWorksClient:
         return node
 
     def _read_builtin_props(self, model_doc) -> dict:
-        """读取内置属性。SW 中 PartNumber/Revision 来自自定义属性，用简单的 Get 方式。"""
+        """从自定义属性中提取 PartNumber / Revision（供前端件号+版本匹配）。"""
         if model_doc is None:
             return {}
         props = {}
-        # PartNumber: 文件名作为兜底
+        # 文件名兜底
         try:
             title = model_doc.GetTitle or ""
             props["PartNumber"] = str(os.path.splitext(str(title))[0])
         except Exception:
             pass
-        # Revision / PartNumber: 从自定义属性读取覆盖
         try:
             ext = model_doc.Extension
             cpm = ext.CustomPropertyManager("")
@@ -217,32 +216,18 @@ class SolidWorksClient:
                 if names is not None:
                     for name in names:
                         n = str(name)
-                        # PartNumber: "Part Number" / "代号" / "PartNumber"
-                        if n in ("Part Number", "代号", "PartNumber") or n == "零件号":
-                            try:
-                                val = cpm.Get(n)
-                                if val and str(val).strip():
+                        try:
+                            val = cpm.Get(n)
+                            if val and str(val).strip():
+                                # PartNumber: 覆盖文件名兜底
+                                if n in ("Part Number", "PartNumber", "代号"):
                                     props["PartNumber"] = str(val).strip()
-                            except Exception:
-                                pass
-                        # Revision: "版本" / "Revision" / "Rev"
-                        elif n in ("版本", "Revision", "Rev"):
-                            try:
-                                val = cpm.Get(n)
-                                if val and str(val).strip():
+                                elif n in ("版本", "Revision", "Rev"):
                                     props["Revision"] = str(val).strip()
-                            except Exception:
-                                pass
-                        # Description: "名称" / "Description"
-                        elif n in ("名称", "Description"):
-                            try:
-                                val = cpm.Get(n)
-                                if val and str(val).strip():
-                                    props["Description"] = str(val).strip()
-                            except Exception:
-                                pass
+                        except Exception:
+                            pass
         except Exception as e:
-            logger.debug(f"读取 SW 内置属性失败: {e}")
+            logger.debug(f"提取 SW 内置属性失败: {e}")
         return props
 
     def _read_custom_props(self, model_doc) -> dict:
