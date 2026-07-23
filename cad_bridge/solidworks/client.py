@@ -17,8 +17,12 @@ class SolidWorksClient:
         self.mapping = self._load_mapping(mapping_path)
 
     def _load_mapping(self, path: str) -> dict:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            logger.warning(f"加载字段映射失败 ({path}): {e}")
+            return {"builtin": {}, "properties": {}}
 
     def _get_sw_app(self):
         """通过 COM GetObject 获取已运行的 SolidWorks Application"""
@@ -240,13 +244,16 @@ class SolidWorksClient:
 
         product = self._find_component_by_path(sw.ActiveDoc, params.get("path", "0"))
         if product is None:
-            raise RuntimeError("COMPONENT_NOT_FOUND")
+            model_doc = sw.ActiveDoc
+        else:
+            model_doc = None
+            try:
+                model_doc = product.GetModelDoc2()
+            except Exception:
+                pass
 
-        model_doc = None
-        try:
-            model_doc = product.GetModelDoc2()
-        except Exception:
-            pass
+        if model_doc is None:
+            raise RuntimeError("COMPONENT_NOT_FOUND")
 
         builtin = self._read_builtin_props(model_doc)
         user_props = self._read_custom_props(model_doc)
@@ -305,11 +312,10 @@ class SolidWorksClient:
 
         product = self._find_component_by_path(sw.ActiveDoc, params.get("path", "0"))
         if product is None:
-            raise RuntimeError("COMPONENT_NOT_FOUND")
-
-        model_doc = product.GetModelDoc2()
+            model_doc = sw.ActiveDoc
+        else:
+            model_doc = product.GetModelDoc2()
         if model_doc is None:
-            # 如果组件没有关联文档，可能是虚拟零部件
             raise RuntimeError("无法获取组件模型文档，不能导出 STP")
 
         if params.get("file_name"):
@@ -350,9 +356,9 @@ class SolidWorksClient:
 
         product = self._find_component_by_path(sw.ActiveDoc, params.get("path", "0"))
         if product is None:
-            raise RuntimeError("COMPONENT_NOT_FOUND")
-
-        model_doc = product.GetModelDoc2()
+            model_doc = sw.ActiveDoc
+        else:
+            model_doc = product.GetModelDoc2()
         if model_doc is None:
             raise RuntimeError("无法获取组件模型文档")
 
@@ -409,7 +415,7 @@ class SolidWorksClient:
             drawing_doc = sw.OpenDoc6(drawing_path, 3, 0, "", 0, 0)  # swDocDRAWING = 3
 
         try:
-            ret = drawing_doc.SaveAs3(out_path, 0, 0)  # 0=默认选项, 保存类型由扩展名决定
+            ret = drawing_doc.ExportToPDF(out_path, 0, 0)
             if ret != 0:
                 raise RuntimeError(f"PDF 导出失败，错误码: {ret}")
         finally:
@@ -425,12 +431,12 @@ class SolidWorksClient:
         return {"file_path": out_path, "file_name": file_name}
 
     def _find_component_by_path(self, doc, path: str):
-        """根据路径在装配体树中查找组件"""
+        """根据路径在装配体树中查找组件，根路径返回 None（调用方需自行使用 ActiveDoc）"""
         if doc is None:
             return None
         parts = path.split(".")
         if len(parts) <= 1:
-            return doc  # 根路径 "0" 返回文档
+            return None  # 根路径 "0" 返回 None，由调用方处理
 
         current = doc.GetComponents(False)
         if current is None:
