@@ -128,7 +128,8 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
     }
     const newOwner = new Map(meshOwner);
     for (const u of meshUuids) newOwner.set(u, leaf);
-    set({ treeData: { ...treeData }, meshOwner: newOwner });
+    const root = nodeMap.get(treeData.id) ?? treeData;
+    set({ treeData: { ...root }, meshOwner: newOwner });
   },
 
   selectNode: (id) => set({ selectedNodeId: id }),

@@ -128,6 +128,22 @@ describe('viewerStore tree extensions', () => {
     expect(s.meshOwner.get('u2')!.id).toBe('P2');
   });
 
+  it('mergeInstanceMeshes 后渲染用 treeData 根节点聚合所有已加载 mesh', () => {
+    const st = useViewerStore.getState();
+    const empty: TreeNode = {
+      id: 'A', name: 'A', type: 'group', parentId: null, meshUuids: [],
+      children: [
+        { id: 'P1', name: 'm1', type: 'part', parentId: 'A', meshUuids: [], children: [] },
+        { id: 'P2', name: 'm2', type: 'part', parentId: 'A', meshUuids: [], children: [] },
+      ],
+    };
+    st.setTreeData(empty);
+    st.mergeInstanceMeshes('P1', ['u1']);
+    st.mergeInstanceMeshes('P2', ['u2']);
+    // 渲染用的 treeData（非 nodeMap）根节点必须包含两次加载的 mesh
+    expect(useViewerStore.getState().treeData!.meshUuids.sort()).toEqual(['u1', 'u2']);
+  });
+
   it('setStreamProgress 与 reset', () => {
     const st = useViewerStore.getState();
     st.setStreamProgress({ loaded: 2, total: 5 });
