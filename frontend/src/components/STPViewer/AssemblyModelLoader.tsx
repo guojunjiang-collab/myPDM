@@ -124,13 +124,19 @@ export function AssemblyModelLoader({ instances, tree, applyZUp = true, displayT
       setStreamProgress({ loaded: 0, total: instances.length });
     }
 
-    const fitToView = () => {
-      rootGroup.updateMatrixWorld(true);
-      const box = new THREE.Box3().setFromObject(rootGroup);
-      if (box.isEmpty() || !groupRef.current) return;
+    const fitToView = (preBBox?: THREE.Box3) => {
+      if (!groupRef.current) return;
+      // 先把外层 group 复位到单位变换再测量：setFromObject 取的是世界包围盒，
+      // 而 rootGroup 是 groupRef 的子级；若不复位，本次测量会包含上一次取景施加的
+      // 缩放/位移，导致反复取景时缩放不断被重复相除，模型越缩越小、漂出视野。
+      groupRef.current.scale.setScalar(1);
+      groupRef.current.position.set(0, 0, 0);
+      groupRef.current.updateMatrixWorld(true);
+      const box = preBBox ? preBBox.clone() : new THREE.Box3().setFromObject(rootGroup);
+      if (box.isEmpty()) return;
       const s = box.getSize(new THREE.Vector3());
       const maxDim = Math.max(s.x, s.y, s.z);
-      const scale = maxDim > 0.001 ? 4 / maxDim : 1;
+      const scale = maxDim > 0.001 ? 16 / maxDim : 1;
       setModelScale(scale / 1000);
       const center = box.getCenter(new THREE.Vector3());
       groupRef.current.scale.setScalar(scale);
@@ -142,6 +148,24 @@ export function AssemblyModelLoader({ instances, tree, applyZUp = true, displayT
         camTarget: [0, 0, 0],
       });
     };
+
+    // 装配模式：用所有实例位置预计算整体空间范围，做一次初始取景
+    // 避免仅依赖首个(可能很小的)零件定标导致后续大零件穿过近裁剪面
+    if (!displayTree && instances.length > 0) {
+      const roughBox = new THREE.Box3();
+      for (const inst of instances) {
+        const p = new THREE.Vector3(inst.matrix[3], inst.matrix[7], inst.matrix[11]);
+        p.applyMatrix4(Z_UP_TO_Y_UP);
+        roughBox.expandByPoint(p);
+      }
+      const diag = roughBox.getSize(new THREE.Vector3()).length();
+      if (diag < 0.001) {
+        roughBox.expandByPoint(new THREE.Vector3(1, 1, 1));
+        roughBox.expandByPoint(new THREE.Vector3(-1, -1, -1));
+      }
+      roughBox.expandByScalar(diag * 0.15);
+      fitToView(roughBox);
+    }
 
     (async () => {
       const meshByBomItem = new Map<string, string[]>();
@@ -207,15 +231,11 @@ export function AssemblyModelLoader({ instances, tree, applyZUp = true, displayT
           list.push(...uuids);
           meshByBomItem.set(leafBom, list);
         }
-        // 流式：装配模式增量把该实例 mesh 并入树节点并更新进度；首件加入后取景一次
+        // 流式：装配模式增量把该实例 mesh 并入树节点并更新进度
         if (!displayTree) {
           if (leafBom) mergeInstanceMeshes(leafBom, uuids);
           loadedCount++;
           setStreamProgress({ loaded: loadedCount, total: ordered.length });
-          // 持续按"当前已加载内容"取景，直到用户手动操作相机为止。
-          // 若只按首个(可能很小的)零件定标，会把整机放得过大而穿过相机近裁剪面，
-          // 表现为一个平行于屏幕、把模型剖开的平面。逐件重取景可避免过大定标。
-          if (!userInteracted.current) fitToView();
         }
       }
 
