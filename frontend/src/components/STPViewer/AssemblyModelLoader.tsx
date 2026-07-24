@@ -109,6 +109,8 @@ export function AssemblyModelLoader({ instances, tree, applyZUp = true, displayT
   // 加载 + 摆位 + 注册进 viewerStore
   useEffect(() => {
     let cancelled = false;
+    firstFitDone.current = false;
+    userInteracted.current = false;
     rootGroup.matrixAutoUpdate = false;
     if (applyZUp) {
       rootGroup.matrix.copy(Z_UP_TO_Y_UP);
@@ -148,12 +150,13 @@ export function AssemblyModelLoader({ instances, tree, applyZUp = true, displayT
       const origColor = new Map<string, number>();
 
       const order = leafOrderFromTree(tree);
-      const ordered = [...instances].sort((a, b) => {
-        const ka = a.bom_path[a.bom_path.length - 1];
-        const kb = b.bom_path[b.bom_path.length - 1];
-        const ia = order.indexOf(ka); const ib = order.indexOf(kb);
-        return (ia < 0 ? Number.MAX_SAFE_INTEGER : ia) - (ib < 0 ? Number.MAX_SAFE_INTEGER : ib);
-      });
+      const orderIdx = new Map(order.map((k, i) => [k, i]));
+      const rank = (inst: AssemblyInstance) => {
+        const k = inst.bom_path[inst.bom_path.length - 1];
+        const i = orderIdx.get(k);
+        return i === undefined ? Number.MAX_SAFE_INTEGER : i;
+      };
+      const ordered = [...instances].sort((a, b) => rank(a) - rank(b));
       let loadedCount = 0;
       for (const inst of ordered) {
         let coarse: THREE.Group, normal: THREE.Group, fine: THREE.Group;
@@ -197,18 +200,17 @@ export function AssemblyModelLoader({ instances, tree, applyZUp = true, displayT
 
         rootGroup.add(lod);
 
-        // 叶子 BOM 链接 id = bom_path 末段；收集该实例所有层级的 mesh uuid
+        // 叶子 BOM 链接 id = bom_path 末段；收集该实例所有层级的 mesh uuid（单次遍历）
         const leafBom = inst.bom_path[inst.bom_path.length - 1];
+        const uuids: string[] = [];
+        lod.traverse((c) => { if ((c as THREE.Mesh).isMesh) uuids.push(c.uuid); });
         if (leafBom) {
           const list = meshByBomItem.get(leafBom) ?? [];
-          lod.traverse((c) => { if ((c as THREE.Mesh).isMesh) list.push(c.uuid); });
+          list.push(...uuids);
           meshByBomItem.set(leafBom, list);
         }
-
         // 流式：装配模式增量把该实例 mesh 并入树节点并更新进度；首件加入后取景一次
         if (!displayTree) {
-          const uuids: string[] = [];
-          lod.traverse((c) => { if ((c as THREE.Mesh).isMesh) uuids.push(c.uuid); });
           if (leafBom) mergeInstanceMeshes(leafBom, uuids);
           loadedCount++;
           setStreamProgress({ loaded: loadedCount, total: ordered.length });
@@ -235,7 +237,7 @@ export function AssemblyModelLoader({ instances, tree, applyZUp = true, displayT
       setLoadingState('ready');
     })();
 
-    return () => { cancelled = true; rootGroup.clear(); };
+    return () => { cancelled = true; rootGroup.clear(); setStreamProgress(null); };
   }, [instances, tree, rootGroup, setTreeData, setModelScale, setLoadingState, setInitialState, mergeInstanceMeshes, setStreamProgress, displayTree]);
 
   // 重置：恢复到加载时的初始视角和大小
