@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
@@ -49,6 +50,23 @@ function loadScene(url: string): Promise<THREE.Group> {
 // STEP(Z-up) → three(Y-up)：绕 X 轴 -90°，施加在装配根 group
 const Z_UP_TO_Y_UP = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
 
+// 按装配树 DFS 得到叶子 key 顺序（key 与实例 bom_path 末段一致），用于让画面自上而下填充
+function leafOrderFromTree(tree: AssemblyTreeNode[]): string[] {
+  const order: string[] = [];
+  const keyOf = (n: AssemblyTreeNode) =>
+    n.instance_index !== undefined && n.instance_index !== null
+      ? `${n.bom_item_id}:${n.instance_index}`
+      : n.bom_item_id;
+  const walk = (nodes: AssemblyTreeNode[]) => {
+    for (const n of nodes) {
+      if (n.is_leaf || !n.children || n.children.length === 0) order.push(keyOf(n));
+      else walk(n.children);
+    }
+  };
+  walk(tree);
+  return order;
+}
+
 interface Props {
   instances: AssemblyInstance[];
   tree: AssemblyTreeNode[];
@@ -62,16 +80,31 @@ interface Props {
  * 从而复用同一套树面板/工具栏/高亮/隔离/剖切/测量/爆炸/重置逻辑。
  */
 export function AssemblyModelLoader({ instances, tree, applyZUp = true, displayTree }: Props) {
-  const { setTreeData, setModelScale, setLoadingState, selectByMesh, resetViewTrigger, measureMode } =
+  const { setTreeData, setModelScale, setLoadingState, selectByMesh, resetViewTrigger, measureMode, mergeInstanceMeshes, setStreamProgress } =
     useViewerStore();
   const setInitialState = useViewerStore((s) => s.setInitialState);
   const groupRef = useRef<THREE.Group>(null);
   const [rootGroup] = useState(() => new THREE.Group());
   const origColorRef = useRef<Map<string, number>>(new Map());
   const pointerDown = useRef<{ x: number; y: number } | null>(null);
+  const { gl } = useThree();
+  const userInteracted = useRef(false);
+  const firstFitDone = useRef(false);
 
   // 选中高亮 / 隔离 / 显隐 / 线框 / 自动上色 —— 与单件模式共用
   useSceneVisualState(groupRef, origColorRef);
+
+  // 探测用户是否手动操作过相机：一旦交互，收尾 refit 让位、不再抢镜头
+  useEffect(() => {
+    const el = gl.domElement;
+    const mark = () => { userInteracted.current = true; };
+    el.addEventListener('pointerdown', mark);
+    el.addEventListener('wheel', mark, { passive: true });
+    return () => {
+      el.removeEventListener('pointerdown', mark);
+      el.removeEventListener('wheel', mark);
+    };
+  }, [gl]);
 
   // 加载 + 摆位 + 注册进 viewerStore
   useEffect(() => {
@@ -85,14 +118,44 @@ export function AssemblyModelLoader({ instances, tree, applyZUp = true, displayT
     rootGroup.clear();
     // config 模式有 displayTree 时，树数据已由 STPViewer 预设好，不覆盖 loadingState
     if (!displayTree) {
-      setLoadingState('loading');
+      // 装配模式：立即用空 mesh 的完整树渲染面板，并让画布可见可交互
+      setTreeData(buildAssemblyTreeNodes(tree, new Map<string, string[]>()));
+      setLoadingState('ready');
+      setStreamProgress({ loaded: 0, total: instances.length });
     }
+
+    const fitToView = () => {
+      rootGroup.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(rootGroup);
+      if (box.isEmpty() || !groupRef.current) return;
+      const s = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(s.x, s.y, s.z);
+      const scale = maxDim > 0.001 ? 4 / maxDim : 1;
+      setModelScale(scale / 1000);
+      const center = box.getCenter(new THREE.Vector3());
+      groupRef.current.scale.setScalar(scale);
+      groupRef.current.position.copy(center.multiplyScalar(-scale));
+      setInitialState({
+        groupScale: scale,
+        groupPos: [groupRef.current.position.x, groupRef.current.position.y, groupRef.current.position.z],
+        camPos: [5, 5, 5],
+        camTarget: [0, 0, 0],
+      });
+    };
 
     (async () => {
       const meshByBomItem = new Map<string, string[]>();
       const origColor = new Map<string, number>();
 
-      for (const inst of instances) {
+      const order = leafOrderFromTree(tree);
+      const ordered = [...instances].sort((a, b) => {
+        const ka = a.bom_path[a.bom_path.length - 1];
+        const kb = b.bom_path[b.bom_path.length - 1];
+        const ia = order.indexOf(ka); const ib = order.indexOf(kb);
+        return (ia < 0 ? Number.MAX_SAFE_INTEGER : ia) - (ib < 0 ? Number.MAX_SAFE_INTEGER : ib);
+      });
+      let loadedCount = 0;
+      for (const inst of ordered) {
         let coarse: THREE.Group, normal: THREE.Group, fine: THREE.Group;
         try {
           [coarse, normal, fine] = await Promise.all([
@@ -141,44 +204,39 @@ export function AssemblyModelLoader({ instances, tree, applyZUp = true, displayT
           lod.traverse((c) => { if ((c as THREE.Mesh).isMesh) list.push(c.uuid); });
           meshByBomItem.set(leafBom, list);
         }
+
+        // 流式：装配模式增量把该实例 mesh 并入树节点并更新进度；首件加入后取景一次
+        if (!displayTree) {
+          const uuids: string[] = [];
+          lod.traverse((c) => { if ((c as THREE.Mesh).isMesh) uuids.push(c.uuid); });
+          if (leafBom) mergeInstanceMeshes(leafBom, uuids);
+          loadedCount++;
+          setStreamProgress({ loaded: loadedCount, total: ordered.length });
+          if (!firstFitDone.current) { fitToView(); firstFitDone.current = true; }
+        }
       }
 
       if (cancelled) return;
       origColorRef.current = origColor;
 
-      // 注册装配树（走 viewerStore，树面板/高亮/隔离全部复用）
       if (displayTree) {
-        // config 模式：回填 mesh uuid 到配置项树中
+        // config 模式：树保持一次性写入（退化路径，不做增量流式）
         const merged = mergeMeshUuidsIntoConfigTree(displayTree, tree, meshByBomItem);
         setTreeData(merged);
+        fitToView();
       } else {
-        setTreeData(buildAssemblyTreeNodes(tree, meshByBomItem));
-      }
-
-      // 缩放居中 + 保存初始状态（同 ModelLoader）
-      rootGroup.updateMatrixWorld(true);
-      const box = new THREE.Box3().setFromObject(rootGroup);
-      if (!box.isEmpty() && groupRef.current) {
-        const s = box.getSize(new THREE.Vector3());
-        const maxDim = Math.max(s.x, s.y, s.z);
-        const scale = maxDim > 0.001 ? 4 / maxDim : 1;
-        setModelScale(scale / 1000);
-        const center = box.getCenter(new THREE.Vector3());
-        groupRef.current.scale.setScalar(scale);
-        groupRef.current.position.copy(center.multiplyScalar(-scale));
-        setInitialState({
-          groupScale: scale,
-          groupPos: [groupRef.current.position.x, groupRef.current.position.y, groupRef.current.position.z],
-          camPos: [5, 5, 5],
-          camTarget: [0, 0, 0],
-        });
+        // 装配模式：树已在流式中增量写好；进度收尾清空
+        setStreamProgress(null);
+        // 收尾 refit 让位于用户交互
+        if (!firstFitDone.current) fitToView();
+        else if (!userInteracted.current) fitToView();
       }
 
       setLoadingState('ready');
     })();
 
     return () => { cancelled = true; rootGroup.clear(); };
-  }, [instances, tree, rootGroup, setTreeData, setModelScale, setLoadingState, setInitialState]);
+  }, [instances, tree, rootGroup, setTreeData, setModelScale, setLoadingState, setInitialState, mergeInstanceMeshes, setStreamProgress, displayTree]);
 
   // 重置：恢复到加载时的初始视角和大小
   useEffect(() => {
