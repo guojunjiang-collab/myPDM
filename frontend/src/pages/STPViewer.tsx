@@ -149,7 +149,8 @@ export default function STPViewerPage() {
 
   return (
     <div className="w-screen h-screen relative flex">
-      {(asmTree.length > 0 || !!configDisplayTree) && (
+      {(asmTree.length > 0 || !!configDisplayTree ||
+        (!assemblyRevId && !configProfileId && loadingState === 'ready')) && (
         <>
           <div style={{ width: treeWidth }} className="shrink-0 h-full">
             <ModelTreePanel />
