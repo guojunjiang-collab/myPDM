@@ -1,5 +1,6 @@
 """零部件签入检出 CRUD 操作"""
 from __future__ import annotations
+import copy
 from typing import Optional, List, Tuple, Any, Dict
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
@@ -397,6 +398,9 @@ def _copy_iteration_data(db: Session, source_iter: models_parts.PartIteration, n
             child_revision_id=bom.child_revision_id,
             quantity=bom.quantity,
             sort_order=bom.sort_order,
+            # 复制 CAD 变换矩阵等实例信息，否则新迭代 3D 预览子项位置丢失。
+            # 深拷贝使新旧迭代互不影响。
+            cad_instances=copy.deepcopy(bom.cad_instances or []),
         )
         db.add(new_bom)
 
