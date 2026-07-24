@@ -58,3 +58,43 @@ def test_undocheckout_clears_copied_attachments_and_bom(db):
     rev, err = crud_parts.undocheckout_part(db, r.id, user)
     assert err is None
     assert rev.latest_iteration == 1
+
+
+def test_checkout_copies_bom_cad_instances(db):
+    """签出生成新迭代时，必须复制 BOM 子项的 cad_instances(变换矩阵)，
+    否则 3D 预览时子项位置丢失。防回归。"""
+    _, asm_r, asm_it = _mk(db, "ASM")
+    _, leaf_r, _ = _mk(db, "LEAF")
+    matrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 10, 20, 30, 1]
+    instances = [{"matrix": matrix, "source": "step", "label": "inst1"}]
+    b = models.BOMItem(id=uuid.uuid4(), iteration_id=asm_it.id,
+                       parent_revision_id=asm_r.id, child_revision_id=leaf_r.id,
+                       quantity=2, sort_order=0, cad_instances=instances)
+    db.add(b); db.commit()
+
+    user = uuid.uuid4()
+    rev, err = crud_parts.checkout_part(db, asm_r.id, user)
+    assert err is None
+    assert rev.latest_iteration == 2
+
+    new_iter = (
+        db.query(models_parts.PartIteration)
+        .filter(models_parts.PartIteration.revision_id == asm_r.id,
+                models_parts.PartIteration.iteration == 2)
+        .first()
+    )
+    new_bom = (
+        db.query(models.BOMItem)
+        .filter(models.BOMItem.iteration_id == new_iter.id)
+        .first()
+    )
+    assert new_bom is not None
+    assert new_bom.cad_instances == instances
+
+    # 应为深拷贝：改新迭代不影响旧迭代
+    new_bom.cad_instances[0]["label"] = "changed"
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(new_bom, "cad_instances")
+    db.commit()
+    db.refresh(b)
+    assert b.cad_instances[0]["label"] == "inst1"

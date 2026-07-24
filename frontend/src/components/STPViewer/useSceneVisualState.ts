@@ -26,6 +26,7 @@ export function useSceneVisualState(
   const hiddenParts = useViewerStore((s) => s.hiddenParts);
   const wireframe = useViewerStore((s) => s.wireframe);
   const autoColor = useViewerStore((s) => s.autoColor);
+  const treeData = useViewerStore((s) => s.treeData);
 
   // 选中高亮 / 隔离 / 显隐 / 线框
   useEffect(() => {
@@ -97,5 +98,5 @@ export function useSceneVisualState(
       std.color.setHex(hex);
       std.needsUpdate = true;
     });
-  }, [groupRef, origColorRef, autoColor, nodeMap]);
+  }, [groupRef, origColorRef, autoColor, treeData]);
 }

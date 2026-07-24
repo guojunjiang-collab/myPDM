@@ -36,10 +36,13 @@ export function CameraController() {
   const viewTarget = useViewerStore((s) => s.viewTarget);
   const setViewTarget = useViewerStore((s) => s.setViewTarget);
   const resetViewTrigger = useViewerStore((s) => s.resetViewTrigger);
+  const streamProgress = useViewerStore((s) => s.streamProgress);
   const { camera, set, size } = useThree();
   const controlsRef = useRef<any>(null);
   const prevMode = useRef<string | null>(null);
   const anim = useRef<{ start: THREE.Vector3; end: THREE.Vector3; up: THREE.Vector3; target: THREE.Vector3; elapsed: number } | null>(null);
+
+  const isStreaming = streamProgress !== null && streamProgress.loaded < streamProgress.total;
 
   useEffect(() => {
     if (controlsRef.current) {
@@ -158,5 +161,5 @@ export function CameraController() {
     }
   });
 
-  return <ArcballControls ref={controlsRef} makeDefault />;
+  return <ArcballControls ref={controlsRef} makeDefault enabled={!isStreaming} />;
 }

@@ -53,7 +53,7 @@
 
 ## 3. 安装
 
-**把 cad_bridge 文件夹放在项目目录中**
+**把 cad_bridge 文件夹放在项目目录中（示例：`D:\OpenCode\myPDM`，可自行放置）**
 
 ```powershell
 # 进入项目目录

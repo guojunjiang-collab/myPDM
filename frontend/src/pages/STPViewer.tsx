@@ -18,6 +18,7 @@ export default function STPViewerPage() {
   const [treeWidth, setTreeWidth] = useState(240);
   const dragging = useRef(false);
   const loadingState = useViewerStore((s) => s.loadingState);
+  const streamProgress = useViewerStore((s) => s.streamProgress);
   const errorMessage = useViewerStore((s) => s.errorMessage);
   const reset = useViewerStore((s) => s.reset);
   const setTreeData = useViewerStore((s) => s.setTreeData);
@@ -149,7 +150,8 @@ export default function STPViewerPage() {
 
   return (
     <div className="w-screen h-screen relative flex">
-      {(asmTree.length > 0 || !!configDisplayTree) && (
+      {(asmTree.length > 0 || !!configDisplayTree ||
+        (!assemblyRevId && !configProfileId && loadingState === 'ready')) && (
         <>
           <div style={{ width: treeWidth }} className="shrink-0 h-full">
             <ModelTreePanel />
@@ -188,12 +190,21 @@ export default function STPViewerPage() {
           <p className="text-sm text-white">正在加载配置清单3D模型...</p>
         </div>
       )}
+      {/* 单件：解析渲染中（非阻塞角标） */}
       {!assemblyRevId && url && state === 'ready' && loadingState !== 'ready' && loadingState !== 'error' && (
-        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/90 gap-4">
-          <div className="text-gray-500 text-sm">正在解析渲染...</div>
-          <div className="w-72 h-2 bg-gray-200 rounded-full overflow-hidden">
-            <div className="h-full bg-green-500 rounded-full animate-pulse" style={{ width: '70%' }} />
-          </div>
+        <div className="absolute top-3 right-3 z-30 flex items-center gap-2 bg-white/90 rounded-full shadow px-3 py-1.5 pointer-events-none">
+          <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-green-500 border-t-transparent" />
+          <span className="text-gray-600 text-xs">正在解析渲染...</span>
+        </div>
+      )}
+
+      {/* 装配：流式加载进度（非阻塞角标） */}
+      {assemblyRevId && streamProgress && streamProgress.loaded < streamProgress.total && (
+        <div className="absolute top-3 right-3 z-30 flex items-center gap-2 bg-white/90 rounded-full shadow px-3 py-1.5 pointer-events-none">
+          <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-blue-500 border-t-transparent" />
+          <span className="text-gray-600 text-xs tabular-nums">
+            已加载 {streamProgress.loaded}/{streamProgress.total}
+          </span>
         </div>
       )}
       {loadingState === 'error' && (
