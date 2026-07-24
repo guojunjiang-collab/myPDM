@@ -84,4 +84,55 @@ describe('viewerStore tree extensions', () => {
     expect(s.hiddenParts.has('u1')).toBe(true);
     expect(s.hiddenParts.has('u2')).toBe(true);
   });
+
+  it('mergeInstanceMeshes 把 mesh 并入叶子及祖先并更新 meshOwner', () => {
+    const st = useViewerStore.getState();
+    const empty: TreeNode = {
+      id: 'A', name: 'A', type: 'group', parentId: null, meshUuids: [],
+      children: [{
+        id: 'G', name: 'G', type: 'group', parentId: 'A', meshUuids: [],
+        children: [
+          { id: 'P1', name: 'm1', type: 'part', parentId: 'G', meshUuids: [], children: [] },
+          { id: 'P2', name: 'm2', type: 'part', parentId: 'G', meshUuids: [], children: [] },
+        ],
+      }],
+    };
+    st.setTreeData(empty);
+    st.mergeInstanceMeshes('P1', ['u1', 'ua']);
+    const s = useViewerStore.getState();
+    expect(s.nodeMap.get('P1')!.meshUuids.sort()).toEqual(['u1', 'ua']);
+    expect(s.nodeMap.get('G')!.meshUuids.sort()).toEqual(['u1', 'ua']);
+    expect(s.nodeMap.get('A')!.meshUuids.sort()).toEqual(['u1', 'ua']);
+    expect(s.meshOwner.get('u1')!.id).toBe('P1');
+    expect(s.meshOwner.get('ua')!.id).toBe('P1');
+    st.selectByMesh('u1');
+    expect(useViewerStore.getState().selectedNodeId).toBe('P1');
+  });
+
+  it('mergeInstanceMeshes 去重且第二个叶子独立聚合', () => {
+    const st = useViewerStore.getState();
+    const empty: TreeNode = {
+      id: 'A', name: 'A', type: 'group', parentId: null, meshUuids: [],
+      children: [
+        { id: 'P1', name: 'm1', type: 'part', parentId: 'A', meshUuids: [], children: [] },
+        { id: 'P2', name: 'm2', type: 'part', parentId: 'A', meshUuids: [], children: [] },
+      ],
+    };
+    st.setTreeData(empty);
+    st.mergeInstanceMeshes('P1', ['u1']);
+    st.mergeInstanceMeshes('P1', ['u1']);
+    st.mergeInstanceMeshes('P2', ['u2']);
+    const s = useViewerStore.getState();
+    expect(s.nodeMap.get('P1')!.meshUuids).toEqual(['u1']);
+    expect(s.nodeMap.get('A')!.meshUuids.sort()).toEqual(['u1', 'u2']);
+    expect(s.meshOwner.get('u2')!.id).toBe('P2');
+  });
+
+  it('setStreamProgress 与 reset', () => {
+    const st = useViewerStore.getState();
+    st.setStreamProgress({ loaded: 2, total: 5 });
+    expect(useViewerStore.getState().streamProgress).toEqual({ loaded: 2, total: 5 });
+    st.reset();
+    expect(useViewerStore.getState().streamProgress).toBeNull();
+  });
 });

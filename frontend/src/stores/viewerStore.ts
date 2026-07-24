@@ -17,6 +17,7 @@ export interface ViewerState {
   isolateMode: boolean;
   expandedIds: Set<string>;
   hiddenParts: Set<string>;
+  streamProgress: { loaded: number; total: number } | null;
 
   // 视图
   modelScale: number;
@@ -40,6 +41,8 @@ export interface ViewerState {
   setModelScale: (s: number) => void;
   setLoadingState: (state: ViewerState['loadingState'], msg?: string) => void;
   setTreeData: (t: TreeNode | null) => void;
+  setStreamProgress: (p: { loaded: number; total: number } | null) => void;
+  mergeInstanceMeshes: (nodeId: string, meshUuids: string[]) => void;
   selectNode: (id: string | null) => void;
   selectByMesh: (meshUuid: string) => void;
   setIsolateMode: (v: boolean) => void;
@@ -64,6 +67,7 @@ const initialState = {
   loadingState: 'idle' as const,
   errorMessage: '',
   treeData: null as TreeNode | null,
+  streamProgress: null as { loaded: number; total: number } | null,
   nodeMap: new Map<string, TreeNode>(),
   meshOwner: new Map<string, TreeNode>(),
   selectedNodeId: null as string | null,
@@ -104,6 +108,27 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
     };
     if (t) visit(t);
     set({ treeData: t, nodeMap, meshOwner, selectedNodeId: null, hiddenParts: new Set() });
+  },
+
+  setStreamProgress: (p) => set({ streamProgress: p }),
+
+  // 流式加载：把某叶子实例的 mesh uuid 增量并入其节点及所有祖先（祖先聚合供组级显隐/高亮），
+  // 并把 meshOwner 指向该叶子。以浅拷贝 treeData 触发面板重渲染。
+  mergeInstanceMeshes: (nodeId, meshUuids) => {
+    const { treeData, nodeMap, meshOwner } = get();
+    if (!treeData || meshUuids.length === 0) return;
+    const leaf = nodeMap.get(nodeId);
+    if (!leaf) return;
+    let cur: TreeNode | null = leaf;
+    while (cur) {
+      const merged = new Set(cur.meshUuids);
+      for (const u of meshUuids) merged.add(u);
+      cur.meshUuids = Array.from(merged);
+      cur = cur.parentId ? nodeMap.get(cur.parentId) ?? null : null;
+    }
+    const newOwner = new Map(meshOwner);
+    for (const u of meshUuids) newOwner.set(u, leaf);
+    set({ treeData: { ...treeData }, meshOwner: newOwner });
   },
 
   selectNode: (id) => set({ selectedNodeId: id }),
