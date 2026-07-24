@@ -89,7 +89,6 @@ export function AssemblyModelLoader({ instances, tree, applyZUp = true, displayT
   const pointerDown = useRef<{ x: number; y: number } | null>(null);
   const { gl } = useThree();
   const userInteracted = useRef(false);
-  const firstFitDone = useRef(false);
 
   // 选中高亮 / 隔离 / 显隐 / 线框 / 自动上色 —— 与单件模式共用
   useSceneVisualState(groupRef, origColorRef);
@@ -109,7 +108,6 @@ export function AssemblyModelLoader({ instances, tree, applyZUp = true, displayT
   // 加载 + 摆位 + 注册进 viewerStore
   useEffect(() => {
     let cancelled = false;
-    firstFitDone.current = false;
     userInteracted.current = false;
     rootGroup.matrixAutoUpdate = false;
     if (applyZUp) {
@@ -214,7 +212,10 @@ export function AssemblyModelLoader({ instances, tree, applyZUp = true, displayT
           if (leafBom) mergeInstanceMeshes(leafBom, uuids);
           loadedCount++;
           setStreamProgress({ loaded: loadedCount, total: ordered.length });
-          if (!firstFitDone.current) { fitToView(); firstFitDone.current = true; }
+          // 持续按"当前已加载内容"取景，直到用户手动操作相机为止。
+          // 若只按首个(可能很小的)零件定标，会把整机放得过大而穿过相机近裁剪面，
+          // 表现为一个平行于屏幕、把模型剖开的平面。逐件重取景可避免过大定标。
+          if (!userInteracted.current) fitToView();
         }
       }
 
@@ -229,9 +230,8 @@ export function AssemblyModelLoader({ instances, tree, applyZUp = true, displayT
       } else {
         // 装配模式：树已在流式中增量写好；进度收尾清空
         setStreamProgress(null);
-        // 收尾 refit 让位于用户交互
-        if (!firstFitDone.current) fitToView();
-        else if (!userInteracted.current) fitToView();
+        // 收尾按完整装配取景（让位于用户交互）
+        if (!userInteracted.current) fitToView();
       }
 
       setLoadingState('ready');
