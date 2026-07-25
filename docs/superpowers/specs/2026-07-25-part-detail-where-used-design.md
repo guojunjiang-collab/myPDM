@@ -5,9 +5,10 @@
 > 目标：在「零部件管理 → 零部件详情(PartDetailModal)」中新增一个 **反查(Where-Used)** Tab，
 > 汇总展示当前零部件被三类对象引用的情况：父项零部件、构型项、项目任务。
 >
-> **依赖/排期（2026-07-25 定）**：本功能排在「构型模块版本级绑定改造」之后实施。
-> 待构型改造落地（`configuration_item_parts` 存 revision_id）后，本方案 §2/§4.2 的构型段
-> 反查口径由 master 级升级为 **版本级**（改为按 `revision_id` 查询），其余不变。
+> **前置依赖（2026-07-25 已完成）**：前置项目「构型模块版本级绑定改造」已实施并合入——
+> `configuration_item_parts` 现存 `revision_id`（绑定具体零部件版本，允许同零件多版本）。
+> 因此本方案构型段反查为 **版本级**（按 `revision_id` 查询），与 BOM/任务两段口径统一，
+> 详情弹窗切换版本时三段结果同步随当前 `revisionId` 变化。
 
 ## 1. 背景与目标
 
@@ -18,23 +19,24 @@
 详情弹窗打开时已知当前零部件的 `masterId` 与 `revisionId`，因此反查无需搜索框，直接对
 当前对象反查即可。
 
-## 2. 三类引用的关联粒度（关键）
+## 2. 三类引用的关联粒度
 
-三个来源在数据库中的关联粒度不同，反查口径随之不同——这不是矛盾，是各模块的既有设计：
+前置的构型版本级绑定改造完成后，三个来源**均为 revision 级**，反查口径统一为「当前版本」：
 
 | 引用来源 | 关联表 | 存储字段 | 反查口径 | 现有接口 |
 |---------|--------|---------|---------|---------|
 | 父项零部件 | BOM(`bom_items`) | `child_revision_id` = revision | **当前版本** | 有：`bomApi.trace('component', revisionId)` |
 | 项目任务 | `project_task_links.entity_id` | **revision_id** | **当前版本** | 无反向查询，需新增 |
-| 构型项 | `configuration_item_parts.part_id` | **master_id**（整零部件） | **该零部件（不分版本）** | 无反向查询，需新增 |
+| 构型项 | `configuration_item_parts.revision_id` | **revision_id** | **当前版本** | 无反向查询，需新增 |
 
 依据：
 - `project_task_links`：`entity_type ∈ (part/assembly/component)`，`entity_id` 经
   `JOIN part_revisions pr ON pr.id = entity_id` 解析（见 `routers/projects.py` `_link_dict`）→ revision 级。
-- `configuration_item_parts.part_id`：经 `PartMaster.id == part_id` 解析（见
-  `routers/configuration.py:182`）→ master 级。
+- `configuration_item_parts.revision_id`：FK→`part_revisions.id`，绑定具体零部件版本
+  （2026-07-25 改造，见 `2026-07-25-config-part-version-binding-design.md`）→ revision 级。
+  同一构型项内同一零件允许多版本（按 revision 区分），故反查按 `revision_id` 精确命中当前版本。
 
-用户已确认：BOM 与任务按 **当前版本** 反查；构型项天然是零部件(master)级别。
+三段口径一致：详情弹窗切换零部件版本时，三段反查结果都随当前 `revisionId` 变化。
 
 ## 3. 范围
 
@@ -45,9 +47,12 @@
 - 抽取共享组件 `BomWhereUsedTree`，供新 Tab 与原 `BOMTracePanel` 复用，消除重复。
 
 **不做（Non-goals）：**
-- 不改动三类关联的写入侧逻辑。
-- 不做跨版本聚合（BOM/任务保持当前版本口径）。
+- 不改动三类关联的写入侧逻辑（构型版本级绑定已作为独立前置项目完成）。
+- 不做跨版本聚合（三段均按当前版本口径）。
 - 不新增权限模型（复用现有读权限；见 §7）。
+- **暂不**加入"被配置清单(Profile)引用"作为第四段。构型改造后
+  `configuration_profile_items.part_revision_id` 已具备版本级反查条件，若后续需要可按同样
+  模式扩展一段（`GET /parts/revisions/{revision_id}/where-used/profiles`），本轮不纳入。
 
 ## 4. 后端设计
 
@@ -56,17 +61,20 @@
 | 用途 | 方法 & 路径 | 输入 | 说明 |
 |------|-----------|------|------|
 | 父项（复用） | `GET /bom/trace/component/{revision_id}` | revision_id | 已有，返回多级上级装配树 |
-| 构型项（新增） | `GET /parts/{master_id}/where-used/configurations` | master_id | 见 §4.2 |
+| 构型项（新增） | `GET /parts/revisions/{revision_id}/where-used/configurations` | revision_id | 见 §4.2 |
 | 项目任务（新增） | `GET /parts/revisions/{revision_id}/where-used/tasks` | revision_id | 见 §4.3 |
 
-### 4.2 构型项反查
+### 4.2 构型项反查（版本级）
 
-查询：`configuration_item_parts` where `part_id = :master_id`
-→ `JOIN configuration_item_iterations it ON it.id = ci_parts.iteration_id`
+查询：`configuration_item_parts` where `revision_id = :revision_id`（精确命中当前零部件版本）
+→ `JOIN configuration_item_iterations it ON it.id = cip.iteration_id`
 → `JOIN configuration_item_revisions cir ON cir.id = it.revision_id`
 → `JOIN configuration_item_masters cim ON cim.id = cir.master_id`
 
-去重：同一构型项可能多版本/多迭代引用；按 `构型项 revision_id` 去重，取代表迭代。
+- **口径**：只返回绑定了**当前版本**的构型项；构型绑定的是别的版本则不出现在本结果中
+  （切到那个版本时才出现），与 BOM/任务一致。
+- **去重**：同一构型项可能跨多个迭代引用同一零件版本；按 `构型项 revision_id` 去重，取代表迭代。
+- **权限/软删**：过滤构型项 `deleted_at IS NULL`；沿用现有构型读权限。
 
 返回项（数组）：
 ```jsonc
@@ -75,12 +83,14 @@
   "config_item_revision_id": "…",   // 用于点击打开 ConfigItemDetailModal
   "code": "构型项件号",
   "name": "构型项名称",
-  "version": "A",
+  "version": "A",                   // 构型项自身版本
   "status": "released",
   "is_required": true,
   "quantity": 2
 }
 ```
+> 注：因反查已按当前零部件 `revision_id` 精确命中，返回项无需再带"引用的零部件版本"
+> （即当前详情版本本身）。构型项自身的 `version` 仍返回，用于列表展示与打开详情。
 
 ### 4.3 项目任务反查
 
@@ -117,7 +127,8 @@ task 对象 + `project_id`）：
 ### 5.2 内容：三段堆叠 + 懒加载
 
 新增子组件 `PartWhereUsedTab`（`components/PartDetailModal/PartWhereUsedTab.tsx` 或同目录），
-props：`{ masterId, revisionId, onOpenPart, onOpenConfig, onOpenTask }`。
+props：`{ revisionId, onOpenPart, onOpenConfig, onOpenTask }`。三段反查均以当前 `revisionId`
+为输入（构型改造后不再需要 `masterId`）。
 
 - 切到「反查」Tab 时首次挂载，三段 **并行懒加载**（各自 loading/empty/error 态）。
 - 三段结构（每段：小标题 + 计数徽标 + 表格）：
@@ -146,12 +157,12 @@ props：`{ masterId, revisionId, onOpenPart, onOpenConfig, onOpenTask }`。
 ## 6. 数据流
 
 ```
-切到「反查」Tab
-  ├─ GET /bom/trace/component/{revisionId}          → 父项树
-  ├─ GET /parts/{masterId}/where-used/configurations → 构型项列表
-  └─ GET /parts/revisions/{revisionId}/where-used/tasks → 任务列表
+切到「反查」Tab（三段输入均为当前 revisionId）
+  ├─ GET /bom/trace/component/{revisionId}                    → 父项树
+  ├─ GET /parts/revisions/{revisionId}/where-used/configurations → 构型项列表
+  └─ GET /parts/revisions/{revisionId}/where-used/tasks       → 任务列表
 点击某行 → 打开对应详情弹窗（PartDetailModal / ConfigItemDetailModal / TaskEditModal）
-切换详情版本（版本历史 Tab 切 revision）→ 反查 Tab 数据随当前 revisionId/masterId 重新拉取
+切换详情版本（版本历史 Tab 切 revision）→ 三段反查均随当前 revisionId 重新拉取
 ```
 
 ## 7. 边界与权限
@@ -160,13 +171,15 @@ props：`{ masterId, revisionId, onOpenPart, onOpenConfig, onOpenTask }`。
 - **权限**：三个反查端点均为只读查询，复用现有认证；构型/项目读权限若已有 code 级校验，
   沿用（查询不到即空列表，不额外报错）。
 - **性能**：三段并行；构型/任务为单表 + 少量 JOIN，量级小，无需分页。
-- **版本切换**：详情弹窗切换 revision 时，反查 Tab 依赖 `revisionId`（父项/任务）与 `masterId`
-  （构型）自动重查。
+- **版本切换**：详情弹窗切换 revision 时，三段反查均依赖当前 `revisionId` 自动重查
+  （构型改造后已统一为版本级）。
 
 ## 8. 测试
 
 **后端：**
-- 构型反查：无引用→空；单/多构型项引用→正确件号/版本/用量；多版本引用去重。
+- 构型反查（版本级）：无引用→空；构型项绑定**当前版本**→命中；构型项绑定**同零件的其他版本**
+  →**不**出现在当前版本结果（切到该版本才出现）；同构型项多迭代引用同一版本→按构型项 revision 去重；
+  构型项软删→排除。
 - 任务反查：无引用→空；part/assembly/component 三种 entity_type 命中；已删除任务(deleted_at)排除；
   返回 task 结构字段完整（可直接喂 TaskEditModal）。
 - 越权/不存在 id → 空列表而非 500。
