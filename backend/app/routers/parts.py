@@ -1223,3 +1223,15 @@ def get_attachment_lod_glb(
     if not glb or not _os.path.exists(glb):
         raise HTTPException(status_code=404, detail="LOD 未生成")
     return FileResponse(str(glb), media_type="model/gltf-binary", filename=glb.name)
+
+
+# ===== 零部件反查 =====
+
+@router.get("/revisions/{revision_id}/where-used/configurations")
+async def where_used_configurations_ep(
+    revision_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("parts:read")),
+):
+    from ..crud_configuration import where_used_configurations
+    return where_used_configurations(db, revision_id)

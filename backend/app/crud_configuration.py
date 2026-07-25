@@ -1432,3 +1432,33 @@ def get_config_item_iteration_detail(db: Session, iteration_id):
     return db.query(models.ConfigurationItemIteration).filter(
         models.ConfigurationItemIteration.id == iteration_id
     ).first()
+
+
+def where_used_configurations(db: Session, revision_id) -> list:
+    """反查：绑定了该零部件版本(revision)的构型项（按构型项 revision 去重）。"""
+    rows = (
+        db.query(models.ConfigurationItemPart, models.ConfigurationItemRevision, models.ConfigurationItemMaster)
+        .join(models.ConfigurationItemIteration,
+              models.ConfigurationItemIteration.id == models.ConfigurationItemPart.iteration_id)
+        .join(models.ConfigurationItemRevision,
+              models.ConfigurationItemRevision.id == models.ConfigurationItemIteration.revision_id)
+        .join(models.ConfigurationItemMaster,
+              models.ConfigurationItemMaster.id == models.ConfigurationItemRevision.master_id)
+        .filter(models.ConfigurationItemPart.revision_id == revision_id,
+                models.ConfigurationItemMaster.deleted_at.is_(None),
+                models.ConfigurationItemRevision.deleted_at.is_(None))
+        .all()
+    )
+    seen, out = set(), []
+    for cip, cir, cim in rows:
+        if str(cir.id) in seen:
+            continue
+        seen.add(str(cir.id))
+        out.append({
+            "config_item_master_id": str(cim.id),
+            "config_item_revision_id": str(cir.id),
+            "code": cim.code, "name": cim.name,
+            "version": cir.version, "status": cir.status,
+            "is_required": cip.is_required, "quantity": cip.quantity,
+        })
+    return out
