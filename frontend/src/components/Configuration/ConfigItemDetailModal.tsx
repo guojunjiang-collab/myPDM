@@ -449,11 +449,12 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
 
       {/* 零部件选择器 */}
       <AssemblyPartPicker open={partPickerOpen} onClose={() => setPartPickerOpen(false)}
-        existingChildIds={new Set(parts.map(p => p.part_id))}
+        existingChildIds={new Set(parts.map(p => p.part_detail?.revision_id).filter(Boolean) as string[])}
         onConfirm={async (items) => {
-          const itemsToAdd: { part_type: string; part_id: string; quantity: number }[] = [];
+          const existingRevs = new Set(parts.map(p => p.part_detail?.revision_id).filter(Boolean));
+          const toAdd: { part_type: string; part_id: string; revision_id: string; is_required: boolean; quantity: number }[] = [];
           for (const it of items) {
-            if (parts.some(p => p.part_id === it.child_id)) continue;
+            if (existingRevs.has(it.child_id)) continue;
             let masterId = ''; let pType = 'part';
             try {
               const rev = await partsApi.getRevision(it.child_id);
@@ -462,18 +463,12 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
               const master = await partsApi.get(masterId);
               pType = master.type || 'part';
             } catch { continue; }
-            if (parts.some(p => p.part_id === masterId)) continue;
-            itemsToAdd.push({ part_type: pType, part_id: masterId, quantity: it.quantity ?? 1 });
+            toAdd.push({ part_type: pType, part_id: masterId, revision_id: it.child_id, is_required: true, quantity: it.quantity ?? 1 });
           }
-          if (itemsToAdd.length === 0) { setPartPickerOpen(false); return; }
+          if (toAdd.length === 0) { setPartPickerOpen(false); return; }
           try {
-            await configurationApi.addParts(internalRevId, itemsToAdd.map(it => ({
-              part_type: it.part_type,
-              part_id: it.part_id,
-              is_required: true,
-              quantity: it.quantity,
-            })));
-            toast.success(`已关联 ${itemsToAdd.length} 个零部件`);
+            await configurationApi.addParts(internalRevId, toAdd);
+            toast.success(`已关联 ${toAdd.length} 个零部件版本`);
             setPartPickerOpen(false);
             loadDetail();
           } catch (e: any) {
@@ -492,22 +487,16 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
           entityId={parts[versionSelectIdx].part_id}
           entityName={parts[versionSelectIdx].part_detail?.name || ''}
           currentVersionId={parts[versionSelectIdx].part_detail?.revision_id || parts[versionSelectIdx].part_id}
-          onSelect={(versionId: string) => {
-            const pd = parts[versionSelectIdx].part_detail || {};
-            partsApi.getRevision(versionId).then(r => {
-              setParts(prev => prev.map((p, i) => i === versionSelectIdx ? {
-                ...p,
-                part_detail: {
-                  ...pd,
-                  revision_id: r.id,
-                  version: r.version || '',
-                  status: r.status || '',
-                  check_out_user_id: r.check_out_user_id || null,
-                  check_out_user_name: r.check_out_user_name || null,
-                },
-              } : p));
-            }).catch(() => {});
+          onSelect={async (versionId: string) => {
+            const target = parts[versionSelectIdx];
             setVersionSelectIdx(null);
+            try {
+              await configurationApi.updatePart(internalRevId, target.id, { revision_id: versionId });
+              toast.success('已更新绑定版本');
+              loadDetail();
+            } catch (e: any) {
+              toast.error(e?.response?.data?.detail || '更新版本失败');
+            }
           }}
           onClose={() => setVersionSelectIdx(null)}
         />
