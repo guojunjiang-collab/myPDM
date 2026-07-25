@@ -181,10 +181,14 @@ async def get_config_item_detail(
         for p in crud.get_iteration_parts(db, current_iter.id):
             entity = db.query(PartMaster).filter(PartMaster.id == p.part_id).first()
             if entity:
-                rev = db.query(PartRevision).filter(
-                    PartRevision.master_id == entity.id,
-                    PartRevision.deleted_at.is_(None)
-                ).order_by(PartRevision.created_at.desc()).first()
+                rev = None
+                if p.revision_id:
+                    rev = db.query(PartRevision).filter(PartRevision.id == p.revision_id).first()
+                if rev is None:
+                    rev = db.query(PartRevision).filter(
+                        PartRevision.master_id == entity.id,
+                        PartRevision.deleted_at.is_(None)
+                    ).order_by(PartRevision.created_at.desc()).first()
                 checkout_user_name = _resolve_user_name(db, rev.check_out_user_id) if rev else None
                 # 检查当前迭代是否有STP生产附件（用于3D预览）
                 has_3d = entity.type == 'assembly'

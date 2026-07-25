@@ -69,3 +69,34 @@ def test_update_part_changes_revision(db):
     updated = crud.update_config_part(db, link.id, {"revision_id": revs[1].id})
     assert updated is not None
     assert updated.revision_id == revs[1].id
+
+
+def _resolve_bound_revision(db, cip):
+    """镜像 router 中 part_detail 的版本解析：优先绑定版本，空则回退最新。"""
+    from app.models_parts import PartRevision
+
+    rev = None
+    if cip.revision_id:
+        rev = db.query(PartRevision).filter(PartRevision.id == cip.revision_id).first()
+    if rev is None:
+        rev = (db.query(PartRevision)
+               .filter(PartRevision.master_id == cip.part_id, PartRevision.deleted_at.is_(None))
+               .order_by(PartRevision.created_at.desc()).first())
+    return rev
+
+
+def test_detail_shows_bound_version_not_latest(db):
+    """构型项详情按绑定版本解析：升版后仍显示绑定版本，固定不跟新。"""
+    import time
+    from app import crud_configuration as crud
+
+    m, revs = _part(db, versions=("A",))
+    _, _, ci = _config_iter(db)
+    link = crud.add_part_to_iteration(db, ci.id, "part", m.id, revision_id=revs[0].id)
+    # 该零件升版到 B（更晚创建）
+    time.sleep(0.01)
+    rb = models_parts.PartRevision(id=uuid.uuid4(), master_id=m.id, version="B", status="released", latest_iteration=1)
+    db.add(rb); db.commit()
+    db.refresh(link)
+    bound = _resolve_bound_revision(db, link)
+    assert bound.version == "A"  # 固定绑定，不跟新到 B
