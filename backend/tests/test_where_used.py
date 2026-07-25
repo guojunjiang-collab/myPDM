@@ -5,6 +5,7 @@ from app import crud_configuration as ccrud
 from app.models_configuration import (
     ConfigurationItemMaster, ConfigurationItemRevision,
     ConfigurationItemIteration, ConfigurationItemPart,
+    ConfigurationProfile, ConfigurationProfileItem,
 )
 
 
@@ -70,3 +71,23 @@ def test_where_used_configurations_matches_bound_version(db):
     assert hit_a[0]["quantity"] == 2
     # 查 B 版：不命中（绑定的是 A）
     assert ccrud.where_used_configurations(db, revs[1].id) == []
+
+
+def test_where_used_profiles_matches_bound_version(db):
+    m, revs = _part(db, versions=("A", "B"))
+    prof = ConfigurationProfile(
+        id=uuid.uuid4(), code=f"CFG-{uuid.uuid4().hex[:5]}", name="配置1",
+        status="active", creator_id=uuid.uuid4(), reviewers=[], review_mode="all", cc_users=[],
+    )
+    db.add(prof); db.flush()
+    db.add(ConfigurationProfileItem(
+        id=uuid.uuid4(), profile_id=prof.id, item_type="part", item_id=m.id,
+        item_code=m.code, item_name=m.name, part_revision_id=revs[0].id,
+        is_required=True, is_selected=True, quantity=1, source_type="direct", sort_order=0,
+    )); db.commit()
+    hit = ccrud.where_used_profiles(db, revs[0].id)
+    assert len(hit) == 1
+    assert hit[0]["profile_id"] == str(prof.id)
+    assert hit[0]["code"] == prof.code
+    # 绑定 A，查 B → 空
+    assert ccrud.where_used_profiles(db, revs[1].id) == []

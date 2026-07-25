@@ -1249,3 +1249,13 @@ async def where_used_tasks_ep(
         {"project_id": str(p.id), "project_name": p.name, "task": _task_dict(db, t)}
         for t, p in where_used_tasks(db, revision_id)
     ]
+
+
+@router.get("/revisions/{revision_id}/where-used/profiles")
+async def where_used_profiles_ep(
+    revision_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("parts:read")),
+):
+    from ..crud_configuration import where_used_profiles
+    return where_used_profiles(db, revision_id)

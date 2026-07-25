@@ -1462,3 +1462,25 @@ def where_used_configurations(db: Session, revision_id) -> list:
             "is_required": cip.is_required, "quantity": cip.quantity,
         })
     return out
+
+
+def where_used_profiles(db: Session, revision_id) -> list:
+    """反查：正式配置清单中引用了该零部件版本的构型配置(Profile)。按 profile 去重。"""
+    rows = (
+        db.query(models.ConfigurationProfileItem, models.ConfigurationProfile)
+        .join(models.ConfigurationProfile,
+              models.ConfigurationProfile.id == models.ConfigurationProfileItem.profile_id)
+        .filter(models.ConfigurationProfileItem.part_revision_id == revision_id)
+        .all()
+    )
+    seen, out = set(), []
+    for pi, prof in rows:
+        if str(prof.id) in seen:
+            continue
+        seen.add(str(prof.id))
+        out.append({
+            "profile_id": str(prof.id),
+            "code": prof.code, "name": prof.name, "status": prof.status,
+            "is_required": pi.is_required, "quantity": pi.quantity,
+        })
+    return out
