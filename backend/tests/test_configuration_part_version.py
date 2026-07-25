@@ -40,3 +40,20 @@ def test_part_link_persists_revision_id(db):
     )
     db.add(link); db.commit(); db.refresh(link)
     assert link.revision_id == revs[0].id
+
+
+def test_add_parts_stores_revision_and_allows_multi_version(db):
+    """写入侧通过 CRUD/Schema 存储 revision_id，同零件多版本共存。"""
+    from app import crud_configuration as crud
+    from app import schemas_configuration as schemas
+
+    m, revs = _part(db, versions=("A", "B"))   # revs[0]=A, revs[1]=B(最新)
+    _, _, ci = _config_iter(db)
+    crud.add_config_parts(db, str(ci.id), [
+        schemas.ConfigPartCreate(part_type="part", part_id=m.id, revision_id=revs[0].id, quantity=1),
+        schemas.ConfigPartCreate(part_type="part", part_id=m.id, revision_id=revs[1].id, quantity=1),
+    ])
+    parts = crud.get_iteration_parts(db, ci.id)
+    bound = sorted(str(p.revision_id) for p in parts)
+    assert bound == sorted([str(revs[0].id), str(revs[1].id)])
+    assert len(parts) == 2   # 同零件两个版本共存

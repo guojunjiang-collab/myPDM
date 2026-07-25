@@ -692,6 +692,7 @@ def get_iteration_parts(db: Session, iteration_id: UUID) -> List[models.Configur
 
 def add_part_to_iteration(
     db: Session, iteration_id: UUID, part_type: str, part_id: UUID,
+    revision_id: Optional[UUID] = None,
     is_required: bool = True, quantity: int = 1, sort_order: int = 0,
 ) -> models.ConfigurationItemPart:
     """向迭代添加关联零部件"""
@@ -699,6 +700,7 @@ def add_part_to_iteration(
         iteration_id=iteration_id,
         part_type=part_type,
         part_id=part_id,
+        revision_id=revision_id,
         is_required=is_required,
         quantity=quantity,
         sort_order=sort_order,
@@ -755,6 +757,7 @@ def add_config_parts(
             iteration_id=iteration_id,
             part_type=it.part_type,
             part_id=it.part_id,
+            revision_id=it.revision_id,
             is_required=it.is_required,
             quantity=it.quantity,
             sort_order=it.sort_order,

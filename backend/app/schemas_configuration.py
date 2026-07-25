@@ -51,6 +51,7 @@ class ConfigItemRevisionOut(BaseSchema):
 class ConfigPartCreate(BaseSchema):
     part_type: str  # 'part' | 'assembly'
     part_id: uuid.UUID
+    revision_id: uuid.UUID
     is_required: bool = True
     quantity: int = 1
     sort_order: int = 0
@@ -60,6 +61,7 @@ class ConfigPartUpdate(BaseSchema):
     is_required: Optional[bool] = None
     quantity: Optional[int] = None
     sort_order: Optional[int] = None
+    revision_id: Optional[uuid.UUID] = None
 
 
 class ConfigPartResponse(BaseSchema):
@@ -67,6 +69,7 @@ class ConfigPartResponse(BaseSchema):
     iteration_id: uuid.UUID
     part_type: str
     part_id: uuid.UUID
+    revision_id: Optional[uuid.UUID] = None
     is_required: bool
     quantity: int
     sort_order: int
