@@ -190,6 +190,13 @@ export const partsApi = {
     instances: { matrix: number[] | null; label: string }[];
   }[]) =>
     api.post(`/parts/revisions/${revisionId}/cad/bom-sync`, { children }).then((r) => r.data),
+
+  whereUsedConfigurations: (revisionId: string) =>
+    api.get(`/parts/revisions/${revisionId}/where-used/configurations`).then((r) => r.data),
+  whereUsedTasks: (revisionId: string) =>
+    api.get(`/parts/revisions/${revisionId}/where-used/tasks`).then((r) => r.data),
+  whereUsedProfiles: (revisionId: string) =>
+    api.get(`/parts/revisions/${revisionId}/where-used/profiles`).then((r) => r.data),
 };
 
 // 图文档 API（三层模型：Master → Revision → Iteration）
