@@ -697,6 +697,27 @@ def persist_rollup_all(db: Session):
             db.rollback()
 
 
+def where_used_tasks(db: Session, revision_id) -> list:
+    """反查：引用了该零部件版本的项目任务（含所属项目）。按任务去重。"""
+    rows = (
+        db.query(ProjectTask, Project)
+        .join(ProjectTaskLink, ProjectTaskLink.task_id == ProjectTask.id)
+        .join(Project, Project.id == ProjectTask.project_id)
+        .filter(ProjectTaskLink.entity_type.in_(["part", "assembly", "component"]),
+                ProjectTaskLink.entity_id == revision_id,
+                ProjectTask.deleted_at.is_(None),
+                Project.deleted_at.is_(None))
+        .all()
+    )
+    seen, out = set(), []
+    for t, p in rows:
+        if str(t.id) in seen:
+            continue
+        seen.add(str(t.id))
+        out.append((t, p))
+    return out
+
+
 def get_gantt_data(db: Session, project_id: uuid.UUID) -> dict:
     tasks = db.query(ProjectTask).filter(
         ProjectTask.project_id == project_id, ProjectTask.deleted_at.is_(None)

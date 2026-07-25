@@ -30,6 +30,33 @@ def _config_iter(db, code="CI1", version="A"):
     return cm, cr, ci
 
 
+from app import crud_project as pcrud
+from app.models_project import Project, ProjectTask, ProjectTaskLink
+
+
+def _task_with_link(db, entity_rev_id, entity_type="part"):
+    proj = Project(id=uuid.uuid4(), code=f"PRJ-{uuid.uuid4().hex[:5]}", name="proj", owner_id=uuid.uuid4())
+    db.add(proj); db.flush()
+    t = ProjectTask(id=uuid.uuid4(), project_id=proj.id, code="T1", name="任务1")
+    db.add(t); db.flush()
+    db.add(ProjectTaskLink(id=uuid.uuid4(), task_id=t.id, entity_type=entity_type, entity_id=entity_rev_id))
+    db.commit()
+    return proj, t
+
+
+def test_where_used_tasks_matches_revision(db):
+    m, revs = _part(db, versions=("A",))
+    proj, t = _task_with_link(db, revs[0].id, entity_type="part")
+    rows = pcrud.where_used_tasks(db, revs[0].id)
+    assert len(rows) == 1
+    task, project = rows[0]
+    assert str(task.id) == str(t.id)
+    assert str(project.id) == str(proj.id)
+    # 无引用版本 → 空
+    m2, revs2 = _part(db, code="P2", versions=("A",))
+    assert pcrud.where_used_tasks(db, revs2[0].id) == []
+
+
 def test_where_used_configurations_matches_bound_version(db):
     m, revs = _part(db, versions=("A", "B"))
     cm, cr, ci = _config_iter(db)
