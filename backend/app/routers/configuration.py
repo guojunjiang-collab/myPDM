@@ -1562,7 +1562,13 @@ async def update_profile_item(
 
 def _format_profile_item(item, entity_map: dict = None) -> dict:
     """格式化清单项响应"""
-    entity = entity_map.get(str(item.item_id)) if entity_map else None
+    entity = None
+    if entity_map:
+        rev_id = getattr(item, "part_revision_id", None)
+        if rev_id:
+            entity = entity_map.get(str(rev_id))
+        if entity is None:
+            entity = entity_map.get(str(item.item_id))
     result = {
         "id": str(item.id),
         "profile_id": str(item.profile_id),
@@ -1585,10 +1591,21 @@ def _format_profile_item(item, entity_map: dict = None) -> dict:
 
 
 def _build_entity_map(db: Session, items: list) -> dict:
-    """批量查找零部件版本和状态 — 取每个 master 最新未软删 revision"""
-    master_ids = list(set(str(item.item_id) for item in items))
+    """批量查找零部件版本和状态 — 优先用 part_revision_id 精确查，空则取 master 最新版"""
     entity_map = {}
+    # 先按 part_revision_id 精确查找
+    rev_ids = [getattr(item, "part_revision_id", None) for item in items]
+    rev_ids = [rid for rid in rev_ids if rid is not None]
+    if rev_ids:
+        revs = db.query(PartRevision).filter(PartRevision.id.in_(rev_ids)).all()
+        for rev in revs:
+            entity_map[str(rev.id)] = rev
+    # 没有 part_revision_id 的（旧数据），按 master_id 取最新版兜底
+    master_ids = list(set(str(item.item_id) for item in items
+                         if not getattr(item, "part_revision_id", None)))
     for mid in master_ids:
+        if mid in entity_map:
+            continue
         rev = (
             db.query(PartRevision)
             .filter(

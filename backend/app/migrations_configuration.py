@@ -21,3 +21,14 @@ def migrate_config_part_revision(db, engine):
         "ON configuration_item_parts(revision_id)"
     ))
     db.commit()
+
+
+def migrate_config_list_part_revision(db, engine):
+    """配置清单 working/formal 表加 part_revision_id 列（幂等）"""
+    db.execute(text(
+        "ALTER TABLE configuration_working_items ADD COLUMN IF NOT EXISTS part_revision_id UUID"
+    ))
+    db.execute(text(
+        "ALTER TABLE configuration_profile_items ADD COLUMN IF NOT EXISTS part_revision_id UUID"
+    ))
+    db.commit()

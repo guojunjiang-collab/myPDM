@@ -487,6 +487,13 @@ async def startup_event():
                 db.rollback()
                 print(f"⚠ Config part revision migration skipped: {_ce}")
 
+            try:
+                from app.migrations_configuration import migrate_config_list_part_revision
+                migrate_config_list_part_revision(db, engine)
+            except Exception as _cle:
+                db.rollback()
+                print(f"⚠ Config list part revision migration skipped: {_cle}")
+
             def _col_default_sql(col):
                 sd = getattr(col, "server_default", None)
                 if sd is not None and getattr(sd, "arg", None) is not None:
