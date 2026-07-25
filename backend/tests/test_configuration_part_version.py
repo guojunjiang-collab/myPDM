@@ -57,3 +57,15 @@ def test_add_parts_stores_revision_and_allows_multi_version(db):
     bound = sorted(str(p.revision_id) for p in parts)
     assert bound == sorted([str(revs[0].id), str(revs[1].id)])
     assert len(parts) == 2   # 同零件两个版本共存
+
+
+def test_update_part_changes_revision(db):
+    """更新构型关联零部件的绑定版本。"""
+    from app import crud_configuration as crud
+
+    m, revs = _part(db, versions=("A", "B"))
+    _, _, ci = _config_iter(db)
+    link = crud.add_part_to_iteration(db, ci.id, "part", m.id, revision_id=revs[0].id)
+    updated = crud.update_config_part(db, link.id, {"revision_id": revs[1].id})
+    assert updated is not None
+    assert updated.revision_id == revs[1].id
