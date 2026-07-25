@@ -64,6 +64,7 @@ class ConfigurationItemPart(Base):
     iteration_id = Column(UUID(as_uuid=True), ForeignKey("configuration_item_iterations.id", ondelete="CASCADE"), nullable=False)
     part_type = Column(String(16), nullable=False)
     part_id = Column(UUID(as_uuid=True), nullable=False)
+    revision_id = Column(UUID(as_uuid=True), ForeignKey("part_revisions.id"), nullable=True)
     is_required = Column(Boolean, nullable=False, default=True)
     quantity = Column(Integer, nullable=False, default=1)
     sort_order = Column(Integer, nullable=False, default=0)
