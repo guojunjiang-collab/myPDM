@@ -20,7 +20,7 @@ from ..cad.assembly_parser import parse_assembly_step
 from ..stp_converter import get_lod_glb_paths, get_glb_cache_path
 from ..schemas_parts import MatchReport, AssemblyInstanceDTO, AssemblyTreeNodeDTO
 from ..schemas_parts import CadImportPreviewRequest, CadImportPreviewResponse
-from ..file_storage import chunked_uploader, CHUNK_SIZE
+from ..file_storage import chunked_uploader, CHUNK_SIZE, UPLOAD_DIR
 
 router = APIRouter(prefix="/parts", tags=["parts"])
 
@@ -888,7 +888,7 @@ def _store_part_attachment(db: Session, revision_id: UUID, filename: str,
     # 防路径遍历：仅取文件名部分
     safe_name = os.path.basename(filename or "unnamed")
 
-    upload_dir = f"./uploads/parts/{master.code}/{revision.version}/{iteration.iteration}"
+    upload_dir = os.path.join(UPLOAD_DIR, "parts", master.code, revision.version, str(iteration.iteration))
     os.makedirs(upload_dir, exist_ok=True)
 
     file_path = os.path.join(upload_dir, safe_name)

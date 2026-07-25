@@ -1,7 +1,9 @@
 import os
 import re
+import socket
 import httpx
 import logging
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -16,23 +18,60 @@ class PDMClient:
         self._client_kwargs = {"verify": False, "timeout": 30.0}
 
     def _resolve_url(self, override_base: str = None) -> str:
-        """解析有效的 PDM 地址，优先使用动态传入的地址"""
+        """解析有效的 PDM 地址，优先使用动态传入的地址。
+        自动将域名解析为 IP，避免自签名证书 + SNI 导致的 TLS 握手被拒。
+        """
         effective = (override_base or self.base_url).rstrip("/")
         if not effective:
             raise RuntimeError("PDM 服务地址未提供：请确保通过浏览器前端连接（地址自动传入）")
-        return effective
+        return self._resolve_hostname(effective)
+
+    def _resolve_hostname(self, url: str) -> str:
+        """将 URL 中的域名解析为 IP 地址，解决 TLS SNI 兼容性问题"""
+        try:
+            parsed = urlparse(url)
+            if parsed.hostname and not self._is_ip(parsed.hostname):
+                ip = socket.gethostbyname(parsed.hostname)
+                resolved = url.replace(f"://{parsed.hostname}", f"://{ip}", 1)
+                logger.info(f"域名 {parsed.hostname} 已解析为 {ip}")
+                return resolved
+        except (socket.gaierror, Exception) as e:
+            logger.warning(f"域名解析失败，使用原始地址: {e}")
+        return url
+
+    def _get_headers(self, token: str, original_url: str = None) -> dict:
+        """构建请求头，含 JWT 令牌和原始域名 Host 头"""
+        headers = {"Authorization": f"Bearer {token}"}
+        if original_url:
+            try:
+                parsed = urlparse(original_url)
+                if parsed.netloc:
+                    headers["Host"] = parsed.netloc
+            except Exception:
+                pass
+        return headers
+
+    @staticmethod
+    def _is_ip(hostname: str) -> bool:
+        """判断字符串是否为 IP 地址"""
+        try:
+            socket.inet_aton(hostname)
+            return True
+        except (socket.error, OSError):
+            return False
 
     async def download_attachment(self, attachment_id: str, save_dir: str, token: str,
                                   base_url: str = None) -> dict:
         """下载附件到本地目录"""
         effective_url = self._resolve_url(base_url)
+        headers = self._get_headers(token, base_url)
         os.makedirs(save_dir, exist_ok=True)
         async with httpx.AsyncClient(**self._client_kwargs) as client:
             # 获取媒体令牌
             token_resp = await client.get(
                 f"{effective_url}/v2/attachments/{attachment_id}/media-token",
                 params={"action": "direct-download"},
-                headers={"Authorization": f"Bearer {token}"}
+                headers=headers
             )
             token_resp.raise_for_status()
             media_token = token_resp.json().get("token")
@@ -41,7 +80,7 @@ class PDMClient:
             resp = await client.get(
                 f"{effective_url}/v2/attachments/{attachment_id}/stream",
                 params={"token": media_token},
-                headers={"Authorization": f"Bearer {token}"}
+                headers=headers
             )
             resp.raise_for_status()
 
@@ -65,6 +104,7 @@ class PDMClient:
         filename = os.path.basename(file_path)
         file_size = os.path.getsize(file_path)
         effective_url = self._resolve_url(base_url)
+        headers = self._get_headers(token, base_url)
 
         async with httpx.AsyncClient(**self._client_kwargs) as client:
             # 初始化分块上传
@@ -75,7 +115,7 @@ class PDMClient:
                     "file_size": str(file_size),
                     "category": category,
                 },
-                headers={"Authorization": f"Bearer {token}"}
+                headers=headers
             )
             init_resp.raise_for_status()
             upload_info = init_resp.json()
@@ -93,7 +133,7 @@ class PDMClient:
                         f"{effective_url}/v2/attachments/chunk/upload",
                         data={"upload_id": upload_id, "chunk_index": str(chunk_index)},
                         files={"chunk": (filename, chunk)},
-                        headers={"Authorization": f"Bearer {token}"}
+                        headers=headers
                     )
                     resp.raise_for_status()
                     chunk_index += 1
@@ -102,7 +142,7 @@ class PDMClient:
             complete_resp = await client.post(
                 f"{effective_url}/parts/revisions/{revision_id}/attachments/chunk/complete",
                 data={"upload_id": upload_id, "overwrite": "true" if overwrite else "false"},
-                headers={"Authorization": f"Bearer {token}"}
+                headers=headers
             )
             complete_resp.raise_for_status()
             return complete_resp.json()

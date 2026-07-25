@@ -31,7 +31,10 @@ services:
     # 开发环境：源码以卷挂载，开启 --reload 使后端代码改动自动生效。
     # 否则改了后端代码但进程未重载会导致新路由 404（旧 uvicorn 进程仍用旧路由表）。
     # 生产环境请勿开启 --reload。
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # 生产环境请勿开启 --reload。
+    # 容器内 chown 需 root 权限，用 user: "0:0" 覆盖 Dockerfile 的 USER appuser
+    user: "0:0"
+    entrypoint: sh -c "chown -R appuser:appuser /app/uploads && exec su appuser -c 'uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload'"
     environment:
       - POSTGRES_USER=bomadmin
       - POSTGRES_PASSWORD=bompass
