@@ -10,6 +10,10 @@ import EntityDocumentSection from './EntityDocumentSection';
 import PartAttachmentBucket from './PartAttachmentBucket';
 import CadImportPreviewModal from './CadImportPreviewModal';
 import AssemblyPartPicker from './AssemblyPartPicker';
+import PartWhereUsedTab from './PartDetailModal/PartWhereUsedTab';
+import ConfigItemDetailModal from './Configuration/ConfigItemDetailModal';
+import TaskEditModal from '../pages/Project/TaskEditModal';
+import ProfileEditModal from './Configuration/ProfileEditModal';
 
 const statusTag = (s: string) => {
   const map: Record<string, { label: string; cls: string }> = {
@@ -37,7 +41,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const [internalRevisionId, setInternalRevisionId] = useState<string | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'info' | 'bom' | 'docs' | 'attachments' | 'versions' | 'iterations'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'bom' | 'whereused' | 'docs' | 'attachments' | 'versions' | 'iterations'>('info');
   const [checkinNote, setCheckinNote] = useState('');
   const [showCheckinModal, setShowCheckinModal] = useState(false);
   const [viewingIteration, setViewingIteration] = useState<PartIteration | null>(null);
@@ -60,6 +64,9 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const [matrixPopup, setMatrixPopup] = useState<any>(null);
   const [nestedMasterId, setNestedMasterId] = useState<string | null>(null);
   const [nestedRevisionId, setNestedRevisionId] = useState<string | null>(null);
+  const [wuConfigRevId, setWuConfigRevId] = useState<string | null>(null);
+  const [wuTask, setWuTask] = useState<{ projectId: string; task: any } | null>(null);
+  const [wuProfileId, setWuProfileId] = useState<string | null>(null);
   const assemblyFileRef = useRef<HTMLInputElement>(null);
   const cadFolderInputRef = useRef<HTMLInputElement>(null);
   const [cadImportPreview, setCadImportPreview] = useState<{
@@ -517,6 +524,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const tabs = useMemo(() => [
     { key: 'info' as const, label: '基本信息', show: !!currentDisplay },
     { key: 'bom' as const, label: 'BOM结构', show: hasBomChildren || canEdit },
+    { key: 'whereused' as const, label: '反查', show: true },
     { key: 'docs' as const, label: '关联文档', show: !!currentDisplay },
     { key: 'attachments' as const, label: '附件', show: true },
     { key: 'versions' as const, label: '版本历史', show: true },
@@ -830,6 +838,20 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                   </div>
                 )}
 
+                {activeTab === 'whereused' && revisionId && (
+                  <PartWhereUsedTab
+                    revisionId={revisionId}
+                    masterId={masterId}
+                    code={master?.code || ''}
+                    name={master?.name || ''}
+                    version={revision?.version}
+                    onOpenPart={(mid, rid) => { setNestedMasterId(mid); setNestedRevisionId(rid || null); }}
+                    onOpenConfig={(cirId) => setWuConfigRevId(cirId)}
+                    onOpenTask={(projectId, task) => setWuTask({ projectId, task })}
+                    onOpenProfile={(pid) => setWuProfileId(pid)}
+                  />
+                )}
+
                 {activeTab === 'docs' && revisionId && (
                     <EntityDocumentSection
                       entityType="part"
@@ -1102,6 +1124,18 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
             <div className="bg-blue-600 h-2 rounded-full transition-all duration-300" style={{ width: `${importProgress.total > 0 ? (importProgress.current / importProgress.total) * 100 : 0}%` }} />
           </div>
         </div>
+      )}
+      {wuConfigRevId && (
+        <ConfigItemDetailModal open={!!wuConfigRevId} revisionId={wuConfigRevId}
+          onClose={() => setWuConfigRevId(null)} />
+      )}
+      {wuTask && (
+        <TaskEditModal open={!!wuTask} projectId={wuTask.projectId} task={wuTask.task} parentId={null}
+          onClose={() => setWuTask(null)} onSaved={() => {}} onRefresh={() => {}} />
+      )}
+      {wuProfileId && (
+        <ProfileEditModal open={!!wuProfileId} profileId={wuProfileId}
+          onClose={() => setWuProfileId(null)} onSaved={() => {}} />
       )}
     </Modal>
   );
