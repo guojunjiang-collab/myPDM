@@ -695,7 +695,19 @@ def add_part_to_iteration(
     revision_id: Optional[UUID] = None,
     is_required: bool = True, quantity: int = 1, sort_order: int = 0,
 ) -> models.ConfigurationItemPart:
-    """向迭代添加关联零部件"""
+    """向迭代添加关联零部件（同一 revision 仅允许一条，重复则更新）"""
+    if revision_id:
+        existing = db.query(models.ConfigurationItemPart).filter(
+            models.ConfigurationItemPart.iteration_id == iteration_id,
+            models.ConfigurationItemPart.revision_id == revision_id,
+        ).first()
+        if existing:
+            existing.is_required = is_required
+            existing.quantity = quantity
+            existing.sort_order = sort_order
+            db.commit()
+            db.refresh(existing)
+            return existing
     part = models.ConfigurationItemPart(
         iteration_id=iteration_id,
         part_type=part_type,
@@ -749,10 +761,20 @@ def get_config_parts(db: Session, config_id: str) -> List[models.ConfigurationIt
 def add_config_parts(
     db: Session, config_id: str, items: List[schemas.ConfigPartCreate],
 ) -> List[models.ConfigurationItemPart]:
-    """向后兼容：config_id 实际为 iteration_id"""
+    """向后兼容：config_id 实际为 iteration_id，同一 revision 去重跳过"""
     iteration_id = UUID(config_id) if isinstance(config_id, str) else config_id
+    existing_revs = {
+        str(r.revision_id) for r in
+        db.query(models.ConfigurationItemPart.revision_id).filter(
+            models.ConfigurationItemPart.iteration_id == iteration_id,
+            models.ConfigurationItemPart.revision_id.isnot(None),
+        ).all() if r.revision_id
+    }
     parts = []
     for it in items:
+        rev_key = str(it.revision_id) if it.revision_id else None
+        if rev_key and rev_key in existing_revs:
+            continue
         part = models.ConfigurationItemPart(
             iteration_id=iteration_id,
             part_type=it.part_type,
@@ -764,6 +786,8 @@ def add_config_parts(
         )
         db.add(part)
         parts.append(part)
+        if rev_key:
+            existing_revs.add(rev_key)
     db.commit()
     for p in parts:
         db.refresh(p)
@@ -1435,7 +1459,7 @@ def get_config_item_iteration_detail(db: Session, iteration_id):
 
 
 def where_used_configurations(db: Session, revision_id) -> list:
-    """反查：绑定了该零部件版本(revision)的构型项（按构型项 revision 去重）。"""
+    """反查：绑定了该零部件版本(revision)的构型项（仅取每个 revision 的最新 iteration）。"""
     rows = (
         db.query(models.ConfigurationItemPart, models.ConfigurationItemRevision, models.ConfigurationItemMaster)
         .join(models.ConfigurationItemIteration,
@@ -1444,24 +1468,31 @@ def where_used_configurations(db: Session, revision_id) -> list:
               models.ConfigurationItemRevision.id == models.ConfigurationItemIteration.revision_id)
         .join(models.ConfigurationItemMaster,
               models.ConfigurationItemMaster.id == models.ConfigurationItemRevision.master_id)
-        .filter(models.ConfigurationItemPart.revision_id == revision_id,
-                models.ConfigurationItemMaster.deleted_at.is_(None),
-                models.ConfigurationItemRevision.deleted_at.is_(None))
+        .filter(
+            models.ConfigurationItemPart.revision_id == revision_id,
+            models.ConfigurationItemIteration.iteration == models.ConfigurationItemRevision.latest_iteration,
+            models.ConfigurationItemMaster.deleted_at.is_(None),
+            models.ConfigurationItemRevision.deleted_at.is_(None),
+        )
         .all()
     )
-    seen, out = set(), []
+    seen, result = set(), {}
     for cip, cir, cim in rows:
-        if str(cir.id) in seen:
-            continue
-        seen.add(str(cir.id))
-        out.append({
-            "config_item_master_id": str(cim.id),
-            "config_item_revision_id": str(cir.id),
-            "code": cim.code, "name": cim.name,
-            "version": cir.version, "status": cir.status,
-            "is_required": cip.is_required, "quantity": cip.quantity,
-        })
-    return out
+        key = str(cir.id)
+        if key not in seen:
+            seen.add(key)
+            result[key] = {
+                "config_item_master_id": str(cim.id),
+                "config_item_revision_id": str(cir.id),
+                "code": cim.code, "name": cim.name,
+                "version": cir.version, "status": cir.status,
+                "is_required": cip.is_required, "quantity": cip.quantity,
+            }
+        else:
+            prev = result[key]
+            prev["is_required"] = prev["is_required"] or cip.is_required
+            prev["quantity"] += cip.quantity
+    return list(result.values())
 
 
 def where_used_profiles(db: Session, revision_id) -> list:

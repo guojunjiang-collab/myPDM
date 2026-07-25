@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { partsApi } from '../../services/api';
 import BomWhereUsedTree from '../../pages/BOM/BomWhereUsedTree';
+import { getStatusLabel } from '../../pages/BOM/helpers';
 
 interface Props {
   revisionId: string;
@@ -40,6 +41,7 @@ const Section = ({ title, count, children }: any) => (
 
 export default function PartWhereUsedTab(props: Props) {
   const { revisionId, masterId, code, name, version } = props;
+  const [bomState, setBomState] = useState({ loading: true, error: false, empty: false });
   const cfg = useLazy(() => partsApi.whereUsedConfigurations(revisionId), revisionId);
   const tsk = useLazy(() => partsApi.whereUsedTasks(revisionId), revisionId);
   const prof = useLazy(() => partsApi.whereUsedProfiles(revisionId), revisionId);
@@ -47,19 +49,22 @@ export default function PartWhereUsedTab(props: Props) {
   return (
     <div className="space-y-2">
       {/* 1) 父项零部件 */}
+      {(bomState.loading || bomState.error || !bomState.empty) && (
       <Section title="父项零部件" count={''}>
         <BomWhereUsedTree
           revisionId={revisionId}
           root={{ masterId, revisionId, code, name, version }}
           onViewEntity={props.onOpenPart}
+          onStateChange={setBomState}
         />
       </Section>
+      )}
 
       {/* 2) 被构型项引用 */}
+      {(cfg.loading || cfg.error || cfg.data.length > 0) && (
       <Section title="被构型项引用" count={cfg.loading ? '…' : cfg.data.length}>
         {cfg.loading ? <div className="text-gray-400 text-sm py-2">加载中...</div>
           : cfg.error ? <div className="text-red-500 text-sm py-2">加载失败</div>
-          : cfg.data.length === 0 ? <div className="text-gray-400 text-sm py-2">暂无引用</div>
           : (
           <table className="w-full text-sm border rounded">
             <thead className="bg-gray-50 border-b"><tr>
@@ -67,7 +72,7 @@ export default function PartWhereUsedTab(props: Props) {
               <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
               <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
               <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">状态</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">必需</th>
+              <th className="px-3 py-2 text-center text-gray-500 font-medium w-24 whitespace-nowrap">可选/必选</th>
               <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">用量</th>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
@@ -77,8 +82,10 @@ export default function PartWhereUsedTab(props: Props) {
                   <td className="px-3 py-2 font-medium">{r.code}</td>
                   <td className="px-3 py-2">{r.name}</td>
                   <td className="px-3 py-2 text-gray-500">{r.version || '-'}</td>
-                  <td className="px-3 py-2 text-gray-500">{r.status || '-'}</td>
-                  <td className="px-3 py-2 text-gray-500">{r.is_required ? '是' : '否'}</td>
+                  <td className="px-3 py-2 text-gray-500">{getStatusLabel(r.status)}</td>
+                  <td className="px-3 py-2 text-center">
+                    <span className={`text-xs px-2 py-0.5 rounded ${r.is_required ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>{r.is_required ? '必选' : '可选'}</span>
+                  </td>
                   <td className="px-3 py-2">{r.quantity}</td>
                 </tr>
               ))}
@@ -86,12 +93,13 @@ export default function PartWhereUsedTab(props: Props) {
           </table>
         )}
       </Section>
+      )}
 
       {/* 3) 被项目任务引用 */}
+      {(tsk.loading || tsk.error || tsk.data.length > 0) && (
       <Section title="被项目任务引用" count={tsk.loading ? '…' : tsk.data.length}>
         {tsk.loading ? <div className="text-gray-400 text-sm py-2">加载中...</div>
           : tsk.error ? <div className="text-red-500 text-sm py-2">加载失败</div>
-          : tsk.data.length === 0 ? <div className="text-gray-400 text-sm py-2">暂无引用</div>
           : (
           <table className="w-full text-sm border rounded">
             <thead className="bg-gray-50 border-b"><tr>
@@ -112,19 +120,19 @@ export default function PartWhereUsedTab(props: Props) {
           </table>
         )}
       </Section>
+      )}
 
       {/* 4) 被构型配置引用 */}
+      {(prof.loading || prof.error || prof.data.length > 0) && (
       <Section title="被构型配置引用" count={prof.loading ? '…' : prof.data.length}>
         {prof.loading ? <div className="text-gray-400 text-sm py-2">加载中...</div>
           : prof.error ? <div className="text-red-500 text-sm py-2">加载失败</div>
-          : prof.data.length === 0 ? <div className="text-gray-400 text-sm py-2">暂无引用</div>
           : (
           <table className="w-full text-sm border rounded">
             <thead className="bg-gray-50 border-b"><tr>
               <th className="px-3 py-2 text-left text-gray-500 font-medium">配置编号</th>
               <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
               <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">状态</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">必需</th>
               <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">用量</th>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
@@ -133,8 +141,7 @@ export default function PartWhereUsedTab(props: Props) {
                     onClick={() => props.onOpenProfile(r.profile_id)}>
                   <td className="px-3 py-2 font-medium">{r.code}</td>
                   <td className="px-3 py-2">{r.name}</td>
-                  <td className="px-3 py-2 text-gray-500">{r.status || '-'}</td>
-                  <td className="px-3 py-2 text-gray-500">{r.is_required ? '是' : '否'}</td>
+                  <td className="px-3 py-2 text-gray-500">{getStatusLabel(r.status)}</td>
                   <td className="px-3 py-2">{r.quantity}</td>
                 </tr>
               ))}
@@ -142,6 +149,7 @@ export default function PartWhereUsedTab(props: Props) {
           </table>
         )}
       </Section>
+      )}
     </div>
   );
 }

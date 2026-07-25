@@ -32,3 +32,27 @@ def migrate_config_list_part_revision(db, engine):
         "ALTER TABLE configuration_profile_items ADD COLUMN IF NOT EXISTS part_revision_id UUID"
     ))
     db.commit()
+
+
+def migrate_cip_dedup_revision(db, engine):
+    """清理 configuration_item_parts 中 (iteration_id, revision_id) 重复行 + 加唯一索引（幂等）"""
+    db.execute(text("""
+        DELETE FROM configuration_item_parts
+        WHERE id IN (
+            SELECT id FROM (
+                SELECT id,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY iteration_id, revision_id ORDER BY created_at
+                       ) AS rn
+                FROM configuration_item_parts
+                WHERE revision_id IS NOT NULL
+            ) sub
+            WHERE sub.rn > 1
+        )
+    """))
+    db.execute(text(
+        "CREATE UNIQUE INDEX IF NOT EXISTS uix_cip_iteration_revision "
+        "ON configuration_item_parts(iteration_id, revision_id) "
+        "WHERE revision_id IS NOT NULL"
+    ))
+    db.commit()

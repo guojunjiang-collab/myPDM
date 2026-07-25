@@ -1134,7 +1134,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
           onClose={() => setWuTask(null)} onSaved={() => {}} onRefresh={() => {}} />
       )}
       {wuProfileId && (
-        <ProfileEditModal open={!!wuProfileId} profileId={wuProfileId}
+        <ProfileEditModal open={!!wuProfileId} profileId={wuProfileId} readOnly
           onClose={() => setWuProfileId(null)} onSaved={() => {}} />
       )}
     </Modal>

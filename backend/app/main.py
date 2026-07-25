@@ -494,6 +494,13 @@ async def startup_event():
                 db.rollback()
                 print(f"⚠ Config list part revision migration skipped: {_cle}")
 
+            try:
+                from app.migrations_configuration import migrate_cip_dedup_revision
+                migrate_cip_dedup_revision(db, engine)
+            except Exception as _de:
+                db.rollback()
+                print(f"⚠ CIP dedup migration skipped: {_de}")
+
             def _col_default_sql(col):
                 sd = getattr(col, "server_default", None)
                 if sd is not None and getattr(sd, "arg", None) is not None:

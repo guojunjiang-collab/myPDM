@@ -8,6 +8,7 @@ interface Props {
   revisionId: string;
   root: { masterId: string; revisionId: string; code: string; name: string; version?: string } | null;
   onViewEntity: (masterId: string, revisionId?: string) => void;
+  onStateChange?: (state: { loading: boolean; error: boolean; empty: boolean }) => void;
 }
 
 const statusCls = (s: string) => {
@@ -20,7 +21,7 @@ const statusCls = (s: string) => {
   return map[s] || 'bg-gray-100 text-gray-800';
 };
 
-export default function BomWhereUsedTree({ revisionId, root, onViewEntity }: Props) {
+export default function BomWhereUsedTree({ revisionId, root, onViewEntity, onStateChange }: Props) {
   const [traceResult, setTraceResult] = useState<BOMTraceItem[]>([]);
   const [traceTree, setTraceTree] = useState<TraceTreeNode[]>([]);
   const [loading, setLoading] = useState(false);
@@ -52,6 +53,10 @@ export default function BomWhereUsedTree({ revisionId, root, onViewEntity }: Pro
   useEffect(() => {
     setTraceTree(buildTraceTree(traceResult));
   }, [traceResult]);
+
+  useEffect(() => {
+    onStateChange?.({ loading, error: !!error, empty: searched && traceTree.length === 0 });
+  }, [loading, error, searched, traceTree]);
 
   const toggleTraceAll = () => {
     const allExpanded = traceTree.length > 0 && traceTree.every((n) => n.expanded);
