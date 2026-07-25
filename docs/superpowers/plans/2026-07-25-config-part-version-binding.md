@@ -20,12 +20,12 @@
   `docker exec bom_backend python -m pytest ...`，需确保 tests 目录在容器内可见）。
 - 前端无单测框架，验证用 `cd frontend && npm run build`（含 `tsc`）+ Docker 手测。
 
-## 延后项（本计划不做，交接时确认是否单开）
+## 下游范围（本轮一并做）
 
-配置清单下游（`configuration_working_items` / `configuration_profile_items`）当前仅存
-`item_id`(master)+code/name，无零部件版本列。让清单按绑定版本"钉版"需给这两张表加
-`part_revision_id` 列 + 迁移 + 改生成/消费逻辑，明显超出核心绑定，**本计划延后**。
-核心绑定完成后，配置清单仍按 master 解析 code/name（版本无关），不回归。
+配置清单（`configuration_working_items` / `configuration_profile_items`）也按绑定版本"钉版"：
+两表各加 `part_revision_id` 列、迁移回填、生成/定版拷贝写入、清单项格式化按绑定版本解析
+`item_version`/`item_status`（现状因 `PartMaster` 无 `.version` 属性恒为空）。前端
+`ProfileEditModal` 已渲染 `item_version`，无需改。见 Task 9-10。
 
 ---
 
@@ -537,7 +537,201 @@ git commit -m "feat(config): 新建构型配置按版本绑定零部件并按版
 
 ---
 
-### Task 8: 集成验证（Docker 手测）
+### Task 9: 后端 — 配置清单表加 `part_revision_id` + 迁移 + 生成/定版拷贝写入
+
+**Files:**
+- Modify: `backend/app/models_configuration.py`（`ConfigurationWorkingItem`、`ConfigurationProfileItem` 各加列）
+- Modify: `backend/app/migrations_configuration.py`（追加两表 ALTER + 回填）
+- Modify: `backend/app/crud_configuration.py`（`_generate_checklist` 约 936 行、working→profile 拷贝约 1101 行）
+- Test: `backend/tests/test_configuration_part_version.py`
+
+**Interfaces:**
+- Consumes: `ConfigurationItemPart.revision_id`（Task 1-2）。
+- Produces: `ConfigurationWorkingItem.part_revision_id`、`ConfigurationProfileItem.part_revision_id`
+  （`Column(UUID, ForeignKey("part_revisions.id"), nullable=True)`）；生成的 working item 写入
+  `part_revision_id = p.revision_id`；定版拷贝携带该字段。
+
+- [ ] **Step 1: 写失败测试（生成清单钉住绑定版本）**
+
+追加到 `test_configuration_part_version.py`：
+```python
+from app.models_configuration import ConfigurationProfile, ConfigurationWorkingItem
+
+
+def _profile(db):
+    p = ConfigurationProfile(
+        id=uuid.uuid4(), code=f"CFG-{uuid.uuid4().hex[:6]}", name="cfg",
+        status="draft", creator_id=uuid.uuid4(),
+        reviewers=[], review_mode="all", cc_users=[],
+    )
+    db.add(p); db.commit(); db.refresh(p)
+    return p
+
+
+def test_generate_checklist_pins_part_revision(db):
+    m, revs = _part(db, versions=("A",))
+    cm, cr, ci = _config_iter(db)
+    crud.add_part_to_iteration(db, ci.id, "part", m.id, revision_id=revs[0].id)
+    prof = _profile(db)
+    crud._generate_checklist(db, str(prof.id), str(cr.id))
+    wi = db.query(ConfigurationWorkingItem).filter(
+        ConfigurationWorkingItem.profile_id == prof.id,
+        ConfigurationWorkingItem.item_type == "part",
+    ).first()
+    assert wi is not None
+    assert str(wi.part_revision_id) == str(revs[0].id)
+```
+
+- [ ] **Step 2: 跑测试，确认失败**
+
+Run: `cd backend && python -m pytest tests/test_configuration_part_version.py::test_generate_checklist_pins_part_revision -v`
+Expected: FAIL（`ConfigurationWorkingItem` 无 `part_revision_id` / 生成未写入）
+
+- [ ] **Step 3: 两个清单模型加列**
+
+`models_configuration.py`，`ConfigurationWorkingItem` 与 `ConfigurationProfileItem` 各在
+`item_id` 行后加：
+```python
+    part_revision_id = Column(UUID(as_uuid=True), ForeignKey("part_revisions.id"), nullable=True)
+```
+
+- [ ] **Step 4: 迁移追加两表加列 + 回填**
+
+`migrations_configuration.py` `migrate_config_part_revision` 末尾（`db.commit()` 之前）追加：
+```python
+    for tbl in ("configuration_working_items", "configuration_profile_items"):
+        db.execute(text(f"ALTER TABLE {tbl} ADD COLUMN IF NOT EXISTS part_revision_id UUID"))
+        db.execute(text(f"""
+            UPDATE {tbl} t
+            SET part_revision_id = (
+                SELECT pr.id FROM part_revisions pr
+                WHERE pr.master_id = t.item_id AND pr.deleted_at IS NULL
+                ORDER BY pr.created_at DESC
+                LIMIT 1
+            )
+            WHERE t.part_revision_id IS NULL AND t.item_type IN ('part', 'assembly')
+        """))
+```
+
+- [ ] **Step 5: 生成与拷贝写入 part_revision_id**
+
+`crud_configuration.py` `_generate_checklist` 内 `ConfigurationWorkingItem(...)` 构造处加：
+```python
+            item_id=p.part_id,
+            part_revision_id=p.revision_id,
+```
+working→profile 拷贝处（约 1101 行）`ConfigurationProfileItem(...)` 加：
+```python
+                item_id=wi.item_id,
+                part_revision_id=wi.part_revision_id,
+```
+
+- [ ] **Step 6: 跑测试，确认通过**
+
+Run: `cd backend && python -m pytest tests/test_configuration_part_version.py -v`
+Expected: 全部 PASS
+
+- [ ] **Step 7: 提交**
+
+```bash
+git add backend/app/models_configuration.py backend/app/migrations_configuration.py backend/app/crud_configuration.py backend/tests/test_configuration_part_version.py
+git commit -m "feat(config): 配置清单项记录零部件绑定版本 part_revision_id"
+```
+
+---
+
+### Task 10: 后端 — 清单项按绑定版本解析 `item_version`/`item_status`
+
+**Files:**
+- Modify: `backend/app/routers/configuration.py`（`_format_profile_item` 约 1559 行；其调用处构建 `revision_map`）
+- Modify: `backend/app/schemas_configuration.py`（`ConfigurationProfileItemResponse` 加 `part_revision_id`/`item_version`/`item_status`）
+- Test: `backend/tests/test_configuration_part_version.py`
+
+**Interfaces:**
+- Consumes: `ConfigurationProfileItem.part_revision_id`（Task 9）。
+- Produces: `_format_profile_item(item, entity_map=None, revision_map=None) -> dict`，
+  `item_version`/`item_status` 取自 `revision_map[str(item.part_revision_id)]`。
+
+- [ ] **Step 1: 写失败测试（清单项版本取自绑定 revision）**
+
+追加：
+```python
+from app.routers.configuration import _format_profile_item
+from app.models_configuration import ConfigurationProfileItem
+
+
+def test_format_profile_item_uses_bound_revision(db):
+    m, revs = _part(db, versions=("A",))
+    prof = _profile(db)
+    pi = ConfigurationProfileItem(
+        id=uuid.uuid4(), profile_id=prof.id, item_type="part",
+        item_id=m.id, item_code=m.code, item_name=m.name,
+        part_revision_id=revs[0].id, is_required=True, is_selected=True,
+        quantity=1, source_type="direct", sort_order=0,
+    )
+    db.add(pi); db.commit()
+    out = _format_profile_item(pi, revision_map={str(revs[0].id): revs[0]})
+    assert out["item_version"] == "A"
+    assert out["part_revision_id"] == str(revs[0].id)
+```
+
+- [ ] **Step 2: 跑测试，确认失败**
+
+Run: `cd backend && python -m pytest tests/test_configuration_part_version.py::test_format_profile_item_uses_bound_revision -v`
+Expected: FAIL（`_format_profile_item` 无 `revision_map` 参数 / `item_version` 取自 master 恒空）
+
+- [ ] **Step 3: 改 `_format_profile_item` 按绑定版本解析**
+
+签名加 `revision_map`，version/status 改从绑定 revision 取，并补 `part_revision_id`：
+```python
+def _format_profile_item(item, entity_map: dict = None, revision_map: dict = None) -> dict:
+    entity = entity_map.get(str(item.item_id)) if entity_map else None
+    rev = revision_map.get(str(item.part_revision_id)) if (revision_map and item.part_revision_id) else None
+    result = {
+        # …保持既有键…
+        "item_version": rev.version if rev else "",
+        "item_status": rev.status if rev else "",
+        "part_revision_id": str(item.part_revision_id) if item.part_revision_id else None,
+        # …
+    }
+```
+（保留原有其他键；仅替换 `item_version`/`item_status` 两行来源，并新增 `part_revision_id`。）
+
+- [ ] **Step 4: 调用处构建 revision_map**
+
+在构建 `entity_map`（约 1590 行 `_build_entity_map` 或调用 `_format_profile_item` 的循环处），
+一并收集 `part_revision_id` 并构建：
+```python
+from app.models_parts import PartRevision
+rev_ids = [it.part_revision_id for it in items if getattr(it, "part_revision_id", None)]
+revision_map = {str(r.id): r for r in db.query(PartRevision).filter(PartRevision.id.in_(rev_ids)).all()} if rev_ids else {}
+```
+并把 `revision_map=revision_map` 传入每次 `_format_profile_item(...)` 调用。
+
+- [ ] **Step 5: 响应 schema 加字段**
+
+`schemas_configuration.py` `ConfigurationProfileItemResponse` 追加：
+```python
+    part_revision_id: Optional[uuid.UUID] = None
+    item_version: Optional[str] = None
+    item_status: Optional[str] = None
+```
+
+- [ ] **Step 6: 跑测试，确认通过**
+
+Run: `cd backend && python -m pytest tests/test_configuration_part_version.py -v`
+Expected: 全部 PASS
+
+- [ ] **Step 7: 提交**
+
+```bash
+git add backend/app/routers/configuration.py backend/app/schemas_configuration.py backend/tests/test_configuration_part_version.py
+git commit -m "feat(config): 配置清单项按绑定版本解析 item_version/item_status"
+```
+
+---
+
+### Task 11: 集成验证（Docker 手测）
 
 **Files:** 无（验证）
 
@@ -553,33 +747,38 @@ docker compose up -d --build
 ```bash
 docker exec bom_postgres psql -U bomadmin -d bom_system -c "\d configuration_item_parts"
 docker exec bom_postgres psql -U bomadmin -d bom_system -c "SELECT count(*) total, count(revision_id) filled FROM configuration_item_parts;"
+docker exec bom_postgres psql -U bomadmin -d bom_system -c "SELECT count(*) t, count(part_revision_id) f FROM configuration_working_items WHERE item_type IN ('part','assembly');"
+docker exec bom_postgres psql -U bomadmin -d bom_system -c "SELECT count(*) t, count(part_revision_id) f FROM configuration_profile_items WHERE item_type IN ('part','assembly');"
 ```
-Expected: 存在 `revision_id` 列与 `ix_cip_revision_id` 索引；`filled` 接近 `total`（仅无任何 revision 的脏 master 为空）。
+Expected: `configuration_item_parts` 有 `revision_id` 列与 `ix_cip_revision_id` 索引；三表 `filled/f` 接近 `total/t`（仅无 revision 的脏 master 为空）。
 
 - [ ] **Step 3: 功能手测（浏览器 https://localhost:8080，Ctrl+F5）**
 
-- 打开一个构型项详情 → 关联零部件的版本显示为绑定版本。
-- 「添加子项」选中某零件的具体版本 → 列表新增该版本行。
-- 对同一零件再选**另一个版本** → 新增第二行（多版本共存）。
-- 用版本选择器改某行版本 → 刷新后显示新版本（已持久化，DB 可复核）。
+- 打开一个构型项详情 → 关联零部件版本显示为绑定版本。
+- 「添加子项」选中某零件的具体版本 → 列表新增该版本行；对同一零件再选另一版本 → 新增第二行（多版本共存）。
+- 用版本选择器改某行版本 → 刷新后显示新版本。
 - 把该零件**升版**后重开构型项 → 绑定版本**不变**（固定，不跟新）。
-- 历史构型项（改造前创建）→ 版本显示与改造前一致（回填最新版）。
+- 生成/查看该构型的**配置清单**（Profile）→ 清单项「版本」列显示锁定版本（非空、非最新）。
+- 历史构型项/历史清单 → 版本显示与改造前一致（回填最新版）。
 
 - [ ] **Step 4: DB 复核绑定持久化**
 
 ```bash
 docker exec bom_postgres psql -U bomadmin -d bom_system -c "SELECT part_id, revision_id, quantity FROM configuration_item_parts ORDER BY created_at DESC LIMIT 5;"
+docker exec bom_postgres psql -U bomadmin -d bom_system -c "SELECT item_code, part_revision_id FROM configuration_profile_items ORDER BY created_at DESC LIMIT 5;"
 ```
-Expected: 新增/改版行的 `revision_id` 为选定版本。
+Expected: 新增/改版行的 `revision_id`、清单项 `part_revision_id` 为选定版本。
 
 ---
 
 ## Self-Review
 
 - **Spec 覆盖**：§4 列+迁移→Task1；§5.1 schema→Task2；§5.2 写入/改版本→Task2/3；
-  详情按绑定版本→Task4；前端添加/去重/改版本→Task5/6/7；迁移回填/兼容→Task1/8。
-  §5.2 下游配置清单版本化 → 见「延后项」明确标注（需交接确认）。
+  详情按绑定版本→Task4；前端添加/去重/改版本→Task5/6/7；下游配置清单版本化→Task9/10；
+  迁移回填/兼容/清单显示→Task1/9/11。
 - **占位符**：无 TODO/TBD；测试与实现均含真实代码。
 - **类型一致**：`revision_id`(UUID/string) 贯穿 model/schema/crud/api；`add_part_to_iteration`
   新增 `revision_id` 参数与 Task2/3 调用一致；前端 `addParts` 项含 `revision_id` 与 Task6/7 传参一致；
-  `VersionSelectModal.onSelect` 用 `ConfigurationItemPart.id`(行 id) 调 `updatePart`。
+  `VersionSelectModal.onSelect` 用 `ConfigurationItemPart.id`(行 id) 调 `updatePart`；
+  清单 `part_revision_id` 贯穿 working/profile 两表(Task9)→`_format_profile_item.revision_map`(Task10)→
+  前端已渲染的 `item_version`(ProfileEditModal)。

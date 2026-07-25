@@ -93,9 +93,16 @@ CREATE INDEX IF NOT EXISTS ix_cip_revision_id ON configuration_item_parts(revisi
 - `update_config_part`：支持更新 `revision_id`。
 - 构型项详情组装（`routers/configuration.py` 第 178–216 段）：`part_detail` 用
   `PartRevision.id == cip.revision_id` 直接取该版本；`PartMaster` 仍供 code/name。
-- **下游**：
-  - 配置清单工作项生成（`crud_configuration.py:925` 起）：`ConfigurationWorkingItem` 记录/解析绑定 `revision_id`。
-  - 实体 map 解析（`configuration.py:1594`）：按 revision 补充版本/状态（code/name 仍可来自 master）。
+- **下游（配置清单，本轮一并做）**：
+  - `configuration_working_items` / `configuration_profile_items` 各加 `part_revision_id UUID`
+    列（清单项快照绑定版本；`config_item` 行留空）。迁移回填 = 该 `item_id`(master) 最新版本。
+  - 生成 `_generate_checklist`（`crud_configuration.py:925`）：working item 写入
+    `part_revision_id = p.revision_id`。
+  - 定版拷贝 working→profile（`crud_configuration.py:1101`）：`part_revision_id` 一并复制。
+  - 清单项格式化 `_format_profile_item`（`configuration.py:1559`）：`item_version`/`item_status`
+    改为**按 `part_revision_id` 解析**（现状从 `PartMaster` 取 `.version` 恒为空，因 master 无版本）。
+    构建 revision_map（`PartRevision.id.in_(revision_ids)`）供解析。
+  - 前端 `ProfileEditModal.tsx:516/597` 已渲染 `item_version`，无需改，本次起能显示锁定版本。
 
 ## 6. 前端
 
