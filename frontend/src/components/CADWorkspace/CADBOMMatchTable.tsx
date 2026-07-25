@@ -798,9 +798,20 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                     <td className="p-2 text-center" style={{ width: 160 }}>
                       <div className="flex gap-1 flex-wrap justify-center">
                         {row.match_status === 'new' && <button onClick={() => handleCreatePart(row)} className="px-2 py-1 bg-amber-500 text-white rounded hover:bg-amber-600">创建零件</button>}
-                        {row.match_status === 'matched' && row.checkout_status === 'not_checked_out' && (<><button onClick={() => handleCheckout(row)} className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">签出</button><button onClick={() => handlePullFromPDM(row)} className="px-2 py-1 bg-amber-50 text-amber-700 border border-amber-300 rounded hover:bg-amber-100">属性←</button></>)}
-                        {row.match_status === 'matched' && row.checkout_status === 'checked_out' && (<><button onClick={() => handleCheckin(row)} className="px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600">签入</button><button onClick={() => handlePushToPDM(row)} title="CAD 属性推送到 PDM" className="px-2 py-1 bg-blue-100 text-blue-700 border border-blue-300 rounded hover:bg-blue-200">属性→</button><button onClick={() => handlePullFromPDM(row)} title="PDM 字段拉取覆盖 CAD 属性" className="px-2 py-1 bg-amber-50 text-amber-700 border border-amber-300 rounded hover:bg-amber-100">属性←</button><button onClick={() => handleUndoCheckout(row)} className="px-2 py-1 bg-red-50 text-red-700 border border-red-300 rounded hover:bg-red-100">撤销</button></>)}
-                        {row.match_status === 'matched' && row.checkout_status === 'other_checked_out' && <button onClick={() => handlePullFromPDM(row)} className="px-2 py-1 bg-amber-50 text-amber-700 border border-amber-300 rounded hover:bg-amber-100">属性←</button>}
+                        {row.match_status === 'matched' && row.checkout_status === 'not_checked_out' && (<><button onClick={() => handleCheckout(row)} className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">签出</button><button onClick={() => handlePullFromPDM(row)} className="px-2 py-1 bg-amber-50 text-amber-700 border border-amber-300 rounded hover:bg-amber-100">属性↓</button></>)}
+                        {row.match_status === 'matched' && row.checkout_status === 'checked_out' && (
+                          <div className="flex flex-col gap-1">
+                            <div className="flex gap-1 justify-center">
+                              <button onClick={() => handleCheckin(row)} className="px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600">签入</button>
+                              <button onClick={() => handleUndoCheckout(row)} className="px-2 py-1 bg-red-50 text-red-700 border border-red-300 rounded hover:bg-red-100">撤销</button>
+                            </div>
+                            <div className="flex gap-1 justify-center">
+                              <button onClick={() => handlePushToPDM(row)} title="CAD 属性推送到 PDM" className="px-2 py-1 bg-blue-100 text-blue-700 border border-blue-300 rounded hover:bg-blue-200">属性↑</button>
+                              <button onClick={() => handlePullFromPDM(row)} title="PDM 字段拉取覆盖 CAD 属性" className="px-2 py-1 bg-amber-50 text-amber-700 border border-amber-300 rounded hover:bg-amber-100">属性↓</button>
+                            </div>
+                          </div>
+                        )}
+                        {row.match_status === 'matched' && row.checkout_status === 'other_checked_out' && <button onClick={() => handlePullFromPDM(row)} className="px-2 py-1 bg-amber-50 text-amber-700 border border-amber-300 rounded hover:bg-amber-100">属性↓</button>}
                       </div>
                     </td>
                   </tr>
