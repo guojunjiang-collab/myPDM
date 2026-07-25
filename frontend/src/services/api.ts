@@ -723,9 +723,9 @@ export const configurationApi = {
   deleteItem: (id: string) =>
     api.delete(`/configurations/items/${id}`),
 
-  addParts: (id: string, items: { part_type: string; part_id: string; is_required: boolean }[]) =>
+  addParts: (id: string, items: { part_type: string; part_id: string; revision_id: string; is_required: boolean; quantity?: number }[]) =>
     api.post(`/configurations/items/${id}/parts`, { items }),
-  updatePart: (id: string, partId: string, data: { is_required?: boolean; quantity?: number }) =>
+  updatePart: (id: string, partId: string, data: { is_required?: boolean; quantity?: number; revision_id?: string }) =>
     api.put(`/configurations/items/${id}/parts/${partId}`, data),
   removePart: (id: string, partId: string) =>
     api.delete(`/configurations/items/${id}/parts/${partId}`),
