@@ -16,7 +16,8 @@
 
 **首期范围**
 - 覆盖高频查询模块：仪表盘、看板、零部件管理、图文档管理、构型管理、变更管理、库存管理、通知中心、系统设置。
-- **延后**：Three.js STEP/3D 查看器（STPViewer）、CAD 工作台（CADWorkspace）、OfficeReader 等重模块。手机上先给"请用电脑打开"占位提示，不做适配。
+- **纳入 3D 查看器（STPViewer）**：手机上可查看/旋转/缩放模型、看模型树。详见第 6 节。
+- **延后**：CAD 工作台（CADWorkspace）、OfficeReader。手机上先给"请用电脑打开"占位提示，不做适配。
 
 ## 2. 断点约定
 
@@ -54,29 +55,41 @@
 - `≥ md`：保持现有居中卡片与 `widthMap` 尺寸。
 - 改一处覆盖大部分详情场景。
 
-## 6. 触控与细节
+## 6. 3D 查看器适配（`pages/STPViewer.tsx` 及 `components/STPViewer/*`）
+
+STPViewer 是独立全屏路由（`/stp-viewer`，不走 Layout），左侧 240px 可拖拽模型树面板 + `flex-1` 的 `ViewerCanvas`（react-three-fiber + drei `ArcballControls`）。
+
+- **触控手势**：`ArcballControls` 默认支持触控（单指旋转、双指平移/缩放）。关键是给 Canvas 容器加 `touch-action: none`，防止浏览器把手势当成页面滚动/双指缩放抢走。实施时先真机验证 `ArcballControls` 的触控行为，必要时调 `enablePan/enableZoom`/手势灵敏度。
+- **模型树面板**：`< md` 时不再固定侧栏，改为可切换的**抽屉/底部弹层**——画布上加一个"模型树"浮动按钮，点开覆盖显示树，选中/点遮罩关闭；隐藏拖拽调宽手柄（`treeWidth` 逻辑仅在 `≥ md` 生效）。
+- **工具控件**（测量 MeasureTool、剖切 SectionPlanes、爆炸 ExplodeView 等）：`< md` 折叠进一个浮动工具菜单/底部工具条，避免铺满小屏；点区 ≥ 40px。
+- **画布尺寸**：保持 `w-full h-full` 自适应；`ViewerCanvas` 已是百分比尺寸，`dpr` 可按需限制上限（如 `[1, 2]`）以兼顾手机性能。
+- **退出/返回**：全屏路由加一个明显的关闭/返回按钮（手机上没有 Layout 的返回入口）。
+- **性能**：沿用已有的流式加载与三档 LOD（近期已实现），首期不额外做移动专属降级；真机卡顿时再评估。
+
+## 7. 触控与细节
 
 - 可点区域 ≥ 40px（`min-h`/`py` 补足）。
 - 页面工具栏：`< md` 时按钮折叠为图标或"操作"下拉；搜索/筛选栏堆叠为整行、单列。
 - 长编号/长文本：`break-all` 或省略号处理，避免撑破卡片。
 - 表单在 `< md` 下单列堆叠（保留编辑能力）。
 
-## 7. 实施顺序（增量，可随时停）
+## 8. 实施顺序（增量，可随时停）
 
 1. **地基**：AppBar + Drawer（`Layout.tsx`）、`useIsMobile` hook、全屏 `Modal`。完成后全站在手机上可进入、可看详情。
 2. **共享组件**：实现 `ResponsiveTable`，先落地零部件 → 图文档 → 构型三个高频页。
 3. **铺开**：变更 / 库存 / 看板 / 仪表盘。
-4. **收尾**：其余表格迁移或 `overflow-x-auto` 兜底；3D/CAD/OfficeReader 加"请用电脑打开"占位提示。
+4. **3D 查看器**：Canvas `touch-action: none` + 真机触控验证、模型树抽屉化、工具控件折叠、返回按钮。
+5. **收尾**：其余表格迁移或 `overflow-x-auto` 兜底；CAD 工作台 / OfficeReader 加"请用电脑打开"占位提示。
 
-## 8. 验证
+## 9. 验证
 
-- Chrome DevTools 移动仿真（375px / 390px）+ 真机抽测。
+- Chrome DevTools 移动仿真（375px / 390px）+ 真机抽测（含 3D 查看器触控手势）。
 - 桌面端 `≥ md` 逐页对比，确认无回归。
 - `npm run build` 通过；关键页 `npm run test` 绿。
 
-## 9. 明确不做（YAGNI）
+## 10. 明确不做（YAGNI）
 
 - 不新建移动专用工程 / 路由 / PWA。
 - 不做移动端专属只读权限。
-- 首期不适配 3D 查看器、CAD 工作台、OfficeReader。
+- 首期不适配 CAD 工作台、OfficeReader（给占位提示）。
 - 不引入新的 UI 组件库；沿用现有 Tailwind + primary 配色 + 共享 Modal/表格约定。
