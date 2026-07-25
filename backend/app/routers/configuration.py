@@ -1585,21 +1585,21 @@ def _format_profile_item(item, entity_map: dict = None) -> dict:
 
 
 def _build_entity_map(db: Session, items: list) -> dict:
-    """批量查找零部件版本和状态"""
-    part_ids = []
-    assembly_ids = []
-    for item in items:
-        if item.item_type == "part":
-            part_ids.append(item.item_id)
-        else:
-            assembly_ids.append(item.item_id)
+    """批量查找零部件版本和状态 — 取每个 master 最新未软删 revision"""
+    master_ids = list(set(str(item.item_id) for item in items))
     entity_map = {}
-    if part_ids:
-        for p in db.query(PartMaster).filter(PartMaster.id.in_(part_ids)).all():
-            entity_map[str(p.id)] = p
-    if assembly_ids:
-        for a in db.query(PartMaster).filter(PartMaster.id.in_(assembly_ids)).all():
-            entity_map[str(a.id)] = a
+    for mid in master_ids:
+        rev = (
+            db.query(PartRevision)
+            .filter(
+                PartRevision.master_id == mid,
+                PartRevision.deleted_at.is_(None),
+            )
+            .order_by(PartRevision.created_at.desc())
+            .first()
+        )
+        if rev:
+            entity_map[mid] = rev
     return entity_map
 
 
