@@ -162,10 +162,10 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
         } catch {}
       }
       if (parts.length > 0) {
-        const validParts = parts.filter(p => p.part_type && p.part_id);
+        const validParts = parts.filter(p => p.part_type && p.part_id && p.revision_id);
         if (validParts.length > 0) {
           await configurationApi.addParts(configId, validParts.map(p => ({
-            part_type: p.part_type, part_id: p.part_id, is_required: p.is_required, quantity: p.quantity ?? 1,
+            part_type: p.part_type, part_id: p.part_id, revision_id: p.revision_id!, is_required: p.is_required, quantity: p.quantity ?? 1,
           })));
         }
       }
@@ -745,8 +745,8 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
             } catch {
               continue;
             }
-            const key = `${type}_${masterId}`;
-            const exists = parts.some(p => `${p.part_type}_${p.part_id}` === key);
+            const key = `${type}_${it.child_id}`;
+            const exists = parts.some(p => `${p.part_type}_${p.revision_id}` === key);
             if (exists) continue;
             setParts(prev => [...prev, { part_type: type, part_id: masterId, revision_id: it.child_id, part_code: code, part_name: name, part_version: ver, part_spec: spec, part_status: status, is_required: true, quantity: it.quantity ?? 1 }]);
           }

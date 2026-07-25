@@ -3597,7 +3597,7 @@ export async function executeConfigurationItemsImport(preview: ImportPreview): P
       }
 
       // 解析零部件件号+版本→entity_id，构造 addParts 参数
-      const partsToAdd: { part_type: string; part_id: string; is_required: boolean; quantity: number }[] = [];
+      const partsToAdd: { part_type: string; part_id: string; revision_id: string; is_required: boolean; quantity: number }[] = [];
       for (const p of parts) {
         const pc = p.part_code as string;
         const pv = p.part_version as string;
@@ -3610,6 +3610,7 @@ export async function executeConfigurationItemsImport(preview: ImportPreview): P
         partsToAdd.push({
           part_type: p.part_type as string || 'part',
           part_id: entity.revision_id,
+          revision_id: entity.revision_id,
           is_required: p.is_required as boolean,
           quantity: (p.quantity as number) || 1,
         });
