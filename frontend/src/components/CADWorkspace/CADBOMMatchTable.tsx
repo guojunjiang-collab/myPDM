@@ -53,11 +53,14 @@ function getPropertyColumns(userProps: Record<string, string>): string[] {
   return Object.keys(userProps).filter(k => !BUILTIN_KEYS.has(k));
 }
 
-// CATIA 内置属性列：列头中文，写回 CATIA 用英文属性名。
+// 内置属性列：按 PDM 目标字段(target)定义，实际 CAD 属性名由当前生效的字段映射
+// (fieldMapping.builtin)反查——CATIA 为 Nomenclature/Revision，SolidWorks 为 中文名称/Revision。
+// 不能硬编码 CAD 属性名：SW 下拉取写回写入映射属性(中文名称)，若显示列读硬编码属性
+// (Nomenclature)会与写回目标不一致，导致拉取后左侧列不刷新。
 // 件号（PartNumber）只读不在此列表；属性存于零件文档，编辑后按同 PartNumber 实例同步。
-const BUILTIN_COLUMNS: { label: string; attr: string; width?: string }[] = [
-  { label: '版本', attr: 'Revision', width: 'w-14' },
-  { label: '术语/中文名称', attr: 'Nomenclature' },
+const BUILTIN_COLUMNS: { label: string; target: 'name' | 'version'; fallbackAttr: string }[] = [
+  { label: '版本', target: 'version', fallbackAttr: 'Revision' },
+  { label: '术语/中文名称', target: 'name', fallbackAttr: 'Nomenclature' },
 ];
 
 // CATIA-PDM 字段映射（单一事实源为桥接端 cad_bridge/catia/field_mapping.json，
@@ -101,6 +104,11 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
   // CATIA 属性名 → PDM 字段名反向查找
   const getCatiaPropForPdmField = useCallback((pdmFieldName: string): string | undefined => {
     return Object.entries(fieldMapping.properties || {}).find(([, t]) => t === pdmFieldName)?.[0];
+  }, [fieldMapping]);
+
+  // 内置字段 PDM 目标(name/version) → 当前 CAD 属性名反查（无映射时回退英文默认）
+  const builtinAttrOf = useCallback((target: 'name' | 'version', fallbackAttr: string): string => {
+    return Object.entries(fieldMapping.builtin || {}).find(([, t]) => t === target)?.[0] || fallbackAttr;
   }, [fieldMapping]);
 
   // propertyColumns 来自 PDM 自定义字段定义；加载中回退到 CATIA 用户属性
@@ -213,9 +221,6 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
     setRows(prev => syncRowsByPartNumber(prev, row, key, value, target));
     scheduleWrite(row.path, key, value);
   }, [scheduleWrite]);
-  // 输入法(IME)组合态：拼音逐键的 onChange 不提交，待选定汉字(compositionend)才算一次输入，
-  // 避免组合中反复 setRows 触发重渲染打断输入法、造成闪烁
-  const composingRef = useRef(false);
 
   const [matching, setMatching] = useState(false);
   // 各版本附件计数（cad/production），显示在附件列按钮上方
@@ -702,7 +707,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                   <th className="p-2 text-left" style={{ width: 110 }}>件号</th>
                   <th className="p-2 text-center" style={{ width: 40 }}>用量</th>
                   {BUILTIN_COLUMNS.map(col => (
-                    <th key={col.attr} className="p-2 text-left" style={{ width: col.attr === 'Revision' ? 56 : 100 }}>{col.label}</th>
+                    <th key={col.target} className="p-2 text-left" style={{ width: col.target === 'version' ? 56 : 100 }}>{col.label}</th>
                   ))}
                   <th className="p-2 text-center" style={{ width: 90 }}>CAD附件</th>
                   <th className="p-2 text-center" style={{ width: 100 }}>生产附件</th>
@@ -737,9 +742,12 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                     <td className="p-2 text-center" style={{ width: 40 }}>{row.quantity}</td>
                     {BUILTIN_COLUMNS.map(col => {
                       // 内置列同样对比 PDM：术语/中文名称↔name、版本↔version
-                      const cadVal = row.builtin[col.attr] || '';
-                      const pdmVal = col.attr === 'Nomenclature' ? (row.pdm_match?.name || '')
-                        : col.attr === 'Revision' ? (row.pdm_match?.version || '') : '';
+                      // CAD 属性名由当前生效映射反查（SW: 中文名称/Revision，CATIA: Nomenclature/Revision），
+                      // 与拉取写回目标一致，确保拉取后左侧列同步刷新
+                      const attr = builtinAttrOf(col.target, col.fallbackAttr);
+                      const cadVal = row.builtin[attr] || '';
+                      const pdmVal = col.target === 'name' ? (row.pdm_match?.name || '')
+                        : (row.pdm_match?.version || '');
                       const fromPdm = cadVal === '' && pdmVal !== '';
                       const conflict = cadVal !== '' && pdmVal !== '' && cadVal.trim() !== pdmVal.trim();
                       const value = fromPdm ? pdmVal : cadVal;
@@ -748,11 +756,9 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                       const title = fromPdm ? `PDM 值（CAD 为空）: ${pdmVal}`
                         : conflict ? `与 PDM 不同 — CAD: ${cadVal} / PDM: ${pdmVal}` : undefined;
                       return (
-                      <td key={col.attr} className="p-2" style={{ width: col.attr === 'Revision' ? 56 : 100 }} title={title}>
+                      <td key={col.target} className="p-2" style={{ width: col.target === 'version' ? 56 : 100 }} title={title}>
                         <input value={value} disabled={!canEditProps(row)}
-                          onCompositionStart={() => { composingRef.current = true; }}
-                          onCompositionEnd={e => { composingRef.current = false; commitEdit(row, col.attr, e.currentTarget.value, 'builtin'); }}
-                          onChange={e => { if (composingRef.current) return; commitEdit(row, col.attr, e.target.value, 'builtin'); }}
+                          onChange={e => commitEdit(row, attr, e.target.value, 'builtin')}
                           className={`border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200${toneCls}`} />
                       </td>
                       );
@@ -862,9 +868,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                                 </select>
                               ) : (
                                 <input value={value} disabled={!canEditProps(row) || !catiaProp}
-                                  onCompositionStart={() => { composingRef.current = true; }}
-                                  onCompositionEnd={e => { composingRef.current = false; if (!catiaProp) return; commitEdit(row, catiaProp, e.currentTarget.value); }}
-                                  onChange={e => { if (composingRef.current || !catiaProp) return; commitEdit(row, catiaProp, e.target.value); }}
+                                  onChange={e => { if (!catiaProp) return; commitEdit(row, catiaProp, e.target.value); }}
                                   className={`border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200${toneCls}`} />
                               )}
                             </td>
