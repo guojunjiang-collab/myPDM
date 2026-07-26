@@ -264,6 +264,16 @@ export const documentsApi = {
   // 反查
   references: (revisionId: string) =>
     api.get(`/documents/${revisionId}/references`),
+  whereUsedConfigurations: (revisionId: string) =>
+    api.get(`/documents/revisions/${revisionId}/where-used/configurations`).then(r => r.data),
+  whereUsedParts: (revisionId: string) =>
+    api.get(`/documents/revisions/${revisionId}/where-used/parts`).then(r => r.data),
+  whereUsedTasks: (revisionId: string) =>
+    api.get(`/documents/revisions/${revisionId}/where-used/tasks`).then(r => r.data),
+  whereUsedEcos: (revisionId: string) =>
+    api.get(`/documents/revisions/${revisionId}/where-used/ecos`).then(r => r.data),
+  whereUsedEcrs: (revisionId: string) =>
+    api.get(`/documents/revisions/${revisionId}/where-used/ecrs`).then(r => r.data),
 
   // ===== 向后兼容别名（Tasks 6-7 逐步迁移到 detail/del 等新名称） =====
   /** @deprecated 使用 detail() */

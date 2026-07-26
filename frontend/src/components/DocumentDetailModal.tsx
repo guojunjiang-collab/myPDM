@@ -9,6 +9,12 @@ import CustomFieldInput from './CustomFieldInput';
 import { previewAttachment } from '../utils/attachmentPreview';
 import ArchiveTreeModal from './ArchiveTreeModal';
 import { formatDateTime } from '../utils/date';
+import DocWhereUsedTab from './DocumentDetailModal/DocWhereUsedTab';
+import ConfigItemDetailModal from './Configuration/ConfigItemDetailModal';
+import PartDetailModal from './PartDetailModal';
+import TaskEditModal from '../pages/Project/TaskEditModal';
+import { ECODetailModal } from './ECO/ECODetailModal';
+import { ECRDetailModal } from './ECR/ECRDetailModal';
 import type { DocumentRevision, DocumentIteration, CustomFieldDefinition } from '../types';
 
 interface Props {
@@ -34,7 +40,7 @@ const statusTag = (s: string) => {
   return tags[s] || { label: s, class: 'bg-gray-100 text-gray-800' };
 };
 
-type TabKey = 'attachments' | 'versions' | 'iterations' | 'custom-fields';
+type TabKey = 'attachments' | 'versions' | 'iterations' | 'custom-fields' | 'whereused';
 
 interface AttInfo {
   id: string;
@@ -62,6 +68,11 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
   const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
   const [allGroups, setAllGroups] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+  const [wuConfig, setWuConfig] = useState<string | null>(null);
+  const [wuPart, setWuPart] = useState<{ masterId: string; revisionId: string } | null>(null);
+  const [wuTask, setWuTask] = useState<{ projectId: string; task: any } | null>(null);
+  const [wuEco, setWuEco] = useState<string | null>(null);
+  const [wuEcr, setWuEcr] = useState<string | null>(null);
 
   const effectiveRevisionId = viewingVersionId || revisionId;
   const isViewingOtherVersion = !!viewingVersionId && viewingVersionId !== revisionId;
@@ -337,6 +348,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
       { key: 'custom-fields' as const, label: '自定义字段' },
       { key: 'versions' as const, label: '版本历史' },
       { key: 'iterations' as const, label: '迭代历史' },
+      { key: 'whereused' as const, label: '反查' },
     ],
     []
   );
@@ -699,6 +711,16 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                     </table>
                   </div>
                 )}
+                {activeTab === 'whereused' && effectiveRevisionId && (
+                  <DocWhereUsedTab
+                    revisionId={effectiveRevisionId}
+                    onOpenConfig={(cirId) => setWuConfig(cirId)}
+                    onOpenPart={(masterId, revisionId) => setWuPart({ masterId, revisionId })}
+                    onOpenTask={(projectId, task) => setWuTask({ projectId, task })}
+                    onOpenEco={(ecoId) => setWuEco(ecoId)}
+                    onOpenEcr={(ecrId) => setWuEcr(ecrId)}
+                  />
+                )}
               </div>
             </div>
           </>
@@ -735,6 +757,23 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
           attachmentId={archivePreview.attId}
           fileName={archivePreview.fileName}
         />
+      )}
+      {wuConfig && (
+        <ConfigItemDetailModal open={!!wuConfig} revisionId={wuConfig} onClose={() => setWuConfig(null)} />
+      )}
+      {wuPart && (
+        <PartDetailModal open={!!wuPart} masterId={wuPart.masterId} revisionId={wuPart.revisionId}
+          onClose={() => setWuPart(null)} />
+      )}
+      {wuTask && (
+        <TaskEditModal open={!!wuTask} projectId={wuTask.projectId} task={wuTask.task} parentId={null}
+          onClose={() => setWuTask(null)} onSaved={() => {}} onRefresh={() => {}} />
+      )}
+      {wuEco && (
+        <ECODetailModal ecoId={wuEco} onClose={() => setWuEco(null)} onRefresh={() => {}} />
+      )}
+      {wuEcr && (
+        <ECRDetailModal open={!!wuEcr} ecrId={wuEcr} onClose={() => setWuEcr(null)} onSuccess={() => {}} />
       )}
     </Modal>
   );
