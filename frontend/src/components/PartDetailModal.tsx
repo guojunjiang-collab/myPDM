@@ -524,11 +524,11 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const tabs = useMemo(() => [
     { key: 'info' as const, label: '基本信息', show: !!currentDisplay },
     { key: 'bom' as const, label: 'BOM结构', show: hasBomChildren || canEdit },
-    { key: 'whereused' as const, label: '反查', show: true },
-    { key: 'docs' as const, label: '关联文档', show: !!currentDisplay },
+    { key: 'docs' as const, label: '关联图文档', show: !!currentDisplay },
     { key: 'attachments' as const, label: '附件', show: true },
     { key: 'versions' as const, label: '版本历史', show: true },
     { key: 'iterations' as const, label: '迭代历史', show: true },
+    { key: 'whereused' as const, label: '反查', show: true },
   ].filter(t => t.show), [currentDisplay, hasBomChildren, canEdit]);
 
   if (!open) return null;
@@ -543,7 +543,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
         </span>
       ) : undefined}
     >
-      <div className="h-[50vh] flex flex-col">
+      <div className="h-[60vh] flex flex-col">
         {detailLoading && !master ? (
           <Loading />
         ) : !master ? (
@@ -702,7 +702,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                 ))}
               </div>
 
-              <div className="p-4 overflow-y-auto flex-1">
+              <div className="p-4 flex-1 min-h-0">
                 {activeTab === 'info' && currentDisplay && (
                   <div className="space-y-4">
                     <div className="text-xs text-gray-500">
@@ -788,8 +788,8 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                 )}
 
                 {activeTab === 'bom' && (
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
+                  <div className="flex flex-col min-h-0 h-full">
+                    <div className="flex items-center justify-between mb-3 shrink-0">
                       <h4 className="text-sm font-bold text-gray-700">子项清单</h4>
                       <div className="flex gap-2">
                         {canEdit && !viewingIterationId && (
@@ -811,7 +811,8 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                     {bomItems.length === 0 ? (
                       <div className="text-gray-400 text-sm py-4 text-center">暂无子项</div>
                     ) : (
-                      <div className="border rounded-lg overflow-hidden">
+                      <div className="border rounded-lg overflow-hidden flex-1 min-h-0">
+                        <div className="overflow-y-auto h-full">
                         <table className="w-full text-sm">
                         <thead>
                           <tr className="bg-gray-50 border-b sticky top-0 z-10">
@@ -833,6 +834,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                           {bomItems.map((item: any) => renderBomRow(item, 0))}
                         </tbody>
                       </table>
+                        </div>
                       </div>
                     )}
                   </div>

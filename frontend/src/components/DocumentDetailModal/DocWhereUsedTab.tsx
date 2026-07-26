@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { documentsApi } from '../../services/api';
+import { getStatusLabel } from '../../pages/BOM/helpers';
+import { formatDateTime } from '../../utils/date';
 
 interface Props {
   revisionId: string;
@@ -63,7 +65,7 @@ export default function DocWhereUsedTab(props: Props) {
                   onClick={() => props.onOpenConfig(r.config_item_revision_id)}>
                 <td className="px-3 py-2 font-medium">{r.code}</td><td className="px-3 py-2">{r.name}</td>
                 <td className="px-3 py-2 text-gray-500">{r.version || '-'}</td>
-                <td className="px-3 py-2 text-gray-500">{r.status || '-'}</td>
+                <td className="px-3 py-2 text-gray-500">{getStatusLabel(r.status) || '-'}</td>
               </tr>))}
           </tbody></table>
         </State>
@@ -72,13 +74,15 @@ export default function DocWhereUsedTab(props: Props) {
       <Section title="被零部件引用" count={prt.loading ? '…' : prt.data.length}>
         <State s={prt}>
           <table className={tbl}><thead className="bg-gray-50 border-b"><tr>
-            <th className={th}>件号</th><th className={th}>名称</th><th className={`${th} w-16`}>类型</th>
+            <th className={th}>件号</th><th className={th}>名称</th>
+            <th className={`${th} w-16`}>版本</th><th className={`${th} w-20`}>状态</th>
           </tr></thead><tbody className="divide-y divide-gray-100">
             {prt.data.map((r: any) => (
               <tr key={r.master_id} className="hover:bg-gray-50 cursor-pointer"
                   onClick={() => props.onOpenPart(r.master_id, r.revision_id)}>
                 <td className="px-3 py-2 font-medium">{r.code}</td><td className="px-3 py-2">{r.name}</td>
-                <td className="px-3 py-2 text-gray-500">{r.type === 'assembly' ? '部件' : '零件'}</td>
+                <td className="px-3 py-2 text-gray-500">{r.version || '-'}</td>
+                <td className="px-3 py-2 text-gray-500">{getStatusLabel(r.status) || '-'}</td>
               </tr>))}
           </tbody></table>
         </State>
@@ -87,13 +91,18 @@ export default function DocWhereUsedTab(props: Props) {
       <Section title="被项目任务引用" count={tsk.loading ? '…' : tsk.data.length}>
         <State s={tsk}>
           <table className={tbl}><thead className="bg-gray-50 border-b"><tr>
-            <th className={th}>项目</th><th className={th}>任务</th><th className={`${th} w-20`}>状态</th>
+            <th className={th}>项目</th><th className={th}>任务</th><th className={`${th} w-16`}>负责人</th>
+            <th className={`${th} w-28`}>计划开始</th><th className={`${th} w-28`}>计划完成</th>
+            <th className={`${th} w-20`}>状态</th>
           </tr></thead><tbody className="divide-y divide-gray-100">
             {tsk.data.map((r: any) => (
               <tr key={r.task.id} className="hover:bg-gray-50 cursor-pointer"
                   onClick={() => props.onOpenTask(r.project_id, r.task)}>
                 <td className="px-3 py-2">{r.project_name}</td>
                 <td className="px-3 py-2 font-medium">{r.task.name}</td>
+                <td className="px-3 py-2 text-gray-500">{r.task.assignee_name || '-'}</td>
+                <td className="px-3 py-2 text-gray-500">{formatDateTime(r.task.planned_start, 'date') || '-'}</td>
+                <td className="px-3 py-2 text-gray-500">{formatDateTime(r.task.planned_end, 'date') || '-'}</td>
                 <td className="px-3 py-2 text-gray-500">{r.task.status}</td>
               </tr>))}
           </tbody></table>
@@ -110,7 +119,7 @@ export default function DocWhereUsedTab(props: Props) {
                   onClick={() => props.onOpenEco(r.eco_id)}>
                 <td className="px-3 py-2 font-medium">{r.eco_number}</td>
                 <td className="px-3 py-2">{r.title}</td>
-                <td className="px-3 py-2 text-gray-500">{r.status}</td>
+                <td className="px-3 py-2 text-gray-500">{getStatusLabel(r.status) || r.status}</td>
               </tr>))}
           </tbody></table>
         </State>
@@ -126,7 +135,7 @@ export default function DocWhereUsedTab(props: Props) {
                   onClick={() => props.onOpenEcr(r.ecr_id)}>
                 <td className="px-3 py-2 font-medium">{r.ecr_number}</td>
                 <td className="px-3 py-2">{r.title}</td>
-                <td className="px-3 py-2 text-gray-500">{r.status}</td>
+                <td className="px-3 py-2 text-gray-500">{getStatusLabel(r.status) || r.status}</td>
               </tr>))}
           </tbody></table>
         </State>

@@ -723,5 +723,6 @@ def where_used_parts_by_document(db, doc_revision_id) -> list:
             continue
         seen.add(str(pm.id))
         out.append({"master_id": str(pm.id), "revision_id": str(pr.id),
-                    "code": pm.code, "name": pm.name, "type": pm.type})
+                    "code": pm.code, "name": pm.name, "type": pm.type,
+                    "version": pr.version, "status": pr.status})
     return out
