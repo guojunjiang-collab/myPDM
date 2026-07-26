@@ -728,3 +728,59 @@ def delete_document_iteration(
                     "删除图文档迭代", "document_iteration", str(iteration_id),
                     f"编号:{revision.master.code if revision and revision.master else ''}", ip)
     return {"message": "迭代已删除", "latest_iteration": revision.latest_iteration if revision else 0}
+
+
+# ===== 图文档反查（五段） =====
+
+@router.get("/revisions/{revision_id}/where-used/configurations")
+async def doc_where_used_configurations(
+    revision_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:read")),
+):
+    from ..crud_configuration import where_used_configurations_by_document
+    return where_used_configurations_by_document(db, revision_id)
+
+
+@router.get("/revisions/{revision_id}/where-used/parts")
+async def doc_where_used_parts(
+    revision_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:read")),
+):
+    from ..crud_documents import where_used_parts_by_document
+    return where_used_parts_by_document(db, revision_id)
+
+
+@router.get("/revisions/{revision_id}/where-used/tasks")
+async def doc_where_used_tasks(
+    revision_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:read")),
+):
+    from ..crud_project import where_used_tasks_by_document
+    from .projects import _task_dict
+    return [
+        {"project_id": str(p.id), "project_name": p.name, "task": _task_dict(db, t)}
+        for t, p in where_used_tasks_by_document(db, revision_id)
+    ]
+
+
+@router.get("/revisions/{revision_id}/where-used/ecos")
+async def doc_where_used_ecos(
+    revision_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:read")),
+):
+    from ..crud_eco import where_used_by_document
+    return where_used_by_document(db, revision_id)
+
+
+@router.get("/revisions/{revision_id}/where-used/ecrs")
+async def doc_where_used_ecrs(
+    revision_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:read")),
+):
+    from ..crud_ecr import where_used_by_document
+    return where_used_by_document(db, revision_id)

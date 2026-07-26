@@ -703,3 +703,25 @@ def get_current_iteration(
             .first()
         )
     return None
+
+
+def where_used_parts_by_document(db, doc_revision_id) -> list:
+    """反查：迭代 document_links 引用了该图文档版本的零部件（按零件 master 去重）。"""
+    from app.models_parts import PartIteration, PartRevision, PartMaster
+    rev_str = str(doc_revision_id)
+    seen, out = set(), []
+    for it in db.query(PartIteration).all():
+        if not any(l.get("document_id") == rev_str for l in (it.document_links or [])):
+            continue
+        pr = db.query(PartRevision).filter(
+            PartRevision.id == it.revision_id, PartRevision.deleted_at.is_(None)).first()
+        if not pr:
+            continue
+        pm = db.query(PartMaster).filter(
+            PartMaster.id == pr.master_id, PartMaster.deleted_at.is_(None)).first()
+        if not pm or str(pm.id) in seen:
+            continue
+        seen.add(str(pm.id))
+        out.append({"master_id": str(pm.id), "revision_id": str(pr.id),
+                    "code": pm.code, "name": pm.name, "type": pm.type})
+    return out

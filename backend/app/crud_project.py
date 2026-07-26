@@ -718,6 +718,27 @@ def where_used_tasks(db: Session, revision_id) -> list:
     return out
 
 
+def where_used_tasks_by_document(db: Session, doc_revision_id) -> list:
+    """反查：通过 task_link(entity_type=document) 引用了该图文档版本的任务（按任务去重）。"""
+    rows = (
+        db.query(ProjectTask, Project)
+        .join(ProjectTaskLink, ProjectTaskLink.task_id == ProjectTask.id)
+        .join(Project, Project.id == ProjectTask.project_id)
+        .filter(ProjectTaskLink.entity_type == "document",
+                ProjectTaskLink.entity_id == doc_revision_id,
+                ProjectTask.deleted_at.is_(None),
+                Project.deleted_at.is_(None))
+        .all()
+    )
+    seen, out = set(), []
+    for t, p in rows:
+        if str(t.id) in seen:
+            continue
+        seen.add(str(t.id))
+        out.append((t, p))
+    return out
+
+
 def get_gantt_data(db: Session, project_id: uuid.UUID) -> dict:
     tasks = db.query(ProjectTask).filter(
         ProjectTask.project_id == project_id, ProjectTask.deleted_at.is_(None)

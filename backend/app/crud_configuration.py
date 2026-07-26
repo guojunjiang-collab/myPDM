@@ -1515,3 +1515,28 @@ def where_used_profiles(db: Session, revision_id) -> list:
             "is_required": pi.is_required, "quantity": pi.quantity,
         })
     return out
+
+
+def where_used_configurations_by_document(db: Session, doc_revision_id) -> list:
+    """反查：迭代 document_links 引用了该图文档版本的构型项（按构型项 revision 去重）。"""
+    rev_str = str(doc_revision_id)
+    seen, out = set(), []
+    for it in db.query(models.ConfigurationItemIteration).all():
+        if not any(l.get("document_id") == rev_str for l in (it.document_links or [])):
+            continue
+        cir = db.query(models.ConfigurationItemRevision).filter(
+            models.ConfigurationItemRevision.id == it.revision_id,
+            models.ConfigurationItemRevision.deleted_at.is_(None)).first()
+        if not cir or str(cir.id) in seen:
+            continue
+        cim = db.query(models.ConfigurationItemMaster).filter(
+            models.ConfigurationItemMaster.id == cir.master_id,
+            models.ConfigurationItemMaster.deleted_at.is_(None)).first()
+        if not cim:
+            continue
+        seen.add(str(cir.id))
+        out.append({
+            "config_item_master_id": str(cim.id), "config_item_revision_id": str(cir.id),
+            "code": cim.code, "name": cim.name, "version": cir.version, "status": cir.status,
+        })
+    return out

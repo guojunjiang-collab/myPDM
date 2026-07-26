@@ -1095,3 +1095,18 @@ def get_bom_trace(db: Session, entity_type: str, entity_id: uuid.UUID) -> dict:
     upward = _get_upward_trace(db, entity_type, entity_id)
     downward = _get_downward_trace(db, entity_type, entity_id)
     return {"upward_chain": upward, "downward_items": downward}
+
+
+def where_used_by_document(db, doc_revision_id) -> list:
+    """反查：document_links 引用了该图文档版本的 ECO（按 ECO 去重）。"""
+    from app.models_eco import ECO
+    rev_str = str(doc_revision_id)
+    seen, out = set(), []
+    for eco in db.query(ECO).all():
+        if str(eco.id) in seen:
+            continue
+        if any(l.get("document_id") == rev_str for l in (eco.document_links or [])):
+            seen.add(str(eco.id))
+            out.append({"eco_id": str(eco.id), "eco_number": eco.eco_number,
+                        "title": eco.title, "status": eco.status})
+    return out

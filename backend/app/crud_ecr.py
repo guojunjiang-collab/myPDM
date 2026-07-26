@@ -648,3 +648,18 @@ def _get_downward_trace(db: Session, entity_type: str, entity_id: uuid.UUID) -> 
             "parent_target_version": None,
         })
     return downward_items
+
+
+def where_used_by_document(db, doc_revision_id) -> list:
+    """反查：document_links 引用了该图文档版本的 ECR（按 ECR 去重）。"""
+    from app.models_ecr import ECR
+    rev_str = str(doc_revision_id)
+    seen, out = set(), []
+    for ecr in db.query(ECR).all():
+        if str(ecr.id) in seen:
+            continue
+        if any(l.get("document_id") == rev_str for l in (ecr.document_links or [])):
+            seen.add(str(ecr.id))
+            out.append({"ecr_id": str(ecr.id), "ecr_number": ecr.ecr_number,
+                        "title": ecr.title, "status": ecr.status})
+    return out
