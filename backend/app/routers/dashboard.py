@@ -8,7 +8,7 @@ from ..models import (
     DashboardItem, DashboardFolderShare
 )
 from ..models_parts import PartMaster, PartRevision
-from ..models_configuration import ConfigurationItemMaster
+from ..models_configuration import ConfigurationItemMaster, ConfigurationItemRevision
 from ..permissions import require_permission, enforce_object_policy
 
 router = APIRouter(prefix="/dashboard", tags=["用户看板"])
@@ -17,25 +17,18 @@ router = APIRouter(prefix="/dashboard", tags=["用户看板"])
 COMPONENT_ENTITY_TYPES = ("component", "part", "assembly")
 
 
-def _build_component_item(item, master: PartMaster, db: Session) -> dict:
-    """构建零部件看板项：版本/状态来自最新有效 revision（PartMaster 本身无这些字段）"""
-    rev = (
-        db.query(PartRevision)
-        .filter(
-            PartRevision.master_id == master.id,
-            PartRevision.deleted_at.is_(None),
-        )
-        .order_by(PartRevision.created_at.desc())
-        .first()
-    )
+def _build_component_item(item, rev: PartRevision, db: Session) -> dict:
+    """构建零部件看板项：直接使用关联时指定的 revision"""
+    master = db.query(PartMaster).filter(PartMaster.id == rev.master_id).first()
     return {
         "id": item.id,
         "entity_type": "component",
-        "entity_id": str(master.id),
-        "code": master.code,
-        "name": master.name,
-        "version": rev.version if rev else "",
-        "status": rev.status if rev else "draft",
+        "entity_id": str(rev.id),
+        "master_id": str(rev.master_id),
+        "code": master.code if master else "",
+        "name": master.name if master else "",
+        "version": rev.version,
+        "status": rev.status,
     }
 
 
@@ -61,47 +54,48 @@ def _folder_to_dict(folder, db: Session, include_items=False, include_children=F
         ).all()
         item_list = []
         for item in items:
-            entity = None
             if item.entity_type in COMPONENT_ENTITY_TYPES:
-                entity = db.query(PartMaster).filter(
-                    PartMaster.id == item.entity_id,
-                    PartMaster.deleted_at.is_(None),
+                rev = db.query(PartRevision).filter(
+                    PartRevision.id == item.entity_id,
+                    PartRevision.deleted_at.is_(None),
                 ).first()
-                if entity:
-                    item_list.append(_build_component_item(item, entity, db))
+                if rev:
+                    item_list.append(_build_component_item(item, rev, db))
             elif item.entity_type == "document":
-                entity = db.query(DocumentMaster).filter(
-                    DocumentMaster.id == item.entity_id,
-                    DocumentMaster.deleted_at.is_(None),
+                rev = db.query(DocumentRevision).filter(
+                    DocumentRevision.id == item.entity_id,
+                    DocumentRevision.deleted_at.is_(None),
                 ).first()
-                if entity:
-                    latest_rev = db.query(DocumentRevision).filter(
-                        DocumentRevision.master_id == entity.id,
-                        DocumentRevision.deleted_at.is_(None),
-                    ).order_by(DocumentRevision.created_at.desc()).first()
+                if rev:
+                    master = db.query(DocumentMaster).filter(DocumentMaster.id == rev.master_id).first()
                     item_list.append({
                         "id": item.id,
                         "entity_type": "document",
-                        "entity_id": str(entity.id),
-                        "code": entity.code,
-                        "name": entity.name,
-                        "version": latest_rev.version if latest_rev else "",
-                        "status": latest_rev.status if latest_rev else "draft",
+                        "entity_id": str(rev.id),
+                        "master_id": str(rev.master_id),
+                        "code": master.code if master else "",
+                        "name": master.name if master else "",
+                        "version": rev.version,
+                        "status": rev.status,
                     })
             elif item.entity_type == "configuration":
-                entity = db.query(ConfigurationItemMaster).filter(
-                    ConfigurationItemMaster.id == item.entity_id,
-                    ConfigurationItemMaster.deleted_at.is_(None)
+                rev = db.query(ConfigurationItemRevision).filter(
+                    ConfigurationItemRevision.id == item.entity_id,
+                    ConfigurationItemRevision.deleted_at.is_(None),
                 ).first()
-                if entity:
+                if rev:
+                    master = db.query(ConfigurationItemMaster).filter(
+                        ConfigurationItemMaster.id == rev.master_id
+                    ).first()
                     item_list.append({
                         "id": item.id,
                         "entity_type": "configuration",
-                        "entity_id": str(entity.id),
-                        "code": entity.code,
-                        "name": entity.name,
-                        "version": "-",
-                        "status": "active",
+                        "entity_id": str(rev.id),
+                        "master_id": str(rev.master_id),
+                        "code": master.code if master else "",
+                        "name": master.name if master else "",
+                        "version": rev.version,
+                        "status": rev.status,
                     })
         # 按名称排序
         item_list.sort(key=lambda x: x["name"])
@@ -440,24 +434,23 @@ async def add_items(data: dict, request: Request, db: Session = Depends(get_db),
         if entity_type not in COMPONENT_ENTITY_TYPES and entity_type not in ("document", "configuration"):
             continue
 
-        # 验证实体存在
+        # 验证实体存在（entity_id 为 revision_id）
         entity = None
         if entity_type in COMPONENT_ENTITY_TYPES:
-            # 零件/部件统一为零部件，存储归一化为 component
             entity_type = "component"
-            entity = db.query(PartMaster).filter(
-                PartMaster.id == entity_id,
-                PartMaster.deleted_at.is_(None),
+            entity = db.query(PartRevision).filter(
+                PartRevision.id == entity_id,
+                PartRevision.deleted_at.is_(None),
             ).first()
         elif entity_type == "document":
-            entity = db.query(DocumentMaster).filter(
-                DocumentMaster.id == entity_id,
-                DocumentMaster.deleted_at.is_(None),
+            entity = db.query(DocumentRevision).filter(
+                DocumentRevision.id == entity_id,
+                DocumentRevision.deleted_at.is_(None),
             ).first()
         elif entity_type == "configuration":
-            entity = db.query(ConfigurationItemMaster).filter(
-                ConfigurationItemMaster.id == entity_id,
-                ConfigurationItemMaster.deleted_at.is_(None)
+            entity = db.query(ConfigurationItemRevision).filter(
+                ConfigurationItemRevision.id == entity_id,
+                ConfigurationItemRevision.deleted_at.is_(None),
             ).first()
         if not entity:
             continue
@@ -814,28 +807,30 @@ async def export_all_dashboards(
         comp_map = {}
         comp_ver_map = {}
         if comp_ids:
-            comps = db.query(PartMaster).filter(PartMaster.id.in_(comp_ids)).all()
-            comp_map = {str(p.id): p for p in comps}
-            # 零部件版本在最新有效 revision 上
-            revs = (
-                db.query(PartRevision)
-                .filter(
-                    PartRevision.master_id.in_(comp_ids),
-                    PartRevision.deleted_at.is_(None),
-                )
-                .order_by(PartRevision.created_at.desc())
-                .all()
-            )
+            revs = db.query(PartRevision).filter(PartRevision.id.in_(comp_ids)).all()
+            master_ids = list(set(r.master_id for r in revs))
+            masters = db.query(PartMaster).filter(PartMaster.id.in_(master_ids)).all()
+            master_map = {str(m.id): m for m in masters}
             for r in revs:
-                comp_ver_map.setdefault(str(r.master_id), r.version)
+                m = master_map.get(str(r.master_id))
+                comp_map[str(r.id)] = m
+                comp_ver_map[str(r.id)] = r.version
         doc_map = {}
         if doc_ids:
-            docs = db.query(DocumentMaster).filter(DocumentMaster.id.in_(doc_ids)).all()
-            doc_map = {str(d.id): d for d in docs}
+            doc_revs = db.query(DocumentRevision).filter(DocumentRevision.id.in_(doc_ids)).all()
+            doc_master_ids = list(set(r.master_id for r in doc_revs))
+            doc_masters = db.query(DocumentMaster).filter(DocumentMaster.id.in_(doc_master_ids)).all()
+            doc_master_map = {str(m.id): m for m in doc_masters}
+            for r in doc_revs:
+                doc_map[str(r.id)] = doc_master_map.get(str(r.master_id))
         config_map = {}
         if config_ids:
-            configs = db.query(ConfigurationItemMaster).filter(ConfigurationItemMaster.id.in_(config_ids)).all()
-            config_map = {str(c.id): c for c in configs}
+            cfg_revs = db.query(ConfigurationItemRevision).filter(ConfigurationItemRevision.id.in_(config_ids)).all()
+            cfg_master_ids = list(set(r.master_id for r in cfg_revs))
+            cfg_masters = db.query(ConfigurationItemMaster).filter(ConfigurationItemMaster.id.in_(cfg_master_ids)).all()
+            cfg_master_map = {str(m.id): m for m in cfg_masters}
+            for r in cfg_revs:
+                config_map[str(r.id)] = cfg_master_map.get(str(r.master_id))
 
         def _get_entity_info(entity_type, entity_id):
             """获取实体的 code、name 和 version"""

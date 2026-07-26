@@ -16,6 +16,7 @@ interface DashboardItem {
   id: string;
   entity_type: 'part' | 'assembly' | 'component' | 'document' | 'configuration';
   entity_id: string;
+  master_id?: string;
   code: string;
   name: string;
   version: string;
@@ -160,7 +161,11 @@ export default function Board() {
   const selectedFolder = useMemo(() => selectedId ? findFolderById(allFolders, selectedId) : null, [selectedId, allFolders]);
   const selectedItems = useMemo(() => selectedFolder ? flattenItems(selectedFolder) : [], [selectedFolder]);
   const filteredItems = useMemo(() => filterTab === 'all' ? selectedItems : selectedItems.filter((i) => filterTab === 'component' ? isComponentType(i.entity_type) : i.entity_type === filterTab), [selectedItems, filterTab]);
-  const existingIds = useMemo(() => new Set(selectedItems.map((i) => i.entity_id)), [selectedItems]);
+  const existingIds = useMemo(() => {
+    const ids = new Set(selectedItems.map((i) => i.entity_id));
+    selectedItems.forEach((i) => { if (i.master_id) ids.add(i.master_id); });
+    return ids;
+  }, [selectedItems]);
 
   /* Count items recursively */
   const countItems = (folder: FolderNode): number => {
@@ -279,7 +284,7 @@ export default function Board() {
       setDetailComponentId(null);
       setDetailItem(null);
     } else if (isComponentType(item.entity_type)) {
-      setDetailComponentId(item.entity_id);
+      setDetailComponentId(item.master_id || item.entity_id);
       setDetailItem(null);
     } else {
       setDetailItem(item);
@@ -677,9 +682,9 @@ function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) 
     setDataWarning(null);
     (async () => {
       const [comp, d, c] = await Promise.allSettled([
-        partsApi.list({ page_size: 200 }),  // 零部件（part_masters，返回最新版本行，上限 200）
-        documentsApi.list({ page_size: 10000, brief: true }),
-        configurationApi.listItems({ page_size: 10000, brief: true }),
+        partsApi.list({ page_size: 10000, show_all_versions: true }),  // 零部件：所有版本
+        documentsApi.list({ page_size: 10000, show_all_versions: true }),
+        configurationApi.listItems({ page_size: 10000 }),  // 非brief模式，返回version/status
       ]);
       if (cancelled) return;
       // 每类独立处理：成功用服务器数据，失败回退到本地缓存，互不影响
@@ -706,10 +711,11 @@ function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) 
   const candidates = useMemo(() => {
     const kw = search.trim().toLowerCase();
     const all: any[] = [];
-    // 零部件：id 取 master_id（part_masters 主键），兼容本地缓存的 id 字段
-    if (tab === 'all' || tab === 'component') srcComponents.forEach((p: any) => { const id = p.master_id || p.id; if (!existingIds.has(id)) all.push({ t: 'component', id, code: p.code, name: p.name, version: p.version || '', status: p.status || '' }); });
-    if (tab === 'all' || tab === 'document') srcDocuments.forEach((d: any) => { if (!existingIds.has(d.id)) all.push({ t: 'document', id: d.id, code: d.code, name: d.name, version: d.version || '', status: d.status || '' }); });
-    if (tab === 'all' || tab === 'configuration') srcConfigItems.forEach((c: any) => { if (!existingIds.has(c.id)) all.push({ t: 'configuration', id: c.id, code: c.code, name: c.name, version: '-', status: 'active' }); });
+    const seen = new Set<string>();
+    // 零部件：id 取 revision_id（看板存储 revision_id，显示时按关联版本展示）；同时检查 master_id 兼容旧数据
+    if (tab === 'all' || tab === 'component') srcComponents.forEach((p: any) => { const id = p.revision_id || p.id; const mid = p.master_id || p.id; if (!existingIds.has(id) && !existingIds.has(mid) && !seen.has(id)) { seen.add(id); all.push({ t: 'component', id, code: p.code, name: p.name, version: p.version || '', status: p.status || '' }); } });
+    if (tab === 'all' || tab === 'document') srcDocuments.forEach((d: any) => { const id = d.id || d.revision_id; if (!existingIds.has(id) && !seen.has(id)) { seen.add(id); all.push({ t: 'document', id, code: d.code, name: d.name, version: d.version || '', status: d.status || '' }); } });
+    if (tab === 'all' || tab === 'configuration') srcConfigItems.forEach((c: any) => { const id = c.id || c.revision_id; if (!existingIds.has(id) && !seen.has(id)) { seen.add(id); all.push({ t: 'configuration', id, code: c.code, name: c.name, version: c.version || '', status: c.status || '' }); } });
     return kw ? all.filter((i) => i.code.toLowerCase().includes(kw) || i.name.toLowerCase().includes(kw)) : all;
   }, [tab, search, srcComponents, srcDocuments, srcConfigItems, existingIds]);
 
@@ -753,13 +759,13 @@ function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) 
           ) : candidates.length === 0 ? (
             <p className="p-4 text-center text-sm text-gray-400">无匹配结果</p>
           ) : (
-            <table className="w-full text-sm"><thead className="bg-gray-50 border-b sticky top-0"><tr>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium">类型</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium">编号</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium">版本</th>
+            <table className="w-full text-sm table-fixed"><thead className="bg-gray-50 border-b sticky top-0"><tr>
+              <th className="px-3 py-2 text-left text-gray-500 font-medium w-24">类型</th>
+              <th className="px-3 py-2 text-left text-gray-500 font-medium w-48">编号</th>
+              <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
               <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium">状态</th>
-               <th className="px-3 py-2 text-center text-gray-500 font-medium w-24">操作</th>
+              <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
+              <th className="px-3 py-2 text-center text-gray-500 font-medium w-20">操作</th>
             </tr></thead><tbody className="divide-y divide-gray-100">
               {candidates.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50">

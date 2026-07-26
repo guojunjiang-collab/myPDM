@@ -97,8 +97,8 @@ export const useDataStore = create<DataState>()(
         set({ isSyncing: true, syncError: null });
         try {
           const [partsRes, documentsRes, fieldsRes, configRes] = await Promise.allSettled([
-            partsApi.list({ page_size: 200, show_all_versions: true }),
-            documentsApi.list({ page_size: 10000, brief: true }),
+            partsApi.list({ page_size: 10000, show_all_versions: true }),
+            documentsApi.list({ page_size: 10000, show_all_versions: true }),
             customFieldsApi.listDefinitions(),
             configurationApi.listItems({ page_size: 10000 }),
           ]);
