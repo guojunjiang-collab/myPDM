@@ -21,7 +21,7 @@
 | 引用来源 | 关联机制 | 存储 | 反查依据 |
 |---------|---------|------|---------|
 | 构型项 | `configuration_item_iterations.document_links[]` | `{document_id = doc_revision_id}` | JSONB 数组含当前版本 |
-| 零部件 | ① `part_iterations.document_links[]` 关联；② `bom_items` 中文档作为子项 | rev id | JSONB 含 + BOM 子项 |
+| 零部件 | `part_iterations.document_links[]` 关联挂接 | `{document_id = doc_revision_id}` | JSONB 数组含当前版本 |
 | 项目任务 | `project_task_links`（entity_type=`document`） | `entity_id = doc_revision_id` | 关系查询 |
 | ECO | `ecos.document_links[]` | `{document_id = doc_revision_id}` | JSONB 数组含 |
 | ECR | `ecrs.document_links[]` | `{document_id = doc_revision_id}` | JSONB 数组含 |
@@ -74,21 +74,20 @@ crud 采用**可移植的 Python 侧过滤**（查出候选行后在 Python 判�
 
 ### 4.3 零部件反查（新写，结构化）
 
-两路合并：
-- **关联**：`part_iterations.document_links` 含 `:rev` → `iteration → revision(pr) → master(pm)`，`ref_type="关联"`。
-- **BOM 子项**：`bom_items` 中 `child_type='document' AND child_revision_id=:rev` → 父 `parent_id`(零部件 master)，`ref_type="BOM子项"`。
+**唯一路径**：图文档通过 `part_iterations.document_links` 挂接到零部件迭代（`BOMItem` 的子项
+只能是零件版本，`child_revision_id` FK→`part_revisions`，**文档不作为 BOM 子项**）。
 
-按 `零部件 master_id` 去重（同一零件两路都命中时合并 `ref_type`）；每行带一个可打开的 `revision_id`
-（关联路取该零件迭代所属 revision；BOM 路取该零件最新 revision）。返回：
+扫描 `part_iterations`（`document_links` 非空者），Python 过滤 `document_id == :rev`
+→ `iteration → revision(pr) → master(pm)`；按 `零部件 master_id` 去重（同一零件多迭代命中取代表，
+用其所属 revision 作为可打开的 `revision_id`）；过滤 `pm.deleted_at IS NULL`。返回：
 ```jsonc
 {
   "master_id": "…",
   "revision_id": "…",     // 打开 PartDetailModal 需 master+revision
-  "code": "…", "name": "…", "type": "part|assembly",
-  "ref_type": "关联" | "BOM子项" | "关联,BOM子项"
+  "code": "…", "name": "…", "type": "part|assembly"
 }
 ```
-> 参考现有 `routers/bom.py::get_document_references`（同样做 BOM 子项 + 迭代 document_links 两路），
+> 参考现有 `routers/bom.py::check_references`（document 分支即扫描 `PartIteration.document_links`），
 > 但本端点返回结构化行（含可打开的 revision），与其他段风格统一。
 
 ### 4.4 项目任务反查
@@ -132,7 +131,7 @@ crud 采用**可移植的 Python 侧过滤**（查出候选行后在 Python 判�
 各自 loading/empty/error 态，镜像 `PartWhereUsedTab` 的 `useLazy` + `Section` 结构。
 
 - 1) **被构型项引用**：构型项件号/名称/版本/状态。
-- 2) **被零部件引用**：件号/名称/类型/引用方式(ref_type)。
+- 2) **被零部件引用**：件号/名称/类型。
 - 3) **被项目任务引用**：项目/任务/状态。
 - 4) **被 ECO 引用**：ECO 编号/标题/状态。
 - 5) **被 ECR 引用**：ECR 编号/标题/状态。
@@ -180,8 +179,8 @@ whereUsedEcrs`，均 `api.get('/documents/revisions/{revisionId}/where-used/...'
 
 **后端（pytest / SQLite）：**
 - 构型项：迭代 document_links 含当前版本→命中；含别的版本→不命中；多迭代→按构型项去重；软删排除。
-- 零部件：迭代关联→命中(ref_type=关联)；BOM 子项文档→命中(ref_type=BOM子项)；两路同一零件→合并去重；
-  返回可打开的 master+revision。
+- 零部件：零件迭代 document_links 含当前文档版本→命中；含别的版本→不命中；同一零件多迭代→按 master
+  去重；返回可打开的 master+revision。
 - 任务：entity_type=document 且 entity_id=当前版本→命中；已删除任务/项目→排除；task 结构完整。
 - ECO/ECR：document_links 含当前版本→命中；含别的版本→不命中；按 id 去重。
 - 不存在/无引用 id → 空数组非 500。
@@ -193,7 +192,7 @@ whereUsedEcrs`，均 `api.get('/documents/revisions/{revisionId}/where-used/...'
 ## 9. 实现顺序（供计划参考）
 
 1. 后端：构型项反查端点 + 测试。
-2. 后端：零部件反查端点（关联 + BOM 子项两路）+ 测试。
+2. 后端：零部件反查端点（part_iterations.document_links）+ 测试。
 3. 后端：任务反查端点（entity_type=document）+ 测试。
 4. 后端：ECO、ECR 反查端点 + 测试。
 5. 前端：`documentsApi` 5 方法。
