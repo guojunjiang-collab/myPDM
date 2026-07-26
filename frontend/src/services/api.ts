@@ -261,9 +261,6 @@ export const documentsApi = {
   deleteAttachment: (revisionId: string, attId: string) =>
     api.delete(`/documents/${revisionId}/attachments/${attId}`),
 
-  // 反查
-  references: (revisionId: string) =>
-    api.get(`/documents/${revisionId}/references`),
   whereUsedConfigurations: (revisionId: string) =>
     api.get(`/documents/revisions/${revisionId}/where-used/configurations`).then(r => r.data),
   whereUsedParts: (revisionId: string) =>

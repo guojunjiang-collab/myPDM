@@ -2,17 +2,13 @@ import { useState } from 'react';
 import PartDetailModal from '../../components/PartDetailModal';
 import BOMTreePanel from './BOMTreePanel';
 import BOMComparePanel from './BOMComparePanel';
-import BOMTracePanel from './BOMTracePanel';
-import DocTracePanel from './DocTracePanel';
 import { useHeaderTabs } from '../../hooks/useHeaderTabs';
 import { usePersistedTabState } from '../../hooks/usePersistedTabState';
 
-type ModeKey = 'tree' | 'compare' | 'trace' | 'doc-trace';
+type ModeKey = 'tree' | 'compare';
 const modeTabs: { key: ModeKey; label: string }[] = [
   { key: 'tree', label: 'BOM 树' },
   { key: 'compare', label: 'BOM 对比' },
-  { key: 'trace', label: 'BOM 反查' },
-  { key: 'doc-trace', label: '图文档反查' },
 ];
 
 export default function BOM() {
@@ -35,8 +31,6 @@ export default function BOM() {
       {/* 各模式 Panel */}
       {mode === 'tree'      && <BOMTreePanel onViewEntity={handleViewEntity} />}
       {mode === 'compare'   && <BOMComparePanel onViewEntity={handleViewEntity} />}
-      {mode === 'trace'     && <BOMTracePanel onViewEntity={handleViewEntity} />}
-      {mode === 'doc-trace' && <DocTracePanel onViewEntity={handleViewEntity} />}
 
       {/* 行点击详情弹窗 */}
       {detail && (

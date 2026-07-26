@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { partsApi } from '../../services/api';
 import BomWhereUsedTree from '../../pages/BOM/BomWhereUsedTree';
 import { getStatusLabel } from '../../pages/BOM/helpers';
+import { formatDateTime } from '../../utils/date';
 
 interface Props {
   revisionId: string;
@@ -48,9 +49,8 @@ export default function PartWhereUsedTab(props: Props) {
   const prof = useLazy(() => partsApi.whereUsedProfiles(revisionId), revisionId);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 overflow-y-auto max-h-full">
       {/* 1) 父项零部件 */}
-      {(bomState.loading || bomState.error || !bomState.empty) && (
       <Section title="父项零部件" count={''}>
         <BomWhereUsedTree
           revisionId={revisionId}
@@ -59,13 +59,12 @@ export default function PartWhereUsedTab(props: Props) {
           onStateChange={setBomState}
         />
       </Section>
-      )}
 
       {/* 2) 被构型项引用 */}
-      {(cfg.loading || cfg.error || cfg.data.length > 0) && (
       <Section title="被构型项引用" count={cfg.loading ? '…' : cfg.data.length}>
         {cfg.loading ? <div className="text-gray-400 text-sm py-2">加载中...</div>
           : cfg.error ? <div className="text-red-500 text-sm py-2">加载失败</div>
+          : cfg.data.length === 0 ? <div className="text-gray-400 text-sm py-2">暂无引用</div>
           : (
           <table className="w-full text-sm border rounded">
             <thead className="bg-gray-50 border-b"><tr>
@@ -94,18 +93,21 @@ export default function PartWhereUsedTab(props: Props) {
           </table>
         )}
       </Section>
-      )}
 
       {/* 3) 被项目任务引用 */}
-      {(tsk.loading || tsk.error || tsk.data.length > 0) && (
       <Section title="被项目任务引用" count={tsk.loading ? '…' : tsk.data.length}>
         {tsk.loading ? <div className="text-gray-400 text-sm py-2">加载中...</div>
           : tsk.error ? <div className="text-red-500 text-sm py-2">加载失败</div>
+          : tsk.data.length === 0 ? <div className="text-gray-400 text-sm py-2">暂无引用</div>
           : (
           <table className="w-full text-sm border rounded">
             <thead className="bg-gray-50 border-b"><tr>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium">项目</th>
+              <th className="px-3 py-2 text-left text-gray-500 font-medium w-32">项目</th>
+              <th className="px-3 py-2 text-left text-gray-500 font-medium w-28">任务编号</th>
               <th className="px-3 py-2 text-left text-gray-500 font-medium">任务</th>
+              <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">负责人</th>
+              <th className="px-3 py-2 text-left text-gray-500 font-medium w-28">计划开始</th>
+              <th className="px-3 py-2 text-left text-gray-500 font-medium w-28">计划完成</th>
               <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">状态</th>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
@@ -113,7 +115,11 @@ export default function PartWhereUsedTab(props: Props) {
                 <tr key={r.task.id} className="hover:bg-gray-50 cursor-pointer"
                     onClick={() => props.onOpenTask(r.project_id, r.task)}>
                   <td className="px-3 py-2">{r.project_name}</td>
+                  <td className="px-3 py-2 font-medium">{r.task.code || '-'}</td>
                   <td className="px-3 py-2 font-medium">{r.task.name}</td>
+                  <td className="px-3 py-2 text-gray-500">{r.task.assignee_name || '-'}</td>
+                  <td className="px-3 py-2 text-gray-500">{formatDateTime(r.task.planned_start, 'date') || '-'}</td>
+                  <td className="px-3 py-2 text-gray-500">{formatDateTime(r.task.planned_end, 'date') || '-'}</td>
                   <td className="px-3 py-2 text-gray-500">{r.task.status}</td>
                 </tr>
               ))}
@@ -121,13 +127,12 @@ export default function PartWhereUsedTab(props: Props) {
           </table>
         )}
       </Section>
-      )}
 
       {/* 4) 被构型配置引用 */}
-      {(prof.loading || prof.error || prof.data.length > 0) && (
       <Section title="被构型配置引用" count={prof.loading ? '…' : prof.data.length}>
         {prof.loading ? <div className="text-gray-400 text-sm py-2">加载中...</div>
           : prof.error ? <div className="text-red-500 text-sm py-2">加载失败</div>
+          : prof.data.length === 0 ? <div className="text-gray-400 text-sm py-2">暂无引用</div>
           : (
           <table className="w-full text-sm border rounded">
             <thead className="bg-gray-50 border-b"><tr>
@@ -150,7 +155,6 @@ export default function PartWhereUsedTab(props: Props) {
           </table>
         )}
       </Section>
-      )}
     </div>
   );
 }

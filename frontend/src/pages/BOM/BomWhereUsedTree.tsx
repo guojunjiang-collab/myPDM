@@ -92,9 +92,7 @@ export default function BomWhereUsedTree({ revisionId, root, onViewEntity, onSta
 
   if (searched && traceResult.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-400 bg-white rounded-lg border border-gray-200">
-        未找到任何引用该零部件（选中版本）的上级装配
-      </div>
+      <div className="text-gray-400 text-sm py-2">暂无引用</div>
     );
   }
 

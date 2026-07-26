@@ -91,7 +91,8 @@ export default function DocWhereUsedTab(props: Props) {
       <Section title="被项目任务引用" count={tsk.loading ? '…' : tsk.data.length}>
         <State s={tsk}>
           <table className={tbl}><thead className="bg-gray-50 border-b"><tr>
-            <th className={th}>项目</th><th className={th}>任务</th><th className={`${th} w-16`}>负责人</th>
+            <th className={`${th} w-32`}>项目</th><th className={`${th} w-28`}>任务编号</th><th className={th}>任务</th>
+            <th className={`${th} w-20`}>负责人</th>
             <th className={`${th} w-28`}>计划开始</th><th className={`${th} w-28`}>计划完成</th>
             <th className={`${th} w-20`}>状态</th>
           </tr></thead><tbody className="divide-y divide-gray-100">
@@ -99,6 +100,7 @@ export default function DocWhereUsedTab(props: Props) {
               <tr key={r.task.id} className="hover:bg-gray-50 cursor-pointer"
                   onClick={() => props.onOpenTask(r.project_id, r.task)}>
                 <td className="px-3 py-2">{r.project_name}</td>
+                <td className="px-3 py-2 font-medium">{r.task.code || '-'}</td>
                 <td className="px-3 py-2 font-medium">{r.task.name}</td>
                 <td className="px-3 py-2 text-gray-500">{r.task.assignee_name || '-'}</td>
                 <td className="px-3 py-2 text-gray-500">{formatDateTime(r.task.planned_start, 'date') || '-'}</td>

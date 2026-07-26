@@ -1245,10 +1245,21 @@ async def where_used_tasks_ep(
 ):
     from ..crud_project import where_used_tasks
     from .projects import _task_dict
-    return [
-        {"project_id": str(p.id), "project_name": p.name, "task": _task_dict(db, t)}
-        for t, p in where_used_tasks(db, revision_id)
-    ]
+    rows = where_used_tasks(db, revision_id)
+    result = []
+    user_ids = set()
+    for t, _p in rows:
+        if t.assignee_id:
+            user_ids.add(t.assignee_id)
+    user_map = {}
+    if user_ids:
+        users = db.query(User).filter(User.id.in_(user_ids)).all()
+        user_map = {str(u.id): u.real_name for u in users}
+    for t, p in rows:
+        td = _task_dict(db, t)
+        td["assignee_name"] = user_map.get(td.get("assignee_id")) if td.get("assignee_id") else None
+        result.append({"project_id": str(p.id), "project_name": p.name, "task": td})
+    return result
 
 
 @router.get("/revisions/{revision_id}/where-used/profiles")
