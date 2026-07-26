@@ -9,6 +9,7 @@ interface Props {
   code: string;
   name: string;
   version?: string;
+  status?: string;
   onOpenPart: (masterId: string, revisionId?: string) => void;
   onOpenConfig: (configItemRevisionId: string) => void;
   onOpenTask: (projectId: string, task: any) => void;
@@ -40,7 +41,7 @@ const Section = ({ title, count, children }: any) => (
 );
 
 export default function PartWhereUsedTab(props: Props) {
-  const { revisionId, masterId, code, name, version } = props;
+  const { revisionId, masterId, code, name, version, status } = props;
   const [bomState, setBomState] = useState({ loading: true, error: false, empty: false });
   const cfg = useLazy(() => partsApi.whereUsedConfigurations(revisionId), revisionId);
   const tsk = useLazy(() => partsApi.whereUsedTasks(revisionId), revisionId);
@@ -53,7 +54,7 @@ export default function PartWhereUsedTab(props: Props) {
       <Section title="父项零部件" count={''}>
         <BomWhereUsedTree
           revisionId={revisionId}
-          root={{ masterId, revisionId, code, name, version }}
+          root={{ masterId, revisionId, code, name, version, status }}
           onViewEntity={props.onOpenPart}
           onStateChange={setBomState}
         />

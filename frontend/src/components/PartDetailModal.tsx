@@ -845,6 +845,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                     code={master?.code || ''}
                     name={master?.name || ''}
                     version={revision?.version}
+                    status={revision?.status}
                     onOpenPart={(mid, rid) => { setNestedMasterId(mid); setNestedRevisionId(rid || null); }}
                     onOpenConfig={(cirId) => setWuConfigRevId(cirId)}
                     onOpenTask={(projectId, task) => setWuTask({ projectId, task })}

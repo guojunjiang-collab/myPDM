@@ -14,6 +14,7 @@ interface TraceSelection {
   code: string;
   name: string;
   version?: string;
+  status?: string;
 }
 
 const statusCls = (s: string) => {
@@ -61,6 +62,7 @@ export default function BOMTracePanel({ onViewEntity }: BOMTracePanelProps) {
       code: item.code,
       name: item.name,
       version: item.version,
+      status: item.status,
     };
     setSelected(sel);
     setTraceSearch(`${item.code} - ${item.name}`);
@@ -137,6 +139,7 @@ export default function BOMTracePanel({ onViewEntity }: BOMTracePanelProps) {
             code: selected.code,
             name: selected.name,
             version: selected.version,
+            status: selected.status,
           }}
           onViewEntity={onViewEntity}
         />

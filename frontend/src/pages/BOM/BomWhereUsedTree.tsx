@@ -6,7 +6,7 @@ import type { TraceTreeNode } from './types';
 
 interface Props {
   revisionId: string;
-  root: { masterId: string; revisionId: string; code: string; name: string; version?: string } | null;
+  root: { masterId: string; revisionId: string; code: string; name: string; version?: string; status?: string } | null;
   onViewEntity: (masterId: string, revisionId?: string) => void;
   onStateChange?: (state: { loading: boolean; error: boolean; empty: boolean }) => void;
 }
@@ -57,13 +57,6 @@ export default function BomWhereUsedTree({ revisionId, root, onViewEntity, onSta
   useEffect(() => {
     onStateChange?.({ loading, error: !!error, empty: searched && traceResult.length === 0 });
   }, [loading, error, searched, traceResult]);
-
-  const toggleTraceAll = () => {
-    const allExpanded = traceTree.length > 0 && traceTree.every((n) => n.expanded);
-    setTraceTree((prev) =>
-      prev.map((n) => ({ ...n, expanded: !allExpanded })),
-    );
-  };
 
   const toggleTraceNode = (targetId: string) => {
     setTraceTree((prev) => {
@@ -120,7 +113,6 @@ export default function BomWhereUsedTree({ revisionId, root, onViewEntity, onSta
               <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">类型</th>
               <th className="px-3 py-2 text-left text-gray-500 font-medium">件号</th>
               <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium">规格型号</th>
               <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">版本</th>
               <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">状态</th>
               <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">用量</th>
@@ -133,26 +125,21 @@ export default function BomWhereUsedTree({ revisionId, root, onViewEntity, onSta
                 onClick={() => onViewEntity(root.masterId, root.revisionId)}
               >
                 <td className="px-3 py-2 whitespace-nowrap text-left">
-                  <span className="inline-flex items-center gap-0.5">
-                    <span className="text-xs text-gray-400">0</span>
-                    {traceTree.length > 0 && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); toggleTraceAll(); }}
-                        className="w-4 h-4 inline-flex items-center justify-center text-gray-500 hover:bg-gray-200 rounded"
-                      >
-                        {traceTree.every((n) => n.expanded) ? '▼' : '▶'}
-                      </button>
-                    )}
-                  </span>
+                  <span className="text-xs text-gray-400">0</span>
                 </td>
                 <td className="px-3 py-2">
                   <span className="px-1.5 py-0.5 text-xs rounded bg-purple-50 text-purple-700">零部件</span>
                 </td>
                 <td className="px-3 py-2 font-medium">{root.code}</td>
                 <td className="px-3 py-2">{root.name}</td>
-                <td className="px-3 py-2">-</td>
                 <td className="px-3 py-2">{root.version || '-'}</td>
-                <td className="px-3 py-2">-</td>
+                <td className="px-3 py-2">
+                  {root.status ? (
+                    <span className={`px-1.5 py-0.5 text-xs rounded ${statusCls(root.status)}`}>
+                      {getStatusLabel(root.status)}
+                    </span>
+                  ) : '-'}
+                </td>
                 <td className="px-3 py-2">-</td>
               </tr>
             )}
@@ -189,7 +176,6 @@ export default function BomWhereUsedTree({ revisionId, root, onViewEntity, onSta
                   </td>
                   <td className="px-3 py-2 font-medium">{parent?.code || '-'}</td>
                   <td className="px-3 py-2">{parent?.name || '-'}</td>
-                  <td className="px-3 py-2 text-gray-500">{parent?.spec || '-'}</td>
                   <td className="px-3 py-2 text-gray-500">{parent?.version || '-'}</td>
                   <td className="px-3 py-2">
                     <span className={`px-1.5 py-0.5 text-xs rounded ${statusCls(parent?.status || '')}`}>
