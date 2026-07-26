@@ -55,20 +55,14 @@ export default function BomWhereUsedTree({ revisionId, root, onViewEntity, onSta
   }, [traceResult]);
 
   useEffect(() => {
-    onStateChange?.({ loading, error: !!error, empty: searched && traceTree.length === 0 });
-  }, [loading, error, searched, traceTree]);
+    onStateChange?.({ loading, error: !!error, empty: searched && traceResult.length === 0 });
+  }, [loading, error, searched, traceResult]);
 
   const toggleTraceAll = () => {
     const allExpanded = traceTree.length > 0 && traceTree.every((n) => n.expanded);
-    setTraceTree((prev) => {
-      const toggleAll = (nodes: TraceTreeNode[]): TraceTreeNode[] =>
-        nodes.map((n) => ({
-          ...n,
-          expanded: !allExpanded,
-          children: n.children.length > 0 ? toggleAll(n.children) : n.children,
-        }));
-      return toggleAll(prev);
-    });
+    setTraceTree((prev) =>
+      prev.map((n) => ({ ...n, expanded: !allExpanded })),
+    );
   };
 
   const toggleTraceNode = (targetId: string) => {
