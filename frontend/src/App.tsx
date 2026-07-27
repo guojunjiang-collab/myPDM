@@ -18,6 +18,7 @@ import Configuration from './pages/Configuration';
 import Inventory from './pages/Inventory';
 import Projects from './pages/Project/Projects';
 import DataManagement from './pages/DataManagement';
+import Help from './pages/Help';
 const STPViewer = lazy(() => import('./pages/STPViewer'));
 const OfficeReader = lazy(() => import('./pages/OfficeReader'));
 
@@ -78,6 +79,7 @@ export default function App() {
           <Route path="logs" element={<Logs />} />
           <Route path="notifications" element={<Notifications />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="help" element={<Help />} />
           <Route path="data-management" element={<DataManagement />} />
           <Route path="datamanagement" element={<DataManagement />} />
         </Route>
