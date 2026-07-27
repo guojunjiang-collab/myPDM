@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { AxiosError } from 'axios';
 import { Modal } from './Modal';
 import PartDetailModal from './PartDetailModal';
 import { partsApi, bomApi } from '../services/api';
@@ -116,8 +117,9 @@ export default function PartCompareModal({ open, onClose }: Props) {
       const rootKeys = (res.data as BOMCompareResponse).comparison.filter((n: BOMCompareNode) => n.level === 0).map((n: BOMCompareNode) => n.key);
       setExpanded(new Set(rootKeys));
     } catch (err) {
+      const msg = (err as AxiosError<{ detail: string }>)?.response?.data?.detail || '对比失败，请重试';
       console.error('BOM对比失败', err);
-      setError('对比失败，请重试');
+      setError(msg);
       setResult(null);
     } finally {
       setLoading(false);
