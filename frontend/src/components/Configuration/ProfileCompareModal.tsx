@@ -233,7 +233,7 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
   return (
     <>
       <Modal open={open} onClose={onClose} title="构型配置对比" width="3xl" height="75vh">
-        <div className="space-y-4">
+        <div className="flex flex-col h-full space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <ProfilePicker label="左配置" options={options} valueId={leftId} onPick={setLeftId} />
             <ProfilePicker label="右配置" options={options} valueId={rightId} onPick={setRightId} />
@@ -268,7 +268,7 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
           {result && result.root && (
             <>
               {summaryBar}
-              <div className="border rounded-lg overflow-auto max-h-[60vh]">
+              <div className="flex-1 min-h-0 border rounded-lg overflow-auto">
                 <table className="w-full text-sm">
                   <colgroup>
                     <col className="w-12" />
