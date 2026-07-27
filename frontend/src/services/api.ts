@@ -175,9 +175,6 @@ export const partsApi = {
   // 按附件 ID 直接下载零部件附件（blob，带 JWT）
   downloadPartAttachmentBlob: (attachmentId: string) =>
     api.get(`/parts/attachments/${attachmentId}/download`, { responseType: 'blob' }).then((r) => r.data as Blob),
-  // CAD 文件夹导入
-  cadImportPreview: (revisionId: string, fileNames: string[]) =>
-    api.post(`/parts/revisions/${revisionId}/cad/import-preview`, { file_names: fileNames }).then((r) => r.data),
   // CAD 工作台：按 件号+版本 批量匹配 PDM 零部件
   cadBomMatch: (items: { code: string; version?: string }[]) =>
     api.post('/parts/cad/bom-match', { items }).then((r) => r.data),
@@ -911,14 +908,6 @@ export const assemblyViewerApi = {
     api.get<AssemblyInstance[]>(`/parts/revisions/${revisionId}/assembly-instances`).then((r) => r.data),
   tree: (revisionId: string) =>
     api.get<AssemblyTreeNode[]>(`/parts/revisions/${revisionId}/assembly-tree`).then((r) => r.data),
-  importStep: (revisionId: string, file: File) => {
-    const fd = new FormData();
-    fd.append('file', file);
-    return api.post(`/parts/revisions/${revisionId}/import-assembly-step`, fd, {
-      headers: { 'Content-Type': undefined },
-      transformRequest: [(data: any, headers: any) => { delete headers['Content-Type']; return data; }],
-    }).then((r) => r.data);
-  },
 };
 
 export const settingsApi = {

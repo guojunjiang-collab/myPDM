@@ -19,7 +19,6 @@ import tempfile, os as _os
 from ..cad.assembly_parser import parse_assembly_step
 from ..stp_converter import get_lod_glb_paths, get_glb_cache_path
 from ..schemas_parts import MatchReport, AssemblyInstanceDTO, AssemblyTreeNodeDTO
-from ..schemas_parts import CadImportPreviewRequest, CadImportPreviewResponse
 from ..file_storage import chunked_uploader, CHUNK_SIZE, UPLOAD_DIR
 
 router = APIRouter(prefix="/parts", tags=["parts"])
@@ -1126,23 +1125,6 @@ def _glb_url_resolver_factory(db):
         return urls
 
     return resolver
-
-
-@router.post("/revisions/{revision_id}/cad/import-preview", response_model=CadImportPreviewResponse)
-def cad_import_preview(
-    revision_id: UUID,
-    body: CadImportPreviewRequest,
-    current_user: User = Depends(require_permission("parts:update")),
-    db: Session = Depends(get_db),
-):
-    """CAD文件夹导入预览：匹配文件名到BOM树零部件"""
-    result = crud_parts.match_cad_files(
-        db=db,
-        revision_id=revision_id,
-        file_names=body.file_names,
-        current_user_id=current_user.id,
-    )
-    return CadImportPreviewResponse(**result)
 
 
 @router.post("/revisions/{revision_id}/import-assembly-step", response_model=MatchReport)
