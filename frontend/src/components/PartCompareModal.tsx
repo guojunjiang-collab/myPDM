@@ -114,8 +114,7 @@ export default function PartCompareModal({ open, onClose }: Props) {
     try {
       const res = await bomApi.compare(leftId, rightId);
       setResult(res.data as BOMCompareResponse);
-      const rootKeys = (res.data as BOMCompareResponse).comparison.filter((n: BOMCompareNode) => n.level === 0).map((n: BOMCompareNode) => n.key);
-      setExpanded(new Set(rootKeys));
+      setExpanded(new Set(['ROOT']));
     } catch (err) {
       const msg = (err as AxiosError<{ detail: string }>)?.response?.data?.detail || '对比失败，请重试';
       console.error('BOM对比失败', err);
@@ -149,25 +148,57 @@ export default function PartCompareModal({ open, onClose }: Props) {
       ? result.comparison.filter((n: BOMCompareNode) => n.change_type !== 'none')
       : result.comparison;
     const out: BOMCompareNode[] = [];
-    const level0Paths = new Set(allNodes.filter((n: BOMCompareNode) => n.level === 0).map((n: BOMCompareNode) => n.key));
-    const hasChildren = (parentPath: string) => {
-      if (level0Paths.has(parentPath) && allNodes.find((n: BOMCompareNode) => n.key === parentPath)?.level === 0) {
-        return allNodes.some((n: BOMCompareNode) => n.path.startsWith(parentPath + '/') && n.path.split('/').length === parentPath.split('/').length + 1);
-      }
-      return allNodes.some((n: BOMCompareNode) => n.path.startsWith(parentPath + '/') && n.path.split('/').length === parentPath.split('/').length + 1);
+
+    // 注入对比的根零部件节点
+    const la = result.left_assembly;
+    const ra = result.right_assembly;
+    const rootChanged = (la?.version || '') !== (ra?.version || '') || (la?.status || '') !== (ra?.status || '');
+    const rootNode: BOMCompareNode = {
+      key: 'ROOT',
+      level: -1,
+      sort: '-1',
+      path: '',
+      change_type: rootChanged ? 'modify' : (result.summary.added > 0 || result.summary.deleted > 0 || result.summary.modified > 0 ? 'internal' : 'none'),
+      left: la ? {
+        id: '', child_type: 'assembly', child_id: la.id, child_master_id: la.id,
+        child_revision_id: la.id, quantity: 1,
+        detail: { code: la.code, name: la.name, spec: '', version: la.version, status: la.status },
+      } : null,
+      right: ra ? {
+        id: '', child_type: 'assembly', child_id: ra.id, child_master_id: ra.id,
+        child_revision_id: ra.id, quantity: 1,
+        detail: { code: ra.code, name: ra.name, spec: '', version: ra.version, status: ra.status },
+      } : null,
     };
-    const walk = (parentPath: string | null, parentExpanded: boolean) => {
-      for (const n of allNodes) {
-        const isRoot = parentPath === null && n.level === 0;
-        const isChild = parentPath !== null && n.path.startsWith(parentPath + '/') && n.path.split('/').length === parentPath.split('/').length + 1;
-        if (!isRoot && !isChild) continue;
+    out.push(rootNode);
+
+    if (expanded.has('ROOT')) {
+      const level0Nodes = allNodes.filter((n: BOMCompareNode) => n.level === 0);
+      for (const n of level0Nodes) {
         out.push(n);
-        if (hasChildren(n.key) && expanded.has(n.key)) {
-          walk(n.key, true);
+        if (allNodes.some((c: BOMCompareNode) => c.path.startsWith(n.key + '/')) && expanded.has(n.key)) {
+          for (const c of allNodes) {
+            if (c.path.startsWith(n.key + '/') && c.path.split('/').length === n.key.split('/').length + 1) {
+              out.push(c);
+              if (allNodes.some((gc: BOMCompareNode) => gc.path.startsWith(c.key + '/')) && expanded.has(c.key)) {
+                for (const gc of allNodes) {
+                  if (gc.path.startsWith(c.key + '/') && gc.path.split('/').length === c.key.split('/').length + 1) {
+                    out.push(gc);
+                    if (allNodes.some((ggc: BOMCompareNode) => ggc.path.startsWith(gc.key + '/')) && expanded.has(gc.key)) {
+                      for (const ggc of allNodes) {
+                        if (ggc.path.startsWith(gc.key + '/') && ggc.path.split('/').length === gc.key.split('/').length + 1) {
+                          out.push(ggc);
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
-    };
-    walk(null, true);
+    }
     return out;
   }, [result, onlyDiff, expanded]);
 
@@ -285,7 +316,7 @@ export default function PartCompareModal({ open, onClose }: Props) {
                             }
                           }}>
                           <td className="px-2 py-2 text-xs text-gray-500 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                            {'-'.repeat(n.level)} {n.level}
+                            {n.level >= 0 ? <>{'-'.repeat(n.level)} {n.level}</> : '0'}
                             {hasChildren && (
                               <button type="button" onClick={(e) => { e.stopPropagation(); toggle(n.key); }}
                                 className="ml-1 text-gray-400 hover:text-gray-600">{isExpanded ? '▼' : '▶'}</button>
