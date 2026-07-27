@@ -35,6 +35,7 @@ const navItems: (NavItem | NavSeparator)[] = [
   { type: 'separator' },
   { path: '/users', label: '用户管理', icon: '👥', roles: ['admin', 'engineer', 'production', 'guest'] },
   { path: '/settings', label: '系统设置', icon: '⚙️', roles: ['admin', 'engineer', 'production', 'guest'] },
+  { type: 'separator' },
   { path: '/help', label: '帮助文档', icon: '❓', roles: ['admin', 'engineer', 'production', 'guest'] },
 ];
 
