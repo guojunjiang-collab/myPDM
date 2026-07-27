@@ -309,7 +309,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
                 <button key={t.key} onClick={() => setActiveTab(t.key)} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === t.key ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>{t.label}</button>
               ))}
             </div>
-            <div className="p-4 overflow-y-auto flex-1">
+            <div className="p-4 overflow-y-auto flex-1 min-h-0">
               {activeTab === 'info' && (
                 <div className="space-y-4">
                   <div className="text-xs text-gray-500">
@@ -405,10 +405,10 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
                 </div>
               )}
               {activeTab === 'children' && (
-                <div>
-                  <div className="flex items-center justify-between mb-3"><h4 className="text-sm font-bold text-gray-700">子构型项</h4>{canEdit && (<button onClick={() => { setPickerParentId(internalRevId); setCfgPickerOpen(true); }} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 添加子项</button>)}</div>
+                <div className="flex flex-col h-full min-h-0">
+                  <div className="flex items-center justify-between mb-3 shrink-0"><h4 className="text-sm font-bold text-gray-700">子构型项</h4>{canEdit && (<button onClick={() => { setPickerParentId(internalRevId); setCfgPickerOpen(true); }} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 添加子项</button>)}</div>
                   {children.length === 0 ? (<div className="text-gray-400 text-sm py-4 text-center">暂无子构型项</div>) : (
-                    <div className="border rounded-lg overflow-hidden"><table className="w-full text-sm"><thead><tr className="bg-gray-50 border-b"><th className="px-3 py-2 text-left text-gray-500 font-medium w-24 whitespace-nowrap">层级</th><th className="px-3 py-2 text-left text-gray-500 font-medium">构型号</th><th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-16">版本</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-20">状态</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-20">签出状态</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-20 whitespace-nowrap">必选/可选</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-16 whitespace-nowrap">数量</th>{canEdit && <th className="px-3 py-2 text-center text-gray-500 font-medium w-28 whitespace-nowrap">操作</th>}</tr></thead><tbody className="divide-y divide-gray-200">{rows}</tbody></table></div>
+                    <div className="border rounded-lg overflow-hidden flex-1 min-h-0"><div className="overflow-y-auto h-full"><table className="w-full text-sm"><thead><tr className="bg-gray-50 border-b sticky top-0 z-10"><th className="px-3 py-2 text-left text-gray-500 font-medium w-24 whitespace-nowrap">层级</th><th className="px-3 py-2 text-left text-gray-500 font-medium">构型号</th><th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-16">版本</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-20">状态</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-20">签出状态</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-20 whitespace-nowrap">必选/可选</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-16 whitespace-nowrap">数量</th>{canEdit && <th className="px-3 py-2 text-center text-gray-500 font-medium w-28 whitespace-nowrap">操作</th>}</tr></thead><tbody className="divide-y divide-gray-200">{rows}</tbody></table></div></div>
                   )}
                 </div>
               )}

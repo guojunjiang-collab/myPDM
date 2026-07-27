@@ -8,7 +8,6 @@ import Dashboard from './pages/Dashboard';
 import Board from './pages/Board';
 import PartsPage from './pages/PartsPage';
 import Documents from './pages/Documents';
-import BOM from './pages/BOM/BOM';
 import Users from './pages/Users';
 import Logs from './pages/Logs';
 import Notifications from './pages/Notifications';
@@ -18,6 +17,7 @@ import Configuration from './pages/Configuration';
 import Inventory from './pages/Inventory';
 import Projects from './pages/Project/Projects';
 import DataManagement from './pages/DataManagement';
+import Help from './pages/Help';
 const STPViewer = lazy(() => import('./pages/STPViewer'));
 const OfficeReader = lazy(() => import('./pages/OfficeReader'));
 
@@ -70,7 +70,6 @@ export default function App() {
           <Route path="components" element={<PartsPage />} />
           <Route path="documents" element={<Documents />} />
           <Route path="configuration" element={<Configuration />} />
-          <Route path="bom" element={<BOM />} />
           <Route path="ec" element={<EC />} />
           <Route path="inventory" element={<Inventory />} />
           <Route path="projects" element={<Projects />} />
@@ -78,6 +77,7 @@ export default function App() {
           <Route path="logs" element={<Logs />} />
           <Route path="notifications" element={<Notifications />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="help" element={<Help />} />
           <Route path="data-management" element={<DataManagement />} />
           <Route path="datamanagement" element={<DataManagement />} />
         </Route>

@@ -890,6 +890,8 @@ export interface ConfigTreeNode {
   id: string;
   code: string;
   name: string;
+  version?: string;
+  status?: string;
   is_required: boolean;
   is_selected: boolean;
   quantity?: number;

@@ -38,7 +38,7 @@ def revision_summary(db: Session, revision_id: Any) -> Optional[Dict[str, Any]]:
         "master_id": str(rev.master_id),
         "code": master.code if master else "",
         "name": master.name if master else "",
-        "spec": (master.spec if master else "") or "",
+        "spec": (getattr(master, 'spec', '') if master else "") or "",
         "version": rev.version,
         "status": rev.status,
     }

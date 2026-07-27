@@ -5,7 +5,7 @@ import { Modal, ConfirmModal } from '../components/Modal';
 import PartDetailModal from '../components/PartDetailModal';
 import DocumentDetailModal from '../components/DocumentDetailModal';
 import ArchiveTreeModal from '../components/ArchiveTreeModal';
-import ConfigurationDetailModal from '../components/Configuration/ConfigurationDetailModal';
+import ConfigItemDetailModal from '../components/Configuration/ConfigItemDetailModal';
 import { useAuthStore } from '../stores/auth';
 
 /* ================================================================
@@ -127,6 +127,38 @@ export default function Board() {
   const [detailComponentId, setDetailComponentId] = useState<string | null>(null);
   const [detailDocId, setDetailDocId] = useState<string | null>(null);
   const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
+
+  /* ---- 侧边栏「共享给我的」区域高度（可拖动分隔条调整） ---- */
+  const SHARED_PANE_MIN = 80;
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const [sharedPaneH, setSharedPaneH] = useState<number>(() => {
+    const v = Number(localStorage.getItem('board.sharedPaneH'));
+    return v >= SHARED_PANE_MIN ? v : 192;
+  });
+
+  const handleSharedResize = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const handle = e.currentTarget;
+    handle.setPointerCapture(e.pointerId);
+    const startY = e.clientY;
+    const startH = sharedPaneH;
+
+    const onMove = (ev: PointerEvent) => {
+      // 向上拖动 → 共享区域变高
+      const sidebarH = sidebarRef.current?.clientHeight ?? window.innerHeight;
+      const max = Math.max(SHARED_PANE_MIN, sidebarH - 160);
+      const next = Math.min(max, Math.max(SHARED_PANE_MIN, startH + (startY - ev.clientY)));
+      setSharedPaneH(next);
+    };
+    const onUp = () => {
+      handle.releasePointerCapture?.(e.pointerId);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      setSharedPaneH((h) => { localStorage.setItem('board.sharedPaneH', String(h)); return h; });
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }, [sharedPaneH]);
 
   /* Load */
   const loadDashboard = useCallback(async () => {
@@ -278,7 +310,7 @@ export default function Board() {
   const canEditFolder = selectedFolder ? !selectedFolder.shared_from || selectedFolder.shared_from?.permission === 'edit' : false;
 
   const handleViewDetail = (item: DashboardItem) => {
-    // 图文档 → DocumentDetailModal；零部件 → 复用零部件管理的 PartDetailModal；构型项 → ConfigurationDetailModal
+    // 图文档 → DocumentDetailModal；零部件 → 复用零部件管理的 PartDetailModal；构型项 → 复用构型项管理的 ConfigItemDetailModal
     if (item.entity_type === 'document') {
       setDetailDocId(item.entity_id);
       setDetailComponentId(null);
@@ -309,14 +341,14 @@ export default function Board() {
   return (
     <div className="flex h-full">
       {/* Left: Folder Tree */}
-      <div className="w-72 shrink-0 border-r border-gray-200 bg-gray-50 flex flex-col">
+      <div ref={sidebarRef} className="w-72 shrink-0 border-r border-gray-200 bg-gray-50 flex flex-col">
         <div className="px-2 pt-2 pb-1">
           <button type="button" onClick={() => { setCreateModal(''); setCreateName(''); }} className="w-full px-3 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">
             + 新建文件夹
           </button>
         </div>
         <div className="px-3 py-2 text-xs font-medium text-gray-400 uppercase tracking-wide">我的文件夹</div>
-        <div className="flex-1 overflow-y-auto px-2 pb-2">
+        <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-2">
           {myFolders.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-6">暂无文件夹</p>
           ) : (
@@ -329,8 +361,17 @@ export default function Board() {
         </div>
         {sharedFolders.length > 0 && (
           <>
-            <div className="px-3 py-2 text-xs font-medium text-gray-400 uppercase tracking-wide border-t border-gray-200">📂 共享给我的</div>
-            <div className="flex-1 overflow-y-auto px-2 pb-2 max-h-48">
+            {/* 可拖动分隔条：调整「共享给我的」区域高度 */}
+            <div
+              onPointerDown={handleSharedResize}
+              title="拖动调整高度"
+              className="group shrink-0 h-px cursor-row-resize bg-gray-200 hover:bg-primary-400 active:bg-primary-500 transition-colors relative"
+            >
+              {/* 视觉 1px，热区上下各扩 3px 便于拖动 */}
+              <div className="absolute inset-x-0 -top-[3px] -bottom-[3px]" />
+            </div>
+            <div className="px-3 py-2 text-xs font-medium text-gray-400 uppercase tracking-wide shrink-0">📂 共享给我的</div>
+            <div className="shrink-0 overflow-y-auto px-2 pb-2" style={{ height: sharedPaneH }}>
               <div className="space-y-0.5">
                 {sharedFolders.map((f) => (
                   <BoardTreeNode key={`s-${f.id}`} node={f} depth={0} isShared={true} selectedId={selectedId} expandedIds={expandedIds} onSelect={setSelectedId} onToggle={toggleExpand} onMenu={(id, el) => setMenuAnchor({ id, el })} />
@@ -553,9 +594,11 @@ export default function Board() {
         />
       )}
 
+      {/* ---- 构型项详情：复用构型项管理的 ConfigItemDetailModal ---- */}
       {detailItem?.entity_type === 'configuration' && (
-        <ConfigurationDetailModal
-          itemId={detailItem?.entity_id || null}
+        <ConfigItemDetailModal
+          revisionId={detailItem.entity_id}
+          open
           onClose={() => setDetailItem(null)}
         />
       )}

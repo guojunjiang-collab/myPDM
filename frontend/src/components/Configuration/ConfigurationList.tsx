@@ -1,17 +1,17 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useTableSort } from '../../hooks/useTableSort';
-import { configurationApi } from '../../services/api';
+import { configurationApi, customFieldsApi } from '../../services/api';
 import { canEdit, isAdmin } from '../../stores/auth';
+import { useDataStore } from '../../stores/data';
 import { ConfirmModal } from '../Modal';
 import ConfigurationCreateModal from './ConfigurationCreateModal';
+import type { CustomFieldDefinition } from '../../types';
 
 interface ConfigItemRow {
   revision_id: string;
   master_id: string;
   code: string;
   name: string;
-  spec?: string;
-  remark?: string;
   version: string;
   status: string;
   check_out_user_id?: string;
@@ -33,25 +33,31 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
   const [searchField, setSearchField] = useState('all');
   const [loading, setLoading] = useState(false);
   const [topLevelOnly, setTopLevelOnly] = useState(false);
+  const [showAllVersions, setShowAllVersions] = useState(false);
+  const [cfValuesMap, setCfValuesMap] = useState<Record<string, Record<string, any>>>({});
+  const storeCustomDefs = useDataStore((s) => s.customFieldDefs);
+  const configCustomDefs = storeCustomDefs.filter((d: CustomFieldDefinition) =>
+    d.applies_to?.includes('configuration_item')
+  );
 
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const [allData, setAllData] = useState<ConfigItemRow[]>([]);
 
   const PAGE_CAP = 10000;
 
   const load = async () => {
     setLoading(true);
     try {
-      const result = await configurationApi.list({ page: 1, page_size: PAGE_CAP, top_level: topLevelOnly || undefined });
+      const result = await configurationApi.list({ page: 1, page_size: PAGE_CAP, top_level: topLevelOnly || undefined, show_all_versions: true });
       const rawItems = result.items || [];
-      const rows: ConfigItemRow[] = rawItems.map((item: any) => ({
+      let rows: ConfigItemRow[] = rawItems.map((item: any) => ({
         revision_id: item.revision_id || item.id,
         master_id: item.master_id,
         code: item.code || '',
         name: item.name || '',
-        spec: item.spec || undefined,
-        remark: item.remark || undefined,
         version: item.version || '',
         status: item.status || 'draft',
         check_out_user_id: item.check_out_user_id,
@@ -62,11 +68,36 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
         created_at: item.created_at,
         updated_at: item.updated_at,
       }));
+      setAllData(rows);
+      if (!showAllVersions) {
+        const latestMap: Record<string, ConfigItemRow> = {};
+        rows.forEach(item => {
+          const existing = latestMap[item.code];
+          if (!existing || new Date(item.created_at || 0) > new Date(existing.created_at || 0)) {
+            latestMap[item.code] = item;
+          }
+        });
+        rows = Object.values(latestMap);
+      }
       setItems(rows);
     } catch { } finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, [topLevelOnly]);
+  const versionCountMap: Record<string, number> = {};
+  allData.forEach(item => {
+    versionCountMap[item.code] = (versionCountMap[item.code] || 0) + 1;
+  });
+
+  useEffect(() => { load(); }, [topLevelOnly, showAllVersions]);
+
+  useEffect(() => {
+    if (configCustomDefs.length === 0 || items.length === 0) return;
+    const ids = items.map(i => i.revision_id).filter(Boolean);
+    if (ids.length === 0) return;
+    customFieldsApi.getValuesBatch({ type: 'configuration_item', ids: ids.join(',') }).then(res => {
+      setCfValuesMap(res.data || {});
+    }).catch(() => {});
+  }, [items, configCustomDefs]);
 
   const filteredData = useMemo(() => {
     if (!search) return items;
@@ -75,15 +106,21 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
 
     return items.filter(item => {
       if (searchField === 'all') {
-        return match(item.code) || match(item.name) || match(item.spec) || match(item.remark);
+        return match(item.code) || match(item.name);
       }
       if (searchField === 'code') return match(item.code);
       if (searchField === 'name') return match(item.name);
-      if (searchField === 'spec') return match(item.spec);
-      if (searchField === 'remark') return match(item.remark);
+      if (searchField.startsWith('cf_')) {
+        const fieldId = searchField.slice(3);
+        const cfVals = cfValuesMap[item.revision_id] || {};
+        const v = cfVals[fieldId];
+        if (v === null || v === undefined) return false;
+        if (Array.isArray(v)) return v.some(s => String(s).toLowerCase().includes(keyword));
+        return String(v).toLowerCase().includes(keyword);
+      }
       return true;
     });
-  }, [items, search, searchField]);
+  }, [items, search, searchField, cfValuesMap]);
 
   const { sortedData, handleSort, getSortIcon } = useTableSort<ConfigItemRow>(filteredData, 'code', 'asc');
 
@@ -132,13 +169,14 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
           <option value="all">全部字段</option>
           <option value="code">构型号</option>
           <option value="name">名称</option>
-          <option value="spec">规格型号</option>
-          <option value="remark">备注</option>
+          {configCustomDefs.map(def => (
+            <option key={def.id} value={`cf_${def.id}`}>{def.name}</option>
+          ))}
         </select>
         <input
           type="text"
           value={search} onChange={(e) => setSearch(e.target.value)}
-          placeholder={searchField === 'all' ? '搜索全部字段...' : `搜索${searchField === 'code' ? '构型号' : searchField === 'name' ? '名称' : searchField === 'spec' ? '规格型号' : '备注'}...`}
+          placeholder={searchField === 'all' ? '搜索全部字段...' : searchField === 'code' ? '搜索构型号...' : searchField === 'name' ? '搜索名称...' : searchField.startsWith('cf_') ? `搜索${configCustomDefs.find(d => d.id === searchField.replace('cf_', ''))?.name || '自定义字段'}...` : '搜索...'}
           className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
         <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm whitespace-nowrap" title="只显示没有父项的最顶层构型项">
@@ -149,6 +187,15 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
             className="w-3.5 h-3.5"
           />
           仅顶层构型项
+        </label>
+        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm whitespace-nowrap">
+          <input
+            type="checkbox"
+            checked={showAllVersions}
+            onChange={(e) => setShowAllVersions(e.target.checked)}
+            className="w-3.5 h-3.5"
+          />
+          全部版本
         </label>
         <div className="flex-1" />
         {canEdit() && (
@@ -177,7 +224,14 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
               <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
             ) : sortedData.map((item) => (
               <tr key={item.revision_id} onClick={() => onOpenDetail(item.revision_id)} className="hover:bg-gray-50 cursor-pointer">
-                <td className="px-3 py-3 text-sm font-medium">{item.code}</td>
+                <td className="px-3 py-3 text-sm font-medium">
+                  {item.code}
+                  {!showAllVersions && (versionCountMap[item.code] || 0) > 1 && (
+                    <span className="ml-1.5 text-xs text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded">
+                      {(versionCountMap[item.code] || 0)}个版本
+                    </span>
+                  )}
+                </td>
                 <td className="px-3 py-3 text-sm">{item.name}</td>
                 <td className="px-2 py-3 text-sm font-mono text-center">{item.version}</td>
                 <td className="px-2 py-3 text-sm text-center">
