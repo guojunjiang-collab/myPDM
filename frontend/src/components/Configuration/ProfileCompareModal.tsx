@@ -127,7 +127,8 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
       const res = diffProfileTrees(lr.data.config_tree || null, rr.data.config_tree || null);
       setResult(res);
       setExpanded(res.root ? new Set([res.root.key]) : new Set());
-    } catch {
+    } catch (err) {
+      console.error('配置对比失败', err);
       setError('对比失败，请重试');
       setResult(null);
     } finally {
