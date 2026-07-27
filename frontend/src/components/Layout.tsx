@@ -24,7 +24,6 @@ type NavSeparator = {
 const navItems: (NavItem | NavSeparator)[] = [
   { path: '/dashboard', label: '仪表盘', icon: '📊', roles: ['admin', 'engineer', 'production', 'guest'] },
   { path: '/board', label: '用户看板', icon: '📋', roles: ['admin', 'engineer', 'production', 'guest'] },
-  { path: '/bom', label: '管理工具', icon: '🛠️', roles: ['admin', 'engineer', 'production'] },
   { type: 'separator' },
   { path: '/configuration', label: '构型管理', icon: '📐', roles: ['admin', 'engineer', 'production', 'guest'] },
   { path: '/parts', label: '零部件管理', icon: '📦', roles: ['admin', 'engineer', 'production', 'guest'] },
@@ -36,6 +35,7 @@ const navItems: (NavItem | NavSeparator)[] = [
   { type: 'separator' },
   { path: '/users', label: '用户管理', icon: '👥', roles: ['admin', 'engineer', 'production', 'guest'] },
   { path: '/settings', label: '系统设置', icon: '⚙️', roles: ['admin', 'engineer', 'production', 'guest'] },
+  { type: 'separator' },
   { path: '/help', label: '帮助文档', icon: '❓', roles: ['admin', 'engineer', 'production', 'guest'] },
 ];
 

@@ -1656,6 +1656,8 @@ def _build_config_tree(db: Session, revision_id: str, profile_items: list, entit
         "id": str(revision.id),
         "code": master.code,
         "name": master.name,
+        "version": revision.version,
+        "status": revision.status,
         "is_required": True,
         "is_selected": True,
         "parts": parts,

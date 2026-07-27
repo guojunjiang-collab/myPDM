@@ -8,7 +8,6 @@ import Dashboard from './pages/Dashboard';
 import Board from './pages/Board';
 import PartsPage from './pages/PartsPage';
 import Documents from './pages/Documents';
-import BOM from './pages/BOM/BOM';
 import Users from './pages/Users';
 import Logs from './pages/Logs';
 import Notifications from './pages/Notifications';
@@ -71,7 +70,6 @@ export default function App() {
           <Route path="components" element={<PartsPage />} />
           <Route path="documents" element={<Documents />} />
           <Route path="configuration" element={<Configuration />} />
-          <Route path="bom" element={<BOM />} />
           <Route path="ec" element={<EC />} />
           <Route path="inventory" element={<Inventory />} />
           <Route path="projects" element={<Projects />} />
