@@ -143,13 +143,13 @@ export default function ProfileList() {
           <option value="rejected">已驳回</option>
           <option value="archived">已归档</option>
         </select>
-        <div className="flex-1" />
         <button
           onClick={() => setCompareOpen(true)}
           className="px-4 py-2 border border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50 text-sm"
         >
           ⇄ 配置对比
         </button>
+        <div className="flex-1" />
         {canEdit() && (
           <button onClick={() => setCreateOpen(true)} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建配置</button>
         )}
