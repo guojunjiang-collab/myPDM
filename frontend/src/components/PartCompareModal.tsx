@@ -296,10 +296,10 @@ export default function PartCompareModal({ open, onClose }: Props) {
                           <td className="px-2 py-2 text-xs text-center text-gray-500">{statusLabel(l?.detail.status)}</td>
                           <td className="px-2 py-2 text-xs text-center text-gray-500">{l?.quantity ?? '-'}</td>
                           <td className="w-px bg-gray-200 p-0" />
-                          <td className={`px-2 py-2 text-xs font-medium ${versionChanged ? 'bg-yellow-100' : ''}`}>{r?.detail.code || '-'}</td>
-                          <td className={`px-2 py-2 text-xs text-center ${versionChanged ? 'bg-yellow-100' : 'text-gray-500'}`}>{r?.detail.version || '-'}</td>
-                          <td className={`px-2 py-2 text-xs text-center ${statusChanged ? 'bg-yellow-100' : 'text-gray-500'}`}>{statusLabel(r?.detail.status)}</td>
-                          <td className={`px-2 py-2 text-xs text-center ${qtyChanged ? 'bg-yellow-100' : 'text-gray-500'}`}>{r?.quantity ?? '-'}</td>
+                          <td className={`px-2 py-2 text-xs font-medium ${versionChanged ? 'font-semibold' : ''}`}>{r?.detail.code || '-'}</td>
+                          <td className={`px-2 py-2 text-xs text-center ${versionChanged ? 'font-semibold' : 'text-gray-500'}`}>{r?.detail.version || '-'}</td>
+                          <td className={`px-2 py-2 text-xs text-center ${statusChanged ? 'font-semibold' : 'text-gray-500'}`}>{statusLabel(r?.detail.status)}</td>
+                          <td className={`px-2 py-2 text-xs text-center ${qtyChanged ? 'font-semibold' : 'text-gray-500'}`}>{r?.quantity ?? '-'}</td>
                           <td className="w-px bg-gray-200 p-0" />
                           <td className="px-2 py-2 text-xs text-gray-700">{changeText(n)}</td>
                         </tr>

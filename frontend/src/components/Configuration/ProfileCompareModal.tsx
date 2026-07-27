@@ -178,7 +178,7 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
         <td className="px-2 py-2 text-xs font-medium">{r?.code || '-'}</td>
         <td className="px-2 py-2 text-xs text-gray-600">{r?.name || '-'}</td>
         <td className="px-2 py-2 text-xs text-center text-gray-500">{r?.version || '-'}</td>
-        <td className={`px-2 py-2 text-xs text-center ${n.changed_fields?.includes('quantity') ? 'bg-yellow-100' : 'text-gray-500'}`}>{r?.quantity ?? '-'}</td>
+        <td className={`px-2 py-2 text-xs text-center ${n.changed_fields?.includes('quantity') ? 'font-semibold' : 'text-gray-500'}`}>{r?.quantity ?? '-'}</td>
         <td className="w-px bg-gray-200 p-0" />
         <td className="px-2 py-2 text-xs text-gray-700">{nodeChangeText(n)}</td>
       </tr>
@@ -197,14 +197,14 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
             <td className="px-2 py-2 text-xs text-center text-gray-500">{pl?.item_version || '-'}</td>
             <td className="px-2 py-2 text-xs text-center text-gray-500">{pl?.quantity ?? '-'}</td>
             <td className="w-px bg-gray-200 p-0" />
-            <td className={`px-2 py-2 text-xs font-mono ${chg.has('version') ? 'bg-yellow-100' : 'text-gray-600'}`}>
+            <td className={`px-2 py-2 text-xs font-mono ${chg.has('version') ? 'font-semibold' : 'text-gray-600'}`}>
               {pr?.item_code || '-'}
             </td>
             <td className="px-2 py-2 text-xs text-gray-600">{pr?.item_name || '-'}</td>
-            <td className={`px-2 py-2 text-xs text-center ${chg.has('version') ? 'bg-yellow-100' : 'text-gray-500'}`}>
+            <td className={`px-2 py-2 text-xs text-center ${chg.has('version') ? 'font-semibold' : 'text-gray-500'}`}>
               {pr?.item_version || '-'}
             </td>
-            <td className={`px-2 py-2 text-xs text-center ${chg.has('quantity') ? 'bg-yellow-100' : 'text-gray-500'}`}>{pr?.quantity ?? '-'}</td>
+            <td className={`px-2 py-2 text-xs text-center ${chg.has('quantity') ? 'font-semibold' : 'text-gray-500'}`}>{pr?.quantity ?? '-'}</td>
             <td className="w-px bg-gray-200 p-0" />
             <td className="px-2 py-2 text-xs text-gray-700">{partChangeText(p)}</td>
           </tr>
