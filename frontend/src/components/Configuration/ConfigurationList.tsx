@@ -33,6 +33,7 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
   const [searchField, setSearchField] = useState('all');
   const [loading, setLoading] = useState(false);
   const [topLevelOnly, setTopLevelOnly] = useState(false);
+  const [showAllVersions, setShowAllVersions] = useState(false);
   const [cfValuesMap, setCfValuesMap] = useState<Record<string, Record<string, any>>>({});
   const storeCustomDefs = useDataStore((s) => s.customFieldDefs);
   const configCustomDefs = storeCustomDefs.filter((d: CustomFieldDefinition) =>
@@ -48,9 +49,9 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
   const load = async () => {
     setLoading(true);
     try {
-      const result = await configurationApi.list({ page: 1, page_size: PAGE_CAP, top_level: topLevelOnly || undefined });
+      const result = await configurationApi.list({ page: 1, page_size: PAGE_CAP, top_level: topLevelOnly || undefined, show_all_versions: true });
       const rawItems = result.items || [];
-      const rows: ConfigItemRow[] = rawItems.map((item: any) => ({
+      let rows: ConfigItemRow[] = rawItems.map((item: any) => ({
         revision_id: item.revision_id || item.id,
         master_id: item.master_id,
         code: item.code || '',
@@ -65,11 +66,21 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
         created_at: item.created_at,
         updated_at: item.updated_at,
       }));
+      if (!showAllVersions) {
+        const latestMap: Record<string, ConfigItemRow> = {};
+        rows.forEach(item => {
+          const existing = latestMap[item.code];
+          if (!existing || new Date(item.created_at || 0) > new Date(existing.created_at || 0)) {
+            latestMap[item.code] = item;
+          }
+        });
+        rows = Object.values(latestMap);
+      }
       setItems(rows);
     } catch { } finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, [topLevelOnly]);
+  useEffect(() => { load(); }, [topLevelOnly, showAllVersions]);
 
   useEffect(() => {
     if (configCustomDefs.length === 0 || items.length === 0) return;
@@ -168,6 +179,15 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
             className="w-3.5 h-3.5"
           />
           仅顶层构型项
+        </label>
+        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm whitespace-nowrap">
+          <input
+            type="checkbox"
+            checked={showAllVersions}
+            onChange={(e) => setShowAllVersions(e.target.checked)}
+            className="w-3.5 h-3.5"
+          />
+          全部版本
         </label>
         <div className="flex-1" />
         {canEdit() && (
