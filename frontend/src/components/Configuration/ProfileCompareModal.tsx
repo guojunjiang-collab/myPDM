@@ -269,15 +269,29 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
             <>
               {summaryBar}
               <div className="border rounded-lg overflow-auto max-h-[60vh]">
-                <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
+                <table className="w-full text-sm">
+                  <colgroup>
+                    <col className="w-12" />
+                    <col />
+                    <col />
+                    <col className="w-10" />
+                    <col className="w-10" />
+                    <col className="w-px" />
+                    <col />
+                    <col />
+                    <col className="w-10" />
+                    <col className="w-10" />
+                    <col className="w-px" />
+                    <col className="w-40" />
+                  </colgroup>
                   <thead className="sticky top-0 bg-gray-50 z-10">
                     <tr className="text-xs font-medium text-gray-600 border-b">
-                      <th className="px-2 py-2 text-left w-14">层级</th>
+                      <th className="px-2 py-2 text-left">层级</th>
                       <th colSpan={4} className="px-2 py-2 text-left border-r border-gray-200">左配置</th>
                       <th className="w-px bg-gray-200 p-0" />
                       <th colSpan={4} className="px-2 py-2 text-left">右配置</th>
                       <th className="w-px bg-gray-200 p-0" />
-                      <th className="px-2 py-2 text-left w-40">变更</th>
+                      <th className="px-2 py-2 text-left">变更</th>
                     </tr>
                     <tr className="text-xs font-medium text-gray-500 border-b">
                       <th className="px-2 py-1" />
