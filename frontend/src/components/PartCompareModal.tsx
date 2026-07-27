@@ -160,12 +160,12 @@ export default function PartCompareModal({ open, onClose }: Props) {
       path: '',
       change_type: rootChanged ? 'modify' : (result.summary.added > 0 || result.summary.deleted > 0 || result.summary.modified > 0 ? 'internal' : 'none'),
       left: la ? {
-        id: '', child_type: 'assembly', child_id: la.id, child_master_id: la.id,
+        id: '', child_type: 'assembly', child_id: (la as any).master_id || la.id, child_master_id: (la as any).master_id || la.id,
         child_revision_id: la.id, quantity: 1,
         detail: { code: la.code, name: la.name, spec: '', version: la.version, status: la.status },
       } : null,
       right: ra ? {
-        id: '', child_type: 'assembly', child_id: ra.id, child_master_id: ra.id,
+        id: '', child_type: 'assembly', child_id: (ra as any).master_id || ra.id, child_master_id: (ra as any).master_id || ra.id,
         child_revision_id: ra.id, quantity: 1,
         detail: { code: ra.code, name: ra.name, spec: '', version: ra.version, status: ra.status },
       } : null,
@@ -308,9 +308,8 @@ export default function PartCompareModal({ open, onClose }: Props) {
                       );
                       const isExpanded = expanded.has(n.key);
                       return (
-                        <tr key={n.key} className={`${rowBg[n.change_type]} border-b border-gray-100 ${n.key !== 'ROOT' ? 'cursor-pointer hover:brightness-95' : ''}`}
+                        <tr key={n.key} className={`${rowBg[n.change_type]} border-b border-gray-100 cursor-pointer hover:brightness-95`}
                           onClick={() => {
-                            if (n.key === 'ROOT') return;
                             const side = n.right || n.left;
                             if (side?.child_master_id && side?.child_revision_id) {
                               setDetail({ masterId: side.child_master_id, revisionId: side.child_revision_id });
