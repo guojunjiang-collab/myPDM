@@ -215,7 +215,7 @@ export default function PartCompareModal({ open, onClose }: Props) {
 
           {error && <div className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{error}</div>}
 
-          {result && result.comparison.length === 0 && (
+          {result && result.comparison.length === 0 && !identical && (
             <div className="text-sm text-gray-500 text-center py-6">两侧 BOM 均为空</div>
           )}
           {identical && (
