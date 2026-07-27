@@ -15,6 +15,8 @@ export interface ConfigItemSide {
   id: string;
   code: string;
   name: string;
+  version?: string;
+  status?: string;
   quantity?: number;
 }
 export interface ProfileComparePart {
@@ -67,7 +69,7 @@ function partToSide(p: ConfigTreePart): PartSide {
   };
 }
 function nodeToSide(n: ConfigTreeNode): ConfigItemSide {
-  return { id: n.id, code: n.code, name: n.name, quantity: n.quantity };
+  return { id: n.id, code: n.code, name: n.name, version: n.version, status: n.status, quantity: n.quantity };
 }
 
 function comparePart(key: string, left?: ConfigTreePart, right?: ConfigTreePart): ProfileComparePart {

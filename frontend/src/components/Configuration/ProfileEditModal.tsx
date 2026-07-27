@@ -491,8 +491,8 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         <td className="px-3 py-2 text-xs whitespace-nowrap">
           <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">构型项</span>
         </td>
-        <td className="px-3 py-2 text-xs text-gray-400">-</td>
-        <td className="px-3 py-2 text-xs text-gray-400">-</td>
+        <td className="px-3 py-2 text-sm text-gray-500">{node.version || '-'}</td>
+        <td className="px-3 py-2 text-sm text-gray-500">{partStatusBadge(node.status)}</td>
         <td className="px-3 py-2 text-center text-sm">{node.quantity ?? 1}</td>
       </tr>
     );
@@ -557,8 +557,8 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         <td className="px-3 py-2 text-xs whitespace-nowrap">
           <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">构型项</span>
         </td>
-        <td className="px-3 py-2 text-xs text-gray-400">-</td>
-        <td className="px-3 py-2 text-xs text-gray-400">-</td>
+        <td className="px-3 py-2 text-sm text-gray-500">{node.version || '-'}</td>
+        <td className="px-3 py-2 text-sm text-gray-500">{partStatusBadge(node.status)}</td>
         <td className="px-3 py-2 text-center text-sm">{node.quantity ?? 1}</td>
         <td className="px-3 py-2 text-center whitespace-nowrap">
           <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
