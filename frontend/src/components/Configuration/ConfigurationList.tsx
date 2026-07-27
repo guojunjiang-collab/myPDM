@@ -1,17 +1,17 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useTableSort } from '../../hooks/useTableSort';
-import { configurationApi } from '../../services/api';
+import { configurationApi, customFieldsApi } from '../../services/api';
 import { canEdit, isAdmin } from '../../stores/auth';
+import { useDataStore } from '../../stores/data';
 import { ConfirmModal } from '../Modal';
 import ConfigurationCreateModal from './ConfigurationCreateModal';
+import type { CustomFieldDefinition } from '../../types';
 
 interface ConfigItemRow {
   revision_id: string;
   master_id: string;
   code: string;
   name: string;
-  spec?: string;
-  remark?: string;
   version: string;
   status: string;
   check_out_user_id?: string;
@@ -33,6 +33,11 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
   const [searchField, setSearchField] = useState('all');
   const [loading, setLoading] = useState(false);
   const [topLevelOnly, setTopLevelOnly] = useState(false);
+  const [cfValuesMap, setCfValuesMap] = useState<Record<string, Record<string, any>>>({});
+  const storeCustomDefs = useDataStore((s) => s.customFieldDefs);
+  const configCustomDefs = storeCustomDefs.filter((d: CustomFieldDefinition) =>
+    d.applies_to?.includes('configuration_item')
+  );
 
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -50,8 +55,6 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
         master_id: item.master_id,
         code: item.code || '',
         name: item.name || '',
-        spec: item.spec || undefined,
-        remark: item.remark || undefined,
         version: item.version || '',
         status: item.status || 'draft',
         check_out_user_id: item.check_out_user_id,
@@ -68,6 +71,15 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
 
   useEffect(() => { load(); }, [topLevelOnly]);
 
+  useEffect(() => {
+    if (configCustomDefs.length === 0 || items.length === 0) return;
+    const ids = items.map(i => i.revision_id).filter(Boolean);
+    if (ids.length === 0) return;
+    customFieldsApi.getValuesBatch({ type: 'configuration_item', ids: ids.join(',') }).then(res => {
+      setCfValuesMap(res.data || {});
+    }).catch(() => {});
+  }, [items, configCustomDefs]);
+
   const filteredData = useMemo(() => {
     if (!search) return items;
     const keyword = search.toLowerCase();
@@ -75,15 +87,21 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
 
     return items.filter(item => {
       if (searchField === 'all') {
-        return match(item.code) || match(item.name) || match(item.spec) || match(item.remark);
+        return match(item.code) || match(item.name);
       }
       if (searchField === 'code') return match(item.code);
       if (searchField === 'name') return match(item.name);
-      if (searchField === 'spec') return match(item.spec);
-      if (searchField === 'remark') return match(item.remark);
+      if (searchField.startsWith('cf_')) {
+        const fieldId = searchField.slice(3);
+        const cfVals = cfValuesMap[item.revision_id] || {};
+        const v = cfVals[fieldId];
+        if (v === null || v === undefined) return false;
+        if (Array.isArray(v)) return v.some(s => String(s).toLowerCase().includes(keyword));
+        return String(v).toLowerCase().includes(keyword);
+      }
       return true;
     });
-  }, [items, search, searchField]);
+  }, [items, search, searchField, cfValuesMap]);
 
   const { sortedData, handleSort, getSortIcon } = useTableSort<ConfigItemRow>(filteredData, 'code', 'asc');
 
@@ -132,13 +150,14 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
           <option value="all">全部字段</option>
           <option value="code">构型号</option>
           <option value="name">名称</option>
-          <option value="spec">规格型号</option>
-          <option value="remark">备注</option>
+          {configCustomDefs.map(def => (
+            <option key={def.id} value={`cf_${def.id}`}>{def.name}</option>
+          ))}
         </select>
         <input
           type="text"
           value={search} onChange={(e) => setSearch(e.target.value)}
-          placeholder={searchField === 'all' ? '搜索全部字段...' : `搜索${searchField === 'code' ? '构型号' : searchField === 'name' ? '名称' : searchField === 'spec' ? '规格型号' : '备注'}...`}
+          placeholder={searchField === 'all' ? '搜索全部字段...' : searchField === 'code' ? '搜索构型号...' : searchField === 'name' ? '搜索名称...' : searchField.startsWith('cf_') ? `搜索${configCustomDefs.find(d => d.id === searchField.replace('cf_', ''))?.name || '自定义字段'}...` : '搜索...'}
           className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
         <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm whitespace-nowrap" title="只显示没有父项的最顶层构型项">
