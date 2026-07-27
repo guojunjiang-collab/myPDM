@@ -44,6 +44,8 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  const [allData, setAllData] = useState<ConfigItemRow[]>([]);
+
   const PAGE_CAP = 10000;
 
   const load = async () => {
@@ -66,6 +68,7 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
         created_at: item.created_at,
         updated_at: item.updated_at,
       }));
+      setAllData(rows);
       if (!showAllVersions) {
         const latestMap: Record<string, ConfigItemRow> = {};
         rows.forEach(item => {
@@ -79,6 +82,11 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
       setItems(rows);
     } catch { } finally { setLoading(false); }
   };
+
+  const versionCountMap: Record<string, number> = {};
+  allData.forEach(item => {
+    versionCountMap[item.code] = (versionCountMap[item.code] || 0) + 1;
+  });
 
   useEffect(() => { load(); }, [topLevelOnly, showAllVersions]);
 
@@ -216,7 +224,14 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
               <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
             ) : sortedData.map((item) => (
               <tr key={item.revision_id} onClick={() => onOpenDetail(item.revision_id)} className="hover:bg-gray-50 cursor-pointer">
-                <td className="px-3 py-3 text-sm font-medium">{item.code}</td>
+                <td className="px-3 py-3 text-sm font-medium">
+                  {item.code}
+                  {!showAllVersions && (versionCountMap[item.code] || 0) > 1 && (
+                    <span className="ml-1.5 text-xs text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded">
+                      {(versionCountMap[item.code] || 0)}个版本
+                    </span>
+                  )}
+                </td>
                 <td className="px-3 py-3 text-sm">{item.name}</td>
                 <td className="px-2 py-3 text-sm font-mono text-center">{item.version}</td>
                 <td className="px-2 py-3 text-sm text-center">
