@@ -79,6 +79,17 @@ describe('diffProfileTrees', () => {
     expect(r.root!.change_type).toBe('none');
   });
 
+  it('必选项(is_required=true, is_selected=false)被纳入对比', () => {
+    const left = node('ROOT', { parts: [
+      part('P1'),
+      part('P2', { is_required: true, is_selected: false }),
+    ] });
+    const right = node('ROOT', { parts: [part('P1')] });
+    const r = diffProfileTrees(left, right);
+    expect(r.root!.parts.map(p => p.left?.item_code || p.right?.item_code)).toEqual(['P1', 'P2']);
+    expect(r.root!.parts.find(p => (p.left?.item_code || p.right?.item_code) === 'P2')!.change_type).toBe('delete');
+  });
+
   it('某侧树为 null → 另一侧全 add；两侧 null → root null', () => {
     const right = node('ROOT', { parts: [part('P1')], children: [node('C1', { parts: [part('P2')] })] });
     const r = diffProfileTrees(null, right);
