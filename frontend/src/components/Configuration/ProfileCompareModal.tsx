@@ -163,24 +163,24 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
     rows.push(
       <tr key={n.key} className={`${rowBg[n.change_type]} border-b border-gray-100 cursor-pointer hover:brightness-95`}
         onClick={() => openDetail('config_item', n)}>
-        <td className="px-2 py-1 text-xs text-gray-500 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+        <td className="px-2 py-2 text-xs text-gray-500 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
           {'-'.repeat(level)}{level}
           {hasChildren && (
             <button type="button" onClick={(e) => { e.stopPropagation(); toggle(n.key); }}
               className="ml-1 text-gray-400 hover:text-gray-600">{isExpanded ? '▼' : '▶'}</button>
           )}
         </td>
-        <td className="px-2 py-1 text-xs font-medium">{l?.code || '-'}</td>
-        <td className="px-2 py-1 text-xs text-gray-600">{l?.name || '-'}</td>
-        <td className="px-2 py-1 text-xs text-center text-gray-500">{l?.version || '-'}</td>
-        <td className="px-2 py-1 text-xs text-center text-gray-500">{l?.quantity ?? '-'}</td>
+        <td className="px-2 py-2 text-xs font-medium">{l?.code || '-'}</td>
+        <td className="px-2 py-2 text-xs text-gray-600">{l?.name || '-'}</td>
+        <td className="px-2 py-2 text-xs text-center text-gray-500">{l?.version || '-'}</td>
+        <td className="px-2 py-2 text-xs text-center text-gray-500">{l?.quantity ?? '-'}</td>
         <td className="w-px bg-gray-200 p-0" />
-        <td className="px-2 py-1 text-xs font-medium">{r?.code || '-'}</td>
-        <td className="px-2 py-1 text-xs text-gray-600">{r?.name || '-'}</td>
-        <td className="px-2 py-1 text-xs text-center text-gray-500">{r?.version || '-'}</td>
-        <td className={`px-2 py-1 text-xs text-center ${n.changed_fields?.includes('quantity') ? 'bg-yellow-100' : 'text-gray-500'}`}>{r?.quantity ?? '-'}</td>
+        <td className="px-2 py-2 text-xs font-medium">{r?.code || '-'}</td>
+        <td className="px-2 py-2 text-xs text-gray-600">{r?.name || '-'}</td>
+        <td className="px-2 py-2 text-xs text-center text-gray-500">{r?.version || '-'}</td>
+        <td className={`px-2 py-2 text-xs text-center ${n.changed_fields?.includes('quantity') ? 'bg-yellow-100' : 'text-gray-500'}`}>{r?.quantity ?? '-'}</td>
         <td className="w-px bg-gray-200 p-0" />
-        <td className="px-2 py-1 text-xs text-gray-700">{nodeChangeText(n)}</td>
+        <td className="px-2 py-2 text-xs text-gray-700">{nodeChangeText(n)}</td>
       </tr>
     );
     if (isExpanded) {
@@ -191,22 +191,22 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
         rows.push(
           <tr key={p.key} className={`${rowBg[p.change_type]} border-b border-gray-100 cursor-pointer hover:brightness-95`}
             onClick={() => openDetail('part', p)}>
-            <td className="px-2 py-1 text-xs text-gray-400 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>{'-'.repeat(level + 1)}</td>
-            <td className="px-2 py-1 text-xs font-mono text-gray-600">{pl?.item_code || '-'}</td>
-            <td className="px-2 py-1 text-xs text-gray-600">{pl?.item_name || '-'}</td>
-            <td className="px-2 py-1 text-xs text-center text-gray-500">{pl?.item_version || '-'}</td>
-            <td className="px-2 py-1 text-xs text-center text-gray-500">{pl?.quantity ?? '-'}</td>
+            <td className="px-2 py-2 text-xs text-gray-400 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>{'-'.repeat(level + 1)}</td>
+            <td className="px-2 py-2 text-xs font-mono text-gray-600">{pl?.item_code || '-'}</td>
+            <td className="px-2 py-2 text-xs text-gray-600">{pl?.item_name || '-'}</td>
+            <td className="px-2 py-2 text-xs text-center text-gray-500">{pl?.item_version || '-'}</td>
+            <td className="px-2 py-2 text-xs text-center text-gray-500">{pl?.quantity ?? '-'}</td>
             <td className="w-px bg-gray-200 p-0" />
-            <td className={`px-2 py-1 text-xs font-mono ${chg.has('version') ? 'bg-yellow-100' : 'text-gray-600'}`}>
+            <td className={`px-2 py-2 text-xs font-mono ${chg.has('version') ? 'bg-yellow-100' : 'text-gray-600'}`}>
               {pr?.item_code || '-'}
             </td>
-            <td className="px-2 py-1 text-xs text-gray-600">{pr?.item_name || '-'}</td>
-            <td className={`px-2 py-1 text-xs text-center ${chg.has('version') ? 'bg-yellow-100' : 'text-gray-500'}`}>
+            <td className="px-2 py-2 text-xs text-gray-600">{pr?.item_name || '-'}</td>
+            <td className={`px-2 py-2 text-xs text-center ${chg.has('version') ? 'bg-yellow-100' : 'text-gray-500'}`}>
               {pr?.item_version || '-'}
             </td>
-            <td className={`px-2 py-1 text-xs text-center ${chg.has('quantity') ? 'bg-yellow-100' : 'text-gray-500'}`}>{pr?.quantity ?? '-'}</td>
+            <td className={`px-2 py-2 text-xs text-center ${chg.has('quantity') ? 'bg-yellow-100' : 'text-gray-500'}`}>{pr?.quantity ?? '-'}</td>
             <td className="w-px bg-gray-200 p-0" />
-            <td className="px-2 py-1 text-xs text-gray-700">{partChangeText(p)}</td>
+            <td className="px-2 py-2 text-xs text-gray-700">{partChangeText(p)}</td>
           </tr>
         );
       }
@@ -232,7 +232,7 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
 
   return (
     <>
-      <Modal open={open} onClose={onClose} title="构型配置对比" width="3xl">
+      <Modal open={open} onClose={onClose} title="构型配置对比" width="3xl" height="75vh">
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <ProfilePicker label="左配置" options={options} valueId={leftId} onPick={setLeftId} />
