@@ -285,7 +285,7 @@ export default function PartCompareModal({ open, onClose }: Props) {
                             }
                           }}>
                           <td className="px-2 py-2 text-xs text-gray-500 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                            {'-'.repeat(n.level)}{n.level}
+                            {'-'.repeat(n.level)} {n.level}
                             {hasChildren && (
                               <button type="button" onClick={(e) => { e.stopPropagation(); toggle(n.key); }}
                                 className="ml-1 text-gray-400 hover:text-gray-600">{isExpanded ? '▼' : '▶'}</button>

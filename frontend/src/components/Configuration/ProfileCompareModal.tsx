@@ -164,7 +164,7 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
       <tr key={n.key} className={`${rowBg[n.change_type]} border-b border-gray-100 cursor-pointer hover:brightness-95`}
         onClick={() => openDetail('config_item', n)}>
         <td className="px-2 py-2 text-xs text-gray-500 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-          {'-'.repeat(level)}{level}
+          {'-'.repeat(level)} {level}
           {hasChildren && (
             <button type="button" onClick={(e) => { e.stopPropagation(); toggle(n.key); }}
               className="ml-1 text-gray-400 hover:text-gray-600">{isExpanded ? '▼' : '▶'}</button>
