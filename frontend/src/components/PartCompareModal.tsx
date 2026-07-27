@@ -308,8 +308,9 @@ export default function PartCompareModal({ open, onClose }: Props) {
                       );
                       const isExpanded = expanded.has(n.key);
                       return (
-                        <tr key={n.key} className={`${rowBg[n.change_type]} border-b border-gray-100 cursor-pointer hover:brightness-95`}
+                        <tr key={n.key} className={`${rowBg[n.change_type]} border-b border-gray-100 ${n.key !== 'ROOT' ? 'cursor-pointer hover:brightness-95' : ''}`}
                           onClick={() => {
+                            if (n.key === 'ROOT') return;
                             const side = n.right || n.left;
                             if (side?.child_master_id && side?.child_revision_id) {
                               setDetail({ masterId: side.child_master_id, revisionId: side.child_revision_id });
