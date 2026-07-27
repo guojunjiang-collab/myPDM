@@ -189,7 +189,7 @@ async def get_config_item_detail(
                         PartRevision.master_id == entity.id,
                         PartRevision.deleted_at.is_(None)
                     ).order_by(PartRevision.created_at.desc()).first()
-                checkout_user_name = _resolve_user_name(db, rev.check_out_user_id) if rev else None
+                part_checkout_user_name = _resolve_user_name(db, rev.check_out_user_id) if rev else None
                 # 检查当前迭代是否有STP生产附件（用于3D预览）
                 has_3d = entity.type == 'assembly'
                 if not has_3d and rev:
@@ -213,7 +213,7 @@ async def get_config_item_detail(
                         "revision_id": str(rev.id) if rev else "",
                         "status": rev.status if rev else "draft",
                         "check_out_user_id": str(rev.check_out_user_id) if (rev and rev.check_out_user_id) else None,
-                        "check_out_user_name": checkout_user_name,
+                        "check_out_user_name": part_checkout_user_name,
                         "has_3d": has_3d,
                     },
                 })
