@@ -172,10 +172,12 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
         </td>
         <td className="px-2 py-1 text-xs font-medium">{l?.code || '-'}</td>
         <td className="px-2 py-1 text-xs text-gray-600">{l?.name || '-'}</td>
+        <td className="px-2 py-1 text-xs text-center text-gray-500">{l?.version || '-'}</td>
         <td className="px-2 py-1 text-xs text-center text-gray-500">{l?.quantity ?? '-'}</td>
         <td className="w-px bg-gray-200 p-0" />
         <td className="px-2 py-1 text-xs font-medium">{r?.code || '-'}</td>
         <td className="px-2 py-1 text-xs text-gray-600">{r?.name || '-'}</td>
+        <td className="px-2 py-1 text-xs text-center text-gray-500">{r?.version || '-'}</td>
         <td className={`px-2 py-1 text-xs text-center ${n.changed_fields?.includes('quantity') ? 'bg-yellow-100' : 'text-gray-500'}`}>{r?.quantity ?? '-'}</td>
         <td className="w-px bg-gray-200 p-0" />
         <td className="px-2 py-1 text-xs text-gray-700">{nodeChangeText(n)}</td>
@@ -192,12 +194,16 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
             <td className="px-2 py-1 text-xs text-gray-400 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>{'-'.repeat(level + 1)}</td>
             <td className="px-2 py-1 text-xs font-mono text-gray-600">{pl?.item_code || '-'}</td>
             <td className="px-2 py-1 text-xs text-gray-600">{pl?.item_name || '-'}</td>
+            <td className="px-2 py-1 text-xs text-center text-gray-500">{pl?.item_version || '-'}</td>
             <td className="px-2 py-1 text-xs text-center text-gray-500">{pl?.quantity ?? '-'}</td>
             <td className="w-px bg-gray-200 p-0" />
             <td className={`px-2 py-1 text-xs font-mono ${chg.has('version') ? 'bg-yellow-100' : 'text-gray-600'}`}>
-              {pr?.item_code || '-'}{pr?.item_version ? ` (${pr.item_version})` : ''}
+              {pr?.item_code || '-'}
             </td>
             <td className="px-2 py-1 text-xs text-gray-600">{pr?.item_name || '-'}</td>
+            <td className={`px-2 py-1 text-xs text-center ${chg.has('version') ? 'bg-yellow-100' : 'text-gray-500'}`}>
+              {pr?.item_version || '-'}
+            </td>
             <td className={`px-2 py-1 text-xs text-center ${chg.has('quantity') ? 'bg-yellow-100' : 'text-gray-500'}`}>{pr?.quantity ?? '-'}</td>
             <td className="w-px bg-gray-200 p-0" />
             <td className="px-2 py-1 text-xs text-gray-700">{partChangeText(p)}</td>
@@ -267,9 +273,9 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
                   <thead className="sticky top-0 bg-gray-50 z-10">
                     <tr className="text-xs font-medium text-gray-600 border-b">
                       <th className="px-2 py-2 text-left w-14">层级</th>
-                      <th colSpan={3} className="px-2 py-2 text-left border-r border-gray-200">左配置</th>
+                      <th colSpan={4} className="px-2 py-2 text-left border-r border-gray-200">左配置</th>
                       <th className="w-px bg-gray-200 p-0" />
-                      <th colSpan={3} className="px-2 py-2 text-left">右配置</th>
+                      <th colSpan={4} className="px-2 py-2 text-left">右配置</th>
                       <th className="w-px bg-gray-200 p-0" />
                       <th className="px-2 py-2 text-left w-40">变更</th>
                     </tr>
@@ -277,10 +283,12 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
                       <th className="px-2 py-1" />
                       <th className="px-2 py-1 text-left">构型号/件号</th>
                       <th className="px-2 py-1 text-left">名称</th>
+                      <th className="px-2 py-1 text-center">版本</th>
                       <th className="px-2 py-1 text-center">数量</th>
                       <th className="w-px bg-gray-200 p-0" />
                       <th className="px-2 py-1 text-left">构型号/件号</th>
                       <th className="px-2 py-1 text-left">名称</th>
+                      <th className="px-2 py-1 text-center">版本</th>
                       <th className="px-2 py-1 text-center">数量</th>
                       <th className="w-px bg-gray-200 p-0" />
                       <th className="px-2 py-1 text-left">说明</th>
