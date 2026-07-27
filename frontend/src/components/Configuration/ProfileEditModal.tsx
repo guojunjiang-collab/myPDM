@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Modal } from '../Modal';
 import ConfigItemPicker from './ConfigItemPicker';
-import ConfigurationDetailModal from './ConfigurationDetailModal';
+import ConfigItemDetailModal from './ConfigItemDetailModal';
 import PartDetailModal from '../PartDetailModal';
 import ProfileStatusBadge from './ProfileStatusBadge';
 import ProfileReviewPanel from './ProfileReviewPanel';
@@ -1017,8 +1017,9 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
 
     {/* ── 正式清单行点击 → 详情弹窗 ── */}
     {detailModal?.type === 'config_item' && (
-      <ConfigurationDetailModal
-        itemId={detailModal.id}
+      <ConfigItemDetailModal
+        revisionId={detailModal.id}
+        open={!!detailModal}
         onClose={() => setDetailModal(null)}
       />
     )}

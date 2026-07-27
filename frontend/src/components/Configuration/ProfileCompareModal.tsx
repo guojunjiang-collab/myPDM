@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../Modal';
 import ProfileStatusBadge from './ProfileStatusBadge';
 import PartDetailModal from '../PartDetailModal';
-import ConfigurationDetailModal from './ConfigurationDetailModal';
+import ConfigItemDetailModal from './ConfigItemDetailModal';
 import { configurationProfileApi } from '../../services/api';
 import { diffProfileTrees } from '../../lib/profileCompare';
 import type { ProfileCompareNode, ProfileComparePart, ProfileCompareResult } from '../../lib/profileCompare';
@@ -298,7 +298,7 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
         <PartDetailModal masterId={partMasterId} open={!!partMasterId} onClose={() => setPartMasterId(null)} />
       )}
       {configItemId && (
-        <ConfigurationDetailModal itemId={configItemId} onClose={() => setConfigItemId(null)} />
+        <ConfigItemDetailModal revisionId={configItemId} open={!!configItemId} onClose={() => setConfigItemId(null)} />
       )}
     </>
   );
