@@ -1070,3 +1070,19 @@ export interface NotificationListResult {
   unread: number;
 }
 
+export type LicenseState = 'VALID' | 'GRACE' | 'READONLY' | 'TAMPERED' | 'MISSING';
+
+export interface LicenseStatus {
+  state: LicenseState;
+  edition: string | null;
+  customer: string | null;
+  license_id: string | null;
+  issued_at: string | null;
+  expires_at: string | null;
+  days_left: number | null;
+  max_users: number | null;
+  used_users: number;
+  modules: string[];
+  reason: string;
+}
+

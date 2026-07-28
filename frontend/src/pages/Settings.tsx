@@ -10,6 +10,7 @@ import { useDataStore } from '../stores/data';
 import { exportAllData, exportCustomFieldDefs, importCustomFieldDefs, importAllData, exportDashboardFile, previewDashboardImportFromFile, executeDashboardImport } from '../services/importExport';
 
 import Logs from './Logs';
+import LicenseTab from '../components/settings/LicenseTab';
 
 const FIELD_TYPES = [
   { value: 'text', label: '单行文本' },
@@ -49,7 +50,7 @@ export default function Settings() {
   const logout = useAuthStore((state) => state.logout);
   const [loading, setLoading] = useState(true);
 
-  type TabKey = 'password' | 'logs' | 'customFields' | 'dataManagement';
+  type TabKey = 'password' | 'logs' | 'customFields' | 'dataManagement' | 'license';
 
   const [activeTab, setActiveTab] = useState<TabKey>('password');
 
@@ -58,6 +59,7 @@ export default function Settings() {
     { key: 'dataManagement', label: '数据管理', enabled: true, adminOnly: true },
     { key: 'password', label: '修改密码', enabled: true, adminOnly: false },
     { key: 'logs', label: '操作日志', enabled: true, adminOnly: true },
+    { key: 'license', label: '许可管理', enabled: true, adminOnly: true },
   ];
 
   // Password change state
@@ -785,6 +787,9 @@ export default function Settings() {
 
       {/* 操作日志 */}
       {activeTab === 'logs' && <Logs />}
+
+      {/* 许可管理 */}
+      {activeTab === 'license' && <LicenseTab />}
 
       {/* 自定义字段 Modal */}
       <Modal
