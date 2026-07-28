@@ -42,3 +42,9 @@ migrations/
 !cad_bridge/.env
 .superpowers/
 cad_workspace/
+
+# license 签发工具产物（私钥与台账绝不入库）
+keys/
+tools/license_issuer/keys/
+licenses/
+issued.csv
