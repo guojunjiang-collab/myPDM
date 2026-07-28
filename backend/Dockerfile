@@ -26,13 +26,13 @@ COPY ./app ./app
 
 # 编译许可核心三文件为 .so，并删除对应 .py 源码
 RUN test -n "$LICENSE_PUBKEY" || (echo "LICENSE_PUBKEY build-arg 未提供" && exit 1) && \
-    pip install --no-cache-dir cython==3.0.11 && \
+    pip install --no-cache-dir setuptools cython==3.0.11 && \
     sed -i "s|@@LICENSE_PUBKEY@@|${LICENSE_PUBKEY}|" app/licensing/verifier.py && \
     grep -q "@@LICENSE_PUBKEY@@" app/licensing/verifier.py && (echo "公钥注入失败" && exit 1) || true && \
     cythonize -i -3 app/licensing/verifier.py app/licensing/fingerprint.py app/licensing/state.py && \
     rm -f app/licensing/verifier.py app/licensing/fingerprint.py app/licensing/state.py \
           app/licensing/verifier.c app/licensing/fingerprint.c app/licensing/state.c && \
-    pip uninstall -y cython && \
+    pip uninstall -y cython setuptools && \
     python -c "from app.licensing import state; print('licensing 编译校验通过')"
 
 # 非 root 用户

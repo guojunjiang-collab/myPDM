@@ -6,8 +6,7 @@ from . import state as st
 
 WHITELIST_PREFIXES: tuple[str, ...] = (
     "/api/license",
-    "/api/auth/login",
-    "/api/auth/refresh",
+    "/api/auth",
     "/api/docs",
     "/api/redoc",
     "/api/openapi.json",
