@@ -9,7 +9,7 @@ set VERSION=v3.1.1
 if not "%1"=="" set VERSION=%1
 
 for %%I in ("%ROOT%") do set PARENT=%%~dpI
-set PKGDIR=%PARENT%myPDM-Delivery-%VERSION%
+set PKGDIR=%PARENT%myPDM-Delivery
 
 if exist "%PKGDIR%" rd /s /q "%PKGDIR%"
 mkdir "%PKGDIR%"
