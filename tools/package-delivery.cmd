@@ -32,11 +32,13 @@ if exist "%ROOT%\frontend\dist" (
     echo Warning: frontend\dist\ not found, run: cd frontend ^&^& npm run build
 )
 
-echo [5/6] mypdm-backend-%VERSION%.tar
-if exist "%ROOT%\backend\mypdm-backend-%VERSION%.tar" (
-    copy /y "%ROOT%\backend\mypdm-backend-%VERSION%.tar" "%PKGDIR%\" >nul
-) else (
-    echo Warning: image tar not found, run: docker save -o backend\mypdm-backend-%VERSION%.tar mypdm-backend:%VERSION%
+echo [5/6] backend *.tar
+for %%f in ("%ROOT%\backend\*.tar") do (
+    copy /y "%%f" "%PKGDIR%\" >nul
+    echo    %%f
+)
+if not exist "%ROOT%\backend\*.tar" (
+    echo Warning: no .tar found in backend\, run: docker save -o backend\mypdm-backend-%VERSION%.tar mypdm-backend:%VERSION%
 )
 
 echo [6/6] env.template
