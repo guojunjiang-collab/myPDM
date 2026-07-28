@@ -44,7 +44,7 @@
 | 项目     | 要求                                                       |
 | ------ | -------------------------------------------------------- |
 | 操作系统   | Windows 10/11（COM 接口要求）                                  |
-| Python | 3.10 及以上（推荐 3.12）                                        |
+| Python | 可选。命令行方式需 3.10+；使用一键 exe 则无需安装 Python                       |
 | CAD 软件 | CATIA V5/V6 或 SolidWorks（需与桥接服务运行在**同一台机器**）              |
 | 网络     | 可访问 PDM 服务器（HTTPS）                                       |
 | 浏览器    | Chrome / Edge / Firefox（HTTPS 页面直连本机回环 WebSocket 需现代浏览器） |
@@ -74,6 +74,25 @@ pip install -r cad_bridge\requirements.txt
 ---
 
 ## 4. 启动
+
+### 方式一：一键启动（推荐，无需 Python 环境）
+
+将 `dist/cad_bridge.exe` 拷贝到任意目录，**双击运行**。
+
+```
+cad_bridge.exe 所在目录/
+├── cad_bridge.exe              ← 双击启动
+├── .env                        ← 可选：外部覆盖配置
+├── catia/
+│   └── field_mapping.json      ← 可选：外部覆盖 CATIA 映射
+├── solidworks/
+│   └── field_mapping.json      ← 可选：外部覆盖 SolidWorks 映射
+└── cad_workspace/              ← 运行时自动生成
+```
+
+配置文件的优先级：**exe 同目录外部文件 > exe 内置默认值**。若未放置外部配置文件，则使用打包时内置的默认配置。
+
+### 方式二：命令行启动（需 Python 环境）
 
 ```powershell
 cd D:\OpenCode\myPDM
@@ -282,21 +301,26 @@ Get-Content <日志路径> -Tail 50
 
 ```
 cad_bridge/
-├── __main__.py              # 入口（参数解析 + 方法注册，CATIA/SW 并行）
-├── server.py                # WebSocket JSON-RPC 服务端
-├── pdm_client.py            # PDM API 代理（附件下载/分块上传/覆盖模式）
-├── requirements.txt         # Python 依赖
+├── launcher.py               # PyInstaller 打包入口（生成 .exe）
+├── build_exe.py              # 一键打包脚本
+├── __main__.py               # 命令行入口（python -m cad_bridge）
+├── server.py                 # WebSocket JSON-RPC 服务端
+├── pdm_client.py             # PDM API 代理（附件下载/分块上传/覆盖模式）
+├── requirements.txt          # Python 依赖
+├── .env                      # 附件命名前缀配置
 ├── catia/
-│   ├── client.py            # CATIA COM 互操作客户端（属性/矩阵/STP/PDF 导出）
-│   └── field_mapping.json   # CATIA↔PDM 属性映射配置（可自定义）
+│   ├── client.py             # CATIA COM 互操作客户端（属性/矩阵/STP/PDF 导出）
+│   └── field_mapping.json    # CATIA↔PDM 属性映射配置（可自定义）
 ├── solidworks/
-│   ├── client.py            # SolidWorks COM 互操作客户端（属性/矩阵/STP/PDF 导出）
-│   └── field_mapping.json   # SolidWorks↔PDM 属性映射配置（可自定义）
-
-cad_workspace/               # 本地工作目录（运行时生成，已加入 .gitignore）
-├── {零件号}/{版本号}/        # 附件下载目录
-├── stp_export/              # STP 导出临时目录
-└── pdf_export/              # PDF 导出临时目录
+│   ├── client.py             # SolidWorks COM 互操作客户端（属性/矩阵/STP/PDF 导出）
+│   └── field_mapping.json    # SolidWorks↔PDM 属性映射配置（可自定义）
+├── dist/
+│   └── cad_bridge.exe        # 打包产物（一键启动）
+├── build/                    # PyInstaller 构建中间文件
+└── cad_workspace/            # 本地工作目录（运行时生成）
+    ├── {零件号}/{版本号}/      # 附件下载目录
+    ├── stp_export/           # STP 导出临时目录
+    └── pdf_export/           # PDF 导出临时目录
 ```
 
 ---
@@ -304,3 +328,4 @@ cad_workspace/               # 本地工作目录（运行时生成，已加入 
 *配套设计文档*：
 - CATIA: `docs/superpowers/specs/2026-07-15-catia-pdm-integration-design.md`
 - SolidWorks: `docs/superpowers/specs/2026-07-23-solidworks-bridge-design.md`
+- 一键 exe 封装: `docs/superpowers/specs/2026-07-28-cad-bridge-oneclick-exe-design.md`
