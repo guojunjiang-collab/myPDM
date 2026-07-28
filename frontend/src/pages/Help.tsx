@@ -207,6 +207,23 @@ const sections: Section[] = [
         <P>
           编辑图文档等对象时采用「签出（锁定编辑）→ 修改 → 签入（解锁并保存版本）」机制，避免多人同时改动冲突。
         </P>
+        <H>升版与签出 — 数据复制规则</H>
+        <P>
+          升版（创建新版本）和签出（创建新迭代）时，系统会自动从源版本/迭代复制数据，但复制范围有所不同：
+        </P>
+        <MiniTable
+          head={['数据类型', '升版', '签出']}
+          rows={[
+            ['关联图文档', <span className="text-green-700">复制</span>, <span className="text-green-700">复制</span>],
+            ['BOM 结构', <span className="text-green-700">复制</span>, <span className="text-green-700">复制</span>],
+            ['自定义字段值', <span className="text-green-700">复制</span>, <span className="text-green-700">复制</span>],
+            ['CAD 附件', <span className="text-green-700">复制</span>, <span className="text-green-700">复制</span>],
+            ['生产附件', <span className="text-red-700">不复制</span>, <span className="text-green-700">复制</span>],
+          ]}
+        />
+        <Tip>
+          升版不复制生产附件，是因为新版本通常需要重新生成二维图纸、工艺文件等；签出复制全部附件，因为同一版本内的迭代修订应继承完整数据。
+        </Tip>
         <H>数据同步（检出）</H>
         <P>
           系统默认自动同步，顶部的绿色小圆点表示已同步。若怀疑数据不是最新，可点击顶部的 <K>↻</K>{' '}
