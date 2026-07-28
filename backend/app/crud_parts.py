@@ -345,15 +345,18 @@ def list_iterations_by_revision(db: Session, revision_id: UUID) -> List[models_p
 
 # ====== 迭代数据复制工具 ======
 
-def _copy_iteration_data(db: Session, source_iter: models_parts.PartIteration, new_iter: models_parts.PartIteration):
-    """复制上一迭代的全部数据到新迭代"""
+def _copy_iteration_data(db: Session, source_iter: models_parts.PartIteration, new_iter: models_parts.PartIteration, include_production: bool = False):
+    """复制上一迭代的全部数据到新迭代
+    
+    include_production=False: 仅复制 CAD 附件（用于升版场景）
+    include_production=True:  复制全部附件（用于签出迭代场景）
+    """
     import os, shutil
     new_iter.document_links = source_iter.document_links or []
     db.flush()
 
-    # 复制附件引用，并复制文件到新迭代目录（仅 CAD 附件，生产附件不复制）
     for att in source_iter.attachments:
-        if att.category != 'cad':
+        if not include_production and att.category != 'cad':
             continue
         new_file_path = None
         if att.file_path:
@@ -436,10 +439,10 @@ def checkout_part(db: Session, revision_id: UUID, user_id: UUID) -> Tuple[Option
     db.flush()
 
     if prev_iter:
-        _copy_iteration_data(db, prev_iter, new_iter)
+        _copy_iteration_data(db, prev_iter, new_iter, include_production=True)
         # 复制自定义字段值到新迭代
         from . import crud as crud_common
-        crud_common._copy_iteration_custom_fields(db, prev_iter.id, new_iter.id)
+        crud_common._copy_iteration_custom_fields(db, prev_iter.id, new_iter.id, source_entity_id=revision_id)
 
     revision.latest_iteration = new_iteration_num
     revision.check_out_user_id = user_id
@@ -659,6 +662,9 @@ def upgrade_part(db: Session, revision_id: UUID, user_id: UUID) -> Tuple[Optiona
 
     if source_iter:
         _copy_iteration_data(db, source_iter, new_iter)
+        # 复制自定义字段值到新迭代（升版需更新 entity_id 为新 revision_id）
+        from . import crud as crud_common
+        crud_common._copy_iteration_custom_fields(db, source_iter.id, new_iter.id, new_entity_id=new_rev.id, source_entity_id=source_rev.id)
 
     new_rev.check_out_user_id = user_id
     new_rev.check_out_date = datetime.now(timezone.utc)

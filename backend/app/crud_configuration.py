@@ -423,7 +423,7 @@ def checkout_config_item(
             db.add(new_child)
 
         # 复制自定义字段值（带 iteration_id，签出快照）
-        crud_common._copy_iteration_custom_fields(db, current_iter.id, new_iter.id)
+        crud_common._copy_iteration_custom_fields(db, current_iter.id, new_iter.id, source_entity_id=revision_id)
 
     rev.latest_iteration += 1
     rev.check_out_user_id = user_id
