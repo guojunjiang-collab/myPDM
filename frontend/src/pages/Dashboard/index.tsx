@@ -3,6 +3,7 @@ import { useDataStore } from '../../stores/data';
 import { useAuthStore } from '../../stores/auth';
 import { ecrApi, ecoApi } from '../../services/api';
 import { useRecentEdited, useFavorites, useActivityFeed } from './hooks';
+import { hasModule } from '../../stores/license';
 import {
   GreetingHeader, KpiStrip, StatusDistributionTile, RecentItemsTile, FavoritesTile, ActivityFeedTile,
 } from './tiles';
@@ -10,7 +11,6 @@ import { MyTodosTile } from './MyTodosTile';
 import { MyTasksTile } from './MyTasksTile';
 
 export default function Dashboard() {
-  // myPDM 统一 components 模型（含 part/assembly）
   const components = useDataStore((s) => s.parts);
   const documents = useDataStore((s) => s.documents);
   const configItems = useDataStore((s) => s.configItems);
@@ -24,6 +24,7 @@ export default function Dashboard() {
   const [overdueCount, setOverdueCount] = useState(0);
   const [changeOpen, setChangeOpen] = useState(0);
   useEffect(() => {
+    if (!hasModule('change')) return;
     let cancelled = false;
     Promise.allSettled([
       ecrApi.list({ status: 'reviewing', page_size: 1 }),

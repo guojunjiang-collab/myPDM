@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Tile, EmptyState } from './tiles';
 import { projectApi } from '../../services/projectApi';
 import { overdueDays } from './lib/aggregate';
+import { hasModule } from '../../stores/license';
 import type { MyTaskItem } from '../../types';
 
 const STATUS_CLS: Record<string, string> = {
@@ -20,6 +21,7 @@ export function MyTasksTile({ onOverdue }: { onOverdue?: (n: number) => void }) 
   const [items, setItems] = useState<MyTaskItem[]>([]);
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
+    if (!hasModule('project')) { setLoaded(true); return; }
     let cancelled = false;
     projectApi.myTasks()
       .then((res) => {
