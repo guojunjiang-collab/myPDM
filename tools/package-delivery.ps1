@@ -1,50 +1,51 @@
 # myPDM delivery packaging script
-# Usage: .\package-delivery.ps1 [-Version "v3.1.1"]
-# Output: ..\myPDM-Delivery-{version}\
-
-param(
-  [string]$Version = "v3.1.1"
-)
+# Usage: .\package-delivery.ps1
+# Output: ..\myPDM-Delivery\
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$pkgDir = Join-Path (Split-Path -Parent $root) "myPDM-Delivery-$Version"
+$pkgDir = Join-Path (Split-Path -Parent $root) "myPDM-Delivery"
 
 if (Test-Path $pkgDir) { Remove-Item -Recurse -Force $pkgDir }
 New-Item -ItemType Directory -Force $pkgDir | Out-Null
 
 # 1. docker-compose.prod.yml
 Copy-Item "$root\docker-compose.prod.yml"               "$pkgDir\" -Force
-Write-Host "[1/7] docker-compose.prod.yml"
+Write-Host "[1/6] docker-compose.prod.yml"
 
 # 2. nginx
-Copy-Item "$root\nginx\nginx.conf"                      "$pkgDir\nginx.conf" -Force
-Write-Host "[2/7] nginx.conf"
+New-Item -ItemType Directory -Force "$pkgDir\nginx" | Out-Null
+Copy-Item "$root\nginx\nginx.conf"                      "$pkgDir\nginx\nginx.conf" -Force
+Write-Host "[2/6] nginx/nginx.conf"
 
 # 3. certs
 if (Test-Path "$root\certs") {
   Copy-Item "$root\certs"                               "$pkgDir\certs" -Recurse -Force
-  Write-Host "[3/7] certs/"
-} else { Write-Warning "[3/7] certs/ not found" }
+  Write-Host "[3/6] certs/"
+} else { Write-Warning "[3/6] certs/ not found" }
 
 # 4. initdb
 if (Test-Path "$root\initdb") {
   Copy-Item "$root\initdb"                              "$pkgDir\initdb" -Recurse -Force
-  Write-Host "[4/7] initdb/"
-} else { Write-Warning "[4/7] initdb/ not found" }
+  Write-Host "[4/6] initdb/"
+} else { Write-Warning "[4/6] initdb/ not found" }
 
 # 5. frontend dist
 if (Test-Path "$root\frontend\dist") {
   Copy-Item "$root\frontend\dist"                       "$pkgDir\frontend\dist" -Recurse -Force
-  Write-Host "[5/7] frontend/dist/"
-} else { Write-Warning "[5/7] frontend/dist/ not found - run: cd frontend; npm run build" }
+  Write-Host "[5/6] frontend/dist/"
+} else { Write-Warning "[5/6] frontend/dist/ not found" }
 
-# 6. backend image tar
-$img = "mypdm-backend-${Version}.tar"
-if (Test-Path "$root\backend\$img") {
-  Copy-Item "$root\backend\$img"                        "$pkgDir\" -Force
-  Write-Host "[6/7] $img"
-} else { Write-Warning "[6/7] $img not found - run: docker save -o backend\$img mypdm-backend:${Version}" }
+# 6. backend image tar (wildcard match)
+$tars = Get-ChildItem "$root\backend\*.tar" -ErrorAction SilentlyContinue
+if ($tars) {
+  foreach ($f in $tars) {
+    Copy-Item $f.FullName "$pkgDir\" -Force
+    Write-Host "[6/6] $($f.Name)"
+  }
+} else {
+  Write-Warning "[6/6] no .tar found in backend\"
+}
 
 # 7. .env template
 if (Test-Path "$root\.env") {
