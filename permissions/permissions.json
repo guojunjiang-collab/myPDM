@@ -179,6 +179,9 @@
     "notifications:read": ["admin", "engineer", "production", "guest"],
 
     "nav.admin_tools": ["admin", "engineer", "production"],
-    "nav.settings": ["admin", "engineer"]
+    "nav.settings": ["admin", "engineer"],
+
+    "license:read": ["admin", "engineer", "production", "guest"],
+    "license:manage": ["admin"]
   }
 }

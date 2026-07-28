@@ -4,6 +4,8 @@ from sqlalchemy import text
 import os
 
 from .licensing.middleware import LicenseMiddleware
+from .licensing.router import router as license_router
+from .migrations_license import migrate_licenses
 from .routers import auth_router, users_router, bom_router, logs_router, custom_fields_router, documents_router, user_groups_router, dashboard_router, ecr_router, eco_router, config_router, inventory_router, notifications_router, parts_router, settings_router
 from .routers.attachments_v2 import router as attachments_v2_router
 from .routers.sync import router as sync_router
@@ -52,6 +54,7 @@ app.include_router(admin_router, prefix="/api")
 app.include_router(assistant_router, prefix="/api")
 app.include_router(projects_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
+app.include_router(license_router, prefix="/api")
 
 @app.on_event("startup")
 async def startup_event():
@@ -503,6 +506,9 @@ async def startup_event():
             except Exception as _de:
                 db.rollback()
                 print(f"⚠ CIP dedup migration skipped: {_de}")
+
+            migrate_licenses(db, engine)
+            print("✓ licenses 表检查完成")
 
             def _col_default_sql(col):
                 sd = getattr(col, "server_default", None)

@@ -13,7 +13,7 @@ from sqlalchemy.ext.compiler import compiles
 
 from app.database import Base
 # 导入全部模型模块，确保 Base.metadata 注册所有表（BOMItem 外键依赖 part_revisions 等跨模块表）
-from app import models, models_parts, models_ecr, models_eco, models_configuration, models_notification  # noqa: F401
+from app import models, models_parts, models_ecr, models_eco, models_configuration, models_notification, models_license  # noqa: F401
 try:
     from app import models_inventory, models_project  # noqa: F401
 except ImportError:

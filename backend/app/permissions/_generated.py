@@ -109,6 +109,8 @@ PERMISSIONS: dict[str, list[str]] = {
     "inventory.warehouse:delete": ["admin"],
     "inventory.warehouse:read": ["admin", "engineer", "production", "guest"],
     "inventory.warehouse:write": ["admin", "engineer"],
+    "license:manage": ["admin"],
+    "license:read": ["admin", "engineer", "production", "guest"],
     "logs:read": ["admin"],
     "nav.admin_tools": ["admin", "engineer", "production"],
     "nav.settings": ["admin", "engineer"],
