@@ -9,12 +9,15 @@ import { APP_VERSION } from '../constants';
 import { ConfirmModal } from './Modal';
 import FloatingAssistant from './assistant/FloatingAssistant';
 import NotificationBell from './NotificationBell';
+import LicenseBanner from './LicenseBanner';
+import { useLicenseStore, hasModule } from '../stores/license';
 
 type NavItem = {
   path: string;
   label: string;
   icon: string;
   roles: string[];
+  module?: string;
 };
 
 type NavSeparator = {
@@ -29,9 +32,9 @@ const navItems: (NavItem | NavSeparator)[] = [
   { path: '/parts', label: '零部件管理', icon: '📦', roles: ['admin', 'engineer', 'production', 'guest'] },
   { path: '/documents', label: '图文档管理', icon: '📄', roles: ['admin', 'engineer', 'production', 'guest'] },
   { type: 'separator' },
-  { path: '/ec', label: '变更管理', icon: '🔄', roles: ['admin', 'engineer', 'production', 'guest'] },
-  { path: '/inventory', label: '库存管理', icon: '🏬', roles: ['admin', 'engineer', 'production', 'guest'] },
-  { path: '/projects', label: '项目管理', icon: '🗂️', roles: ['admin', 'engineer', 'production'] },
+  { path: '/ec', label: '变更管理', icon: '🔄', roles: ['admin', 'engineer', 'production', 'guest'], module: 'change' },
+  { path: '/inventory', label: '库存管理', icon: '🏬', roles: ['admin', 'engineer', 'production', 'guest'], module: 'inventory' },
+  { path: '/projects', label: '项目管理', icon: '🗂️', roles: ['admin', 'engineer', 'production'], module: 'project' },
   { type: 'separator' },
   { path: '/users', label: '用户管理', icon: '👥', roles: ['admin', 'engineer', 'production', 'guest'] },
   { path: '/settings', label: '系统设置', icon: '⚙️', roles: ['admin', 'engineer', 'production', 'guest'] },
@@ -51,6 +54,11 @@ export default function Layout() {
   const headerContent = usePageHeader((s) => s.content);
   const userRole = user?.role || 'guest';
   const fetchUnread = useNotificationStore((s) => s.fetchUnread);
+  const fetchLicense = useLicenseStore((s) => s.fetch);
+
+  useEffect(() => {
+    fetchLicense();
+  }, [fetchLicense]);
 
   // Auto-start sync on mount
   useEffect(() => {
@@ -85,9 +93,12 @@ export default function Layout() {
   const isSeparator = (item: NavItem | NavSeparator): item is NavSeparator =>
     'type' in item && item.type === 'separator';
 
-  const visibleNavItems = navItems.filter((item) =>
-    isSeparator(item) || item.roles.includes(userRole)
-  );
+  const visibleNavItems = navItems.filter((item) => {
+    if (isSeparator(item)) return true;
+    if (!item.roles.includes(userRole)) return false;
+    if (item.module && !hasModule(item.module)) return false;
+    return true;
+  });
 
   const handleSync = async () => {
     setConfirmSyncOpen(false);
@@ -157,6 +168,7 @@ export default function Layout() {
 
       {/* 主内容区 */}
       <div className="flex-1 flex flex-col overflow-hidden">
+        <LicenseBanner />
         {/* 顶部栏 */}
         <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4">
           <div className="left">

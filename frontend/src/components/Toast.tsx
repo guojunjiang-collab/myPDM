@@ -26,6 +26,11 @@ export const toast = {
   },
 };
 
+export function showToast(message: string, type: 'error' | 'success' | 'warning' = 'error') {
+  const fn = toast[type];
+  fn(message);
+}
+
 export function ToastContainer() {
   const [toasts, setToasts] = useState<Toast[]>([]);
 

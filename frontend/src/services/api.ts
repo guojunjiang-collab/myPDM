@@ -66,6 +66,15 @@ api.interceptors.response.use(
       localStorage.removeItem('refresh_token');
       window.location.href = '/login';
     }
+    if (error.response?.status === 403) {
+      const data: any = error.response.data;
+      if (data?.license_state) {
+        const msg = data.license_state === 'MODULE_DENIED'
+          ? '该功能模块未授权，请联系供应商'
+          : data.detail || '许可证已过期或无效，系统处于只读模式';
+        window.dispatchEvent(new CustomEvent('license-error', { detail: msg }));
+      }
+    }
     return Promise.reject(error);
   }
 );
