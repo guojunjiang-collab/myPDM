@@ -20,6 +20,16 @@ except ImportError:
     pass
 
 
+from tests.license_helpers import install_license  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _default_license(monkeypatch):
+    """默认给每个测试装一份全模块、远期到期的 license。"""
+    install_license(monkeypatch)
+    yield
+
+
 # SQLite 下把 PG 的 JSONB 渲染成 JSON，使 create_all 可用（已实测必需）
 @compiles(JSONB, "sqlite")
 def _compile_jsonb_sqlite(element, compiler, **kw):
