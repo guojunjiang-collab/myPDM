@@ -351,8 +351,10 @@ def _copy_iteration_data(db: Session, source_iter: models_parts.PartIteration, n
     new_iter.document_links = source_iter.document_links or []
     db.flush()
 
-    # 复制附件引用，并复制文件到新迭代目录
+    # 复制附件引用，并复制文件到新迭代目录（仅 CAD 附件，生产附件不复制）
     for att in source_iter.attachments:
+        if att.category != 'cad':
+            continue
         new_file_path = None
         if att.file_path:
             revision = db.query(models_parts.PartRevision).filter(

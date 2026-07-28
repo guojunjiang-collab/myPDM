@@ -1,6 +1,6 @@
-"""CAD 桥接服务入口
-用法: python -m cad_bridge
-PDM 地址由浏览器前端自动传入（无需手动指定 --pdm-url）
+"""CAD 桥接服务 PyInstaller 打包入口
+用于生成 cad_bridge.exe，双击启动。
+与 __main__.py 的差异：支持 sys._MEIPASS（PyInstaller 临时解压目录）下的内置资源回退。
 """
 import sys
 import os
@@ -10,46 +10,54 @@ import argparse
 
 from cad_bridge.server import BridgeServer
 from cad_bridge.pdm_client import PDMClient
-from cad_bridge.catia.client import catia_client
-from cad_bridge.solidworks.client import sw_client
+from cad_bridge.catia.client import CATIAClient
+from cad_bridge.solidworks.client import SolidWorksClient
+
+
+def _get_exe_dir():
+    """获取 exe 所在目录（开发时返回 launcher.py 所在目录）"""
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
 
 
 def _load_dotenv():
-    """加载 .env 文件，优先级：exe同目录 > cad_bridge 目录 > 系统环境变量"""
-    # PyInstaller 打包后：exe 同目录的 .env
+    """加载 .env 文件，优先级：exe同目录 > MEIPASS内置 > 系统环境变量"""
+    env_file = None
     if getattr(sys, 'frozen', False):
-        env_file = os.path.join(os.path.dirname(sys.executable), '.env')
-        if os.path.isfile(env_file):
-            with open(env_file, 'r', encoding='utf-8') as f:
-                for line in f:
-                    line = line.strip()
-                    if not line or line.startswith('#'):
-                        continue
-                    if '=' not in line:
-                        continue
-                    key, val = line.split('=', 1)
-                    key = key.strip()
-                    val = val.strip()
-                    if key:
-                        os.environ.setdefault(key, val)
-            return
+        env_file = os.path.join(_get_exe_dir(), '.env')
+        if not os.path.isfile(env_file):
+            env_file = os.path.join(sys._MEIPASS, 'cad_bridge', '.env')
+    else:
+        env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
 
-    # 开发模式：cad_bridge 目录下的 .env
-    env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
-    if not os.path.isfile(env_file):
-        return
-    with open(env_file, 'r', encoding='utf-8') as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-            if '=' not in line:
-                continue
-            key, val = line.split('=', 1)
-            key = key.strip()
-            val = val.strip()
-            if key:
-                os.environ.setdefault(key, val)
+    if env_file and os.path.isfile(env_file):
+        with open(env_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                if '=' not in line:
+                    continue
+                key, val = line.split('=', 1)
+                key = key.strip()
+                val = val.strip()
+                if key:
+                    os.environ.setdefault(key, val)
+
+
+def _resolve_mapping_path(cad_type: str) -> str:
+    """解析 field_mapping.json 路径，优先级：exe同目录 > MEIPASS内置"""
+    relative = os.path.join('cad_bridge', cad_type, 'field_mapping.json')
+    if getattr(sys, 'frozen', False):
+        external = os.path.join(_get_exe_dir(), cad_type, 'field_mapping.json')
+        if os.path.isfile(external):
+            return external
+        internal = os.path.join(sys._MEIPASS, relative)
+        if os.path.isfile(internal):
+            return internal
+    return os.path.join(os.path.dirname(__file__), cad_type, 'field_mapping.json')
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -58,7 +66,8 @@ logging.basicConfig(
 logger = logging.getLogger("cad_bridge")
 
 
-def register_handlers(server: BridgeServer, pdm_client: PDMClient):
+def register_handlers(server: BridgeServer, pdm_client: PDMClient,
+                      catia_client: CATIAClient, sw_client: SolidWorksClient):
     """注册所有 JSON-RPC 方法处理器（CATIA + SolidWorks 并行）"""
 
     # --- 共用 handler ---
@@ -85,7 +94,6 @@ def register_handlers(server: BridgeServer, pdm_client: PDMClient):
         # 上传源文件时，同目录同名的工程图（若存在）一并上传
         if params.get("include_drawing"):
             base, _ = os.path.splitext(file_path)
-            # CATIA/SolidWorks 工程图
             for ext in (".CATDrawing", ".SLDDRW"):
                 drawing_path = base + ext
                 if os.path.isfile(drawing_path):
@@ -195,10 +203,14 @@ def main():
 
     pdm_client = PDMClient(base_url=args.pdm_url)
     server = BridgeServer(host=args.host, port=args.port)
-    register_handlers(server, pdm_client)
+
+    catia_client = CATIAClient(mapping_path=_resolve_mapping_path('catia'))
+    sw_client = SolidWorksClient(mapping_path=_resolve_mapping_path('solidworks'))
+    register_handlers(server, pdm_client, catia_client, sw_client)
 
     logger.info(f"CAD 桥接服务启动中...")
     logger.info(f"  WebSocket: ws://{args.host}:{args.port}")
+    logger.info(f"  EXE 目录: {_get_exe_dir()}")
     if args.pdm_url:
         logger.info(f"  PDM 后端（回退值）: {args.pdm_url}")
     else:
