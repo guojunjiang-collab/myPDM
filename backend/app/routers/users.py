@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 import uuid
 
 from ..database import get_db
+from ..licensing.state import LicenseQuotaError, check_user_quota
 from ..models import User, UserGroupMember
 from .. import crud, schemas
 from ..permissions import require_permission
@@ -17,6 +18,11 @@ async def list_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_
 async def create_user(user: schemas.UserCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("users:create"))):
     if crud.get_user_by_username(db, user.username):
         raise HTTPException(status_code=400, detail="用户名已存在")
+    if getattr(user, "status", "active") == "active":
+        try:
+            check_user_quota(db)
+        except LicenseQuotaError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
     return crud.create_user(db, user)
 
 @router.get("/{user_id}", response_model=schemas.UserResponse)
@@ -28,9 +34,16 @@ async def get_user(user_id: uuid.UUID, db: Session = Depends(get_db), current_us
 
 @router.put("/{user_id}", response_model=schemas.UserResponse)
 async def update_user(user_id: uuid.UUID, user_update: schemas.UserUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_permission("users:update"))):
-    db_user = crud.update_user(db, user_id, user_update)
-    if not db_user:
+    existing = crud.get_user(db, user_id)
+    if not existing:
         raise HTTPException(status_code=404, detail="用户不存在")
+    changes = user_update.model_dump(exclude_unset=True)
+    if changes.get("status") == "active" and existing.status != "active":
+        try:
+            check_user_quota(db)
+        except LicenseQuotaError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+    db_user = crud.update_user(db, user_id, user_update)
     return db_user
 
 @router.delete("/{user_id}")
