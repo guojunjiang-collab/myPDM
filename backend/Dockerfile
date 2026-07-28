@@ -19,7 +19,21 @@ RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/ && \
     pip config set global.extra-index-url https://pypi.org/simple/ && \
     pip install --no-cache-dir -r requirements.txt
 
+# 许可模块公钥（构建时注入，绝不入版本库）
+ARG LICENSE_PUBKEY
+
 COPY ./app ./app
+
+# 编译许可核心三文件为 .so，并删除对应 .py 源码
+RUN test -n "$LICENSE_PUBKEY" || (echo "LICENSE_PUBKEY build-arg 未提供" && exit 1) && \
+    pip install --no-cache-dir cython==3.0.11 && \
+    sed -i "s|@@LICENSE_PUBKEY@@|${LICENSE_PUBKEY}|" app/licensing/verifier.py && \
+    grep -q "@@LICENSE_PUBKEY@@" app/licensing/verifier.py && (echo "公钥注入失败" && exit 1) || true && \
+    cythonize -i -3 app/licensing/verifier.py app/licensing/fingerprint.py app/licensing/state.py && \
+    rm -f app/licensing/verifier.py app/licensing/fingerprint.py app/licensing/state.py \
+          app/licensing/verifier.c app/licensing/fingerprint.c app/licensing/state.c && \
+    pip uninstall -y cython && \
+    python -c "from app.licensing import state; print('licensing 编译校验通过')"
 
 # 非 root 用户
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
