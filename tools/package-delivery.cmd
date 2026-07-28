@@ -17,8 +17,9 @@ mkdir "%PKGDIR%"
 echo [1/6] docker-compose.prod.yml
 copy /y "%ROOT%\docker-compose.prod.yml" "%PKGDIR%\" >nul
 
-echo [2/6] nginx.conf
-copy /y "%ROOT%\nginx\nginx.conf" "%PKGDIR%\nginx.conf" >nul
+echo [2/6] nginx\
+if not exist "%PKGDIR%\nginx" mkdir "%PKGDIR%\nginx"
+copy /y "%ROOT%\nginx\nginx.conf" "%PKGDIR%\nginx\nginx.conf" >nul
 
 echo [3/6] certs\ initdb\
 if exist "%ROOT%\certs" xcopy /e /i /y "%ROOT%\certs" "%PKGDIR%\certs" >nul
