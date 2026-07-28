@@ -457,16 +457,23 @@ def _copy_custom_field_values(db, entity_type: str, old_entity_id, new_entity_id
         db.flush()
 
 
-def _copy_iteration_custom_fields(db, source_iteration_id, target_iteration_id):
-    """复制迭代的自定义字段值到目标迭代（签出时调用）"""
-    source_values = db.query(models.CustomFieldValue).filter(
-        models.CustomFieldValue.iteration_id == source_iteration_id
-    ).all()
+def _copy_iteration_custom_fields(db, source_iteration_id, target_iteration_id, new_entity_id=None, source_entity_id=None):
+    """复制迭代的自定义字段值到目标迭代
+    
+    签出（同版本新迭代）: entity_id 保持不变，不传 new_entity_id，传 source_entity_id
+    升版（新版本新迭代）: entity_id 需更新为新的 revision_id，传 new_entity_id 和 source_entity_id
+    """
+    from sqlalchemy import or_
+    conditions = [models.CustomFieldValue.iteration_id == source_iteration_id]
+    if source_entity_id is not None:
+        conditions.append(models.CustomFieldValue.entity_id == source_entity_id)
+    source_values = db.query(models.CustomFieldValue).filter(or_(*conditions)).all()
     for sv in source_values:
+        target_id = new_entity_id or sv.entity_id
         new_val = models.CustomFieldValue(
             field_id=sv.field_id,
             entity_type=sv.entity_type,
-            entity_id=sv.entity_id,
+            entity_id=target_id,
             value_text=sv.value_text,
             value_number=sv.value_number,
             value_json=sv.value_json,

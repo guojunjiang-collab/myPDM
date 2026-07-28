@@ -265,7 +265,7 @@ def checkout_document(
 
     if prev_iter:
         _copy_attachments_to_iteration(db, prev_iter, new_iter)
-        crud_common._copy_iteration_custom_fields(db, prev_iter.id, new_iter.id)
+        crud_common._copy_iteration_custom_fields(db, prev_iter.id, new_iter.id, source_entity_id=revision_id)
 
     revision.latest_iteration = new_iter_num
     revision.check_out_user_id = user_id
