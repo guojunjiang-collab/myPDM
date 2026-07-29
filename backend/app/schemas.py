@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, ConfigDict, BeforeValidator, field_validator
+from pydantic import BaseModel, Field, ConfigDict, BeforeValidator, field_validator, model_validator
 from typing import Optional, List, Any, Dict, Union, Annotated
 from datetime import datetime
 import uuid
@@ -58,6 +58,7 @@ class UserResponse(UserBase):
     id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+    must_change_password: bool = False
 
 class BOMItemBase(BaseSchema):
     parent_type: str = "assembly"   # 后端接口会覆盖此字段
@@ -109,6 +110,13 @@ class ChangePasswordRequest(BaseSchema):
         if not re.search(r'\d', v):
             raise ValueError('密码需包含数字')
         return v
+
+    @model_validator(mode='after')
+    def validate_new_differs_from_old(self):
+        if self.new_password == self.old_password:
+            raise ValueError('新密码不能与原密码相同')
+        return self
+
 
 class LogResponse(BaseSchema):
     id: uuid.UUID

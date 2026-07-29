@@ -31,6 +31,11 @@ async def update_user(user_id: uuid.UUID, user_update: schemas.UserUpdate, db: S
     db_user = crud.update_user(db, user_id, user_update)
     if not db_user:
         raise HTTPException(status_code=404, detail="用户不存在")
+    # 管理员替他人重置密码 → 该用户下次登录必须重设；改自己的密码不算
+    if user_update.password is not None and db_user.id != current_user.id:
+        db_user.must_change_password = True
+        db.commit()
+        db.refresh(db_user)
     return db_user
 
 @router.delete("/{user_id}")

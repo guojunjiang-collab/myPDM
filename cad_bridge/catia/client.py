@@ -1,6 +1,7 @@
 """CATIA COM 互操作客户端"""
 import json
 import os
+import sys
 import logging
 
 logger = logging.getLogger(__name__)
@@ -14,6 +15,12 @@ class CATIAClient:
     def __init__(self, mapping_path: str = None):
         if mapping_path is None:
             mapping_path = os.path.join(os.path.dirname(__file__), "field_mapping.json")
+        # PyInstaller 打包后：优先使用 exe 同目录的外部映射文件
+        if getattr(sys, 'frozen', False):
+            external = os.path.join(os.path.dirname(sys.executable), 'catia', 'field_mapping.json')
+            if os.path.isfile(external):
+                mapping_path = external
+                logger.info(f"CATIA 使用外部映射文件: {external}")
         self.mapping = self._load_mapping(mapping_path)
 
     def _load_mapping(self, path: str) -> dict:

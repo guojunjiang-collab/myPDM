@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { bomApi, partsApi } from '../services/api';
 import { Modal } from './Modal';
 import { toast } from './Toast';
@@ -83,14 +83,13 @@ export default function AssemblyPartPicker({
   const [quickCreating, setQuickCreating] = useState(false);
 
   /* 加载数据 */
-  useEffect(() => {
-    if (!open) return;
-    setQuickForm({ code: '', name: '', spec: '', remark: '' });
-    setQuickOpen(false);
-    setQuickCreating(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
+  const loadParts = (keyword?: string) => {
     setLoading(true);
-    partsApi.list({ page_size: 200, show_all_versions: true })
+    const params: any = { page_size: 200, show_all_versions: true };
+    if (keyword) params.search = keyword;
+    partsApi.list(params)
       .then((r: any) => {
         const items = r.items || r || [];
         const transformed = items.map((p: any) => ({
@@ -107,6 +106,15 @@ export default function AssemblyPartPicker({
       })
       .catch(() => setFetchedParts([]))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    setQuickForm({ code: '', name: '', spec: '', remark: '' });
+    setQuickOpen(false);
+    setQuickCreating(false);
+
+    loadParts();
 
     // 计算祖先链：向上查找所有包含当前部件的父部件（避免自引用循环）
     if (currentAssemblyId) {
@@ -121,7 +129,6 @@ export default function AssemblyPartPicker({
               childToParents.set(item.child_id, existing);
             }
           }
-          // BFS 向上查找所有祖先
           const ancestors = new Set<string>();
           const queue = [currentAssemblyId];
           while (queue.length > 0) {
@@ -140,7 +147,24 @@ export default function AssemblyPartPicker({
         })
         .catch(() => setAncestorIds(new Set()));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, currentAssemblyId]);
+
+  // 搜索时调用后端 API，300ms 防抖
+  useEffect(() => {
+    if (!open) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const keyword = search.trim();
+    if (!keyword) {
+      loadParts();
+    } else {
+      debounceRef.current = setTimeout(() => {
+        loadParts(keyword);
+      }, 300);
+    }
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, open]);
 
   const componentsList = fetchedParts;
 
