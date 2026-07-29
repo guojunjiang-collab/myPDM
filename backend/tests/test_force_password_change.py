@@ -105,3 +105,60 @@ def test_disabled_user_still_400_not_403(client, db):
     token = login(client)
     r = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 400
+
+
+def test_created_user_is_flagged(client, db):
+    make_user(db, username="admin1")
+    token = login(client, username="admin1")
+    r = client.post(
+        "/api/users/",
+        json={"username": "newbie", "real_name": "新人", "role": "engineer",
+              "password": "Init1234", "department": "IT"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["must_change_password"] is True
+
+
+def test_admin_reset_flags_target_user(client, db):
+    make_user(db, username="admin1")
+    target = make_user(db, username="victim", role="engineer")
+    assert target.must_change_password is False
+
+    token = login(client, username="admin1")
+    r = client.put(
+        f"/api/users/{target.id}",
+        json={"password": "123456"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 200, r.text
+    db.refresh(target)
+    assert target.must_change_password is True
+
+
+def test_admin_changing_own_password_does_not_flag_self(client, db):
+    """管理员在用户管理页改自己的密码，不应把自己锁进强制改密页。"""
+    admin = make_user(db, username="admin1")
+    token = login(client, username="admin1")
+    r = client.put(
+        f"/api/users/{admin.id}",
+        json={"password": "Another1"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 200, r.text
+    db.refresh(admin)
+    assert admin.must_change_password is False
+
+
+def test_admin_update_without_password_does_not_flag(client, db):
+    make_user(db, username="admin1")
+    target = make_user(db, username="victim", role="engineer")
+    token = login(client, username="admin1")
+    r = client.put(
+        f"/api/users/{target.id}",
+        json={"department": "研发部"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 200, r.text
+    db.refresh(target)
+    assert target.must_change_password is False
