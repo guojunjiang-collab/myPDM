@@ -24,7 +24,7 @@ export default function Login() {
       // 获取用户信息
       const userResponse = await authApi.getCurrentUser();
       useAuthStore.getState().setUser(userResponse.data, access_token);
-      navigate('/');
+      navigate(userResponse.data.must_change_password ? '/change-password' : '/');
     } catch (err) {
       setError('用户名或密码错误');
     } finally {
