@@ -4,6 +4,7 @@ import { useAuthStore } from './stores/auth';
 import Layout from './components/Layout';
 import { ToastContainer } from './components/Toast';
 import Login from './pages/Login';
+import ForcePasswordChange from './pages/ForcePasswordChange';
 import Dashboard from './pages/Dashboard';
 import Board from './pages/Board';
 import PartsPage from './pages/PartsPage';
@@ -22,11 +23,25 @@ const STPViewer = lazy(() => import('./pages/STPViewer'));
 const OfficeReader = lazy(() => import('./pages/OfficeReader'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
+  if (user?.must_change_password) {
+    return <Navigate to="/change-password" replace />;
+  }
   return <>{children}</>;
+}
+
+function ForcePasswordChangeRoute() {
+  const { isAuthenticated, user } = useAuthStore();
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  if (!user?.must_change_password) {
+    return <Navigate to="/" replace />;
+  }
+  return <ForcePasswordChange />;
 }
 
 export default function App() {
@@ -35,6 +50,7 @@ export default function App() {
       <ToastContainer />
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/change-password" element={<ForcePasswordChangeRoute />} />
         <Route
           path="/stp-viewer"
           element={
