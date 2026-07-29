@@ -162,3 +162,26 @@ def test_admin_update_without_password_does_not_flag(client, db):
     assert r.status_code == 200, r.text
     db.refresh(target)
     assert target.must_change_password is False
+
+
+def test_new_password_same_as_old_rejected(client, db):
+    make_user(db, must_change=True)
+    token = login(client)
+    r = client.post(
+        "/api/auth/change-password",
+        json={"old_password": "Passw0rd", "new_password": "Passw0rd"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 422
+
+
+def test_weak_new_password_rejected(client, db):
+    """既有强度规则依然生效：123456 无大小写字母，直接被挡。"""
+    make_user(db, must_change=True)
+    token = login(client)
+    r = client.post(
+        "/api/auth/change-password",
+        json={"old_password": "Passw0rd", "new_password": "123456"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 422
