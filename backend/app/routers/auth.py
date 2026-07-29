@@ -45,9 +45,18 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         raise HTTPException(status_code=401, detail="用户不存在")
     return user
 
-async def get_current_active_user(current_user: User = Depends(get_current_user)):
+async def get_current_user_pwchange(current_user: User = Depends(get_current_user)):
+    """豁免版依赖：只校验账户状态，不校验强制改密标记。
+
+    仅供 GET /auth/me 与 POST /auth/change-password 使用，新增接口不要用它。
+    """
     if current_user.status != "active":
         raise HTTPException(status_code=400, detail="账户已被禁用")
+    return current_user
+
+async def get_current_active_user(current_user: User = Depends(get_current_user_pwchange)):
+    if current_user.must_change_password:
+        raise HTTPException(status_code=403, detail="PASSWORD_CHANGE_REQUIRED")
     return current_user
 
 def require_role(roles):
@@ -87,13 +96,14 @@ async def refresh(req: schemas.RefreshRequest, db: Session = Depends(get_db)):
     }
 
 @router.get("/me", response_model=schemas.UserResponse)
-async def get_me(current_user: User = Depends(get_current_active_user)):
+async def get_me(current_user: User = Depends(get_current_user_pwchange)):
     return current_user
 
 @router.post("/change-password")
-async def change_password(req: schemas.ChangePasswordRequest, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+async def change_password(req: schemas.ChangePasswordRequest, current_user: User = Depends(get_current_user_pwchange), db: Session = Depends(get_db)):
     if not crud.verify_password(req.old_password, current_user.password_hash):
         raise HTTPException(status_code=400, detail="原密码错误")
     current_user.password_hash = crud.get_password_hash(req.new_password)
+    current_user.must_change_password = False
     db.commit()
     return {"message": "密码修改成功"}

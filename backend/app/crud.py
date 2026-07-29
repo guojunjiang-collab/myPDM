@@ -42,7 +42,8 @@ def create_user(db, user):
     db_user = models.User(
         username=user.username, password_hash=hashed_password,
         real_name=user.real_name, role=user.role,
-        department=user.department, phone=user.phone, status=user.status
+        department=user.department, phone=user.phone, status=user.status,
+        must_change_password=True,
     )
     if user.id:
         db_user.id = user.id

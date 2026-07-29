@@ -53,6 +53,14 @@ api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const original: any = error.config;
+    if (
+      error.response?.status === 403 &&
+      (error.response?.data as any)?.detail === 'PASSWORD_CHANGE_REQUIRED' &&
+      window.location.pathname !== '/change-password'
+    ) {
+      window.location.href = '/change-password';
+      return Promise.reject(error);
+    }
     if (error.response?.status === 401 && original && !original._retry) {
       original._retry = true;
       refreshing = refreshing || doRefresh();

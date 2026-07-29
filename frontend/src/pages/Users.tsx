@@ -591,7 +591,7 @@ export default function Users() {
       <ConfirmModal
         open={!!resetId}
         title="重置密码"
-        content="确定要将该用户密码重置为 123456 吗？"
+        content="确定要将该用户密码重置为 123456 吗？该用户下次登录时必须重新设置密码。"
         confirmText="确认重置"
         cancelText="取消"
         type="danger"

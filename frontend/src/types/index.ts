@@ -8,6 +8,7 @@ export interface User {
   department?: string;
   phone?: string;
   status: string;
+  must_change_password?: boolean;
   created_at: string;
   updated_at: string;
 }
