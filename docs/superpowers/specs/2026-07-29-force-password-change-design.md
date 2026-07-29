@@ -76,9 +76,11 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL
 
 其余所有接口一律 403。
 
-### 登录响应
+### 标记的对外暴露
 
-`POST /auth/token` 响应体新增 `must_change_password: bool`（`schemas.Token` 加可选字段）。JWT payload 也带一份，仅供前端展示；**权威判定始终以数据库查询为准**，不信任 token 内容。
+`schemas.UserResponse` 新增 `must_change_password: bool = False`，由 `GET /auth/me` 返回。
+
+`POST /auth/token` 的响应体和 JWT payload **均不携带**该标记：前端登录后本来就会紧接着调 `/auth/me`（`Login.tsx:25`），而 `/auth/me` 是豁免接口，够用了。判定始终以数据库查询为准。
 
 ### 改密接口
 
@@ -86,12 +88,13 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL
 
 ## 密码强度规则
 
-在 `schemas.ChangePasswordRequest` 上用 pydantic validator 实现，对 `new_password`：
+`schemas.ChangePasswordRequest` **已有**强度校验（`backend/app/schemas.py:96-111`），且比原计划更严：长度 ≥ 8，且必须同时包含大写字母、小写字母、数字。保持不变。
 
-- 长度 ≥ 8
-- 至少包含字母和数字两类字符
-- 不得与 `old_password` 相同
-- 不得命中弱密码黑名单（`123456`、`12345678`、`password`、`admin`、`abc123`、`111111` 等，小列表即可）
+本期只新增一条跨字段校验：
+
+- 新密码不得与 `old_password` 相同
+
+**不新增弱密码黑名单**：既有规则要求大小写字母，`123456`/`password`/`admin`/`111111` 这类弱密码已经全部被挡，黑名单是冗余的。
 
 违反规则返回 422，错误信息用中文，前端直接展示。
 
@@ -130,7 +133,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL
 
 后端 pytest，沿用 `backend/tests/` 现有风格与 fixtures：
 
-1. 管理员新建用户 → 该用户登录，响应 `must_change_password == true`
+1. 管理员新建用户 → 该用户登录后 `GET /auth/me` 返回 `must_change_password == true`
 2. 带该标记的 token 访问任意业务接口（如 `/parts`）→ 403，`detail == "PASSWORD_CHANGE_REQUIRED"`
 3. 同一 token 访问 `GET /auth/me` → 200
 4. 同一 token 访问 `POST /auth/change-password` → 可用
