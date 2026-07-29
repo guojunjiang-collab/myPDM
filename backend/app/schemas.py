@@ -58,6 +58,7 @@ class UserResponse(UserBase):
     id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+    must_change_password: bool = False
 
 class BOMItemBase(BaseSchema):
     parent_type: str = "assembly"   # 后端接口会覆盖此字段
