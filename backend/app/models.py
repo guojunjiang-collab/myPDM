@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Integer, DateTime, Numeric, Text, JSON, UniqueConstraint, ForeignKey, LargeBinary
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, Numeric, Text, JSON, UniqueConstraint, ForeignKey, LargeBinary
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -15,6 +15,7 @@ class User(Base):
     department = Column(String(128))
     phone = Column(String(32))
     status = Column(String(32), nullable=False, default="active")
+    must_change_password = Column(Boolean, nullable=False, default=False, server_default="false")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
