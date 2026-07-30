@@ -257,3 +257,125 @@ def test_config_item_without_matching_iteration_has_empty_extra(db):
     items = crud_deliverables.list_config_items(db, p.id, crud_deliverables._user_names(db))
     assert len(items) == 1
     assert items[0]["extra"] == ""
+
+
+# ────────── Task 3: 变更、汇总、路由 ──────────
+
+from app.models_ecr import ECR
+from app.models_eco import ECO
+
+
+def _ecr(db, creator, number="ECR-001", status="approved", deleted=False):
+    e = ECR(id=uuid.uuid4(), ecr_number=number, title=f"{number}标题", reason="设计缺陷",
+            status=status, creator_id=creator.id,
+            deleted_at=datetime.now(timezone.utc) if deleted else None)
+    db.add(e); db.commit()
+    return e
+
+
+def _eco(db, creator, number="ECO-001", status="executing"):
+    e = ECO(id=uuid.uuid4(), eco_number=number, title=f"{number}标题", reason="设计缺陷",
+            status=status, creator_id=creator.id)
+    db.add(e); db.commit()
+    return e
+
+
+def test_changes_merge_ecr_and_eco(db):
+    owner = _user(db)
+    p = _project(db, owner)
+    t = _task(db, p)
+    ecr = _ecr(db, owner)
+    eco = _eco(db, owner)
+    _link(db, t, "ec", ecr.id)
+    _link(db, t, "ec", eco.id)
+
+    items = crud_deliverables.list_changes(db, p.id, crud_deliverables._user_names(db))
+    assert [i["code"] for i in items] == ["ECO-001", "ECR-001"]
+    by_code = {i["code"]: i for i in items}
+    assert by_code["ECR-001"]["extra"] == "ECR"
+    assert by_code["ECR-001"]["status"] == "approved"
+    assert by_code["ECO-001"]["extra"] == "ECO"
+    assert all(i["version"] is None for i in items)
+    assert all(i["master_id"] is None for i in items)
+    assert all(i["entity_type"] == "ec" for i in items)
+
+
+def test_deleted_ecr_is_excluded(db):
+    owner = _user(db)
+    p = _project(db, owner)
+    t = _task(db, p)
+    ecr = _ecr(db, owner, deleted=True)
+    _link(db, t, "ec", ecr.id)
+
+    assert crud_deliverables.list_changes(db, p.id, crud_deliverables._user_names(db)) == []
+
+
+def test_get_deliverables_shape_and_counts(db):
+    owner = _user(db)
+    p = _project(db, owner)
+    t = _task(db, p)
+    _, prevs = _part(db, owner)
+    _, drevs = _document(db, owner)
+    _, cirev = _config_item(db, owner)
+    ecr = _ecr(db, owner)
+    _link(db, t, "part", prevs[0].id)
+    _link(db, t, "document", drevs[0].id)
+    _link(db, t, "config_item", cirev.id)
+    _link(db, t, "ec", ecr.id)
+
+    data = crud_deliverables.get_deliverables(db, p.id)
+    assert data["counts"] == {"config_items": 1, "parts": 1, "documents": 1, "changes": 1}
+    assert len(data["parts"]) == 1
+    assert len(data["documents"]) == 1
+    assert len(data["config_items"]) == 1
+    assert len(data["changes"]) == 1
+
+
+def test_get_deliverables_empty_project(db):
+    owner = _user(db)
+    p = _project(db, owner)
+    data = crud_deliverables.get_deliverables(db, p.id)
+    assert data["counts"] == {"config_items": 0, "parts": 0, "documents": 0, "changes": 0}
+    assert data["parts"] == [] and data["documents"] == []
+    assert data["config_items"] == [] and data["changes"] == []
+
+
+# ────────── 路由测试 ──────────
+
+from fastapi.testclient import TestClient
+from app.main import app
+from app.database import get_db
+from app.routers.auth import get_current_active_user, oauth2_scheme
+
+
+def test_deliverables_endpoint_returns_data(db, engineer_user):
+    p = _project(db, engineer_user)
+    t = _task(db, p)
+    _, prevs = _part(db, engineer_user)
+    _link(db, t, "part", prevs[0].id)
+
+    app.dependency_overrides[get_db] = lambda: db
+    app.dependency_overrides[get_current_active_user] = lambda: engineer_user
+    app.dependency_overrides[oauth2_scheme] = lambda: "test-token"
+    try:
+        client = TestClient(app)
+        resp = client.get(f"/api/projects/{p.id}/deliverables")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["counts"]["parts"] == 1
+        assert body["parts"][0]["code"] == "P-001"
+        assert body["parts"][0]["tasks"][0]["code"] == "T-01"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_deliverables_endpoint_404_for_unknown_project(db, engineer_user):
+    app.dependency_overrides[get_db] = lambda: db
+    app.dependency_overrides[get_current_active_user] = lambda: engineer_user
+    app.dependency_overrides[oauth2_scheme] = lambda: "test-token"
+    try:
+        client = TestClient(app)
+        resp = client.get(f"/api/projects/{uuid.uuid4()}/deliverables")
+        assert resp.status_code == 404
+    finally:
+        app.dependency_overrides.clear()

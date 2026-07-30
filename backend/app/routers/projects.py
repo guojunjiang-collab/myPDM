@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User
-from app import crud_project, crud
+from app import crud_project, crud, crud_deliverables
 from app.schemas_project import (
     ProjectCreate, ProjectEdit, MemberAdd, MemberRoleUpdate,
     TaskCreate, TaskEdit, TaskStatusUpdate, TaskMove, TaskReorder, TaskLinkAdd, CommentAdd, DepCreate,
@@ -445,6 +445,14 @@ async def remove_dep(project_id: uuid.UUID, dep_id: uuid.UUID, db: Session = Dep
     _enforce_manager(db, current_user, p)
     crud_project.remove_dep(db, project_id, dep_id)
     return {"detail": "已删除"}
+
+
+@router.get("/{project_id}/deliverables")
+async def get_deliverables(project_id: uuid.UUID, db: Session = Depends(get_db),
+                           current_user: User = Depends(require_permission("project:read"))):
+    """项目交付物汇总：构型项/零部件/图文档/变更四类，按版本去重、合并来源任务。"""
+    crud_project.get_project(db, project_id)   # 项目不存在时抛 404
+    return crud_deliverables.get_deliverables(db, project_id)
 
 
 # ──────────── 序列化辅助 ────────────

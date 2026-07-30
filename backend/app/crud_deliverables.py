@@ -13,6 +13,8 @@ from app.models import DocumentMaster, DocumentRevision, User
 from app.models_configuration import (
     ConfigurationItemIteration, ConfigurationItemMaster, ConfigurationItemRevision,
 )
+from app.models_eco import ECO
+from app.models_ecr import ECR
 from app.models_parts import PartMaster, PartRevision
 from app.models_project import ProjectTask, ProjectTaskLink
 
@@ -149,3 +151,58 @@ def list_config_items(db: Session, project_id: uuid.UUID, user_names: dict) -> l
             }
         _collect(bucket, str(rev.id), task, factory)
     return _finalize(bucket)
+
+
+def list_changes(db: Session, project_id: uuid.UUID, user_names: dict) -> list:
+    """变更：entity_type 统一为 ec，entity_id 指向 ecrs.id 或 ecos.id。
+
+    ECR/ECO 是单实例对象，无版本概念，version 与 master_id 恒为 None。
+    """
+    bucket: dict = {}
+    for model, number_attr, kind in ((ECR, "ecr_number", "ECR"), (ECO, "eco_number", "ECO")):
+        rows = (
+            db.query(ProjectTask, model)
+            .join(ProjectTaskLink, ProjectTaskLink.task_id == ProjectTask.id)
+            .join(model, model.id == ProjectTaskLink.entity_id)
+            .filter(ProjectTask.project_id == project_id,
+                    ProjectTask.deleted_at.is_(None),
+                    ProjectTaskLink.entity_type == "ec",
+                    model.deleted_at.is_(None))
+            .all()
+        )
+        for task, ec in rows:
+            def factory(ec=ec, number_attr=number_attr, kind=kind):
+                return {
+                    "entity_type": "ec",
+                    "entity_id": str(ec.id),
+                    "master_id": None,
+                    "code": getattr(ec, number_attr),
+                    "name": ec.title,
+                    "version": None,
+                    "status": ec.status,
+                    "creator_name": user_names.get(ec.creator_id, ""),
+                    "extra": kind,
+                }
+            _collect(bucket, str(ec.id), task, factory)
+    return _finalize(bucket)
+
+
+def get_deliverables(db: Session, project_id: uuid.UUID) -> dict:
+    """项目交付物汇总：四类对象各自去重后返回，counts 为各类总数（不受前端筛选影响）。"""
+    user_names = _user_names(db)
+    config_items = list_config_items(db, project_id, user_names)
+    parts = list_parts(db, project_id, user_names)
+    documents = list_documents(db, project_id, user_names)
+    changes = list_changes(db, project_id, user_names)
+    return {
+        "counts": {
+            "config_items": len(config_items),
+            "parts": len(parts),
+            "documents": len(documents),
+            "changes": len(changes),
+        },
+        "config_items": config_items,
+        "parts": parts,
+        "documents": documents,
+        "changes": changes,
+    }
