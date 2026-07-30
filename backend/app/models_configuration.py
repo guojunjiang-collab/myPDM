@@ -21,7 +21,6 @@ class ConfigurationItemMaster(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     code = Column(String(64), unique=True, nullable=False)
     name = Column(String(255), nullable=False)
-    creator_id = Column(UUID(as_uuid=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
@@ -38,7 +37,6 @@ class ConfigurationItemRevision(Base):
     check_out_user_id = Column(UUID(as_uuid=True), nullable=True)
     check_out_date = Column(DateTime(timezone=True), nullable=True)
     latest_iteration = Column(Integer, nullable=False, default=1)
-    creator_id = Column(UUID(as_uuid=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
 
@@ -54,6 +52,8 @@ class ConfigurationItemIteration(Base):
     version_name = Column(String(255))
     document_links = Column(JSONB, default=[])
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
+    creator_id = Column(UUID(as_uuid=True), nullable=True)
 
 
 class ConfigurationItemPart(Base):

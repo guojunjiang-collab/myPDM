@@ -24,6 +24,7 @@ class ConfigItemCreate(BaseSchema):
 
 
 class ConfigItemUpdate(BaseSchema):
+    code: Optional[str] = None
     name: Optional[str] = None
 
 
@@ -40,7 +41,6 @@ class ConfigItemRevisionOut(BaseSchema):
     check_out_user_name: Optional[str] = None
     check_out_date: Optional[str] = None
     latest_iteration: int = 1
-    creator_id: Optional[str] = None
     created_at: Optional[str] = None
 
 

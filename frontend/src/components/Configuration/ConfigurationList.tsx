@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useTableSort } from '../../hooks/useTableSort';
 import { configurationApi, customFieldsApi } from '../../services/api';
 import { canEdit, isAdmin } from '../../stores/auth';
@@ -18,16 +18,17 @@ interface ConfigItemRow {
   check_out_user_name?: string;
   check_out_date?: string;
   latest_iteration: number;
-  creator_id?: string;
   created_at?: string;
   updated_at?: string;
 }
 
 interface Props {
   onOpenDetail: (revisionId: string) => void;
+  refreshTrigger?: number;
+  pendingPatch?: React.MutableRefObject<{ revisionId: string; code?: string; name?: string } | null>;
 }
 
-export default function ConfigurationList({ onOpenDetail }: Props) {
+export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendingPatch }: Props) {
   const [items, setItems] = useState<ConfigItemRow[]>([]);
   const [search, setSearch] = useState('');
   const [searchField, setSearchField] = useState('all');
@@ -64,7 +65,6 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
         check_out_user_name: item.check_out_user_name,
         check_out_date: item.check_out_date,
         latest_iteration: item.latest_iteration || 1,
-        creator_id: item.creator_id,
         created_at: item.created_at,
         updated_at: item.updated_at,
       }));
@@ -88,15 +88,30 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
     versionCountMap[item.code] = (versionCountMap[item.code] || 0) + 1;
   });
 
-  useEffect(() => { load(); }, [topLevelOnly, showAllVersions]);
+  useEffect(() => {
+    if (pendingPatch?.current) {
+      const p = pendingPatch.current;
+      pendingPatch.current = null;
+      setAllData(prev => prev.map((item: ConfigItemRow) =>
+        item.revision_id === p.revisionId ? { ...item, code: p.code ?? item.code, name: p.name ?? item.name } : item
+      ));
+      setItems(prev => prev.map((item: ConfigItemRow) =>
+        item.revision_id === p.revisionId ? { ...item, code: p.code ?? item.code, name: p.name ?? item.name } : item
+      ));
+    }
+    load();
+  }, [topLevelOnly, showAllVersions, refreshTrigger]);
 
   useEffect(() => {
     if (configCustomDefs.length === 0 || items.length === 0) return;
     const ids = items.map(i => i.revision_id).filter(Boolean);
     if (ids.length === 0) return;
-    customFieldsApi.getValuesBatch({ type: 'configuration_item', ids: ids.join(',') }).then(res => {
-      setCfValuesMap(res.data || {});
-    }).catch(() => {});
+    const timer = setTimeout(() => {
+      customFieldsApi.getValuesBatch({ type: 'configuration_item', ids: ids.join(',') }).then(res => {
+        setCfValuesMap(res.data || {});
+      }).catch(() => {});
+    }, 200);
+    return () => clearTimeout(timer);
   }, [items, configCustomDefs]);
 
   const filteredData = useMemo(() => {
@@ -216,7 +231,7 @@ export default function ConfigurationList({ onOpenDetail }: Props) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {loading ? (
+            {loading && items.length === 0 ? (
               <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
             ) : items.length === 0 ? (
               <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>

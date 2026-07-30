@@ -73,7 +73,7 @@ def list_parts(db: Session, project_id: uuid.UUID, user_names: dict) -> list:
                 "name": master.name,
                 "version": rev.version,
                 "status": rev.status,
-                "creator_name": user_names.get(rev.creator_id, ""),
+                "creator_name": "",
                 "extra": PART_TYPE_LABEL.get(master.type, master.type),
             }
         _collect(bucket, str(rev.id), task, factory)
@@ -105,7 +105,7 @@ def list_documents(db: Session, project_id: uuid.UUID, user_names: dict) -> list
                 "name": master.name,
                 "version": rev.version,
                 "status": rev.status,
-                "creator_name": user_names.get(rev.creator_id, ""),
+                "creator_name": "",
                 "extra": rev.remark or "",
             }
         _collect(bucket, str(rev.id), task, factory)
@@ -146,7 +146,7 @@ def list_config_items(db: Session, project_id: uuid.UUID, user_names: dict) -> l
                 "name": master.name,
                 "version": rev.version,
                 "status": rev.status,
-                "creator_name": user_names.get(rev.creator_id, ""),
+                "creator_name": "",
                 "extra": (iteration.version_name if iteration else "") or "",
             }
         _collect(bucket, str(rev.id), task, factory)

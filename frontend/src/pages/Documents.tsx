@@ -131,7 +131,7 @@ export default function Documents() {
     setLoading(true);
     try {
       // 直接调 API 取全量（含所有版本），避免依赖 store 缓存导致看不到「多版本」徽标
-      const res = await documentsApi.list({ page_size: 10000 });
+      const res = await documentsApi.list({ page_size: 10000, show_all_versions: true });
       const respData = res.data as Record<string, unknown>;
       const rawItems: Record<string, unknown>[] = Array.isArray(respData) ? respData : (respData?.items || []) as Record<string, unknown>[];
       const localDocuments: Document[] = rawItems.map((item: Record<string, unknown>) => ({
@@ -369,10 +369,9 @@ export default function Documents() {
                       : <span className="text-gray-400">—</span>}
                   </td>
                   <td className="px-4 py-3 text-center text-sm" onClick={(e) => e.stopPropagation()}>
-                    {(() => {
-                      const isCreator = (doc as any).creator_id === useAuthStore.getState().user?.id;
-                      const canManage = isAdmin() || isCreator;
-                      return canManage && (doc as any).accessible !== false ? (
+                      {(() => {
+                        const canManage = isAdmin();
+                        return canManage && (doc as any).accessible !== false ? (
                         <button onClick={() => setDeleteId(doc.id)} className="text-red-500 hover:text-red-700">删除</button>
                       ) : null;
                     })()}

@@ -659,6 +659,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                           <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">迭代</th>
                           <th className="px-3 py-2 text-left text-gray-500 font-medium w-44">签入时间</th>
                           <th className="px-3 py-2 text-left text-gray-500 font-medium">签入说明</th>
+                          <th className="px-3 py-2 text-left text-gray-500 font-medium">创建人</th>
                           <th className="px-3 py-2 text-right text-gray-500 font-medium w-24">操作</th>
                         </tr>
                       </thead>
@@ -675,6 +676,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                                   : '-'}
                               </td>
                               <td className="px-3 py-2 text-gray-700">{it.check_in_note || '-'}</td>
+                              <td className="px-3 py-2 text-gray-500">{(it as any).creator_name || '-'}</td>
                               <td className="px-3 py-2 text-right">
                                 <div className="flex items-center justify-end gap-2">
                                   {isCurrent ? (

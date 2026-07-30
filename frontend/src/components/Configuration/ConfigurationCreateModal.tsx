@@ -109,7 +109,6 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
       if (item?.id) {
         configurationApi.detail(item.id).then(r => {
           setForm({ code: r.master.code, name: r.revision.name || r.master.name });
-          setCreatorName(r.master.creator_id || '');
           setParts((r.parts || []).map((p: any) => ({
             id: p.id, part_type: p.part_type, part_id: p.part_id,
             revision_id: p.part_detail?.revision_id || '',
