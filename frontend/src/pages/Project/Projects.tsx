@@ -9,6 +9,7 @@ import { toast } from '../../components/Toast';
 import { useHeaderTabs } from '../../hooks/useHeaderTabs';
 import { usePersistedTabState } from '../../hooks/usePersistedTabState';
 import MemberManageModal from './MemberManageModal';
+import DeliverableModal from './DeliverableModal';
 import TaskEditModal from './TaskEditModal';
 import GanttView from './gantt/GanttView';
 import SharedLeftPanel from './SharedLeftPanel';
@@ -66,6 +67,7 @@ export default function Projects() {
   // Detail tab state
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [memberOpen, setMemberOpen] = useState(false);
+  const [deliverableOpen, setDeliverableOpen] = useState(false);
   const [editTask, setEditTask] = useState<ProjectTask | null>(null);
   const [editParentId, setEditParentId] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
@@ -606,6 +608,8 @@ export default function Projects() {
                   <span className={`px-2 py-0.5 text-xs rounded-full ${STATUS_CLASS[currentProject.status]}`}>{currentProject.status}</span>
                   <span className="text-sm text-gray-500">负责人 {currentProject.owner_name}</span>
                   <div className="flex-1" />
+                  <button onClick={() => setDeliverableOpen(true)}
+                          className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-white">交付物汇总</button>
                   {isManager && (
                     <button onClick={() => setMemberOpen(true)} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-white">成员管理</button>
                   )}
@@ -777,6 +781,10 @@ export default function Projects() {
                 <MemberManageModal open={memberOpen} projectId={selectedProjectId!} ownerId={currentProject.owner_id}
                   onClose={() => setMemberOpen(false)}
                   onSaved={() => { loadProject(selectedProjectId!); loadTasks(selectedProjectId!); loadProjects(); }} />
+                <DeliverableModal open={deliverableOpen} projectId={selectedProjectId!}
+                  projectCode={currentProject.code}
+                  onClose={() => setDeliverableOpen(false)}
+                  onOpenTask={() => {}} />
                 <TaskEditModal open={editOpen} projectId={selectedProjectId!} task={editTask} parentId={editParentId}
                                onClose={() => setEditOpen(false)} onSaved={() => { setEditOpen(false); reload(); }}
                                onRefresh={() => reload()} />
