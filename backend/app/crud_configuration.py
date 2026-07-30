@@ -239,7 +239,6 @@ def get_config_items(
                 "check_out_user_name": checkout_user_name,
                 "check_out_date": rev.check_out_date.isoformat() if rev.check_out_date else None,
                 "latest_iteration": rev.latest_iteration,
-                "creator_id": str(rev.creator_id) if rev.creator_id else None,
                 "created_at": rev.created_at.isoformat() if rev.created_at else None,
                 "updated_at": master.updated_at.isoformat() if master.updated_at else None,
             })
@@ -270,14 +269,13 @@ def create_config_item(db: Session, data: dict, user_id: UUID) -> Tuple[models.C
     master = models.ConfigurationItemMaster(
         code=code,
         name=data["name"],
-        creator_id=user_id,
     )
     db.add(master)
     db.flush()
 
     revision = models.ConfigurationItemRevision(
         master_id=master.id, version="A", status="draft",
-        creator_id=user_id, latest_iteration=1,
+        latest_iteration=1,
         check_out_user_id=user_id,
         check_out_date=sqlfunc.now(),
     )
@@ -286,6 +284,7 @@ def create_config_item(db: Session, data: dict, user_id: UUID) -> Tuple[models.C
 
     iteration = models.ConfigurationItemIteration(
         revision_id=revision.id, iteration=1,
+        creator_id=user_id,
         version_name=master.name,
         document_links=[],
     )
@@ -306,7 +305,7 @@ def revive_config_item(
 
     revision = models.ConfigurationItemRevision(
         master_id=master.id, version="A", status="draft",
-        creator_id=user_id, latest_iteration=1,
+        latest_iteration=1,
         check_out_user_id=user_id,
         check_out_date=sqlfunc.now(),
     )
@@ -315,6 +314,7 @@ def revive_config_item(
 
     iteration = models.ConfigurationItemIteration(
         revision_id=revision.id, iteration=1,
+        creator_id=user_id,
         version_name=master.name,
         document_links=[],
     )
@@ -350,11 +350,14 @@ def update_config_item_iteration(
 # ============================================================
 
 def delete_config_item_revision(db: Session, revision_id: UUID) -> bool:
-    """软删除版本"""
+    """软删除版本（级联软删除所有迭代）"""
     revision = get_config_item_revision(db, revision_id)
     if not revision:
         return False
     revision.deleted_at = sqlfunc.now()
+    db.query(models.ConfigurationItemIteration).filter(
+        models.ConfigurationItemIteration.revision_id == revision_id
+    ).update({"deleted_at": datetime.now(timezone.utc)})
     db.commit()
     return True
 
@@ -380,6 +383,7 @@ def checkout_config_item(
     new_iter = models.ConfigurationItemIteration(
         revision_id=revision_id,
         iteration=rev.latest_iteration + 1,
+        creator_id=user_id,
         version_name=(current_iter.version_name if current_iter else ""),
         document_links=(current_iter.document_links if current_iter else []),
     )
@@ -552,7 +556,6 @@ def upgrade_config_item(
         version=new_version,
         status="draft",
         latest_iteration=1,
-        creator_id=user_id,
     )
     db.add(new_rev)
     db.flush()
@@ -560,6 +563,7 @@ def upgrade_config_item(
     new_iter = models.ConfigurationItemIteration(
         revision_id=new_rev.id,
         iteration=1,
+        creator_id=user_id,
         version_name=(source_iter.version_name if source_iter else ""),
         document_links=(source_iter.document_links if source_iter else []),
     )

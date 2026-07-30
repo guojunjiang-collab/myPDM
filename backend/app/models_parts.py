@@ -17,7 +17,6 @@ class PartMaster(Base):
     code = Column(String(64), nullable=False)
     name = Column(String(255), nullable=False)
     type = Column(String(16), nullable=False, default="part")  # 'part' / 'assembly'
-    creator_id = Column(UUID(as_uuid=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
@@ -37,7 +36,6 @@ class PartRevision(Base):
     check_out_date = Column(DateTime(timezone=True), nullable=True)
     latest_iteration = Column(Integer, nullable=False, default=0)
     revision_parent_id = Column(UUID(as_uuid=True), nullable=True)
-    creator_id = Column(UUID(as_uuid=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
@@ -57,6 +55,8 @@ class PartIteration(Base):
     check_in_note = Column(Text)
     document_links = Column(JSONB, default=[])
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
+    creator_id = Column(UUID(as_uuid=True), nullable=True)
 
     revision = relationship("PartRevision", back_populates="iterations")
     attachments = relationship("PartAttachment", back_populates="iteration", lazy="dynamic")

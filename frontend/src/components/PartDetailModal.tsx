@@ -27,7 +27,7 @@ interface PartDetailModalProps {
   masterId: string;
   revisionId?: string;
   open: boolean;
-  onClose: () => void;
+  onClose: (savedPatch?: Record<string, string>) => void;
 }
 
 export default function PartDetailModal({ masterId, revisionId: propRevisionId, open, onClose }: PartDetailModalProps) {
@@ -132,11 +132,14 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   }, [revisionId]);
 
   const masterTimer = useRef<ReturnType<typeof setTimeout>>();
+  const savedPatchRef = useRef<Record<string, string>>({});
   const autoSaveMaster = useCallback((data: Record<string, any>) => {
     if (!masterId) return;
     if (masterTimer.current) clearTimeout(masterTimer.current);
     masterTimer.current = setTimeout(() => {
-      partsApi.update(masterId, data).catch(console.error);
+      partsApi.update(masterId, data).then(() => {
+        Object.assign(savedPatchRef.current, data);
+      }).catch(console.error);
     }, 500);
   }, [masterId]);
 
@@ -404,7 +407,9 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
     setActiveTab('info');
     setViewingIterationId(null);
     setViewingIteration(null);
-    onClose();
+    const hasChanges = Object.keys(savedPatchRef.current).length > 0;
+    onClose(hasChanges ? { ...savedPatchRef.current } : undefined);
+    savedPatchRef.current = {};
   };
 
   const currentDisplay = viewingIteration || iteration;
@@ -781,6 +786,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                         <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">迭代</th>
                         <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">签入时间</th>
                         <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">签入说明</th>
+                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">创建人</th>
                         <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">操作</th>
                       </tr>
                     </thead>
@@ -790,6 +796,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                           <td className="px-4 py-3">#{it.iteration}</td>
                           <td className="px-4 py-3 text-gray-500">{it.check_in_date ? new Date(it.check_in_date).toLocaleString('zh-CN') : '未签入'}</td>
                           <td className="px-4 py-3">{it.check_in_note || '—'}</td>
+                          <td className="px-4 py-3 text-gray-500">{it.creator_name || '—'}</td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
                               {it.id === iteration?.id ? (

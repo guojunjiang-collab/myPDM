@@ -138,7 +138,6 @@ async def list_config_items(
             "items": [{
                 "id": i["revision_id"],
                 "code": i["code"], "name": i["name"],
-                "creator_id": str(i.get("creator_id")) if i.get("creator_id") else None,
                 "updated_at": i.get("updated_at"),
                 "deleted_at": None,
             } for i in items],
@@ -280,14 +279,12 @@ async def get_config_item_detail(
             "check_out_user_name": v_checkout_name,
             "check_out_date": v.check_out_date.isoformat() if v.check_out_date else None,
             "latest_iteration": v.latest_iteration,
-            "creator_id": str(v.creator_id) if v.creator_id else None,
             "created_at": v.created_at.isoformat() if v.created_at else None,
         })
 
     return {
         "master": {
             "id": str(master.id), "code": master.code, "name": master.name,
-            "creator_id": str(master.creator_id) if master.creator_id else None,
             "created_at": master.created_at.isoformat() if master.created_at else None,
             "updated_at": master.updated_at.isoformat() if master.updated_at else None,
         },
@@ -298,7 +295,6 @@ async def get_config_item_detail(
             "check_out_user_name": checkout_user_name,
             "check_out_date": revision.check_out_date.isoformat() if revision.check_out_date else None,
             "latest_iteration": revision.latest_iteration,
-            "creator_id": str(revision.creator_id) if revision.creator_id else None,
             "created_at": revision.created_at.isoformat() if revision.created_at else None,
             "iteration_id": str(current_iter.id) if current_iter else None,
             "name": current_iter.version_name if current_iter else master.name,
@@ -554,7 +550,6 @@ async def get_config_item_versions(
             "check_out_user_name": v_checkout_name,
             "check_out_date": v.check_out_date.isoformat() if v.check_out_date else None,
             "latest_iteration": v.latest_iteration,
-            "creator_id": str(v.creator_id) if v.creator_id else None,
             "created_at": v.created_at.isoformat() if v.created_at else None,
         })
     return result
@@ -579,6 +574,8 @@ async def get_config_item_iterations(
             "check_in_note": it.check_in_note or "",
             "version_name": it.version_name or "",
             "created_at": it.created_at.isoformat() if it.created_at else None,
+            "creator_id": str(it.creator_id) if it.creator_id else None,
+            "creator_name": _resolve_creator(db, it.creator_id),
         })
     return result
 

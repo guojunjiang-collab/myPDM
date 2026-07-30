@@ -38,7 +38,12 @@ def _build_revision_response(db: Session, revision: DocumentRevision, iteration:
     """构建版本响应字典"""
     master = revision.master
     checkout_user_name = _checkout_user_name(db, revision.check_out_user_id)
-    creator_name = _checkout_user_name(db, revision.creator_id)
+    # creator_name 从第一个迭代获取
+    first_iter = crud_documents._get_current_iteration(db, revision.id) if revision else None
+    creator_name = ""
+    if first_iter and first_iter.creator_id:
+        cu = db.query(User).filter(User.id == first_iter.creator_id).first()
+        creator_name = cu.real_name if cu else ""
     gids = crud_groups.get_document_group_ids(db, master.id) if master else set()
     gnames = _resolve_group_names(db, gids)
 
@@ -70,7 +75,6 @@ def _build_revision_response(db: Session, revision: DocumentRevision, iteration:
         "latest_iteration": revision.latest_iteration,
         "iteration_count": iteration_count,
         "revision_parent_id": str(revision.revision_parent_id) if revision.revision_parent_id else None,
-        "creator_id": str(revision.creator_id) if revision.creator_id else None,
         "creator_name": creator_name,
         "file_name": first_att.file_name if first_att else None,
         "file_id": str(first_att.id) if first_att else None,
@@ -707,7 +711,14 @@ def get_document_iterations(
     revision = crud_documents.get_document_revision(db, revision_id)
     if not revision:
         raise HTTPException(status_code=404, detail="文档版本不存在")
-    return crud_documents.list_iterations(db, revision_id)
+    result = crud_documents.list_iterations(db, revision_id)
+    for it in result:
+        if it.get("creator_id"):
+            u = db.query(User).filter(User.id == it["creator_id"]).first()
+            it["creator_name"] = u.real_name if u else ""
+        else:
+            it["creator_name"] = ""
+    return result
 
 
 @router.delete("/{revision_id}/iterations/{iteration_id}")

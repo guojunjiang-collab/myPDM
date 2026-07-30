@@ -86,6 +86,8 @@ export interface PartIteration {
   document_links: DocumentLink[];
   remark?: string;
   created_at?: string;
+  creator_id?: string;
+  creator_name?: string;
 }
 
 export interface DocumentLink {
@@ -225,6 +227,8 @@ export interface DocumentIteration {
   check_in_note?: string | null;
   created_at?: string | null;
   attachments?: DocumentAttachmentBrief[];
+  creator_id?: string;
+  creator_name?: string;
 }
 
 export interface DocumentAttachment {

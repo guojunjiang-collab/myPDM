@@ -265,7 +265,7 @@ export default function PartsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {loading ? (
+            {loading && sortedData.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                   加载中...
@@ -357,7 +357,18 @@ export default function PartsPage() {
         masterId={detailMasterId || ''}
         revisionId={detailRevisionId || undefined}
         open={!!detailMasterId}
-        onClose={() => { setDetailMasterId(null); setDetailRevisionId(null); }}
+          onClose={(saved) => { 
+          setDetailMasterId(null); 
+          setDetailRevisionId(null);
+          if (saved && detailMasterId) {
+            const applyPatch = (item: any) =>
+              item.master_id === detailMasterId ? { ...item, ...saved } : item;
+            setAllData(prev => prev.map(applyPatch));
+            setItems(prev => prev.map(applyPatch));
+          } else {
+            loadData();
+          }
+        }}
       />
 
       {deleteTarget && (

@@ -53,7 +53,6 @@ class DocumentMaster(Base):
     code = Column(String(64), unique=True, nullable=False)
     name = Column(String(255), nullable=False)
     revisions = Column(JSONB, default=[])
-    creator_id = Column(UUID(as_uuid=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
@@ -73,7 +72,6 @@ class DocumentRevision(Base):
     check_out_user_id = Column(UUID(as_uuid=True), nullable=True)
     check_out_date = Column(DateTime(timezone=True), nullable=True)
     latest_iteration = Column(Integer, nullable=False, default=0)
-    creator_id = Column(UUID(as_uuid=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
@@ -91,6 +89,8 @@ class DocumentIteration(Base):
     check_in_date = Column(DateTime(timezone=True), nullable=True)
     check_in_note = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
+    creator_id = Column(UUID(as_uuid=True), nullable=True)
     
     revision = relationship("DocumentRevision", back_populates="doc_iterations")
     attachments = relationship("DocumentAttachment", back_populates="iteration", lazy="dynamic",

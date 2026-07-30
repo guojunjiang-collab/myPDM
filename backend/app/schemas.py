@@ -248,7 +248,6 @@ class DocumentRevisionOut(BaseSchema):
     latest_iteration: int
     iteration_count: Optional[int] = None
     revision_parent_id: Optional[uuid.UUID] = None
-    creator_id: Optional[uuid.UUID] = None
     creator_name: Optional[str] = None
     file_name: Optional[str] = None
     file_id: Optional[uuid.UUID] = None

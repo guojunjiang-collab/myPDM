@@ -72,7 +72,6 @@ def create_part_master(db: Session, data: dict, user_id: UUID) -> models_parts.P
         master = models_parts.PartMaster(
             code=code,
             name=data["name"],
-            creator_id=user_id,
         )
         db.add(master)
         db.flush()
@@ -82,7 +81,6 @@ def create_part_master(db: Session, data: dict, user_id: UUID) -> models_parts.P
         version="A",
         status="draft",
         latest_iteration=1,
-        creator_id=user_id,
         check_out_user_id=user_id,
         check_out_date=datetime.now(timezone.utc),
     )
@@ -92,6 +90,7 @@ def create_part_master(db: Session, data: dict, user_id: UUID) -> models_parts.P
     iteration = models_parts.PartIteration(
         revision_id=revision.id,
         iteration=1,
+        creator_id=user_id,
     )
     db.add(iteration)
     db.commit()
@@ -278,6 +277,9 @@ def delete_part_master(db: Session, master_id: UUID) -> bool:
     db.query(models_parts.PartRevision).filter(
         models_parts.PartRevision.master_id == master_id
     ).update({"deleted_at": datetime.now(timezone.utc)})
+    db.query(models_parts.PartIteration).filter(
+        models_parts.PartIteration.revision_id.in_(rev_ids)
+    ).update({"deleted_at": datetime.now(timezone.utc)})
     db.commit()
     shutil.rmtree(os.path.join("./uploads/parts", master.code), ignore_errors=True)
     return True
@@ -434,6 +436,7 @@ def checkout_part(db: Session, revision_id: UUID, user_id: UUID) -> Tuple[Option
     new_iter = models_parts.PartIteration(
         revision_id=revision_id,
         iteration=new_iteration_num,
+        creator_id=user_id,
     )
     db.add(new_iter)
     db.flush()
@@ -648,7 +651,6 @@ def upgrade_part(db: Session, revision_id: UUID, user_id: UUID) -> Tuple[Optiona
         status="draft",
         latest_iteration=1,
         revision_parent_id=source_rev.id,
-        creator_id=user_id,
     )
     db.add(new_rev)
     db.flush()
@@ -656,6 +658,7 @@ def upgrade_part(db: Session, revision_id: UUID, user_id: UUID) -> Tuple[Optiona
     new_iter = models_parts.PartIteration(
         revision_id=new_rev.id,
         iteration=1,
+        creator_id=user_id,
     )
     db.add(new_iter)
     db.flush()

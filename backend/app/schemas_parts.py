@@ -25,7 +25,6 @@ class PartMasterUpdate(BaseModel):
 
 class PartMasterResponse(PartMasterBase):
     id: UUID
-    creator_id: Optional[UUID] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     latest_revision: Optional["PartRevisionBrief"] = None
@@ -55,7 +54,6 @@ class PartRevisionResponse(PartRevisionBrief):
     master_id: UUID
     revision_note: Optional[str] = None
     revision_parent_id: Optional[UUID] = None
-    creator_id: Optional[UUID] = None
     updated_at: Optional[datetime] = None
     current_iteration: Optional["PartIterationResponse"] = None
 
@@ -70,6 +68,8 @@ class PartIterationResponse(BaseModel):
     check_in_note: Optional[str] = None
     document_links: Optional[List[Dict[str, Any]]] = []
     created_at: Optional[datetime] = None
+    creator_id: Optional[UUID] = None
+    creator_name: Optional[str] = None
 
     class Config:
         from_attributes = True
