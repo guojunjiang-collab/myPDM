@@ -147,3 +147,113 @@ def test_other_project_links_are_not_mixed_in(db):
     _link(db, t2, "part", revs[0].id)
 
     assert crud_deliverables.list_parts(db, p1.id, crud_deliverables._user_names(db)) == []
+
+
+# ────────── Task 2: 图文档与构型项 ──────────
+
+from app.models_configuration import (
+    ConfigurationItemMaster, ConfigurationItemRevision, ConfigurationItemIteration,
+)
+
+
+def _document(db, creator, code="D-001", versions=("A",), status="released",
+              remark="首版", deleted=False):
+    m = models.DocumentMaster(id=uuid.uuid4(), code=code, name=f"{code}图纸",
+                              creator_id=creator.id,
+                              deleted_at=datetime.now(timezone.utc) if deleted else None)
+    db.add(m); db.flush()
+    revs = []
+    for v in versions:
+        r = models.DocumentRevision(id=uuid.uuid4(), master_id=m.id, version=v,
+                                    status=status, remark=remark, creator_id=creator.id)
+        db.add(r); db.flush(); revs.append(r)
+    db.commit()
+    return m, revs
+
+
+def _config_item(db, creator, code="CI-001", version="A", status="released",
+                 latest_iteration=2, version_name="首轮构型"):
+    m = ConfigurationItemMaster(id=uuid.uuid4(), code=code, name=f"{code}构型",
+                                creator_id=creator.id)
+    db.add(m); db.flush()
+    r = ConfigurationItemRevision(id=uuid.uuid4(), master_id=m.id, version=version,
+                                  status=status, latest_iteration=latest_iteration,
+                                  creator_id=creator.id)
+    db.add(r); db.flush()
+    # 造两个迭代，确认取的是 latest_iteration 那个而不是第一个
+    db.add(ConfigurationItemIteration(id=uuid.uuid4(), revision_id=r.id, iteration=1,
+                                      version_name="旧名"))
+    db.add(ConfigurationItemIteration(id=uuid.uuid4(), revision_id=r.id,
+                                      iteration=latest_iteration, version_name=version_name))
+    db.commit()
+    return m, r
+
+
+def test_document_extra_is_remark(db):
+    owner = _user(db)
+    p = _project(db, owner)
+    t = _task(db, p)
+    m, revs = _document(db, owner, remark="出图版")
+    _link(db, t, "document", revs[0].id)
+
+    items = crud_deliverables.list_documents(db, p.id, crud_deliverables._user_names(db))
+    assert len(items) == 1
+    assert items[0]["code"] == "D-001"
+    assert items[0]["extra"] == "出图版"
+    assert items[0]["entity_type"] == "document"
+    assert items[0]["master_id"] == str(m.id)
+    assert items[0]["version"] == "A"
+
+
+def test_deleted_document_is_excluded(db):
+    owner = _user(db)
+    p = _project(db, owner)
+    t = _task(db, p)
+    m, revs = _document(db, owner, deleted=True)
+    _link(db, t, "document", revs[0].id)
+
+    assert crud_deliverables.list_documents(db, p.id, crud_deliverables._user_names(db)) == []
+
+
+def test_documents_sorted_by_code(db):
+    owner = _user(db)
+    p = _project(db, owner)
+    t = _task(db, p)
+    for code in ("D-003", "D-001", "D-002"):
+        _, revs = _document(db, owner, code=code)
+        _link(db, t, "document", revs[0].id)
+
+    items = crud_deliverables.list_documents(db, p.id, crud_deliverables._user_names(db))
+    assert [i["code"] for i in items] == ["D-001", "D-002", "D-003"]
+
+
+def test_config_item_extra_is_latest_iteration_version_name(db):
+    owner = _user(db)
+    p = _project(db, owner)
+    t = _task(db, p)
+    m, rev = _config_item(db, owner, version_name="二轮构型")
+    _link(db, t, "config_item", rev.id)
+
+    items = crud_deliverables.list_config_items(db, p.id, crud_deliverables._user_names(db))
+    assert len(items) == 1
+    assert items[0]["code"] == "CI-001"
+    assert items[0]["extra"] == "二轮构型"
+    assert items[0]["entity_type"] == "config_item"
+    assert items[0]["master_id"] == str(m.id)
+
+
+def test_config_item_without_matching_iteration_has_empty_extra(db):
+    owner = _user(db)
+    p = _project(db, owner)
+    t = _task(db, p)
+    m = ConfigurationItemMaster(id=uuid.uuid4(), code="CI-009", name="无迭代构型",
+                                creator_id=owner.id)
+    db.add(m); db.flush()
+    rev = ConfigurationItemRevision(id=uuid.uuid4(), master_id=m.id, version="A",
+                                    status="draft", latest_iteration=5, creator_id=owner.id)
+    db.add(rev); db.commit()
+    _link(db, t, "config_item", rev.id)
+
+    items = crud_deliverables.list_config_items(db, p.id, crud_deliverables._user_names(db))
+    assert len(items) == 1
+    assert items[0]["extra"] == ""

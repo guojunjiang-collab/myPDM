@@ -6,9 +6,13 @@
 import uuid
 from typing import Callable
 
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
-from app.models import User
+from app.models import DocumentMaster, DocumentRevision, User
+from app.models_configuration import (
+    ConfigurationItemIteration, ConfigurationItemMaster, ConfigurationItemRevision,
+)
 from app.models_parts import PartMaster, PartRevision
 from app.models_project import ProjectTask, ProjectTaskLink
 
@@ -69,6 +73,79 @@ def list_parts(db: Session, project_id: uuid.UUID, user_names: dict) -> list:
                 "status": rev.status,
                 "creator_name": user_names.get(rev.creator_id, ""),
                 "extra": PART_TYPE_LABEL.get(master.type, master.type),
+            }
+        _collect(bucket, str(rev.id), task, factory)
+    return _finalize(bucket)
+
+
+def list_documents(db: Session, project_id: uuid.UUID, user_names: dict) -> list:
+    """图文档：entity_id 指向 document_revisions.id，extra 取该版本备注。"""
+    rows = (
+        db.query(ProjectTask, DocumentRevision, DocumentMaster)
+        .join(ProjectTaskLink, ProjectTaskLink.task_id == ProjectTask.id)
+        .join(DocumentRevision, DocumentRevision.id == ProjectTaskLink.entity_id)
+        .join(DocumentMaster, DocumentMaster.id == DocumentRevision.master_id)
+        .filter(ProjectTask.project_id == project_id,
+                ProjectTask.deleted_at.is_(None),
+                ProjectTaskLink.entity_type == "document",
+                DocumentRevision.deleted_at.is_(None),
+                DocumentMaster.deleted_at.is_(None))
+        .all()
+    )
+    bucket: dict = {}
+    for task, rev, master in rows:
+        def factory(rev=rev, master=master):
+            return {
+                "entity_type": "document",
+                "entity_id": str(rev.id),
+                "master_id": str(master.id),
+                "code": master.code,
+                "name": master.name,
+                "version": rev.version,
+                "status": rev.status,
+                "creator_name": user_names.get(rev.creator_id, ""),
+                "extra": rev.remark or "",
+            }
+        _collect(bucket, str(rev.id), task, factory)
+    return _finalize(bucket)
+
+
+def list_config_items(db: Session, project_id: uuid.UUID, user_names: dict) -> list:
+    """构型项：entity_id 指向 configuration_item_revisions.id。
+
+    extra 取 latest_iteration 对应迭代的 version_name；迭代缺失时为空串（outerjoin）。
+    """
+    rows = (
+        db.query(ProjectTask, ConfigurationItemRevision, ConfigurationItemMaster,
+                 ConfigurationItemIteration)
+        .join(ProjectTaskLink, ProjectTaskLink.task_id == ProjectTask.id)
+        .join(ConfigurationItemRevision,
+              ConfigurationItemRevision.id == ProjectTaskLink.entity_id)
+        .join(ConfigurationItemMaster,
+              ConfigurationItemMaster.id == ConfigurationItemRevision.master_id)
+        .outerjoin(ConfigurationItemIteration,
+                   and_(ConfigurationItemIteration.revision_id == ConfigurationItemRevision.id,
+                        ConfigurationItemIteration.iteration == ConfigurationItemRevision.latest_iteration))
+        .filter(ProjectTask.project_id == project_id,
+                ProjectTask.deleted_at.is_(None),
+                ProjectTaskLink.entity_type == "config_item",
+                ConfigurationItemRevision.deleted_at.is_(None),
+                ConfigurationItemMaster.deleted_at.is_(None))
+        .all()
+    )
+    bucket: dict = {}
+    for task, rev, master, iteration in rows:
+        def factory(rev=rev, master=master, iteration=iteration):
+            return {
+                "entity_type": "config_item",
+                "entity_id": str(rev.id),
+                "master_id": str(master.id),
+                "code": master.code,
+                "name": master.name,
+                "version": rev.version,
+                "status": rev.status,
+                "creator_name": user_names.get(rev.creator_id, ""),
+                "extra": (iteration.version_name if iteration else "") or "",
             }
         _collect(bucket, str(rev.id), task, factory)
     return _finalize(bucket)
