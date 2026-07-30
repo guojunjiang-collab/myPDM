@@ -170,8 +170,19 @@ Modal (width="3xl" height="75vh", headerAction=<导出 Excel 按钮>)
 - **一次加载，本地切换**：打开弹窗时请求一次 `/deliverables` 拿全四类；切 TAB、搜索、筛状态全在前端完成，不再发请求。关闭再打开重新拉取，保证数据新鲜。导出直接用这份数据，不二次请求。
 - **一套表格渲染 + 列配置驱动**：四个 TAB 共用一个 `DeliverableTable` 组件，差异仅在一个 `columns` 配置数组。避免四份近乎重复的表格代码。
 - **状态下拉动态生成**：从当前 TAB 数据中 distinct `status` 生成选项，不硬编码状态字典 —— 后续任何模块新增状态值都不需要改动本功能。状态中文标签复用 `frontend/src/constants/index.ts` 的 `STATUS_OPTIONS`；变更类复用 ECR/ECO 模块已有的状态映射；映射不到的原样显示。
-- **来源任务列**：显示第一个任务的 `编号 名称`，超过一个时追加 `+N` 灰色角标，`title` 属性悬浮显示完整列表。**不做点击跳转** —— 跳转需关闭弹窗并定位任务行，交互链过长，收益不明确。
-- **行点击 → 嵌套详情弹窗**：照搬 `frontend/src/pages/Project/TaskEditModal.tsx` 约 702 行处的分发模式，按 `entity_type` 打开 `ConfigItemDetailModal` / `PartDetailModal` / `DocumentDetailModal` / `ECRDetailModal` / `ECODetailModal`，`zIndex` 高于本弹窗一级。
+- **来源任务列**：显示第一个任务的 `编号 名称`，超过一个时追加 `+N` 灰色角标，`title` 属性悬浮显示完整列表。**任务名可点击**，见 4.4.1。
+- **行点击 → 嵌套详情弹窗**：照搬 `frontend/src/pages/Project/TaskEditModal.tsx` 约 702 行处的分发模式，按 `entity_type` 打开 `ConfigItemDetailModal` / `PartDetailModal` / `DocumentDetailModal` / `ECRDetailModal` / `ECODetailModal`。
+
+#### 4.4.1 来源任务点击跳转
+
+点击来源任务 → **不关闭交付物弹窗**，在其上层直接打开现有的 `TaskEditModal`；关闭任务弹窗后回到交付物清单，TAB / 搜索 / 筛选状态保持不变。
+
+- 多任务时，`+N` 角标展开为一个下拉列表，每项可单独点击；单任务时直接点文字。
+- `TaskEditModal` 接收的是 `ProjectTask` 对象而非 id，因此 `DeliverableModal` 只向上抛 `onOpenTask(taskId)`；由 `Projects.tsx` 用已有的 `findTaskById(tasks, taskId)` 解析，复用现有的 `editTask` / `editOpen` 状态打开弹窗。**`TaskEditModal` 本身零改动。**
+- 解析不到任务时（极端情况：期间任务被他人删除）弹 toast「任务不存在或已被删除」，不做其他处理。
+- 任务弹窗保存后（`onSaved`）除现有的 `reload()` 外，**同时触发交付物数据重新拉取** —— 用户可能在任务弹窗里增删了关联对象，清单必须同步。
+
+**叠放层级**：不引入 `zIndex` 层级参数，全部沿用 `Modal` 默认的 `zIndex: 50`，叠放顺序由 portal 挂载顺序决定（后挂载者在上）。这与现有 `TaskEditModal → 各详情弹窗` 的做法完全一致。已验证覆盖各种打开顺序：交付物→任务、交付物→详情、交付物→任务→详情、以及关闭任务后再开详情，后开的弹窗均在上层。若改为显式 zIndex，则需要给 `Modal` 的每一层调用方逐级透传，成本远高于收益。
 - **空态与加载态**：加载中显示「加载中...」；某类为空显示「暂无关联的XXX」，措辞与现有表格空态一致。
 
 ### 4.5 导出
@@ -196,6 +207,7 @@ Modal (width="3xl" height="75vh", headerAction=<导出 Excel 按钮>)
 - 状态过滤与「全部状态」
 - 状态选项去重与顺序
 - 来源任务展示文案（单任务、多任务 `+N`、空任务数组）
+- `findTaskById` 解析失败时的降级路径（返回 null → 提示而非崩溃）
 
 表格渲染本身不做快照测试，与现有前端测试策略一致。
 
@@ -206,7 +218,6 @@ Modal (width="3xl" height="75vh", headerAction=<导出 Excel 按钮>)
 - 不做 PDF 导出（`Modal.headerAction` 留有位置，后续按需追加）
 - 不做「总览」混排 TAB（导出已覆盖看全量的需求）
 - 不做来源任务筛选（任务视角在任务编辑弹窗中已有）
-- 不做来源任务点击跳转
 
 ## 6. 影响面
 
