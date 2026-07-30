@@ -357,13 +357,14 @@ export default function PartsPage() {
         masterId={detailMasterId || ''}
         revisionId={detailRevisionId || undefined}
         open={!!detailMasterId}
-        onClose={(saved) => { 
+          onClose={(saved) => { 
           setDetailMasterId(null); 
           setDetailRevisionId(null);
           if (saved && detailMasterId) {
-            setAllData(prev => prev.map((item: any) => 
-              item.master_id === detailMasterId ? { ...item, ...saved } : item
-            ));
+            const applyPatch = (item: any) =>
+              item.master_id === detailMasterId ? { ...item, ...saved } : item;
+            setAllData(prev => prev.map(applyPatch));
+            setItems(prev => prev.map(applyPatch));
           } else {
             loadData();
           }

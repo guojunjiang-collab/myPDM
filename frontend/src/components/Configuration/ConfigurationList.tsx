@@ -23,9 +23,9 @@ interface ConfigItemRow {
 }
 
 interface Props {
-  onOpenDetail: (revisionId: string) => void;
+  onOpenDetail: (revisionId: string, code: string) => void;
   refreshTrigger?: number;
-  pendingPatch?: React.MutableRefObject<{ revisionId: string; code?: string; name?: string } | null>;
+  pendingPatch?: React.MutableRefObject<{ oldCode?: string; revisionId: string; code?: string; name?: string } | null>;
 }
 
 export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendingPatch }: Props) {
@@ -92,12 +92,16 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
     if (pendingPatch?.current) {
       const p = pendingPatch.current;
       pendingPatch.current = null;
-      setAllData(prev => prev.map((item: ConfigItemRow) =>
-        item.revision_id === p.revisionId ? { ...item, code: p.code ?? item.code, name: p.name ?? item.name } : item
-      ));
-      setItems(prev => prev.map((item: ConfigItemRow) =>
-        item.revision_id === p.revisionId ? { ...item, code: p.code ?? item.code, name: p.name ?? item.name } : item
-      ));
+      const matchCode = p.oldCode || '';
+      if (matchCode) {
+        setAllData(prev => prev.map((item: ConfigItemRow) =>
+          item.code === matchCode ? { ...item, code: p.code ?? item.code, name: p.name ?? item.name } : item
+        ));
+        setItems(prev => prev.map((item: ConfigItemRow) =>
+          item.code === matchCode ? { ...item, code: p.code ?? item.code, name: p.name ?? item.name } : item
+        ));
+      }
+      return;
     }
     load();
   }, [topLevelOnly, showAllVersions, refreshTrigger]);
@@ -238,7 +242,7 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
             ) : filteredData.length === 0 ? (
               <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
             ) : sortedData.map((item) => (
-              <tr key={item.revision_id} onClick={() => onOpenDetail(item.revision_id)} className="hover:bg-gray-50 cursor-pointer">
+              <tr key={item.revision_id} onClick={() => onOpenDetail(item.revision_id, item.code)} className="hover:bg-gray-50 cursor-pointer">
                 <td className="px-3 py-3 text-sm font-medium">
                   {item.code}
                   {!showAllVersions && (versionCountMap[item.code] || 0) > 1 && (

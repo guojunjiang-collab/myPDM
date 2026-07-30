@@ -17,12 +17,13 @@ export default function Configuration() {
   useHeaderTabs(tabs, activeTab, setActiveTab);
 
   const [selectedRevisionId, setSelectedRevisionId] = useState<string | null>(null);
+  const selectedCodeRef = useRef<string>('');
   const [listKey, setListKey] = useState(0);
-  const pendingPatchRef = useRef<{ revisionId: string; code?: string; name?: string } | null>(null);
+  const pendingPatchRef = useRef<{ oldCode?: string; revisionId: string; code?: string; name?: string } | null>(null);
 
   const handleDetailClose = useCallback((savedPatch?: Record<string, string>) => {
     if (savedPatch && selectedRevisionId) {
-      pendingPatchRef.current = { revisionId: selectedRevisionId, ...savedPatch };
+      pendingPatchRef.current = { revisionId: selectedRevisionId, oldCode: selectedCodeRef.current, ...savedPatch };
     }
     setSelectedRevisionId(null);
     setListKey(k => k + 1);
@@ -31,7 +32,11 @@ export default function Configuration() {
   return (
     <div className="flex flex-col h-full">
       {activeTab === 'effectivity' && (
-        <ConfigurationList refreshTrigger={listKey} pendingPatch={pendingPatchRef} onOpenDetail={setSelectedRevisionId} />
+        <ConfigurationList
+          refreshTrigger={listKey}
+          pendingPatch={pendingPatchRef}
+          onOpenDetail={(revId, code) => { setSelectedRevisionId(revId); selectedCodeRef.current = code || ''; }}
+        />
       )}
       {activeTab === 'single-config' && <ProfileList />}
 

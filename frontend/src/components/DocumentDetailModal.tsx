@@ -20,7 +20,7 @@ import type { DocumentRevision, DocumentIteration, CustomFieldDefinition } from 
 interface Props {
   open: boolean;
   revisionId: string | null;
-  onClose: () => void;
+  onClose: (savedPatch?: Record<string, string>) => void;
   onSaved: () => void;
 }
 
@@ -247,8 +247,9 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
     },
     [effectiveRevisionId, cfDefs, onSaved]
   );
-
   const saveTimer = useRef<ReturnType<typeof setTimeout>>();
+  const savedPatchRef = useRef<Record<string, string>>({});
+
   const autoSave = useCallback(
     (patch: Partial<{ code: string; name: string; remark: string }>) => {
       if (!revisionId) return;
@@ -258,6 +259,9 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
       saveTimer.current = setTimeout(async () => {
         try {
           await documentsApi.update(revisionId, patch);
+          if (patch.code !== undefined || patch.name !== undefined) {
+            Object.assign(savedPatchRef.current, patch);
+          }
           onSaved();
         } catch (e: any) {
           toast.error(e?.response?.data?.detail || '保存失败');
@@ -354,10 +358,17 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
   );
 
   if (!open) return null;
+
+  const handleClose = () => {
+    const hasChanges = Object.keys(savedPatchRef.current).length > 0;
+    onClose(hasChanges ? { ...savedPatchRef.current } : undefined);
+    savedPatchRef.current = {};
+  };
+
   const tag = doc ? statusTag(doc.status) : { label: '', class: '' };
 
   return (
-    <Modal open={open} title="图文档详情" onClose={onClose} width="full"
+    <Modal open={open} title="图文档详情" onClose={handleClose} width="full"
       headerAction={(isViewingOtherVersion && doc) ? (
         <span className="flex items-center gap-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 px-2 py-0.5 rounded">
           正在查看版本 {doc.version}（只读）

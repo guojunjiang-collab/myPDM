@@ -10,6 +10,7 @@ interface ProjectState {
   loadProjects: () => Promise<void>;
   loadProject: (id: string) => Promise<void>;
   loadTasks: (id: string) => Promise<void>;
+  patchTask: (taskId: string, patch: Partial<ProjectTask>) => void;
 }
 
 export const useProjectStore = create<ProjectState>((set) => ({
@@ -38,5 +39,10 @@ export const useProjectStore = create<ProjectState>((set) => ({
     } finally {
       set({ loading: false });
     }
+  },
+  patchTask: (taskId, patch) => {
+    set(state => ({
+      tasks: state.tasks.map(t => t.id === taskId ? { ...t, ...patch } : t),
+    }));
   },
 }));

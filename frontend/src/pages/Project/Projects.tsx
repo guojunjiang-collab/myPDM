@@ -52,7 +52,7 @@ export default function Projects() {
   }, []);
   useHeaderTabs(tabs, tab, handleTabChange);
 
-  const { projects, currentProject, loadProjects, loadProject, tasks, loadTasks, loading } = useProjectStore();
+  const { projects, currentProject, loadProjects, loadProject, tasks, loadTasks, loading, patchTask } = useProjectStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const pendingTaskIdRef = useRef<string | null>(null);
   const [search, setSearch] = useState('');
@@ -844,8 +844,25 @@ export default function Projects() {
                   onOpenTask={handleOpenTaskFromDeliverable} />
                 <TaskEditModal open={editOpen} projectId={selectedProjectId!} task={editTask} parentId={editParentId}
                                onClose={() => setEditOpen(false)}
-                               onSaved={() => { setEditOpen(false); reload(); setDeliverableKey((k) => k + 1); }}
-                               onRefresh={() => { reload(); setDeliverableKey((k) => k + 1); }} />
+                               onSaved={(saved) => {
+                                 setEditOpen(false);
+                                 if (saved?.taskId) {
+                                   patchTask(saved.taskId, saved);
+                                   setGanttKey((k) => k + 1);
+                                 } else {
+                                   reload();
+                                   setDeliverableKey((k) => k + 1);
+                                 }
+                               }}
+                               onRefresh={(payload) => {
+                                 if (payload?.taskId) {
+                                   patchTask(payload.taskId, payload);
+                                   setGanttKey((k) => k + 1);
+                                 } else {
+                                   reload();
+                                   setDeliverableKey((k) => k + 1);
+                                 }
+                               }} />
                 <ConfirmModal open={!!delTask} content={`确认删除任务"${delTask?.name}"及其所有子任务?`}
                               onConfirm={confirmDelete} onCancel={() => setDelTask(null)} />
               </>

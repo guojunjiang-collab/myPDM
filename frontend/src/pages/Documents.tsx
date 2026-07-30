@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { documentsApi, customFieldsApi, bomApi, userGroupsApi } from '../services/api';
 import type { Document, CustomFieldDefinition, CustomFieldValue } from '../types';
 import { canEdit, isAdmin, useAuthStore } from '../stores/auth';
@@ -41,6 +41,7 @@ export default function Documents() {
 
   // 详情/编辑合一弹窗（签入签出）
   const [detailDocId, setDetailDocId] = useState<string | null>(null);
+  const viewedDocCodeRef = useRef<string | null>(null);
 
   // 从 store 订阅数据
   const storeDocuments = useDataStore((s) => s.documents);
@@ -208,6 +209,7 @@ export default function Documents() {
       setCreateModalOpen(false);
       useDataStore.getState().setDocuments([...useDataStore.getState().documents, newDoc]);
       setDetailDocId(newDoc.id);
+      viewedDocCodeRef.current = newDoc.code;
     } catch (error: any) {
       const detail = error.response?.data?.detail;
       setCreateSaveError(typeof detail === 'string' ? detail : '创建失败，请重试');
@@ -340,13 +342,13 @@ export default function Documents() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {loading ? (
+            {loading && documents.length === 0 ? (
               <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
             ) : filteredData.length === 0 ? (
               <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">无匹配数据</td></tr>
             ) : (
               displayData.map((doc) => (
-                <tr key={doc.id} className={`hover:bg-gray-50 cursor-pointer ${(doc as any).accessible === false ? 'opacity-60' : ''}`} onClick={() => setDetailDocId(doc.id)}>
+                <tr key={doc.id} className={`hover:bg-gray-50 cursor-pointer ${(doc as any).accessible === false ? 'opacity-60' : ''}`} onClick={() => { setDetailDocId(doc.id); viewedDocCodeRef.current = doc.code; }}>
                   <td className="px-4 py-3 text-sm font-medium">
                     {(doc as any).accessible === false && <span className="mr-1" title="无权限：需关联用户组成员">🔒</span>}
                     {doc.code}
@@ -532,11 +534,19 @@ export default function Documents() {
       <DocumentDetailModal
         open={!!detailDocId}
         revisionId={detailDocId}
-        onClose={() => {
+        onClose={(saved) => {
+          const viewedCode = viewedDocCodeRef.current;
           setDetailDocId(null);
-          loadDocuments();
+          viewedDocCodeRef.current = null;
+          if (saved && viewedCode) {
+            setDocuments(prev => prev.map((d: any) =>
+              d.code === viewedCode ? { ...d, code: saved.code ?? d.code, name: saved.name ?? d.name } : d
+            ));
+          } else {
+            loadDocuments();
+          }
         }}
-        onSaved={() => loadDocuments()}
+        onSaved={() => {}}
       />
     </div>
   );
