@@ -9,6 +9,7 @@ import { toast } from '../../components/Toast';
 import { useHeaderTabs } from '../../hooks/useHeaderTabs';
 import { usePersistedTabState } from '../../hooks/usePersistedTabState';
 import MemberManageModal from './MemberManageModal';
+import DeliverableModal from './DeliverableModal';
 import TaskEditModal from './TaskEditModal';
 import GanttView from './gantt/GanttView';
 import SharedLeftPanel from './SharedLeftPanel';
@@ -51,7 +52,7 @@ export default function Projects() {
   }, []);
   useHeaderTabs(tabs, tab, handleTabChange);
 
-  const { projects, currentProject, loadProjects, loadProject, tasks, loadTasks, loading } = useProjectStore();
+  const { projects, currentProject, loadProjects, loadProject, tasks, loadTasks, loading, patchTask } = useProjectStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const pendingTaskIdRef = useRef<string | null>(null);
   const [search, setSearch] = useState('');
@@ -66,6 +67,8 @@ export default function Projects() {
   // Detail tab state
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [memberOpen, setMemberOpen] = useState(false);
+  const [deliverableOpen, setDeliverableOpen] = useState(false);
+  const [deliverableKey, setDeliverableKey] = useState(0);
   const [editTask, setEditTask] = useState<ProjectTask | null>(null);
   const [editParentId, setEditParentId] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
@@ -288,10 +291,57 @@ export default function Projects() {
 
   const isManager = useMemo(() => can('project.task:create'), []);
 
+  // 展开层级下拉的受控值:'collapsed'|'all'|数字字符串|'custom'
+  const [expandSel, setExpandSel] = useState<string>('all');
+
   const toggle = (tid: string) => {
     const next = new Set(expanded);
     next.has(tid) ? next.delete(tid) : next.add(tid);
     setExpanded(next);
+    setExpandSel('custom');
+  };
+
+  // 任务树最大深度
+  const maxTreeDepth = useMemo(() => {
+    let max = 0;
+    const walk = (ts: ProjectTask[], d: number) => {
+      for (const t of ts) {
+        if (d > max) max = d;
+        if (t.children?.length) walk(t.children, d + 1);
+      }
+    };
+    walk(tasks, 0);
+    return max;
+  }, [tasks]);
+
+  // 收集 depth < k 且有子节点的任务ID
+  const collectExpandableByDepth = useCallback((k: number): string[] => {
+    const ids: string[] = [];
+    const walk = (ts: ProjectTask[], d: number) => {
+      for (const t of ts) {
+        if (d < k && t.children?.length) ids.push(t.id);
+        if (t.children?.length) walk(t.children, d + 1);
+      }
+    };
+    walk(tasks, 0);
+    return ids;
+  }, [tasks]);
+
+  const handleExpandChange = (value: string) => {
+    setExpandSel(value);
+    if (value === 'custom') return;
+    if (value === 'all') {
+      const allIds: string[] = [];
+      const collect = (ts: ProjectTask[]) => {
+        for (const t of ts) { if (t.children?.length) { allIds.push(t.id); collect(t.children); } }
+      };
+      collect(tasks);
+      setExpanded(new Set(allIds));
+    } else if (value === 'collapsed') {
+      setExpanded(new Set());
+    } else {
+      setExpanded(new Set(collectExpandableByDepth(Number(value))));
+    }
   };
 
   // 将树形任务扁平化为 GanttTask[]，供 SharedLeftPanel 统一使用
@@ -479,6 +529,14 @@ export default function Projects() {
     }
     return null;
   };
+  // 交付物弹窗里点来源任务：不关闭交付物弹窗，直接在其上层打开任务编辑弹窗
+  const handleOpenTaskFromDeliverable = useCallback((taskId: string) => {
+    const t = findTaskById(tasks, taskId);
+    if (!t) { toast.error('任务不存在或已被删除'); return; }
+    setEditTask(t);
+    setEditParentId(null);
+    setEditOpen(true);
+  }, [tasks]);
 
   const confirmDelete = async () => {
     if (!selectedProjectId || !delTask) return;
@@ -606,6 +664,8 @@ export default function Projects() {
                   <span className={`px-2 py-0.5 text-xs rounded-full ${STATUS_CLASS[currentProject.status]}`}>{currentProject.status}</span>
                   <span className="text-sm text-gray-500">负责人 {currentProject.owner_name}</span>
                   <div className="flex-1" />
+                  <button onClick={() => setDeliverableOpen(true)}
+                          className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-white">交付物汇总</button>
                   {isManager && (
                     <button onClick={() => setMemberOpen(true)} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-white">成员管理</button>
                   )}
@@ -628,19 +688,20 @@ export default function Projects() {
                       className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
                     只看我的任务
                   </label>
-                  {(() => {
-                    // 合并展开/折叠为一个切换按钮:全部已展开时显示"全部折叠",否则显示"全部展开"
-                    const allIds: string[] = [];
-                    const collect = (ts: ProjectTask[]) => { for (const t of ts) { if (t.children?.length) { allIds.push(t.id); collect(t.children); } } };
-                    collect(tasks);
-                    const allExpanded = allIds.length > 0 && allIds.every((id) => expanded.has(id));
-                    return (
-                      <button onClick={() => setExpanded(allExpanded ? new Set() : new Set(allIds))}
-                        className="px-2 py-1.5 text-sm rounded bg-white border border-gray-300 text-gray-600 hover:bg-gray-50">
-                        {allExpanded ? '全部折叠' : '全部展开'}
-                      </button>
-                    );
-                  })()}
+                  {maxTreeDepth > 0 && (
+                    <select
+                      value={expandSel}
+                      onChange={(e) => handleExpandChange(e.target.value)}
+                      className="px-2 py-1.5 text-sm rounded bg-white border border-gray-300 text-gray-600"
+                    >
+                      <option value="collapsed">全部折叠</option>
+                      {Array.from({ length: maxTreeDepth }, (_, i) => i + 1).map((k) => (
+                        <option key={k} value={String(k)}>L{k}</option>
+                      ))}
+                      <option value="all">全部展开</option>
+                      {expandSel === 'custom' && <option value="custom">自定义</option>}
+                    </select>
+                  )}
                   {viewMode === 'table' ? (
                     <button onClick={() => setViewMode('gantt')} className="px-2 py-1.5 text-sm rounded bg-white border border-gray-300 text-gray-600 hover:bg-gray-50">甘特图</button>
                   ) : (
@@ -777,9 +838,31 @@ export default function Projects() {
                 <MemberManageModal open={memberOpen} projectId={selectedProjectId!} ownerId={currentProject.owner_id}
                   onClose={() => setMemberOpen(false)}
                   onSaved={() => { loadProject(selectedProjectId!); loadTasks(selectedProjectId!); loadProjects(); }} />
+                <DeliverableModal open={deliverableOpen} projectId={selectedProjectId!}
+                  projectCode={currentProject.code} refreshKey={deliverableKey}
+                  onClose={() => setDeliverableOpen(false)}
+                  onOpenTask={handleOpenTaskFromDeliverable} />
                 <TaskEditModal open={editOpen} projectId={selectedProjectId!} task={editTask} parentId={editParentId}
-                               onClose={() => setEditOpen(false)} onSaved={() => { setEditOpen(false); reload(); }}
-                               onRefresh={() => reload()} />
+                               onClose={() => setEditOpen(false)}
+                               onSaved={(saved) => {
+                                 setEditOpen(false);
+                                 if (saved?.taskId) {
+                                   patchTask(saved.taskId, saved);
+                                   setGanttKey((k) => k + 1);
+                                 } else {
+                                   reload();
+                                   setDeliverableKey((k) => k + 1);
+                                 }
+                               }}
+                               onRefresh={(payload) => {
+                                 if (payload?.taskId) {
+                                   patchTask(payload.taskId, payload);
+                                   setGanttKey((k) => k + 1);
+                                 } else {
+                                   reload();
+                                   setDeliverableKey((k) => k + 1);
+                                 }
+                               }} />
                 <ConfirmModal open={!!delTask} content={`确认删除任务"${delTask?.name}"及其所有子任务?`}
                               onConfirm={confirmDelete} onCancel={() => setDelTask(null)} />
               </>

@@ -343,6 +343,8 @@ def list_iterations(
             "check_in_date": it.check_in_date.isoformat() if it.check_in_date else None,
             "check_in_note": it.check_in_note,
             "created_at": it.created_at.isoformat() if it.created_at else None,
+            "creator_id": str(it.creator_id) if it.creator_id else None,
+            "creator_name": db.query(User).filter(User.id == it.creator_id).first().real_name if it.creator_id else "",
         }
         for it in iterations
     ]
@@ -580,7 +582,6 @@ def _build_master_response(db: Session, master) -> dict:
         "code": master.code,
         "name": master.name,
         "type": dynamic_type,
-        "creator_id": str(master.creator_id) if master.creator_id else None,
         "created_at": master.created_at.isoformat() if master.created_at else None,
         "updated_at": master.updated_at.isoformat() if master.updated_at else None,
         "latest_revision": {
@@ -614,7 +615,6 @@ def _build_revision_response(db: Session, revision, iteration) -> dict:
         "check_out_date": revision.check_out_date.isoformat() if revision.check_out_date else None,
         "latest_iteration": revision.latest_iteration,
         "revision_parent_id": str(revision.revision_parent_id) if revision.revision_parent_id else None,
-        "creator_id": str(revision.creator_id) if revision.creator_id else None,
         "created_at": revision.created_at.isoformat() if revision.created_at else None,
         "updated_at": revision.updated_at.isoformat() if revision.updated_at else None,
         "current_iteration": None,

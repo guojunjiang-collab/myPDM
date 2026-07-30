@@ -16,11 +16,16 @@ interface SoftDeletedStats {
 const TABLE_LABELS: Record<string, string> = {
   part_masters: '零部件主数据',
   part_revisions: '零部件版本',
-  documents: '图文档',
+  part_iterations: '零部件迭代',
+  document_masters: '图文档主数据',
+  document_revisions: '图文档版本',
+  document_iterations: '图文档迭代',
   bom_items: 'BOM 关系',
   ecrs: 'ECR 变更请求',
   ecos: 'ECO 变更指令',
-  configuration_items: '构型项',
+  configuration_item_masters: '构型项主数据',
+  configuration_item_revisions: '构型项版本',
+  configuration_item_iterations: '构型项迭代',
 };
 
 export default function DataManagement() {

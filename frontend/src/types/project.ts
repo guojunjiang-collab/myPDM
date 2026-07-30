@@ -101,3 +101,33 @@ export interface GanttData {
   deps: TaskDependency[];
   range: { min_date: string | null; max_date: string | null };
 }
+
+/** 交付物汇总：来源任务引用 */
+export interface DeliverableTaskRef {
+  id: string;
+  code: string;
+  name: string;
+}
+
+/** 交付物汇总：统一条目形状（四类共用） */
+export interface DeliverableItem {
+  entity_type: string;
+  entity_id: string;
+  master_id: string | null;
+  code: string;
+  name: string;
+  version: string | null;
+  status: string;
+  creator_name: string;
+  extra: string | null;
+  tasks: DeliverableTaskRef[];
+}
+
+/** 交付物汇总：接口响应 */
+export interface DeliverableSummary {
+  counts: { config_items: number; parts: number; documents: number; changes: number };
+  config_items: DeliverableItem[];
+  parts: DeliverableItem[];
+  documents: DeliverableItem[];
+  changes: DeliverableItem[];
+}

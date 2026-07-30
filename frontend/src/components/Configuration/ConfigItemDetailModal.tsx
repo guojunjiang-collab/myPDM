@@ -26,7 +26,7 @@ const statusTag = (s: string) => {
 interface Props {
   revisionId: string;
   open: boolean;
-  onClose: () => void;
+  onClose: (savedPatch?: Record<string, string>) => void;
 }
 
 function InfoCard({ label, value, readonly, onChange }: {
@@ -74,6 +74,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
   const [expandedChildren, setExpandedChildren] = useState<Set<string>>(new Set());
   const [subChildren, setSubChildren] = useState<Record<string, any[]>>({});
   const masterTimer = useRef<ReturnType<typeof setTimeout>>();
+  const savedPatchRef = useRef<Record<string, string>>({});
   const cfTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const [partPickerOpen, setPartPickerOpen] = useState(false);
   const [versionSelectIdx, setVersionSelectIdx] = useState<number | null>(null);
@@ -135,10 +136,12 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
   const canForceCheckin = isCheckedOut && isAdminUser;
 
   const autoSaveMaster = useCallback((data: Record<string, any>) => {
-    if (!master?.id) return;
+    if (!internalRevId) return;
     if (masterTimer.current) clearTimeout(masterTimer.current);
-    masterTimer.current = setTimeout(() => { configurationApi.updateMaster(master.id, data).catch(() => {}); }, 500);
-  }, [master?.id]);
+    masterTimer.current = setTimeout(() => { configurationApi.updateMaster(internalRevId, data).then(() => {
+      Object.assign(savedPatchRef.current, data);
+    }).catch(() => {}); }, 500);
+  }, [internalRevId]);
 
   const autoSaveCf = useCallback((fieldId: string, value: any) => {
     if (!internalRevId) return;
@@ -153,7 +156,14 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
     try { await action(); toast.success(msg); setActiveIterationId(null); setViewingIterationData(null); loadDetail(); } catch (e: any) { toast.error(e?.response?.data?.detail || '操作失败'); }
   };
 
-  const handleClose = () => { setActiveTab('info'); setViewingIterationData(null); setActiveIterationId(null); onClose(); };
+  const handleClose = () => { 
+    setActiveTab('info'); 
+    setViewingIterationData(null); 
+    setActiveIterationId(null); 
+    const hasChanges = Object.keys(savedPatchRef.current).length > 0;
+    onClose(hasChanges ? { ...savedPatchRef.current } : undefined);
+    savedPatchRef.current = {};
+  };
 
   const handleViewIteration = async (it: any) => {
     const target = iterations.find((i: any) => i.id === it.id);
@@ -421,9 +431,9 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
                 </tbody></table>
               )}
               {activeTab === 'iterations' && (
-                <table className="w-full text-sm"><thead><tr className="bg-gray-50 border-b border-gray-200"><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">迭代</th><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">签入时间</th><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">签入说明</th><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">操作</th></tr></thead><tbody className="divide-y divide-gray-200">
+                <table className="w-full text-sm"><thead><tr className="bg-gray-50 border-b border-gray-200"><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">迭代</th><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">签入时间</th><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">签入说明</th><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">创建人</th><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">操作</th></tr></thead><tbody className="divide-y divide-gray-200">
                   {iterations.map((it: any) => (
-                    <tr key={it.id} className={`hover:bg-gray-50 ${it.iteration === revision?.latest_iteration ? 'bg-blue-50' : ''}`}><td className="px-4 py-3">#{it.iteration}</td><td className="px-4 py-3 text-gray-500">{it.created_at ? new Date(it.created_at).toLocaleString('zh-CN') : '未签入'}</td><td className="px-4 py-3">{it.check_in_note || '—'}</td><td className="px-4 py-3"><div className="flex items-center gap-2">{it.iteration === revision?.latest_iteration ? (<span className="text-primary-600 text-xs">当前</span>) : (<button onClick={() => handleViewIteration(it)} className="text-primary-600 hover:text-primary-800 hover:underline text-xs">查看数据</button>)}{it.iteration > 1 && isAdminUser && (<button onClick={() => handleDeleteIteration(it)} className="text-xs text-red-600 hover:text-red-800 hover:underline">删除</button>)}</div></td></tr>
+                    <tr key={it.id} className={`hover:bg-gray-50 ${it.iteration === revision?.latest_iteration ? 'bg-blue-50' : ''}`}><td className="px-4 py-3">#{it.iteration}</td><td className="px-4 py-3 text-gray-500">{it.created_at ? new Date(it.created_at).toLocaleString('zh-CN') : '未签入'}</td><td className="px-4 py-3">{it.check_in_note || '—'}</td><td className="px-4 py-3 text-gray-500">{it.creator_name || '—'}</td><td className="px-4 py-3"><div className="flex items-center gap-2">{it.iteration === revision?.latest_iteration ? (<span className="text-primary-600 text-xs">当前</span>) : (<button onClick={() => handleViewIteration(it)} className="text-primary-600 hover:text-primary-800 hover:underline text-xs">查看数据</button>)}{it.iteration > 1 && isAdminUser && (<button onClick={() => handleDeleteIteration(it)} className="text-xs text-red-600 hover:text-red-800 hover:underline">删除</button>)}</div></td></tr>
                   ))}
                 </tbody></table>
               )}

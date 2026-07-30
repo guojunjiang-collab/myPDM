@@ -136,7 +136,6 @@ def create_document(
     master = models.DocumentMaster(
         code=code,
         name=data["name"],
-        creator_id=user_id,
     )
     db.add(master)
     db.flush()
@@ -146,7 +145,6 @@ def create_document(
         version="A",
         status="draft",
         latest_iteration=1,
-        creator_id=user_id,
         check_out_user_id=user_id,
         check_out_date=datetime.now(timezone.utc),
     )
@@ -156,6 +154,7 @@ def create_document(
     iteration = models.DocumentIteration(
         revision_id=revision.id,
         iteration=1,
+        creator_id=user_id,
     )
     db.add(iteration)
     db.commit()
@@ -259,6 +258,7 @@ def checkout_document(
     new_iter = models.DocumentIteration(
         revision_id=revision_id,
         iteration=new_iter_num,
+        creator_id=user_id,
     )
     db.add(new_iter)
     db.flush()
@@ -387,7 +387,6 @@ def upgrade_document(
         status="draft",
         latest_iteration=1,
         revision_parent_id=source_rev.id,
-        creator_id=user_id,
     )
     db.add(new_rev)
     db.flush()
@@ -395,6 +394,7 @@ def upgrade_document(
     new_iter = models.DocumentIteration(
         revision_id=new_rev.id,
         iteration=1,
+        creator_id=user_id,
     )
     db.add(new_iter)
     db.flush()
@@ -463,11 +463,14 @@ def obsolete_document(
 # ====== 删除版本 ======
 
 def delete_document_revision(db: Session, revision_id: UUID) -> bool:
-    """软删除版本"""
+    """软删除版本（级联软删除所有迭代）"""
     revision = get_document_revision(db, revision_id)
     if not revision:
         return False
     revision.deleted_at = datetime.now(timezone.utc)
+    db.query(models.DocumentIteration).filter(
+        models.DocumentIteration.revision_id == revision_id
+    ).update({"deleted_at": datetime.now(timezone.utc)})
     db.commit()
     return True
 
@@ -563,7 +566,6 @@ def list_documents(
                     "file_id": str(first_att.id) if first_att else None,
                     "file_size": first_att.file_size if first_att else None,
                     "remark": rev.remark,
-                    "creator_id": str(rev.creator_id) if rev.creator_id else None,
                     "created_at": rev.created_at.isoformat()
                     if rev.created_at
                     else None,
@@ -602,6 +604,7 @@ def list_iterations(db: Session, revision_id: UUID) -> list:
                 "created_at": it.created_at.isoformat()
                 if it.created_at
                 else None,
+                "creator_id": str(it.creator_id) if it.creator_id else None,
                 "attachments": [
                     {
                         "id": str(a.id),

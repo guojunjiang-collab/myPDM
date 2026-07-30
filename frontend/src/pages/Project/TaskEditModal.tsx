@@ -25,9 +25,9 @@ interface Props {
   task: ProjectTask | null;
   parentId: string | null;
   onClose: () => void;
-  onSaved: () => void;
-  /** 刷新父级数据但不关闭弹窗（状态动作按钮用）。当前弹窗暂未使用，接受以兼容新版 Projects 调用。 */
-  onRefresh?: () => void;
+  onSaved: (savedPayload?: Record<string, any>) => void;
+  /** 刷新父级数据但不关闭弹窗（状态动作按钮用）。传入本次更新的 payload 以便局部刷新。 */
+  onRefresh?: (payload?: Record<string, any>) => void;
 }
 
 const TYPES: TaskType[] = ['任务', '里程碑', '评审'];
@@ -153,9 +153,8 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
     if (payload.actual_start === '') payload.actual_start = null;
     if (payload.actual_end === '') payload.actual_end = null;
     try {
-      if (task) await projectApi.updateTask(projectId, task.id, payload);
-      else await projectApi.createTask(projectId, payload);
-      onSaved();
+      if (task) { await projectApi.updateTask(projectId, task.id, payload); onSaved({ taskId: task.id, ...payload }); }
+      else { await projectApi.createTask(projectId, payload); onSaved(); }
     } catch (err: any) {
       alert(err?.response?.data?.detail || '保存失败');
     }
@@ -178,7 +177,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
         actual_end: payload.actual_end !== undefined ? (payload.actual_end ?? '') : form.actual_end,
       });
       // 刷新父级（甘特/计划表）但不关闭弹窗，便于连续操作
-      onRefresh?.();
+      onRefresh?.({ ...payload, taskId: task.id });
     } catch (err: any) {
       alert(err?.response?.data?.detail || '操作失败');
     } finally {
