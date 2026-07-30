@@ -68,6 +68,7 @@ export default function Projects() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [memberOpen, setMemberOpen] = useState(false);
   const [deliverableOpen, setDeliverableOpen] = useState(false);
+  const [deliverableKey, setDeliverableKey] = useState(0);
   const [editTask, setEditTask] = useState<ProjectTask | null>(null);
   const [editParentId, setEditParentId] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
@@ -481,6 +482,14 @@ export default function Projects() {
     }
     return null;
   };
+  // 交付物弹窗里点来源任务：不关闭交付物弹窗，直接在其上层打开任务编辑弹窗
+  const handleOpenTaskFromDeliverable = useCallback((taskId: string) => {
+    const t = findTaskById(tasks, taskId);
+    if (!t) { toast.error('任务不存在或已被删除'); return; }
+    setEditTask(t);
+    setEditParentId(null);
+    setEditOpen(true);
+  }, [tasks]);
 
   const confirmDelete = async () => {
     if (!selectedProjectId || !delTask) return;
@@ -782,12 +791,13 @@ export default function Projects() {
                   onClose={() => setMemberOpen(false)}
                   onSaved={() => { loadProject(selectedProjectId!); loadTasks(selectedProjectId!); loadProjects(); }} />
                 <DeliverableModal open={deliverableOpen} projectId={selectedProjectId!}
-                  projectCode={currentProject.code}
+                  projectCode={currentProject.code} refreshKey={deliverableKey}
                   onClose={() => setDeliverableOpen(false)}
-                  onOpenTask={() => {}} />
+                  onOpenTask={handleOpenTaskFromDeliverable} />
                 <TaskEditModal open={editOpen} projectId={selectedProjectId!} task={editTask} parentId={editParentId}
-                               onClose={() => setEditOpen(false)} onSaved={() => { setEditOpen(false); reload(); }}
-                               onRefresh={() => reload()} />
+                               onClose={() => setEditOpen(false)}
+                               onSaved={() => { setEditOpen(false); reload(); setDeliverableKey((k) => k + 1); }}
+                               onRefresh={() => { reload(); setDeliverableKey((k) => k + 1); }} />
                 <ConfirmModal open={!!delTask} content={`确认删除任务"${delTask?.name}"及其所有子任务?`}
                               onConfirm={confirmDelete} onCancel={() => setDelTask(null)} />
               </>

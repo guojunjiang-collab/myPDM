@@ -5,12 +5,18 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Modal } from '../../components/Modal';
 import { projectApi } from '../../services/projectApi';
+import { exportDeliverables } from '../../services/deliverableExport';
 import { toast } from '../../components/Toast';
-import type { DeliverableItem, DeliverableSummary } from '../../types/project';
+import type { DeliverableItem, DeliverableSummary, DeliverableTaskRef } from '../../types/project';
 import {
   DELIVERABLE_TABS, filterItems, statusOptions, statusLabel, taskTooltip,
   type DeliverableTabKey, type DeliverableTabDef,
 } from './deliverableUtils';
+import PartDetailModal from '../../components/PartDetailModal';
+import DocumentDetailModal from '../../components/DocumentDetailModal';
+import ConfigItemDetailModal from '../../components/Configuration/ConfigItemDetailModal';
+import { ECRDetailModal } from '../../components/ECR/ECRDetailModal';
+import { ECODetailModal } from '../../components/ECO/ECODetailModal';
 
 interface Props {
   open: boolean;
@@ -28,16 +34,59 @@ const EMPTY_HINT: Record<DeliverableTabKey, string> = {
   changes: '暂无关联的变更',
 };
 
+/** 来源任务单元格：单任务直接点，多任务用 +N 展开下拉 */
+function TaskCell({ tasks, onOpenTask }: {
+  tasks: DeliverableTaskRef[];
+  onOpenTask: (taskId: string) => void;
+}) {
+  const [listOpen, setListOpen] = useState(false);
+
+  if (tasks.length === 0) return <span className="text-gray-400">—</span>;
+
+  return (
+    <span className="relative inline-flex items-center gap-1" title={taskTooltip(tasks)}>
+      <button
+        onClick={(e) => { e.stopPropagation(); onOpenTask(tasks[0].id); }}
+        className="text-primary-600 hover:text-primary-800 truncate max-w-[160px]"
+      >
+        {tasks[0].code} {tasks[0].name}
+      </button>
+      {tasks.length > 1 && (
+        <>
+          <button
+            onClick={(e) => { e.stopPropagation(); setListOpen((v) => !v); }}
+            className="px-1 rounded bg-gray-100 text-gray-500 text-xs hover:bg-gray-200"
+          >
+            +{tasks.length - 1}
+          </button>
+          {listOpen && (
+            <div className="absolute right-0 top-full mt-1 z-10 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[180px]">
+              {tasks.slice(1).map((t) => (
+                <button
+                  key={t.id}
+                  onClick={(e) => { e.stopPropagation(); setListOpen(false); onOpenTask(t.id); }}
+                  className="block w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 truncate"
+                >
+                  {t.code} {t.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </span>
+  );
+}
+
 export default function DeliverableModal({
   open, projectId, projectCode, refreshKey = 0, onClose, onOpenTask,
 }: Props) {
-  void projectCode; void onOpenTask;
-
   const [summary, setSummary] = useState<DeliverableSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<DeliverableTabKey>('config_items');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
+  const [detail, setDetail] = useState<DeliverableItem | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -53,7 +102,7 @@ export default function DeliverableModal({
   }, [open, projectId, refreshKey]);
 
   useEffect(() => {
-    if (!open) { setTab('config_items'); setSearch(''); setStatus(''); }
+    if (!open) { setTab('config_items'); setSearch(''); setStatus(''); setDetail(null); }
   }, [open]);
 
   const handleTabChange = (k: DeliverableTabKey) => {
@@ -65,12 +114,26 @@ export default function DeliverableModal({
   const items = useMemo(() => filterItems(rawItems, search, status), [rawItems, search, status]);
   const options = useMemo(() => statusOptions(rawItems), [rawItems]);
 
-  const colSpan = 7 + (tabDef.showVersion ? 1 : 0);
+  const colSpan = 5 + (tabDef.showVersion ? 1 : 0) + (tabDef.showExtra ? 1 : 0);
+
+  const handleExport = () => {
+    if (!summary) return;
+    exportDeliverables(summary, projectCode);
+  };
 
   return (
-    <Modal open={open} title="交付物汇总" onClose={onClose} width="3xl" height="75vh">
+    <>
+      <Modal open={open} title="交付物汇总" onClose={onClose} width="3xl" height="75vh"
+        headerAction={
+          <button onClick={handleExport} disabled={!summary}
+            title="导出全部四类，不受当前 TAB 与筛选影响"
+            className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed">
+            导出 Excel
+          </button>
+        }>
+      <div className="flex flex-col h-full">
       {/* TAB 条 */}
-      <div className="flex items-center gap-1 border-b border-gray-200 mb-3">
+      <div className="flex items-center gap-1 border-b border-gray-200 mb-3 shrink-0">
         {DELIVERABLE_TABS.map((t) => (
           <button
             key={t.key}
@@ -90,7 +153,7 @@ export default function DeliverableModal({
       </div>
 
       {/* 工具栏 */}
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-3 shrink-0">
         <input
           type="text"
           placeholder="搜索编号/名称..."
@@ -111,20 +174,21 @@ export default function DeliverableModal({
       </div>
 
       {/* 表格 */}
-      <div className="border border-gray-200 rounded-lg overflow-auto">
+      <div className="border border-gray-200 rounded-lg flex-1 min-h-0 overflow-y-auto">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+          <thead className="bg-gray-50 sticky top-0 z-10">
             <tr>
-              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap">编号</th>
+              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap w-28">编号</th>
               <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap">{tabDef.nameLabel}</th>
               {tabDef.showVersion && (
-                <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap">版本</th>
+                <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap w-16">版本</th>
               )}
-              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap">{tabDef.extraLabel}</th>
-              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap">状态</th>
-              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap">创建人</th>
+              {tabDef.showExtra && (
+                <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap w-20">{tabDef.extraLabel}</th>
+              )}
+              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap w-18">状态</th>
+              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap w-18">创建人</th>
               <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap">来源任务</th>
-              <th className="px-3 py-2 text-right text-sm font-medium text-gray-500 whitespace-nowrap">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -134,26 +198,24 @@ export default function DeliverableModal({
               <tr><td colSpan={colSpan} className="px-3 py-8 text-center text-gray-500">{EMPTY_HINT[tab]}</td></tr>
             ) : (
               items.map((i) => (
-                <tr key={i.entity_id} className="hover:bg-gray-50">
+                <tr key={i.entity_id} onClick={() => setDetail(i)}
+                    className="hover:bg-gray-50 cursor-pointer">
                   <td className="px-3 py-2 text-sm font-medium whitespace-nowrap">{i.code}</td>
                   <td className="px-3 py-2 text-sm">{i.name}</td>
                   {tabDef.showVersion && (
                     <td className="px-3 py-2 text-sm text-gray-600 whitespace-nowrap">{i.version || '—'}</td>
                   )}
-                  <td className="px-3 py-2 text-sm text-gray-600">{i.extra || '—'}</td>
+                  {tabDef.showExtra && (
+                    <td className="px-3 py-2 text-sm text-gray-600">{i.extra || '—'}</td>
+                  )}
                   <td className="px-3 py-2 text-sm whitespace-nowrap">
                     <span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
                       {statusLabel(i.status)}
                     </span>
                   </td>
                   <td className="px-3 py-2 text-sm text-gray-600 whitespace-nowrap">{i.creator_name || '—'}</td>
-                  <td className="px-3 py-2 text-sm text-gray-600" title={taskTooltip(i.tasks)}>
-                    {i.tasks.length === 0
-                      ? '—'
-                      : `${i.tasks[0].code} ${i.tasks[0].name}${i.tasks.length > 1 ? ` +${i.tasks.length - 1}` : ''}`}
-                  </td>
-                  <td className="px-3 py-2 text-right whitespace-nowrap">
-                    <span className="text-gray-300 text-sm">详情</span>
+                  <td className="px-3 py-2 text-sm text-gray-600">
+                    <TaskCell tasks={i.tasks} onOpenTask={onOpenTask} />
                   </td>
                 </tr>
               ))
@@ -161,6 +223,29 @@ export default function DeliverableModal({
           </tbody>
         </table>
       </div>
-    </Modal>
+      </div>
+      </Modal>
+
+      {detail?.entity_type === 'config_item' && (
+        <ConfigItemDetailModal open revisionId={detail.entity_id}
+          onClose={() => setDetail(null)} />
+      )}
+      {detail?.entity_type === 'ec' && detail.extra === 'ECR' && (
+        <ECRDetailModal open ecrId={detail.entity_id}
+          onClose={() => setDetail(null)} onSuccess={() => {}} />
+      )}
+      {detail?.entity_type === 'ec' && detail.extra === 'ECO' && (
+        <ECODetailModal ecoId={detail.entity_id}
+          onClose={() => setDetail(null)} onRefresh={() => {}} />
+      )}
+      {detail && ['part', 'assembly', 'component'].includes(detail.entity_type) && (
+        <PartDetailModal open masterId={detail.master_id || ''} revisionId={detail.entity_id}
+          onClose={() => setDetail(null)} />
+      )}
+      {detail?.entity_type === 'document' && (
+        <DocumentDetailModal open revisionId={detail.entity_id}
+          onClose={() => setDetail(null)} onSaved={() => {}} />
+      )}
+    </>
   );
 }

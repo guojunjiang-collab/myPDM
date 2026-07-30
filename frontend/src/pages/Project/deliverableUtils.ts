@@ -13,13 +13,14 @@ export interface DeliverableTabDef {
   nameLabel: string;
   extraLabel: string;
   showVersion: boolean;
+  showExtra: boolean;
 }
 
 export const DELIVERABLE_TABS: DeliverableTabDef[] = [
-  { key: 'config_items', label: '构型项', nameLabel: '名称', extraLabel: '版本名称', showVersion: true },
-  { key: 'parts', label: '零部件', nameLabel: '名称', extraLabel: '类型', showVersion: true },
-  { key: 'documents', label: '图文档', nameLabel: '名称', extraLabel: '备注', showVersion: true },
-  { key: 'changes', label: '变更', nameLabel: '标题', extraLabel: '类型', showVersion: false },
+  { key: 'config_items', label: '构型项', nameLabel: '名称', extraLabel: '版本名称', showVersion: true, showExtra: true },
+  { key: 'parts', label: '零部件', nameLabel: '名称', extraLabel: '类型', showVersion: true, showExtra: true },
+  { key: 'documents', label: '图文档', nameLabel: '名称', extraLabel: '备注', showVersion: true, showExtra: false },
+  { key: 'changes', label: '变更', nameLabel: '标题', extraLabel: '类型', showVersion: false, showExtra: true },
 ];
 
 /** 零部件/图文档/构型项状态 */
