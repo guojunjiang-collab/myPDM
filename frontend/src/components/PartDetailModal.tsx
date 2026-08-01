@@ -375,6 +375,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                 <button type="button" onClick={async (e) => {
                   e.stopPropagation();
                   if (!revisionId) return;
+                  if (!confirm('确定移除此子项？')) return;
                   const targetRevId = parentRevId || revisionId;
                   try {
                     await partsApi.deleteBOMItem(targetRevId, item.id);
