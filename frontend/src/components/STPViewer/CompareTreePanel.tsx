@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { Fragment, useEffect, useMemo, useRef } from 'react';
 import { useViewerStore } from '../../stores/viewerStore';
 import { filterCompareTree } from './compareTreeFilter';
 import type { CompareNode, CompareSide, ChangeType, Side, CompareInstanceNode } from './compareTypes';
@@ -144,12 +144,35 @@ function InstanceCell({ present, label, meshUuids, indent }: {
   );
 }
 
-/** 两格各自的层级参考线：左格线在 19+indent 处，右格线在 50%+9.5+indent 处（两格严格等宽） */
-function GuideLines({ indent }: { indent: number }) {
+/**
+ * 层级参考线：每一行自己画满 1..level 各级竖线段，画在**行内部**。
+ *
+ * 不能挂在 <li> 上跨子树画一条长线 —— 对比树大量行带变更底色，
+ * 行背景会把长线截断成一段一段。改成每行画自己那一段、上下首尾相接，
+ * 无论行有没有底色，ladder 都是连续的。
+ *
+ * 两格严格等宽，故右格的 x 可用 calc(50% + …) 稳定算出。
+ * 竖线落在单元格 padding 区（内容自 28+indent 起），压不到文字。
+ */
+function GuideLines({ level }: { level: number }) {
+  if (level <= 0) return null;
   return (
     <>
-      <div className="absolute top-0 bottom-0 w-px bg-gray-200 pointer-events-none" style={{ left: 19 + indent }} />
-      <div className="absolute top-0 bottom-0 w-px bg-gray-200 pointer-events-none" style={{ left: `calc(50% + ${9.5 + indent}px)` }} />
+      {Array.from({ length: level }, (_, k) => {
+        const indent = (k + 1) * 12;
+        return (
+          <Fragment key={k}>
+            <span
+              className="absolute top-0 -bottom-px w-px bg-gray-200 pointer-events-none"
+              style={{ left: 19 + indent }}
+            />
+            <span
+              className="absolute top-0 -bottom-px w-px bg-gray-200 pointer-events-none"
+              style={{ left: `calc(50% + ${9.5 + indent}px)` }}
+            />
+          </Fragment>
+        );
+      })}
     </>
   );
 }
@@ -176,12 +199,12 @@ function InstanceRow({ inst, depth, node }: { inst: CompareInstanceNode; depth: 
         : 'hover:bg-gray-50';
 
   return (
-    <li className="relative">
-      <GuideLines indent={indent} />
+    <li>
       <div
         onClick={(e) => { e.stopPropagation(); selectCompareKey(inst.key); }}
-        className={`flex items-stretch cursor-pointer select-none border-b border-gray-50 transition-colors ${bg}`}
+        className={`relative flex items-stretch cursor-pointer select-none border-b border-gray-50 transition-colors ${bg}`}
       >
+        <GuideLines level={depth + 1} />
         <div className="shrink-0 w-5" />
         <InstanceCell present={inLeft} label={labelOf(node.left)} meshUuids={inst.leftMeshUuids} indent={indent} />
         <div className="w-px bg-gray-200 shrink-0" />
@@ -208,16 +231,16 @@ function Row({ node, depth }: { node: CompareNode; depth: number }) {
   }, [selected]);
 
   return (
-    <li className="relative">
-      {depth > 0 && <GuideLines indent={depth * 12} />}
+    <li>
       <div
         ref={rowRef}
         onClick={() => selectCompareKey(node.key)}
-        className={`flex items-stretch cursor-pointer select-none border-b border-gray-50 transition-colors
+        className={`relative flex items-stretch cursor-pointer select-none border-b border-gray-50 transition-colors
           ${selected
             ? 'ring-1 ring-inset ring-primary-400 bg-primary-50'
             : `${node.changeType === 'none' && node.placementChanged ? 'bg-purple-50' : ROW_BG[node.changeType]} hover:brightness-95`}`}
       >
+        <GuideLines level={depth} />
         {/* 展开槽宽度固定，不随层级变化 —— 缩进走两格各自的 paddingLeft，
             这样两格永远等宽、分隔线在所有行上处于同一水平位置 */}
         <div className="shrink-0 w-5 flex items-center justify-center">
