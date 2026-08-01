@@ -9,6 +9,7 @@ import { useCompareVisualState } from './useCompareVisualState';
 import { renderDecision } from './compareRenderRules';
 import type { CompareNode, CompareInstanceNode, Side, ChangeType } from './compareTypes';
 import type { AssemblyInstance } from '../../services/api';
+import { matchInstancePairs, type InstanceRef } from './matchInstances';
 
 const draco = new DRACOLoader();
 draco.setDecoderPath('/draco/');
@@ -65,40 +66,6 @@ function indexByBomItem(tree: CompareNode, side: Side): Map<string, string> {
   };
   visit(tree);
   return map;
-}
-
-/** 矩阵稳定标识（4 位小数取整） */
-function matrixKey(m: number[]): string {
-  return m.map(v => v.toFixed(4)).join(',');
-}
-
-/** 对同一 bomItemId 的左右实例做矩阵匹配，产出实例子节点列表 */
-function matchInstances(
-  nodeKey: string,
-  leftMats: { idx: number; matrix: number[] }[],
-  rightMats: { idx: number; matrix: number[] }[],
-): CompareInstanceNode[] {
-  const instances: CompareInstanceNode[] = [];
-  const matchedRight = new Set<number>();
-
-  // 左→右匹配
-  for (const lm of leftMats) {
-    const mk = matrixKey(lm.matrix);
-    const ri = rightMats.findIndex((rm, i) => !matchedRight.has(i) && matrixKey(rm.matrix) === mk);
-    if (ri >= 0) {
-      matchedRight.add(ri);
-      instances.push({ key: `${nodeKey}:inst:${lm.idx}`, changeType: 'none', side: 'both', leftIndex: lm.idx, rightIndex: rightMats[ri].idx, meshUuid: '', label: '', seq: 0 });
-    } else {
-      instances.push({ key: `${nodeKey}:inst:${lm.idx}`, changeType: 'delete', side: 'left', leftIndex: lm.idx, meshUuid: '', label: '', seq: 0 });
-    }
-  }
-  // 右未匹配
-  for (let i = 0; i < rightMats.length; i++) {
-    if (!matchedRight.has(i)) {
-      instances.push({ key: `${nodeKey}:inst:r${i}`, changeType: 'add', side: 'right', rightIndex: i, meshUuid: '', label: '', seq: 0 });
-    }
-  }
-  return instances;
 }
 
 interface Props {
@@ -199,51 +166,61 @@ export function CompareModelLoader({ leftInstances, rightInstances }: Props) {
       fitToView(roughBox);
     }
 
-    // 逐实例排队：先左后右，保证 modify 的旧版先落位
-    const queue: { inst: AssemblyInstance; side: Side }[] = [
-      ...leftInstances.map((inst) => ({ inst, side: 'left' as Side })),
-      ...rightInstances.map((inst) => ({ inst, side: 'right' as Side })),
+    // 逐实例排队：先左后右。index 即该实例在所属侧数组中的下标，匹配结果按它回查。
+    const queue: { inst: AssemblyInstance; side: Side; index: number }[] = [
+      ...leftInstances.map((inst, index) => ({ inst, side: 'left' as Side, index })),
+      ...rightInstances.map((inst, index) => ({ inst, side: 'right' as Side, index })),
     ];
 
     (async () => {
-      // ── 第一遍：按 bomItemId 分组收集矩阵，做实例匹配 ──
-      const groupLeft = new Map<string, { idx: number; matrix: number[] }[]>();
-      const groupRight = new Map<string, { idx: number; matrix: number[] }[]>();
-      let li = 0, ri = 0;
-      for (const { inst, side } of queue) {
-        const id = bomItemIdOf(inst);
-        (side === 'left' ? groupLeft : groupRight).set(
-          id, [...((side === 'left' ? groupLeft : groupRight).get(id) || []), { idx: side === 'left' ? li++ : ri++, matrix: inst.matrix }]
-        );
-      }
-      const allIds = new Set([...groupLeft.keys(), ...groupRight.keys()]);
-      for (const id of allIds) {
-        const nodeKey = leftIndex.get(id) || rightIndex.get(id);
+      // ── 第一遍：按配对行 key 分组，做实例匹配 ──
+      // 关键：分组键必须是 CompareNode.key（件号链，左右共有），不能是 bom_item id
+      // ——后者按 parent_revision_id 存行，左右版本下必然不同，会导致永远匹配不上。
+      const groupLeft = new Map<string, InstanceRef[]>();
+      const groupRight = new Map<string, InstanceRef[]>();
+      for (const { inst, side, index } of queue) {
+        const nodeKey = (side === 'left' ? leftIndex : rightIndex).get(bomItemIdOf(inst));
         if (!nodeKey) continue;
+        const group = side === 'left' ? groupLeft : groupRight;
+        const list = group.get(nodeKey) || [];
+        list.push({ index, matrix: inst.matrix, revisionId: inst.revision_id });
+        group.set(nodeKey, list);
+      }
+
+      const allKeys = new Set([...groupLeft.keys(), ...groupRight.keys()]);
+      for (const nodeKey of allKeys) {
         const node = compare.nodeMap.get(nodeKey);
         if (!node) continue;
-        const lms = groupLeft.get(id) || [];
-        const rms = groupRight.get(id) || [];
-        const instances = matchInstances(nodeKey, lms, rms);
-        // 生成显示名：件号_版本_名称_序号
-        const leftSide = node.left;
-        const rightSide = node.right;
-        let seq = 0;
-        for (const inst of instances) {
-          seq++;
-          inst.seq = seq;
-          const sideData = inst.side === 'left' ? leftSide : inst.side === 'right' ? rightSide : (leftSide || rightSide);
-          const code = sideData?.code || id;
-          const ver = sideData?.version || '';
-          const name = sideData?.name || '';
-          inst.label = [code, ver, name, seq].filter(Boolean).join('_');
-        }
-        node.instances = instances;
+        const matches = matchInstancePairs(groupLeft.get(nodeKey) || [], groupRight.get(nodeKey) || []);
+        // 左右共享一套序号：删除项与新增项都占号，匹配上的实例在两侧序号相同
+        node.instances = matches.map((m, i) => {
+          const sideData = m.side === 'right' ? node.right : (node.left || node.right);
+          const seq = i + 1;
+          return {
+            key: `${nodeKey}:inst:${seq}`,
+            changeType: m.changeType,
+            side: m.side,
+            leftIndex: m.leftIndex,
+            rightIndex: m.rightIndex,
+            leftMeshUuid: '',
+            rightMeshUuid: '',
+            label: [sideData?.code, sideData?.version, sideData?.name, seq].filter(Boolean).join('_'),
+            seq,
+          };
+        });
       }
-      // 强制刷新 compare 状态以触发面板重渲染（实例数据直接修改了节点对象）
-      const c = useViewerStore.getState().compare;
-      if (c) {
-        useViewerStore.setState({ compare: { ...c, tree: { ...c.tree } } });
+
+      // 实例数据是直接改在节点对象上的，浅拷贝 compare 触发面板重渲染
+      const c0 = useViewerStore.getState().compare;
+      if (c0) useViewerStore.setState({ compare: { ...c0, tree: { ...c0.tree } } });
+
+      // 按 "{side}:{index}" 建反查表，第二遍加载时按实例下标直接定位（不再按矩阵串比）
+      const instByRef = new Map<string, CompareInstanceNode>();
+      for (const node of compare.nodeMap.values()) {
+        for (const inst of node.instances || []) {
+          if (inst.leftIndex !== undefined) instByRef.set(`left:${inst.leftIndex}`, inst);
+          if (inst.rightIndex !== undefined) instByRef.set(`right:${inst.rightIndex}`, inst);
+        }
       }
 
       // ── 第二遍：加载模型，按实例匹配结果着色 ──
@@ -251,22 +228,15 @@ export function CompareModelLoader({ leftInstances, rightInstances }: Props) {
       const total = queue.length;
       setStreamProgress({ loaded: 0, total });
 
-      for (const { inst, side } of queue) {
-        const bomItemId = bomItemIdOf(inst);
-        const nodeKey = (side === 'left' ? leftIndex : rightIndex).get(bomItemId);
+      for (const { inst, side, index } of queue) {
+        const nodeKey = (side === 'left' ? leftIndex : rightIndex).get(bomItemIdOf(inst));
         if (!nodeKey) { loaded++; setStreamProgress({ loaded, total }); continue; }
         const node = compare.nodeMap.get(nodeKey);
         if (!node) { loaded++; setStreamProgress({ loaded, total }); continue; }
 
-        // 查找该实例对应的实例子节点，确定其变更类型和颜色
-        const instances = node.instances || [];
-        const mk = matrixKey(inst.matrix);
-        let instNode: CompareInstanceNode | undefined;
-        if (side === 'left') {
-          instNode = instances.find(i => i.leftIndex !== undefined && matrixKey(leftInstances[i.leftIndex]?.matrix || []) === mk);
-        } else {
-          instNode = instances.find(i => i.rightIndex !== undefined && matrixKey(rightInstances[i.rightIndex]?.matrix || []) === mk);
-        }
+        // 按 "{side}:{index}" 直接定位实例子节点，确定其变更类型与颜色。
+        // 匹配不到（该节点无实例数据）时回退到节点级 changeType。
+        const instNode = instByRef.get(`${side}:${index}`);
         const instChangeType: ChangeType = instNode?.changeType ?? node.changeType;
         const decision = renderDecision(instChangeType, 'both');
 
@@ -330,9 +300,11 @@ export function CompareModelLoader({ leftInstances, rightInstances }: Props) {
           uuids.forEach((u) => ghostCandidates.current.add(u));
         }
         mergeCompareMeshes(nodeKey, side, uuids);
-        // 回填实例子节点的 meshUuid
+        // 回填该实例在**本侧**的 mesh uuid：none 实例左右各有一份几何，
+        // 两格的眼睛按钮各自控制自己那份，不能共用一个值。
         if (instNode && uuids.length > 0) {
-          instNode.meshUuid = uuids[0];
+          if (side === 'left') instNode.leftMeshUuid = uuids[0];
+          else instNode.rightMeshUuid = uuids[0];
         }
 
         loaded++;
