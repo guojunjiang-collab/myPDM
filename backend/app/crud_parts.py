@@ -1610,6 +1610,22 @@ def sync_cad_bom_children(
             )
             if child_rev is None:
                 continue
+            # 防并发重复：检查同一 parent+child 组合是否已有 BOMItem（含本事务内已添加的）
+            existing_same = (
+                db.query(models.BOMItem)
+                .filter(
+                    models.BOMItem.parent_revision_id == revision_id,
+                    models.BOMItem.child_revision_id == child_rev.id,
+                    models.BOMItem.deleted_at.is_(None),
+                )
+                .first()
+            )
+            if existing_same:
+                existing_same.quantity = quantity
+                existing_same.cad_instances = cad_entries
+                code_to_item[code] = existing_same
+                updated_items += 1
+                continue
             item = models.BOMItem(
                 iteration_id=iteration.id if iteration else None,
                 parent_revision_id=revision_id,
