@@ -48,6 +48,7 @@ interface ViewerCanvasProps {
 
 export function ViewerCanvas({ source }: ViewerCanvasProps) {
   const selectNode = useViewerStore((s) => s.selectNode);
+  const selectCompareKey = useViewerStore((s) => s.selectCompareKey);
   const measureMode = useViewerStore((s) => s.measureMode);
 
   useEffect(() => {
@@ -68,7 +69,7 @@ export function ViewerCanvas({ source }: ViewerCanvasProps) {
         antialias: false,
         stencil: false,
       }}
-      onPointerMissed={() => { if (measureMode === 'off') selectNode(null); }}
+      onPointerMissed={() => { if (measureMode === 'off') { selectNode(null); selectCompareKey(null); } }}
     >
       <LocalEnvironment />
       <ambientLight intensity={0.25} />
