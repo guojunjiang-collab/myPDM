@@ -99,10 +99,13 @@ function SideCell({ side, node, which, indent }: {
         {count !== null && count !== undefined && <span className="text-gray-400 ml-1">×{count}</span>}
         {noModel && <span className="text-gray-400 ml-1">(无模型)</span>}
       </span>
-      {which === 'right' && CHANGE_LABEL[node.changeType] && (
+      {which === 'right' && node.changeType !== 'none' && CHANGE_LABEL[node.changeType] && (
         <span className={`shrink-0 text-[10px] ${CHANGE_LABEL_COLOR[node.changeType]}`}>
           {CHANGE_LABEL[node.changeType]}
         </span>
+      )}
+      {which === 'right' && node.changeType === 'none' && node.placementChanged && (
+        <span className="shrink-0 text-[10px] text-purple-600">位置变</span>
       )}
     </div>
   );
@@ -199,7 +202,9 @@ function Row({ node, depth }: { node: CompareNode; depth: number }) {
         ref={rowRef}
         onClick={() => selectCompareKey(node.key)}
         className={`flex items-stretch cursor-pointer select-none border-b border-gray-50 transition-colors
-          ${selected ? 'ring-1 ring-inset ring-primary-400 bg-primary-50' : `${ROW_BG[node.changeType]} hover:brightness-95`}`}
+          ${selected
+            ? 'ring-1 ring-inset ring-primary-400 bg-primary-50'
+            : `${node.changeType === 'none' && node.placementChanged ? 'bg-purple-50' : ROW_BG[node.changeType]} hover:brightness-95`}`}
       >
         {/* 展开槽宽度固定，不随层级变化 —— 缩进走两格各自的 paddingLeft，
             这样两格永远等宽、分隔线在所有行上处于同一水平位置 */}

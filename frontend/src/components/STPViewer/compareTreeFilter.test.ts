@@ -7,6 +7,11 @@ const n = (key: string, changeType: ChangeType, children: CompareNode[] = []): C
   left: null, right: null, children,
 });
 
+const np = (key: string, changeType: ChangeType, placementChanged: boolean, children: CompareNode[] = []): CompareNode => ({
+  key, parentKey: null, level: 0, changeType,
+  left: null, right: null, children, placementChanged,
+});
+
 const keys = (node: CompareNode): string[] => [node.key, ...node.children.flatMap(keys)];
 
 describe('filterCompareTree', () => {
@@ -46,5 +51,23 @@ describe('filterCompareTree', () => {
   it('modify / delete 与 add 一样被保留', () => {
     const root = n('ROOT', 'internal', [n('/A', 'modify'), n('/B', 'delete'), n('/C', 'none')]);
     expect(keys(filterCompareTree(root, true))).toEqual(['ROOT', '/A', '/B']);
+  });
+
+  it('placementChanged=true 的 none 节点在仅显示差异下被保留', () => {
+    const root = n('ROOT', 'internal', [np('/A', 'none', true), n('/B', 'none')]);
+    expect(keys(filterCompareTree(root, true))).toEqual(['ROOT', '/A']);
+  });
+
+  it('placementChanged 缺省/false 的 none 节点仍被剪掉', () => {
+    const root = n('ROOT', 'internal', [np('/A', 'none', false), n('/B', 'none')]);
+    expect(keys(filterCompareTree(root, true))).toEqual(['ROOT']);
+  });
+
+  it('placementChanged 的子孙使 none 祖先被保留', () => {
+    const root = n('ROOT', 'internal', [
+      n('/G', 'none', [np('/G/X', 'none', true), n('/G/Y', 'none')]),
+    ]);
+    const out = filterCompareTree(root, true);
+    expect(keys(out)).toEqual(['ROOT', '/G', '/G/X']);
   });
 });

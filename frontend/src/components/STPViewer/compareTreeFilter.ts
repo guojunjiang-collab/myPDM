@@ -13,7 +13,7 @@ export function filterCompareTree(root: CompareNode, onlyDiff: boolean): Compare
     const children = node.children
       .map(prune)
       .filter((c): c is CompareNode => c !== null);
-    if (node.changeType === 'none' && children.length === 0) return null;
+    if (node.changeType === 'none' && !node.placementChanged && children.length === 0) return null;
     return { ...node, children };
   };
 

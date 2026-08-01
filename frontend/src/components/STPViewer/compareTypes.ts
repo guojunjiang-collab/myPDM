@@ -35,6 +35,9 @@ export interface CompareNode {
   children: CompareNode[];
   /** 按实例矩阵匹配后的子实例列表；非空时显示实例明细行 */
   instances?: CompareInstanceNode[];
+  /** 该行自身或其子孙存在"仅位置变动"——件号/版本/数量都没变，但实例位置对不上。
+      与后端的 changeType 正交：只在 changeType === 'none' 的行上判定，不与增删改抢语义。 */
+  placementChanged?: boolean;
 }
 
 /** 单个实例节点：由左右两侧矩阵匹配生成 */

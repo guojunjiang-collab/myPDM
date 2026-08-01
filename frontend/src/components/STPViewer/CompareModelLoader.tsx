@@ -208,6 +208,22 @@ export function CompareModelLoader({ leftInstances, rightInstances }: Props) {
         });
       }
 
+      // 仅位置变动标记：件号/版本/数量都没变（changeType === 'none'）但实例矩阵对不上，
+      // 与后端 changeType 正交，单独打标；再沿 parentKey 向上传播到所有祖先（含 ROOT），
+      // 让折叠的父行也能看到"子孙里有仅位置变动"。
+      for (const node of compare.nodeMap.values()) {
+        if (node.changeType === 'none' && node.instances && node.instances.some((i) => i.changeType !== 'none')) {
+          node.placementChanged = true;
+          let p = node.parentKey ? compare.nodeMap.get(node.parentKey) : null;
+          const visited = new Set<string>();
+          while (p && !visited.has(p.key) && !p.placementChanged) {
+            visited.add(p.key);
+            p.placementChanged = true;
+            p = p.parentKey ? compare.nodeMap.get(p.parentKey) : null;
+          }
+        }
+      }
+
       // 实例数据是直接改在节点对象上的，浅拷贝 compare 触发面板重渲染
       const c0 = useViewerStore.getState().compare;
       if (c0) useViewerStore.setState({ compare: { ...c0, tree: { ...c0.tree } } });
