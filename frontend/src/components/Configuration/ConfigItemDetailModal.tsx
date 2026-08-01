@@ -252,12 +252,11 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
     rows.push(
       <tr key={c.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => { if (revId) setNestedConfigRevId(revId); }}>
         <td
-          className="relative px-3 py-2 text-gray-400 text-xs whitespace-nowrap"
-          style={{ paddingLeft: 12 + (level - 1) * 12 }}
+          className="relative px-3 py-2 font-mono text-xs whitespace-nowrap"
+          style={{ paddingLeft: 20 + (level - 1) * 12 }}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* 层级竖线 */}
-          {Array.from({ length: level - 1 }, (_, k) => (
+          {level > 1 && Array.from({ length: level - 1 }, (_, k) => (
             <span
               key={k}
               className="absolute -top-px bottom-0 w-px bg-gray-200 pointer-events-none"
@@ -281,9 +280,9 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
             ) : (
               <span className="w-4 shrink-0" />
             )}
+            <span className="text-xs">{c.child_detail?.code || '—'}</span>
           </span>
         </td>
-        <td className="px-3 py-2 font-mono text-xs">{c.child_detail?.code || '—'}</td>
         <td className="px-3 py-2">{c.child_detail?.name || '—'}</td>
         <td className="px-3 py-2 text-center text-gray-500 text-xs">{c.child_detail?.version || '—'}</td>
         <td className="px-3 py-2 text-center"><span className={`px-1.5 py-0.5 text-xs rounded-full ${statusTag(c.child_detail?.status || 'draft').cls}`}>{statusTag(c.child_detail?.status || 'draft').label}</span></td>
@@ -474,7 +473,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
                 <div className="flex flex-col h-full min-h-0">
                   <div className="flex items-center justify-between mb-3 shrink-0"><h4 className="text-sm font-bold text-gray-700">子构型项</h4>{canEdit && (<button onClick={() => { setPickerParentId(internalRevId); setCfgPickerOpen(true); }} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 添加子项</button>)}</div>
                   {children.length === 0 ? (<div className="text-gray-400 text-sm py-4 text-center">暂无子构型项</div>) : (
-                     <div className="border rounded-lg overflow-hidden flex-1 min-h-0"><div className="overflow-y-auto h-full" ref={childrenScrollRef}><table className="w-full text-sm"><thead><tr className="bg-gray-50 border-b sticky top-0 z-10"><th className="px-3 py-2 text-left text-gray-500 font-medium w-12 whitespace-nowrap">层级</th><th className="px-3 py-2 text-left text-gray-500 font-medium">构型号</th><th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-16">版本</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-20">状态</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-20">签出状态</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-20 whitespace-nowrap">必选/可选</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-16 whitespace-nowrap">数量</th>{canEdit && <th className="px-3 py-2 text-center text-gray-500 font-medium w-28 whitespace-nowrap">操作</th>}</tr></thead><tbody className="divide-y divide-gray-200">{rows}</tbody></table></div></div>
+                     <div className="border rounded-lg overflow-hidden flex-1 min-h-0"><div className="overflow-y-auto h-full" ref={childrenScrollRef}><table className="w-full text-sm"><thead><tr className="bg-gray-50 border-b sticky top-0 z-10"><th className="px-3 py-2 text-left text-gray-500 font-medium">构型号</th><th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-16">版本</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-20">状态</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-20">签出状态</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-20 whitespace-nowrap">必选/可选</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-16 whitespace-nowrap">数量</th>{canEdit && <th className="px-3 py-2 text-center text-gray-500 font-medium w-28 whitespace-nowrap">操作</th>}</tr></thead><tbody className="divide-y divide-gray-200">{rows}</tbody></table></div></div>
                   )}
                 </div>
               )}
