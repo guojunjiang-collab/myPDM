@@ -70,7 +70,11 @@ function SideCell({ side, node, which }: { side: CompareSide | null; node: Compa
         title={label}
       >
         {label}
-        {side.quantity !== null && <span className="text-gray-400 ml-1">×{side.quantity}</span>}
+        {node.instances && node.instances.length > 0 ? (
+          <span className="text-gray-400 ml-1">×{node.instances.length}</span>
+        ) : side.quantity !== null ? (
+          <span className="text-gray-400 ml-1">×{side.quantity}</span>
+        ) : null}
         {noModel && <span className="text-gray-400 ml-1">(无模型)</span>}
       </span>
     </div>
@@ -121,6 +125,37 @@ function Row({ node, depth }: { node: CompareNode; depth: number }) {
       {hasChildren && expanded && (
         <ul>
           {node.children.map((c) => <Row key={c.key} node={c} depth={depth + 1} />)}
+        </ul>
+      )}
+
+      {/* 实例子行：按矩阵匹配结果，仿 ModelTreePanel 样式逐实例展示增删 */}
+      {node.instances && node.instances.length > 0 && (
+        <ul>
+          {node.instances.map((inst, idx) => {
+            const isSelected = selectedKey === inst.key;
+            const side = inst.side;
+            const partSide = side === 'both' ? (node.left || node.right) : node[side];
+            const label = partSide ? [partSide.code, partSide.version].filter(Boolean).join('·') : `实例 ${idx + 1}`;
+            return (
+              <li key={inst.key} className="relative">
+                <div
+                  onClick={(e) => { e.stopPropagation(); selectCompareKey(inst.key); }}
+                  className={`group flex items-center gap-1 py-0.5 pr-2 cursor-pointer select-none text-xs transition-colors
+                    ${isSelected ? 'ring-1 ring-inset ring-primary-400 bg-primary-50' :
+                      inst.changeType === 'add' ? 'bg-green-50 hover:bg-green-100' :
+                      inst.changeType === 'delete' ? 'bg-red-50 hover:bg-red-100' :
+                      'hover:bg-gray-50 text-gray-500'}`}
+                  style={{ paddingLeft: (depth + 1) * 12 + 28 }}
+                >
+                  {isSelected && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500 rounded-r" />}
+                  <span className="truncate flex-1">
+                    {inst.changeType === 'add' ? '+ ' : inst.changeType === 'delete' ? '− ' : ''}
+                    {label}
+                  </span>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </li>

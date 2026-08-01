@@ -7,7 +7,7 @@ import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.j
 import { useViewerStore } from '../../stores/viewerStore';
 import { useCompareVisualState } from './useCompareVisualState';
 import { renderDecision } from './compareRenderRules';
-import type { CompareNode, Side } from './compareTypes';
+import type { CompareNode, CompareInstanceNode, Side, ChangeType } from './compareTypes';
 import type { AssemblyInstance } from '../../services/api';
 
 const draco = new DRACOLoader();
@@ -65,6 +65,40 @@ function indexByBomItem(tree: CompareNode, side: Side): Map<string, string> {
   };
   visit(tree);
   return map;
+}
+
+/** 矩阵稳定标识（4 位小数取整） */
+function matrixKey(m: number[]): string {
+  return m.map(v => v.toFixed(4)).join(',');
+}
+
+/** 对同一 bomItemId 的左右实例做矩阵匹配，产出实例子节点列表 */
+function matchInstances(
+  nodeKey: string,
+  leftMats: { idx: number; matrix: number[] }[],
+  rightMats: { idx: number; matrix: number[] }[],
+): CompareInstanceNode[] {
+  const instances: CompareInstanceNode[] = [];
+  const matchedRight = new Set<number>();
+
+  // 左→右匹配
+  for (const lm of leftMats) {
+    const mk = matrixKey(lm.matrix);
+    const ri = rightMats.findIndex((rm, i) => !matchedRight.has(i) && matrixKey(rm.matrix) === mk);
+    if (ri >= 0) {
+      matchedRight.add(ri);
+      instances.push({ key: `${nodeKey}:inst:${lm.idx}`, changeType: 'none', side: 'both', leftIndex: lm.idx, rightIndex: rightMats[ri].idx, meshUuid: '' });
+    } else {
+      instances.push({ key: `${nodeKey}:inst:${lm.idx}`, changeType: 'delete', side: 'left', leftIndex: lm.idx, meshUuid: '' });
+    }
+  }
+  // 右未匹配
+  for (let i = 0; i < rightMats.length; i++) {
+    if (!matchedRight.has(i)) {
+      instances.push({ key: `${nodeKey}:inst:r${i}`, changeType: 'add', side: 'right', rightIndex: i, meshUuid: '' });
+    }
+  }
+  return instances;
 }
 
 interface Props {
@@ -172,20 +206,51 @@ export function CompareModelLoader({ leftInstances, rightInstances }: Props) {
     ];
 
     (async () => {
+      // ── 第一遍：按 bomItemId 分组收集矩阵，做实例匹配 ──
+      const groupLeft = new Map<string, { idx: number; matrix: number[] }[]>();
+      const groupRight = new Map<string, { idx: number; matrix: number[] }[]>();
+      let li = 0, ri = 0;
+      for (const { inst, side } of queue) {
+        const id = bomItemIdOf(inst);
+        (side === 'left' ? groupLeft : groupRight).set(
+          id, [...((side === 'left' ? groupLeft : groupRight).get(id) || []), { idx: side === 'left' ? li++ : ri++, matrix: inst.matrix }]
+        );
+      }
+      const allIds = new Set([...groupLeft.keys(), ...groupRight.keys()]);
+      for (const id of allIds) {
+        const nodeKey = leftIndex.get(id) || rightIndex.get(id);
+        if (!nodeKey) continue;
+        const node = compare.nodeMap.get(nodeKey);
+        if (!node) continue;
+        node.instances = matchInstances(nodeKey, groupLeft.get(id) || [], groupRight.get(id) || []);
+      }
+      // 重新读取 tree 以获取 instances（避免闭包陈旧引用）
+      const freshTree = useViewerStore.getState().compare?.tree;
+      if (!freshTree) return;
+
+      // ── 第二遍：加载模型，按实例匹配结果着色 ──
       let loaded = 0;
-      setStreamProgress({ loaded: 0, total: queue.length });
+      const total = queue.length;
+      setStreamProgress({ loaded: 0, total });
 
       for (const { inst, side } of queue) {
         const bomItemId = bomItemIdOf(inst);
-        const key = (side === 'left' ? leftIndex : rightIndex).get(bomItemId);
-        if (!key) { loaded++; setStreamProgress({ loaded, total: queue.length }); continue; }
-        const node = compare.nodeMap.get(key);
-        if (!node) { loaded++; setStreamProgress({ loaded, total: queue.length }); continue; }
+        const nodeKey = (side === 'left' ? leftIndex : rightIndex).get(bomItemId);
+        if (!nodeKey) { loaded++; setStreamProgress({ loaded, total }); continue; }
+        const node = compare.nodeMap.get(nodeKey);
+        if (!node) { loaded++; setStreamProgress({ loaded, total }); continue; }
 
-        // 两侧实例一律加载入场，由 useCompareVisualState 按当前 displayMode 控制 visible，
-        // 这样切换显示模式不需要重新下载模型。
-        // 这里只取 color（与模式无关）与 leftGhost（叠加模式下 modify 的旧版）。
-        const decision = renderDecision(node.changeType, 'both');
+        // 查找该实例对应的实例子节点，确定其变更类型和颜色
+        const instances = node.instances || [];
+        const mk = matrixKey(inst.matrix);
+        let instNode: CompareInstanceNode | undefined;
+        if (side === 'left') {
+          instNode = instances.find(i => i.leftIndex !== undefined && matrixKey(leftInstances[i.leftIndex]?.matrix || []) === mk);
+        } else {
+          instNode = instances.find(i => i.rightIndex !== undefined && matrixKey(rightInstances[i.rightIndex]?.matrix || []) === mk);
+        }
+        const instChangeType: ChangeType = instNode?.changeType ?? node.changeType;
+        const decision = renderDecision(instChangeType, 'both');
 
         let coarse: THREE.Group, normal: THREE.Group, fine: THREE.Group;
         try {
@@ -226,10 +291,10 @@ export function CompareModelLoader({ leftInstances, rightInstances }: Props) {
 
         lod.matrixAutoUpdate = false;
         lod.matrix.fromArray(inst.matrix).transpose(); // 行主序→three 列主序
-        // 侧别与变更类型写进 userData，供视觉态按显示模式取舍
         lod.userData.compareSide = side;
-        lod.userData.compareKey = key;
-        lod.userData.changeType = node.changeType;
+        lod.userData.compareKey = nodeKey;
+        lod.userData.changeType = instChangeType;
+        lod.userData.compareInstanceKey = instNode?.key || '';
 
         rootGroup.add(lod);
 
@@ -238,14 +303,15 @@ export function CompareModelLoader({ leftInstances, rightInstances }: Props) {
           if ((c as THREE.Mesh).isMesh) {
             uuids.push(c.uuid);
             c.userData.compareSide = side;
-            c.userData.compareKey = key;
-            c.userData.changeType = node.changeType;
+            c.userData.compareKey = nodeKey;
+            c.userData.changeType = instChangeType;
+            c.userData.compareInstanceKey = instNode?.key || '';
           }
         });
         if (decision.leftGhost && side === 'left') {
           uuids.forEach((u) => ghostCandidates.current.add(u));
         }
-        mergeCompareMeshes(key, side, uuids);
+        mergeCompareMeshes(nodeKey, side, uuids);
 
         loaded++;
         setStreamProgress({ loaded, total: queue.length });

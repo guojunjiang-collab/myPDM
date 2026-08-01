@@ -33,4 +33,20 @@ export interface CompareNode {
   left: CompareSide | null;
   right: CompareSide | null;
   children: CompareNode[];
+  /** 按实例矩阵匹配后的子实例列表；非空时显示实例明细行 */
+  instances?: CompareInstanceNode[];
+}
+
+/** 单个实例节点：由左右两侧矩阵匹配生成 */
+export interface CompareInstanceNode {
+  /** 唯一 key，形如 parentKey:inst:idx */
+  key: string;
+  changeType: ChangeType; // 'add' | 'delete' | 'none'
+  /** 该实例所属侧别；'both' 表示左右矩阵匹配 */
+  side: Side | 'both';
+  /** 该实例在源侧 instance 数组中的序号 */
+  leftIndex?: number;
+  rightIndex?: number;
+  /** 关联的 mesh uuid（加载后回填） */
+  meshUuid: string;
 }
