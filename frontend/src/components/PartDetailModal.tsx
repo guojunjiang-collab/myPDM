@@ -13,6 +13,19 @@ import ConfigItemDetailModal from './Configuration/ConfigItemDetailModal';
 import TaskEditModal from '../pages/Project/TaskEditModal';
 import ProfileEditModal from './Configuration/ProfileEditModal';
 
+/** BOM 结构树的展开箭头，与 STPViewer 模型树(ModelTreePanel)保持同一风格 */
+function BomChevron({ expanded }: { expanded: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className={`w-3.5 h-3.5 transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
+      fill="none"
+    >
+      <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 const statusTag = (s: string) => {
   const map: Record<string, { label: string; cls: string }> = {
     draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
@@ -260,14 +273,32 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
     return (
       <React.Fragment key={item.child_revision_id}>
         <tr className="hover:bg-gray-50 cursor-pointer" onClick={rowClick}>
-          <td className="px-3 py-2 text-gray-400 text-xs whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-            <span>{'-'.repeat(level + 1)}{level + 1}</span>
-            {hasChildren && (
-              <button type="button" onClick={(e) => { e.stopPropagation(); toggleBomExpand(item.child_revision_id); }}
-                className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
-                {children ? '\u25BC' : '\u25B6'}
-              </button>
-            )}
+          <td
+            className="relative px-3 py-2 text-gray-400 text-xs whitespace-nowrap"
+            style={{ paddingLeft: 12 + level * 12 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* \u5C42\u7EA7\u7AD6\u7EBF\uFF1A\u6BCF\u884C\u81EA\u7ED8 0..level-1 \u5404\u7EA7\u7EBF\u6BB5\uFF0C\u5BF9\u9F50\u8BE5\u5C42\u5C55\u5F00\u6309\u94AE\u4E2D\u5FC3(20+k*12)\u3002
+                -top-px \u76D6\u4F4F tbody \u7684 divide-y \u5206\u9694\u7EBF\uFF0C\u4F7F\u4E0A\u4E0B\u884C\u7EBF\u6BB5\u9996\u5C3E\u76F8\u63A5\u3002 */}
+            {Array.from({ length: level }, (_, k) => (
+              <span
+                key={k}
+                className="absolute -top-px bottom-0 w-px bg-gray-200 pointer-events-none"
+                style={{ left: 20 + k * 12 }}
+              />
+            ))}
+            <span className="inline-flex items-center gap-1">
+              {hasChildren ? (
+                <button type="button" onClick={(e) => { e.stopPropagation(); toggleBomExpand(item.child_revision_id); }}
+                  className="w-4 h-4 inline-flex items-center justify-center shrink-0 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-200/60"
+                  title={children ? '\u6298\u53E0' : '\u5C55\u5F00'}>
+                  <BomChevron expanded={!!children} />
+                </button>
+              ) : (
+                <span className="w-4 shrink-0" />
+              )}
+              {level + 1}
+            </span>
           </td>
           <td className="px-3 py-2 font-medium">{item.child_code}</td>
           <td className="px-3 py-2">{item.child_name}</td>
