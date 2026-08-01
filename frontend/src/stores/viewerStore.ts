@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { TreeNode } from '../components/STPViewer/treeTypes';
+import type { CompareNode, DisplayMode, Side } from '../components/STPViewer/compareTypes';
 
 export interface ViewerState {
   // 模型状态
@@ -18,6 +19,20 @@ export interface ViewerState {
   expandedIds: Set<string>;
   hiddenParts: Set<string>;
   streamProgress: { loaded: number; total: number } | null;
+
+  /** BOM 3D 对比分片；null 表示非对比模式（其余三种预览模式均为 null） */
+  compare: {
+    tree: CompareNode;
+    nodeMap: Map<string, CompareNode>;
+    /** mesh uuid → 所属配对行与侧别，供 3D 点选反查 */
+    meshOwner: Map<string, { key: string; side: Side }>;
+    displayMode: DisplayMode;
+    onlyDiff: boolean;
+    ghostOpacity: number;
+    selectedKey: string | null;
+    leftMissing: boolean;
+    rightMissing: boolean;
+  } | null;
 
   // 视图
   modelScale: number;
@@ -42,6 +57,13 @@ export interface ViewerState {
   setLoadingState: (state: ViewerState['loadingState'], msg?: string) => void;
   setTreeData: (t: TreeNode | null) => void;
   setStreamProgress: (p: { loaded: number; total: number } | null) => void;
+  setCompareTree: (tree: CompareNode, opts: { leftMissing: boolean; rightMissing: boolean }) => void;
+  mergeCompareMeshes: (key: string, side: Side, meshUuids: string[]) => void;
+  selectCompareKey: (key: string | null) => void;
+  selectCompareByMesh: (meshUuid: string) => void;
+  setDisplayMode: (mode: DisplayMode) => void;
+  setOnlyDiff: (v: boolean) => void;
+  setGhostOpacity: (v: number) => void;
   mergeInstanceMeshes: (nodeId: string, meshUuids: string[]) => void;
   selectNode: (id: string | null) => void;
   selectByMesh: (meshUuid: string) => void;
@@ -68,6 +90,7 @@ const initialState = {
   errorMessage: '',
   treeData: null as TreeNode | null,
   streamProgress: null as { loaded: number; total: number } | null,
+  compare: null as ViewerState['compare'],
   nodeMap: new Map<string, TreeNode>(),
   meshOwner: new Map<string, TreeNode>(),
   selectedNodeId: null as string | null,
@@ -111,6 +134,94 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   },
 
   setStreamProgress: (p) => set({ streamProgress: p }),
+
+  setCompareTree: (tree, opts) => {
+    const nodeMap = new Map<string, CompareNode>();
+    const visit = (n: CompareNode) => {
+      nodeMap.set(n.key, n);
+      n.children.forEach(visit);
+    };
+    visit(tree);
+    set({
+      compare: {
+        tree,
+        nodeMap,
+        meshOwner: new Map(),
+        displayMode: 'both',
+        onlyDiff: false,
+        ghostOpacity: 0.12,
+        selectedKey: null,
+        leftMissing: opts.leftMissing,
+        rightMissing: opts.rightMissing,
+      },
+      expandedIds: new Set(['ROOT']),
+      hiddenParts: new Set(),
+    });
+  },
+
+  // 流式加载：把某侧某行的 mesh uuid 增量并入该节点及其所有祖先的同侧
+  // （祖先聚合供组级显隐/高亮），并把 meshOwner 指向该行。
+  mergeCompareMeshes: (key, side, meshUuids) => {
+    const c = get().compare;
+    if (!c || meshUuids.length === 0) return;
+    const node = c.nodeMap.get(key);
+    if (!node) return;
+
+    let cur: CompareNode | null = node;
+    while (cur) {
+      const target = cur[side];
+      if (target) {
+        const merged = new Set(target.meshUuids);
+        for (const u of meshUuids) merged.add(u);
+        target.meshUuids = Array.from(merged);
+      }
+      cur = cur.parentKey ? c.nodeMap.get(cur.parentKey) ?? null : null;
+    }
+
+    const meshOwner = new Map(c.meshOwner);
+    for (const u of meshUuids) meshOwner.set(u, { key, side });
+    // 浅拷贝 tree 触发面板重渲染
+    set({ compare: { ...c, tree: { ...c.tree }, meshOwner } });
+  },
+
+  selectCompareKey: (key) => {
+    const c = get().compare;
+    if (!c) return;
+    set({ compare: { ...c, selectedKey: key } });
+  },
+
+  selectCompareByMesh: (meshUuid) => {
+    const c = get().compare;
+    if (!c) return;
+    const owner = c.meshOwner.get(meshUuid);
+    if (!owner) return;
+    // 沿 parentKey 上溯展开所有祖先；expanded 自带去重，兼作环路防护
+    const expanded = new Set(get().expandedIds);
+    let p = c.nodeMap.get(owner.key)?.parentKey ?? null;
+    while (p && !expanded.has(p)) {
+      expanded.add(p);
+      p = c.nodeMap.get(p)?.parentKey ?? null;
+    }
+    set({ compare: { ...c, selectedKey: owner.key }, expandedIds: expanded });
+  },
+
+  setDisplayMode: (mode) => {
+    const c = get().compare;
+    if (!c) return;
+    set({ compare: { ...c, displayMode: mode } });
+  },
+
+  setOnlyDiff: (v) => {
+    const c = get().compare;
+    if (!c) return;
+    set({ compare: { ...c, onlyDiff: v } });
+  },
+
+  setGhostOpacity: (v) => {
+    const c = get().compare;
+    if (!c) return;
+    set({ compare: { ...c, ghostOpacity: v } });
+  },
 
   // 流式加载：把某叶子实例的 mesh uuid 增量并入其节点及所有祖先（祖先聚合供组级显隐/高亮），
   // 并把 meshOwner 指向该叶子。以浅拷贝 treeData 触发面板重渲染。
