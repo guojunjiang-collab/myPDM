@@ -35,7 +35,8 @@ export function Toolbar() {
   ];
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-100 bg-white shadow-sm">
+    <div className="relative border-b border-gray-100 bg-white shadow-sm">
+      <div className="flex items-center gap-3 px-4 py-2">
       {compare && (
         <>
           <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50 overflow-hidden shrink-0">
@@ -176,18 +177,19 @@ export function Toolbar() {
       >
         上色
       </button>
+      </div>
 
-      {/* Section plane sliders */}
+      {/* Section plane slider popup */}
       {activeAxes.length > 0 && (
-        <div className="flex items-center gap-3 ml-auto">
+        <div className="absolute left-1/2 -translate-x-1/2 top-full z-20 bg-white border border-gray-200 rounded-lg shadow-lg px-4 py-3">
           {(['x', 'y', 'z'] as const).map((axis) => {
             const plane = getPlane(axis);
             return plane ? (
-              <label key={axis} className="flex items-center gap-1.5 text-sm font-semibold uppercase text-gray-400">
-                {axis}
+              <div key={axis} className="flex items-center gap-2 text-sm py-0.5">
+                <span className="font-semibold uppercase text-gray-400 w-4">{axis}</span>
                 <button
                   onClick={() => toggleClipFlip(axis)}
-                  className={`text-sm px-1 rounded transition-colors ${(plane as any).flip ? 'text-blue-500 bg-blue-50' : 'text-gray-400 hover:text-gray-600'}`}
+                  className={`text-xs px-1.5 py-0.5 rounded transition-colors ${(plane as any).flip ? 'text-blue-500 bg-blue-50' : 'text-gray-400 hover:text-gray-600'}`}
                   title="切换剖面方向"
                 >
                   {(plane as any).flip ? '>' : '<'}
@@ -199,9 +201,9 @@ export function Toolbar() {
                   step={0.1}
                   value={(plane as any).position}
                   onChange={(e) => setClipPlane(axis, Number(e.target.value))}
-                  className="w-[13.5rem] h-1 accent-blue-500"
+                  className="w-48 h-1 accent-blue-500"
                 />
-              </label>
+              </div>
             ) : null;
           })}
         </div>
