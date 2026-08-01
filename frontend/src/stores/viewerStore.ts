@@ -64,6 +64,7 @@ export interface ViewerState {
   setDisplayMode: (mode: DisplayMode) => void;
   setOnlyDiff: (v: boolean) => void;
   setGhostOpacity: (v: number) => void;
+  toggleCompareSideVisibility: (key: string, side: Side) => void;
   mergeInstanceMeshes: (nodeId: string, meshUuids: string[]) => void;
   selectNode: (id: string | null) => void;
   selectByMesh: (meshUuid: string) => void;
@@ -221,6 +222,20 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
     const c = get().compare;
     if (!c) return;
     set({ compare: { ...c, ghostOpacity: v } });
+  },
+
+  // 切换某配对行某一侧的显隐（作用于该侧 meshUuids，与既有 hiddenParts 同一套机制）
+  toggleCompareSideVisibility: (key, side) => {
+    const c = get().compare;
+    if (!c) return;
+    const node = c.nodeMap.get(key);
+    const uuids = node?.[side]?.meshUuids ?? [];
+    if (uuids.length === 0) return;
+    const hidden = new Set(get().hiddenParts);
+    const allHidden = uuids.every((u) => hidden.has(u));
+    if (allHidden) uuids.forEach((u) => hidden.delete(u));
+    else uuids.forEach((u) => hidden.add(u));
+    set({ hiddenParts: hidden });
   },
 
   // 流式加载：把某叶子实例的 mesh uuid 增量并入其节点及所有祖先（祖先聚合供组级显隐/高亮），

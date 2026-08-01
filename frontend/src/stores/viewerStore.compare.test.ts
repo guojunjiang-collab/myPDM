@@ -112,4 +112,18 @@ describe('viewerStore compare 分片', () => {
     useViewerStore.getState().reset();
     expect(useViewerStore.getState().compare).toBeNull();
   });
+
+  it('toggleCompareSideVisibility 只隐藏指定侧的 mesh，再次调用恢复', () => {
+    const s = useViewerStore.getState();
+    s.setCompareTree(makeTree(), { leftMissing: false, rightMissing: false });
+    s.mergeCompareMeshes('/G/X', 'left', ['ml']);
+    s.mergeCompareMeshes('/G/X', 'right', ['mr']);
+
+    s.toggleCompareSideVisibility('/G/X', 'left');
+    expect(useViewerStore.getState().hiddenParts.has('ml')).toBe(true);
+    expect(useViewerStore.getState().hiddenParts.has('mr')).toBe(false);
+
+    useViewerStore.getState().toggleCompareSideVisibility('/G/X', 'left');
+    expect(useViewerStore.getState().hiddenParts.has('ml')).toBe(false);
+  });
 });
