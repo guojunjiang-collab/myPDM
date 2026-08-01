@@ -238,6 +238,14 @@ export default function PartCompareModal({ open, onClose }: Props) {
               className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 text-sm">
               {loading ? '对比中...' : '开始对比'}
             </button>
+            <button
+              onClick={() => window.open(`/stp-viewer?compare-left=${leftId}&compare-right=${rightId}`, '_blank')}
+              disabled={!leftId || !rightId}
+              title="在新标签页中叠加对比两个部件的 3D 模型"
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm"
+            >
+              🧊 3D对比
+            </button>
             {result && (
               <label className="flex items-center gap-1 text-sm text-gray-600 cursor-pointer select-none">
                 <input type="checkbox" checked={onlyDiff} onChange={(e) => setOnlyDiff(e.target.checked)} />
