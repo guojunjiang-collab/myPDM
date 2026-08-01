@@ -11,22 +11,6 @@ const ROW_BG: Record<ChangeType, string> = {
   none: '',
 };
 
-const CHANGE_LABEL: Record<ChangeType, string> = {
-  add: '新增',
-  delete: '删除',
-  modify: '修改',
-  internal: '子项变',
-  none: '',
-};
-
-const CHANGE_LABEL_COLOR: Record<ChangeType, string> = {
-  add: 'text-green-600',
-  delete: 'text-red-600',
-  modify: 'text-yellow-600',
-  internal: 'text-yellow-600',
-  none: '',
-};
-
 function Chevron({ expanded }: { expanded: boolean }) {
   return (
     <svg
@@ -107,11 +91,9 @@ function SideCell({ side, node, which, indent, leading }: {
         {count !== null && count !== undefined && <span className="text-gray-400 ml-1">×{count}</span>}
         {noModel && <span className="text-gray-400 ml-1">(无模型)</span>}
       </span>
-      {which === 'right' && node.changeType !== 'none' && CHANGE_LABEL[node.changeType] && (
-        <span className={`shrink-0 text-[10px] ${CHANGE_LABEL_COLOR[node.changeType]}`}>
-          {CHANGE_LABEL[node.changeType]}
-        </span>
-      )}
+      {/* 增删改的底色已足够表意，不再重复文字标签；
+          「位置变」保留 —— 紫色底在这套界面里没有约定俗成的含义，
+          且它标的正是后端 BOM diff 看不见的那类变动。 */}
       {which === 'right' && node.changeType === 'none' && node.placementChanged && (
         <span className="shrink-0 text-[10px] text-purple-600">位置变</span>
       )}
