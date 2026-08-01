@@ -180,7 +180,7 @@ function InstanceRow({ inst, depth, node }: { inst: CompareInstanceNode; depth: 
       <GuideLines indent={indent} />
       <div
         onClick={(e) => { e.stopPropagation(); selectCompareKey(inst.key); }}
-        className={`flex items-stretch cursor-pointer select-none border-b border-gray-50 transition-colors relative ${bg}`}
+        className={`flex items-stretch cursor-pointer select-none border-b border-gray-50 transition-colors ${bg}`}
       >
         <div className="shrink-0 w-5" />
         <InstanceCell present={inLeft} label={labelOf(node.left)} meshUuids={inst.leftMeshUuids} indent={indent} />
@@ -213,7 +213,7 @@ function Row({ node, depth }: { node: CompareNode; depth: number }) {
       <div
         ref={rowRef}
         onClick={() => selectCompareKey(node.key)}
-        className={`flex items-stretch cursor-pointer select-none border-b border-gray-50 transition-colors relative
+        className={`flex items-stretch cursor-pointer select-none border-b border-gray-50 transition-colors
           ${selected
             ? 'ring-1 ring-inset ring-primary-400 bg-primary-50'
             : `${node.changeType === 'none' && node.placementChanged ? 'bg-purple-50' : ROW_BG[node.changeType]} hover:brightness-95`}`}
