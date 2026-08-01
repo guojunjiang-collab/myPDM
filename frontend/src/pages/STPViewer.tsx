@@ -26,6 +26,7 @@ export default function STPViewerPage() {
   const reset = useViewerStore((s) => s.reset);
   const setTreeData = useViewerStore((s) => s.setTreeData);
   const setLoadingState = useViewerStore((s) => s.setLoadingState);
+  const setModelZUp = useViewerStore((s) => s.setModelZUp);
 
   const params = new URLSearchParams(location.search);
   const assemblyRevId = params.get('assembly');
@@ -67,6 +68,7 @@ export default function STPViewerPage() {
     reset();
     if (compareLeftId && compareRightId) {
       setState('loading');
+      setModelZUp(true);
       Promise.all([
         bomApi.compare(compareLeftId, compareRightId),
         assemblyViewerApi.instances(compareLeftId).catch(() => [] as AssemblyInstance[]),
@@ -86,6 +88,7 @@ export default function STPViewerPage() {
       return;
     }
     if (assemblyRevId) {
+      setModelZUp(true);
       Promise.all([
         assemblyViewerApi.instances(assemblyRevId),
         assemblyViewerApi.tree(assemblyRevId),

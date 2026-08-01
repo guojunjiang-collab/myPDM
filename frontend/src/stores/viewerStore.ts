@@ -45,6 +45,9 @@ export interface ViewerState {
   viewTarget: string | null;
   cameraQuat: [number, number, number, number];
   resetViewTrigger: number;
+  /** 模型使用 Z-up 坐标系（STEP/STP 导入），与 Three.js 默认 Y-up 差 -90°X；
+      为true时 ViewCube 与视图跳转需做坐标补偿 */
+  modelZUp: boolean;
   // 初始状态（重置时恢复）
   initGroupScale: number;
   initGroupPos: [number, number, number];
@@ -80,6 +83,7 @@ export interface ViewerState {
   toggleAutoColor: () => void;
   toggleCameraMode: () => void;
   setViewTarget: (view: string | null) => void;
+  setModelZUp: (v: boolean) => void;
   triggerResetView: () => void;
   setInitialState: (s: { groupScale: number; groupPos: [number, number, number]; camPos: [number, number, number]; camTarget: [number, number, number] }) => void;
   reset: () => void;
@@ -108,6 +112,7 @@ const initialState = {
   viewTarget: null as string | null,
   cameraQuat: [0, 0, 0, 1] as [number, number, number, number],
   resetViewTrigger: 0,
+  modelZUp: false,
   initGroupScale: 1,
   initGroupPos: [0, 0, 0] as [number, number, number],
   initCamPos: [5, 5, 5] as [number, number, number],
@@ -319,6 +324,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   toggleAutoColor: () => set({ autoColor: !get().autoColor }),
   toggleCameraMode: () => set({ cameraMode: get().cameraMode === 'orthographic' ? 'perspective' : 'orthographic' }),
   setViewTarget: (view) => set({ viewTarget: view }),
+  setModelZUp: (v) => set({ modelZUp: v }),
   triggerResetView: () => set({ resetViewTrigger: get().resetViewTrigger + 1 }),
   setInitialState: (s) => set({
     initGroupScale: s.groupScale,

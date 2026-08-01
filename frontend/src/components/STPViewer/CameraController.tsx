@@ -34,6 +34,7 @@ function bestUp(viewDir: THREE.Vector3, currentUp: THREE.Vector3): THREE.Vector3
 export function CameraController() {
   const cameraMode = useViewerStore((s) => s.cameraMode);
   const viewTarget = useViewerStore((s) => s.viewTarget);
+  const modelZUp = useViewerStore((s) => s.modelZUp);
   const setViewTarget = useViewerStore((s) => s.setViewTarget);
   const resetViewTrigger = useViewerStore((s) => s.resetViewTrigger);
   const streamProgress = useViewerStore((s) => s.streamProgress);
@@ -102,12 +103,19 @@ export function CameraController() {
     const dir = VIEWS[viewTarget];
     if (!dir) return;
 
+    // Z-up 模型：front(Y+)→世界-Z，故前后需交换（左右／上下不变）
+    let worldDir = dir.clone();
+    if (modelZUp) {
+      if (viewTarget === 'front') worldDir = VIEWS.back.clone();
+      else if (viewTarget === 'back') worldDir = VIEWS.front.clone();
+    }
+
     const controls = controlsRef.current;
     const target = (controls as any).target as THREE.Vector3 | undefined;
     const center = target ? target.clone() : new THREE.Vector3(0, 0, 0);
     const dist = camera.position.distanceTo(center) || 5;
-    const endPos = center.clone().addScaledVector(dir, dist);
-    const up = bestUp(dir, camera.up);
+    const endPos = center.clone().addScaledVector(worldDir, dist);
+    const up = bestUp(worldDir, camera.up);
     anim.current = {
       start: camera.position.clone(),
       end: endPos,
@@ -116,7 +124,7 @@ export function CameraController() {
       elapsed: 0,
     };
     setViewTarget(null);
-  }, [viewTarget]);
+  }, [viewTarget, modelZUp]);
 
   // 重置：恢复到初始视角
   useEffect(() => {
