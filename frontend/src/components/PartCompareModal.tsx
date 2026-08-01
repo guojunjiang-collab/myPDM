@@ -298,7 +298,6 @@ export default function PartCompareModal({ open, onClose }: Props) {
               <div className="flex-1 min-h-0 border rounded-lg overflow-auto">
                 <table className="w-full text-sm">
                   <colgroup>
-                    <col className="w-12" />
                     <col />
                     <col className="w-10" />
                     <col className="w-16" />
@@ -313,7 +312,6 @@ export default function PartCompareModal({ open, onClose }: Props) {
                   </colgroup>
                   <thead className="sticky top-0 bg-gray-50 z-10">
                     <tr className="text-xs font-medium text-gray-600 border-b">
-                      <th className="px-2 py-2 text-left">层级</th>
                       <th colSpan={4} className="px-2 py-2 text-left border-r border-gray-200">左部件 BOM</th>
                       <th className="w-px bg-gray-200 p-0" />
                       <th colSpan={4} className="px-2 py-2 text-left">右部件 BOM</th>
@@ -321,7 +319,6 @@ export default function PartCompareModal({ open, onClose }: Props) {
                       <th className="px-2 py-2 text-left">变更</th>
                     </tr>
                     <tr className="text-xs font-medium text-gray-500 border-b">
-                      <th className="px-2 py-1" />
                       <th className="px-2 py-1 text-left">件号</th>
                       <th className="px-2 py-1 text-center">版本</th>
                       <th className="px-2 py-1 text-center">状态</th>
@@ -355,13 +352,11 @@ export default function PartCompareModal({ open, onClose }: Props) {
                             }
                           }}>
                           <td
-                            className="relative px-3 py-2 text-gray-400 text-xs whitespace-nowrap"
-                            style={{ paddingLeft: n.key === 'ROOT' ? 12 : (12 + n.level * 12) }}
+                            className="relative px-2 py-2 text-xs font-medium whitespace-nowrap"
+                            style={{ paddingLeft: n.key === 'ROOT' ? 12 : (20 + n.level * 12) }}
                             onClick={(e) => e.stopPropagation()}
                           >
-                            {/* 层级竖线：每行自绘 0..level-1 各级线段，对齐该层展开按钮中心(20+k*12)。
-                                -top-px 盖住 tbody 的 divide-y 分隔线，使上下行线段首尾相接。 */}
-                            {n.key !== 'ROOT' && Array.from({ length: n.level }, (_, k) => (
+                            {n.key !== 'ROOT' && n.level > 0 && Array.from({ length: n.level }, (_, k) => (
                               <span
                                 key={k}
                                 className="absolute -top-px bottom-0 w-px bg-gray-200 pointer-events-none"
@@ -378,15 +373,29 @@ export default function PartCompareModal({ open, onClose }: Props) {
                               ) : (
                                 <span className="w-4 shrink-0" />
                               )}
-                              {n.level + 1}
+                              <span>{l?.detail.code || '-'}</span>
                             </span>
                           </td>
-                          <td className="px-2 py-2 text-xs font-medium">{l?.detail.code || '-'}</td>
                           <td className="px-2 py-2 text-xs text-center text-gray-500">{l?.detail.version || '-'}</td>
                           <td className="px-2 py-2 text-xs text-center text-gray-500">{statusLabel(l?.detail.status)}</td>
                           <td className="px-2 py-2 text-xs text-center text-gray-500">{n.key === 'ROOT' ? '-' : (l?.quantity ?? '-')}</td>
                           <td className="w-px bg-gray-200 p-0" />
-                          <td className={`px-2 py-2 text-xs font-medium ${versionChanged ? 'font-semibold' : ''}`}>{r?.detail.code || '-'}</td>
+                          <td
+                            className="relative px-2 py-2 text-xs font-medium whitespace-nowrap"
+                            style={{ paddingLeft: n.key === 'ROOT' ? 12 : (20 + n.level * 12) }}
+                          >
+                            {n.key !== 'ROOT' && n.level > 0 && Array.from({ length: n.level }, (_, k) => (
+                              <span
+                                key={k}
+                                className="absolute -top-px bottom-0 w-px bg-gray-200 pointer-events-none"
+                                style={{ left: 20 + k * 12 }}
+                              />
+                            ))}
+                            <span className="inline-flex items-center gap-1">
+                              <span className="w-4 shrink-0" />
+                              <span className={versionChanged ? 'font-semibold' : ''}>{r?.detail.code || '-'}</span>
+                            </span>
+                          </td>
                           <td className={`px-2 py-2 text-xs text-center ${versionChanged ? 'font-semibold' : 'text-gray-500'}`}>{r?.detail.version || '-'}</td>
                           <td className={`px-2 py-2 text-xs text-center ${statusChanged ? 'font-semibold' : 'text-gray-500'}`}>{statusLabel(r?.detail.status)}</td>
                           <td className={`px-2 py-2 text-xs text-center ${qtyChanged ? 'font-semibold' : 'text-gray-500'}`}>{n.key === 'ROOT' ? '-' : (r?.quantity ?? '-')}</td>
