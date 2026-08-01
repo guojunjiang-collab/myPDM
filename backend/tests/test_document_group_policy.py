@@ -9,8 +9,9 @@ def _u(role, uid):
     return SimpleNamespace(role=role, id=uid)
 
 
-def _doc(creator_id=None):
-    return SimpleNamespace(id=uuid.uuid4(), creator_id=creator_id)
+def _doc():
+    """纯占位对象：策略不再从对象上读 creator_id（v3.1.3 起该列在迭代层）。"""
+    return SimpleNamespace(id=uuid.uuid4())
 
 
 def test_admin_always_allowed():
@@ -20,10 +21,18 @@ def test_admin_always_allowed():
 
 
 def test_creator_always_allowed():
+    """创建者放行 —— creator_id 由调用方（crud_groups 回溯迭代层）显式传入。"""
     uid = uuid.uuid4()
     g = uuid.uuid4()
-    assert check_object_policy("document_content_access", _u("engineer", uid), _doc(creator_id=uid),
-                               user_group_ids=set(), doc_group_ids={g}) is True
+    assert check_object_policy("document_content_access", _u("engineer", uid), _doc(),
+                               user_group_ids=set(), doc_group_ids={g}, creator_id=uid) is True
+
+
+def test_other_user_not_treated_as_creator():
+    g = uuid.uuid4()
+    assert check_object_policy("document_content_access", _u("engineer", uuid.uuid4()), _doc(),
+                               user_group_ids=set(), doc_group_ids={g},
+                               creator_id=uuid.uuid4()) is False
 
 
 def test_unlinked_document_allows_everyone():

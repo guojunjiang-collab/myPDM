@@ -9,7 +9,7 @@ from ..models import (
 )
 from ..models_parts import PartMaster, PartRevision
 from ..models_configuration import ConfigurationItemMaster, ConfigurationItemRevision
-from ..permissions import require_permission, enforce_object_policy
+from ..permissions import require_permission, check_object_policy
 
 router = APIRouter(prefix="/dashboard", tags=["用户看板"])
 
@@ -511,8 +511,7 @@ async def get_folder_shares(folder_id: uuid.UUID, db: Session = Depends(get_db),
     dash = db.query(UserDashboard).filter(UserDashboard.id == folder.dashboard_id).first()
     if not dash or dash.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="只有文件夹拥有者可以查看共享列表")
-    folder.owner_user_id = dash.user_id if dash else None
-    enforce_object_policy("dashboard_folder_editor", current_user, folder)
+    _check_folder_edit_permission(folder, current_user, db)
 
     shares = db.query(DashboardFolderShare).filter(
         DashboardFolderShare.folder_id == folder_id
@@ -548,8 +547,7 @@ async def add_folder_share(folder_id: uuid.UUID, data: dict, request: Request, d
     dash = db.query(UserDashboard).filter(UserDashboard.id == folder.dashboard_id).first()
     if not dash or dash.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="只有文件夹拥有者可以设置共享")
-    folder.owner_user_id = dash.user_id if dash else None
-    enforce_object_policy("dashboard_folder_editor", current_user, folder)
+    _check_folder_edit_permission(folder, current_user, db)
 
     user_id = data.get("shared_with_user_id")
     permission = data.get("permission", "view")
@@ -602,12 +600,15 @@ async def update_folder_share_permission(folder_id: uuid.UUID, share_id: uuid.UU
     if not share:
         raise HTTPException(status_code=404, detail="共享记录不存在")
 
+    folder = db.query(DashboardFolder).filter(DashboardFolder.id == folder_id).first()
+    if not folder:
+        raise HTTPException(status_code=404, detail="文件夹不存在")
+
     # 只有拥有者可以修改共享权限
-    dash = db.query(UserDashboard).filter(UserDashboard.id == db.query(DashboardFolder).filter(DashboardFolder.id == folder_id).first().dashboard_id).first()
+    dash = db.query(UserDashboard).filter(UserDashboard.id == folder.dashboard_id).first()
     if not dash or dash.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="只有文件夹拥有者可以修改共享权限")
-    folder.owner_user_id = dash.user_id if dash else None
-    enforce_object_policy("dashboard_folder_editor", current_user, folder)
+    _check_folder_edit_permission(folder, current_user, db)
 
     permission = data.get("permission")
     if not permission or permission not in ("view", "edit"):
@@ -678,8 +679,7 @@ async def save_folder_shares_batch(
     dash = db.query(UserDashboard).filter(UserDashboard.id == folder.dashboard_id).first()
     if not dash or dash.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="只有文件夹拥有者可以设置共享")
-    folder.owner_user_id = dash.user_id if dash else None
-    enforce_object_policy("dashboard_folder_editor", current_user, folder)
+    _check_folder_edit_permission(folder, current_user, db)
 
     shares_data = data.get("shares", [])
     # 去重：同一用户只保留一条
@@ -1152,25 +1152,27 @@ def _delete_folder_cascade(folder_id, db: Session):
 
 
 def _check_folder_edit_permission(folder, user, db):
-    """检查用户是否有文件夹编辑权限（支持向上追溯父级共享权限）"""
+    """文件夹编辑权门禁 —— 全模块唯一入口。
+
+    判定委托给注册策略 `dashboard_folder_editor`，本函数只负责算出策略所需的
+    上下文：看板所有者 + 在本文件夹或其任一祖先上被授予 edit 的用户集合。
+    （DashboardFolder 模型既无 owner 列也无法表达祖先继承，故不能让策略自己去取。）
+    """
     dash = db.query(UserDashboard).filter(UserDashboard.id == folder.dashboard_id).first()
     if not dash:
         raise HTTPException(status_code=404, detail="看板不存在")
 
-    # 拥有者始终有权限
-    if dash.user_id == user.id:
-        return
-
-    # 向上追溯：检查该文件夹或其任何祖先是否有给当前用户的编辑权限
-    ancestor_ids = _get_ancestor_ids(folder.id, db)
-    all_check_ids = [folder.id] + ancestor_ids
-
-    share = db.query(DashboardFolderShare).filter(
-        DashboardFolderShare.folder_id.in_(all_check_ids),
-        DashboardFolderShare.shared_with_user_id == user.id,
-        DashboardFolderShare.permission == "edit",
-    ).first()
-    if not share:
+    # 向上追溯：本文件夹 + 全部祖先上的 edit 共享
+    all_check_ids = [folder.id] + _get_ancestor_ids(folder.id, db)
+    editor_ids = {
+        s.shared_with_user_id
+        for s in db.query(DashboardFolderShare).filter(
+            DashboardFolderShare.folder_id.in_(all_check_ids),
+            DashboardFolderShare.permission == "edit",
+        ).all()
+    }
+    if not check_object_policy("dashboard_folder_editor", user, folder,
+                               owner_user_id=dash.user_id, editor_user_ids=editor_ids):
         raise HTTPException(status_code=403, detail="无权编辑此文件夹")
 
 

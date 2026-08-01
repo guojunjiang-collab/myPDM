@@ -116,6 +116,8 @@ async def list_documents(
         show_all_versions=show_all_versions,
         page=page, page_size=page_size,
     )
+    # 用户组访问标记（前端据此置灰 + 🔒 + "可查看"筛选）；批量查询，不逐行
+    crud_groups.annotate_documents_access(db, current_user, items)
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 

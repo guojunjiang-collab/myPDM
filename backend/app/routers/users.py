@@ -12,7 +12,16 @@ router = APIRouter(prefix="/users", tags=["用户管理"])
 
 @router.get("/", response_model=list[schemas.UserResponse])
 async def list_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(require_permission("users:read"))):
-    return crud.get_users(db, skip=skip, limit=limit)
+    """用户列表。全角色可读（选人下拉依赖此接口），但手机号仅 admin 与本人可见。"""
+    users = crud.get_users(db, skip=skip, limit=limit)
+    if current_user.role == "admin":
+        return users
+    return [
+        schemas.UserResponse.model_validate(u).model_copy(
+            update={} if u.id == current_user.id else {"phone": None}
+        )
+        for u in users
+    ]
 
 @router.post("/", response_model=schemas.UserResponse)
 async def create_user(user: schemas.UserCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_permission("users:create"))):

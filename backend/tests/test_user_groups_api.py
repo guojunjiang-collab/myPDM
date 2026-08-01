@@ -1,56 +1,53 @@
 import uuid
 from fastapi import HTTPException
 import pytest
-from app import models, crud_groups
+from app import crud_groups, models
 
 
-def _doc(db, creator_id=None):
-    d = models.Document(code=f"D{uuid.uuid4().hex[:6]}", name="图纸", creator_id=creator_id)
-    db.add(d); db.commit(); db.refresh(d)
-    return d
-
-
-def _att(db, document_id):
-    a = models.DocumentAttachment(document_id=document_id, file_name="a.pdf", file_path="x/a.pdf")
-    db.add(a); db.commit(); db.refresh(a)
-    return a
-
-
-def _group(db, name):
-    g = models.UserGroup(name=name)
-    db.add(g); db.commit(); db.refresh(g)
-    return g
-
-
-def test_get_user_and_document_group_ids(db, engineer_user):
-    g = _group(db, "G1")
+def test_get_user_and_document_group_ids(db, engineer_user, make_user_group, make_document):
+    g = make_user_group("G1")
     db.add(models.UserGroupMember(user_id=engineer_user.id, group_id=g.id)); db.commit()
-    d = _doc(db)
-    db.add(models.DocumentGroupLink(document_id=d.id, group_id=g.id)); db.commit()
+    master, _rev, _it = make_document(group_ids=[g.id])
     assert crud_groups.get_user_group_ids(db, engineer_user.id) == {g.id}
-    assert crud_groups.get_document_group_ids(db, d.id) == {g.id}
+    # 组关联挂在 Master 上
+    assert crud_groups.get_document_group_ids(db, master.id) == {g.id}
 
 
-def test_document_is_accessible_unlinked(db, guest_user):
-    d = _doc(db)
-    assert crud_groups.document_is_accessible(db, guest_user, d) is True
+def test_get_document_creator_id_reads_first_iteration(db, engineer_user, make_document):
+    """创建者取"最早版本最早迭代"的 creator_id（v3.1.3 起该列在迭代层）。"""
+    master, _rev, _it = make_document(creator=engineer_user)
+    assert crud_groups.get_document_creator_id(db, master.id) == engineer_user.id
 
 
-def test_document_is_accessible_member_vs_nonmember(db, engineer_user, guest_user):
-    g = _group(db, "G2")
+def test_document_is_accessible_unlinked(db, guest_user, make_document):
+    master, _rev, _it = make_document()
+    assert crud_groups.document_is_accessible(db, guest_user, master) is True
+
+
+def test_document_is_accessible_member_vs_nonmember(db, engineer_user, guest_user,
+                                                    make_user_group, make_document):
+    g = make_user_group("G2")
     db.add(models.UserGroupMember(user_id=engineer_user.id, group_id=g.id)); db.commit()
-    d = _doc(db)
-    db.add(models.DocumentGroupLink(document_id=d.id, group_id=g.id)); db.commit()
-    assert crud_groups.document_is_accessible(db, engineer_user, d) is True
-    assert crud_groups.document_is_accessible(db, guest_user, d) is False
+    master, _rev, _it = make_document(group_ids=[g.id])
+    assert crud_groups.document_is_accessible(db, engineer_user, master) is True
+    assert crud_groups.document_is_accessible(db, guest_user, master) is False
 
 
-def test_enforce_attachment_content_access(db, engineer_user, guest_user):
-    g = _group(db, "G3")
+def test_document_is_accessible_for_creator_outside_group(db, engineer_user, guest_user,
+                                                          make_user_group, make_document):
+    """创建者即使不在关联组内也可访问（审计问题 #5 的回归护栏）。"""
+    g = make_user_group("G2b")
+    db.add(models.UserGroupMember(user_id=guest_user.id, group_id=g.id)); db.commit()
+    master, _rev, _it = make_document(creator=engineer_user, group_ids=[g.id])
+    assert crud_groups.document_is_accessible(db, engineer_user, master) is True
+
+
+def test_enforce_attachment_content_access(db, engineer_user, guest_user, make_user_group,
+                                           make_document, make_doc_attachment):
+    g = make_user_group("G3")
     db.add(models.UserGroupMember(user_id=engineer_user.id, group_id=g.id)); db.commit()
-    d = _doc(db)
-    db.add(models.DocumentGroupLink(document_id=d.id, group_id=g.id)); db.commit()
-    att = _att(db, d.id)
+    _m, rev, it = make_document(group_ids=[g.id])
+    att = make_doc_attachment(rev, it)
     crud_groups.enforce_attachment_content_access(db, engineer_user, att.id)
     with pytest.raises(HTTPException):
         crud_groups.enforce_attachment_content_access(db, guest_user, att.id)
@@ -104,11 +101,11 @@ def test_group_create_forbidden_for_non_admin(db, engineer_user):
         app.dependency_overrides.clear()
 
 
-def test_user_groups_subresource(db, admin_user, engineer_user):
+def test_user_groups_subresource(db, admin_user, engineer_user, make_user_group):
     from app.main import app
     client = _client(db, admin_user)
     try:
-        g = _group(db, "Gsub")
+        g = make_user_group("Gsub")
         r = client.get(f"/api/users/{engineer_user.id}/groups")
         assert r.status_code == 200 and r.json()["group_ids"] == []
         r = client.put(f"/api/users/{engineer_user.id}/groups", json={"group_ids": [str(g.id)]})

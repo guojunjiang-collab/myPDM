@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timezone
 
 from app import models, crud_deliverables
-from app.models_parts import PartMaster, PartRevision
+from app.models_parts import PartMaster, PartRevision, PartIteration
 from app.models_project import Project, ProjectTask, ProjectTaskLink
 
 
@@ -38,15 +38,17 @@ def _link(db, task, entity_type, entity_id):
 
 def _part(db, creator, code="P-001", versions=("A",), ptype="part",
           status="released", deleted=False):
+    # v3.1.3：creator_id 落在 Iteration 层，Master/Revision 上已无该列
     m = PartMaster(id=uuid.uuid4(), code=code, name=f"{code}名称", type=ptype,
-                   creator_id=creator.id,
                    deleted_at=datetime.now(timezone.utc) if deleted else None)
     db.add(m); db.flush()
     revs = []
     for v in versions:
-        r = PartRevision(id=uuid.uuid4(), master_id=m.id, version=v, status=status,
-                         creator_id=creator.id)
-        db.add(r); db.flush(); revs.append(r)
+        r = PartRevision(id=uuid.uuid4(), master_id=m.id, version=v, status=status)
+        db.add(r); db.flush()
+        db.add(PartIteration(id=uuid.uuid4(), revision_id=r.id, iteration=1,
+                             creator_id=creator.id))
+        db.flush(); revs.append(r)
     db.commit()
     return m, revs
 
@@ -158,31 +160,33 @@ from app.models_configuration import (
 
 def _document(db, creator, code="D-001", versions=("A",), status="released",
               remark="首版", deleted=False):
+    # v3.1.3：creator_id 落在 Iteration 层
     m = models.DocumentMaster(id=uuid.uuid4(), code=code, name=f"{code}图纸",
-                              creator_id=creator.id,
                               deleted_at=datetime.now(timezone.utc) if deleted else None)
     db.add(m); db.flush()
     revs = []
     for v in versions:
         r = models.DocumentRevision(id=uuid.uuid4(), master_id=m.id, version=v,
-                                    status=status, remark=remark, creator_id=creator.id)
-        db.add(r); db.flush(); revs.append(r)
+                                    status=status, remark=remark)
+        db.add(r); db.flush()
+        db.add(models.DocumentIteration(id=uuid.uuid4(), revision_id=r.id, iteration=1,
+                                        creator_id=creator.id))
+        db.flush(); revs.append(r)
     db.commit()
     return m, revs
 
 
 def _config_item(db, creator, code="CI-001", version="A", status="released",
                  latest_iteration=2, version_name="首轮构型"):
-    m = ConfigurationItemMaster(id=uuid.uuid4(), code=code, name=f"{code}构型",
-                                creator_id=creator.id)
+    m = ConfigurationItemMaster(id=uuid.uuid4(), code=code, name=f"{code}构型")
     db.add(m); db.flush()
     r = ConfigurationItemRevision(id=uuid.uuid4(), master_id=m.id, version=version,
-                                  status=status, latest_iteration=latest_iteration,
-                                  creator_id=creator.id)
+                                  status=status, latest_iteration=latest_iteration)
     db.add(r); db.flush()
-    # 造两个迭代，确认取的是 latest_iteration 那个而不是第一个
+    # 造两个迭代，确认 extra 取的是 latest_iteration 那个而不是第一个；
+    # 创建者按"首个迭代"口径，故 creator_id 写在 iteration 1 上
     db.add(ConfigurationItemIteration(id=uuid.uuid4(), revision_id=r.id, iteration=1,
-                                      version_name="旧名"))
+                                      version_name="旧名", creator_id=creator.id))
     db.add(ConfigurationItemIteration(id=uuid.uuid4(), revision_id=r.id,
                                       iteration=latest_iteration, version_name=version_name))
     db.commit()
@@ -246,11 +250,10 @@ def test_config_item_without_matching_iteration_has_empty_extra(db):
     owner = _user(db)
     p = _project(db, owner)
     t = _task(db, p)
-    m = ConfigurationItemMaster(id=uuid.uuid4(), code="CI-009", name="无迭代构型",
-                                creator_id=owner.id)
+    m = ConfigurationItemMaster(id=uuid.uuid4(), code="CI-009", name="无迭代构型")
     db.add(m); db.flush()
     rev = ConfigurationItemRevision(id=uuid.uuid4(), master_id=m.id, version="A",
-                                    status="draft", latest_iteration=5, creator_id=owner.id)
+                                    status="draft", latest_iteration=5)
     db.add(rev); db.commit()
     _link(db, t, "config_item", rev.id)
 

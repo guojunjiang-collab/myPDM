@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
-import { useAuthStore } from '../stores/auth';
+import { useAuthStore, can } from '../stores/auth';
 import { useDataStore } from '../stores/data';
 import { usePageHeader } from '../stores/pageHeader';
 import { useNotificationStore } from '../stores/notification';
@@ -11,12 +11,15 @@ import FloatingAssistant from './assistant/FloatingAssistant';
 import NotificationBell from './NotificationBell';
 import LicenseBanner from './LicenseBanner';
 import { useLicenseStore, hasModule } from '../stores/license';
+import type { Permission } from '../constants/permissions.generated';
 
 type NavItem = {
   path: string;
   label: string;
   icon: string;
-  roles: string[];
+  /** 导航可见性权限（permissions.json 的 nav.* 项），与后端同一事实源 */
+  perm: Permission;
+  /** 所属 license 模块，未授权时隐藏；不填表示不受模块授权限制 */
   module?: string;
 };
 
@@ -25,21 +28,21 @@ type NavSeparator = {
 };
 
 const navItems: (NavItem | NavSeparator)[] = [
-  { path: '/dashboard', label: '仪表盘', icon: '📊', roles: ['admin', 'engineer', 'production', 'guest'] },
-  { path: '/board', label: '用户看板', icon: '📋', roles: ['admin', 'engineer', 'production', 'guest'] },
+  { path: '/dashboard', label: '仪表盘', icon: '📊', perm: 'nav.dashboard' },
+  { path: '/board', label: '用户看板', icon: '📋', perm: 'nav.board' },
   { type: 'separator' },
-  { path: '/configuration', label: '构型管理', icon: '📐', roles: ['admin', 'engineer', 'production', 'guest'] },
-  { path: '/parts', label: '零部件管理', icon: '📦', roles: ['admin', 'engineer', 'production', 'guest'] },
-  { path: '/documents', label: '图文档管理', icon: '📄', roles: ['admin', 'engineer', 'production', 'guest'] },
+  { path: '/configuration', label: '构型管理', icon: '📐', perm: 'nav.configuration' },
+  { path: '/parts', label: '零部件管理', icon: '📦', perm: 'nav.parts' },
+  { path: '/documents', label: '图文档管理', icon: '📄', perm: 'nav.documents' },
   { type: 'separator' },
-  { path: '/ec', label: '变更管理', icon: '🔄', roles: ['admin', 'engineer', 'production', 'guest'], module: 'change' },
-  { path: '/inventory', label: '库存管理', icon: '🏬', roles: ['admin', 'engineer', 'production', 'guest'], module: 'inventory' },
-  { path: '/projects', label: '项目管理', icon: '🗂️', roles: ['admin', 'engineer', 'production'], module: 'project' },
+  { path: '/ec', label: '变更管理', icon: '🔄', perm: 'nav.ec', module: 'change' },
+  { path: '/inventory', label: '库存管理', icon: '🏬', perm: 'nav.inventory', module: 'inventory' },
+  { path: '/projects', label: '项目管理', icon: '🗂️', perm: 'nav.projects', module: 'project' },
   { type: 'separator' },
-  { path: '/users', label: '用户管理', icon: '👥', roles: ['admin', 'engineer', 'production', 'guest'] },
-  { path: '/settings', label: '系统设置', icon: '⚙️', roles: ['admin', 'engineer', 'production', 'guest'] },
+  { path: '/users', label: '用户管理', icon: '👥', perm: 'nav.users' },
+  { path: '/settings', label: '系统设置', icon: '⚙️', perm: 'nav.settings' },
   { type: 'separator' },
-  { path: '/help', label: '帮助文档', icon: '❓', roles: ['admin', 'engineer', 'production', 'guest'] },
+  { path: '/help', label: '帮助文档', icon: '❓', perm: 'nav.help' },
 ];
 
 export default function Layout() {
@@ -52,7 +55,6 @@ export default function Layout() {
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [lastSyncText, setLastSyncText] = useState<string>('--');
   const headerContent = usePageHeader((s) => s.content);
-  const userRole = user?.role || 'guest';
   const fetchUnread = useNotificationStore((s) => s.fetchUnread);
   const fetchLicense = useLicenseStore((s) => s.fetch);
 
@@ -93,9 +95,10 @@ export default function Layout() {
   const isSeparator = (item: NavItem | NavSeparator): item is NavSeparator =>
     'type' in item && item.type === 'separator';
 
+  // 两道门：角色权限（nav.* 与后端同源）+ license 模块授权
   const visibleNavItems = navItems.filter((item) => {
     if (isSeparator(item)) return true;
-    if (!item.roles.includes(userRole)) return false;
+    if (!can(item.perm)) return false;
     if (item.module && !hasModule(item.module)) return false;
     return true;
   });
