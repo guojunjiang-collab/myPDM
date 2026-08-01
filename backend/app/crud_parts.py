@@ -1527,12 +1527,31 @@ def sync_cad_bom_children(
         .all()
     )
     code_to_item: dict = {}
+    duplicate_codes: set = set()
     for item in existing_items:
         child_rev = get_part_revision(db, item.child_revision_id)
         if child_rev:
             master = get_part_master(db, child_rev.master_id)
             if master:
-                code_to_item[master.code] = item
+                if master.code in code_to_item:
+                    duplicate_codes.add(master.code)
+                else:
+                    code_to_item[master.code] = item
+    if duplicate_codes:
+        dup_items = (
+            db.query(models.BOMItem)
+            .filter(
+                models.BOMItem.parent_revision_id == revision_id,
+                models.BOMItem.deleted_at.is_(None),
+            )
+            .all()
+        )
+        for item in dup_items:
+            child_rev = get_part_revision(db, item.child_revision_id)
+            if child_rev:
+                master = get_part_master(db, child_rev.master_id)
+                if master and master.code in duplicate_codes and code_to_item.get(master.code) != item:
+                    item.deleted_at = datetime.now(timezone.utc)
 
     iteration = _current_iteration(db, revision_id)
     created_parts: List[str] = []
@@ -1599,6 +1618,8 @@ def sync_cad_bom_children(
                 cad_instances=cad_entries,
             )
             db.add(item)
+            # 更新索引：同一请求中后续出现相同 code 时走 UPDATE 分支，避免重复 INSERT
+            code_to_item[code] = item
             created_items += 1
 
     db.commit()
