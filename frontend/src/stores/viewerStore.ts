@@ -137,7 +137,10 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
       n.children.forEach(visit);
     };
     if (t) visit(t);
-    set({ treeData: t, nodeMap, meshOwner, selectedNodeId: null, hiddenParts: new Set() });
+    // 默认展开根（显示根的直接子节点，但不展开子节点自身）
+    const expandedIds = new Set<string>();
+    if (t) expandedIds.add(t.id);
+    set({ treeData: t, nodeMap, meshOwner, selectedNodeId: null, hiddenParts: new Set(), expandedIds });
   },
 
   setStreamProgress: (p) => set({ streamProgress: p }),

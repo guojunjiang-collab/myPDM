@@ -299,10 +299,12 @@ export default function PartCompareModal({ open, onClose }: Props) {
                 <table className="w-full text-sm">
                   <colgroup>
                     <col />
+                    <col />
                     <col className="w-10" />
                     <col className="w-16" />
                     <col className="w-10" />
                     <col className="w-px" />
+                    <col />
                     <col />
                     <col className="w-10" />
                     <col className="w-16" />
@@ -312,19 +314,21 @@ export default function PartCompareModal({ open, onClose }: Props) {
                   </colgroup>
                   <thead className="sticky top-0 bg-gray-50 z-10">
                     <tr className="text-xs font-medium text-gray-600 border-b">
-                      <th colSpan={4} className="px-2 py-2 text-left border-r border-gray-200">左部件 BOM</th>
+                      <th colSpan={5} className="px-2 py-2 text-left border-r border-gray-200">左部件 BOM</th>
                       <th className="w-px bg-gray-200 p-0" />
-                      <th colSpan={4} className="px-2 py-2 text-left">右部件 BOM</th>
+                      <th colSpan={5} className="px-2 py-2 text-left">右部件 BOM</th>
                       <th className="w-px bg-gray-200 p-0" />
                       <th className="px-2 py-2 text-left">变更</th>
                     </tr>
                     <tr className="text-xs font-medium text-gray-500 border-b">
                       <th className="px-2 py-1 text-left">件号</th>
+                      <th className="px-2 py-1 text-left">名称</th>
                       <th className="px-2 py-1 text-center">版本</th>
                       <th className="px-2 py-1 text-center">状态</th>
                       <th className="px-2 py-1 text-center">数量</th>
                       <th className="w-px bg-gray-200 p-0" />
                       <th className="px-2 py-1 text-left">件号</th>
+                      <th className="px-2 py-1 text-left">名称</th>
                       <th className="px-2 py-1 text-center">版本</th>
                       <th className="px-2 py-1 text-center">状态</th>
                       <th className="px-2 py-1 text-center">数量</th>
@@ -342,7 +346,10 @@ export default function PartCompareModal({ open, onClose }: Props) {
                         c.path.startsWith(n.path + '/') && c.path.split('/').length === n.path.split('/').length + 1
                       );
                       const isExpanded = expanded.has(n.key);
-                      // ROOT 的 level 是 -1，其直接子项为 0 —— 缩进深度取 level+1
+                      // depth = n.level + 1，ROOT 为 0，直接子项为 1，以此类推
+                      // 对齐 CompareTreePanel：paddingLeft = 8 + depth*12，按钮中心 = 16 + depth*12
+                      const depth = n.level + 1;
+                      const indent = 8 + depth * 12;
                       return (
                         <tr key={n.key} className={`${rowBg[n.change_type]} border-b border-gray-100 cursor-pointer hover:brightness-95`}
                           onClick={() => {
@@ -353,18 +360,18 @@ export default function PartCompareModal({ open, onClose }: Props) {
                           }}>
                           <td
                             className="relative px-2 py-2 text-xs font-medium whitespace-nowrap"
-                            style={{ paddingLeft: n.key === 'ROOT' ? 12 : (20 + n.level * 12) }}
+                            style={{ paddingLeft: indent }}
                             onClick={(e) => e.stopPropagation()}
                           >
-                            {n.key !== 'ROOT' && n.level > 0 && Array.from({ length: n.level }, (_, k) => (
+                            {n.key !== 'ROOT' && depth > 0 && Array.from({ length: depth }, (_, k) => (
                               <span
                                 key={k}
                                 className="absolute -top-px bottom-0 w-px bg-gray-200 pointer-events-none"
-                                style={{ left: 20 + k * 12 }}
+                                style={{ left: 16 + k * 12 }}
                               />
                             ))}
                             <span className="inline-flex items-center gap-1">
-                              {hasChildren && n.key !== 'ROOT' ? (
+                              {hasChildren ? (
                                 <button type="button" onClick={(e) => { e.stopPropagation(); toggle(n.key); }}
                                   className="w-4 h-4 inline-flex items-center justify-center shrink-0 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-200/60"
                                   title={isExpanded ? '折叠' : '展开'}>
@@ -376,19 +383,20 @@ export default function PartCompareModal({ open, onClose }: Props) {
                               <span>{l?.detail.code || '-'}</span>
                             </span>
                           </td>
+                          <td className="px-2 py-2 text-xs text-gray-700 truncate max-w-[200px]" title={l?.detail.name || ''}>{l?.detail.name || '-'}</td>
                           <td className="px-2 py-2 text-xs text-center text-gray-500">{l?.detail.version || '-'}</td>
                           <td className="px-2 py-2 text-xs text-center text-gray-500">{statusLabel(l?.detail.status)}</td>
                           <td className="px-2 py-2 text-xs text-center text-gray-500">{n.key === 'ROOT' ? '-' : (l?.quantity ?? '-')}</td>
                           <td className="w-px bg-gray-200 p-0" />
                           <td
                             className="relative px-2 py-2 text-xs font-medium whitespace-nowrap"
-                            style={{ paddingLeft: n.key === 'ROOT' ? 12 : (20 + n.level * 12) }}
+                            style={{ paddingLeft: indent }}
                           >
-                            {n.key !== 'ROOT' && n.level > 0 && Array.from({ length: n.level }, (_, k) => (
+                            {n.key !== 'ROOT' && depth > 0 && Array.from({ length: depth }, (_, k) => (
                               <span
                                 key={k}
                                 className="absolute -top-px bottom-0 w-px bg-gray-200 pointer-events-none"
-                                style={{ left: 20 + k * 12 }}
+                                style={{ left: 16 + k * 12 }}
                               />
                             ))}
                             <span className="inline-flex items-center gap-1">
@@ -396,6 +404,7 @@ export default function PartCompareModal({ open, onClose }: Props) {
                               <span className={versionChanged ? 'font-semibold' : ''}>{r?.detail.code || '-'}</span>
                             </span>
                           </td>
+                          <td className={`px-2 py-2 text-xs text-gray-700 truncate max-w-[200px] ${versionChanged ? 'font-semibold' : ''}`} title={r?.detail.name || ''}>{r?.detail.name || '-'}</td>
                           <td className={`px-2 py-2 text-xs text-center ${versionChanged ? 'font-semibold' : 'text-gray-500'}`}>{r?.detail.version || '-'}</td>
                           <td className={`px-2 py-2 text-xs text-center ${statusChanged ? 'font-semibold' : 'text-gray-500'}`}>{statusLabel(r?.detail.status)}</td>
                           <td className={`px-2 py-2 text-xs text-center ${qtyChanged ? 'font-semibold' : 'text-gray-500'}`}>{n.key === 'ROOT' ? '-' : (r?.quantity ?? '-')}</td>

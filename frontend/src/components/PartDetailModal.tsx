@@ -298,14 +298,14 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
         <tr className="hover:bg-gray-50 cursor-pointer" onClick={rowClick}>
           <td
             className="relative px-3 py-2 font-medium whitespace-nowrap"
-            style={{ paddingLeft: 20 + level * 12 }}
+            style={{ paddingLeft: 8 + level * 12 }}
             onClick={(e) => e.stopPropagation()}
           >
             {level > 0 && Array.from({ length: level }, (_, k) => (
               <span
                 key={k}
                 className="absolute -top-px bottom-0 w-px bg-gray-200 pointer-events-none"
-                style={{ left: 20 + k * 12 }}
+                style={{ left: 16 + k * 12 }}
               />
             ))}
             <span className="inline-flex items-center gap-1">
@@ -742,7 +742,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                         <table className="w-full text-sm">
                         <thead>
                           <tr className="bg-gray-50 border-b sticky top-0 z-10">
-                            <th className="px-3 py-2 text-left text-gray-500 font-medium">件号</th>
+                            <th className="px-3 py-2 text-left text-gray-500 font-medium" style={{ paddingLeft: 28 }}>件号</th>
                             <th className="px-3 py-2 text-left text-gray-500 font-medium">中文名称</th>
                             <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
                             <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">状态</th>
