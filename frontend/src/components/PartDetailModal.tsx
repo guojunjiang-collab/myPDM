@@ -297,13 +297,11 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
       <React.Fragment key={item.child_revision_id}>
         <tr className="hover:bg-gray-50 cursor-pointer" onClick={rowClick}>
           <td
-            className="relative px-3 py-2 text-gray-400 text-xs whitespace-nowrap"
-            style={{ paddingLeft: 12 + level * 12 }}
+            className="relative px-3 py-2 font-medium whitespace-nowrap"
+            style={{ paddingLeft: 20 + level * 12 }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* \u5C42\u7EA7\u7AD6\u7EBF\uFF1A\u6BCF\u884C\u81EA\u7ED8 0..level-1 \u5404\u7EA7\u7EBF\u6BB5\uFF0C\u5BF9\u9F50\u8BE5\u5C42\u5C55\u5F00\u6309\u94AE\u4E2D\u5FC3(20+k*12)\u3002
-                -top-px \u76D6\u4F4F tbody \u7684 divide-y \u5206\u9694\u7EBF\uFF0C\u4F7F\u4E0A\u4E0B\u884C\u7EBF\u6BB5\u9996\u5C3E\u76F8\u63A5\u3002 */}
-            {Array.from({ length: level }, (_, k) => (
+            {level > 0 && Array.from({ length: level }, (_, k) => (
               <span
                 key={k}
                 className="absolute -top-px bottom-0 w-px bg-gray-200 pointer-events-none"
@@ -320,9 +318,9 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
               ) : (
                 <span className="w-4 shrink-0" />
               )}
+              <span className="text-sm">{item.child_code}</span>
             </span>
           </td>
-          <td className="px-3 py-2 font-medium">{item.child_code}</td>
           <td className="px-3 py-2">{item.child_name}</td>
           <td className="px-3 py-2 text-gray-500">{item.child_version}</td>
           <td className="px-3 py-2">
@@ -389,7 +387,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
             </td>
           )}
         </tr>
-        {isLoading && <tr><td colSpan={canEdit ? 10 : 9} className="px-3 py-2 text-sm text-gray-400 text-center">加载中...</td></tr>}
+        {isLoading && <tr><td colSpan={canEdit ? 9 : 8} className="px-3 py-2 text-sm text-gray-400 text-center">加载中...</td></tr>}
         {children && children.map((child: any) => renderBomRow(child, level + 1, item.child_revision_id))}
       </React.Fragment>
     );
@@ -743,7 +741,6 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                         <table className="w-full text-sm">
                         <thead>
                           <tr className="bg-gray-50 border-b sticky top-0 z-10">
-                            <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">层级</th>
                             <th className="px-3 py-2 text-left text-gray-500 font-medium">件号</th>
                             <th className="px-3 py-2 text-left text-gray-500 font-medium">中文名称</th>
                             <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
