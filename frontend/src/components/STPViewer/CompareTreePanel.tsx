@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef } from 'react';
+import { Fragment, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useViewerStore } from '../../stores/viewerStore';
 import { filterCompareTree } from './compareTreeFilter';
 import type { CompareNode, CompareSide, ChangeType, Side, CompareInstanceNode } from './compareTypes';
@@ -48,19 +48,26 @@ function EyeIcon({ visible }: { visible: boolean }) {
   );
 }
 
-/** 单侧格子：缺失侧渲染占位。缩进走本格 paddingLeft，保证两格等宽。 */
-function SideCell({ side, node, which, indent }: {
+/**
+ * 单侧格子：缺失侧渲染占位。缩进走本格 paddingLeft，保证两格等宽。
+ *
+ * leading 是格内首位插槽（展开按钮或等宽占位）。展开按钮放在格内而非行首固定槽里，
+ * 才能随层级缩进移动、与本层竖线对齐；两格各放一个同宽插槽，文字仍横向对齐。
+ */
+function SideCell({ side, node, which, indent, leading }: {
   side: CompareSide | null;
   node: CompareNode;
   which: Side;
   indent: number;
+  leading: ReactNode;
 }) {
   const hiddenParts = useViewerStore((s) => s.hiddenParts);
   const toggleMeshes = useViewerStore((s) => s.toggleCompareSideVisibility);
 
   if (!side) {
     return (
-      <div className="flex-1 min-w-0 flex items-center px-2 py-0.5" style={{ paddingLeft: 8 + indent }}>
+      <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-0.5" style={{ paddingLeft: 8 + indent }}>
+        {leading}
         <span className="text-gray-300 italic text-xs">—</span>
       </div>
     );
@@ -77,6 +84,7 @@ function SideCell({ side, node, which, indent }: {
 
   return (
     <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-0.5" style={{ paddingLeft: 8 + indent }}>
+      {leading}
       {side.meshUuids.length > 0 ? (
         <button
           onClick={(e) => { e.stopPropagation(); toggleMeshes(node.key, which); }}
@@ -125,6 +133,8 @@ function InstanceCell({ present, label, meshUuids, indent }: {
 
   return (
     <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-0.5" style={{ paddingLeft: 8 + indent }}>
+      {/* 与 BOM 行的展开按钮等宽占位，保证实例行文字与上级行对齐 */}
+      <span className="w-4 shrink-0" />
       {present && meshUuids.length > 0 ? (
         <button
           onClick={(e) => { e.stopPropagation(); toggleMeshes(meshUuids); }}
@@ -151,24 +161,25 @@ function InstanceCell({ present, label, meshUuids, indent }: {
  * 行背景会把长线截断成一段一段。改成每行画自己那一段、上下首尾相接，
  * 无论行有没有底色，ladder 都是连续的。
  *
- * 两格严格等宽，故右格的 x 可用 calc(50% + …) 稳定算出。
- * 竖线落在单元格 padding 区（内容自 28+indent 起），压不到文字。
+ * 每条线对齐**该层展开按钮的中心**：格内 paddingLeft = 8 + level*12，
+ * 按钮宽 16px，故第 k 层按钮中心距格左边 16 + k*12。两格严格等宽
+ * （行内只有 两个 flex-1 + 1px 分隔线），右格左边即 50% + 0.5px。
  */
 function GuideLines({ level }: { level: number }) {
   if (level <= 0) return null;
   return (
     <>
       {Array.from({ length: level }, (_, k) => {
-        const indent = (k + 1) * 12;
+        const x = 16 + k * 12;
         return (
           <Fragment key={k}>
             <span
               className="absolute top-0 -bottom-px w-px bg-gray-200 pointer-events-none"
-              style={{ left: 19 + indent }}
+              style={{ left: x }}
             />
             <span
               className="absolute top-0 -bottom-px w-px bg-gray-200 pointer-events-none"
-              style={{ left: `calc(50% + ${9.5 + indent}px)` }}
+              style={{ left: `calc(50% + ${x + 0.5}px)` }}
             />
           </Fragment>
         );
@@ -205,7 +216,6 @@ function InstanceRow({ inst, depth, node }: { inst: CompareInstanceNode; depth: 
         className={`relative flex items-stretch cursor-pointer select-none border-b border-gray-50 transition-colors ${bg}`}
       >
         <GuideLines level={depth + 1} />
-        <div className="shrink-0 w-5" />
         <InstanceCell present={inLeft} label={labelOf(node.left)} meshUuids={inst.leftMeshUuids} indent={indent} />
         <div className="w-px bg-gray-200 shrink-0" />
         <InstanceCell present={inRight} label={labelOf(node.right)} meshUuids={inst.rightMeshUuids} indent={indent} />
@@ -241,23 +251,33 @@ function Row({ node, depth }: { node: CompareNode; depth: number }) {
             : `${node.changeType === 'none' && node.placementChanged ? 'bg-purple-50' : ROW_BG[node.changeType]} hover:brightness-95`}`}
       >
         <GuideLines level={depth} />
-        {/* 展开槽宽度固定，不随层级变化 —— 缩进走两格各自的 paddingLeft，
-            这样两格永远等宽、分隔线在所有行上处于同一水平位置 */}
-        <div className="shrink-0 w-5 flex items-center justify-center">
-          {hasChildren || hasInstances ? (
+        {/* 展开按钮放在左格内首位，随层级缩进移动、与本层竖线对齐；
+            右格放同宽占位，两格仍等宽、分隔线在所有行上齐平 */}
+        <SideCell
+          side={node.left}
+          node={node}
+          which="left"
+          indent={depth * 12}
+          leading={hasChildren || hasInstances ? (
             <button
               onClick={(e) => { e.stopPropagation(); toggleExpanded(node.key); }}
-              className="w-4 h-4 flex items-center justify-center rounded hover:bg-gray-200/60"
+              className="w-4 h-4 flex items-center justify-center shrink-0 rounded hover:bg-gray-200/60"
+              title={expanded ? '折叠' : '展开'}
             >
               <Chevron expanded={expanded} />
             </button>
           ) : (
-            <span className="w-4" />
+            <span className="w-4 shrink-0" />
           )}
-        </div>
-        <SideCell side={node.left} node={node} which="left" indent={depth * 12} />
+        />
         <div className="w-px bg-gray-200 shrink-0" />
-        <SideCell side={node.right} node={node} which="right" indent={depth * 12} />
+        <SideCell
+          side={node.right}
+          node={node}
+          which="right"
+          indent={depth * 12}
+          leading={<span className="w-4 shrink-0" />}
+        />
       </div>
 
       {hasChildren && expanded && (
@@ -302,7 +322,6 @@ export function CompareTreePanel() {
       </div>
 
       <div className="flex items-stretch text-xs font-medium text-gray-500 bg-gray-50 border-b border-gray-200">
-        <span className="shrink-0 w-5" />
         <span className="flex-1 min-w-0 px-2 py-1 truncate">
           左 · {compare.tree.left?.code || '-'} {compare.tree.left?.version || ''}
           {compare.leftMissing && <span className="text-gray-400 ml-1">(无模型)</span>}
