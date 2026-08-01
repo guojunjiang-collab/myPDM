@@ -87,15 +87,15 @@ function matchInstances(
     const ri = rightMats.findIndex((rm, i) => !matchedRight.has(i) && matrixKey(rm.matrix) === mk);
     if (ri >= 0) {
       matchedRight.add(ri);
-      instances.push({ key: `${nodeKey}:inst:${lm.idx}`, changeType: 'none', side: 'both', leftIndex: lm.idx, rightIndex: rightMats[ri].idx, meshUuid: '' });
+      instances.push({ key: `${nodeKey}:inst:${lm.idx}`, changeType: 'none', side: 'both', leftIndex: lm.idx, rightIndex: rightMats[ri].idx, meshUuid: '', label: '', seq: 0 });
     } else {
-      instances.push({ key: `${nodeKey}:inst:${lm.idx}`, changeType: 'delete', side: 'left', leftIndex: lm.idx, meshUuid: '' });
+      instances.push({ key: `${nodeKey}:inst:${lm.idx}`, changeType: 'delete', side: 'left', leftIndex: lm.idx, meshUuid: '', label: '', seq: 0 });
     }
   }
   // 右未匹配
   for (let i = 0; i < rightMats.length; i++) {
     if (!matchedRight.has(i)) {
-      instances.push({ key: `${nodeKey}:inst:r${i}`, changeType: 'add', side: 'right', rightIndex: i, meshUuid: '' });
+      instances.push({ key: `${nodeKey}:inst:r${i}`, changeType: 'add', side: 'right', rightIndex: i, meshUuid: '', label: '', seq: 0 });
     }
   }
   return instances;
@@ -222,11 +222,29 @@ export function CompareModelLoader({ leftInstances, rightInstances }: Props) {
         if (!nodeKey) continue;
         const node = compare.nodeMap.get(nodeKey);
         if (!node) continue;
-        node.instances = matchInstances(nodeKey, groupLeft.get(id) || [], groupRight.get(id) || []);
+        const lms = groupLeft.get(id) || [];
+        const rms = groupRight.get(id) || [];
+        const instances = matchInstances(nodeKey, lms, rms);
+        // 生成显示名：件号_版本_名称_序号
+        const leftSide = node.left;
+        const rightSide = node.right;
+        let seq = 0;
+        for (const inst of instances) {
+          seq++;
+          inst.seq = seq;
+          const sideData = inst.side === 'left' ? leftSide : inst.side === 'right' ? rightSide : (leftSide || rightSide);
+          const code = sideData?.code || id;
+          const ver = sideData?.version || '';
+          const name = sideData?.name || '';
+          inst.label = [code, ver, name, seq].filter(Boolean).join('_');
+        }
+        node.instances = instances;
       }
-      // 重新读取 tree 以获取 instances（避免闭包陈旧引用）
-      const freshTree = useViewerStore.getState().compare?.tree;
-      if (!freshTree) return;
+      // 强制刷新 compare 状态以触发面板重渲染（实例数据直接修改了节点对象）
+      const c = useViewerStore.getState().compare;
+      if (c) {
+        useViewerStore.setState({ compare: { ...c, tree: { ...c.tree } } });
+      }
 
       // ── 第二遍：加载模型，按实例匹配结果着色 ──
       let loaded = 0;
@@ -312,6 +330,10 @@ export function CompareModelLoader({ leftInstances, rightInstances }: Props) {
           uuids.forEach((u) => ghostCandidates.current.add(u));
         }
         mergeCompareMeshes(nodeKey, side, uuids);
+        // 回填实例子节点的 meshUuid
+        if (instNode && uuids.length > 0) {
+          instNode.meshUuid = uuids[0];
+        }
 
         loaded++;
         setStreamProgress({ loaded, total: queue.length });

@@ -49,4 +49,8 @@ export interface CompareInstanceNode {
   rightIndex?: number;
   /** 关联的 mesh uuid（加载后回填） */
   meshUuid: string;
+  /** 显示用全名：件号_版本_名称_序号 */
+  label: string;
+  /** 实例在同父节点下的序号（1-based） */
+  seq: number;
 }

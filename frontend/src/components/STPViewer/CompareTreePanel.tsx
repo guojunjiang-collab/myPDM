@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useViewerStore } from '../../stores/viewerStore';
 import { filterCompareTree } from './compareTreeFilter';
-import type { CompareNode, CompareSide, ChangeType, Side } from './compareTypes';
+import type { CompareNode, CompareSide, ChangeType, Side, CompareInstanceNode } from './compareTypes';
 
 const ROW_BG: Record<ChangeType, string> = {
   add: 'bg-green-50',
@@ -81,6 +81,66 @@ function SideCell({ side, node, which }: { side: CompareSide | null; node: Compa
   );
 }
 
+function InstanceRow({ inst, depth, node }: { inst: CompareInstanceNode; depth: number; node: CompareNode }) {
+  const selectedKey = useViewerStore((s) => s.compare?.selectedKey ?? null);
+  const selectCompareKey = useViewerStore((s) => s.selectCompareKey);
+  const hiddenParts = useViewerStore((s) => s.hiddenParts);
+  const toggleMesh = useViewerStore((s) => s.toggleMesh);
+  const isSelected = selectedKey === inst.key;
+  const visible = !inst.meshUuid || !hiddenParts.has(inst.meshUuid);
+  const inLeft = inst.side === 'left' || inst.side === 'both';
+  const inRight = inst.side === 'right' || inst.side === 'both';
+
+  // 左右两侧可能型号不同（如修改件版本 V1→V2），分别取自对应侧的 CompareSide
+  const leftLabel = inLeft ? formatInstanceLabel(inst, node.left) : '';
+  const rightLabel = inRight ? formatInstanceLabel(inst, node.right) : '';
+
+  return (
+    <li key={inst.key} className="relative">
+      <div
+        onClick={(e) => { e.stopPropagation(); selectCompareKey(inst.key); }}
+        className={`flex items-stretch cursor-pointer select-none text-xs transition-colors
+          ${isSelected ? 'ring-1 ring-inset ring-primary-400 bg-primary-50' :
+            inst.changeType === 'add' ? 'bg-green-50 hover:bg-green-100' :
+            inst.changeType === 'delete' ? 'bg-red-50 hover:bg-red-100' :
+            'hover:bg-gray-50 text-gray-500'}`}
+        style={{ paddingLeft: (depth + 1) * 12 + 28 }}
+      >
+        {isSelected && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500 rounded-r" />}
+        <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-0.5">
+          {inst.meshUuid && inLeft ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleMesh(inst.meshUuid); }}
+              className={`w-3.5 h-3.5 flex items-center justify-center shrink-0 rounded ${visible ? 'text-gray-400' : 'text-gray-300'}`}
+            >
+              <EyeIcon visible={visible} />
+            </button>
+          ) : <span className="w-3.5 shrink-0" />}
+          <span className="truncate flex-1">{inLeft ? leftLabel : <span className="text-gray-300 italic">—</span>}</span>
+        </div>
+        <div className="w-px bg-gray-200 shrink-0" />
+        <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-0.5">
+          {inst.meshUuid && inRight ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleMesh(inst.meshUuid); }}
+              className={`w-3.5 h-3.5 flex items-center justify-center shrink-0 rounded ${visible ? 'text-gray-400' : 'text-gray-300'}`}
+            >
+              <EyeIcon visible={visible} />
+            </button>
+          ) : <span className="w-3.5 shrink-0" />}
+          <span className="truncate flex-1">{inRight ? rightLabel : <span className="text-gray-300 italic">—</span>}</span>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+/** 从侧别数据 + 实例序号生成 件号_版本_名称_序号 */
+function formatInstanceLabel(inst: CompareInstanceNode, side: CompareSide | null): string {
+  if (!side) return inst.label || '';
+  return [side.code, side.version, side.name, inst.seq].filter(Boolean).join('_');
+}
+
 function Row({ node, depth }: { node: CompareNode; depth: number }) {
   const expandedIds = useViewerStore((s) => s.expandedIds);
   const toggleExpanded = useViewerStore((s) => s.toggleExpanded);
@@ -128,34 +188,12 @@ function Row({ node, depth }: { node: CompareNode; depth: number }) {
         </ul>
       )}
 
-      {/* 实例子行：按矩阵匹配结果，仿 ModelTreePanel 样式逐实例展示增删 */}
+      {/* 实例子行：按矩阵匹配结果，逐实例展示，仿 ModelTreePanel 样式 */}
       {node.instances && node.instances.length > 0 && (
         <ul>
-          {node.instances.map((inst, idx) => {
-            const isSelected = selectedKey === inst.key;
-            const side = inst.side;
-            const partSide = side === 'both' ? (node.left || node.right) : node[side];
-            const label = partSide ? [partSide.code, partSide.version].filter(Boolean).join('·') : `实例 ${idx + 1}`;
-            return (
-              <li key={inst.key} className="relative">
-                <div
-                  onClick={(e) => { e.stopPropagation(); selectCompareKey(inst.key); }}
-                  className={`group flex items-center gap-1 py-0.5 pr-2 cursor-pointer select-none text-xs transition-colors
-                    ${isSelected ? 'ring-1 ring-inset ring-primary-400 bg-primary-50' :
-                      inst.changeType === 'add' ? 'bg-green-50 hover:bg-green-100' :
-                      inst.changeType === 'delete' ? 'bg-red-50 hover:bg-red-100' :
-                      'hover:bg-gray-50 text-gray-500'}`}
-                  style={{ paddingLeft: (depth + 1) * 12 + 28 }}
-                >
-                  {isSelected && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500 rounded-r" />}
-                  <span className="truncate flex-1">
-                    {inst.changeType === 'add' ? '+ ' : inst.changeType === 'delete' ? '− ' : ''}
-                    {label}
-                  </span>
-                </div>
-              </li>
-            );
-          })}
+          {node.instances.map((inst) => (
+            <InstanceRow key={inst.key} inst={inst} depth={depth} node={node} />
+          ))}
         </ul>
       )}
     </li>
