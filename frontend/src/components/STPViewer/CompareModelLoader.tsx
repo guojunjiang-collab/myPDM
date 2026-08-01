@@ -135,7 +135,7 @@ export function CompareModelLoader({ leftInstances, rightInstances }: Props) {
       if (box.isEmpty()) return;
       const s = box.getSize(new THREE.Vector3());
       const maxDim = Math.max(s.x, s.y, s.z);
-      const scale = maxDim > 0.001 ? 16 / maxDim : 1;
+      const scale = maxDim > 0.001 ? 10 / maxDim : 1;
       setModelScale(scale / 1000);
       const center = box.getCenter(new THREE.Vector3());
       groupRef.current.scale.setScalar(scale);
