@@ -144,6 +144,16 @@ function InstanceCell({ present, label, meshUuids, indent }: {
   );
 }
 
+/** 两格各自的层级参考线：左格线在 19+indent 处，右格线在 50%+9.5+indent 处（两格严格等宽） */
+function GuideLines({ indent }: { indent: number }) {
+  return (
+    <>
+      <div className="absolute top-0 bottom-0 w-px bg-gray-200 pointer-events-none" style={{ left: 19 + indent }} />
+      <div className="absolute top-0 bottom-0 w-px bg-gray-200 pointer-events-none" style={{ left: `calc(50% + ${9.5 + indent}px)` }} />
+    </>
+  );
+}
+
 /** 实例行：与 BOM 行同一套骨架（展开槽 + 两格等宽 + 分隔线），缩进走格内 padding */
 function InstanceRow({ inst, depth, node }: { inst: CompareInstanceNode; depth: number; node: CompareNode }) {
   const selectedKey = useViewerStore((s) => s.compare?.selectedKey ?? null);
@@ -166,10 +176,11 @@ function InstanceRow({ inst, depth, node }: { inst: CompareInstanceNode; depth: 
         : 'hover:bg-gray-50';
 
   return (
-    <li>
+    <li className="relative">
+      <GuideLines indent={indent} />
       <div
         onClick={(e) => { e.stopPropagation(); selectCompareKey(inst.key); }}
-        className={`flex items-stretch cursor-pointer select-none border-b border-gray-50 transition-colors ${bg}`}
+        className={`flex items-stretch cursor-pointer select-none border-b border-gray-50 transition-colors relative ${bg}`}
       >
         <div className="shrink-0 w-5" />
         <InstanceCell present={inLeft} label={labelOf(node.left)} meshUuids={inst.leftMeshUuids} indent={indent} />
@@ -197,11 +208,12 @@ function Row({ node, depth }: { node: CompareNode; depth: number }) {
   }, [selected]);
 
   return (
-    <li>
+    <li className="relative">
+      {depth > 0 && <GuideLines indent={depth * 12} />}
       <div
         ref={rowRef}
         onClick={() => selectCompareKey(node.key)}
-        className={`flex items-stretch cursor-pointer select-none border-b border-gray-50 transition-colors
+        className={`flex items-stretch cursor-pointer select-none border-b border-gray-50 transition-colors relative
           ${selected
             ? 'ring-1 ring-inset ring-primary-400 bg-primary-50'
             : `${node.changeType === 'none' && node.placementChanged ? 'bg-purple-50' : ROW_BG[node.changeType]} hover:brightness-95`}`}
