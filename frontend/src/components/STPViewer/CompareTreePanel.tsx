@@ -69,7 +69,11 @@ function SideCell({ side, node, which, indent }: {
   const visible = side.meshUuids.length === 0 ? true : side.meshUuids.some((u) => !hiddenParts.has(u));
   const noModel = !side.hasModel;
   const label = [side.code, side.version, side.name].filter(Boolean).join('_');
-  const count = node.instances && node.instances.length > 0 ? node.instances.length : side.quantity;
+  // 数量只统计**本格这一侧**存在的实例：node.instances 是左右并集
+  // （左侧全部 + 右侧未匹配上的），直接用其长度会让两格显示同一个并集数。
+  const count = node.instances && node.instances.length > 0
+    ? node.instances.filter((i) => i.side === 'both' || i.side === which).length
+    : side.quantity;
 
   return (
     <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-0.5" style={{ paddingLeft: 8 + indent }}>
@@ -105,21 +109,22 @@ function SideCell({ side, node, which, indent }: {
 }
 
 /** 实例行的单侧格子 */
-function InstanceCell({ present, label, meshUuid, indent }: {
+function InstanceCell({ present, label, meshUuids, indent }: {
   present: boolean;
   label: string;
-  meshUuid: string;
+  meshUuids: string[];
   indent: number;
 }) {
   const hiddenParts = useViewerStore((s) => s.hiddenParts);
-  const toggleMesh = useViewerStore((s) => s.toggleMesh);
-  const visible = !meshUuid || !hiddenParts.has(meshUuid);
+  const toggleMeshes = useViewerStore((s) => s.toggleMeshes);
+  // 一个实例含三档 LOD、每档可能多个 mesh：只要还有一个没被隐藏就算可见
+  const visible = meshUuids.length === 0 || meshUuids.some((u) => !hiddenParts.has(u));
 
   return (
     <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-0.5" style={{ paddingLeft: 8 + indent }}>
-      {present && meshUuid ? (
+      {present && meshUuids.length > 0 ? (
         <button
-          onClick={(e) => { e.stopPropagation(); toggleMesh(meshUuid); }}
+          onClick={(e) => { e.stopPropagation(); toggleMeshes(meshUuids); }}
           className={`w-3.5 h-3.5 flex items-center justify-center shrink-0 rounded transition-colors
             ${visible ? 'text-gray-400 hover:text-blue-500' : 'text-gray-300'}`}
           title={visible ? '隐藏' : '显示'}
@@ -161,12 +166,12 @@ function InstanceRow({ inst, depth, node }: { inst: CompareInstanceNode; depth: 
     <li>
       <div
         onClick={(e) => { e.stopPropagation(); selectCompareKey(inst.key); }}
-        className={`flex items-stretch cursor-pointer select-none transition-colors ${bg}`}
+        className={`flex items-stretch cursor-pointer select-none border-b border-gray-50 transition-colors ${bg}`}
       >
         <div className="shrink-0 w-5" />
-        <InstanceCell present={inLeft} label={labelOf(node.left)} meshUuid={inst.leftMeshUuid} indent={indent} />
+        <InstanceCell present={inLeft} label={labelOf(node.left)} meshUuids={inst.leftMeshUuids} indent={indent} />
         <div className="w-px bg-gray-200 shrink-0" />
-        <InstanceCell present={inRight} label={labelOf(node.right)} meshUuid={inst.rightMeshUuid} indent={indent} />
+        <InstanceCell present={inRight} label={labelOf(node.right)} meshUuids={inst.rightMeshUuids} indent={indent} />
       </div>
     </li>
   );
@@ -262,7 +267,7 @@ export function CompareTreePanel() {
           左 · {compare.tree.left?.code || '-'} {compare.tree.left?.version || ''}
           {compare.leftMissing && <span className="text-gray-400 ml-1">(无模型)</span>}
         </span>
-        <span className="w-px bg-gray-200" />
+        <span className="w-px bg-gray-200 shrink-0" />
         <span className="flex-1 min-w-0 px-2 py-1 truncate">
           右 · {compare.tree.right?.code || '-'} {compare.tree.right?.version || ''}
           {compare.rightMissing && <span className="text-gray-400 ml-1">(无模型)</span>}

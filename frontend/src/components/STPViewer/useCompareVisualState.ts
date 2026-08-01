@@ -29,12 +29,23 @@ export function useCompareVisualState(
 
     const { displayMode, onlyDiff, ghostOpacity, selectedKey, nodeMap } = compare;
 
-    // 选中行涉及的 mesh（左右两侧一起）
+    // 选中行涉及的 mesh（左右两侧一起）。
+    // BOM 行 key 在 nodeMap 里，直接取两侧 meshUuids；
+    // 实例行 key（形如 "<nodeKey>:inst:3"）不在 nodeMap 里，
+    // 改按 mesh 上回填的 userData.compareInstanceKey 反查。
     const selected = new Set<string>();
     if (selectedKey) {
       const node = nodeMap.get(selectedKey);
-      node?.left?.meshUuids.forEach((u) => selected.add(u));
-      node?.right?.meshUuids.forEach((u) => selected.add(u));
+      if (node) {
+        node.left?.meshUuids.forEach((u) => selected.add(u));
+        node.right?.meshUuids.forEach((u) => selected.add(u));
+      } else {
+        group.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh && child.userData.compareInstanceKey === selectedKey) {
+            selected.add(child.uuid);
+          }
+        });
+      }
     }
 
     group.traverse((child) => {

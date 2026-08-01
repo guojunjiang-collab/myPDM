@@ -68,7 +68,7 @@ export interface ViewerState {
   setOnlyDiff: (v: boolean) => void;
   setGhostOpacity: (v: number) => void;
   toggleCompareSideVisibility: (key: string, side: Side) => void;
-  toggleMesh: (uuid: string) => void;
+  toggleMeshes: (uuids: string[]) => void;
   mergeInstanceMeshes: (nodeId: string, meshUuids: string[]) => void;
   selectNode: (id: string | null) => void;
   selectByMesh: (meshUuid: string) => void;
@@ -244,10 +244,16 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
     set({ hiddenParts: hidden });
   },
 
-  // 切换单个 mesh 的显隐
-  toggleMesh: (uuid) => {
+  // 切换一组 mesh 的显隐（全隐 → 全显，否则全隐），与 toggleCompareSideVisibility 同一套语义
+  toggleMeshes: (uuids) => {
+    if (uuids.length === 0) return;
     const hidden = new Set(get().hiddenParts);
-    hidden.has(uuid) ? hidden.delete(uuid) : hidden.add(uuid);
+    const allHidden = uuids.every((u) => hidden.has(u));
+    if (allHidden) {
+      uuids.forEach((u) => hidden.delete(u));
+    } else {
+      uuids.forEach((u) => hidden.add(u));
+    }
     set({ hiddenParts: hidden });
   },
 

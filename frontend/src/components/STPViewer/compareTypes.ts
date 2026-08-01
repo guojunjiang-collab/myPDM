@@ -47,12 +47,10 @@ export interface CompareInstanceNode {
   /** 该实例在源侧 instance 数组中的序号 */
   leftIndex?: number;
   rightIndex?: number;
-  /** 左侧那份几何的 mesh uuid（加载后回填；无左份时为空串） */
-  leftMeshUuid: string;
-  /** 右侧那份几何的 mesh uuid（加载后回填；无右份时为空串） */
-  rightMeshUuid: string;
-  /** 显示用全名：件号_版本_名称_序号 */
-  label: string;
+  /** 左侧那份几何的全部 mesh uuid（含三档 LOD 的每个 mesh；加载后回填，无左份时为空数组） */
+  leftMeshUuids: string[];
+  /** 右侧那份几何的全部 mesh uuid（含三档 LOD 的每个 mesh；加载后回填，无右份时为空数组） */
+  rightMeshUuids: string[];
   /** 实例在同父节点下的序号（1-based） */
   seq: number;
 }

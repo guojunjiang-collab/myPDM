@@ -194,7 +194,6 @@ export function CompareModelLoader({ leftInstances, rightInstances }: Props) {
         const matches = matchInstancePairs(groupLeft.get(nodeKey) || [], groupRight.get(nodeKey) || []);
         // 左右共享一套序号：删除项与新增项都占号，匹配上的实例在两侧序号相同
         node.instances = matches.map((m, i) => {
-          const sideData = m.side === 'right' ? node.right : (node.left || node.right);
           const seq = i + 1;
           return {
             key: `${nodeKey}:inst:${seq}`,
@@ -202,9 +201,8 @@ export function CompareModelLoader({ leftInstances, rightInstances }: Props) {
             side: m.side,
             leftIndex: m.leftIndex,
             rightIndex: m.rightIndex,
-            leftMeshUuid: '',
-            rightMeshUuid: '',
-            label: [sideData?.code, sideData?.version, sideData?.name, seq].filter(Boolean).join('_'),
+            leftMeshUuids: [],
+            rightMeshUuids: [],
             seq,
           };
         });
@@ -235,7 +233,8 @@ export function CompareModelLoader({ leftInstances, rightInstances }: Props) {
         if (!node) { loaded++; setStreamProgress({ loaded, total }); continue; }
 
         // 按 "{side}:{index}" 直接定位实例子节点，确定其变更类型与颜色。
-        // 匹配不到（该节点无实例数据）时回退到节点级 changeType。
+        // 两遍用的是同一套 nodeKey/node 守卫，正常情况下必能命中；
+        // ?? 仅作防御，兜住实例表意外缺项时回退到节点级 changeType。
         const instNode = instByRef.get(`${side}:${index}`);
         const instChangeType: ChangeType = instNode?.changeType ?? node.changeType;
         const decision = renderDecision(instChangeType, 'both');
@@ -299,13 +298,15 @@ export function CompareModelLoader({ leftInstances, rightInstances }: Props) {
         if (decision.leftGhost && side === 'left') {
           uuids.forEach((u) => ghostCandidates.current.add(u));
         }
-        mergeCompareMeshes(nodeKey, side, uuids);
-        // 回填该实例在**本侧**的 mesh uuid：none 实例左右各有一份几何，
-        // 两格的眼睛按钮各自控制自己那份，不能共用一个值。
+        // 回填该实例在**本侧**的全部 mesh uuid：none 实例左右各有一份几何，
+        // 两格的眼睛按钮各自控制自己那份，不能共用一组值。
+        // 必须在 mergeCompareMeshes 之前赋值——后者的 setState 是本轮唯一会
+        // 触发面板重渲染的 compare 更新，之后再改就要等下一次无关更新才可见。
         if (instNode && uuids.length > 0) {
-          if (side === 'left') instNode.leftMeshUuid = uuids[0];
-          else instNode.rightMeshUuid = uuids[0];
+          if (side === 'left') instNode.leftMeshUuids = uuids;
+          else instNode.rightMeshUuids = uuids;
         }
+        mergeCompareMeshes(nodeKey, side, uuids);
 
         loaded++;
         setStreamProgress({ loaded, total: queue.length });
