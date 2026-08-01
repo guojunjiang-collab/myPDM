@@ -289,7 +289,12 @@ export default function Projects() {
     if (selectedProjectId) { loadTasks(selectedProjectId); setGanttKey((k) => k + 1); }
   }, [selectedProjectId, loadTasks]);
 
-  const isManager = useMemo(() => can('project.task:create'), []);
+  // 系统角色 + 项目角色双层判定：两者都满足才显示管理类按钮，避免"看得见却 403"。
+  // is_manager 由 GET /projects/{id} 返回（admin / owner / 经理成员）。
+  const isManager = useMemo(
+    () => can('project.task:create') && currentProject?.is_manager === true,
+    [currentProject?.is_manager],
+  );
 
   // 展开层级下拉的受控值:'collapsed'|'all'|数字字符串|'custom'
   const [expandSel, setExpandSel] = useState<string>('all');

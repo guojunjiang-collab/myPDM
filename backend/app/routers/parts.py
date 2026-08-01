@@ -919,6 +919,14 @@ def _store_part_attachment(db: Session, revision_id: UUID, filename: str,
     return att
 
 
+def _attachment_belongs_to_revision(db: Session, att, revision_id: UUID) -> bool:
+    """附件 → 迭代 → 版本 回溯校验，防止用 A 版本的路径删 B 版本的附件。"""
+    iteration = db.query(crud_parts.models_parts.PartIteration).filter(
+        crud_parts.models_parts.PartIteration.id == att.iteration_id
+    ).first()
+    return bool(iteration and str(iteration.revision_id) == str(revision_id))
+
+
 @router.post("/revisions/{revision_id}/attachments")
 async def add_attachment(
     revision_id: UUID,
@@ -926,6 +934,7 @@ async def add_attachment(
     category: str = Form("cad"),
     overwrite: bool = Form(False),
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("attachments:upload")),
 ):
     """上传附件到当前迭代（整包，适用于小文件）"""
     content = await file.read()
@@ -1001,12 +1010,17 @@ def delete_attachment(
     revision_id: UUID,
     attachment_id: UUID,
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("attachments:delete")),
+    request: Request = None,
 ):
     """删除附件"""
     att = db.query(crud_parts.models_parts.PartAttachment).filter(
         crud_parts.models_parts.PartAttachment.id == attachment_id
     ).first()
     if not att:
+        raise HTTPException(404, "附件不存在")
+    # 防跨版本越权：附件必须属于路径中的版本（迭代 → 版本 回溯）
+    if not _attachment_belongs_to_revision(db, att, revision_id):
         raise HTTPException(404, "附件不存在")
     import os
     if att.file_path and os.path.exists(att.file_path):
@@ -1015,8 +1029,12 @@ def delete_attachment(
     from ..stp_converter import delete_glb_cache, is_stp_file
     if is_stp_file(att.file_name):
         delete_glb_cache(str(attachment_id), att.file_path, is_part=True)
+    file_name, category = att.file_name, att.category
     db.delete(att)
     db.commit()
+    ip = request.client.host if request and request.client else None
+    crud.create_log(db, current_user.id, current_user.username, "删除附件", "part_attachment",
+                    str(attachment_id), f"{category}:{file_name}", ip)
     return {"detail": "已删除"}
 
 
@@ -1042,7 +1060,7 @@ def get_attachment_file(
     revision_id: UUID,
     attachment_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("attachments:list")),
+    current_user: User = Depends(require_permission("attachments:download")),
 ):
     """获取附件文件内容"""
     import os, mimetypes

@@ -1,4 +1,8 @@
-"""站内通知 API：查询 / 未读数 / 标记已读 / 清除。"""
+"""站内通知 API：查询 / 未读数 / 标记已读 / 清除。
+
+读用 notifications:read，写用 notifications:manage_own；
+所有操作一律以 current_user.id 为作用域，只能读写自己的通知。
+"""
 from typing import Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -45,7 +49,7 @@ def unread_count(
 def mark_read(
     notification_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("notifications:read")),
+    current_user: User = Depends(require_permission("notifications:manage_own")),
 ):
     ok = notif_svc.mark_read(db, current_user.id, notification_id)
     if not ok:
@@ -56,7 +60,7 @@ def mark_read(
 @router.post("/read-all")
 def mark_all_read(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("notifications:read")),
+    current_user: User = Depends(require_permission("notifications:manage_own")),
 ):
     n = notif_svc.mark_all_read(db, current_user.id)
     return {"detail": "全部已读", "count": n}
@@ -65,7 +69,7 @@ def mark_all_read(
 @router.delete("/read")
 def clear_read(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("notifications:read")),
+    current_user: User = Depends(require_permission("notifications:manage_own")),
 ):
     n = notif_svc.clear_read(db, current_user.id)
     return {"detail": "已清除", "count": n}

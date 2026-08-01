@@ -27,7 +27,7 @@ from app.media_token import mint_media_token
 import os as _os
 import logging
 _logger = logging.getLogger(__name__)
-from ..permissions import require_permission
+from ..permissions import require_permission, enforce_object_policy
 
 router = APIRouter(prefix="/configurations", tags=["构型配置"])
 
@@ -1357,12 +1357,14 @@ async def review_profile_endpoint(
     profile_id: str,
     data: schemas.ProfileReviewRequest,
     db: Session = Depends(get_db),
-    current_user=Depends(require_permission("profile:read")),
+    current_user=Depends(require_permission("profile:approve")),
 ):
     """审批操作（通过/驳回/退回）"""
     profile = crud.get_profile(db, profile_id)
     if not profile:
         raise HTTPException(status_code=404, detail="配置不存在")
+    # 审批人门禁与 ECR 对齐：admin 或被指定审批人
+    enforce_object_policy("profile_approver_or_admin", current_user, profile)
     if data.decision not in ("approved", "rejected", "returned"):
         raise HTTPException(status_code=400, detail="无效审批决定")
     profile = crud.review_profile(db, profile, current_user, data.decision, data.comment or "")
@@ -1446,7 +1448,7 @@ async def add_profile_cc_endpoint(
     profile_id: str,
     data: schemas.ProfileCcAddRequest,
     db: Session = Depends(get_db),
-    current_user=Depends(require_permission("profile:read")),
+    current_user=Depends(require_permission("profile:cc_manage")),
 ):
     profile = crud.get_profile(db, profile_id)
     if not profile:
@@ -1460,7 +1462,7 @@ async def remove_profile_cc_endpoint(
     profile_id: str,
     user_id: str,
     db: Session = Depends(get_db),
-    current_user=Depends(require_permission("profile:read")),
+    current_user=Depends(require_permission("profile:cc_manage")),
 ):
     profile = crud.get_profile(db, profile_id)
     if not profile:

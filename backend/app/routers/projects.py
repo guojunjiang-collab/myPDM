@@ -72,7 +72,7 @@ async def create_project(data: ProjectCreate, db: Session = Depends(get_db),
     p = crud_project.create_project(db, data, current_user.id)
     ip = request.client.host if request and request.client else None
     crud.create_log(db, current_user.id, current_user.username, "创建项目", "project", str(p.id), f"名称:{p.name}", ip)
-    return _project_detail(db, p)
+    return _project_detail(db, p, current_user)
 
 
 @router.get("/my-tasks")
@@ -88,7 +88,7 @@ async def get_project(project_id: uuid.UUID, db: Session = Depends(get_db),
                       current_user: User = Depends(require_permission("project:read"))):
     p = crud_project.get_project(db, project_id)
     _require_member(db, project_id, current_user)
-    return _project_detail(db, p)
+    return _project_detail(db, p, current_user)
 
 
 @router.put("/{project_id}")
@@ -103,7 +103,7 @@ async def update_project(project_id: uuid.UUID, data: ProjectEdit, db: Session =
             return None
         return str(v)
     old_vals = {k: getattr(p, k, None) for k in changed}
-    result = _project_detail(db, crud_project.update_project(db, p, data))
+    result = _project_detail(db, crud_project.update_project(db, p, data), current_user)
     ip = request.client.host if request and request.client else None
     parts = []
     for k, new_val in changed.items():
@@ -466,10 +466,15 @@ def _project_brief(db, p):
             "member_count": member_count, "created_at": p.created_at}
 
 
-def _project_detail(db, p):
+def _project_detail(db, p, user=None):
     base = _project_brief(db, p)
     base["description"] = p.description
     base["members"] = [_member_dict(db, m) for m in crud_project.list_members(db, p.id)]
+    if user is not None:
+        # 供前端按项目角色渲染按钮，避免"看得见却 403"
+        base["is_manager"] = _is_manager(db, user, p)
+        member = next((m for m in crud_project.list_members(db, p.id) if m.user_id == user.id), None)
+        base["my_role_in_project"] = member.role_in_project if member else None
     return base
 
 

@@ -41,6 +41,8 @@ export const can = (perm: Permission): boolean => {
 
 // 旧 helper 改为 can() 薄封装（保持向后兼容）
 export const canEdit = () => can('parts:create');
-export const canDownload = () => can('parts:read');
+// 导出/下载类按钮：绑定 parts:export（admin/engineer/production），guest 不可导出。
+// 注意导出目前由前端生成，此判定仅为 UI 约束，后端只保证读权限。
+export const canDownload = () => can('parts:export');
 export const canPreview = () => true;
 export const isAdmin = () => can('parts:delete');

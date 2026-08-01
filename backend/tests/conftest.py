@@ -79,6 +79,54 @@ def production_user(db):
     return user
 
 
+@pytest.fixture
+def make_document(db):
+    """三层图文档工厂：Master → Revision(A) → Iteration(1)。
+
+    ⚠️ v3.1.3 起 creator_id 从 Master/Revision 下移到 Iteration 层。造图文档测试数据
+    一律走本工厂，**不要**直接给 Master/Revision 传 creator_id —— 那样只会静默失配，
+    掩盖 document_content_access 之类依赖创建者的策略回归（历史上就这么漏过一次）。
+    """
+    def _make(creator=None, code=None, name="图纸", group_ids=(), status="draft"):
+        m = models.DocumentMaster(id=uuid.uuid4(), code=code or f"D{uuid.uuid4().hex[:6]}", name=name)
+        db.add(m); db.flush()
+        r = models.DocumentRevision(id=uuid.uuid4(), master_id=m.id, version="A",
+                                    status=status, latest_iteration=1)
+        db.add(r); db.flush()
+        it = models.DocumentIteration(id=uuid.uuid4(), revision_id=r.id, iteration=1,
+                                      creator_id=creator.id if creator else None)
+        db.add(it); db.flush()
+        for gid in group_ids:
+            db.add(models.DocumentGroupLink(document_id=m.id, group_id=gid))
+        db.commit()
+        db.refresh(m); db.refresh(r); db.refresh(it)
+        return m, r, it
+    return _make
+
+
+@pytest.fixture
+def make_doc_attachment(db):
+    """图文档附件工厂（挂在 revision + iteration 上）。"""
+    def _make(revision, iteration=None, file_name="a.pdf", file_path="x/a.pdf"):
+        a = models.DocumentAttachment(
+            id=uuid.uuid4(), revision_id=revision.id,
+            iteration_id=iteration.id if iteration is not None else None,
+            file_name=file_name, file_path=file_path,
+        )
+        db.add(a); db.commit(); db.refresh(a)
+        return a
+    return _make
+
+
+@pytest.fixture
+def make_user_group(db):
+    def _make(name):
+        g = models.UserGroup(name=name)
+        db.add(g); db.commit(); db.refresh(g)
+        return g
+    return _make
+
+
 class FakeLLM:
     """脚本化的假 LLM：按预设序列产出 stream_chat 事件。
 

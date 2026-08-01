@@ -9,13 +9,13 @@ from typing import Callable
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
-from app.models import DocumentMaster, DocumentRevision, User
+from app.models import DocumentIteration, DocumentMaster, DocumentRevision, User
 from app.models_configuration import (
     ConfigurationItemIteration, ConfigurationItemMaster, ConfigurationItemRevision,
 )
 from app.models_eco import ECO
 from app.models_ecr import ECR
-from app.models_parts import PartMaster, PartRevision
+from app.models_parts import PartIteration, PartMaster, PartRevision
 from app.models_project import ProjectTask, ProjectTaskLink
 
 # task_links 中代表零部件的 entity_type 取值（component 为历史遗留值）
@@ -26,6 +26,28 @@ PART_TYPE_LABEL = {"part": "零件", "assembly": "部件"}
 def _user_names(db: Session) -> dict:
     """一次性取全部用户的显示名，避免逐行查询。"""
     return {u.id: u.real_name for u in db.query(User).all()}
+
+
+def _version_creators(db: Session, iteration_model, revision_ids) -> dict:
+    """revision_id → 该版本首个迭代的 creator_id（即"谁创建了这个版本"）。
+
+    v3.1.3 起 creator_id 从 Master/Revision 下移到 Iteration 层，
+    创建者必须回溯迭代层查询，不能再直接读 revision.creator_id。
+    """
+    if not revision_ids:
+        return {}
+    rows = (
+        db.query(iteration_model.revision_id, iteration_model.creator_id)
+        .filter(iteration_model.revision_id.in_(list(revision_ids)),
+                iteration_model.deleted_at.is_(None))
+        .order_by(iteration_model.revision_id, iteration_model.iteration)
+        .all()
+    )
+    out: dict = {}
+    for rid, cid in rows:
+        if rid not in out and cid is not None:
+            out[rid] = cid
+    return out
 
 
 def _collect(bucket: dict, key: str, task: ProjectTask, factory: Callable[[], dict]) -> None:
@@ -62,6 +84,7 @@ def list_parts(db: Session, project_id: uuid.UUID, user_names: dict) -> list:
                 PartMaster.deleted_at.is_(None))
         .all()
     )
+    creators = _version_creators(db, PartIteration, {r[1].id for r in rows})
     bucket: dict = {}
     for task, rev, master in rows:
         def factory(rev=rev, master=master):
@@ -73,7 +96,7 @@ def list_parts(db: Session, project_id: uuid.UUID, user_names: dict) -> list:
                 "name": master.name,
                 "version": rev.version,
                 "status": rev.status,
-                "creator_name": "",
+                "creator_name": user_names.get(creators.get(rev.id), ""),
                 "extra": PART_TYPE_LABEL.get(master.type, master.type),
             }
         _collect(bucket, str(rev.id), task, factory)
@@ -94,6 +117,7 @@ def list_documents(db: Session, project_id: uuid.UUID, user_names: dict) -> list
                 DocumentMaster.deleted_at.is_(None))
         .all()
     )
+    creators = _version_creators(db, DocumentIteration, {r[1].id for r in rows})
     bucket: dict = {}
     for task, rev, master in rows:
         def factory(rev=rev, master=master):
@@ -105,7 +129,7 @@ def list_documents(db: Session, project_id: uuid.UUID, user_names: dict) -> list
                 "name": master.name,
                 "version": rev.version,
                 "status": rev.status,
-                "creator_name": "",
+                "creator_name": user_names.get(creators.get(rev.id), ""),
                 "extra": rev.remark or "",
             }
         _collect(bucket, str(rev.id), task, factory)
@@ -135,6 +159,7 @@ def list_config_items(db: Session, project_id: uuid.UUID, user_names: dict) -> l
                 ConfigurationItemMaster.deleted_at.is_(None))
         .all()
     )
+    creators = _version_creators(db, ConfigurationItemIteration, {r[1].id for r in rows})
     bucket: dict = {}
     for task, rev, master, iteration in rows:
         def factory(rev=rev, master=master, iteration=iteration):
@@ -146,7 +171,7 @@ def list_config_items(db: Session, project_id: uuid.UUID, user_names: dict) -> l
                 "name": master.name,
                 "version": rev.version,
                 "status": rev.status,
-                "creator_name": "",
+                "creator_name": user_names.get(creators.get(rev.id), ""),
                 "extra": (iteration.version_name if iteration else "") or "",
             }
         _collect(bucket, str(rev.id), task, factory)

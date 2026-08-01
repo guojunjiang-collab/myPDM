@@ -25,6 +25,10 @@ export interface Project {
   member_count?: number;
   members?: ProjectMember[];
   created_at?: string;
+  /** 当前用户在该项目内是否为管理者（admin / owner / 经理成员），仅项目详情接口返回 */
+  is_manager?: boolean;
+  /** 当前用户在该项目内的角色，非成员为 null，仅项目详情接口返回 */
+  my_role_in_project?: '经理' | '成员' | null;
 }
 
 export interface ProjectTask {

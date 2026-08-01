@@ -16,6 +16,15 @@ from ..permissions import require_permission, enforce_object_policy
 router = APIRouter(prefix="/inventory", tags=["库存管理"])
 
 
+def _enforce_doc_participant(user: User, doc) -> None:
+    """单据级门禁：admin / 创建者 / 保管人 / 指定审批人。
+
+    与 crud_inventory.list_documents 的行级可见性同口径 —— 否则拿到 UUID 就能
+    绕过列表过滤读写他人单据。
+    """
+    enforce_object_policy("inventory_doc_participant_or_admin", user, doc)
+
+
 # ──────────── 仓库 ────────────
 @router.get("/warehouses")
 async def list_warehouses(db: Session = Depends(get_db),
@@ -165,20 +174,25 @@ async def create_document(data: DocumentCreate, db: Session = Depends(get_db),
 @router.get("/documents/{doc_id}")
 async def get_document(doc_id: uuid.UUID, db: Session = Depends(get_db),
                        current_user: User = Depends(require_permission("inventory.doc:read"))):
-    return _doc_detail(db, crud_inventory.get_document(db, doc_id))
+    doc = crud_inventory.get_document(db, doc_id)
+    _enforce_doc_participant(current_user, doc)
+    return _doc_detail(db, doc)
 
 
 @router.put("/documents/{doc_id}")
 async def update_document(doc_id: uuid.UUID, data: DocumentEdit, db: Session = Depends(get_db),
                           current_user: User = Depends(require_permission("inventory.doc:write"))):
     doc = crud_inventory.get_document(db, doc_id)
+    _enforce_doc_participant(current_user, doc)
     return _doc_detail(db, crud_inventory.update_document(db, doc, data))
 
 
 @router.delete("/documents/{doc_id}")
 async def delete_document(doc_id: uuid.UUID, db: Session = Depends(get_db),
                           current_user: User = Depends(require_permission("inventory.doc:delete"))):
-    crud_inventory.delete_document(db, crud_inventory.get_document(db, doc_id))
+    doc = crud_inventory.get_document(db, doc_id)
+    _enforce_doc_participant(current_user, doc)
+    crud_inventory.delete_document(db, doc)
     return {"detail": "已删除"}
 
 
@@ -186,6 +200,7 @@ async def delete_document(doc_id: uuid.UUID, db: Session = Depends(get_db),
 async def submit_document(doc_id: uuid.UUID, db: Session = Depends(get_db),
                           current_user: User = Depends(require_permission("inventory.doc:submit_withdraw_approve"))):
     doc = crud_inventory.get_document(db, doc_id)
+    _enforce_doc_participant(current_user, doc)
     return _doc_detail(db, crud_inventory.submit_document(db, doc, current_user))
 
 
@@ -193,6 +208,7 @@ async def submit_document(doc_id: uuid.UUID, db: Session = Depends(get_db),
 async def withdraw_document(doc_id: uuid.UUID, db: Session = Depends(get_db),
                             current_user: User = Depends(require_permission("inventory.doc:submit_withdraw_approve"))):
     doc = crud_inventory.get_document(db, doc_id)
+    _enforce_doc_participant(current_user, doc)
     return _doc_detail(db, crud_inventory.withdraw_document(db, doc, current_user))
 
 
@@ -200,6 +216,7 @@ async def withdraw_document(doc_id: uuid.UUID, db: Session = Depends(get_db),
 async def review_document(doc_id: uuid.UUID, data: ReviewAction, db: Session = Depends(get_db),
                           current_user: User = Depends(require_permission("inventory.doc:submit_withdraw_approve"))):
     doc = crud_inventory.get_document(db, doc_id)
+    _enforce_doc_participant(current_user, doc)
     return _doc_detail(db, crud_inventory.review_document(db, doc, current_user, data.decision, data.comment or ""))
 
 
@@ -207,6 +224,7 @@ async def review_document(doc_id: uuid.UUID, data: ReviewAction, db: Session = D
 async def assign_keeper(doc_id: uuid.UUID, data: AssignKeeperAction, db: Session = Depends(get_db),
                         current_user: User = Depends(require_permission("inventory.doc:submit_withdraw_approve"))):
     doc = crud_inventory.get_document(db, doc_id)
+    _enforce_doc_participant(current_user, doc)
     keeper = db.query(User).filter(User.id == uuid.UUID(data.keeper_id)).first()
     if not keeper:
         raise HTTPException(status_code=404, detail="指定用户不存在")
@@ -233,6 +251,7 @@ async def post_document(doc_id: uuid.UUID, data: PostAction = None, db: Session 
 async def cancel_document(doc_id: uuid.UUID, db: Session = Depends(get_db),
                           current_user: User = Depends(require_permission("inventory.doc:submit_withdraw_approve"))):
     doc = crud_inventory.get_document(db, doc_id)
+    _enforce_doc_participant(current_user, doc)
     return _doc_detail(db, crud_inventory.cancel_document(db, doc, current_user))
 
 
