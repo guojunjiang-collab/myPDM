@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AxiosError } from 'axios';
 import { Modal } from './Modal';
 import PartDetailModal from './PartDetailModal';
@@ -39,19 +39,38 @@ function changeText(node: BOMCompareNode): string {
   return '';
 }
 
-/** 可搜索的零部件选择器（仅显示部件） */
-function PartPicker({ label, options, valueId, onPick }: {
+/** 可搜索的零部件选择器（服务端搜索，仅显示部件） */
+function PartPicker({ label, valueId, onPick, onSearch }: {
   label: string;
-  options: PartListItem[];
   valueId: string | null;
   onPick: (id: string) => void;
+  onSearch: (query: string) => Promise<PartListItem[]>;
 }) {
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
-  const selected = options.find((o) => o.revision_id === valueId) || null;
-  const filtered = options
-    .filter((o) => !q.trim() || `${o.code} ${o.name}`.toLowerCase().includes(q.toLowerCase()))
-    .slice(0, 50);
+  const [results, setResults] = useState<PartListItem[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [selected, setSelected] = useState<PartListItem | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const doSearch = (query: string) => {
+    setQ(query);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (!query.trim()) {
+      setResults([]);
+      return;
+    }
+    timerRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const items = await onSearch(query.trim());
+        setResults(items);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+  };
+
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
@@ -59,19 +78,28 @@ function PartPicker({ label, options, valueId, onPick }: {
         <input
           type="text"
           value={open ? q : selected ? `${selected.code} - ${selected.name}` : ''}
-          placeholder="搜索件号或名称..."
+          placeholder="输入件号或名称搜索..."
           onFocus={() => { setOpen(true); setQ(''); }}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={(e) => doSearch(e.target.value)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
         />
-        {open && filtered.length > 0 && (
+        {open && (
           <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-auto">
-            {filtered.map((o) => (
+            {searching && (
+              <div className="px-3 py-2 text-sm text-gray-400">搜索中...</div>
+            )}
+            {!searching && q.trim() && results.length === 0 && (
+              <div className="px-3 py-2 text-sm text-gray-400">无匹配结果</div>
+            )}
+            {!searching && !q.trim() && (
+              <div className="px-3 py-2 text-sm text-gray-400">输入关键词搜索</div>
+            )}
+            {!searching && results.map((o) => (
               <button
                 key={o.revision_id}
                 type="button"
-                onMouseDown={() => { onPick(o.revision_id); setOpen(false); }}
+                onMouseDown={() => { onPick(o.revision_id); setSelected(o); setOpen(false); }}
                 className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-b-0 flex items-center gap-2"
               >
                 <span className="font-medium">{o.code}</span>
@@ -87,7 +115,6 @@ function PartPicker({ label, options, valueId, onPick }: {
 }
 
 export default function PartCompareModal({ open, onClose }: Props) {
-  const [options, setOptions] = useState<PartListItem[]>([]);
   const [leftId, setLeftId] = useState<string | null>(null);
   const [rightId, setRightId] = useState<string | null>(null);
   const [result, setResult] = useState<BOMCompareResponse | null>(null);
@@ -99,14 +126,19 @@ export default function PartCompareModal({ open, onClose }: Props) {
 
   useEffect(() => {
     if (!open) return;
-    setLeftId(null); setRightId(null); setResult(null); setError(''); setOnlyDiff(false);
-    partsApi.list({ page_size: 200, show_all_versions: true })
-      .then((res) => setOptions((res.items || []).filter((i: PartListItem) => i.type === 'assembly')))
-      .catch(() => setOptions([]));
+    setLeftId(null); setRightId(null);
+    setResult(null); setError(''); setOnlyDiff(false);
   }, [open]);
 
-  const leftPart = options.find((o) => o.revision_id === leftId) || null;
-  const rightPart = options.find((o) => o.revision_id === rightId) || null;
+  /** 服务端搜索部件（仅 assembly 类型） */
+  const handleSearch = async (query: string): Promise<PartListItem[]> => {
+    try {
+      const res = await partsApi.list({ search: query, page_size: 50, show_all_versions: true });
+      return (res.items || []).filter((i: PartListItem) => i.type === 'assembly');
+    } catch {
+      return [];
+    }
+  };
 
   const handleCompare = async () => {
     if (!leftId || !rightId) return;
@@ -224,15 +256,9 @@ export default function PartCompareModal({ open, onClose }: Props) {
       <Modal open={open} onClose={onClose} title="BOM 对比" width="3xl" height="75vh">
         <div className="flex flex-col h-full space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <PartPicker label="左部件" options={options} valueId={leftId} onPick={setLeftId} />
-            <PartPicker label="右部件" options={options} valueId={rightId} onPick={setRightId} />
+            <PartPicker label="左部件" valueId={leftId} onPick={setLeftId} onSearch={handleSearch} />
+            <PartPicker label="右部件" valueId={rightId} onPick={setRightId} onSearch={handleSearch} />
           </div>
-          {(leftPart || rightPart) && (
-            <div className="grid grid-cols-2 gap-4 text-xs text-gray-500">
-              <div>{leftPart ? <>{leftPart.code} · {leftPart.name} · 版本 {leftPart.version} · {statusLabel(leftPart.status)}</> : ''}</div>
-              <div>{rightPart ? <>{rightPart.code} · {rightPart.name} · 版本 {rightPart.version} · {statusLabel(rightPart.status)}</> : ''}</div>
-            </div>
-          )}
           <div className="flex items-center gap-3">
             <button onClick={handleCompare} disabled={!leftId || !rightId || loading}
               className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 text-sm">

@@ -52,7 +52,7 @@ export default function PartsPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, any> = { page_size: 200, show_all_versions: true };
+      const params: Record<string, any> = { page_size: 10000, show_all_versions: true };
       if (statusFilter) params.status = statusFilter;
       if (topLevelOnly) params.top_level = true;
       if (search && searchField === 'all') params.search = search;
