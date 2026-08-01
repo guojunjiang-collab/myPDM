@@ -31,27 +31,11 @@ function quatToMatrix3d(x: number, y: number, z: number, w: number): string {
 
 export function ViewCube() {
   const quat = useViewerStore((s) => s.cameraQuat);
-  const modelZUp = useViewerStore((s) => s.modelZUp);
   const setViewTarget = useViewerStore((s) => s.setViewTarget);
 
   const [qx, qy, qz, qw] = quat;
 
   const cssTransform = quatToMatrix3d(-qx, qy, -qz, qw);
-
-  // 活跃面检测必须与 cssTransform 使用同一套四元数（取反后），否则立方体视觉旋转
-  // 与高亮面之间存在由 X/Z 分量符号差引入的角度偏差
-  const nqx = -qx, nqz = -qz;
-  const fwdX = 2 * (nqx * nqz + qw * qy);
-  const fwdY = 2 * (qy * nqz - qw * nqx);
-  const fwdZ = 1 - 2 * (nqx * nqx + qy * qy);
-  const vx = -fwdX, vy = -fwdY, vz = -fwdZ;
-  const ax = Math.abs(vx), ay = Math.abs(vy), az = Math.abs(vz);
-  let active: string;
-  if (ax >= ay && ax >= az) active = vx > 0 ? 'right' : 'left';
-  else if (ay >= ax && ay >= az) active = vy > 0 ? 'top' : 'bottom';
-  // Z-up 模式下模型 front(Y+)→世界-Z，故 Z 轴前后反转
-  else if (modelZUp) active = vz > 0 ? 'back' : 'front';
-  else active = vz > 0 ? 'front' : 'back';
 
   return (
     <div
@@ -69,8 +53,7 @@ export function ViewCube() {
           <div
             key={f.key}
             onClick={() => setViewTarget(f.key)}
-            className={`absolute inset-0 flex items-center justify-center cursor-pointer border border-gray-300 text-xs font-medium
-              ${f.key === active ? 'bg-blue-500 text-white border-blue-600' : 'bg-white/90 text-gray-600 hover:bg-gray-100'}`}
+            className="absolute inset-0 flex items-center justify-center cursor-pointer border border-gray-300 text-xs font-medium bg-white/90 text-gray-600 hover:bg-gray-100"
             style={{ transform: f.css, backfaceVisibility: 'hidden' }}
           >
             {f.label}
