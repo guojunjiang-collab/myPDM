@@ -11,6 +11,22 @@ const ROW_BG: Record<ChangeType, string> = {
   none: '',
 };
 
+const CHANGE_LABEL: Record<ChangeType, string> = {
+  add: '新增',
+  delete: '删除',
+  modify: '修改',
+  internal: '子项变',
+  none: '',
+};
+
+const CHANGE_LABEL_COLOR: Record<ChangeType, string> = {
+  add: 'text-green-600',
+  delete: 'text-red-600',
+  modify: 'text-yellow-600',
+  internal: 'text-yellow-600',
+  none: '',
+};
+
 function Chevron({ expanded }: { expanded: boolean }) {
   return (
     <svg
@@ -32,15 +48,20 @@ function EyeIcon({ visible }: { visible: boolean }) {
   );
 }
 
-/** 单侧格子：缺失侧渲染虚线占位 */
-function SideCell({ side, node, which }: { side: CompareSide | null; node: CompareNode; which: Side }) {
+/** 单侧格子：缺失侧渲染占位。缩进走本格 paddingLeft，保证两格等宽。 */
+function SideCell({ side, node, which, indent }: {
+  side: CompareSide | null;
+  node: CompareNode;
+  which: Side;
+  indent: number;
+}) {
   const hiddenParts = useViewerStore((s) => s.hiddenParts);
   const toggleMeshes = useViewerStore((s) => s.toggleCompareSideVisibility);
 
   if (!side) {
     return (
-      <div className="flex-1 min-w-0 px-2 py-0.5">
-        <div className="border border-dashed border-gray-300 rounded text-gray-300 text-xs text-center leading-5">—</div>
+      <div className="flex-1 min-w-0 flex items-center px-2 py-0.5" style={{ paddingLeft: 8 + indent }}>
+        <span className="text-gray-300 italic text-xs">—</span>
       </div>
     );
   }
@@ -48,9 +69,10 @@ function SideCell({ side, node, which }: { side: CompareSide | null; node: Compa
   const visible = side.meshUuids.length === 0 ? true : side.meshUuids.some((u) => !hiddenParts.has(u));
   const noModel = !side.hasModel;
   const label = [side.code, side.version, side.name].filter(Boolean).join('_');
+  const count = node.instances && node.instances.length > 0 ? node.instances.length : side.quantity;
 
   return (
-    <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-0.5">
+    <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-0.5" style={{ paddingLeft: 8 + indent }}>
       {side.meshUuids.length > 0 ? (
         <button
           onClick={(e) => { e.stopPropagation(); toggleMeshes(node.key, which); }}
@@ -70,75 +92,84 @@ function SideCell({ side, node, which }: { side: CompareSide | null; node: Compa
         title={label}
       >
         {label}
-        {node.instances && node.instances.length > 0 ? (
-          <span className="text-gray-400 ml-1">×{node.instances.length}</span>
-        ) : side.quantity !== null ? (
-          <span className="text-gray-400 ml-1">×{side.quantity}</span>
-        ) : null}
+        {count !== null && count !== undefined && <span className="text-gray-400 ml-1">×{count}</span>}
         {noModel && <span className="text-gray-400 ml-1">(无模型)</span>}
+      </span>
+      {which === 'right' && CHANGE_LABEL[node.changeType] && (
+        <span className={`shrink-0 text-[10px] ${CHANGE_LABEL_COLOR[node.changeType]}`}>
+          {CHANGE_LABEL[node.changeType]}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** 实例行的单侧格子 */
+function InstanceCell({ present, label, meshUuid, indent }: {
+  present: boolean;
+  label: string;
+  meshUuid: string;
+  indent: number;
+}) {
+  const hiddenParts = useViewerStore((s) => s.hiddenParts);
+  const toggleMesh = useViewerStore((s) => s.toggleMesh);
+  const visible = !meshUuid || !hiddenParts.has(meshUuid);
+
+  return (
+    <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-0.5" style={{ paddingLeft: 8 + indent }}>
+      {present && meshUuid ? (
+        <button
+          onClick={(e) => { e.stopPropagation(); toggleMesh(meshUuid); }}
+          className={`w-3.5 h-3.5 flex items-center justify-center shrink-0 rounded transition-colors
+            ${visible ? 'text-gray-400 hover:text-blue-500' : 'text-gray-300'}`}
+          title={visible ? '隐藏' : '显示'}
+        >
+          <EyeIcon visible={visible} />
+        </button>
+      ) : (
+        <span className="w-3.5 shrink-0" />
+      )}
+      <span className={`truncate flex-1 text-[11px] ${visible ? 'text-gray-600' : 'text-gray-300 line-through'}`}>
+        {present ? label : <span className="text-gray-300 italic">—</span>}
       </span>
     </div>
   );
 }
 
+/** 实例行：与 BOM 行同一套骨架（展开槽 + 两格等宽 + 分隔线），缩进走格内 padding */
 function InstanceRow({ inst, depth, node }: { inst: CompareInstanceNode; depth: number; node: CompareNode }) {
   const selectedKey = useViewerStore((s) => s.compare?.selectedKey ?? null);
   const selectCompareKey = useViewerStore((s) => s.selectCompareKey);
-  const hiddenParts = useViewerStore((s) => s.hiddenParts);
-  const toggleMesh = useViewerStore((s) => s.toggleMesh);
   const isSelected = selectedKey === inst.key;
-  const visible = !inst.meshUuid || !hiddenParts.has(inst.meshUuid);
   const inLeft = inst.side === 'left' || inst.side === 'both';
   const inRight = inst.side === 'right' || inst.side === 'both';
+  const indent = (depth + 1) * 12;
 
-  // 左右两侧可能型号不同（如修改件版本 V1→V2），分别取自对应侧的 CompareSide
-  const leftLabel = inLeft ? formatInstanceLabel(inst, node.left) : '';
-  const rightLabel = inRight ? formatInstanceLabel(inst, node.right) : '';
+  // 左右两侧件号/版本可能不同，各取自己那侧的 CompareSide
+  const labelOf = (s: CompareSide | null) =>
+    [s?.code, s?.version, s?.name, inst.seq].filter(Boolean).join('_');
+
+  const bg = isSelected
+    ? 'bg-primary-50 ring-1 ring-inset ring-primary-400'
+    : inst.changeType === 'add'
+      ? 'bg-green-50 hover:bg-green-100'
+      : inst.changeType === 'delete'
+        ? 'bg-red-50 hover:bg-red-100'
+        : 'hover:bg-gray-50';
 
   return (
-    <li key={inst.key} className="relative">
+    <li>
       <div
         onClick={(e) => { e.stopPropagation(); selectCompareKey(inst.key); }}
-        className={`flex items-stretch cursor-pointer select-none text-xs transition-colors
-          ${isSelected ? 'ring-1 ring-inset ring-primary-400 bg-primary-50' :
-            inst.changeType === 'add' ? 'bg-green-50 hover:bg-green-100' :
-            inst.changeType === 'delete' ? 'bg-red-50 hover:bg-red-100' :
-            'hover:bg-gray-50 text-gray-500'}`}
-        style={{ paddingLeft: (depth + 1) * 12 + 28 }}
+        className={`flex items-stretch cursor-pointer select-none transition-colors ${bg}`}
       >
-        {isSelected && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500 rounded-r" />}
-        <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-0.5">
-          {inst.meshUuid && inLeft ? (
-            <button
-              onClick={(e) => { e.stopPropagation(); toggleMesh(inst.meshUuid); }}
-              className={`w-3.5 h-3.5 flex items-center justify-center shrink-0 rounded ${visible ? 'text-gray-400' : 'text-gray-300'}`}
-            >
-              <EyeIcon visible={visible} />
-            </button>
-          ) : <span className="w-3.5 shrink-0" />}
-          <span className="truncate flex-1">{inLeft ? leftLabel : <span className="text-gray-300 italic">—</span>}</span>
-        </div>
+        <div className="shrink-0 w-5" />
+        <InstanceCell present={inLeft} label={labelOf(node.left)} meshUuid={inst.leftMeshUuid} indent={indent} />
         <div className="w-px bg-gray-200 shrink-0" />
-        <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-0.5">
-          {inst.meshUuid && inRight ? (
-            <button
-              onClick={(e) => { e.stopPropagation(); toggleMesh(inst.meshUuid); }}
-              className={`w-3.5 h-3.5 flex items-center justify-center shrink-0 rounded ${visible ? 'text-gray-400' : 'text-gray-300'}`}
-            >
-              <EyeIcon visible={visible} />
-            </button>
-          ) : <span className="w-3.5 shrink-0" />}
-          <span className="truncate flex-1">{inRight ? rightLabel : <span className="text-gray-300 italic">—</span>}</span>
-        </div>
+        <InstanceCell present={inRight} label={labelOf(node.right)} meshUuid={inst.rightMeshUuid} indent={indent} />
       </div>
     </li>
   );
-}
-
-/** 从侧别数据 + 实例序号生成 件号_版本_名称_序号 */
-function formatInstanceLabel(inst: CompareInstanceNode, side: CompareSide | null): string {
-  if (!side) return inst.label || '';
-  return [side.code, side.version, side.name, inst.seq].filter(Boolean).join('_');
 }
 
 function Row({ node, depth }: { node: CompareNode; depth: number }) {
@@ -150,6 +181,7 @@ function Row({ node, depth }: { node: CompareNode; depth: number }) {
   const expanded = expandedIds.has(node.key);
   const selected = selectedKey === node.key;
   const hasChildren = node.children.length > 0;
+  const hasInstances = !!node.instances && node.instances.length > 0;
   const rowRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -164,9 +196,10 @@ function Row({ node, depth }: { node: CompareNode; depth: number }) {
         className={`flex items-stretch cursor-pointer select-none border-b border-gray-50 transition-colors
           ${selected ? 'ring-1 ring-inset ring-primary-400 bg-primary-50' : `${ROW_BG[node.changeType]} hover:brightness-95`}`}
       >
-        {/* 展开按钮每行只有一个，作用于整行 —— 左右联动是结构性的 */}
-        <div className="shrink-0 flex items-center" style={{ paddingLeft: 4 + depth * 12 }}>
-          {hasChildren ? (
+        {/* 展开槽宽度固定，不随层级变化 —— 缩进走两格各自的 paddingLeft，
+            这样两格永远等宽、分隔线在所有行上处于同一水平位置 */}
+        <div className="shrink-0 w-5 flex items-center justify-center">
+          {hasChildren || hasInstances ? (
             <button
               onClick={(e) => { e.stopPropagation(); toggleExpanded(node.key); }}
               className="w-4 h-4 flex items-center justify-center rounded hover:bg-gray-200/60"
@@ -177,9 +210,9 @@ function Row({ node, depth }: { node: CompareNode; depth: number }) {
             <span className="w-4" />
           )}
         </div>
-        <SideCell side={node.left} node={node} which="left" />
+        <SideCell side={node.left} node={node} which="left" indent={depth * 12} />
         <div className="w-px bg-gray-200 shrink-0" />
-        <SideCell side={node.right} node={node} which="right" />
+        <SideCell side={node.right} node={node} which="right" indent={depth * 12} />
       </div>
 
       {hasChildren && expanded && (
@@ -189,9 +222,9 @@ function Row({ node, depth }: { node: CompareNode; depth: number }) {
       )}
 
       {/* 实例子行：按矩阵匹配结果，逐实例展示，仿 ModelTreePanel 样式 */}
-      {node.instances && node.instances.length > 0 && (
+      {hasInstances && expanded && (
         <ul>
-          {node.instances.map((inst) => (
+          {node.instances?.map((inst) => (
             <InstanceRow key={inst.key} inst={inst} depth={depth} node={node} />
           ))}
         </ul>
