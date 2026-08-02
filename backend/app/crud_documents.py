@@ -7,6 +7,7 @@ import os
 import shutil
 
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from . import models
 from . import crud as crud_common
@@ -477,103 +478,241 @@ def delete_document_revision(db: Session, revision_id: UUID) -> bool:
 
 # ====== 列表查询 ======
 
+SORT_FIELDS_DOCS = {'code', 'name', 'created_at', 'version', 'status', 'check_out_user_name'}
+SORT_ORDERS = {'asc', 'desc'}
+SEARCH_FIELDS_DOCS = {'all', 'code', 'name', 'remark'}
+
+
 def list_documents(
     db: Session,
     search: Optional[str] = None,
     status: Optional[str] = None,
-    check_out_user_id: Optional[UUID] = None,
     show_all_versions: bool = False,
     page: int = 1,
     page_size: int = 50,
+    sort_field: str = 'code',
+    sort_order: str = 'asc',
+    search_field: str = 'all',
+    include_custom_fields: bool = False,
+    show_accessible_only: bool = False,
+    current_user_id: Optional[UUID] = None,
 ) -> Tuple[List[Dict], int]:
-    """查询文档列表（按 master 聚合，含最新版本摘要和附件信息），返回 (items, total)"""
-    query = (
-        db.query(models.DocumentMaster)
-        .filter(models.DocumentMaster.deleted_at.is_(None))
-    )
+    """按 revision 维度分页，支持服务端排序、搜索与附件信息，返回 (items, total)。"""
+
+    if sort_field not in SORT_FIELDS_DOCS:
+        raise ValueError(f"Invalid sort_field: {sort_field}")
+    if sort_order not in SORT_ORDERS:
+        raise ValueError(f"Invalid sort_order: {sort_order}")
+    if search_field not in SEARCH_FIELDS_DOCS:
+        raise ValueError(f"Invalid search_field: {search_field}")
+    page = max(1, page)
+    page_size = max(1, page_size)
+
+    order_col_map = {
+        'code': 'code',
+        'name': 'name',
+        'created_at': 'created_at',
+        'version': 'version_to_int(version)',
+        'status': 'status',
+        'check_out_user_name': 'check_out_user_name',
+    }
+    order_col = order_col_map[sort_field]
+    order_dir = 'DESC' if sort_order == 'desc' else 'ASC'
+    nulls = 'NULLS LAST' if sort_order == 'asc' else 'NULLS FIRST'
+
+    search_clauses = []
+    search_params = {}
     if search:
-        query = query.filter(
-            models.DocumentMaster.code.ilike(f"%{search}%")
-            | models.DocumentMaster.name.ilike(f"%{search}%")
-        )
-
-    total = query.count()
-    masters = query.offset((page - 1) * page_size).limit(page_size).all()
-
-    items = []
-    for master in masters:
-        revisions_query = (
-            db.query(models.DocumentRevision)
-            .filter(
-                models.DocumentRevision.master_id == master.id,
-                models.DocumentRevision.deleted_at.is_(None),
-            )
-            .order_by(models.DocumentRevision.created_at.desc())
-        )
-        if status:
-            revisions_query = revisions_query.filter(
-                models.DocumentRevision.status == status
-            )
-        if check_out_user_id:
-            revisions_query = revisions_query.filter(
-                models.DocumentRevision.check_out_user_id == check_out_user_id
-            )
-
-        revisions = revisions_query.all()
-        for rev in revisions:
-            if not show_all_versions and rev != revisions[0]:
-                break
-
-            checkout_user_name = None
-            if rev.check_out_user_id:
-                user = (
-                    db.query(models.User)
-                    .filter(models.User.id == rev.check_out_user_id)
-                    .first()
+        like = f"%%{search}%%"
+        search_params['like'] = like
+        if search_field in ('all', 'code'):
+            search_clauses.append("m.code ILIKE :like")
+        if search_field in ('all', 'name'):
+            search_clauses.append("m.name ILIKE :like")
+        if search_field == 'remark':
+            rev_alias_s = 'r' if show_all_versions else 'latest_r'
+            search_clauses.append(f"{rev_alias_s}.remark ILIKE :like")
+        if search_field == 'all':
+            rev_alias_sa = 'r' if show_all_versions else 'latest_r'
+            search_clauses.append(f"{rev_alias_sa}.remark ILIKE :like")
+        if include_custom_fields:
+            rev_alias_cf = 'r' if show_all_versions else 'latest_r'
+            search_clauses.append(f"""
+                EXISTS (
+                    SELECT 1 FROM custom_field_values cfv
+                    WHERE cfv.entity_type = 'document' AND cfv.entity_id = {rev_alias_cf}.id
+                      AND cfv.iteration_id IS NULL
+                      AND COALESCE(cfv.value_text,
+                                   to_char(cfv.value_number, 'FM999999999990.0000'),
+                                   cfv.value_json::text) ILIKE :like
                 )
-                if user:
-                    checkout_user_name = user.real_name
+            """)
+    where_search = ""
+    if search_clauses:
+        where_search = "AND (" + " OR ".join(search_clauses) + ")"
 
-            iteration_count = (
-                db.query(models.DocumentIteration)
-                .filter(models.DocumentIteration.revision_id == rev.id)
-                .count()
+    rev_alias_filter = 'r' if show_all_versions else 'latest_r'
+
+    where_status = ""
+    status_params = {}
+    if status:
+        where_status = f"AND {rev_alias_filter}.status = :status"
+        status_params = {'status': status}
+
+    where_accessible = ""
+    acc_params = {}
+    if show_accessible_only and current_user_id:
+        where_accessible = f"""
+            AND (
+                EXISTS (
+                    SELECT 1 FROM document_group_links dgl
+                    JOIN user_group_members ugm ON ugm.group_id = dgl.group_id
+                    WHERE dgl.document_id = m.id AND ugm.user_id = :current_user_id
+                )
+                OR EXISTS (
+                    SELECT 1 FROM document_iterations di
+                    JOIN document_revisions dr2 ON dr2.id = di.revision_id
+                    WHERE dr2.master_id = m.id AND di.creator_id = :current_user_id
+                )
             )
+        """
+        acc_params = {'current_user_id': current_user_id}
 
-            latest_iter = _get_current_iteration(db, rev.id)
-            first_att = latest_iter.attachments.first() if latest_iter else None
+    version_col = 'r.version' if show_all_versions else 'latest_r.version'
+    status_col = 'r.status' if show_all_versions else 'latest_r.status'
+    check_out_user_id_col = 'r.check_out_user_id' if show_all_versions else 'latest_r.check_out_user_id'
+    check_out_date_col = 'r.check_out_date' if show_all_versions else 'latest_r.check_out_date'
+    latest_iter_col = 'r.latest_iteration' if show_all_versions else 'latest_r.latest_iteration'
+    rev_id_col = 'r.id' if show_all_versions else 'latest_r.id'
+    remark_col = 'r.remark' if show_all_versions else 'latest_r.remark'
 
-            items.append(
-                {
-                    "id": str(rev.id),
-                    "revision_id": str(rev.id),
-                    "master_id": str(master.id),
-                    "code": master.code,
-                    "name": master.name,
-                    "revision_id": str(rev.id),
-                    "version": rev.version,
-                    "status": rev.status,
-                    "check_out_user_id": str(rev.check_out_user_id)
-                    if rev.check_out_user_id
-                    else None,
-                    "check_out_user_name": checkout_user_name,
-                    "check_out_date": rev.check_out_date.isoformat()
-                    if rev.check_out_date
-                    else None,
-                    "latest_iteration": rev.latest_iteration,
-                    "iteration_count": iteration_count,
-                    "file_name": first_att.file_name if first_att else None,
-                    "file_id": str(first_att.id) if first_att else None,
-                    "file_size": first_att.file_size if first_att else None,
-                    "remark": rev.remark,
-                    "created_at": rev.created_at.isoformat()
-                    if rev.created_at
-                    else None,
-                    "updated_at": master.updated_at.isoformat()
-                    if master.updated_at
-                    else None,
-                }
+    base_where = "WHERE m.deleted_at IS NULL"
+
+    if show_all_versions:
+        sql_count = f"""
+            SELECT COUNT(*) FROM document_masters m
+            JOIN document_revisions r ON r.master_id = m.id AND r.deleted_at IS NULL
+            {base_where} {where_search} {where_status} {where_accessible}
+        """
+        sql_items = f"""
+            WITH ranked AS (
+                SELECT
+                    {rev_id_col} AS revision_id, r.master_id, m.code, m.name,
+                    {version_col} AS version, {status_col} AS status,
+                    r.created_at, m.created_at AS master_created_at, m.updated_at AS master_updated_at,
+                    {check_out_user_id_col} AS check_out_user_id,
+                    co_user.real_name AS check_out_user_name,
+                    {check_out_date_col} AS check_out_date,
+                    {latest_iter_col} AS latest_iteration,
+                    {remark_col} AS remark,
+                    COALESCE(v_cnt.cnt, 0) AS version_count,
+                    COALESCE(it_cnt.cnt, 0) AS iteration_count,
+                    att.file_name, att.id AS file_id, att.file_size
+                FROM document_masters m
+                JOIN document_revisions r ON r.master_id = m.id AND r.deleted_at IS NULL
+                LEFT JOIN users co_user ON co_user.id = {check_out_user_id_col}
+                LEFT JOIN (
+                    SELECT master_id, COUNT(*) AS cnt FROM document_revisions WHERE deleted_at IS NULL GROUP BY master_id
+                ) v_cnt ON v_cnt.master_id = m.id
+                LEFT JOIN (
+                    SELECT revision_id, COUNT(*) AS cnt FROM document_iterations GROUP BY revision_id
+                ) it_cnt ON it_cnt.revision_id = r.id
+                LEFT JOIN LATERAL (
+                    SELECT da.file_name, da.id, da.file_size
+                    FROM document_iterations di_att
+                    JOIN document_attachments da ON da.iteration_id = di_att.id
+                    WHERE di_att.revision_id = r.id AND di_att.iteration = r.latest_iteration
+                    ORDER BY da.created_at LIMIT 1
+                ) att ON TRUE
+                {base_where} {where_search} {where_status} {where_accessible}
             )
+            SELECT * FROM ranked
+            ORDER BY {order_col} {order_dir} {nulls}
+            LIMIT :limit OFFSET :offset
+        """
+    else:
+        sql_count = f"""
+            SELECT COUNT(*) FROM document_masters m
+            JOIN LATERAL (
+            SELECT r.* FROM document_revisions r
+            WHERE r.master_id = m.id AND r.deleted_at IS NULL
+            ORDER BY version_to_int(r.version) DESC LIMIT 1
+            ) latest_r ON TRUE
+            {base_where} {where_search} {where_status} {where_accessible}
+        """
+        sql_items = f"""
+            WITH ranked AS (
+                SELECT
+                    latest_r.id AS revision_id, latest_r.master_id, m.code, m.name,
+                    latest_r.version, latest_r.status,
+                    latest_r.created_at, m.created_at AS master_created_at, m.updated_at AS master_updated_at,
+                    latest_r.check_out_user_id,
+                    co_user.real_name AS check_out_user_name,
+                    latest_r.check_out_date,
+                    latest_r.latest_iteration,
+                    latest_r.remark,
+                    COALESCE(v_cnt.cnt, 0) AS version_count,
+                    COALESCE(it_cnt.cnt, 0) AS iteration_count,
+                    att.file_name, att.id AS file_id, att.file_size
+                FROM document_masters m
+                JOIN LATERAL (
+                    SELECT r.* FROM document_revisions r
+                    WHERE r.master_id = m.id AND r.deleted_at IS NULL
+                    ORDER BY version_to_int(r.version) DESC LIMIT 1
+                ) latest_r ON TRUE
+                LEFT JOIN users co_user ON co_user.id = latest_r.check_out_user_id
+                LEFT JOIN (
+                    SELECT master_id, COUNT(*) AS cnt FROM document_revisions WHERE deleted_at IS NULL GROUP BY master_id
+                ) v_cnt ON v_cnt.master_id = m.id
+                LEFT JOIN (
+                    SELECT revision_id, COUNT(*) AS cnt FROM document_iterations GROUP BY revision_id
+                ) it_cnt ON it_cnt.revision_id = latest_r.id
+                LEFT JOIN LATERAL (
+                    SELECT da.file_name, da.id, da.file_size
+                    FROM document_iterations di_att
+                    JOIN document_attachments da ON da.iteration_id = di_att.id
+                    WHERE di_att.revision_id = latest_r.id AND di_att.iteration = latest_r.latest_iteration
+                    ORDER BY da.created_at LIMIT 1
+                ) att ON TRUE
+                {base_where} {where_search} {where_status} {where_accessible}
+            )
+            SELECT * FROM ranked
+            ORDER BY {order_col} {order_dir} {nulls}
+            LIMIT :limit OFFSET :offset
+        """
+
+    params = {
+        'limit': page_size, 'offset': (page - 1) * page_size,
+        **search_params, **status_params, **acc_params,
+    }
+    total = db.execute(text(sql_count), params).scalar()
+    rows = db.execute(text(sql_items), params).mappings().all()
+
+    items: List[Dict] = []
+    for row in rows:
+        fid = row['file_id']
+        items.append({
+            'id': str(row['revision_id']),
+            'revision_id': str(row['revision_id']),
+            'master_id': str(row['master_id']),
+            'code': row['code'],
+            'name': row['name'],
+            'version': row['version'],
+            'status': row['status'],
+            'check_out_user_id': str(row['check_out_user_id']) if row['check_out_user_id'] else None,
+            'check_out_user_name': row['check_out_user_name'],
+            'check_out_date': row['check_out_date'].isoformat() if row['check_out_date'] else None,
+            'latest_iteration': row['latest_iteration'],
+            'iteration_count': row['iteration_count'] or 0,
+            'file_name': row['file_name'],
+            'file_id': str(fid) if fid else None,
+            'file_size': row['file_size'],
+            'remark': row['remark'],
+            'created_at': row['created_at'].isoformat() if row['created_at'] else None,
+            'updated_at': row['master_updated_at'].isoformat() if row['master_updated_at'] else None,
+            'version_count': row['version_count'] or 0,
+        })
+
     return items, total
 
 

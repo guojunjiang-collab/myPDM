@@ -255,6 +255,7 @@ class DocumentRevisionOut(BaseSchema):
     group_ids: Optional[List[uuid.UUID]] = None
     group_names: Optional[List[str]] = None
     accessible: Optional[bool] = None
+    version_count: Optional[int] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     deleted_at: Optional[datetime] = None
