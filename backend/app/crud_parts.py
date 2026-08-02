@@ -180,16 +180,18 @@ def list_part_masters(
     if search_clauses:
         where_search = "AND (" + " OR ".join(search_clauses) + ")"
 
+    rev_alias_filter = 'r' if show_all_versions else 'latest_r'
+
     where_status = ""
     status_params = {}
     if status:
-        where_status = "AND r.status = :status"
+        where_status = f"AND {rev_alias_filter}.status = :status"
         status_params = {'status': status}
 
     where_checkout = ""
     co_params = {}
     if check_out_user_id:
-        where_checkout = "AND r.check_out_user_id = :check_out_user_id"
+        where_checkout = f"AND {rev_alias_filter}.check_out_user_id = :check_out_user_id"
         co_params = {'check_out_user_id': check_out_user_id}
 
     where_type = ""
@@ -237,9 +239,9 @@ def list_part_masters(
         sql_count = f"""
             SELECT COUNT(*) FROM part_masters m
             JOIN LATERAL (
-                SELECT r.id FROM part_revisions r
-                WHERE r.master_id = m.id AND r.deleted_at IS NULL
-                ORDER BY version_to_int(r.version) DESC LIMIT 1
+            SELECT r.* FROM part_revisions r
+            WHERE r.master_id = m.id AND r.deleted_at IS NULL
+            ORDER BY version_to_int(r.version) DESC LIMIT 1
             ) latest_r ON TRUE
             {base_where} {where_search} {where_status} {where_checkout} {where_type} {where_toplevel}
         """
