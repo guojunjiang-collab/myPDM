@@ -6,7 +6,7 @@
 
 import uuid
 from uuid import UUID
-from typing import Optional
+from typing import Optional, Literal
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
@@ -57,8 +57,13 @@ def _get_current_iteration(db: Session, revision_id: UUID) -> Optional[models.Co
 
 @router.get("/items", response_model=dict)
 async def list_config_items(
-    page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=10000),
+    page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=10000),
     search: str = Query(None),
+    sort_field: Literal['code', 'name', 'created_at', 'version', 'status', 'check_out_user_name'] = Query('code'),
+    sort_order: Literal['asc', 'desc'] = Query('asc'),
+    search_field: Literal['all', 'code', 'name'] = Query('all'),
+    include_custom_fields: bool = Query(False),
+    show_all_versions: bool = Query(False),
     exclude_ancestors_of: str = Query(None),
     updated_since: float = Query(None),
     brief: bool = Query(False),
@@ -67,8 +72,7 @@ async def list_config_items(
     db: Session = Depends(get_db),
     current_user=Depends(require_permission("configuration:read")),
 ):
-    """构型项列表（按 master 聚合，返回最新 revision 摘要）"""
-    skip = (page - 1) * page_size
+    """构型项列表（按 revision 维度分页，支持服务端排序与搜索）"""
     exclude_ids: set[str] = set()
     if exclude_ancestors_of:
         exclude_ids.add(exclude_ancestors_of)
@@ -127,11 +131,23 @@ async def list_config_items(
                                     more_exclude_ids.add(pmid)
                                     queue.append(pmid)
                         exclude_ids.update(more_exclude_ids)
-    crud_kwargs = dict(search=search, skip=skip, limit=page_size, exclude_ids=exclude_ids, top_level=top_level, status=status)
+    crud_kwargs = dict(
+        search=search, status=status,
+        show_all_versions=show_all_versions,
+        top_level=top_level,
+        page=page, page_size=page_size,
+        sort_field=sort_field, sort_order=sort_order,
+        search_field=search_field,
+        include_custom_fields=include_custom_fields,
+        exclude_ids=exclude_ids,
+    )
     if updated_since is not None:
         crud_kwargs["include_deleted"] = True
         crud_kwargs["updated_since"] = updated_since
-    items, total = crud.get_config_items(db, **crud_kwargs)
+    try:
+        items, total = crud.list_config_items(db, **crud_kwargs)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     if brief:
         return {

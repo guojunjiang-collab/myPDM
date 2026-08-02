@@ -6,7 +6,7 @@
 """
 
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, func as sqlfunc
+from sqlalchemy import or_, func as sqlfunc, text
 from typing import Optional, List, Tuple, Any, Dict
 from datetime import datetime, timezone
 from uuid import UUID
@@ -152,96 +152,210 @@ def _get_iteration(db: Session, iteration_id: UUID) -> Optional[models.Configura
 # 列表查询（聚合到 master 层）
 # ============================================================
 
-def get_config_items(
-    db: Session, search: Optional[str] = None,
-    skip: int = 0, limit: int = 50,
+# ====== 列表查询常量 ======
+
+SORT_FIELDS_CONFIG = {'code', 'name', 'created_at', 'version', 'status', 'check_out_user_name'}
+SORT_ORDERS = {'asc', 'desc'}
+SEARCH_FIELDS_CONFIG = {'all', 'code', 'name'}
+
+
+def list_config_items(
+    db: Session,
+    search: Optional[str] = None,
+    status: Optional[str] = None,
+    show_all_versions: bool = False,
+    top_level: bool = False,
+    page: int = 1,
+    page_size: int = 50,
+    sort_field: str = 'code',
+    sort_order: str = 'asc',
+    search_field: str = 'all',
+    include_custom_fields: bool = False,
     exclude_ids: set | None = None,
     include_deleted: bool = False,
     updated_since: Optional[float] = None,
-    top_level: bool = False,
-    status: Optional[str] = None,
 ) -> Tuple[List[Dict[str, Any]], int]:
-    """构型项列表：按 master 聚合，返回每个 master 的最新 revision 摘要"""
-    q = db.query(models.ConfigurationItemMaster)
-    if not include_deleted:
-        q = q.filter(models.ConfigurationItemMaster.deleted_at.is_(None))
-    if exclude_ids:
-        q = q.filter(models.ConfigurationItemMaster.id.notin_(exclude_ids))
-    if top_level:
-        # 仅顶层构型项：master.id 未作为任何存活父项的子项出现
-        live_master_ids = db.query(models.ConfigurationItemMaster.id).filter(
-            models.ConfigurationItemMaster.deleted_at.is_(None)
-        )
-        # 子项通过 parent_iteration_id 关联，需先找到所有迭代对应的 revision→master
-        parented_rev_ids = (
-            db.query(models.ConfigurationItemChild.child_revision_id)
-            .join(
-                models.ConfigurationItemIteration,
-                models.ConfigurationItemIteration.id == models.ConfigurationItemChild.parent_iteration_id,
-            )
-            .join(
-                models.ConfigurationItemRevision,
-                models.ConfigurationItemRevision.id == models.ConfigurationItemIteration.revision_id,
-            )
-            .filter(models.ConfigurationItemRevision.deleted_at.is_(None))
-        )
-        parented_master_ids = db.query(models.ConfigurationItemRevision.master_id).filter(
-            models.ConfigurationItemRevision.id.in_(parented_rev_ids)
-        )
-        q = q.filter(models.ConfigurationItemMaster.id.notin_(parented_master_ids))
+    """构型项列表：按 revision 维度分页，支持服务端排序与搜索。"""
+
+    if sort_field not in SORT_FIELDS_CONFIG:
+        raise ValueError(f"Invalid sort_field: {sort_field}")
+    if sort_order not in SORT_ORDERS:
+        raise ValueError(f"Invalid sort_order: {sort_order}")
+    if search_field not in SEARCH_FIELDS_CONFIG:
+        raise ValueError(f"Invalid search_field: {search_field}")
+    page = max(1, page)
+    page_size = max(1, page_size)
+
+    order_col_map = {
+        'code': 'code',
+        'name': 'name',
+        'created_at': 'created_at',
+        'version': 'version_to_int(version)',
+        'status': 'status',
+        'check_out_user_name': 'check_out_user_name',
+    }
+    order_col = order_col_map[sort_field]
+    order_dir = 'DESC' if sort_order == 'desc' else 'ASC'
+    nulls = 'NULLS LAST' if sort_order == 'asc' else 'NULLS FIRST'
+
+    search_clauses = []
+    search_params = {}
     if search:
-        like = f"%{search}%"
-        q = q.filter(or_(
-            models.ConfigurationItemMaster.code.ilike(like),
-            models.ConfigurationItemMaster.name.ilike(like),
-        ))
+        like = f"%%{search}%%"
+        search_params['like'] = like
+        if search_field in ('all', 'code'):
+            search_clauses.append("m.code ILIKE :like")
+        if search_field in ('all', 'name'):
+            search_clauses.append("m.name ILIKE :like")
+        if include_custom_fields:
+            rev_alias_cf = 'r' if show_all_versions else 'latest_r'
+            search_clauses.append(f"""
+                EXISTS (
+                    SELECT 1 FROM custom_field_values cfv
+                    WHERE cfv.entity_type = 'config_item' AND cfv.entity_id = {rev_alias_cf}.id
+                      AND cfv.iteration_id IS NULL
+                      AND COALESCE(cfv.value_text,
+                                   to_char(cfv.value_number, 'FM999999999990.0000'),
+                                   cfv.value_json::text) ILIKE :like
+                )
+            """)
+    where_search = ""
+    if search_clauses:
+        where_search = "AND (" + " OR ".join(search_clauses) + ")"
+
+    rev_alias_filter = 'r' if show_all_versions else 'latest_r'
+
+    where_status = ""
+    status_params = {}
+    if status:
+        where_status = f"AND {rev_alias_filter}.status = :status"
+        status_params = {'status': status}
+
+    where_deleted = "AND m.deleted_at IS NULL"
+    if include_deleted:
+        where_deleted = ""
+
+    where_since = ""
+    since_params = {}
     if updated_since:
         since_dt = datetime.fromtimestamp(updated_since, tz=timezone.utc)
-        q = q.filter(
-            (models.ConfigurationItemMaster.updated_at >= since_dt) |
-            (models.ConfigurationItemMaster.deleted_at >= since_dt)
-        )
-    total = q.count()
-    masters = q.order_by(models.ConfigurationItemMaster.code).offset(skip).limit(limit).all()
+        where_since = "AND (m.updated_at >= :updated_since OR m.deleted_at >= :updated_since)"
+        since_params = {'updated_since': since_dt}
 
-    items = []
-    from . import models as core_models
-    for master in masters:
-        revisions_query = (
-            db.query(models.ConfigurationItemRevision)
-            .filter(
-                models.ConfigurationItemRevision.master_id == master.id,
-                models.ConfigurationItemRevision.deleted_at.is_(None),
+    where_exclude = ""
+    exc_params = {}
+    if exclude_ids:
+        placeholders = []
+        for i, eid in enumerate(exclude_ids):
+            key = f"exc_{i}"
+            placeholders.append(f":{key}")
+            exc_params[key] = eid
+        where_exclude = f"AND m.id NOT IN ({', '.join(placeholders)})"
+
+    where_toplevel = ""
+    if top_level:
+        where_toplevel = """
+            AND m.id NOT IN (
+                SELECT cir.master_id FROM configuration_item_revisions cir
+                JOIN configuration_item_children cic ON cic.child_revision_id = cir.id
+                JOIN configuration_item_iterations cii ON cii.id = cic.parent_iteration_id
+                JOIN configuration_item_revisions cir_parent ON cir_parent.id = cii.revision_id
+                WHERE cir.deleted_at IS NULL AND cir_parent.deleted_at IS NULL
             )
-            .order_by(models.ConfigurationItemRevision.created_at.desc())
-        )
-        if status:
-            revisions_query = revisions_query.filter(models.ConfigurationItemRevision.status == status)
-        revisions = revisions_query.all()
+        """
 
-        for rev in revisions:
-            checkout_user_name = None
-            if rev.check_out_user_id:
-                user = db.query(core_models.User).filter(
-                    core_models.User.id == rev.check_out_user_id
-                ).first()
-                if user:
-                    checkout_user_name = user.real_name
+    base_where = f"WHERE 1=1 {where_deleted} {where_exclude} {where_toplevel}"
 
-            items.append({
-                "master_id": str(master.id),
-                "code": master.code,
-                "name": master.name,
-                "revision_id": str(rev.id),
-                "version": rev.version,
-                "status": rev.status,
-                "check_out_user_id": str(rev.check_out_user_id) if rev.check_out_user_id else None,
-                "check_out_user_name": checkout_user_name,
-                "check_out_date": rev.check_out_date.isoformat() if rev.check_out_date else None,
-                "latest_iteration": rev.latest_iteration,
-                "created_at": rev.created_at.isoformat() if rev.created_at else None,
-                "updated_at": master.updated_at.isoformat() if master.updated_at else None,
-            })
+    if show_all_versions:
+        sql_count = f"""
+            SELECT COUNT(*) FROM configuration_item_masters m
+            JOIN configuration_item_revisions r ON r.master_id = m.id AND r.deleted_at IS NULL
+            {base_where} {where_search} {where_status} {where_since}
+        """
+        sql_items = f"""
+            WITH ranked AS (
+                SELECT
+                    r.id AS revision_id, r.master_id, m.code, m.name,
+                    r.version, r.status, r.created_at,
+                    m.created_at AS master_created_at, m.updated_at AS master_updated_at,
+                    r.check_out_user_id,
+                    co_user.real_name AS check_out_user_name,
+                    r.check_out_date, r.latest_iteration,
+                    COALESCE(v_cnt.cnt, 0) AS version_count
+                FROM configuration_item_masters m
+                JOIN configuration_item_revisions r ON r.master_id = m.id AND r.deleted_at IS NULL
+                LEFT JOIN users co_user ON co_user.id = r.check_out_user_id
+                LEFT JOIN (
+                    SELECT master_id, COUNT(*) AS cnt FROM configuration_item_revisions WHERE deleted_at IS NULL GROUP BY master_id
+                ) v_cnt ON v_cnt.master_id = m.id
+                {base_where} {where_search} {where_status} {where_since}
+            )
+            SELECT * FROM ranked
+            ORDER BY {order_col} {order_dir} {nulls}
+            LIMIT :limit OFFSET :offset
+        """
+    else:
+        sql_count = f"""
+            SELECT COUNT(*) FROM configuration_item_masters m
+            JOIN LATERAL (
+            SELECT r.* FROM configuration_item_revisions r
+            WHERE r.master_id = m.id AND r.deleted_at IS NULL
+            ORDER BY version_to_int(r.version) DESC LIMIT 1
+            ) latest_r ON TRUE
+            {base_where} {where_search} {where_status} {where_since}
+        """
+        sql_items = f"""
+            WITH ranked AS (
+                SELECT
+                    latest_r.id AS revision_id, latest_r.master_id, m.code, m.name,
+                    latest_r.version, latest_r.status, latest_r.created_at,
+                    m.created_at AS master_created_at, m.updated_at AS master_updated_at,
+                    latest_r.check_out_user_id,
+                    co_user.real_name AS check_out_user_name,
+                    latest_r.check_out_date, latest_r.latest_iteration,
+                    COALESCE(v_cnt.cnt, 0) AS version_count
+                FROM configuration_item_masters m
+                JOIN LATERAL (
+                    SELECT r.* FROM configuration_item_revisions r
+                    WHERE r.master_id = m.id AND r.deleted_at IS NULL
+                    ORDER BY version_to_int(r.version) DESC LIMIT 1
+                ) latest_r ON TRUE
+                LEFT JOIN users co_user ON co_user.id = latest_r.check_out_user_id
+                LEFT JOIN (
+                    SELECT master_id, COUNT(*) AS cnt FROM configuration_item_revisions WHERE deleted_at IS NULL GROUP BY master_id
+                ) v_cnt ON v_cnt.master_id = m.id
+                {base_where} {where_search} {where_status} {where_since}
+            )
+            SELECT * FROM ranked
+            ORDER BY {order_col} {order_dir} {nulls}
+            LIMIT :limit OFFSET :offset
+        """
+
+    params = {
+        'limit': page_size, 'offset': (page - 1) * page_size,
+        **search_params, **status_params, **since_params, **exc_params,
+    }
+    total = db.execute(text(sql_count), params).scalar()
+    rows = db.execute(text(sql_items), params).mappings().all()
+
+    items: List[Dict] = []
+    for row in rows:
+        items.append({
+            'master_id': str(row['master_id']),
+            'code': row['code'],
+            'name': row['name'],
+            'revision_id': str(row['revision_id']),
+            'version': row['version'],
+            'status': row['status'],
+            'check_out_user_id': str(row['check_out_user_id']) if row['check_out_user_id'] else None,
+            'check_out_user_name': row['check_out_user_name'],
+            'check_out_date': row['check_out_date'].isoformat() if row['check_out_date'] else None,
+            'latest_iteration': row['latest_iteration'],
+            'version_count': row['version_count'] or 0,
+            'created_at': row['created_at'].isoformat() if row['created_at'] else None,
+            'updated_at': row['master_updated_at'].isoformat() if row['master_updated_at'] else None,
+        })
+
     return items, total
 
 
