@@ -52,7 +52,8 @@ export interface PartMaster {
   creator_id?: string;
   created_at?: string;
   updated_at?: string;
-  latest_revision?: PartRevisionBrief | null;
+  deleted_at?: string | null;
+  version_count?: number;
 }
 
 export interface PartRevisionBrief {
@@ -117,6 +118,7 @@ export interface PartListItem {
   remark?: string;
   /** @deprecated 旧系统兼容 */
   updated_at?: string;
+  version_count?: number;
 }
 
 export interface PartAttachment {

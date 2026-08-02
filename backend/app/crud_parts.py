@@ -5,7 +5,7 @@ from typing import Optional, List, Tuple, Any, Dict
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_
+from sqlalchemy import and_, text
 from fastapi import HTTPException
 
 from . import models, models_parts
@@ -109,6 +109,11 @@ def get_part_master(db: Session, master_id: UUID) -> Optional[models_parts.PartM
     )
 
 
+SORT_FIELDS_PARTS = {'code', 'name', 'created_at', 'version', 'status', 'check_out_user_name', 'type'}
+SORT_ORDERS = {'asc', 'desc'}
+SEARCH_FIELDS_PARTS = {'all', 'code', 'name', 'spec'}
+
+
 def list_part_masters(
     db: Session,
     search: Optional[str] = None,
@@ -118,82 +123,191 @@ def list_part_masters(
     top_level: bool = False,
     page: int = 1,
     page_size: int = 50,
+    sort_field: str = 'code',
+    sort_order: str = 'asc',
+    search_field: str = 'all',
+    include_custom_fields: bool = False,
+    type: Optional[str] = None,
+    updated_since: Optional[float] = None,
 ) -> Tuple[List[Dict], int]:
-    """查询零件列表（含最新版本摘要），返回 (items, total)"""
-    query = (
-        db.query(models_parts.PartMaster)
-        .filter(models_parts.PartMaster.deleted_at.is_(None))
-    )
-    if top_level:
-        child_rev_ids = (
-            db.query(models.BOMItem.child_revision_id)
-            .filter(models.BOMItem.deleted_at.is_(None))
-        )
-        child_master_ids = db.query(models_parts.PartRevision.master_id).filter(
-            models_parts.PartRevision.id.in_(child_rev_ids),
-            models_parts.PartRevision.deleted_at.is_(None),
-        )
-        query = query.filter(models_parts.PartMaster.id.notin_(child_master_ids))
+    """按 revision 维度分页，支持服务端排序与搜索。"""
+
+    if sort_field not in SORT_FIELDS_PARTS:
+        raise ValueError(f"Invalid sort_field: {sort_field}")
+    if sort_order not in SORT_ORDERS:
+        raise ValueError(f"Invalid sort_order: {sort_order}")
+    if search_field not in SEARCH_FIELDS_PARTS:
+        raise ValueError(f"Invalid search_field: {search_field}")
+    page = max(1, page)
+    page_size = max(1, page_size)
+
+    order_col_map = {
+        'code': 'code',
+        'name': 'name',
+        'created_at': 'created_at',
+        'version': 'version_to_int(version)',
+        'status': 'status',
+        'check_out_user_name': 'check_out_user_name',
+        'type': 'component_type',
+    }
+    order_col = order_col_map[sort_field]
+    order_dir = 'DESC' if sort_order == 'desc' else 'ASC'
+    nulls = 'NULLS LAST' if sort_order == 'asc' else 'NULLS FIRST'
+
+    search_clauses = []
+    search_params = {}
     if search:
-        query = query.filter(
-            models_parts.PartMaster.code.ilike(f"%{search}%")
-            | models_parts.PartMaster.name.ilike(f"%{search}%")
-        )
-
-    total = query.count()
-    masters = query.offset((page - 1) * page_size).limit(page_size).all()
-
-    items = []
-    for master in masters:
-        revisions_query = (
-            db.query(models_parts.PartRevision)
-            .filter(
-                models_parts.PartRevision.master_id == master.id,
-                models_parts.PartRevision.deleted_at.is_(None),
-            )
-            .order_by(models_parts.PartRevision.created_at.desc())
-        )
-        if status:
-            revisions_query = revisions_query.filter(models_parts.PartRevision.status == status)
-        if check_out_user_id:
-            revisions_query = revisions_query.filter(
-                models_parts.PartRevision.check_out_user_id == check_out_user_id
-            )
-
-        revisions = revisions_query.all()
-        for rev in revisions:
-            if not show_all_versions and rev != revisions[0]:
-                break
-            checkout_user_name = None
-            if rev.check_out_user_id:
-                user = db.query(models.User).filter(models.User.id == rev.check_out_user_id).first()
-                if user:
-                    checkout_user_name = user.real_name
-            child_count = (
-                db.query(models.BOMItem)
-                .filter(
-                    models.BOMItem.parent_revision_id == rev.id,
-                    models.BOMItem.deleted_at.is_(None),
+        like = f"%%{search}%%"
+        search_params['like'] = like
+        if search_field in ('all', 'code'):
+            search_clauses.append("m.code ILIKE :like")
+        if search_field in ('all', 'name'):
+            search_clauses.append("m.name ILIKE :like")
+        if search_field == 'spec':
+            search_clauses.append("m.name ILIKE :like")
+        if include_custom_fields:
+            rev_alias = 'r' if show_all_versions else 'latest_r'
+            search_clauses.append(f"""
+                EXISTS (
+                    SELECT 1 FROM custom_field_values cfv
+                    WHERE cfv.entity_type = 'component' AND cfv.entity_id = {rev_alias}.id
+                      AND cfv.iteration_id IS NULL
+                      AND COALESCE(cfv.value_text,
+                                   to_char(cfv.value_number, 'FM999999999990.0000'),
+                                   cfv.value_json::text) ILIKE :like
                 )
-                .count()
+            """)
+    where_search = ""
+    if search_clauses:
+        where_search = "AND (" + " OR ".join(search_clauses) + ")"
+
+    rev_alias_filter = 'r' if show_all_versions else 'latest_r'
+
+    where_status = ""
+    status_params = {}
+    if status:
+        where_status = f"AND {rev_alias_filter}.status = :status"
+        status_params = {'status': status}
+
+    where_checkout = ""
+    co_params = {}
+    if check_out_user_id:
+        where_checkout = f"AND {rev_alias_filter}.check_out_user_id = :check_out_user_id"
+        co_params = {'check_out_user_id': check_out_user_id}
+
+    where_type = ""
+    type_params = {}
+    if type:
+        where_type = "AND m.type = :type"
+        type_params = {'type': type}
+
+    where_toplevel = ""
+    if top_level:
+        where_toplevel = "AND m.id NOT IN (SELECT bi.child_master_id FROM bom_items bi)"
+
+    where_since = ""
+    since_params = {}
+    if updated_since:
+        rev_alias_for_since = 'r' if show_all_versions else 'latest_r'
+        where_since = f"AND EXTRACT(EPOCH FROM {rev_alias_for_since}.updated_at) >= :updated_since"
+        since_params = {'updated_since': updated_since}
+
+    base_where = "WHERE m.deleted_at IS NULL"
+
+    if show_all_versions:
+        sql_count = f"""
+            SELECT COUNT(*) FROM part_masters m
+            JOIN part_revisions r ON r.master_id = m.id AND r.deleted_at IS NULL
+            {base_where} {where_search} {where_status} {where_checkout} {where_type} {where_toplevel} {where_since}
+        """
+        sql_items = f"""
+            WITH ranked AS (
+                SELECT
+                    r.id AS revision_id, r.master_id, m.code, m.name, m.type AS component_type,
+                    r.version, r.status, r.created_at,
+                    r.check_out_user_id, co_user.real_name AS check_out_user_name,
+                    COALESCE(v_cnt.cnt, 0) AS version_count,
+                    COALESCE(c_cnt.cnt, 0) AS child_count
+                FROM part_masters m
+                JOIN part_revisions r ON r.master_id = m.id AND r.deleted_at IS NULL
+                LEFT JOIN users co_user ON co_user.id = r.check_out_user_id
+                LEFT JOIN (
+                    SELECT master_id, COUNT(*) AS cnt FROM part_revisions WHERE deleted_at IS NULL GROUP BY master_id
+                ) v_cnt ON v_cnt.master_id = m.id
+                LEFT JOIN (
+                    SELECT child_revision_id, COUNT(*) AS cnt FROM bom_items GROUP BY child_revision_id
+                ) c_cnt ON c_cnt.child_revision_id = r.id
+                {base_where} {where_search} {where_status} {where_checkout} {where_type} {where_toplevel} {where_since}
             )
-            item_type = "assembly" if child_count > 0 else "part"
-            items.append(
-                {
-                    "master_id": master.id,
-                    "code": master.code,
-                    "name": master.name,
-                    "type": item_type,
-                    "revision_id": rev.id,
-                    "version": rev.version,
-                    "status": rev.status,
-                    "check_out_user_id": rev.check_out_user_id,
-                    "check_out_user_name": checkout_user_name,
-                    "check_out_date": rev.check_out_date,
-                    "latest_iteration": rev.latest_iteration,
-                    "created_at": rev.created_at,
-                }
+            SELECT * FROM ranked
+            ORDER BY {order_col} {order_dir} {nulls}
+            LIMIT :limit OFFSET :offset
+        """
+    else:
+        sql_count = f"""
+            SELECT COUNT(*) FROM part_masters m
+            JOIN LATERAL (
+            SELECT r.* FROM part_revisions r
+            WHERE r.master_id = m.id AND r.deleted_at IS NULL
+            ORDER BY version_to_int(r.version) DESC LIMIT 1
+            ) latest_r ON TRUE
+            {base_where} {where_search} {where_status} {where_checkout} {where_type} {where_toplevel} {where_since}
+        """
+        sql_items = f"""
+            WITH ranked AS (
+                SELECT
+                    latest_r.id AS revision_id, latest_r.master_id, m.code, m.name,
+                    m.type AS component_type, latest_r.version, latest_r.status, latest_r.created_at,
+                    latest_r.check_out_user_id, co_user.real_name AS check_out_user_name,
+                    COALESCE(v_cnt.cnt, 0) AS version_count,
+                    COALESCE(c_cnt.cnt, 0) AS child_count
+                FROM part_masters m
+                JOIN LATERAL (
+                    SELECT r.* FROM part_revisions r
+                    WHERE r.master_id = m.id AND r.deleted_at IS NULL
+                    ORDER BY version_to_int(r.version) DESC LIMIT 1
+                ) latest_r ON TRUE
+                LEFT JOIN users co_user ON co_user.id = latest_r.check_out_user_id
+                LEFT JOIN (
+                    SELECT master_id, COUNT(*) AS cnt FROM part_revisions WHERE deleted_at IS NULL GROUP BY master_id
+                ) v_cnt ON v_cnt.master_id = m.id
+                LEFT JOIN (
+                    SELECT child_revision_id, COUNT(*) AS cnt FROM bom_items GROUP BY child_revision_id
+                ) c_cnt ON c_cnt.child_revision_id = latest_r.id
+                {base_where} {where_search} {where_status} {where_checkout} {where_type} {where_toplevel} {where_since}
             )
+            SELECT * FROM ranked
+            ORDER BY {order_col} {order_dir} {nulls}
+            LIMIT :limit OFFSET :offset
+        """
+
+    params = {
+        'limit': page_size, 'offset': (page - 1) * page_size,
+        **search_params, **status_params, **co_params, **type_params, **since_params,
+    }
+    total = db.execute(text(sql_count), params).scalar()
+    rows = db.execute(text(sql_items), params).mappings().all()
+
+    items: List[Dict] = []
+    for row in rows:
+        cmp_type = row['component_type'] or 'part'
+        items.append({
+            'revision_id': str(row['revision_id']),
+            'master_id': str(row['master_id']),
+            'code': row['code'],
+            'name': row['name'],
+            'component_type': cmp_type,
+            'type': 'assembly' if cmp_type == 'assembly' else 'part',
+            'spec': '',
+            'version': row['version'],
+            'status': row['status'],
+            'created_at': row['created_at'],
+            'check_out_user_id': str(row['check_out_user_id']) if row['check_out_user_id'] else None,
+            'check_out_user_name': row['check_out_user_name'],
+            'child_count': row['child_count'] or 0,
+            'version_count': row['version_count'] or 0,
+        })
+
     return items, total
 
 

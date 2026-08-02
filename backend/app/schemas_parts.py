@@ -45,6 +45,7 @@ class PartRevisionBrief(BaseModel):
     check_out_user_name: Optional[str] = None
     check_out_date: Optional[datetime] = None
     created_at: Optional[datetime] = None
+    version_count: Optional[int] = None
 
     class Config:
         from_attributes = True

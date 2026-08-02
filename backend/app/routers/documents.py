@@ -1,5 +1,5 @@
 """图文档管理 API（三层模型：Master → Revision → Iteration）"""
-from typing import Optional
+from typing import Optional, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
@@ -103,19 +103,30 @@ def _build_revision_response(db: Session, revision: DocumentRevision, iteration:
 async def list_documents(
     search: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
-    check_out_user_id: Optional[uuid.UUID] = Query(None),
     show_all_versions: bool = Query(False),
+    sort_field: Literal['code', 'name', 'created_at', 'version', 'status', 'check_out_user_name'] = Query('code'),
+    sort_order: Literal['asc', 'desc'] = Query('asc'),
+    search_field: Literal['all', 'code', 'name', 'remark'] = Query('all'),
+    include_custom_fields: bool = Query(False),
+    show_accessible_only: bool = Query(False),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=10000),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("documents:read")),
 ):
-    items, total = crud_documents.list_documents(
-        db, search=search, status=status,
-        check_out_user_id=check_out_user_id,
-        show_all_versions=show_all_versions,
-        page=page, page_size=page_size,
-    )
+    try:
+        items, total = crud_documents.list_documents(
+            db, search=search, status=status,
+            show_all_versions=show_all_versions,
+            sort_field=sort_field, sort_order=sort_order,
+            search_field=search_field,
+            include_custom_fields=include_custom_fields,
+            show_accessible_only=show_accessible_only,
+            current_user_id=current_user.id,
+            page=page, page_size=page_size,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     # 用户组访问标记（前端据此置灰 + 🔒 + "可查看"筛选）；批量查询，不逐行
     crud_groups.annotate_documents_access(db, current_user, items)
     return {"items": items, "total": total, "page": page, "page_size": page_size}

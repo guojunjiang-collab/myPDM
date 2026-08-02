@@ -1,26 +1,42 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { formatDate } from '../lib/date';
 import { documentsApi, customFieldsApi, bomApi, userGroupsApi } from '../services/api';
 import type { Document, CustomFieldDefinition, CustomFieldValue } from '../types';
-import { canEdit, isAdmin, useAuthStore } from '../stores/auth';
-import { compareVersions } from '../constants';
+import { canEdit, isAdmin } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
 import DocumentDetailContent from '../components/DocumentDetailContent';
 import DocumentDetailModal from '../components/DocumentDetailModal';
 import { toast } from '../components/Toast';
 import VersionHistory from '../components/VersionHistory';
 import { useDataStore } from '../stores/data';
-import { useTableSort } from '../hooks/useTableSort';
+import { useDebounced } from '../hooks/useDebounced';
 import ArchiveTreeModal from '../components/ArchiveTreeModal';
 
+type SortField = 'code' | 'name' | 'created_at' | 'version' | 'status' | 'check_out_user_name';
+type SortOrder = 'asc' | 'desc';
+
 export default function Documents() {
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [loading, setLoading] = useState(true);
+  const storeCustomDefs = useDataStore((s) => s.customFieldDefs);
+  const documentCustomDefs = storeCustomDefs.filter((d: CustomFieldDefinition) =>
+    d.applies_to?.includes('document')
+  );
+
+  const [items, setItems] = useState<Document[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const pageSize = 100;
+  const [sortField, setSortField] = useState<SortField>('code');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounced(search, 400);
   const [searchField, setSearchField] = useState('all');
-  const [status, setStatus] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [showAllVersions, setShowAllVersions] = useState(false);
   const [showAccessibleOnly, setShowAccessibleOnly] = useState(false);
+  const [refreshToken, setRefreshToken] = useState(0);
+
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
 
   // 新增图文档弹窗
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -42,15 +58,6 @@ export default function Documents() {
 
   // 详情/编辑合一弹窗（签入签出）
   const [detailDocId, setDetailDocId] = useState<string | null>(null);
-  const viewedDocCodeRef = useRef<string | null>(null);
-
-  // 从 store 订阅数据
-  const storeDocuments = useDataStore((s) => s.documents);
-
-  // Custom fields
-  const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDefinition[]>([]);
-  // 自定义字段值映射：{ entityId: { fieldId: value } }
-  const [customFieldValuesMap, setCustomFieldValuesMap] = useState<Record<string, Record<string, any>>>({});
 
   // 用户组关联
   const [allGroups, setAllGroups] = useState<Array<{ id: string; name: string }>>([]);
@@ -60,131 +67,43 @@ export default function Documents() {
   }, []);
 
   useEffect(() => {
-    loadDocuments();
-    // 依赖 storeDocuments：跨页变更（创建/编辑/删除/轮询）后自动拉取最新
-    // 不依赖 search/status：本地筛选即可，不需要重新拉取
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeDocuments]);
-
-  const { sortedData, handleSort, getSortIcon } = useTableSort<Document>(documents, 'code', 'asc');
-
-  // 获取图文档适用的自定义字段定义
-  const documentCustomDefs = customFieldDefs.filter((d) => d.applies_to?.includes('document'));
-
-  // 筛选逻辑
-  const filteredData = sortedData.filter(doc => {
-    if (status && doc.status !== status) return false;
-    if (search) {
-      const keyword = search.toLowerCase();
-      const match = (val: string | undefined) => val?.toLowerCase().includes(keyword);
-      // 基础字段搜索
-      if (searchField === 'all') {
-        if (match(doc.code) || match(doc.name) || match(doc.version) || match(doc.remark)) return true;
-        // 搜索自定义字段
-        const docCustomValues = customFieldValuesMap[doc.id] || {};
-        for (const def of documentCustomDefs) {
-          const val = docCustomValues[def.id];
-          if (val != null && String(val).toLowerCase().includes(keyword)) return true;
-        }
-        return false;
-      }
-      if (searchField === 'code') return match(doc.code);
-      if (searchField === 'name') return match(doc.name);
-      if (searchField === 'version') return match(doc.version);
-      if (searchField === 'status') return match(doc.status);
-      if (searchField === 'remark') return match(doc.remark);
-      // 自定义字段搜索
-      if (searchField.startsWith('cf_')) {
-        const fieldId = searchField.replace('cf_', '');
-        const docCustomValues = customFieldValuesMap[doc.id] || {};
-        const val = docCustomValues[fieldId];
-        return val != null && String(val).toLowerCase().includes(keyword);
-      }
-      return true;
-    }
-    return true;
-  });
-
-  // 版本计数
-  const versionCountMap: Record<string, number> = {};
-  documents.forEach(d => {
-    versionCountMap[d.code] = (versionCountMap[d.code] || 0) + 1;
-  });
-
-  // 仅显示最新版本（按版本号序列 A→B→C...→ZZ 比较）
-  const displayData = (() => {
-    let data = showAllVersions ? filteredData : (() => {
-      const latestMap: Record<string, typeof filteredData[0]> = {};
-      filteredData.forEach(d => {
-        const existing = latestMap[d.code];
-        if (!existing || compareVersions(d.version || 'A', existing.version || 'A') > 0) {
-          latestMap[d.code] = d;
-        }
-      });
-      return Object.values(latestMap);
-    })();
-    if (showAccessibleOnly) {
-      data = data.filter((d: any) => d.accessible !== false);
-    }
-    return data;
-  })();
-
-  const loadDocuments = async () => {
     setLoading(true);
-    try {
-      // 直接调 API 取全量（含所有版本），避免依赖 store 缓存导致看不到「多版本」徽标
-      const res = await documentsApi.list({ page_size: 10000, show_all_versions: true });
-      const respData = res.data as Record<string, unknown>;
-      const rawItems: Record<string, unknown>[] = Array.isArray(respData) ? respData : (respData?.items || []) as Record<string, unknown>[];
-      const localDocuments: Document[] = rawItems.map((item: Record<string, unknown>) => ({
-        ...item,
-        id: (item.id ?? item.revision_id) as string,
-      })) as Document[];
-      setDocuments(localDocuments);
-      // 不回写 store：会触发 useEffect 无限循环（storeDocuments 变 → loadDocuments → ...）
-      // store 由 syncService 轮询维护，跨页同步仍生效
-      // 加载自定义字段定义（同步版本）
-      const localDefs = useDataStore.getState().customFieldDefs;
-      setCustomFieldDefs(localDefs.filter((d: CustomFieldDefinition) =>
-        d.applies_to?.includes('document')
-      ));
-      // 加载所有图文档的自定义字段值
-      loadAllCustomFieldValues(localDocuments);
-    } catch (error) {
-      console.error('加载图文档失败', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    documentsApi.list({
+      page,
+      page_size: pageSize,
+      sort_field: sortField,
+      sort_order: sortOrder,
+      search: debouncedSearch || undefined,
+      search_field: searchField.startsWith('cf_') ? 'all' : searchField,
+      include_custom_fields: true,
+      status: statusFilter || undefined,
+      show_all_versions: showAllVersions,
+      show_accessible_only: showAccessibleOnly || undefined,
+    }).then((res) => {
+      const data = res.data as any;
+      setItems((data.items || []) as Document[]);
+      setTotal(data.total || 0);
+      setPage(data.page || 1);
+    }).catch(() => {
+      setItems([]);
+      setTotal(0);
+    }).finally(() => setLoading(false));
+  }, [page, sortField, sortOrder, debouncedSearch, searchField, statusFilter, showAllVersions, showAccessibleOnly, refreshToken]);
 
-  // 批量加载所有图文档的自定义字段值（单次 API 调用，避免 N+1 请求触发 429）
-  const loadAllCustomFieldValues = async (docsList: Document[]) => {
-    if (docsList.length === 0) return;
-    try {
-      const ids = docsList.map((d) => d.id).filter(Boolean);
-      const res = await customFieldsApi.getValuesBatch({ type: 'document', ids: ids.join(',') });
-      // 后端返回 { entityId: { field_key: value, ... } }，按 field_key→field_id 映射转换为 { entityId: { field_id: value, ... } }
-      // 以兼容列表中按 def.id 查找自定义字段的逻辑
-      const fieldDefs = useDataStore.getState().customFieldDefs.filter((d) =>
-        d.applies_to?.includes('document')
-      );
-      const keyToId: Record<string, string> = {};
-      fieldDefs.forEach((d) => { keyToId[d.field_key] = d.id; });
-      const raw = (res.data || {}) as Record<string, Record<string, any>>;
-      const map: Record<string, Record<string, any>> = {};
-      Object.entries(raw).forEach(([docId, kvMap]) => {
-        const byId: Record<string, any> = {};
-        Object.entries(kvMap || {}).forEach(([k, v]) => {
-          const id = keyToId[k] || k;
-          byId[id] = v;
-        });
-        map[docId] = byId;
-      });
-      setCustomFieldValuesMap(map);
-    } catch (error) {
-      console.error('加载自定义字段值失败', error);
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, searchField, statusFilter, showAllVersions, showAccessibleOnly, sortField, sortOrder]);
+
+  const onSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(o => o === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
     }
   };
+  const sortIcon = (field: SortField) =>
+    sortField === field ? (sortOrder === 'asc' ? ' ↑' : ' ↓') : ' ⇅';
 
   const handleAdd = () => {
     setCreateCode('');
@@ -208,9 +127,9 @@ export default function Documents() {
       });
       const newDoc = res.data as Document;
       setCreateModalOpen(false);
-      useDataStore.getState().setDocuments([...useDataStore.getState().documents, newDoc]);
       setDetailDocId(newDoc.id);
-      viewedDocCodeRef.current = newDoc.code;
+      setPage(1);
+      setRefreshToken(t => t + 1);
     } catch (error: any) {
       const detail = error.response?.data?.detail;
       setCreateSaveError(typeof detail === 'string' ? detail : '创建失败，请重试');
@@ -230,11 +149,10 @@ export default function Documents() {
         setDeleteError('该图文档被以下实体引用，不能删除: ' + names);
         return;
       }
-      await documentsApi.delete(deleteId);
+      await documentsApi.del(deleteId);
       setDeleteId(null);
-      useDataStore.getState().setDocuments(
-        useDataStore.getState().documents.filter(d => d.id !== deleteId)
-      );
+      setItems(prev => prev.filter(d => d.id !== deleteId));
+      setRefreshToken(t => t + 1);
     } catch (error) {
       alert('删除失败');
     }
@@ -268,8 +186,6 @@ export default function Documents() {
     return tags[s] || { label: s, class: 'bg-gray-100 text-gray-800' };
   };
 
-
-
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center gap-2 mb-4 shrink-0">
@@ -281,8 +197,6 @@ export default function Documents() {
           <option value="all">全部字段</option>
           <option value="code">编号</option>
           <option value="name">名称</option>
-          <option value="version">版本</option>
-          <option value="status">状态</option>
           <option value="remark">备注</option>
           {documentCustomDefs.map(def => (
             <option key={def.id} value={`cf_${def.id}`}>{def.name}</option>
@@ -290,14 +204,14 @@ export default function Documents() {
         </select>
         <input
           type="text"
-          placeholder={searchField === 'all' ? '搜索...' : searchField.startsWith('cf_') ? `搜索${documentCustomDefs.find(d => d.id === searchField.replace('cf_', ''))?.name || '自定义字段'}...` : `搜索${searchField === 'code' ? '编号' : searchField === 'name' ? '名称' : searchField === 'version' ? '版本' : searchField === 'status' ? '状态' : '备注'}...`}
+          placeholder={searchField === 'all' ? '搜索...' : searchField.startsWith('cf_') ? `搜索${documentCustomDefs.find(d => d.id === searchField.replace('cf_', ''))?.name || '自定义字段'}...` : `搜索${searchField === 'code' ? '编号' : searchField === 'name' ? '名称' : '备注'}...`}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
         <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
           className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
         >
           <option value="">全部状态</option>
@@ -324,39 +238,40 @@ export default function Documents() {
           />
           可查看
         </label>
+
         <div className="flex-1" />
         {canEdit() && (
           <button onClick={handleAdd} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新增图文档</button>
         )}
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
+      <div className="relative bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
-              <th onClick={() => handleSort('code' as keyof Document)} className="w-60 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">编号 {getSortIcon('code' as keyof Document)}</th>
-              <th onClick={() => handleSort('name' as keyof Document)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">名称 {getSortIcon('name' as keyof Document)}</th>
-              <th onClick={() => handleSort('created_at' as keyof Document)} className="w-44 px-2 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">创建时间 {getSortIcon('created_at' as keyof Document)}</th>
-              <th onClick={() => handleSort('version' as keyof Document)} className="w-16 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">版本 {getSortIcon('version' as keyof Document)}</th>
-              <th onClick={() => handleSort('status' as keyof Document)} className="w-20 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">状态 {getSortIcon('status' as keyof Document)}</th>
-              <th onClick={() => handleSort('check_out_user_name' as keyof Document)} className="w-20 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">签出状态 {getSortIcon('check_out_user_name' as keyof Document)}</th>
+              <th onClick={() => onSort('code')} className="w-60 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">编号{sortIcon('code')}</th>
+              <th onClick={() => onSort('name')} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">名称{sortIcon('name')}</th>
+              <th onClick={() => onSort('created_at')} className="w-44 px-2 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">创建时间{sortIcon('created_at')}</th>
+              <th onClick={() => onSort('version')} className="w-16 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">版本{sortIcon('version')}</th>
+              <th onClick={() => onSort('status')} className="w-20 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">状态{sortIcon('status')}</th>
+              <th onClick={() => onSort('check_out_user_name')} className="w-20 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">签出状态{sortIcon('check_out_user_name')}</th>
               <th className="w-16 px-4 py-3 text-center text-sm font-medium text-gray-500 select-none whitespace-nowrap">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {loading && documents.length === 0 ? (
+            {loading && items.length === 0 ? (
               <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
-            ) : filteredData.length === 0 ? (
+            ) : items.length === 0 ? (
               <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">无匹配数据</td></tr>
             ) : (
-              displayData.map((doc) => (
-                <tr key={doc.id} className={`hover:bg-gray-50 cursor-pointer ${(doc as any).accessible === false ? 'opacity-60' : ''}`} onClick={() => { setDetailDocId(doc.id); viewedDocCodeRef.current = doc.code; }}>
+              items.map((doc) => (
+                <tr key={doc.id} className={`hover:bg-gray-50 cursor-pointer ${(doc as any).accessible === false ? 'opacity-60' : ''}`} onClick={() => { setDetailDocId(doc.id); }}>
                   <td className="px-4 py-3 text-sm font-medium">
                     {(doc as any).accessible === false && <span className="mr-1" title="无权限：需关联用户组成员">🔒</span>}
                     {doc.code}
-                    {!showAllVersions && (versionCountMap[doc.code] || 0) > 1 && (
+                    {(doc as any).version_count != null && (doc as any).version_count > 1 && (
                       <span className="ml-1.5 text-xs text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded">
-                        {(versionCountMap[doc.code] || 0)}个版本
+                        {(doc as any).version_count}个版本
                       </span>
                     )}
                   </td>
@@ -374,19 +289,27 @@ export default function Documents() {
                       : <span className="text-gray-400">—</span>}
                   </td>
                   <td className="px-4 py-3 text-center text-sm" onClick={(e) => e.stopPropagation()}>
-                      {(() => {
-                        const canManage = isAdmin();
-                        return canManage && (doc as any).accessible !== false ? (
-                        <button onClick={() => setDeleteId(doc.id)} className="text-red-500 hover:text-red-700">删除</button>
-                      ) : null;
-                    })()}
+                    {isAdmin() && (doc as any).accessible !== false && (
+                      <button onClick={() => setDeleteId(doc.id)} className="text-red-500 hover:text-red-700">删除</button>
+                    )}
                   </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
-      </div>
+
+        <div className="sticky bottom-0 flex justify-center py-2 pointer-events-none">
+          <div className="inline-flex items-center gap-3 text-sm text-gray-600 bg-white border border-gray-200 rounded-full shadow-lg px-4 py-2 pointer-events-auto">
+            共 <span className="font-medium">{total}</span> 条
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1 || loading}
+              className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-40">上一页</button>
+            <span className="tabular-nums">第 {page} / {pageCount} 页</span>
+            <button onClick={() => setPage(p => Math.min(pageCount, p + 1))} disabled={page >= pageCount || loading}
+              className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-40">下一页</button>
+          </div>
+        </div>
+       </div>
 
       <Modal
         open={createModalOpen}
@@ -513,7 +436,7 @@ export default function Documents() {
                 entityId={viewingDoc.id}
                 onViewVersion={async (id) => {
                   try {
-                    const res = await documentsApi.get(id);
+                    const res = await documentsApi.detail(id);
                     handleView(res.data);
                   } catch {
                     alert('加载版本失败');
@@ -537,17 +460,9 @@ export default function Documents() {
       <DocumentDetailModal
         open={!!detailDocId}
         revisionId={detailDocId}
-        onClose={(saved) => {
-          const viewedCode = viewedDocCodeRef.current;
+        onClose={() => {
           setDetailDocId(null);
-          viewedDocCodeRef.current = null;
-          if (saved && viewedCode) {
-            setDocuments(prev => prev.map((d: any) =>
-              d.code === viewedCode ? { ...d, code: saved.code ?? d.code, name: saved.name ?? d.name } : d
-            ));
-          } else {
-            loadDocuments();
-          }
+          setRefreshToken(t => t + 1);
         }}
         onSaved={() => {}}
       />

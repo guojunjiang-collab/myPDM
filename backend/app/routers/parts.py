@@ -2,7 +2,7 @@
 from __future__ import annotations
 import uuid as _uuid
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Literal
 from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, Request
 from fastapi.responses import FileResponse
@@ -35,12 +35,24 @@ def list_parts(
     top_level: bool = Query(False),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=10000),
+    sort_field: Literal['code', 'name', 'created_at', 'version', 'status', 'check_out_user_name', 'type'] = Query('code'),
+    sort_order: Literal['asc', 'desc'] = Query('asc'),
+    search_field: Literal['all', 'code', 'name', 'spec'] = Query('all'),
+    include_custom_fields: bool = Query(False),
+    type: Optional[Literal['part', 'assembly']] = Query(None),
+    updated_since: Optional[float] = Query(None, description="Unix 时间戳，仅返回 updated_at >= 该时间的 revision"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("parts:read")),
 ):
-    items, total = crud_parts.list_part_masters(
-        db, search, status, check_out_user_id, show_all_versions, top_level, page, page_size
-    )
+    try:
+        items, total = crud_parts.list_part_masters(
+            db, search=search, status=status, check_out_user_id=check_out_user_id,
+            show_all_versions=show_all_versions, top_level=top_level, page=page, page_size=page_size,
+            sort_field=sort_field, sort_order=sort_order, search_field=search_field,
+            include_custom_fields=include_custom_fields, type=type, updated_since=updated_since,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 

@@ -561,6 +561,13 @@ async def startup_event():
             db.rollback()
             print(f"⚠ Parent date rollup skipped: {_re}")
 
+        # 列表分页化所需的 SQL 函数与索引（幂等）
+        try:
+            from app import migrations_list_pagination
+            migrations_list_pagination.apply(db)
+        except Exception as _le:
+            db.rollback()
+            print(f"⚠ List pagination migration skipped: {_le}")
 
         print("✓ Database migration completed successfully")
     except Exception as e:

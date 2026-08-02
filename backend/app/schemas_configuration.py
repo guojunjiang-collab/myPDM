@@ -41,6 +41,7 @@ class ConfigItemRevisionOut(BaseSchema):
     check_out_user_name: Optional[str] = None
     check_out_date: Optional[str] = None
     latest_iteration: int = 1
+    version_count: Optional[int] = None
     created_at: Optional[str] = None
 
 
