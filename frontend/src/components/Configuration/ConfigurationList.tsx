@@ -1,7 +1,7 @@
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { formatDate } from '../../lib/date';
-import { useTableSort } from '../../hooks/useTableSort';
-import { configurationApi, customFieldsApi } from '../../services/api';
+import { useDebounced } from '../../hooks/useDebounced';
+import { configurationApi } from '../../services/api';
 import { canEdit, isAdmin } from '../../stores/auth';
 import { useDataStore } from '../../stores/data';
 import { ConfirmModal } from '../Modal';
@@ -21,6 +21,7 @@ interface ConfigItemRow {
   latest_iteration: number;
   created_at?: string;
   updated_at?: string;
+  version_count?: number;
 }
 
 interface Props {
@@ -29,33 +30,53 @@ interface Props {
   pendingPatch?: React.MutableRefObject<{ oldCode?: string; revisionId: string; code?: string; name?: string } | null>;
 }
 
+type SortField = 'code' | 'name' | 'created_at' | 'version' | 'status' | 'check_out_user_name';
+type SortOrder = 'asc' | 'desc';
+
 export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendingPatch }: Props) {
-  const [items, setItems] = useState<ConfigItemRow[]>([]);
-  const [search, setSearch] = useState('');
-  const [searchField, setSearchField] = useState('all');
-  const [loading, setLoading] = useState(false);
-  const [topLevelOnly, setTopLevelOnly] = useState(false);
-  const [showAllVersions, setShowAllVersions] = useState(false);
-  const [cfValuesMap, setCfValuesMap] = useState<Record<string, Record<string, any>>>({});
   const storeCustomDefs = useDataStore((s) => s.customFieldDefs);
   const configCustomDefs = storeCustomDefs.filter((d: CustomFieldDefinition) =>
     d.applies_to?.includes('configuration_item')
   );
 
+  const [items, setItems] = useState<ConfigItemRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const pageSize = 100;
+  const [sortField, setSortField] = useState<SortField>('code');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounced(search, 400);
+  const [searchField, setSearchField] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [topLevelOnly, setTopLevelOnly] = useState(false);
+  const [showAllVersions, setShowAllVersions] = useState(false);
+  const [refreshToken, setRefreshToken] = useState(0);
+
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const [allData, setAllData] = useState<ConfigItemRow[]>([]);
-
-  const PAGE_CAP = 10000;
-
-  const load = async () => {
+  useEffect(() => {
     setLoading(true);
-    try {
-      const result = await configurationApi.list({ page: 1, page_size: PAGE_CAP, top_level: topLevelOnly || undefined, show_all_versions: true });
-      const rawItems = result.items || [];
-      let rows: ConfigItemRow[] = rawItems.map((item: any) => ({
+    configurationApi.listItems({
+      page,
+      page_size: pageSize,
+      sort_field: sortField,
+      sort_order: sortOrder,
+      search: debouncedSearch || undefined,
+      search_field: searchField.startsWith('cf_') ? 'all' : searchField,
+      include_custom_fields: true,
+      status: statusFilter || undefined,
+      show_all_versions: showAllVersions,
+      top_level: topLevelOnly || undefined,
+    }).then((r) => {
+      const data = r.data as any;
+      const rawItems: any[] = data.items || [];
+      const rows: ConfigItemRow[] = rawItems.map((item: any) => ({
         revision_id: item.revision_id || item.id,
         master_id: item.master_id,
         code: item.code || '',
@@ -68,81 +89,31 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
         latest_iteration: item.latest_iteration || 1,
         created_at: item.created_at,
         updated_at: item.updated_at,
+        version_count: item.version_count,
       }));
-      setAllData(rows);
-      if (!showAllVersions) {
-        const latestMap: Record<string, ConfigItemRow> = {};
-        rows.forEach(item => {
-          const existing = latestMap[item.code];
-          if (!existing || new Date(item.created_at || 0) > new Date(existing.created_at || 0)) {
-            latestMap[item.code] = item;
-          }
-        });
-        rows = Object.values(latestMap);
-      }
       setItems(rows);
-    } catch { } finally { setLoading(false); }
-  };
-
-  const versionCountMap: Record<string, number> = {};
-  allData.forEach(item => {
-    versionCountMap[item.code] = (versionCountMap[item.code] || 0) + 1;
-  });
+      setTotal(data.total || 0);
+      setPage(data.page || 1);
+    }).catch(() => {
+      setItems([]);
+      setTotal(0);
+    }).finally(() => setLoading(false));
+  }, [page, sortField, sortOrder, debouncedSearch, searchField, statusFilter, showAllVersions, topLevelOnly, refreshToken, refreshTrigger]);
 
   useEffect(() => {
-    if (pendingPatch?.current) {
-      const p = pendingPatch.current;
-      pendingPatch.current = null;
-      const matchCode = p.oldCode || '';
-      if (matchCode) {
-        setAllData(prev => prev.map((item: ConfigItemRow) =>
-          item.code === matchCode ? { ...item, code: p.code ?? item.code, name: p.name ?? item.name } : item
-        ));
-        setItems(prev => prev.map((item: ConfigItemRow) =>
-          item.code === matchCode ? { ...item, code: p.code ?? item.code, name: p.name ?? item.name } : item
-        ));
-      }
-      return;
+    setPage(1);
+  }, [debouncedSearch, searchField, statusFilter, showAllVersions, topLevelOnly, sortField, sortOrder]);
+
+  const onSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(o => o === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
     }
-    load();
-  }, [topLevelOnly, showAllVersions, refreshTrigger]);
-
-  useEffect(() => {
-    if (configCustomDefs.length === 0 || items.length === 0) return;
-    const ids = items.map(i => i.revision_id).filter(Boolean);
-    if (ids.length === 0) return;
-    const timer = setTimeout(() => {
-      customFieldsApi.getValuesBatch({ type: 'configuration_item', ids: ids.join(',') }).then(res => {
-        setCfValuesMap(res.data || {});
-      }).catch(() => {});
-    }, 200);
-    return () => clearTimeout(timer);
-  }, [items, configCustomDefs]);
-
-  const filteredData = useMemo(() => {
-    if (!search) return items;
-    const keyword = search.toLowerCase();
-    const match = (val: string | undefined) => val?.toLowerCase().includes(keyword);
-
-    return items.filter(item => {
-      if (searchField === 'all') {
-        return match(item.code) || match(item.name);
-      }
-      if (searchField === 'code') return match(item.code);
-      if (searchField === 'name') return match(item.name);
-      if (searchField.startsWith('cf_')) {
-        const fieldId = searchField.slice(3);
-        const cfVals = cfValuesMap[item.revision_id] || {};
-        const v = cfVals[fieldId];
-        if (v === null || v === undefined) return false;
-        if (Array.isArray(v)) return v.some(s => String(s).toLowerCase().includes(keyword));
-        return String(v).toLowerCase().includes(keyword);
-      }
-      return true;
-    });
-  }, [items, search, searchField, cfValuesMap]);
-
-  const { sortedData, handleSort, getSortIcon } = useTableSort<ConfigItemRow>(filteredData, 'code', 'asc');
+  };
+  const sortIcon = (field: SortField) =>
+    sortField === field ? (sortOrder === 'asc' ? ' ↑' : ' ↓') : ' ⇅';
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -150,7 +121,8 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
     try {
       await configurationApi.delete(deleteId);
       setDeleteId(null);
-      load();
+      setItems(prev => prev.filter(item => item.revision_id !== deleteId));
+      setRefreshToken(t => t + 1);
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
       if (detail) {
@@ -217,6 +189,16 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
           />
           全部版本
         </label>
+
+        <div className="flex items-center gap-2 text-xs text-gray-600">
+          共 <span className="font-medium">{total}</span> 条
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1 || loading}
+            className="px-2 py-0.5 border rounded disabled:opacity-40 hover:bg-gray-50">上一页</button>
+          <span className="tabular-nums">第{page}/{pageCount}页</span>
+          <button onClick={() => setPage(p => Math.min(pageCount, p + 1))} disabled={page >= pageCount || loading}
+            className="px-2 py-0.5 border rounded disabled:opacity-40 hover:bg-gray-50">下一页</button>
+        </div>
+
         <div className="flex-1" />
         {canEdit() && (
           <button onClick={() => setCreateOpen(true)} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建构型</button>
@@ -227,12 +209,12 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
-              <th onClick={() => handleSort('code' as keyof ConfigItemRow)} className="text-left px-3 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-60">构型号 {getSortIcon('code' as keyof ConfigItemRow)}</th>
-              <th onClick={() => handleSort('name' as keyof ConfigItemRow)} className="text-left px-3 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap">名称 {getSortIcon('name' as keyof ConfigItemRow)}</th>
-              <th onClick={() => handleSort('created_at' as keyof ConfigItemRow)} className="text-center px-2 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-44">创建时间 {getSortIcon('created_at' as keyof ConfigItemRow)}</th>
-              <th onClick={() => handleSort('version' as keyof ConfigItemRow)} className="text-center px-2 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-16">版本 {getSortIcon('version' as keyof ConfigItemRow)}</th>
-              <th onClick={() => handleSort('status' as keyof ConfigItemRow)} className="text-center px-2 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-20">状态 {getSortIcon('status' as keyof ConfigItemRow)}</th>
-              <th onClick={() => handleSort('check_out_user_name')} className="text-center px-2 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-20">签出状态 {getSortIcon('check_out_user_name')}</th>
+              <th onClick={() => onSort('code')} className="text-left px-3 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-60">构型号{sortIcon('code')}</th>
+              <th onClick={() => onSort('name')} className="text-left px-3 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap">名称{sortIcon('name')}</th>
+              <th onClick={() => onSort('created_at')} className="text-center px-2 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-44">创建时间{sortIcon('created_at')}</th>
+              <th onClick={() => onSort('version')} className="text-center px-2 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-16">版本{sortIcon('version')}</th>
+              <th onClick={() => onSort('status')} className="text-center px-2 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-20">状态{sortIcon('status')}</th>
+              <th onClick={() => onSort('check_out_user_name')} className="text-center px-2 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-20">签出状态{sortIcon('check_out_user_name')}</th>
               <th className="text-center px-2 py-3 text-sm font-medium text-gray-500 w-20">操作</th>
             </tr>
           </thead>
@@ -241,40 +223,40 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
               <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
             ) : items.length === 0 ? (
               <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
-            ) : filteredData.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
-            ) : sortedData.map((item) => (
-              <tr key={item.revision_id} onClick={() => onOpenDetail(item.revision_id, item.code)} className="hover:bg-gray-50 cursor-pointer">
-                <td className="px-3 py-3 text-sm font-medium">
-                  {item.code}
-                  {!showAllVersions && (versionCountMap[item.code] || 0) > 1 && (
-                    <span className="ml-1.5 text-xs text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded">
-                      {(versionCountMap[item.code] || 0)}个版本
+            ) : (
+              items.map((item) => (
+                <tr key={item.revision_id} onClick={() => onOpenDetail(item.revision_id, item.code)} className="hover:bg-gray-50 cursor-pointer">
+                  <td className="px-3 py-3 text-sm font-medium">
+                    {item.code}
+                    {(item.version_count ?? 0) > 1 && (
+                      <span className="ml-1.5 text-xs text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded">
+                        {item.version_count}个版本
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 text-sm">{item.name}</td>
+                  <td className="px-2 py-3 text-sm text-gray-500 text-center whitespace-nowrap">{formatDate(item.created_at, 'YYYY-MM-DD HH:mm')}</td>
+                  <td className="px-2 py-3 text-sm font-mono text-center">{item.version}</td>
+                  <td className="px-2 py-3 text-sm text-center">
+                    <span className={`px-2 py-0.5 text-xs rounded-full ${statusTagClass(item.status)}`}>
+                      {statusTagLabel(item.status)}
                     </span>
-                  )}
-                </td>
-                <td className="px-3 py-3 text-sm">{item.name}</td>
-                <td className="px-2 py-3 text-sm text-gray-500 text-center whitespace-nowrap">{formatDate(item.created_at, 'YYYY-MM-DD HH:mm')}</td>
-                <td className="px-2 py-3 text-sm font-mono text-center">{item.version}</td>
-                <td className="px-2 py-3 text-sm text-center">
-                  <span className={`px-2 py-0.5 text-xs rounded-full ${statusTagClass(item.status)}`}>
-                    {statusTagLabel(item.status)}
-                  </span>
-                </td>
-                <td className="px-2 py-3 text-sm text-center">
-                  {item.check_out_user_name ? (
-                    <span className="text-xs text-orange-600">{item.check_out_user_name}</span>
-                  ) : (
-                    <span className="text-xs text-gray-400">—</span>
-                  )}
-                </td>
-                <td className="px-2 py-3 text-sm text-center" onClick={(e) => e.stopPropagation()}>
-                  {isAdmin() && (
-                    <button onClick={(e) => { e.stopPropagation(); setDeleteId(item.revision_id); }} className="text-red-600 hover:text-red-800">删除</button>
-                  )}
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-2 py-3 text-sm text-center">
+                    {item.check_out_user_name ? (
+                      <span className="text-xs text-orange-600">{item.check_out_user_name}</span>
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
+                    )}
+                  </td>
+                  <td className="px-2 py-3 text-sm text-center" onClick={(e) => e.stopPropagation()}>
+                    {isAdmin() && (
+                      <button onClick={(e) => { e.stopPropagation(); setDeleteId(item.revision_id); }} className="text-red-600 hover:text-red-800">删除</button>
+                    )}
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -282,7 +264,7 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
       <ConfigurationCreateModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        onSaved={() => { setCreateOpen(false); load(); }}
+        onSaved={() => { setCreateOpen(false); setPage(1); setRefreshToken(t => t + 1); }}
       />
 
       <ConfirmModal
