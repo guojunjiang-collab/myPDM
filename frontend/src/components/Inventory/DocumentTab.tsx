@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
+import { formatDate } from '../../lib/date';
 import { useInventoryStore } from '../../stores/inventory';
 import { useAuthStore } from '../../stores/auth';
 import { inventoryApi } from '../../services/inventoryApi';
@@ -162,7 +163,7 @@ export default function DocumentTab() {
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">状态</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">库管员</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">创建人</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">创建时间</th>
+              <th className="text-center px-4 py-3 text-sm font-medium text-gray-500">创建时间</th>
               <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">操作</th>
             </tr>
           </thead>
@@ -183,7 +184,7 @@ export default function DocumentTab() {
                 </td>
                 <td className="px-4 py-3 text-sm font-medium">{d.keeper_name || '-'}</td>
                 <td className="px-4 py-3 text-sm font-medium">{d.creator_name}</td>
-                <td className="px-4 py-3 text-sm font-medium">{d.created_at?.slice(0, 16).replace('T', ' ')}</td>
+                <td className="px-4 py-3 text-sm font-medium text-center whitespace-nowrap">{formatDate(d.created_at, 'YYYY-MM-DD HH:mm')}</td>
                 <td className="px-4 py-3 text-right text-sm" onClick={(e) => e.stopPropagation()}>{renderActions(d)}</td>
               </tr>
             ))}

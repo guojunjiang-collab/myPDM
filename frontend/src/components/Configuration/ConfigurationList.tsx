@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
+import { formatDate } from '../../lib/date';
 import { useTableSort } from '../../hooks/useTableSort';
 import { configurationApi, customFieldsApi } from '../../services/api';
 import { canEdit, isAdmin } from '../../stores/auth';
@@ -228,6 +229,7 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
             <tr>
               <th onClick={() => handleSort('code' as keyof ConfigItemRow)} className="text-left px-3 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-60">构型号 {getSortIcon('code' as keyof ConfigItemRow)}</th>
               <th onClick={() => handleSort('name' as keyof ConfigItemRow)} className="text-left px-3 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap">名称 {getSortIcon('name' as keyof ConfigItemRow)}</th>
+              <th onClick={() => handleSort('created_at' as keyof ConfigItemRow)} className="text-center px-2 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-44">创建时间 {getSortIcon('created_at' as keyof ConfigItemRow)}</th>
               <th onClick={() => handleSort('version' as keyof ConfigItemRow)} className="text-center px-2 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-16">版本 {getSortIcon('version' as keyof ConfigItemRow)}</th>
               <th onClick={() => handleSort('status' as keyof ConfigItemRow)} className="text-center px-2 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-20">状态 {getSortIcon('status' as keyof ConfigItemRow)}</th>
               <th onClick={() => handleSort('check_out_user_name')} className="text-center px-2 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-20">签出状态 {getSortIcon('check_out_user_name')}</th>
@@ -236,11 +238,11 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading && items.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
             ) : items.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
             ) : filteredData.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
             ) : sortedData.map((item) => (
               <tr key={item.revision_id} onClick={() => onOpenDetail(item.revision_id, item.code)} className="hover:bg-gray-50 cursor-pointer">
                 <td className="px-3 py-3 text-sm font-medium">
@@ -252,6 +254,7 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
                   )}
                 </td>
                 <td className="px-3 py-3 text-sm">{item.name}</td>
+                <td className="px-2 py-3 text-sm text-gray-500 text-center whitespace-nowrap">{formatDate(item.created_at, 'YYYY-MM-DD HH:mm')}</td>
                 <td className="px-2 py-3 text-sm font-mono text-center">{item.version}</td>
                 <td className="px-2 py-3 text-sm text-center">
                   <span className={`px-2 py-0.5 text-xs rounded-full ${statusTagClass(item.status)}`}>

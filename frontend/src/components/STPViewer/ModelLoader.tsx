@@ -120,7 +120,9 @@ export function ModelLoader({ url, code, version, name }: ModelLoaderProps) {
       pointerDown.current = null;
       if (Math.abs(dx) > 3 || Math.abs(dy) > 3) return;
     }
-    if (e.object?.uuid) selectByMesh(e.object.uuid);
+    // 跳过被隐藏的 mesh：three.js 的 Raycaster 默认不排除 visible=false 的对象，
+    // 隐藏零件仍会被命中，导致点不到背后可见的零件
+    if (e.object?.uuid && e.object.visible !== false) selectByMesh(e.object.uuid);
   };
 
   return (

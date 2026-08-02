@@ -8,6 +8,19 @@ import { flattenTree } from './flattenTree';
 import { maxLevelOf, buildCollapsedForLevel } from './expandLevel';
 import PartDetailModal from '../PartDetailModal';
 
+/** BOM 结构树的展开箭头，与零部件详情子项清单保持同一风格 */
+function BomChevron({ expanded }: { expanded: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className={`w-3.5 h-3.5 transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
+      fill="none"
+    >
+      <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export interface NamingPrefixes {
   pdfPartPrefix: string;
   pdfAssemblyPrefix: string;
@@ -709,8 +722,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
             <table className="shrink-0 border-collapse text-xs whitespace-nowrap">
               <thead className="sticky top-0 z-10">
                 <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
-                  <th className="p-2 text-left" style={{ width: 60 }}>层级</th>
-                  <th className="p-2 text-left" style={{ width: 110 }}>件号</th>
+                  <th className="p-2 text-left" style={{ width: 180, paddingLeft: 28 }}>件号</th>
                   <th className="p-2 text-center" style={{ width: 40 }}>用量</th>
                   {BUILTIN_COLUMNS.map(col => (
                     <th key={col.target} className="p-2 text-left" style={{ width: col.target === 'version' ? 56 : 100 }}>{col.label}</th>
@@ -728,23 +740,35 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                   const ri = rows.indexOf(row);
                   const collapsed = collapsedPaths.has(row.path);
                   const expandable = hasChildren(row);
-                  const indent = '-'.repeat(row.level);
                   return (
                   <tr key={row.path}
                     onMouseEnter={() => setHoveredIndex(ri)}
                     onMouseLeave={() => setHoveredIndex(null)}
                     className={`border-b border-gray-200 transition-colors ${hoveredIndex === ri ? hoverClass(row) : ''}`}>
-                    <td className="p-2" style={{ width: 60 }}>
-                      <span className="inline-flex items-center gap-0.5">
-                        <span className="font-mono">{indent}{row.level}</span>
-                        {expandable && (
-                          <button onClick={() => toggleCollapse(row.path)} className="text-gray-400 hover:text-gray-700 w-4 h-4 flex items-center justify-center text-[10px] leading-none select-none">
-                            {collapsed ? '▶' : '▼'}
+                    <td
+                      className="relative p-2 font-medium whitespace-nowrap"
+                      style={{ width: 180, paddingLeft: 8 + row.level * 12 }}
+                    >
+                      {row.level > 0 && Array.from({ length: row.level }, (_, k) => (
+                        <span
+                          key={k}
+                          className="absolute -top-px bottom-0 w-px bg-gray-300 pointer-events-none z-10"
+                          style={{ left: 16 + k * 12 }}
+                        />
+                      ))}
+                      <span className="inline-flex items-center gap-1">
+                        {expandable ? (
+                          <button type="button" onClick={() => toggleCollapse(row.path)}
+                            className="w-4 h-4 inline-flex items-center justify-center shrink-0 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-200/60"
+                            title={collapsed ? '展开' : '折叠'}>
+                            <BomChevron expanded={!collapsed} />
                           </button>
+                        ) : (
+                          <span className="w-4 shrink-0" />
                         )}
+                        <span>{row.builtin.PartNumber || ''}</span>
                       </span>
                     </td>
-                    <td className="p-2" style={{ width: 110 }}>{row.builtin.PartNumber || ''}</td>
                     <td className="p-2 text-center" style={{ width: 40 }}>{row.quantity}</td>
                     {BUILTIN_COLUMNS.map(col => {
                       // 内置列同样对比 PDM：术语/中文名称↔name、版本↔version
