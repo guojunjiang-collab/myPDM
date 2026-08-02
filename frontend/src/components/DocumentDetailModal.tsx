@@ -596,7 +596,8 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                               }
                             };
                             return (
-                              <div key={def.id}>
+                              <div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                                <div className="text-xs text-gray-500 mb-0.5">{def.name}</div>
                                 <CustomFieldInput
                                   def={def}
                                   value={val}

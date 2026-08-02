@@ -369,16 +369,13 @@ def set_custom_field_values(db, entity_type, entity_id, values, iteration_id=Non
         field_def = get_custom_field_definition(db, item.field_id)
         if not field_def:
             continue
-        # 查找已有值（加入 iteration_id 匹配）
+        # 查找已有值（按 field_id + entity_id 定位，不限制 iteration_id，
+        # 避免签出复制后遗留 NULL 版本与新 iteration 版本并存，保存时只更新了旧行）
         query = db.query(models.CustomFieldValue).filter(
             models.CustomFieldValue.field_id == item.field_id,
             models.CustomFieldValue.entity_type == entity_type,
             models.CustomFieldValue.entity_id == entity_id
         )
-        if iteration_id is not None:
-            query = query.filter(models.CustomFieldValue.iteration_id == iteration_id)
-        else:
-            query = query.filter(models.CustomFieldValue.iteration_id.is_(None))
         existing = query.first()
 
         # 根据字段类型确定存储列
@@ -488,6 +485,9 @@ def _copy_iteration_custom_fields(db, source_iteration_id, target_iteration_id, 
             iteration_id=target_iteration_id,
         )
         db.add(new_val)
+    # 清除旧迭代的字段值（避免与新版并存，导致读取端拿到过期值）
+    for sv in source_values:
+        db.delete(sv)
     db.flush()
 
 
