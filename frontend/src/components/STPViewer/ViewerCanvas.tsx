@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { ModelLoader } from './ModelLoader';
 import { AssemblyModelLoader } from './AssemblyModelLoader';
+import { CompareModelLoader } from './CompareModelLoader';
 import { PartHighlighter } from './PartHighlighter';
 import { GLTFErrorBoundary } from './GLTFErrorBoundary';
 import { SectionPlanes } from './SectionPlanes';
@@ -17,7 +18,8 @@ import type { TreeNode } from './treeTypes';
 /** 查看器数据源：单件(一个 glb) 或 装配(多实例 + BOM 树) */
 export type ViewerSource =
   | { kind: 'single'; url: string; code?: string; version?: string; name?: string }
-  | { kind: 'assembly'; instances: AssemblyInstance[]; tree: AssemblyTreeNode[]; applyZUp?: boolean; displayTree?: TreeNode | null };
+  | { kind: 'assembly'; instances: AssemblyInstance[]; tree: AssemblyTreeNode[]; applyZUp?: boolean; displayTree?: TreeNode | null }
+  | { kind: 'compare'; leftInstances: AssemblyInstance[]; rightInstances: AssemblyInstance[] };
 
 /**
  * 程序化室内环境光（three 内置 RoomEnvironment + PMREMGenerator）。
@@ -46,6 +48,7 @@ interface ViewerCanvasProps {
 
 export function ViewerCanvas({ source }: ViewerCanvasProps) {
   const selectNode = useViewerStore((s) => s.selectNode);
+  const selectCompareKey = useViewerStore((s) => s.selectCompareKey);
   const measureMode = useViewerStore((s) => s.measureMode);
 
   useEffect(() => {
@@ -66,7 +69,7 @@ export function ViewerCanvas({ source }: ViewerCanvasProps) {
         antialias: false,
         stencil: false,
       }}
-      onPointerMissed={() => { if (measureMode === 'off') selectNode(null); }}
+      onPointerMissed={() => { if (measureMode === 'off') { selectNode(null); selectCompareKey(null); } }}
     >
       <LocalEnvironment />
       <ambientLight intensity={0.25} />
@@ -76,6 +79,8 @@ export function ViewerCanvas({ source }: ViewerCanvasProps) {
         <GLTFErrorBoundary>
           {source.kind === 'single' ? (
             <ModelLoader url={source.url} code={source.code} version={source.version} name={source.name} />
+          ) : source.kind === 'compare' ? (
+            <CompareModelLoader leftInstances={source.leftInstances} rightInstances={source.rightInstances} />
           ) : (
             <AssemblyModelLoader instances={source.instances} tree={source.tree} applyZUp={source.applyZUp ?? true} displayTree={source.displayTree} />
           )}

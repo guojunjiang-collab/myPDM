@@ -13,6 +13,19 @@ import ConfigItemDetailModal from './Configuration/ConfigItemDetailModal';
 import TaskEditModal from '../pages/Project/TaskEditModal';
 import ProfileEditModal from './Configuration/ProfileEditModal';
 
+/** BOM 结构树的展开箭头，与 STPViewer 模型树(ModelTreePanel)保持同一风格 */
+function BomChevron({ expanded }: { expanded: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className={`w-3.5 h-3.5 transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
+      fill="none"
+    >
+      <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 const statusTag = (s: string) => {
   const map: Record<string, { label: string; cls: string }> = {
     draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
@@ -65,6 +78,8 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const [wuConfigRevId, setWuConfigRevId] = useState<string | null>(null);
   const [wuTask, setWuTask] = useState<{ projectId: string; task: any } | null>(null);
   const [wuProfileId, setWuProfileId] = useState<string | null>(null);
+
+  const bomScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -224,6 +239,27 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
     finally { setLoadingBom(prev => { const n = {...prev}; delete n[revId]; return n; }); }
   }, [expandedBom]);
 
+  /** 局部刷新指定父节点的子项清单，保持滚动位置不变 */
+  const refreshChildren = useCallback(async (parentRevId: string) => {
+    const scrollTop = bomScrollRef.current?.scrollTop;
+    try {
+      const iterId = viewingIterationId || iteration?.id;
+      if (parentRevId === revisionId) {
+        const data = await partsApi.getBOM(revisionId!, iterId);
+        setBomItems(data);
+        setHasBomChildren(data.length > 0);
+      } else {
+        const data = await partsApi.getBOM(parentRevId);
+        setExpandedBom(prev => ({ ...prev, [parentRevId]: data || [] }));
+      }
+    } catch (e) { console.error(e); }
+    requestAnimationFrame(() => {
+      if (bomScrollRef.current && scrollTop !== undefined) {
+        bomScrollRef.current.scrollTop = scrollTop;
+      }
+    });
+  }, [revisionId, iteration?.id, viewingIterationId]);
+
   const preview3D = useCallback(async (item: any) => {
     const revId = item.child_revision_id;
     if (!revId) return;
@@ -246,7 +282,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
     } catch { alert('打开预览失败'); }
   }, []);
 
-  const renderBomRow = useCallback((item: any, level: number): React.ReactNode => {
+  const renderBomRow = useCallback((item: any, level: number, parentRevId?: string): React.ReactNode => {
     const hasChildren = item.has_children;
     const children = expandedBom[item.child_revision_id];
     const isLoading = loadingBom[item.child_revision_id];
@@ -260,16 +296,31 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
     return (
       <React.Fragment key={item.child_revision_id}>
         <tr className="hover:bg-gray-50 cursor-pointer" onClick={rowClick}>
-          <td className="px-3 py-2 text-gray-400 text-xs whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-            <span>{'-'.repeat(level + 1)}{level + 1}</span>
-            {hasChildren && (
-              <button type="button" onClick={(e) => { e.stopPropagation(); toggleBomExpand(item.child_revision_id); }}
-                className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
-                {children ? '\u25BC' : '\u25B6'}
-              </button>
-            )}
+          <td
+            className="relative px-3 py-2 font-medium whitespace-nowrap"
+            style={{ paddingLeft: 8 + level * 12 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {level > 0 && Array.from({ length: level }, (_, k) => (
+              <span
+                key={k}
+                className="absolute -top-px bottom-0 w-px bg-gray-200 pointer-events-none"
+                style={{ left: 16 + k * 12 }}
+              />
+            ))}
+            <span className="inline-flex items-center gap-1">
+              {hasChildren ? (
+                <button type="button" onClick={(e) => { e.stopPropagation(); toggleBomExpand(item.child_revision_id); }}
+                  className="w-4 h-4 inline-flex items-center justify-center shrink-0 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-200/60"
+                  title={children ? '\u6298\u53E0' : '\u5C55\u5F00'}>
+                  <BomChevron expanded={!!children} />
+                </button>
+              ) : (
+                <span className="w-4 shrink-0" />
+              )}
+              <span className="text-sm">{item.child_code}</span>
+            </span>
           </td>
-          <td className="px-3 py-2 font-medium">{item.child_code}</td>
           <td className="px-3 py-2">{item.child_name}</td>
           <td className="px-3 py-2 text-gray-500">{item.child_version}</td>
           <td className="px-3 py-2">
@@ -287,9 +338,9 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
               <input type="number" min={1} defaultValue={item.quantity}
                 onBlur={async (e) => {
                   const v = parseInt(e.target.value);
-                  if (v > 0 && v !== item.quantity && revisionId) {
-                    try { await partsApi.updateBOMItem(revisionId, item.id, { quantity: v }); loadTabs(); } catch {}
-                  }
+                    if (v > 0 && v !== item.quantity && revisionId) {
+                        try { await partsApi.updateBOMItem(revisionId, item.id, { quantity: v }); refreshChildren(parentRevId || revisionId); } catch {}
+                      }
                 }}
                 className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-1 focus:ring-primary-500" />
             ) : item.quantity}
@@ -324,11 +375,12 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                 <button type="button" onClick={async (e) => {
                   e.stopPropagation();
                   if (!revisionId) return;
+                  if (!confirm('确定移除此子项？')) return;
+                  const targetRevId = parentRevId || revisionId;
                   try {
-                    await partsApi.deleteBOMItem(revisionId, item.id);
+                    await partsApi.deleteBOMItem(targetRevId, item.id);
                     toast.success('已删除');
-                    loadTabs();
-                    setHasBomChildren(false);
+                    refreshChildren(targetRevId);
                   } catch (e2: any) { toast.error(e2?.response?.data?.detail || '删除失败'); }
                 }}
                   className="text-red-500 hover:text-red-700 text-xs">移除</button>
@@ -336,11 +388,11 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
             </td>
           )}
         </tr>
-        {isLoading && <tr><td colSpan={canEdit ? 10 : 9} className="px-3 py-2 text-sm text-gray-400 text-center">加载中...</td></tr>}
-        {children && children.map((child: any) => renderBomRow(child, level + 1))}
+        {isLoading && <tr><td colSpan={canEdit ? 9 : 8} className="px-3 py-2 text-sm text-gray-400 text-center">加载中...</td></tr>}
+        {children && children.map((child: any) => renderBomRow(child, level + 1, item.child_revision_id))}
       </React.Fragment>
     );
-  }, [canEdit, expandedBom, loadingBom, toggleBomExpand, revisionId, loadTabs, toast, preview3D]);
+  }, [canEdit, expandedBom, loadingBom, toggleBomExpand, revisionId, refreshChildren, toast, preview3D]);
 
   const updateBomItemVersion = useCallback((items: any[], itemId: string, newRevisionId: string, newVersion: string) => {
     const update = (list: any[]): boolean => {
@@ -686,12 +738,11 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                       <div className="text-gray-400 text-sm py-4 text-center">暂无子项</div>
                     ) : (
                       <div className="border rounded-lg overflow-hidden flex-1 min-h-0">
-                        <div className="overflow-y-auto h-full">
+                        <div className="overflow-y-auto h-full" ref={bomScrollRef}>
                         <table className="w-full text-sm">
                         <thead>
                           <tr className="bg-gray-50 border-b sticky top-0 z-10">
-                            <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">层级</th>
-                            <th className="px-3 py-2 text-left text-gray-500 font-medium">件号</th>
+                            <th className="px-3 py-2 text-left text-gray-500 font-medium" style={{ paddingLeft: 28 }}>件号</th>
                             <th className="px-3 py-2 text-left text-gray-500 font-medium">中文名称</th>
                             <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
                             <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">状态</th>
@@ -705,7 +756,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                          {bomItems.map((item: any) => renderBomRow(item, 0))}
+                          {bomItems.map((item: any) => renderBomRow(item, 0, revisionId))}
                         </tbody>
                       </table>
                         </div>
@@ -870,8 +921,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
             }
           }
           setBomPickerOpen(false);
-          loadTabs();
-          setHasBomChildren(true);
+          refreshChildren(revisionId);
           if (failed === 0) toast.success(`已添加 ${items.length} 个子项`);
         }}
         currentAssemblyId={revisionId}
@@ -932,8 +982,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
               } catch (e: any) { console.error(e); }
             }
             setNestedPickerRevId(null);
-            loadTabs();
-            setHasBomChildren(true);
+            refreshChildren(nestedPickerRevId);
           }}
           currentAssemblyId={nestedPickerRevId}
         />

@@ -37,16 +37,6 @@ export function ViewCube() {
 
   const cssTransform = quatToMatrix3d(-qx, qy, -qz, qw);
 
-  const fwdX = 2 * (qx * qz + qw * qy);
-  const fwdY = 2 * (qy * qz - qw * qx);
-  const fwdZ = 1 - 2 * (qx * qx + qy * qy);
-  const vx = -fwdX, vy = -fwdY, vz = -fwdZ;
-  const ax = Math.abs(vx), ay = Math.abs(vy), az = Math.abs(vz);
-  let active: string;
-  if (ax >= ay && ax >= az) active = vx > 0 ? 'right' : 'left';
-  else if (ay >= ax && ay >= az) active = vy > 0 ? 'top' : 'bottom';
-  else active = vz > 0 ? 'front' : 'back';
-
   return (
     <div
       className="absolute top-10 left-10 z-20 select-none"
@@ -63,8 +53,7 @@ export function ViewCube() {
           <div
             key={f.key}
             onClick={() => setViewTarget(f.key)}
-            className={`absolute inset-0 flex items-center justify-center cursor-pointer border border-gray-300 text-xs font-medium
-              ${f.key === active ? 'bg-blue-500 text-white border-blue-600' : 'bg-white/90 text-gray-600 hover:bg-gray-100'}`}
+            className="absolute inset-0 flex items-center justify-center cursor-pointer border border-gray-300 text-xs font-medium bg-white/90 text-gray-600 hover:bg-gray-100"
             style={{ transform: f.css, backfaceVisibility: 'hidden' }}
           >
             {f.label}

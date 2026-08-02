@@ -23,6 +23,18 @@ const statusTag = (s: string) => {
   return map[s] || { label: s, cls: 'bg-gray-100 text-gray-800' };
 };
 
+function BomChevron({ expanded }: { expanded: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className={`w-3.5 h-3.5 transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
+      fill="none"
+    >
+      <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 interface Props {
   revisionId: string;
   open: boolean;
@@ -73,6 +85,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
   const [activeIterationId, setActiveIterationId] = useState<string | null>(null);
   const [expandedChildren, setExpandedChildren] = useState<Set<string>>(new Set());
   const [subChildren, setSubChildren] = useState<Record<string, any[]>>({});
+  const childrenScrollRef = useRef<HTMLDivElement>(null);
   const masterTimer = useRef<ReturnType<typeof setTimeout>>();
   const savedPatchRef = useRef<Record<string, string>>({});
   const cfTimerRef = useRef<ReturnType<typeof setTimeout>>();
@@ -189,6 +202,25 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
     try { const d = await configurationApi.detail(revId); setSubChildren(prev => ({ ...prev, [revId]: d.children || [] })); } catch {}
   };
 
+  const refreshChildren = useCallback(async (parentRevId: string) => {
+    const scrollTop = childrenScrollRef.current?.scrollTop;
+    try {
+      const params = activeIterationId ? { iteration_id: activeIterationId } : undefined;
+      if (parentRevId === internalRevId) {
+        const d = await configurationApi.detail(internalRevId, params);
+        setChildren(d.children || []);
+      } else {
+        const d = await configurationApi.detail(parentRevId);
+        setSubChildren(prev => ({ ...prev, [parentRevId]: d.children || [] }));
+      }
+    } catch (e) { console.error(e); }
+    requestAnimationFrame(() => {
+      if (childrenScrollRef.current && scrollTop !== undefined) {
+        childrenScrollRef.current.scrollTop = scrollTop;
+      }
+    });
+  }, [internalRevId, activeIterationId]);
+
   const handlePart3DPreview = useCallback(async (p: any) => {
     const pd = p.part_detail || {};
     const revId = pd.revision_id || p.part_id;
@@ -219,32 +251,55 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
     const rows: React.ReactNode[] = [];
     rows.push(
       <tr key={c.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => { if (revId) setNestedConfigRevId(revId); }}>
-        <td className="px-3 py-2 text-gray-400 text-xs">
+        <td
+          className="relative px-3 py-2 font-medium whitespace-nowrap"
+          style={{ paddingLeft: 8 + (level - 1) * 12 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {level > 1 && Array.from({ length: level - 1 }, (_, k) => (
+            <span
+              key={k}
+              className="absolute -top-px bottom-0 w-px bg-gray-200 pointer-events-none"
+              style={{ left: 16 + k * 12 }}
+            />
+          ))}
           <span className="inline-flex items-center gap-1">
-            {'-'.repeat(level)}{level}
             {c.has_children ? (
-              <button onClick={(e) => { e.stopPropagation(); if (isExpanded) { setExpandedChildren(prev => { const s = new Set(prev); s.delete(revId); return s; }); } else { setExpandedChildren(prev => new Set(prev).add(revId)); loadSubChildren(revId); } }} className="text-gray-400 hover:text-gray-600 w-4 text-center text-xs">{isExpanded ? '▼' : '▶'}</button>
-            ) : (<span className="w-4" />)}
+              <button onClick={(e) => { e.stopPropagation();
+                if (isExpanded) {
+                  setExpandedChildren(prev => { const s = new Set(prev); s.delete(revId); return s; });
+                } else {
+                  setExpandedChildren(prev => new Set(prev).add(revId));
+                  loadSubChildren(revId);
+                }
+              }}
+                className="w-4 h-4 inline-flex items-center justify-center shrink-0 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-200/60"
+                title={isExpanded ? '折叠' : '展开'}>
+                <BomChevron expanded={isExpanded} />
+              </button>
+            ) : (
+              <span className="w-4 shrink-0" />
+            )}
+            <span className="text-sm">{c.child_detail?.code || '—'}</span>
           </span>
         </td>
-        <td className="px-3 py-2 font-mono text-xs">{c.child_detail?.code || '—'}</td>
         <td className="px-3 py-2">{c.child_detail?.name || '—'}</td>
         <td className="px-3 py-2 text-center text-gray-500 text-xs">{c.child_detail?.version || '—'}</td>
         <td className="px-3 py-2 text-center"><span className={`px-1.5 py-0.5 text-xs rounded-full ${statusTag(c.child_detail?.status || 'draft').cls}`}>{statusTag(c.child_detail?.status || 'draft').label}</span></td>
         <td className="px-3 py-2 text-center">{c.child_detail?.check_out_user_name ? (<span className="text-xs text-orange-600">{c.child_detail.check_out_user_name}</span>) : (<span className="text-xs text-gray-400">—</span>)}</td>
         <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
           {canEdit ? (
-            <button onClick={async () => { try { await configurationApi.updateChild(parentRevisionId, c.id, { is_required: !c.is_required }); if (level === 1) { setChildren(prev => prev.map(x => x.id === c.id ? { ...x, is_required: !x.is_required } : x)); } else { setSubChildren(prev => { const s = { ...prev }; s[parentRevisionId] = (s[parentRevisionId] || []).map((x: any) => x.id === c.id ? { ...x, is_required: !x.is_required } : x); return s; }); } } catch {} }} className={`text-xs px-2 py-0.5 rounded ${c.is_required ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-orange-100 text-orange-700 hover:bg-orange-200'}`}>{c.is_required ? '必选' : '可选'}</button>
+            <button onClick={async () => { try { await configurationApi.updateChild(parentRevisionId, c.id, { is_required: !c.is_required }); if (parentRevisionId === internalRevId) { setChildren(prev => prev.map(x => x.id === c.id ? { ...x, is_required: !x.is_required } : x)); } else { setSubChildren(prev => { const s = { ...prev }; s[parentRevisionId] = (s[parentRevisionId] || []).map((x: any) => x.id === c.id ? { ...x, is_required: !x.is_required } : x); return s; }); } } catch {} }} className={`text-xs px-2 py-0.5 rounded ${c.is_required ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-orange-100 text-orange-700 hover:bg-orange-200'}`}>{c.is_required ? '必选' : '可选'}</button>
           ) : (<span className={`text-xs ${c.is_required ? 'text-green-600' : 'text-orange-600'}`}>{c.is_required ? '必选' : '可选'}</span>)}
         </td>
         <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
-          {canEdit ? (<input type="number" min={1} defaultValue={c.quantity || 1} className="w-14 text-xs px-1 py-0.5 border border-gray-200 rounded text-center" onBlur={async (e) => { const val = parseInt(e.target.value) || 1; if (val === c.quantity) return; try { await configurationApi.updateChild(parentRevisionId, c.id, { quantity: val }); if (level === 1) { setChildren(prev => prev.map(x => x.id === c.id ? { ...x, quantity: val } : x)); } else { setSubChildren(prev => { const s = { ...prev }; s[parentRevisionId] = (s[parentRevisionId] || []).map((x: any) => x.id === c.id ? { ...x, quantity: val } : x); return s; }); } } catch {} }} />) : (c.quantity || 1)}
+          {canEdit ? (<input type="number" min={1} defaultValue={c.quantity || 1} className="w-14 text-xs px-1 py-0.5 border border-gray-200 rounded text-center" onBlur={async (e) => { const val = parseInt(e.target.value) || 1; if (val === c.quantity) return; try { await configurationApi.updateChild(parentRevisionId, c.id, { quantity: val }); if (parentRevisionId === internalRevId) { setChildren(prev => prev.map(x => x.id === c.id ? { ...x, quantity: val } : x)); } else { setSubChildren(prev => { const s = { ...prev }; s[parentRevisionId] = (s[parentRevisionId] || []).map((x: any) => x.id === c.id ? { ...x, quantity: val } : x); return s; }); } } catch {} }} />) : (c.quantity || 1)}
         </td>
         {canEdit && (
           <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2">
               <button onClick={() => { setPickerParentId(revId); setCfgPickerOpen(true); }} className="text-primary-600 hover:text-primary-800 text-xs">+子项</button>
-              <button onClick={async () => { if (!confirm('确定移除此子构型项？')) return; try { await configurationApi.removeChild(parentRevisionId, c.id); setSubChildren(prev => { const s = { ...prev }; delete s[parentRevisionId]; return s; }); loadDetail(); } catch {} }} className="text-red-500 hover:text-red-700 text-xs">移除</button>
+              <button onClick={async () => { if (!confirm('确定移除此子构型项？')) return; try { await configurationApi.removeChild(parentRevisionId, c.id); setSubChildren(prev => { const s = { ...prev }; delete s[parentRevisionId]; return s; }); refreshChildren(parentRevisionId); } catch {} }} className="text-red-500 hover:text-red-700 text-xs">移除</button>
             </div>
           </td>
         )}
@@ -418,7 +473,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
                 <div className="flex flex-col h-full min-h-0">
                   <div className="flex items-center justify-between mb-3 shrink-0"><h4 className="text-sm font-bold text-gray-700">子构型项</h4>{canEdit && (<button onClick={() => { setPickerParentId(internalRevId); setCfgPickerOpen(true); }} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 添加子项</button>)}</div>
                   {children.length === 0 ? (<div className="text-gray-400 text-sm py-4 text-center">暂无子构型项</div>) : (
-                    <div className="border rounded-lg overflow-hidden flex-1 min-h-0"><div className="overflow-y-auto h-full"><table className="w-full text-sm"><thead><tr className="bg-gray-50 border-b sticky top-0 z-10"><th className="px-3 py-2 text-left text-gray-500 font-medium w-24 whitespace-nowrap">层级</th><th className="px-3 py-2 text-left text-gray-500 font-medium">构型号</th><th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-16">版本</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-20">状态</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-20">签出状态</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-20 whitespace-nowrap">必选/可选</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-16 whitespace-nowrap">数量</th>{canEdit && <th className="px-3 py-2 text-center text-gray-500 font-medium w-28 whitespace-nowrap">操作</th>}</tr></thead><tbody className="divide-y divide-gray-200">{rows}</tbody></table></div></div>
+                     <div className="border rounded-lg overflow-hidden flex-1 min-h-0"><div className="overflow-y-auto h-full" ref={childrenScrollRef}><table className="w-full text-sm"><thead><tr className="bg-gray-50 border-b sticky top-0 z-10"><th className="px-3 py-2 text-left text-gray-500 font-medium" style={{ paddingLeft: 28 }}>构型号</th><th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-16">版本</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-20">状态</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-20">签出状态</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-20 whitespace-nowrap">必选/可选</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-16 whitespace-nowrap">数量</th>{canEdit && <th className="px-3 py-2 text-center text-gray-500 font-medium w-28 whitespace-nowrap">操作</th>}</tr></thead><tbody className="divide-y divide-gray-200">{rows}</tbody></table></div></div>
                   )}
                 </div>
               )}
@@ -454,7 +509,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
       )}
       {cfgPickerOpen && (
         <ConfigItemPicker open={cfgPickerOpen} onClose={() => { setCfgPickerOpen(false); setPickerParentId(null); }} excludeId={internalRevId}
-          onConfirm={async (items) => { if (!pickerParentId) return; try { await configurationApi.addChildren(pickerParentId, items); toast.success(`已添加 ${items.length} 个子构型项`); if (pickerParentId !== internalRevId) { setSubChildren(prev => { const s = { ...prev }; delete s[pickerParentId]; return s; }); } setCfgPickerOpen(false); setPickerParentId(null); loadDetail(); } catch {} }} />
+          onConfirm={async (items) => { if (!pickerParentId) return; try { await configurationApi.addChildren(pickerParentId, items); toast.success(`已添加 ${items.length} 个子构型项`); if (pickerParentId !== internalRevId) { setSubChildren(prev => { const s = { ...prev }; delete s[pickerParentId]; return s; }); } setCfgPickerOpen(false); setPickerParentId(null); refreshChildren(pickerParentId); } catch {} }} />
       )}
 
       {/* 零部件选择器 */}

@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BOM 3D 对比树 — 双列实例版预览</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, 'Microsoft YaHei', sans-serif; background:#f3f4f6; padding:24px; color:#374151; }
+
+.page { max-width:860px; margin:0 auto; background:#fff; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,.1); overflow:hidden; }
+
+.header { padding:8px 12px; border-bottom:1px solid #e5e7eb; font-size:13px; display:flex; align-items:center; gap:8px; }
+.header .title { font-weight:600; }
+.header .sep { color:#d1d5db; }
+
+.col-head { display:flex; font-size:11px; font-weight:600; color:#6b7280; background:#f9fafb; border-bottom:1px solid #e5e7eb; }
+.col-head .col-l, .col-head .col-r { flex:1; padding:5px 10px; }
+.col-head .divider { width:1px; background:#e5e7eb; flex:none; }
+
+.tree { max-height:70vh; overflow-y:auto; }
+
+/* 层级行 */
+.lv-row { display:flex; align-items:stretch; font-size:12px; min-height:24px; border-bottom:1px solid #f3f4f6; }
+.lv-row .indent { flex:none; }
+.lv-row .chevron { width:14px; flex:none; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+.lv-row .chevron svg { width:10px; height:10px; color:#9ca3af; transition:transform .15s; }
+.lv-row .chevron.open svg { transform:rotate(90deg); }
+.lv-row .col-l, .lv-row .col-r { flex:1; display:flex; align-items:center; gap:4px; padding:2px 8px; min-width:0; overflow:hidden; }
+.lv-row .col-l { border-right:1px solid #e5e7eb; }
+.lv-row .label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+.lv-row .code { font-weight:600; color:#374151; }
+
+/* 实例子行 */
+.inst-row { display:flex; align-items:stretch; font-size:11px; min-height:22px; }
+.inst-row .col-l, .inst-row .col-r { flex:1; display:flex; align-items:center; gap:4px; padding:1px 8px; min-width:0; }
+.inst-row .col-l { border-right:1px solid #e5e7eb; }
+.inst-row .label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+.inst-row .eye { width:14px; height:14px; flex:none; cursor:pointer; color:#9ca3af; display:flex; align-items:center; justify-content:center; }
+.inst-row .eye svg { width:12px; height:12px; }
+
+/* 占位 */
+.ph { color:#d1d5db; font-style:italic; }
+
+/* 颜色 */
+.bg-add  { background:#ecfdf5; }
+.bg-del  { background:#fef2f2; }
+.bg-mod  { background:#fffbeb; }
+.bg-none {}
+.bg-intern{background:#fffbeb;}
+
+/* 切换显示模式按钮 */
+.mode-bar { display:flex; gap:4px; }
+.mode-bar button { padding:3px 10px; border-radius:4px; font-size:12px; border:1px solid #d1d5db; background:#fff; cursor:pointer; }
+.mode-bar button.active { background:#eff6ff; border-color:#3b82f6; color:#2563eb; }
+
+.footer { border-top:1px solid #e5e7eb; padding:8px 12px; display:flex; gap:14px; font-size:10px; color:#9ca3af; align-items:center; }
+.footer .swatch { width:10px; height:10px; border-radius:2px; flex:none; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <span class="title">BOM 对比树</span>
+    <span style="color:#9ca3af;">左 · ASM V1</span><span class="sep">|</span>
+    <span style="color:#9ca3af;">右 · ASM V2</span>
+    <span style="flex:1"></span>
+    <div class="mode-bar">
+      <button class="active">叠加</button><button>只看左</button><button>只看右</button>
+    </div>
+  </div>
+
+  <div class="col-head">
+    <div class="col-l">左 · ASM V1（旧版）</div>
+    <div class="divider"></div>
+    <div class="col-r">右 · ASM V2（新版）</div>
+  </div>
+
+  <div class="tree">
+
+    <!-- ──────── 按装配层级展示，每个实例一个独立行 ──────── -->
+
+    <!-- ROOT -->
+    <div class="lv-row bg-mod">
+      <div class="indent" style="width:4px"></div>
+      <div class="chevron open"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4l4 4-4 4"/></svg></div>
+      <div class="col-l"><span class="code">ASM</span><span class="label">_V1_总装配体</span></div>
+      <div class="col-r"><span class="code">ASM</span><span class="label">_V2_总装配体</span>&nbsp;<span style="color:#d97706;font-size:10px">修改</span></div>
+    </div>
+
+    <!-- 子装配 GB-110（展开后显示内部实例） -->
+    <div class="lv-row bg-intern">
+      <div class="indent" style="width:20px"></div>
+      <div class="chevron open"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4l4 4-4 4"/></svg></div>
+      <div class="col-l"><span class="code">GB-110</span><span class="label">_V1_下壳体组件 ×2</span></div>
+      <div class="col-r"><span class="code">GB-110</span><span class="label">_V1_下壳体组件 ×2</span>&nbsp;<span style="color:#d97706;font-size:10px">子项变</span></div>
+    </div>
+
+    <!-- GB-110 内部的零件实例 -->
+    <div class="inst-row bg-none">
+      <div class="indent" style="width:36px"></div><div style="width:14px"></div>
+      <div class="col-l" style="padding-left:14px">
+        <span class="eye" title="显示/隐藏"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8s2.5-4.5 6-4.5S14 8 14 8s-2.5 4.5-6 4.5S2 8 2 8z"/><circle cx="8" cy="8" r="2"/></svg></span>
+        <span class="label">GB-115_V1_轴承座_1</span>
+      </div>
+      <div class="col-r" style="padding-left:14px">
+        <span class="eye" title="显示/隐藏"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8s2.5-4.5 6-4.5S14 8 14 8s-2.5 4.5-6 4.5S2 8 2 8z"/><circle cx="8" cy="8" r="2"/></svg></span>
+        <span class="label">GB-115_V1_轴承座_1</span>
+      </div>
+    </div>
+    <div class="inst-row bg-none">
+      <div class="indent" style="width:36px"></div><div style="width:14px"></div>
+      <div class="col-l" style="padding-left:14px">
+        <span class="eye"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8s2.5-4.5 6-4.5S14 8 14 8s-2.5 4.5-6 4.5S2 8 2 8z"/><circle cx="8" cy="8" r="2"/></svg></span>
+        <span class="label">GB-116_V1_端盖_1</span>
+      </div>
+      <div class="col-r" style="padding-left:14px">
+        <span class="eye"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8s2.5-4.5 6-4.5S14 8 14 8s-2.5 4.5-6 4.5S2 8 2 8z"/><circle cx="8" cy="8" r="2"/></svg></span>
+        <span class="label">GB-116_V1_端盖_1</span>
+      </div>
+    </div>
+
+    <!-- 零件 GB-115(数量3→5，按实例拆分) -->
+    <div class="lv-row bg-mod">
+      <div class="indent" style="width:20px"></div>
+      <div class="chevron open"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4l4 4-4 4"/></svg></div>
+      <div class="col-l"><span class="code">GB-115</span><span class="label">_V1_轴承座 ×3</span></div>
+      <div class="col-r"><span class="code">GB-115</span><span class="label">_V1_轴承座 ×5</span>&nbsp;<span style="color:#d97706;font-size:10px">修改</span></div>
+    </div>
+
+    <!-- GB-115 的 5 个实例子行（按矩阵匹配结果着色） -->
+    <!-- 实例1：矩阵匹配(左#2=右#0) → 未变 -->
+    <div class="inst-row bg-none">
+      <div class="indent" style="width:36px"></div><div style="width:14px"></div>
+      <div class="col-l" style="padding-left:14px">
+        <span class="eye"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8s2.5-4.5 6-4.5S14 8 14 8s-2.5 4.5-6 4.5S2 8 2 8z"/><circle cx="8" cy="8" r="2"/></svg></span>
+        <span class="label">GB-115_V1_轴承座_1</span>
+      </div>
+      <div class="col-r" style="padding-left:14px">
+        <span class="eye"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8s2.5-4.5 6-4.5S14 8 14 8s-2.5 4.5-6 4.5S2 8 2 8z"/><circle cx="8" cy="8" r="2"/></svg></span>
+        <span class="label">GB-115_V1_轴承座_1</span>
+      </div>
+    </div>
+
+    <!-- 实例2：矩阵仅左侧(左#1) → 删除 -->
+    <div class="inst-row bg-del">
+      <div class="indent" style="width:36px"></div><div style="width:14px"></div>
+      <div class="col-l" style="padding-left:14px">
+        <span class="eye"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8s2.5-4.5 6-4.5S14 8 14 8s-2.5 4.5-6 4.5S2 8 2 8z"/><circle cx="8" cy="8" r="2"/></svg></span>
+        <span class="label">GB-115_V1_轴承座_2</span>
+      </div>
+      <div class="col-r" style="padding-left:14px">
+        <span class="ph">—</span>
+      </div>
+    </div>
+
+    <!-- 实例3：矩阵匹配(左#0=右#1) → 未变 -->
+    <div class="inst-row bg-none">
+      <div class="indent" style="width:36px"></div><div style="width:14px"></div>
+      <div class="col-l" style="padding-left:14px">
+        <span class="eye"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8s2.5-4.5 6-4.5S14 8 14 8s-2.5 4.5-6 4.5S2 8 2 8z"/><circle cx="8" cy="8" r="2"/></svg></span>
+        <span class="label">GB-115_V1_轴承座_3</span>
+      </div>
+      <div class="col-r" style="padding-left:14px">
+        <span class="eye"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8s2.5-4.5 6-4.5S14 8 14 8s-2.5 4.5-6 4.5S2 8 2 8z"/><circle cx="8" cy="8" r="2"/></svg></span>
+        <span class="label">GB-115_V1_轴承座_3</span>
+      </div>
+    </div>
+
+    <!-- 实例4：矩阵仅右侧(右#2) → 新增 -->
+    <div class="inst-row bg-add">
+      <div class="indent" style="width:36px"></div><div style="width:14px"></div>
+      <div class="col-l" style="padding-left:14px"><span class="ph">—</span></div>
+      <div class="col-r" style="padding-left:14px">
+        <span class="eye"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8s2.5-4.5 6-4.5S14 8 14 8s-2.5 4.5-6 4.5S2 8 2 8z"/><circle cx="8" cy="8" r="2"/></svg></span>
+        <span class="label">GB-115_V1_轴承座_4</span>
+      </div>
+    </div>
+
+    <!-- 实例5：矩阵仅右侧(右#3) → 新增 -->
+    <div class="inst-row bg-add">
+      <div class="indent" style="width:36px"></div><div style="width:14px"></div>
+      <div class="col-l" style="padding-left:14px"><span class="ph">—</span></div>
+      <div class="col-r" style="padding-left:14px">
+        <span class="eye"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8s2.5-4.5 6-4.5S14 8 14 8s-2.5 4.5-6 4.5S2 8 2 8z"/><circle cx="8" cy="8" r="2"/></svg></span>
+        <span class="label">GB-115_V1_轴承座_5</span>
+      </div>
+    </div>
+
+    <!-- 全新零件 GB-200，仅右侧 -->
+    <div class="lv-row bg-add">
+      <div class="indent" style="width:20px"></div>
+      <div class="chevron"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4l4 4-4 4"/></svg></div>
+      <div class="col-l"><span class="ph">—</span></div>
+      <div class="col-r"><span class="code">GB-200</span><span class="label">_A_新增加强筋_1</span>&nbsp;<span style="color:#16a34a;font-size:10px">新增</span></div>
+    </div>
+
+    <!-- 已删除零件 GB-099，仅左侧 -->
+    <div class="lv-row bg-del">
+      <div class="indent" style="width:20px"></div>
+      <div class="chevron"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4l4 4-4 4"/></svg></div>
+      <div class="col-l"><span class="code">GB-099</span><span class="label">_V1_旧垫片_1</span></div>
+      <div class="col-r"><span class="ph">—</span>&nbsp;<span style="color:#dc2626;font-size:10px">删除</span></div>
+    </div>
+
+  </div>
+
+  <!-- 图例 -->
+  <div class="footer">
+    <span><span class="swatch" style="background:#639922"></span> 新增</span>
+    <span><span class="swatch" style="background:#E24B4A"></span> 删除</span>
+    <span><span class="swatch" style="background:#B4B2A9"></span> 未变</span>
+    <span><span class="swatch" style="background:#EF9F27"></span> 修改</span>
+    <span style="margin-left:auto;color:#9ca3af;">命名: 件号_版本_名称_序号 · 矩阵toFixed(4)匹配</span>
+  </div>
+
+</div>
+</body>
+</html>

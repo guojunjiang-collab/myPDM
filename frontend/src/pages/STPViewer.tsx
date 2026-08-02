@@ -2,12 +2,15 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { ViewerCanvas } from '../components/STPViewer/ViewerCanvas';
 import { Toolbar } from '../components/STPViewer/Toolbar';
 import { ModelTreePanel } from '../components/STPViewer/ModelTreePanel';
+import { CompareTreePanel } from '../components/STPViewer/CompareTreePanel';
 import { ViewCube } from '../components/STPViewer/ViewCube';
-import { useViewerStore } from '../stores/viewerStore';import { assemblyViewerApi } from '../services/api';
+import { useViewerStore } from '../stores/viewerStore';import { assemblyViewerApi, bomApi } from '../services/api';
 import type { AssemblyInstance, AssemblyTreeNode } from '../services/api';
 import { configurationProfileApi, type ConfigProfilePreviewData } from '../services/api';
 import { buildConfigTreeNodes } from '../components/STPViewer/buildConfigTreeNodes';
+import { buildCompareTree } from '../components/STPViewer/buildCompareTree';
 import type { TreeNode } from '../components/STPViewer/treeTypes';
+import type { BOMCompareResponse } from '../types';
 import { toast } from '../components/Toast';
 import axios from 'axios';
 
@@ -30,6 +33,8 @@ export default function STPViewerPage() {
   const partCode = params.get('code') || undefined;
   const partVersion = params.get('version') || undefined;
   const partName = params.get('name') || undefined;
+  const compareLeftId = params.get('compare-left');
+  const compareRightId = params.get('compare-right');
 
   const [asmInstances, setAsmInstances] = useState<AssemblyInstance[] | null>(null);
   const [asmTree, setAsmTree] = useState<AssemblyTreeNode[]>([]);
@@ -37,6 +42,11 @@ export default function STPViewerPage() {
   const [configPreviewData, setConfigPreviewData] = useState<ConfigProfilePreviewData | null>(null);
   const [configPreviewTitle, setConfigPreviewTitle] = useState('');
   const [configDisplayTree, setConfigDisplayTree] = useState<TreeNode | null>(null);
+  const [cmpLeftInstances, setCmpLeftInstances] = useState<AssemblyInstance[]>([]);
+  const [cmpRightInstances, setCmpRightInstances] = useState<AssemblyInstance[]>([]);
+  const [cmpError, setCmpError] = useState<string | null>(null);
+  const setCompareTree = useViewerStore((s) => s.setCompareTree);
+  const compareSlice = useViewerStore((s) => s.compare);
 
   const onResizeDown = useCallback(() => { dragging.current = true; }, []);
   useEffect(() => {
@@ -55,6 +65,26 @@ export default function STPViewerPage() {
 
   useEffect(() => {
     reset();
+    if (compareLeftId && compareRightId) {
+      setState('loading');
+      Promise.all([
+        bomApi.compare(compareLeftId, compareRightId),
+        assemblyViewerApi.instances(compareLeftId).catch(() => [] as AssemblyInstance[]),
+        assemblyViewerApi.tree(compareLeftId).catch(() => [] as AssemblyTreeNode[]),
+        assemblyViewerApi.instances(compareRightId).catch(() => [] as AssemblyInstance[]),
+        assemblyViewerApi.tree(compareRightId).catch(() => [] as AssemblyTreeNode[]),
+      ])
+        .then(([cmpRes, li, lt, ri, rt]) => {
+          const result = cmpRes.data as BOMCompareResponse;
+          const tree = buildCompareTree(result, lt, rt);
+          setCompareTree(tree, { leftMissing: li.length === 0, rightMissing: ri.length === 0 });
+          setCmpLeftInstances(li);
+          setCmpRightInstances(ri);
+          setState('ready');
+        })
+        .catch(() => { setCmpError('对比数据加载失败，请关闭后重试'); setState('error'); });
+      return;
+    }
     if (assemblyRevId) {
       Promise.all([
         assemblyViewerApi.instances(assemblyRevId),
@@ -137,6 +167,12 @@ export default function STPViewerPage() {
     }, 2000);
   }
 
+  // 对比模式的前置态
+  if (compareLeftId && compareRightId) {
+    if (cmpError) return <div className="w-screen h-screen flex items-center justify-center text-red-500">{cmpError}</div>;
+    if (state !== 'ready') return <div className="w-screen h-screen flex items-center justify-center text-gray-500">加载对比数据...</div>;
+  }
+
   // 装配模式的前置态（加载/空/错误）
   if (assemblyRevId) {
     if (asmError) return <div className="w-screen h-screen flex items-center justify-center text-red-500">{asmError}</div>;
@@ -150,11 +186,11 @@ export default function STPViewerPage() {
 
   return (
     <div className="w-screen h-screen relative flex">
-      {(asmTree.length > 0 || !!configDisplayTree ||
-        (!assemblyRevId && !configProfileId && loadingState === 'ready')) && (
+      {(asmTree.length > 0 || !!configDisplayTree || !!(compareLeftId && compareRightId) ||
+        (!assemblyRevId && !configProfileId && !compareLeftId && loadingState === 'ready')) && (
         <>
           <div style={{ width: treeWidth }} className="shrink-0 h-full">
-            <ModelTreePanel />
+            {compareLeftId && compareRightId ? <CompareTreePanel /> : <ModelTreePanel />}
           </div>
           <div
             onMouseDown={onResizeDown}
@@ -164,14 +200,25 @@ export default function STPViewerPage() {
       )}
       <div className="flex-1 flex flex-col min-w-0">
         <Toolbar />
+          {compareSlice && compareSlice.leftMissing !== compareSlice.rightMissing && (
+            <div className="px-4 py-1.5 bg-yellow-50 border-b border-yellow-200 text-xs text-yellow-800">
+              {compareSlice.leftMissing ? '左部件' : '右部件'}尚无 3D 模型，仅显示{compareSlice.leftMissing ? '右' : '左'}侧
+            </div>
+          )}
         <div className="flex-1 relative">
           {(state === 'ready' || state === 'loading') && (() => {
+            if (compareLeftId && compareRightId) return <ViewerCanvas source={{ kind: 'compare', leftInstances: cmpLeftInstances, rightInstances: cmpRightInstances }} />;
             if (configProfileId && configPreviewData) return <ViewerCanvas source={{ kind: 'assembly', instances: configPreviewData.instances, tree: configPreviewData.tree, applyZUp: false, displayTree: configDisplayTree }} />;
             if (assemblyRevId && asmInstances) return <ViewerCanvas source={{ kind: 'assembly', instances: asmInstances, tree: asmTree }} />;
             if (url) return <ViewerCanvas source={{ kind: 'single', url, code: partCode, version: partVersion, name: partName }} />;
             return null;
           })()}
           <ViewCube />
+          {compareLeftId && compareRightId && cmpLeftInstances.length === 0 && cmpRightInstances.length === 0 && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center text-gray-500 pointer-events-none">
+              两个部件均无 3D 模型
+            </div>
+          )}
         </div>
       </div>
 
@@ -199,7 +246,7 @@ export default function STPViewerPage() {
       )}
 
       {/* 装配：流式加载进度（非阻塞角标） */}
-      {assemblyRevId && streamProgress && streamProgress.loaded < streamProgress.total && (
+      {(assemblyRevId || (compareLeftId && compareRightId)) && streamProgress && streamProgress.loaded < streamProgress.total && (
         <div className="absolute top-3 right-3 z-30 flex items-center gap-2 bg-white/90 rounded-full shadow px-3 py-1.5 pointer-events-none">
           <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-blue-500 border-t-transparent" />
           <span className="text-gray-600 text-xs tabular-nums">

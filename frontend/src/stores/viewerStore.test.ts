@@ -69,10 +69,13 @@ describe('viewerStore tree extensions', () => {
   it('selectByMesh 对未知 mesh 不改变状态', () => {
     const st = useViewerStore.getState();
     st.setTreeData(tree);
+    const before = new Set(useViewerStore.getState().expandedIds);
     st.selectByMesh('不存在的uuid');
     const s = useViewerStore.getState();
     expect(s.selectedNodeId).toBeNull();
-    expect(s.expandedIds.size).toBe(0);
+    // expandedIds 不应因未知 mesh 而新增
+    expect(s.expandedIds.size).toBe(before.size);
+    expect([...s.expandedIds].every((id) => before.has(id))).toBe(true);
   });
 
   it('toggleNodeVisibility 部分隐藏时切为全隐', () => {
