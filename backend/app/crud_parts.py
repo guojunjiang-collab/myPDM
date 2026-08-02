@@ -203,7 +203,7 @@ def list_part_masters(
 
     where_toplevel = ""
     if top_level:
-        where_toplevel = "AND m.id NOT IN (SELECT bi.child_master_id FROM bom_items bi)"
+        where_toplevel = "AND m.id NOT IN (SELECT pr.master_id FROM bom_items bi JOIN part_revisions pr ON pr.id = bi.child_revision_id AND pr.deleted_at IS NULL WHERE bi.child_revision_id IS NOT NULL)"
 
     where_since = ""
     since_params = {}
@@ -235,8 +235,8 @@ def list_part_masters(
                     SELECT master_id, COUNT(*) AS cnt FROM part_revisions WHERE deleted_at IS NULL GROUP BY master_id
                 ) v_cnt ON v_cnt.master_id = m.id
                 LEFT JOIN (
-                    SELECT child_revision_id, COUNT(*) AS cnt FROM bom_items GROUP BY child_revision_id
-                ) c_cnt ON c_cnt.child_revision_id = r.id
+                    SELECT parent_revision_id, COUNT(*) AS cnt FROM bom_items WHERE deleted_at IS NULL GROUP BY parent_revision_id
+                ) c_cnt ON c_cnt.parent_revision_id = r.id
                 {base_where} {where_search} {where_status} {where_checkout} {where_type} {where_toplevel} {where_since}
             )
             SELECT * FROM ranked
@@ -272,8 +272,8 @@ def list_part_masters(
                     SELECT master_id, COUNT(*) AS cnt FROM part_revisions WHERE deleted_at IS NULL GROUP BY master_id
                 ) v_cnt ON v_cnt.master_id = m.id
                 LEFT JOIN (
-                    SELECT child_revision_id, COUNT(*) AS cnt FROM bom_items GROUP BY child_revision_id
-                ) c_cnt ON c_cnt.child_revision_id = latest_r.id
+                    SELECT parent_revision_id, COUNT(*) AS cnt FROM bom_items WHERE deleted_at IS NULL GROUP BY parent_revision_id
+                ) c_cnt ON c_cnt.parent_revision_id = latest_r.id
                 {base_where} {where_search} {where_status} {where_checkout} {where_type} {where_toplevel} {where_since}
             )
             SELECT * FROM ranked
@@ -291,13 +291,15 @@ def list_part_masters(
     items: List[Dict] = []
     for row in rows:
         cmp_type = row['component_type'] or 'part'
+        child_cnt = row['child_count'] or 0
+        display_type = 'assembly' if child_cnt > 0 else cmp_type
         items.append({
             'revision_id': str(row['revision_id']),
             'master_id': str(row['master_id']),
             'code': row['code'],
             'name': row['name'],
             'component_type': cmp_type,
-            'type': 'assembly' if cmp_type == 'assembly' else 'part',
+            'type': 'assembly' if child_cnt > 0 else 'part',
             'spec': '',
             'version': row['version'],
             'status': row['status'],
@@ -1131,9 +1133,34 @@ def delete_bom_item(db: Session, item_id: UUID) -> bool:
     item = db.query(models.BOMItem).filter(models.BOMItem.id == item_id, models.BOMItem.deleted_at.is_(None)).first()
     if not item:
         return False
+    parent_revision = item.parent_revision_id
     item.deleted_at = datetime.now(timezone.utc)
     db.commit()
+    if parent_revision:
+        _sync_component_type(db, parent_revision)
     return True
+
+
+def _sync_component_type(db: Session, revision_id):
+    """根据子项数量同步零部件的 type：有子项→assembly，无子项→part"""
+    revision = get_part_revision(db, revision_id)
+    if not revision:
+        return
+    master = get_part_master(db, revision.master_id)
+    if not master:
+        return
+    child_count = (
+        db.query(models.BOMItem)
+        .filter(
+            models.BOMItem.parent_revision_id == revision_id,
+            models.BOMItem.deleted_at.is_(None),
+        )
+        .count()
+    )
+    expected = 'assembly' if child_count > 0 else 'part'
+    if master.type != expected:
+        master.type = expected
+        db.commit()
 
 
 # ====== CAD 矩阵匹配与展平 ======
@@ -1383,6 +1410,20 @@ def get_assembly_instances(db: Session, assembly_revision_id, glb_url_resolver) 
         child_links = children_of(rev_id, iteration.id) if iteration else []
 
         if not child_links:
+            # 无子项时，检查自身是否有 3D 模型（零件自身可作为叶子）
+            self_urls = glb_url_resolver(rev_id)
+            if self_urls:
+                rev = get_part_revision(db, rev_id)
+                master = get_part_master(db, rev.master_id) if rev else None
+                instances.append({
+                    "path": "/".join(bom_path),
+                    "bom_path": bom_path,
+                    "part_code": master.code if master else "",
+                    "revision_id": str(rev_id),
+                    "glb_urls": self_urls,
+                    "matrix": _mu.identity(),
+                    "bbox": None,
+                })
             return
 
         for link in child_links:

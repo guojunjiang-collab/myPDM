@@ -83,13 +83,20 @@ export function useCompareVisualState(
       if (isSelected) {
         if (std.emissive) { std.emissive.setHex(0x224488); std.emissiveIntensity = 0.5; }
         std.transparent = false; std.opacity = 1; std.depthWrite = true;
-      } else {
+      } else if (ghost) {
         if (std.emissive) { std.emissive.setHex(0x000000); std.emissiveIntensity = 0; }
-        if (ghost) {
-          std.transparent = true; std.opacity = ghostOpacity; std.depthWrite = false;
+        std.transparent = true; std.opacity = ghostOpacity; std.depthWrite = false;
+      } else if (mesh.userData.isPartCompare) {
+        if (std.emissive) { std.emissive.setHex(0x000000); std.emissiveIntensity = 0; }
+        // 零件对比：左红半透明，右绿实体
+        if (side === 'left') {
+          std.transparent = true; std.opacity = 0.4; std.depthWrite = false;
         } else {
           std.transparent = false; std.opacity = 1; std.depthWrite = true;
         }
+      } else {
+        if (std.emissive) { std.emissive.setHex(0x000000); std.emissiveIntensity = 0; }
+        std.transparent = false; std.opacity = 1; std.depthWrite = true;
       }
       std.needsUpdate = true;
     });

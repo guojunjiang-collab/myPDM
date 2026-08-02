@@ -651,8 +651,8 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                                   debouncedCfSave(newVals);
                                 };
                                 return (
-                                  <div key={def.id}>
-                                    <label className="text-xs text-gray-500">{def.name}</label>
+                                  <div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                                    <div className="text-xs text-gray-500 mb-0.5">{def.name}</div>
                                     {def.field_type === 'select' ? (
                                       <select
                                         className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 mt-0.5 bg-white"
@@ -699,8 +699,8 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                               cfDefs.map((def: any) => {
                                 const val = cfEditValues[def.id];
                                 return (
-                                  <div key={def.id}>
-                                    <label className="text-xs text-gray-500">{def.name}</label>
+                                  <div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                                    <div className="text-xs text-gray-500 mb-0.5">{def.name}</div>
                                     <div className="text-sm">{val !== undefined && val !== null ? String(val) : '—'}</div>
                                   </div>
                                 );

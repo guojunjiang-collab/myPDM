@@ -3,7 +3,7 @@ from uuid import UUID
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sqlfunc
-from . import models, schemas
+from . import models, schemas, crud_parts
 import bcrypt
 
 def _doc_brief(doc):
@@ -116,13 +116,20 @@ def create_bom_item(db, item):
     db.add(db_item)
     db.commit()
     db.refresh(db_item)
+    # 添加子项后，父零部件有子项→更新为部件
+    if db_item.parent_revision_id:
+        crud_parts._sync_component_type(db, db_item.parent_revision_id)
     return db_item
 
 def delete_bom_item(db, item_id):
     db_item = db.query(models.BOMItem).filter(models.BOMItem.id == item_id).first()
     if db_item:
+        parent_revision = db_item.parent_revision_id
         db_item.deleted_at = sqlfunc.now()
         db.commit()
+        # 移除子项后，若父零部件无子项→恢复为零件
+        if parent_revision:
+            crud_parts._sync_component_type(db, parent_revision)
     return db_item
 
 def get_bom_item(db, item_id):

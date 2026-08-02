@@ -123,6 +123,7 @@ export function CompareModelLoader({ leftInstances, rightInstances }: Props) {
     const tree = compare.tree;
     const leftIndex = indexByBomItem(tree, 'left');
     const rightIndex = indexByBomItem(tree, 'right');
+    const isPartCompare = tree.children.length === 0;
 
     setLoadingState('ready');
 
@@ -179,8 +180,8 @@ export function CompareModelLoader({ leftInstances, rightInstances }: Props) {
       const groupLeft = new Map<string, InstanceRef[]>();
       const groupRight = new Map<string, InstanceRef[]>();
       for (const { inst, side, index } of queue) {
-        const nodeKey = (side === 'left' ? leftIndex : rightIndex).get(bomItemIdOf(inst));
-        if (!nodeKey) continue;
+        let nodeKey = (side === 'left' ? leftIndex : rightIndex).get(bomItemIdOf(inst));
+        if (!nodeKey) nodeKey = 'ROOT'; // 无 BOM 子项的零件/部件自身模型挂在根节点
         const group = side === 'left' ? groupLeft : groupRight;
         const list = group.get(nodeKey) || [];
         list.push({ index, matrix: inst.matrix, revisionId: inst.revision_id });
@@ -243,8 +244,7 @@ export function CompareModelLoader({ leftInstances, rightInstances }: Props) {
       setStreamProgress({ loaded: 0, total });
 
       for (const { inst, side, index } of queue) {
-        const nodeKey = (side === 'left' ? leftIndex : rightIndex).get(bomItemIdOf(inst));
-        if (!nodeKey) { loaded++; setStreamProgress({ loaded, total }); continue; }
+        const nodeKey = (side === 'left' ? leftIndex : rightIndex).get(bomItemIdOf(inst)) || 'ROOT';
         const node = compare.nodeMap.get(nodeKey);
         if (!node) { loaded++; setStreamProgress({ loaded, total }); continue; }
 
@@ -280,9 +280,10 @@ export function CompareModelLoader({ leftInstances, rightInstances }: Props) {
           g.traverse((c) => {
             const m = c as THREE.Mesh;
             if (m.isMesh && m.material && !Array.isArray(m.material)) {
-              m.material = (m.material as THREE.Material).clone();
+m.material = (m.material as THREE.Material).clone();
               const std = m.material as THREE.MeshStandardMaterial;
-              if (std.color) std.color.setHex(decision.color);
+              m.userData.isPartCompare = isPartCompare;
+              if (std.color) std.color.setHex(isPartCompare ? (side === 'left' ? 0xE24B4A : 0x639922) : decision.color);
             }
           });
         }
