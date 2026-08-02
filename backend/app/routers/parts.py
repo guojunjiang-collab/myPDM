@@ -40,6 +40,7 @@ def list_parts(
     search_field: Literal['all', 'code', 'name', 'spec'] = Query('all'),
     include_custom_fields: bool = Query(False),
     type: Optional[Literal['part', 'assembly']] = Query(None),
+    updated_since: Optional[float] = Query(None, description="Unix 时间戳，仅返回 updated_at >= 该时间的 revision"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("parts:read")),
 ):
@@ -48,7 +49,7 @@ def list_parts(
             db, search=search, status=status, check_out_user_id=check_out_user_id,
             show_all_versions=show_all_versions, top_level=top_level, page=page, page_size=page_size,
             sort_field=sort_field, sort_order=sort_order, search_field=search_field,
-            include_custom_fields=include_custom_fields, type=type,
+            include_custom_fields=include_custom_fields, type=type, updated_since=updated_since,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))

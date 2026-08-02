@@ -128,6 +128,7 @@ def list_part_masters(
     search_field: str = 'all',
     include_custom_fields: bool = False,
     type: Optional[str] = None,
+    updated_since: Optional[float] = None,
 ) -> Tuple[List[Dict], int]:
     """按 revision 维度分页，支持服务端排序与搜索。"""
 
@@ -204,13 +205,20 @@ def list_part_masters(
     if top_level:
         where_toplevel = "AND m.id NOT IN (SELECT bi.child_master_id FROM bom_items bi)"
 
+    where_since = ""
+    since_params = {}
+    if updated_since:
+        rev_alias_for_since = 'r' if show_all_versions else 'latest_r'
+        where_since = f"AND EXTRACT(EPOCH FROM {rev_alias_for_since}.updated_at) >= :updated_since"
+        since_params = {'updated_since': updated_since}
+
     base_where = "WHERE m.deleted_at IS NULL"
 
     if show_all_versions:
         sql_count = f"""
             SELECT COUNT(*) FROM part_masters m
             JOIN part_revisions r ON r.master_id = m.id AND r.deleted_at IS NULL
-            {base_where} {where_search} {where_status} {where_checkout} {where_type} {where_toplevel}
+            {base_where} {where_search} {where_status} {where_checkout} {where_type} {where_toplevel} {where_since}
         """
         sql_items = f"""
             WITH ranked AS (
@@ -229,7 +237,7 @@ def list_part_masters(
                 LEFT JOIN (
                     SELECT child_revision_id, COUNT(*) AS cnt FROM bom_items GROUP BY child_revision_id
                 ) c_cnt ON c_cnt.child_revision_id = r.id
-                {base_where} {where_search} {where_status} {where_checkout} {where_type} {where_toplevel}
+                {base_where} {where_search} {where_status} {where_checkout} {where_type} {where_toplevel} {where_since}
             )
             SELECT * FROM ranked
             ORDER BY {order_col} {order_dir} {nulls}
@@ -243,7 +251,7 @@ def list_part_masters(
             WHERE r.master_id = m.id AND r.deleted_at IS NULL
             ORDER BY version_to_int(r.version) DESC LIMIT 1
             ) latest_r ON TRUE
-            {base_where} {where_search} {where_status} {where_checkout} {where_type} {where_toplevel}
+            {base_where} {where_search} {where_status} {where_checkout} {where_type} {where_toplevel} {where_since}
         """
         sql_items = f"""
             WITH ranked AS (
@@ -266,7 +274,7 @@ def list_part_masters(
                 LEFT JOIN (
                     SELECT child_revision_id, COUNT(*) AS cnt FROM bom_items GROUP BY child_revision_id
                 ) c_cnt ON c_cnt.child_revision_id = latest_r.id
-                {base_where} {where_search} {where_status} {where_checkout} {where_type} {where_toplevel}
+                {base_where} {where_search} {where_status} {where_checkout} {where_type} {where_toplevel} {where_since}
             )
             SELECT * FROM ranked
             ORDER BY {order_col} {order_dir} {nulls}
@@ -275,7 +283,7 @@ def list_part_masters(
 
     params = {
         'limit': page_size, 'offset': (page - 1) * page_size,
-        **search_params, **status_params, **co_params, **type_params,
+        **search_params, **status_params, **co_params, **type_params, **since_params,
     }
     total = db.execute(text(sql_count), params).scalar()
     rows = db.execute(text(sql_items), params).mappings().all()

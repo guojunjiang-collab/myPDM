@@ -23,10 +23,11 @@ function buildEntities(): SyncEntity[] {
       name: 'parts',
       key: 'parts',
       fetch: async (since: number) => {
-        const res = await partsApi.list({
-          page_size: 200,
-          show_all_versions: true,
-        } as any);
+        const params: any = { page_size: 200, show_all_versions: true };
+        if (since > 0) {
+          params.updated_since = since;
+        }
+        const res = await partsApi.list(params);
         return Array.isArray(res)
           ? res
           : res?.items || [];
