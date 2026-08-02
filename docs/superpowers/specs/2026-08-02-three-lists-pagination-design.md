@@ -186,7 +186,7 @@ CREATE INDEX IF NOT EXISTS idx_cfv_entity
 `backend/tests/test_list_pagination_sort.py`：
 
 - `list_part_masters` 全部 `sort_field` 字段 × asc/desc × show_all_versions on/off 共 8 组，校验结果序与 `total`、`len(items) <= page_size`、`page` 元信息一致。
-- `version_to_int` 单测对齐 frontend `versionToNumber`：A=0, B=1, ..., Z=22, AA=24, AB=25, ..., ZZ=575；非法字符（I、O、数字、小写、空格）按 charIndex=0 处理（pos=1 对应 A）。
+- `version_to_int` 单测对齐 frontend `versionToNumber`：A=0, B=1, ..., Z=23, AA=24, AB=25, ..., ZZ=599；非法字符（I、O、数字、小写、空格）按 charIndex=0 处理（pos=1 对应 A）。
 - `include_custom_fields=True` 时 search 命中自定义字段值的 revision；`False` 时只命中 code/name。
 - 自加 expression index 前后 EXPLAIN 检查（人工）。
 

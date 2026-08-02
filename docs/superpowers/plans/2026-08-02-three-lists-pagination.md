@@ -221,7 +221,7 @@ def list_part_masters(
     if search_field not in SEARCH_FIELDS_PARTS:
         raise ValueError(f"Invalid search_field: {search_field}")
     page = max(1, page)
-    page_size = max(1, min(100, page_size))  # 上限 100
+    page_size = max(1, page_size)  # 上限由路由层 Query 校验，CRUD 不再卡
 
     # 排序字段 SQL 映射
     order_col_map = {
@@ -434,7 +434,7 @@ def list_parts(
     show_all_versions: bool = Query(False),
     top_level: bool = Query(False),
     page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=100),
+    page_size: int = Query(50, ge=1, le=10000),
     sort_field: Literal['code', 'name', 'created_at', 'version', 'status', 'check_out_user_name', 'type'] = Query('code'),
     sort_order: Literal['asc', 'desc'] = Query('asc'),
     search_field: Literal['all', 'code', 'name', 'spec'] = Query('all'),
@@ -518,10 +518,10 @@ def test_version_to_int_basic(db_session):
     """version_to_int 与前端 versionToNumber 1:1 对齐。"""
     cases = [
         ('A', 0), ('B', 1), ('C', 2), ('H', 7), ('J', 8),  # 跳过 I
-        ('N', 13), ('P', 14),  # 跳过 O
-        ('Z', 22),
-        ('AA', 24), ('AB', 25), ('AZ', 46),
-        ('BA', 48), ('ZZ', 575),
+        ('N', 12), ('P', 13),  # 跳过 O
+        ('Z', 23),
+        ('AA', 24), ('AB', 25), ('AZ', 47),
+        ('BA', 48), ('ZZ', 599),
     ]
     for v, expected in cases:
         actual = db_session.execute(f"SELECT version_to_int('{v}')").scalar()
@@ -673,7 +673,7 @@ def list_documents(
     status: Optional[str] = Query(None),
     show_all_versions: bool = Query(False),
     page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=100),
+    page_size: int = Query(50, ge=1, le=10000),
     sort_field: Literal['code', 'name', 'created_at', 'version', 'status', 'check_out_user_name'] = Query('code'),
     sort_order: Literal['asc', 'desc'] = Query('asc'),
     search_field: Literal['all', 'code', 'name', 'remark'] = Query('all'),
