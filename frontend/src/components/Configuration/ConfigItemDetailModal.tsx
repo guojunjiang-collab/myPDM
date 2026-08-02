@@ -331,6 +331,12 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
           <button onClick={() => { setViewingIterationData(null); setActiveIterationId(null); }}
             className="text-primary-600 hover:text-primary-800 hover:underline">返回当前迭代</button>
         </span>
+      ) : (internalRevId && internalRevId !== revisionId) ? (
+        <span className="flex items-center gap-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 px-2 py-0.5 rounded">
+          正在查看版本 {versions.find((v: any) => v.id === internalRevId)?.version || '?'}（只读）
+          <button onClick={() => setInternalRevId(revisionId)}
+            className="text-primary-600 hover:text-primary-800 hover:underline">返回当前版本</button>
+        </span>
       ) : undefined}
     >
       <div className="h-[50vh] flex flex-col">
