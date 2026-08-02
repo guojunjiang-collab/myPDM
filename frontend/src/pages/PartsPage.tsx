@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { formatDate } from '../lib/date';
 import { partsApi, customFieldsApi } from '../services/api';
 import { useAuthStore } from '../stores/auth';
 import { useDataStore } from '../stores/data';
@@ -247,6 +248,9 @@ export default function PartsPage() {
               <th onClick={() => handleSort('name' as keyof PartListItem)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
                 中文名称 {getSortIcon('name' as keyof PartListItem)}
               </th>
+              <th onClick={() => handleSort('created_at' as keyof PartListItem)} className="w-44 px-2 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+                创建时间 {getSortIcon('created_at' as keyof PartListItem)}
+              </th>
               <th onClick={() => handleSort('version' as keyof PartListItem)} className="w-16 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
                 版本 {getSortIcon('version' as keyof PartListItem)}
               </th>
@@ -256,8 +260,8 @@ export default function PartsPage() {
               <th onClick={() => handleSort('status' as keyof PartListItem)} className="w-20 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
                 状态 {getSortIcon('status' as keyof PartListItem)}
               </th>
-              <th className="w-20 px-4 py-3 text-center text-sm font-medium text-gray-500 select-none whitespace-nowrap">
-                签出状态
+              <th onClick={() => handleSort('check_out_user_name' as keyof PartListItem)} className="w-20 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+                签出状态 {getSortIcon('check_out_user_name' as keyof PartListItem)}
               </th>
               <th className="w-16 px-4 py-3 text-center text-sm font-medium text-gray-500 select-none whitespace-nowrap">
                 操作
@@ -267,13 +271,13 @@ export default function PartsPage() {
           <tbody className="divide-y divide-gray-200">
             {loading && sortedData.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                   加载中...
                 </td>
               </tr>
             ) : sortedData.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                   无匹配数据
                 </td>
               </tr>
@@ -289,6 +293,7 @@ export default function PartsPage() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm truncate">{item.name}</td>
+                  <td className="px-2 py-3 text-sm text-gray-500 text-center whitespace-nowrap">{formatDate(item.created_at, 'YYYY-MM-DD HH:mm')}</td>
                   <td className="px-4 py-3 text-sm text-gray-500 text-center">{item.version}</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`px-2 py-1 text-xs rounded-full ${item.type === 'assembly' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'}`}>

@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { formatDate } from '../lib/date';
 import { documentsApi, customFieldsApi, bomApi, userGroupsApi } from '../services/api';
 import type { Document, CustomFieldDefinition, CustomFieldValue } from '../types';
 import { canEdit, isAdmin, useAuthStore } from '../stores/auth';
@@ -335,17 +336,18 @@ export default function Documents() {
             <tr>
               <th onClick={() => handleSort('code' as keyof Document)} className="w-60 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">编号 {getSortIcon('code' as keyof Document)}</th>
               <th onClick={() => handleSort('name' as keyof Document)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">名称 {getSortIcon('name' as keyof Document)}</th>
+              <th onClick={() => handleSort('created_at' as keyof Document)} className="w-44 px-2 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">创建时间 {getSortIcon('created_at' as keyof Document)}</th>
               <th onClick={() => handleSort('version' as keyof Document)} className="w-16 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">版本 {getSortIcon('version' as keyof Document)}</th>
               <th onClick={() => handleSort('status' as keyof Document)} className="w-20 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">状态 {getSortIcon('status' as keyof Document)}</th>
-              <th className="w-20 px-4 py-3 text-center text-sm font-medium text-gray-500 select-none whitespace-nowrap">签出状态</th>
+              <th onClick={() => handleSort('check_out_user_name' as keyof Document)} className="w-20 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">签出状态 {getSortIcon('check_out_user_name' as keyof Document)}</th>
               <th className="w-16 px-4 py-3 text-center text-sm font-medium text-gray-500 select-none whitespace-nowrap">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading && documents.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
             ) : filteredData.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">无匹配数据</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">无匹配数据</td></tr>
             ) : (
               displayData.map((doc) => (
                 <tr key={doc.id} className={`hover:bg-gray-50 cursor-pointer ${(doc as any).accessible === false ? 'opacity-60' : ''}`} onClick={() => { setDetailDocId(doc.id); viewedDocCodeRef.current = doc.code; }}>
@@ -359,6 +361,7 @@ export default function Documents() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm">{doc.name}</td>
+                  <td className="px-2 py-3 text-sm text-gray-500 text-center whitespace-nowrap">{formatDate(doc.created_at, 'YYYY-MM-DD HH:mm')}</td>
                   <td className="px-4 py-3 text-sm text-gray-500 text-center">{doc.version || '-'}</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`px-2 py-1 text-xs rounded-full ${getStatusTag(doc.status).class}`}>
