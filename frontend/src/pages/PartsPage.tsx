@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { formatDate } from '../lib/date';
-import { partsApi, customFieldsApi } from '../services/api';
+import { partsApi } from '../services/api';
 import { useAuthStore } from '../stores/auth';
 import { useDataStore } from '../stores/data';
 import type { PartListItem, CustomFieldDefinition } from '../types';
 import { toast } from '../components/Toast';
 import { Modal, ConfirmModal } from '../components/Modal';
-import { useTableSort } from '../hooks/useTableSort';
+import { useDebounced } from '../hooks/useDebounced';
 import PartDetailModal from '../components/PartDetailModal';
 import { CADWorkspaceModal } from '../components/CADWorkspace/CADWorkspaceModal';
 import PartCompareModal from '../components/PartCompareModal';
@@ -21,105 +21,79 @@ const statusTag = (s: string) => {
   return map[s] || { label: s, cls: 'bg-gray-100 text-gray-800' };
 };
 
+type SortField = 'code' | 'name' | 'created_at' | 'version' | 'status' | 'check_out_user_name' | 'type';
+type SortOrder = 'asc' | 'desc';
+
 export default function PartsPage() {
   const { user } = useAuthStore();
-
-  const [items, setItems] = useState<PartListItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [searchField, setSearchField] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [showAllVersions, setShowAllVersions] = useState(false);
-  const [topLevelOnly, setTopLevelOnly] = useState(false);
-  const [allData, setAllData] = useState<PartListItem[]>([]);
-
-  const [cfValuesMap, setCfValuesMap] = useState<Record<string, Record<string, any>>>({});
   const storeCustomDefs = useDataStore((s) => s.customFieldDefs);
   const componentCustomDefs = storeCustomDefs.filter((d: CustomFieldDefinition) =>
     d.applies_to?.includes('component') || d.applies_to?.includes('part')
   );
 
+  const [items, setItems] = useState<PartListItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const pageSize = 100;
+  const [sortField, setSortField] = useState<SortField>('code');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounced(search, 400);
+  const [searchField, setSearchField] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [showAllVersions, setShowAllVersions] = useState(false);
+  const [topLevelOnly, setTopLevelOnly] = useState(false);
+  const [refreshToken, setRefreshToken] = useState(0);
+
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+
   const [detailMasterId, setDetailMasterId] = useState<string | null>(null);
   const [detailRevisionId, setDetailRevisionId] = useState<string | null>(null);
-
   const [deleteTarget, setDeleteTarget] = useState<PartListItem | null>(null);
   const [showCADWorkspace, setShowCADWorkspace] = useState(false);
-
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCompareModal, setShowCompareModal] = useState(false);
   const [newPart, setNewPart] = useState({ code: '', name: '', spec: '' });
   const [createSaving, setCreateSaving] = useState(false);
 
-  const loadData = useCallback(async () => {
+  useEffect(() => {
     setLoading(true);
-    try {
-      const params: Record<string, any> = { page_size: 10000, show_all_versions: true };
-      if (statusFilter) params.status = statusFilter;
-      if (topLevelOnly) params.top_level = true;
-      if (search && searchField === 'all') params.search = search;
-      else if (searchField === 'code') params.search = search;
-      else if (searchField === 'name') params.search = search;
-      else if (searchField === 'spec') params.search = search;
-      const res = await partsApi.list(params);
-      const rawItems = res.items || [];
-      setAllData(rawItems);
-
-      let filtered: PartListItem[] = rawItems;
-      if (search && searchField !== 'all') {
-        const kw = search.toLowerCase();
-        if (searchField === 'code') filtered = rawItems.filter((i: PartListItem) => i.code?.toLowerCase().includes(kw));
-        else if (searchField === 'name') filtered = rawItems.filter((i: PartListItem) => i.name?.toLowerCase().includes(kw));
-        else if (searchField === 'spec') filtered = rawItems.filter((i: PartListItem) => i.spec?.toLowerCase().includes(kw));
-        else if (searchField.startsWith('cf_')) {
-          const fieldId = searchField.slice(3);
-          filtered = rawItems.filter((i: PartListItem) => {
-            const cfVals = cfValuesMap[i.revision_id] || {};
-            const v = cfVals[fieldId];
-            if (v === null || v === undefined) return false;
-            if (Array.isArray(v)) return v.some(s => String(s).toLowerCase().includes(kw));
-            return String(v).toLowerCase().includes(kw);
-          });
-        }
-      }
-
-      if (!showAllVersions) {
-        const latestMap: Record<string, PartListItem> = {};
-        filtered.forEach((item: PartListItem) => {
-          const existing = latestMap[item.code];
-          if (!existing || new Date(item.created_at || 0) > new Date(existing.created_at || 0)) {
-            latestMap[item.code] = item;
-          }
-        });
-        filtered = Object.values(latestMap);
-      }
-
-      setItems(filtered);
-
-      if (componentCustomDefs.length > 0 && filtered.length > 0) {
-        const ids = filtered.map((i: PartListItem) => i.revision_id).filter(Boolean);
-        if (ids.length > 0) {
-          customFieldsApi.getValuesBatch({ type: 'component', ids: ids.join(',') }).then(res => {
-            setCfValuesMap(res.data || {});
-          }).catch(() => {});
-        }
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  }, [search, searchField, statusFilter, showAllVersions, topLevelOnly]);
+    partsApi.list({
+      page,
+      page_size: pageSize,
+      sort_field: sortField,
+      sort_order: sortOrder,
+      search: debouncedSearch || undefined,
+      search_field: searchField.startsWith('cf_') ? 'all' : searchField,
+      include_custom_fields: true,
+      status: statusFilter || undefined,
+      show_all_versions: showAllVersions,
+      top_level: topLevelOnly,
+    }).then((res: any) => {
+      setItems(res.items || []);
+      setTotal(res.total || 0);
+      setPage(res.page || 1);
+    }).catch(() => {
+      setItems([]);
+      setTotal(0);
+    }).finally(() => setLoading(false));
+  }, [page, sortField, sortOrder, debouncedSearch, searchField, statusFilter, showAllVersions, topLevelOnly, refreshToken]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    setPage(1);
+  }, [debouncedSearch, searchField, statusFilter, showAllVersions, topLevelOnly, sortField, sortOrder]);
 
-  const versionCountMap: Record<string, number> = {};
-  allData.forEach(item => {
-    versionCountMap[item.code] = (versionCountMap[item.code] || 0) + 1;
-  });
-
-  const { sortedData, handleSort, getSortIcon } = useTableSort<PartListItem>(items, 'code', 'asc');
+  const onSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(o => o === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
+  const sortIcon = (field: SortField) =>
+    sortField === field ? (sortOrder === 'asc' ? ' ↑' : ' ↓') : ' ⇅';
 
   const openDetail = (masterId: string, revisionId: string) => {
     setDetailMasterId(masterId);
@@ -131,7 +105,8 @@ export default function PartsPage() {
     try {
       await partsApi.deleteRevision(deleteTarget.revision_id);
       toast.success('已删除');
-      loadData();
+      setItems(prev => prev.filter(it => it.revision_id !== deleteTarget.revision_id));
+      setRefreshToken(t => t + 1);
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || '删除失败');
     }
@@ -149,7 +124,8 @@ export default function PartsPage() {
       toast.success('创建成功');
       setShowCreateModal(false);
       setNewPart({ code: '', name: '', spec: '' });
-      loadData();
+      setPage(1);
+      setRefreshToken(t => t + 1);
       if (created.latest_revision?.id) {
         setDetailMasterId(created.id);
         setDetailRevisionId(created.latest_revision.id);
@@ -179,7 +155,12 @@ export default function PartsPage() {
         </select>
         <input
           type="text"
-          placeholder={searchField === 'all' ? '搜索...' : `搜索${searchField === 'code' ? '件号' : searchField === 'name' ? '名称' : '规格型号'}...`}
+          placeholder={
+            searchField.startsWith('cf_') ? '搜索...' :
+            searchField === 'all' ? '搜索...' :
+            searchField === 'code' ? '搜索件号...' :
+            searchField === 'name' ? '搜索名称...' : '搜索规格型号...'
+          }
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -213,6 +194,16 @@ export default function PartsPage() {
           />
           仅顶层零部件
         </label>
+
+        <div className="flex items-center gap-2 text-xs text-gray-600">
+          共 <span className="font-medium">{total}</span> 条
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1 || loading}
+            className="px-2 py-0.5 border rounded disabled:opacity-40 hover:bg-gray-50">上一页</button>
+          <span className="tabular-nums">第{page}/{pageCount}页</span>
+          <button onClick={() => setPage(p => Math.min(pageCount, p + 1))} disabled={page >= pageCount || loading}
+            className="px-2 py-0.5 border rounded disabled:opacity-40 hover:bg-gray-50">下一页</button>
+        </div>
+
         <button
           onClick={() => setShowCADWorkspace(true)}
           className="px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 text-sm flex items-center gap-1.5"
@@ -221,7 +212,7 @@ export default function PartsPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
-           CAD入口
+          CAD入口
         </button>
         <button
           onClick={() => setShowCompareModal(true)}
@@ -242,26 +233,26 @@ export default function PartsPage() {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
-              <th onClick={() => handleSort('code' as keyof PartListItem)} className="w-56 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
-                件号 {getSortIcon('code' as keyof PartListItem)}
+              <th onClick={() => onSort('code')} className="w-56 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+                件号{sortIcon('code')}
               </th>
-              <th onClick={() => handleSort('name' as keyof PartListItem)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
-                中文名称 {getSortIcon('name' as keyof PartListItem)}
+              <th onClick={() => onSort('name')} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+                中文名称{sortIcon('name')}
               </th>
-              <th onClick={() => handleSort('created_at' as keyof PartListItem)} className="w-44 px-2 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
-                创建时间 {getSortIcon('created_at' as keyof PartListItem)}
+              <th onClick={() => onSort('created_at')} className="w-44 px-2 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+                创建时间{sortIcon('created_at')}
               </th>
-              <th onClick={() => handleSort('version' as keyof PartListItem)} className="w-16 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
-                版本 {getSortIcon('version' as keyof PartListItem)}
+              <th onClick={() => onSort('version')} className="w-16 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+                版本{sortIcon('version')}
               </th>
-              <th onClick={() => handleSort('type' as keyof PartListItem)} className="w-20 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
-                类型 {getSortIcon('type' as keyof PartListItem)}
+              <th onClick={() => onSort('type')} className="w-20 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+                类型{sortIcon('type')}
               </th>
-              <th onClick={() => handleSort('status' as keyof PartListItem)} className="w-20 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
-                状态 {getSortIcon('status' as keyof PartListItem)}
+              <th onClick={() => onSort('status')} className="w-20 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+                状态{sortIcon('status')}
               </th>
-              <th onClick={() => handleSort('check_out_user_name' as keyof PartListItem)} className="w-20 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
-                签出状态 {getSortIcon('check_out_user_name' as keyof PartListItem)}
+              <th onClick={() => onSort('check_out_user_name')} className="w-20 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+                签出状态{sortIcon('check_out_user_name')}
               </th>
               <th className="w-16 px-4 py-3 text-center text-sm font-medium text-gray-500 select-none whitespace-nowrap">
                 操作
@@ -269,26 +260,26 @@ export default function PartsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {loading && sortedData.length === 0 ? (
+            {loading && items.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                   加载中...
                 </td>
               </tr>
-            ) : sortedData.length === 0 ? (
+            ) : items.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                   无匹配数据
                 </td>
               </tr>
             ) : (
-              sortedData.map((item) => (
+              items.map((item) => (
                 <tr key={item.revision_id} className="hover:bg-gray-50 cursor-pointer" onClick={() => openDetail(item.master_id, item.revision_id)}>
                   <td className="px-4 py-3 text-sm font-medium">
                     {item.code}
-                    {!showAllVersions && (versionCountMap[item.code] || 0) > 1 && (
+                    {item.version_count && item.version_count > 1 && !showAllVersions && (
                       <span className="ml-1.5 text-xs text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded">
-                        {(versionCountMap[item.code] || 0)}个版本
+                        {item.version_count}个版本
                       </span>
                     )}
                   </td>
@@ -362,16 +353,15 @@ export default function PartsPage() {
         masterId={detailMasterId || ''}
         revisionId={detailRevisionId || undefined}
         open={!!detailMasterId}
-          onClose={(saved) => { 
-          setDetailMasterId(null); 
+        onClose={(saved: any) => {
+          setDetailMasterId(null);
           setDetailRevisionId(null);
           if (saved && detailMasterId) {
-            const applyPatch = (item: any) =>
+            const applyPatch = (item: PartListItem) =>
               item.master_id === detailMasterId ? { ...item, ...saved } : item;
-            setAllData(prev => prev.map(applyPatch));
             setItems(prev => prev.map(applyPatch));
           } else {
-            loadData();
+            setRefreshToken(t => t + 1);
           }
         }}
       />
@@ -385,7 +375,7 @@ export default function PartsPage() {
           onCancel={() => setDeleteTarget(null)}
         />
       )}
-      <CADWorkspaceModal open={showCADWorkspace} onClose={() => { setShowCADWorkspace(false); loadData(); }} />
+      <CADWorkspaceModal open={showCADWorkspace} onClose={() => { setShowCADWorkspace(false); setRefreshToken(t => t + 1); }} />
       <PartCompareModal open={showCompareModal} onClose={() => setShowCompareModal(false)} />
     </div>
   );
