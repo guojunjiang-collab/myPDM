@@ -331,6 +331,12 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
           <button onClick={() => { setViewingIterationData(null); setActiveIterationId(null); }}
             className="text-primary-600 hover:text-primary-800 hover:underline">返回当前迭代</button>
         </span>
+      ) : (internalRevId && internalRevId !== revisionId) ? (
+        <span className="flex items-center gap-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 px-2 py-0.5 rounded">
+          正在查看版本 {versions.find((v: any) => v.id === internalRevId)?.version || '?'}（只读）
+          <button onClick={() => setInternalRevId(revisionId)}
+            className="text-primary-600 hover:text-primary-800 hover:underline">返回当前版本</button>
+        </span>
       ) : undefined}
     >
       <div className="h-[50vh] flex flex-col">
@@ -386,9 +392,8 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
                     )}
                   </div>
                   {cfDefs.length > 0 ? (
-                    <div><h4 className="text-sm font-semibold mb-2">自定义字段</h4><div className="grid grid-cols-3 gap-3">{cfDefs.map((def: any) => (<div key={def.id}><label className="text-xs text-gray-500">{def.name}</label><div className="mt-0.5"><CustomFieldInput def={def} value={cfValues[def.id]} onChange={(val) => { setCfValues(prev => ({ ...prev, [def.id]: val })); autoSaveCf(def.id, val); }} readOnly={!canEdit} /></div></div>))}</div></div>
+                    <div><h4 className="text-sm font-semibold mb-2">自定义字段</h4><div className="grid grid-cols-3 gap-3">{cfDefs.map((def: any) => (<div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100"><div className="text-xs text-gray-500 mb-0.5">{def.name}</div><div><CustomFieldInput def={def} value={cfValues[def.id]} onChange={(val) => { setCfValues(prev => ({ ...prev, [def.id]: val })); autoSaveCf(def.id, val); }} readOnly={!canEdit} /></div></div>))}</div></div>
                   ) : (<div className="text-gray-400 text-sm">无</div>)}
-                  <div className="text-xs text-gray-400">创建时间：{master?.created_at ? new Date(master.created_at).toLocaleString('zh-CN') : '—'}</div>
                 </div>
               )}
               {activeTab === 'parts' && (

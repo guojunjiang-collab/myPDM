@@ -7,8 +7,10 @@ BOM 对比算法模块（基于 PartRevision 三层模型）
 import uuid
 from typing import Dict, List, Optional, Tuple, Any
 from sqlalchemy.orm import Session
+from sqlalchemy import String, cast
 
 from .. import crud_parts
+from .. import models
 
 
 def _as_uuid(value: Any) -> Optional[uuid.UUID]:
@@ -24,7 +26,7 @@ def _as_uuid(value: Any) -> Optional[uuid.UUID]:
 
 
 def revision_summary(db: Session, revision_id: Any) -> Optional[Dict[str, Any]]:
-    """获取某版本的摘要信息（编码/名称/规格来自 master，版本/状态来自 revision）。"""
+    """获取某版本的摘要信息（编码/名称/规格来自 master，版本/状态来自 revision），含自定义字段值。"""
     rev_uuid = _as_uuid(revision_id)
     if rev_uuid is None:
         return None
@@ -32,8 +34,37 @@ def revision_summary(db: Session, revision_id: Any) -> Optional[Dict[str, Any]]:
     if not rev:
         return None
     master = crud_parts.get_part_master(db, rev.master_id)
+
+    # 获取适用于零部件的全部自定义字段定义
+    all_defs = db.query(models.CustomFieldDefinition).filter(
+        models.CustomFieldDefinition.applies_to.cast(String).like('%component%')
+    ).all()
+    defn_map = {d.id: d for d in all_defs}
+
+    # 获取该版本的自定义字段值
+    cfvs = db.query(models.CustomFieldValue).filter(
+        models.CustomFieldValue.entity_type.in_(['part', 'component']),
+        models.CustomFieldValue.entity_id == rev_uuid,
+    ).all()
+    value_map: Dict[str, Any] = {}
+    for v in cfvs:
+        d2 = defn_map.get(v.field_id)
+        if not d2:
+            continue
+        val = v.value_text or v.value_json
+        if val is None and v.value_number is not None:
+            val = float(v.value_number)
+        value_map[d2.field_key] = val
+
+    custom_fields: Dict[str, Any] = {}
+    for d in defn_map.values():
+        custom_fields[d.field_key] = {
+            "label": d.name,
+            "value": value_map.get(d.field_key),
+        }
+
     return {
-        "id": str(rev.id),                      # id 统一为 revision id
+        "id": str(rev.id),
         "revision_id": str(rev.id),
         "master_id": str(rev.master_id),
         "code": master.code if master else "",
@@ -41,6 +72,7 @@ def revision_summary(db: Session, revision_id: Any) -> Optional[Dict[str, Any]]:
         "spec": (getattr(master, 'spec', '') if master else "") or "",
         "version": rev.version,
         "status": rev.status,
+        "custom_fields": custom_fields,
     }
 
 

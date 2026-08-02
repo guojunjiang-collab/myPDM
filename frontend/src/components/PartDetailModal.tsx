@@ -486,6 +486,12 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
           <button onClick={() => { setViewingIterationId(null); setViewingIteration(null); }}
             className="text-primary-600 hover:text-primary-800 hover:underline">返回当前迭代</button>
         </span>
+      ) : (internalRevisionId && propRevisionId && internalRevisionId !== propRevisionId) ? (
+        <span className="flex items-center gap-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 px-2 py-0.5 rounded">
+          正在查看版本 {versions.find((v: any) => v.id === internalRevisionId)?.version || '?'}（只读）
+          <button onClick={() => setInternalRevisionId(null)}
+            className="text-primary-600 hover:text-primary-800 hover:underline">返回当前版本</button>
+        </span>
       ) : undefined}
     >
       <div className="h-[60vh] flex flex-col">
@@ -651,8 +657,8 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                                   debouncedCfSave(newVals);
                                 };
                                 return (
-                                  <div key={def.id}>
-                                    <label className="text-xs text-gray-500">{def.name}</label>
+                                  <div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                                    <div className="text-xs text-gray-500 mb-0.5">{def.name}</div>
                                     {def.field_type === 'select' ? (
                                       <select
                                         className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 mt-0.5 bg-white"
@@ -699,8 +705,8 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                               cfDefs.map((def: any) => {
                                 const val = cfEditValues[def.id];
                                 return (
-                                  <div key={def.id}>
-                                    <label className="text-xs text-gray-500">{def.name}</label>
+                                  <div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                                    <div className="text-xs text-gray-500 mb-0.5">{def.name}</div>
                                     <div className="text-sm">{val !== undefined && val !== null ? String(val) : '—'}</div>
                                   </div>
                                 );

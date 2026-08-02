@@ -3,7 +3,7 @@ from uuid import UUID
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sqlfunc
-from . import models, schemas
+from . import models, schemas, crud_parts
 import bcrypt
 
 def _doc_brief(doc):
@@ -116,13 +116,20 @@ def create_bom_item(db, item):
     db.add(db_item)
     db.commit()
     db.refresh(db_item)
+    # 添加子项后，父零部件有子项→更新为部件
+    if db_item.parent_revision_id:
+        crud_parts._sync_component_type(db, db_item.parent_revision_id)
     return db_item
 
 def delete_bom_item(db, item_id):
     db_item = db.query(models.BOMItem).filter(models.BOMItem.id == item_id).first()
     if db_item:
+        parent_revision = db_item.parent_revision_id
         db_item.deleted_at = sqlfunc.now()
         db.commit()
+        # 移除子项后，若父零部件无子项→恢复为零件
+        if parent_revision:
+            crud_parts._sync_component_type(db, parent_revision)
     return db_item
 
 def get_bom_item(db, item_id):
@@ -362,16 +369,13 @@ def set_custom_field_values(db, entity_type, entity_id, values, iteration_id=Non
         field_def = get_custom_field_definition(db, item.field_id)
         if not field_def:
             continue
-        # 查找已有值（加入 iteration_id 匹配）
+        # 查找已有值（按 field_id + entity_id 定位，不限制 iteration_id，
+        # 避免签出复制后遗留 NULL 版本与新 iteration 版本并存，保存时只更新了旧行）
         query = db.query(models.CustomFieldValue).filter(
             models.CustomFieldValue.field_id == item.field_id,
             models.CustomFieldValue.entity_type == entity_type,
             models.CustomFieldValue.entity_id == entity_id
         )
-        if iteration_id is not None:
-            query = query.filter(models.CustomFieldValue.iteration_id == iteration_id)
-        else:
-            query = query.filter(models.CustomFieldValue.iteration_id.is_(None))
         existing = query.first()
 
         # 根据字段类型确定存储列
@@ -481,6 +485,9 @@ def _copy_iteration_custom_fields(db, source_iteration_id, target_iteration_id, 
             iteration_id=target_iteration_id,
         )
         db.add(new_val)
+    # 清除旧迭代的字段值（避免与新版并存，导致读取端拿到过期值）
+    for sv in source_values:
+        db.delete(sv)
     db.flush()
 
 
