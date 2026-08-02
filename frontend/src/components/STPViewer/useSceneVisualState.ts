@@ -2,6 +2,7 @@ import { useEffect, type RefObject, type MutableRefObject } from 'react';
 import * as THREE from 'three';
 import { useViewerStore } from '../../stores/viewerStore';
 import { buildColorMap } from './autoColor';
+import { setMeshRaycastEnabled } from './raycastFilter';
 
 /**
  * 共享的"把 viewerStore 视觉态施加到场景根节点"逻辑。
@@ -40,7 +41,10 @@ export function useSceneVisualState(
       if (!mesh.isMesh) return;
 
       // 显隐不依赖材质，先处理，使多材质 mesh 也能正常隐藏/显示
-      mesh.visible = !hiddenParts.has(mesh.uuid);
+      const hidden = hiddenParts.has(mesh.uuid);
+      mesh.visible = !hidden;
+      // 隐藏 mesh 的射线检测需一并禁用，否则点击会先命中隐藏 mesh、挡住背后的可见零件
+      setMeshRaycastEnabled(mesh, !hidden);
 
       const mat = mesh.material;
       if (Array.isArray(mat)) return; // 多材质 mesh：跳过高亮/隔离/线框样式

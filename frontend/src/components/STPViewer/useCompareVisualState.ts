@@ -2,6 +2,7 @@ import { useEffect, type RefObject, type MutableRefObject } from 'react';
 import * as THREE from 'three';
 import { useViewerStore } from '../../stores/viewerStore';
 import { renderDecision } from './compareRenderRules';
+import { setMeshRaycastEnabled } from './raycastFilter';
 import type { ChangeType, Side } from './compareTypes';
 
 /**
@@ -61,7 +62,10 @@ export function useCompareVisualState(
       const wanted = side === 'left' ? decision.drawLeft : decision.drawRight;
 
       // 2) 手动显隐（树上的眼睛按钮）优先级最高
-      mesh.visible = wanted && !hiddenParts.has(mesh.uuid);
+      const visible = wanted && !hiddenParts.has(mesh.uuid);
+      mesh.visible = visible;
+      // 隐藏 mesh 的射线检测需一并禁用，否则点击仍会命中它而挡住背后可见 mesh
+      setMeshRaycastEnabled(mesh, visible);
       if (!mesh.visible) return;
 
       const mat = mesh.material;

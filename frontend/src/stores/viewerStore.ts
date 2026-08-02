@@ -203,6 +203,8 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   selectCompareByMesh: (meshUuid) => {
     const c = get().compare;
     if (!c) return;
+    // 被隐藏的 mesh 不可被选中（防守：UI 层已拦截，此处兜底）
+    if (get().hiddenParts.has(meshUuid)) return;
     const owner = c.meshOwner.get(meshUuid);
     if (!owner) return;
     // 沿 parentKey 上溯展开所有祖先；expanded 自带去重，兼作环路防护
@@ -283,6 +285,8 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   selectNode: (id) => set({ selectedNodeId: id }),
 
   selectByMesh: (meshUuid) => {
+    // 被隐藏的 mesh 不可被选中（防守：UI 层已拦截，此处兜底）
+    if (get().hiddenParts.has(meshUuid)) return;
     const { meshOwner, nodeMap } = get();
     const owner = meshOwner.get(meshUuid);
     if (!owner) return;
