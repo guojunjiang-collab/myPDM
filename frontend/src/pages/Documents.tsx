@@ -239,22 +239,13 @@ export default function Documents() {
           可查看
         </label>
 
-        <div className="flex items-center gap-2 text-xs text-gray-600">
-          共 <span className="font-medium">{total}</span> 条
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1 || loading}
-            className="px-2 py-0.5 border rounded disabled:opacity-40 hover:bg-gray-50">上一页</button>
-          <span className="tabular-nums">第{page}/{pageCount}页</span>
-          <button onClick={() => setPage(p => Math.min(pageCount, p + 1))} disabled={page >= pageCount || loading}
-            className="px-2 py-0.5 border rounded disabled:opacity-40 hover:bg-gray-50">下一页</button>
-        </div>
-
         <div className="flex-1" />
         {canEdit() && (
           <button onClick={handleAdd} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新增图文档</button>
         )}
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
+      <div className="relative bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
             <tr>
@@ -307,7 +298,18 @@ export default function Documents() {
             )}
           </tbody>
         </table>
-      </div>
+
+        <div className="sticky bottom-0 flex justify-center py-2 pointer-events-none">
+          <div className="inline-flex items-center gap-3 text-sm text-gray-600 bg-white border border-gray-200 rounded-full shadow-lg px-4 py-2 pointer-events-auto">
+            共 <span className="font-medium">{total}</span> 条
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1 || loading}
+              className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-40">上一页</button>
+            <span className="tabular-nums">第 {page} / {pageCount} 页</span>
+            <button onClick={() => setPage(p => Math.min(pageCount, p + 1))} disabled={page >= pageCount || loading}
+              className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-40">下一页</button>
+          </div>
+        </div>
+       </div>
 
       <Modal
         open={createModalOpen}
