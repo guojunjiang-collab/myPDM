@@ -21,6 +21,7 @@ import DataManagement from './pages/DataManagement';
 import Help from './pages/Help';
 const STPViewer = lazy(() => import('./pages/STPViewer'));
 const OfficeReader = lazy(() => import('./pages/OfficeReader'));
+const MarkdownReader = lazy(() => import('./pages/MarkdownReader'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user } = useAuthStore();
@@ -67,6 +68,16 @@ export default function App() {
             <ProtectedRoute>
               <Suspense fallback={<div className="w-screen h-screen flex items-center justify-center text-gray-400">加载中...</div>}>
                 <OfficeReader />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/markdown-reader"
+          element={
+            <ProtectedRoute>
+              <Suspense fallback={<div className="w-screen h-screen flex items-center justify-center text-gray-400">加载中...</div>}>
+                <MarkdownReader />
               </Suspense>
             </ProtectedRoute>
           }

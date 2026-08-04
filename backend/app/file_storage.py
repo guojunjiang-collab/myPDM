@@ -27,6 +27,7 @@ ALLOWED_EXTENSIONS = {
     '.zip', '.rar', '.7z', '.tar', '.gz', '.tgz',
     '.glb', '.gltf', '.obj',
     '.txt', '.csv', '.md', '.log', '.json', '.xml',
+    '.html', '.qmd',
 }
 
 

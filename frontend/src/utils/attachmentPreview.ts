@@ -2,10 +2,10 @@
 import { mediaApi } from '../services/api';
 
 export const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'];
-export const TEXT_EXTS = ['txt', 'md', 'csv', 'log', 'json', 'xml'];
+export const TEXT_EXTS = ['txt', 'csv', 'log', 'json', 'xml'];
 export const ARCHIVE_EXTS = ['zip', 'tar', 'gz', 'tgz', 'rar', '7z'];
 
-const INLINE_EXTS = ['pdf', ...IMAGE_EXTS, ...TEXT_EXTS];
+const INLINE_EXTS = ['pdf', ...IMAGE_EXTS, ...TEXT_EXTS, 'html', 'htm'];
 
 /** 前端可在线渲染的 Office 格式（仅 Excel，保真度可接受） */
 export const FRONTEND_OFFICE_EXTS = ['xlsx', 'xls'];
@@ -73,6 +73,14 @@ export async function previewAttachment(
     try {
       const mt = await mediaApi.token(attId, 'office-pdf');
       window.open(`/api/v2/attachments/${attId}/office-pdf?token=${encodeURIComponent(mt)}`, '_blank');
+    } catch (e) { alert(_permissionError(e) ? '无权限访问该附件' : '预览失败，请重试'); }
+    return;
+  }
+
+  if (ext === 'qmd' || ext === 'md') {
+    try {
+      const mt = await mediaApi.token(attId, 'preview');
+      window.open(`/markdown-reader?id=${attId}&token=${encodeURIComponent(mt)}&name=${encodeURIComponent(fileName)}`, '_blank');
     } catch (e) { alert(_permissionError(e) ? '无权限访问该附件' : '预览失败，请重试'); }
     return;
   }

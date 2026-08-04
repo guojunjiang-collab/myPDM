@@ -442,7 +442,7 @@ export const attachmentApi = {
 
 // 媒体令牌 API（替代 ?token= 的会话 JWT）
 export const mediaApi = {
-  token: (attId: string, action: 'preview' | 'direct-download' | 'gltf' | 'archive-tree' | 'extract-file' | 'office-pdf') =>
+  token: (attId: string, action: 'preview' | 'direct-download' | 'gltf' | 'archive-tree' | 'extract-file' | 'office-pdf' | 'qmd-preview') =>
     api.get(`/v2/attachments/${attId}/media-token`, { params: { action } }).then(r => r.data.token as string),
 };
 
