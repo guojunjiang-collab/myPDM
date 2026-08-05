@@ -47,4 +47,31 @@ describe('previewAttachment office 分发', () => {
     await previewAttachment('att-1', 'x.zip', { onArchive });
     expect(onArchive).toHaveBeenCalledWith('att-1', 'x.zip');
   });
+
+  it('html/htm 取 preview 令牌并在新标签页打开 /preview（inline 渲染）', async () => {
+    for (const name of ['a.html', 'b.htm']) {
+      (window.open as ReturnType<typeof vi.fn>).mockClear();
+      (mediaApi.token as ReturnType<typeof vi.fn>).mockClear();
+      const onArchive = vi.fn();
+      await previewAttachment('att-1', name, { onArchive });
+      expect(mediaApi.token).toHaveBeenCalledWith('att-1', 'preview');
+      const url = (window.open as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      expect(url).toContain('/preview?token=tok-123');
+      expect(window.alert).not.toHaveBeenCalled();
+    }
+  });
+
+  it('qmd/md 取 preview 令牌并在新标签页打开 /markdown-reader（前端渲染）', async () => {
+    for (const name of ['test.qmd', 'readme.md', 'NOTE.MD']) {
+      (window.open as ReturnType<typeof vi.fn>).mockClear();
+      (mediaApi.token as ReturnType<typeof vi.fn>).mockClear();
+      const onArchive = vi.fn();
+      await previewAttachment('att-1', name, { onArchive });
+      expect(mediaApi.token).toHaveBeenCalledWith('att-1', 'preview');
+      const url = (window.open as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      expect(url).toContain('/markdown-reader?id=att-1');
+      expect(url).toContain('token=tok-123');
+      expect(url).toContain(`name=${encodeURIComponent(name)}`);
+    }
+  });
 });

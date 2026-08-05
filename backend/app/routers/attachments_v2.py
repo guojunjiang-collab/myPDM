@@ -35,11 +35,14 @@ import mimetypes as _mimetypes
 
 # 文本类扩展名：统一以 UTF-8 纯文本内嵌，避免 md/log 被当二进制下载、避免中文乱码
 _TEXT_PREVIEW_EXTS = {".txt", ".md", ".csv", ".log", ".json", ".xml"}
+_HTML_PREVIEW_EXTS = {".html", ".htm"}
 
 
 def _preview_media_type(filename: str) -> str:
-    """预览时的 Content-Type：文本类统一 UTF-8 纯文本，其余按扩展名猜测"""
+    """预览时的 Content-Type：HTML 用 text/html，文本类统一 UTF-8 纯文本，其余按扩展名猜测"""
     ext = Path(filename).suffix.lower()
+    if ext in _HTML_PREVIEW_EXTS:
+        return "text/html; charset=utf-8"
     if ext in _TEXT_PREVIEW_EXTS:
         return "text/plain; charset=utf-8"
     return _mimetypes.guess_type(filename)[0] or "application/octet-stream"
