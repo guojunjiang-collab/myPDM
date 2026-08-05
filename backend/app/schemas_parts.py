@@ -28,7 +28,7 @@ class PartMasterResponse(PartMasterBase):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     latest_revision: Optional["PartRevisionBrief"] = None
-    type: Optional[str] = None  # 动态计算，非数据库字段
+    type: Optional[str] = None  # 零部件类型，来自 PartMaster.type
 
     class Config:
         from_attributes = True

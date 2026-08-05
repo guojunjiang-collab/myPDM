@@ -518,7 +518,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                   </div>
                   <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                     <div className="text-xs text-gray-500 mb-0.5">类型</div>
-                    <div className="text-sm text-gray-900 font-medium">{hasBomChildren ? '部件' : '零件'}</div>
+                    <div className="text-sm text-gray-900 font-medium">{master?.type === 'assembly' ? '部件' : '零件'}</div>
                   </div>
                 </>
               ) : (
@@ -533,7 +533,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                   </div>
                   <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                     <div className="text-xs text-gray-500 mb-0.5">类型</div>
-                    <div className="text-sm text-gray-900 font-medium">{hasBomChildren ? '部件' : '零件'}</div>
+                    <div className="text-sm text-gray-900 font-medium">{master?.type === 'assembly' ? '部件' : '零件'}</div>
                   </div>
                 </>
               )}

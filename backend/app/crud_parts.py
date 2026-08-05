@@ -290,16 +290,15 @@ def list_part_masters(
 
     items: List[Dict] = []
     for row in rows:
+        # 零部件类型以 PartMaster.type 为唯一事实源，避免新版本/空 BOM 导致误判
         cmp_type = row['component_type'] or 'part'
-        child_cnt = row['child_count'] or 0
-        display_type = 'assembly' if child_cnt > 0 else cmp_type
         items.append({
             'revision_id': str(row['revision_id']),
             'master_id': str(row['master_id']),
             'code': row['code'],
             'name': row['name'],
             'component_type': cmp_type,
-            'type': 'assembly' if child_cnt > 0 else 'part',
+            'type': cmp_type,
             'spec': '',
             'version': row['version'],
             'status': row['status'],
@@ -516,7 +515,9 @@ def _copy_iteration_data(db: Session, source_iter: models_parts.PartIteration, n
     for bom in bom_rows:
         new_bom = models.BOMItem(
             iteration_id=new_iter.id,
-            parent_revision_id=bom.parent_revision_id,
+            # 复制到新迭代时，父版本必须指向新迭代所属的版本，否则 parent_revision_id 将残留旧版本信息
+            #（导致升版后按 parent_revision_id 统计子项数量为 0，零部件类型被误判为零件）。
+            parent_revision_id=new_iter.revision_id,
             child_revision_id=bom.child_revision_id,
             quantity=bom.quantity,
             sort_order=bom.sort_order,
@@ -790,6 +791,8 @@ def upgrade_part(db: Session, revision_id: UUID, user_id: UUID) -> Tuple[Optiona
 
     db.commit()
     db.refresh(new_rev)
+    # 升版后同步零部件类型：新版本的 BOM 子项已复制，需根据子项数量更新 master.type
+    _sync_component_type(db, new_rev.id)
     return new_rev, None
 
 
@@ -1112,6 +1115,8 @@ def add_bom_item(db: Session, revision_id: UUID, data: dict, iteration_id: Optio
     db.add(item)
     db.commit()
     db.refresh(item)
+    # 添加子项后同步零部件类型：父件有子项→assembly
+    _sync_component_type(db, revision_id)
     return item, None
 
 

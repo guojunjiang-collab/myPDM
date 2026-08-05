@@ -576,24 +576,14 @@ def _build_master_response(db: Session, master) -> dict:
         if user:
             checkout_user_name = user.real_name
 
-    child_count = 0
-    if latest_revision:
-        latest_iter = db.query(crud_parts.models_parts.PartIteration).filter(
-            crud_parts.models_parts.PartIteration.revision_id == latest_revision.id,
-            crud_parts.models_parts.PartIteration.iteration == latest_revision.latest_iteration,
-        ).first()
-        if latest_iter:
-            child_count = db.query(crud_parts.models.BOMItem).filter(
-                crud_parts.models.BOMItem.iteration_id == latest_iter.id,
-                crud_parts.models.BOMItem.deleted_at.is_(None),
-            ).count()
-    dynamic_type = "assembly" if child_count > 0 else "part"
+    # 零部件类型以 PartMaster.type 为唯一事实源，避免部件升版后尚未建立 BOM 关系时被误判为零件。
+    master_type = getattr(master, 'type', None) or 'part'
 
     return {
         "id": str(master.id),
         "code": master.code,
         "name": master.name,
-        "type": dynamic_type,
+        "type": master_type,
         "created_at": master.created_at.isoformat() if master.created_at else None,
         "updated_at": master.updated_at.isoformat() if master.updated_at else None,
         "latest_revision": {
