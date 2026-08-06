@@ -719,6 +719,10 @@ def upgrade_config_item(
             )
             db.add(new_child)
 
+    # 复制自定义字段值到新版本
+    if source_iter:
+        crud_common._copy_iteration_custom_fields(db, source_iter.id, new_iter.id, new_entity_id=new_rev.id, source_entity_id=source_rev.id)
+
     new_rev.check_out_user_id = user_id
     new_rev.check_out_date = sqlfunc.now()
     db.commit()
