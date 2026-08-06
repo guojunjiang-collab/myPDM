@@ -83,7 +83,8 @@ export function STPViewerModal({ open, attachmentId, fileName, onClose }: STPVie
         setLoadingState('converting', '模型转换中，请稍后...');
         startPolling(gltfUrl);
       } else {
-        setLoadingState('error', e.response?.status === 404 ? '附件不存在' : '加载失败');
+        const msg = e.response?.data?.message;
+        setLoadingState('error', msg || (e.response?.status === 404 ? '附件不存在' : '加载失败'));
       }
     }
   }, []);

@@ -48,6 +48,9 @@ services:
       - APP_ENV=production
       - LICENSE_DIR=/app/uploads/license
       - LICENSE_HOST_ROOT=/host
+      - CAD_PDF_PART_PREFIX=${CAD_PDF_PART_PREFIX:-DR_}
+      - CAD_PDF_ASSEMBLY_PREFIX=${CAD_PDF_ASSEMBLY_PREFIX:-ASY_}
+      - CAD_STP_PREFIX=${CAD_STP_PREFIX:-MD_}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
       - DEEPSEEK_MODEL=${DEEPSEEK_MODEL:-deepseek-chat}
@@ -56,10 +59,7 @@ services:
       - CORS_ORIGINS=${CORS_ORIGINS:?CORS_ORIGINS not set}
     volumes:
       - ${UPLOADS_HOST_PATH:-./uploads}:/app/uploads
-      # 宿主机硬件指纹三源（只读）
-      - /sys/class/dmi/id/product_uuid:/host/product_uuid:ro
-      - /etc/machine-id:/host/machine-id:ro
-      - /sys/class/net:/host/net:ro
+      # 宿主机硬件指纹三源 -- Windows Docker Desktop 不支持，已移除
     depends_on:
       - postgres
       - redis
