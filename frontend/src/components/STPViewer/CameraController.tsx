@@ -37,6 +37,7 @@ export function CameraController() {
   const setViewTarget = useViewerStore((s) => s.setViewTarget);
   const resetViewTrigger = useViewerStore((s) => s.resetViewTrigger);
   const streamProgress = useViewerStore((s) => s.streamProgress);
+  const loadingState = useViewerStore((s) => s.loadingState);
   const { camera, set, size } = useThree();
   const controlsRef = useRef<any>(null);
   const prevMode = useRef<string | null>(null);
@@ -161,5 +162,5 @@ export function CameraController() {
     }
   });
 
-  return <ArcballControls ref={controlsRef} makeDefault enabled={!isStreaming} />;
+  return <ArcballControls ref={controlsRef} makeDefault enabled={loadingState === 'ready' && !isStreaming} />;
 }
