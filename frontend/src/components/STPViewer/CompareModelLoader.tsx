@@ -16,18 +16,13 @@ draco.setDecoderPath('/draco/');
 const loader = new GLTFLoader();
 loader.setDRACOLoader(draco);
 
+// 拉取 GLB 二进制；若 GLB 尚未转换完成（后端返回 202），
+// 立即跳过该文件（后端已在 GET 请求时触发异步转换），避免阻塞整体渲染。
 async function fetchGlbBuffer(url: string): Promise<ArrayBuffer> {
-  const maxTries = 60; // 最多 ~120 秒
-  for (let i = 0; i < maxTries; i++) {
-    const resp = await fetch(url);
-    if (resp.status === 200) return await resp.arrayBuffer();
-    if (resp.status === 202) {
-      await new Promise((r) => setTimeout(r, 2000));
-      continue;
-    }
-    throw new Error(`GLB 加载失败: ${resp.status}`);
-  }
-  throw new Error('GLB 转换超时');
+  const resp = await fetch(url);
+  if (resp.status === 200) return await resp.arrayBuffer();
+  if (resp.status === 202) throw new Error('GLB 转换中，已跳过');
+  throw new Error(`GLB 加载失败: ${resp.status}`);
 }
 
 // 按 url 缓存：左右两版共用的零件 GLB url 相同，只下载一次

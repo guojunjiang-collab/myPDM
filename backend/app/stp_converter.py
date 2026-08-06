@@ -4,6 +4,7 @@ STP 三维模型转换服务
 - glb 文件存放到 glb 缓存目录（uploads/glb_cache/{图文档编号_版本}/）
 - 删除 STP 附件时同步清理对应的 glb 文件
 - 使用 Semaphore 限制并发 Mayo 进程，防止 CPU/内存过载
+- 转换失败后写入 .failed 标记文件，避免无限重试
 """
 import os
 import shutil
@@ -26,6 +27,9 @@ _stp_semaphore = threading.Semaphore(2)
 
 # uploads 根目录
 UPLOAD_DIR = Path("/app/uploads")
+
+# GLB 文件最小有效大小（字节），低于此值视为转换失败
+MIN_GLB_SIZE = 200
 
 
 def is_stp_file(filename: str) -> bool:
@@ -53,23 +57,50 @@ def get_glb_cache_path(attachment_id: str, file_path: str = None, is_part: bool 
         target_dir.mkdir(parents=True, exist_ok=True)
         return target_dir / f"{attachment_id}.glb"
     elif file_path:
-        # 存放到 gltf_cache/{图文档文件夹}/ 目录
         stp_path = Path(file_path)
-        folder_name = stp_path.parent.name  # 如 test-STP-GD40_A
+        folder_name = stp_path.parent.name
         glb_filename = stp_path.stem + ".glb"
         target_dir = GLTF_CACHE_DIR / folder_name
         target_dir.mkdir(parents=True, exist_ok=True)
         return target_dir / glb_filename
     else:
-        # 兼容旧方式：存放到 gltf_cache 目录
         GLTF_CACHE_DIR.mkdir(parents=True, exist_ok=True)
         return GLTF_CACHE_DIR / f"{attachment_id}.glb"
+
+
+def _get_failed_path(glb_path: Path) -> Path:
+    """获取转换失败标记文件路径"""
+    return glb_path.with_suffix(".failed")
+
+
+def _write_failed_marker(glb_path: Path):
+    """写入转换失败标记文件"""
+    failed_path = _get_failed_path(glb_path)
+    failed_path.parent.mkdir(parents=True, exist_ok=True)
+    failed_path.touch()
+    logger.info(f"已写入转换失败标记: {failed_path}")
+
+
+def is_conversion_failed(attachment_id: str, file_path: str = None, is_part: bool = False) -> bool:
+    """检查附件对应的 STP 转换是否已标记为失败"""
+    glb_path = get_glb_cache_path(attachment_id, file_path, is_part)
+    return _get_failed_path(glb_path).exists()
+
+
+def clear_failed_marker(attachment_id: str, file_path: str = None, is_part: bool = False):
+    """清除转换失败标记（用于手动重试）"""
+    glb_path = get_glb_cache_path(attachment_id, file_path, is_part)
+    failed_path = _get_failed_path(glb_path)
+    if failed_path.exists():
+        failed_path.unlink()
+        logger.info(f"已清除转换失败标记: {failed_path}")
 
 
 def convert_stp_to_gltf(stp_path: str, attachment_id: str, file_path: str = None, is_part: bool = False) -> Optional[str]:
     """
     将 STP 文件转换为 glTF (.glb)
     使用 _stp_semaphore 限制并发 Mayo 进程数（最多 2 个）
+    转换失败后写入 .failed 标记，避免无限重试
 
     Args:
         stp_path: STP 文件绝对路径
@@ -91,6 +122,11 @@ def convert_stp_to_gltf(stp_path: str, attachment_id: str, file_path: str = None
     if glb_path.exists():
         logger.info(f"glTF 缓存已存在: {glb_path}")
         return str(glb_path)
+
+    # 已有的失败标记 → 跳过（避免重复尝试注定失败的转换）
+    if is_conversion_failed(attachment_id, file_path, is_part):
+        logger.info(f"转换已标记为失败，跳过: {stp_path}")
+        return None
 
     # 创建临时输出文件（避免直接写入缓存）
     tmp_glb = stp_file.with_suffix('.tmp.glb')
@@ -116,27 +152,39 @@ def convert_stp_to_gltf(stp_path: str, attachment_id: str, file_path: str = None
                 logger.error(f"转换失败 (exit={result.returncode}): {result.stderr}")
                 if tmp_glb.exists():
                     tmp_glb.unlink()
+                _write_failed_marker(glb_path)
                 return None
 
-            if tmp_glb.exists():
-                GLTF_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-                shutil.move(str(tmp_glb), str(glb_path))
-                size_mb = glb_path.stat().st_size / 1024 / 1024
-                logger.info(f"转换成功: {glb_path} ({size_mb:.2f} MB)")
-                return str(glb_path)
-            else:
+            if not tmp_glb.exists():
                 logger.error(f"转换完成但输出文件不存在")
+                _write_failed_marker(glb_path)
                 return None
+
+            # 校验输出文件大小，空模型（无几何元素）的 GLB 文件极小，视为失败
+            tmp_size = tmp_glb.stat().st_size
+            if tmp_size < MIN_GLB_SIZE:
+                logger.error(f"转换结果异常（文件过小 {tmp_size}B，可能无几何元素）: {stp_path}")
+                tmp_glb.unlink()
+                _write_failed_marker(glb_path)
+                return None
+
+            GLTF_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(tmp_glb), str(glb_path))
+            size_mb = glb_path.stat().st_size / 1024 / 1024
+            logger.info(f"转换成功: {glb_path} ({size_mb:.2f} MB)")
+            return str(glb_path)
 
         except subprocess.TimeoutExpired:
-            logger.error(f"转换超时 (300s): {stp_path}")
+            logger.error(f"转换超时 (120s): {stp_path}")
             if tmp_glb.exists():
                 tmp_glb.unlink()
+            _write_failed_marker(glb_path)
             return None
         except Exception as e:
             logger.error(f"转换异常: {e}")
             if tmp_glb.exists():
                 tmp_glb.unlink()
+            _write_failed_marker(glb_path)
             return None
 
 
@@ -147,11 +195,15 @@ def get_gltf_path_for_attachment(attachment_id: str, file_path: str = None, is_p
 
 
 def delete_glb_cache(attachment_id: str, file_path: str = None, is_part: bool = False):
-    """删除附件对应的 glb 文件"""
+    """删除附件对应的 glb 文件及失败标记"""
     glb_path = get_glb_cache_path(attachment_id, file_path, is_part)
     if glb_path.exists():
         glb_path.unlink()
         logger.info(f"已删除 glb 缓存: {glb_path}")
+    failed_path = _get_failed_path(glb_path)
+    if failed_path.exists():
+        failed_path.unlink()
+        logger.info(f"已删除转换失败标记: {failed_path}")
 
 
 import json as _json

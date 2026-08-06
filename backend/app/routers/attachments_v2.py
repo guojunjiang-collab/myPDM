@@ -18,7 +18,7 @@ from .auth import get_current_active_user
 from ..permissions import require_permission, has_permission
 from ..media_token import mint_media_token, verify_media_token
 from .. import crud_groups
-from ..stp_converter import is_stp_file, convert_stp_to_gltf, get_gltf_path_for_attachment, delete_glb_cache
+from ..stp_converter import is_stp_file, convert_stp_to_gltf, get_gltf_path_for_attachment, delete_glb_cache, is_conversion_failed
 from ..office_converter import (
     is_office_file, convert_office_to_pdf,
     get_pdf_path_for_attachment, delete_pdf_cache,
@@ -749,6 +749,17 @@ async def get_gltf(
     glb_path = get_gltf_path_for_attachment(str(attachment_id), att.file_path, is_part)
 
     if not glb_path:
+        # 检查是否有失败标记，避免无限重试转换
+        if is_conversion_failed(str(attachment_id), att.file_path, is_part):
+            return JSONResponse(
+                status_code=422,
+                content={
+                    "status": "failed",
+                    "message": "模型转换失败（无几何元素或不支持的格式）",
+                    "retry_seconds": 0
+                }
+            )
+
         # 缓存未命中 → 后台异步转换 + 返回 202
         import asyncio
         # 零部件附件的 file_path 是完整路径（如 ./uploads/parts/...），直接使用
