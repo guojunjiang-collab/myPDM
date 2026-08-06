@@ -485,9 +485,22 @@ def _copy_iteration_custom_fields(db, source_iteration_id, target_iteration_id, 
             iteration_id=target_iteration_id,
         )
         db.add(new_val)
-    # 清除旧迭代的字段值（避免与新版并存，导致读取端拿到过期值）
-    for sv in source_values:
-        db.delete(sv)
+    # 清除旧迭代的字段值
+    # 升版时 entity_id 发生变化（新旧版本不同），只清除目标迭代对应的旧值，保留源版本的值
+    # 签出时 entity_id 相同（同版本不同迭代），直接清除旧迭代的值
+    is_upgrade = new_entity_id is not None and source_entity_id is not None and str(new_entity_id) != str(source_entity_id)
+    if is_upgrade:
+        # 升版：只清除旧迭代中 entity_id 匹配新版本的旧值（避免重复），保留源版本的值
+        old_for_new_entity = db.query(models.CustomFieldValue).filter(
+            models.CustomFieldValue.iteration_id == source_iteration_id,
+            models.CustomFieldValue.entity_id == new_entity_id,
+        ).all()
+        for ov in old_for_new_entity:
+            db.delete(ov)
+    else:
+        # 签出：entity_id 不变，清除旧迭代的全部字段值
+        for sv in source_values:
+            db.delete(sv)
     db.flush()
 
 

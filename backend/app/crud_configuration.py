@@ -213,7 +213,6 @@ def list_config_items(
                 EXISTS (
                     SELECT 1 FROM custom_field_values cfv
                     WHERE cfv.entity_type = 'config_item' AND cfv.entity_id = {rev_alias_cf}.id
-                      AND cfv.iteration_id IS NULL
                       AND COALESCE(cfv.value_text,
                                    to_char(cfv.value_number, 'FM999999999990.0000'),
                                    cfv.value_json::text) ILIKE :like
