@@ -12,6 +12,7 @@ import PartWhereUsedTab from './PartDetailModal/PartWhereUsedTab';
 import ConfigItemDetailModal from './Configuration/ConfigItemDetailModal';
 import TaskEditModal from '../pages/Project/TaskEditModal';
 import ProfileEditModal from './Configuration/ProfileEditModal';
+import { useTableSort } from '../hooks/useTableSort';
 
 /** BOM 结构树的展开箭头，与 STPViewer 模型树(ModelTreePanel)保持同一风格 */
 function BomChevron({ expanded }: { expanded: boolean }) {
@@ -80,6 +81,27 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const [wuProfileId, setWuProfileId] = useState<string | null>(null);
 
   const bomScrollRef = useRef<HTMLDivElement>(null);
+
+  // BOM 子项清单排序
+  type BomSortableItem = Record<string, any>;
+  const bomFlatForSort = useMemo(() => bomItems.map((item: any) => ({
+    ...item,
+  }) as BomSortableItem), [bomItems]);
+  const { sortedData: sortedBomItems, sortField, sortDirection, handleSort, getSortIcon } = useTableSort<BomSortableItem>(bomFlatForSort);
+
+  // 对展开的子项应用与顶层相同的排序
+  const sortBomChildren = useCallback((list: any[]): any[] => {
+    if (!sortField || !sortDirection) return list;
+    return [...list].sort((a: any, b: any) => {
+      const aVal = a[sortField];
+      const bVal = b[sortField];
+      if (aVal == null && bVal == null) return 0;
+      if (aVal == null) return 1;
+      if (bVal == null) return -1;
+      const cmp = String(aVal).localeCompare(String(bVal), 'zh-CN');
+      return sortDirection === 'desc' ? -cmp : cmp;
+    });
+  }, [sortField, sortDirection]);
 
   useEffect(() => {
     if (open) {
@@ -234,10 +256,10 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
     setLoadingBom(prev => ({...prev, [revId]: true}));
     try {
       const children = await partsApi.getBOM(revId);
-      setExpandedBom(prev => ({...prev, [revId]: children || []}));
+      setExpandedBom(prev => ({...prev, [revId]: sortBomChildren(children || [])}));
     } catch { setExpandedBom(prev => ({...prev, [revId]: []})); }
     finally { setLoadingBom(prev => { const n = {...prev}; delete n[revId]; return n; }); }
-  }, [expandedBom]);
+  }, [expandedBom, sortBomChildren]);
 
   /** 局部刷新指定父节点的子项清单，保持滚动位置不变 */
   const refreshChildren = useCallback(async (parentRevId: string) => {
@@ -250,7 +272,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
         setHasBomChildren(data.length > 0);
       } else {
         const data = await partsApi.getBOM(parentRevId);
-        setExpandedBom(prev => ({ ...prev, [parentRevId]: data || [] }));
+        setExpandedBom(prev => ({ ...prev, [parentRevId]: sortBomChildren(data || []) }));
       }
     } catch (e) { console.error(e); }
     requestAnimationFrame(() => {
@@ -258,7 +280,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
         bomScrollRef.current.scrollTop = scrollTop;
       }
     });
-  }, [revisionId, iteration?.id, viewingIterationId]);
+  }, [revisionId, iteration?.id, viewingIterationId, sortBomChildren]);
 
   const preview3D = useCallback(async (item: any) => {
     const revId = item.child_revision_id;
@@ -748,11 +770,11 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                         <table className="w-full text-sm">
                         <thead>
                           <tr className="bg-gray-50 border-b sticky top-0 z-10">
-                            <th className="px-3 py-2 text-left text-gray-500 font-medium" style={{ paddingLeft: 28 }}>件号</th>
-                            <th className="px-3 py-2 text-left text-gray-500 font-medium">中文名称</th>
-                            <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-                            <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">状态</th>
-                            <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">签出状态</th>
+                            <th onClick={() => handleSort('child_code')} className="px-3 py-2 text-left text-gray-500 font-medium cursor-pointer select-none whitespace-nowrap hover:text-gray-700" style={{ paddingLeft: 28 }}>件号 {getSortIcon('child_code')}</th>
+                            <th onClick={() => handleSort('child_name')} className="px-3 py-2 text-left text-gray-500 font-medium cursor-pointer select-none whitespace-nowrap hover:text-gray-700">中文名称 {getSortIcon('child_name')}</th>
+                            <th onClick={() => handleSort('child_version')} className="px-3 py-2 text-left text-gray-500 font-medium w-16 cursor-pointer select-none whitespace-nowrap hover:text-gray-700">版本 {getSortIcon('child_version')}</th>
+                            <th onClick={() => handleSort('child_status')} className="px-3 py-2 text-left text-gray-500 font-medium w-20 cursor-pointer select-none whitespace-nowrap hover:text-gray-700">状态 {getSortIcon('child_status')}</th>
+                            <th onClick={() => handleSort('child_check_out_user_name')} className="px-3 py-2 text-left text-gray-500 font-medium w-20 cursor-pointer select-none whitespace-nowrap hover:text-gray-700">签出状态 {getSortIcon('child_check_out_user_name')}</th>
                              <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">用量</th>
                              <th className="px-3 py-2 text-center text-gray-500 font-medium w-12 whitespace-nowrap">矩阵</th>
                              <th className="px-3 py-2 text-center text-gray-500 font-medium w-20">预览</th>
@@ -762,7 +784,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                          {bomItems.map((item: any) => renderBomRow(item, 0, revisionId))}
+                          {sortedBomItems.map((item: any) => renderBomRow(item, 0, revisionId))}
                         </tbody>
                       </table>
                         </div>
