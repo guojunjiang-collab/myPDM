@@ -213,7 +213,6 @@ def list_config_items(
                 EXISTS (
                     SELECT 1 FROM custom_field_values cfv
                     WHERE cfv.entity_type = 'config_item' AND cfv.entity_id = {rev_alias_cf}.id
-                      AND cfv.iteration_id IS NULL
                       AND COALESCE(cfv.value_text,
                                    to_char(cfv.value_number, 'FM999999999990.0000'),
                                    cfv.value_json::text) ILIKE :like
@@ -719,6 +718,10 @@ def upgrade_config_item(
                 sort_order=c.sort_order,
             )
             db.add(new_child)
+
+    # 复制自定义字段值到新版本
+    if source_iter:
+        crud_common._copy_iteration_custom_fields(db, source_iter.id, new_iter.id, new_entity_id=new_rev.id, source_entity_id=source_rev.id)
 
     new_rev.check_out_user_id = user_id
     new_rev.check_out_date = sqlfunc.now()

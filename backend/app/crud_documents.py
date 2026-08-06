@@ -402,6 +402,8 @@ def upgrade_document(
 
     if source_iter:
         _copy_attachments_to_iteration(db, source_iter, new_iter)
+        # 复制自定义字段值到新版本
+        crud_common._copy_iteration_custom_fields(db, source_iter.id, new_iter.id, new_entity_id=new_rev.id, source_entity_id=source_rev.id)
 
     new_rev.check_out_user_id = user_id
     new_rev.check_out_date = datetime.now(timezone.utc)
@@ -541,7 +543,6 @@ def list_documents(
                 EXISTS (
                     SELECT 1 FROM custom_field_values cfv
                     WHERE cfv.entity_type = 'document' AND cfv.entity_id = {rev_alias_cf}.id
-                      AND cfv.iteration_id IS NULL
                       AND COALESCE(cfv.value_text,
                                    to_char(cfv.value_number, 'FM999999999990.0000'),
                                    cfv.value_json::text) ILIKE :like
