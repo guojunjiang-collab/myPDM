@@ -306,8 +306,9 @@ def test_callback_binding_conflict_redirects_error(monkeypatch, client, db):
     state = _bind(client, db, me)
     r = client.get("/api/auth/feishu/callback", params={"code": "c", "state": state},
                    follow_redirects=False)
-    assert "result=error" in r.headers["location"]
-    assert "已绑定其他账号" in r.headers["location"]
+    frag = parse_qs(r.headers["location"].split("#", 1)[1])
+    assert frag["result"] == ["error"]
+    assert "已绑定其他账号" in frag["message"][0]
 
 
 def test_callback_binding_takes_over_guest(monkeypatch, client, db):
