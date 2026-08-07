@@ -42,3 +42,6 @@ migrations/
 !cad_bridge/.env
 .superpowers/
 cad_workspace/
+
+# Vite 构建临时文件
+frontend/vite.config.ts.timestamp-*.mjs
