@@ -63,6 +63,11 @@ services:
       - CAD_PDF_PART_PREFIX=${CAD_PDF_PART_PREFIX:-DR_}
       - CAD_PDF_ASSEMBLY_PREFIX=${CAD_PDF_ASSEMBLY_PREFIX:-ASY_}
       - CAD_STP_PREFIX=${CAD_STP_PREFIX:-MD_}
+      - FEISHU_APP_ID=${FEISHU_APP_ID:-}
+      - FEISHU_APP_SECRET=${FEISHU_APP_SECRET:-}
+      - FEISHU_EH_APP_ID=${FEISHU_EH_APP_ID:-}
+      - FEISHU_EH_APP_SECRET=${FEISHU_EH_APP_SECRET:-}
+      - FEISHU_REDIRECT_BASE=${FEISHU_REDIRECT_BASE:-https://192.168.61.105:8080}
     volumes:
       - ${UPLOADS_HOST_PATH:-./uploads}:/app/uploads
       - ./backend/app:/app/app
@@ -87,6 +92,7 @@ services:
       - bom_network
     ports:
       - "${NGINX_HOST_PORT:-8080}:443"
+      - "${NGINX_HTTP_HOST_PORT:-8081}:80"
 
 networks:
   bom_network:

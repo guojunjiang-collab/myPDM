@@ -19,6 +19,22 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+class UserFeishuBinding(Base):
+    """飞书免登绑定表：身份按 (provider, union_id) 隔离。"""
+    __tablename__ = "user_feishu_bindings"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    provider = Column(String(32), nullable=False)
+    union_id = Column(String(128), nullable=False)
+    open_id = Column(String(128), nullable=True)
+    name = Column(String(64), nullable=True)
+    avatar_url = Column(String(512), nullable=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    __table_args__ = (
+        UniqueConstraint("provider", "union_id", name="uq_user_feishu_bindings_provider_union"),
+    )
+
 # [REMOVED: old Component model]
 
 class BOMItem(Base):

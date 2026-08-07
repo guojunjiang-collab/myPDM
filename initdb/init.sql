@@ -17,6 +17,20 @@ CREATE TABLE users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 飞书免登绑定表（provider 隔离，普通飞书 / EH 各自 union_id）
+CREATE TABLE IF NOT EXISTS user_feishu_bindings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    provider VARCHAR(32) NOT NULL,
+    union_id VARCHAR(128) NOT NULL,
+    open_id VARCHAR(128),
+    name VARCHAR(64),
+    avatar_url VARCHAR(512),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_user_feishu_bindings_provider_union UNIQUE (provider, union_id)
+);
+
 -- 零件表
 CREATE TABLE parts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

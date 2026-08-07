@@ -5,6 +5,7 @@ import os
 
 from .routers import auth_router, users_router, bom_router, logs_router, custom_fields_router, documents_router, user_groups_router, dashboard_router, ecr_router, eco_router, config_router, inventory_router, notifications_router, parts_router, settings_router
 from .routers.attachments_v2 import router as attachments_v2_router
+from .routers.feishu import router as feishu_router
 from .routers.sync import router as sync_router
 from .routers.admin import router as admin_router
 from .routers.assistant import router as assistant_router
@@ -31,6 +32,7 @@ app.add_middleware(
 
 app.include_router(auth_router, prefix="/api")
 app.include_router(users_router, prefix="/api")
+app.include_router(feishu_router, prefix="/api")
 app.include_router(user_groups_router, prefix="/api")
 app.include_router(parts_router, prefix="/api")
 app.include_router(bom_router, prefix="/api")
