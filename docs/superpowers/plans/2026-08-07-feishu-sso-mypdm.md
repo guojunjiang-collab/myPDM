@@ -582,7 +582,8 @@ def test_config_lists_providers_without_secret(monkeypatch, client):
 
 def test_authorize_redirects_to_feishu(monkeypatch, client):
     _setup_env(monkeypatch)
-    r = client.get("/api/auth/feishu/authorize", params={"provider": "feishu"})
+    r = client.get("/api/auth/feishu/authorize", params={"provider": "feishu"},
+                   follow_redirects=False)
     assert r.status_code in (302, 307)
     assert "/authen/v1/authorize" in r.headers["location"]
 
@@ -591,7 +592,8 @@ def test_callback_auto_creates_and_redirects_with_tokens(monkeypatch, client, db
     _setup_env(monkeypatch)
     monkeypatch.setattr(FeishuClient, "exchange_oauth_code", _fake_exchange)
     monkeypatch.setattr(FeishuClient, "get_user_info", _fake_user_info)
-    r = client.get("/api/auth/feishu/authorize", params={"provider": "feishu"})
+    r = client.get("/api/auth/feishu/authorize", params={"provider": "feishu"},
+                   follow_redirects=False)
     state = _get_state(r.headers["location"])
     r2 = client.get("/api/auth/feishu/callback", params={"code": "c", "state": state},
                     follow_redirects=False)
@@ -611,7 +613,8 @@ def test_callback_rejects_disabled_user(monkeypatch, client, db):
     monkeypatch.setattr(FeishuClient, "exchange_oauth_code", _fake_exchange)
     monkeypatch.setattr(FeishuClient, "get_user_info",
                         lambda self, token: {"union_id": "union_dis", "name": "停用"})
-    r = client.get("/api/auth/feishu/authorize", params={"provider": "feishu"})
+    r = client.get("/api/auth/feishu/authorize", params={"provider": "feishu"},
+                   follow_redirects=False)
     state = _get_state(r.headers["location"])
     r2 = client.get("/api/auth/feishu/callback", params={"code": "c", "state": state},
                     follow_redirects=False)
