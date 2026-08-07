@@ -47,6 +47,12 @@ export function requestAccessCode(appId: string): Promise<string> {
       reject(new Error('当前环境不支持飞书免登'));
       return;
     }
+    const ERRNO_MESSAGES: Record<number, string> = {
+      103: '飞书客户端版本过低，不支持免登',
+      20029: '飞书后台重定向 URL / H5 可信域名未配置或与当前地址不一致',
+      2700001: '飞书获取 session 失败，请重试或检查应用配置',
+      2700002: '飞书授权被终止，请重新授权',
+    };
     tt.requestAccess({
       appID: appId,
       scopeList: [],
@@ -56,7 +62,11 @@ export function requestAccessCode(appId: string): Promise<string> {
         if (code) resolve(String(code));
         else reject(new Error('飞书未返回授权码'));
       },
-      fail: (err: any) => reject(new Error(err?.errMsg || '飞书免登失败')),
+      fail: (err: any) => {
+        const errno = err?.errno ?? err?.code;
+        const hint = errno != null ? ERRNO_MESSAGES[Number(errno)] : '';
+        reject(new Error(hint || (errno != null ? `飞书免登失败(errno=${errno})` : err?.errMsg || '飞书免登失败')));
+      },
     });
   });
 }
