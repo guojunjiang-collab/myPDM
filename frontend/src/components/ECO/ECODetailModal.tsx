@@ -12,10 +12,8 @@ import { ECRReviewPanel } from '../ECR/ECRReviewPanel';
 import { ECRDocumentPicker } from '../ECR/ECRDocumentPicker';
 import AssemblyPartPicker from '../AssemblyPartPicker';
 import VersionSelectModal from '../VersionSelectModal';
-import PartDetailContent from '../PartDetailContent';
-import AssemblyDetailContent from '../AssemblyDetailContent';
-import DocumentDetailContent from '../DocumentDetailContent';
-import VersionHistory from '../VersionHistory';
+import PartDetailModal from '../PartDetailModal';
+import DocumentDetailModal from '../DocumentDetailModal';
 import EntityEditModal from '../EntityEditModal';
 
 const statusTag = (s: string) => {
@@ -45,22 +43,18 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
   const docFieldDefs = useDataStore((s) => s.customFieldDefs).filter((d) => d.applies_to?.includes('document'));
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const [documents, setDocuments] = useState<any[]>([]);
   const [docAttachments, setDocAttachments] = useState<Record<string, any[]>>({});
   const [docCustomValues, setDocCustomValues] = useState<Record<string, Record<string, any>>>({});
-  const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
-  const [nestedDetail, setNestedDetail] = useState<{ type: string; id: string } | null>(null);
-  const [nestedData, setNestedData] = useState<any>(null);
-  const [nestedLoading, setNestedLoading] = useState(false);
-  const [nestedCustomDefs, setNestedCustomDefs] = useState<any[]>([]);
-  const [nestedCustomValues, setNestedCustomValues] = useState<Record<string, any>>({});
+  const [viewDocRevisionId, setViewDocRevisionId] = useState<string | null>(null);
+  const [viewPartMasterId, setViewPartMasterId] = useState<string | null>(null);
+  const [viewPartRevisionId, setViewPartRevisionId] = useState<string | null>(null);
   const [checkedExecIds, setCheckedExecIds] = useState<string[]>([]);
   const [showDocPicker, setShowDocPicker] = useState(false);
   const [showReleasePicker, setShowReleasePicker] = useState(false);
   const [documentLinks, setDocumentLinks] = useState<ECRDocumentLink[]>([]);
   const [releaseItems, setReleaseItems] = useState<any[]>([]);
   const [versionSelectState, setVersionSelectState] = useState<{ docId: string; oldDocId: string } | null>(null);
-  const [detailTab, setDetailTab] = useState<'detail' | 'versions'>('detail');
   const [editEntity, setEditEntity] = useState<{ type: string; id: string } | null>(null);
   const [showPublishAll, setShowPublishAll] = useState(false);
   const [publishStatus, setPublishStatus] = useState<{ has_pending: boolean; pending_count: number; total: number } | null>(null);
@@ -86,8 +80,13 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
       }
       const docs = r.data.document_links || [];
       if (docs.length > 0) {
-        const results = await Promise.allSettled(docs.map((d: any) => documentsApi.get(d.document_id)));
-        const loaded = results.filter(r => r.status === 'fulfilled').map((r: any) => r.value.data);
+        const results = await Promise.allSettled(docs.map(async (d: any) => {
+          try {
+            const res = await documentsApi.get(d.document_id);
+            return { ...res.data, _revision_id: d.document_id };
+          } catch { return null; }
+        }));
+        const loaded = results.filter(r => r.status === 'fulfilled').map((r: any) => r.value).filter(Boolean) as any[];
         setDocuments(loaded);
         loaded.forEach((doc: Document) => {
           documentsApi.listAttachments(doc.id).then(r => setDocAttachments(prev => ({...prev, [doc.id]: r.data||[]}))).catch(() => {});
@@ -152,7 +151,6 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
 
   const viewItem = async (entityType: string, entityId: string, mode?: 'view' | 'edit') => {
     if (mode === 'edit') {
-      // 打开编辑弹窗；entityId 为 master_id，需转换为 revision_id
       try {
         const r = await partsApi.get(entityId);
         const revId = r.latest_revision?.id;
@@ -160,33 +158,8 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
       } catch { toast.error('加载失败'); }
       return;
     }
-    setNestedDetail({ type: entityType, id: entityId });
-    setNestedLoading(true);
-    setNestedCustomDefs([]);
-    setNestedCustomValues({});
-    try {
-      const r = await partsApi.get(entityId);
-      const revId = r.latest_revision?.id;
-      setNestedData({
-        ...r,
-        master_id: r.id,
-        revision_id: revId,
-        version: r.latest_revision?.version,
-        status: r.latest_revision?.status,
-      });
-      const allDefs = useDataStore.getState().customFieldDefs;
-      const defs = allDefs.filter((d: any) => d.applies_to?.includes('part'));
-      setNestedCustomDefs(defs);
-      if (defs.length > 0 && revId) {
-        try {
-          const valuesRes = await customFieldsApi.getValues('part', revId);
-          const vals: Record<string, any> = {};
-          (valuesRes.data || []).forEach((v: any) => { vals[v.field_id] = v.value; });
-          setNestedCustomValues(vals);
-        } catch { /* optional */ }
-      }
-    } catch { toast.error('加载详情失败'); }
-    finally { setNestedLoading(false); }
+    setViewPartMasterId(entityId);
+    setViewPartRevisionId(null);
   };
 
   const handleDocDownload = async (attId: string, fileName: string) => {
@@ -283,7 +256,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
                       {documents.map((doc) => {
                         const atts = docAttachments[doc.id] || [];
                         return (
-                          <tr key={doc.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setViewingDoc(doc)}>
+                          <tr key={doc.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setViewDocRevisionId(doc._revision_id || doc.id)}>
                             <td className="px-3 py-2 text-sm font-medium">{doc.code}</td>
                             <td className="px-3 py-2 text-sm">{doc.name}</td>
                             <td className="px-3 py-2 text-sm text-gray-500">{doc.version || '-'}</td>
@@ -417,61 +390,26 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
         </>
       )}
 
-      {/* 嵌套详情弹窗 - 复用零件/部件管理的详情界面 */}
-      {nestedDetail && (
-        <Modal open={true} title={nestedDetail.type === 'assembly' ? '部件详情' : '零件详情'} onClose={() => { setNestedDetail(null); setNestedData(null); setDetailTab('detail'); }} width="full">
-          {nestedLoading ? <div className="text-center py-8 text-sm text-gray-400">加载中...</div>
-          : nestedData ? (
-            <div>
-              {/* Tab 切换 */}
-              <div className="flex gap-1 mb-4 border-b">
-                <button onClick={() => setDetailTab('detail')} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${detailTab === 'detail' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>基本信息</button>
-                <button onClick={() => setDetailTab('versions')} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${detailTab === 'versions' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>版本历史</button>
-              </div>
-              {detailTab === 'detail' ? (
-                nestedDetail.type === 'assembly' ? (
-                  <AssemblyDetailContent assembly={nestedData} customFieldDefs={nestedCustomDefs} customFieldValues={nestedCustomValues} />
-                ) : (
-                  <PartDetailContent part={nestedData} customFieldDefs={nestedCustomDefs} customFieldValues={nestedCustomValues} />
-                )
-              ) : (
-                <VersionHistory
-                  entityType={nestedDetail.type as 'part' | 'assembly'}
-                  entityId={nestedData.id}
-                    onViewVersion={async (id) => {
-                      try {
-                        const r = await partsApi.get(id);
-                        setNestedData({
-                          ...r,
-                          master_id: r.id,
-                          revision_id: r.latest_revision?.id,
-                          version: r.latest_revision?.version,
-                          status: r.latest_revision?.status,
-                        });
-                        const revId = r.latest_revision?.id;
-                        if (revId) {
-                          try {
-                            const valuesRes = await customFieldsApi.getValues('part', revId);
-                            const vals: Record<string, any> = {};
-                            (valuesRes.data || []).forEach((v: any) => { vals[v.field_id] = v.value; });
-                            setNestedCustomValues(vals);
-                          } catch { /* optional */ }
-                        }
-                        setDetailTab('detail');
-                      } catch { toast.error('加载版本失败'); }
-                    }}
-                />
-              )}
-            </div>
-          ) : <div className="text-center py-8 text-sm text-gray-400">未找到数据</div>}
-        </Modal>
+      {/* 零件/部件详情弹窗 */}
+      {viewPartMasterId && (
+        <PartDetailModal
+          masterId={viewPartMasterId}
+          revisionId={viewPartRevisionId || undefined}
+          open={!!viewPartMasterId}
+          onClose={() => { setViewPartMasterId(null); setViewPartRevisionId(null); load(); }}
+        />
       )}
     </Modal>
 
     {/* 图文档详情弹窗 */}
-    <Modal open={!!viewingDoc} title="图文档详情" onClose={() => setViewingDoc(null)} width="full">
-      {viewingDoc && <div className="max-h-[70vh] overflow-y-auto pr-1"><DocumentDetailContent doc={viewingDoc} customFieldDefs={docFieldDefs} customFieldValues={docCustomValues[viewingDoc.id] || {}} /></div>}
-    </Modal>
+    {viewDocRevisionId && (
+      <DocumentDetailModal
+        open={!!viewDocRevisionId}
+        revisionId={viewDocRevisionId}
+        onClose={() => { setViewDocRevisionId(null); load(); }}
+        onSaved={() => { load(); }}
+      />
+    )}
 
     {/* 编辑弹窗 */}
     {editEntity && (
