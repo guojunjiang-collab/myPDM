@@ -72,8 +72,9 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
       if (items.length > 0) {
         const refreshed = await Promise.all(items.map(async (ri: any) => {
           try {
-            const entity = await partsApi.get(ri.entity_id);
-            return { ...ri, status: entity.latest_revision?.status };
+            const rev = await partsApi.getRevision(ri.entity_id);
+            const master = await partsApi.get(rev.master_id);
+            return { ...ri, status: rev.status, entity_version: rev.version, entity_code: master.code, entity_name: master.name };
           } catch { return ri; }
         }));
         setReleaseItems(refreshed);
@@ -150,16 +151,25 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
   };
 
   const viewItem = async (entityType: string, entityId: string, mode?: 'view' | 'edit') => {
-    if (mode === 'edit') {
+    // 统一使用最新的 PartDetailModal，不再区分为内联 EntityEditModal
+    try {
+      const rev = await partsApi.getRevision(entityId);
+      setViewPartMasterId(rev.master_id);
+      setViewPartRevisionId(entityId);
+    } catch {
+      const execItem = (eco?.execution_items || []).find((ei: any) =>
+        ei.new_entity_id === entityId || ei.entity_id === entityId
+      );
+      const fallbackId = execItem?.entity_id || entityId;
       try {
-        const r = await partsApi.get(entityId);
-        const revId = r.latest_revision?.id;
-        if (revId) setEditEntity({ type: entityType, id: revId });
-      } catch { toast.error('加载失败'); }
-      return;
+        const rev = await partsApi.getRevision(fallbackId);
+        setViewPartMasterId(rev.master_id);
+        setViewPartRevisionId(fallbackId);
+      } catch {
+        setViewPartMasterId(fallbackId);
+        setViewPartRevisionId(null);
+      }
     }
-    setViewPartMasterId(entityId);
-    setViewPartRevisionId(null);
   };
 
   const handleDocDownload = async (attId: string, fileName: string) => {
@@ -310,8 +320,13 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
                 }}
                 onExecuteRelease={async (itemId, newEntityId) => {
                   try {
-                    await ecoApi.revertItem(ecoId, itemId, newEntityId);
-                    updateExecutionItem(itemId, { new_entity_id: undefined, new_version: undefined, new_entity_status: undefined });
+                    const r = await ecoApi.revertItem(ecoId, itemId, newEntityId);
+                    const newStatus = r.data?.new_entity_status;
+                    updateExecutionItem(itemId, {
+                      new_entity_id: newStatus ? (r.data?.new_entity_id || newEntityId) : undefined,
+                      new_version: newStatus ? (r.data?.new_version || undefined) : undefined,
+                      new_entity_status: newStatus || undefined,
+                    });
                     toast.success('已还原');
                   } catch (err: any) { toast.error(err?.response?.data?.detail || '操作失败'); }
                 }}

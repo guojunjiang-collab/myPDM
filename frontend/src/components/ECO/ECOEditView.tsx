@@ -303,9 +303,9 @@ function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade, o
                             className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">冻结</button>
                         </>
                       ) : exec?.new_entity_status === 'frozen' ? (
-                        // 已冻结：还原
+                        // 已冻结：解冻
                         <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
-                          className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
+                          className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">解冻</button>
                       ) : !exec?.new_entity_status ? (
                         // 未执行：升版
                         <button onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || '', { entity_type: n.entity_type || 'component', entity_id: n.entity_id, entity_code: n.entity_code || '', entity_name: n.entity_name || '', action: n.action || 'upgrade' }); }}
@@ -403,7 +403,7 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade,
                         )
                       ) : effStatus === 'frozen' ? (
                         <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
-                          className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
+                          className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">解冻</button>
                       ) : !effStatus ? (
                         <button onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || '', { entity_type: n.entity_type || 'component', entity_id: n.entity_id, entity_code: n.entity_code || '', entity_name: n.entity_name || '', action: n.action || 'upgrade' }); }}
                           className="px-1.5 py-0.5 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">升版</button>
@@ -472,7 +472,7 @@ function AffectedTable({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade, on
                         </>
                       ) : effStatus === 'frozen' ? (
                         <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
-                          className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
+                          className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">解冻</button>
                       ) : !effStatus ? (
                         <button onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || '', { entity_type: n.entity_type || 'component', entity_id: n.entity_id, entity_code: n.entity_code || '', entity_name: n.entity_name || '', action: 'upgrade' }); }}
                           className="px-1.5 py-0.5 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">升版</button>
@@ -616,55 +616,36 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
   useEffect(() => {
     if (!executionItems || executionItems.length === 0) return;
 
-    const codeMap = new Map<string, { entity_id: string; entity_type: string; entity_code: string }>();
+    const dedupMap = new Map<string, { entity_id: string; entity_type: string; entity_code: string }>();
     executionItems.forEach((ei: any) => {
-      if (ei.entity_code && !codeMap.has(ei.entity_code)) {
-        codeMap.set(ei.entity_code, { entity_id: ei.entity_id, entity_type: ei.entity_type, entity_code: ei.entity_code });
+      if (ei.entity_code && !dedupMap.has(ei.entity_code)) {
+        dedupMap.set(ei.entity_code, { entity_id: ei.entity_id, entity_type: ei.entity_type, entity_code: ei.entity_code });
       }
     });
 
-    const partCodes = Array.from(codeMap.values()).filter(e => e.entity_type === 'part' || e.entity_type === 'component');
-    const assemblyCodes = Array.from(codeMap.values()).filter(e => e.entity_type === 'assembly' || e.entity_type === 'component');
+    const entries = Array.from(dedupMap.values());
+    if (entries.length === 0) return;
 
-    const promises: Promise<any>[] = [];
-
-    if (partCodes.length > 0) {
-      promises.push(
-        Promise.allSettled(
-          partCodes.map(async ({ entity_id, entity_code }) => {
-            const list = await partsApi.list({ search: entity_code, page_size: 100 });
-            const items = list.items || list || [];
-            const newVersion = items.find((item: any) => item.code === entity_code && item.master_id !== entity_id);
-            if (newVersion) return { entity_id, status: newVersion.status, newId: newVersion.master_id };
-            return null;
-          })
-        )
-      );
-    }
-
-    if (assemblyCodes.length > 0) {
-      promises.push(
-        Promise.allSettled(
-          assemblyCodes.map(async ({ entity_id, entity_code }) => {
-            const list = await partsApi.list({ search: entity_code, page_size: 100 });
-            const items = list.items || list || [];
-            const newVersion = items.find((item: any) => item.code === entity_code && item.master_id !== entity_id);
-            if (newVersion) return { entity_id, status: newVersion.status, newId: newVersion.master_id };
-            return null;
-          })
-        )
-      );
-    }
-
-    Promise.all(promises).then(results => {
+    Promise.allSettled(
+      entries.map(async ({ entity_id, entity_code }) => {
+        try {
+          // entity_id 为 PartRevision.id，获取其所属 master 的全部版本
+          const revision = await partsApi.getRevision(entity_id);
+          if (!revision?.master_id) return null;
+          const revisions = await partsApi.revisions(revision.master_id);
+          const { items } = (revisions as any) || {};
+          if (!items || items.length === 0) return null;
+          // 查找除自身外的最新版本（状态非 draft 表示已升版/冻结/发布）
+          const other = items.find((r: any) => r.id !== entity_id && r.status && r.status !== 'draft');
+          if (other) return { entity_id, status: other.status, newId: other.id };
+          return null;
+        } catch { return null; }
+      })
+    ).then(results => {
       const dataMap = new Map<string, { status: string; newId: string }>();
-      results.forEach(result => {
-        if (Array.isArray(result)) {
-          result.forEach(r => {
-            if (r.status === 'fulfilled' && r.value) {
-              dataMap.set(r.value.entity_id, { status: r.value.status, newId: r.value.newId });
-            }
-          });
+      results.forEach(r => {
+        if (r.status === 'fulfilled' && r.value) {
+          dataMap.set(r.value.entity_id, { status: r.value.status, newId: r.value.newId });
         }
       });
       setLiveExecData(dataMap);

@@ -211,7 +211,27 @@ def get_revision(
 ):
     result = crud_parts.get_part_revision_with_current_iteration(db, revision_id)
     if not result:
-        raise HTTPException(404, "版本不存在")
+        # 兼容旧数据：如果传入的是 master_id，优先取 released/obsolete 版本
+        revisions = (
+            db.query(crud_parts.models_parts.PartRevision)
+            .filter(
+                crud_parts.models_parts.PartRevision.master_id == revision_id,
+                crud_parts.models_parts.PartRevision.deleted_at.is_(None),
+            )
+            .order_by(crud_parts.models_parts.PartRevision.created_at.desc())
+            .all()
+        )
+        target = None
+        for r in revisions:
+            if r.status in ("released", "obsolete"):
+                target = r
+                break
+        if not target and revisions:
+            target = revisions[0]
+        if target:
+            result = crud_parts.get_part_revision_with_current_iteration(db, target.id)
+        if not result:
+            raise HTTPException(404, "版本不存在")
     revision, iteration = result
     return _build_revision_response(db, revision, iteration)
 

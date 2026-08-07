@@ -203,16 +203,25 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
   };
 
   const viewItem = async (entityType: string, entityId: string, mode?: 'view' | 'edit') => {
-    if (mode === 'edit') {
+    // 统一使用最新的 PartDetailModal，不再区分为内联 EntityEditModal
+    try {
+      const rev = await partsApi.getRevision(entityId);
+      setViewPartMasterId(rev.master_id);
+      setViewPartRevisionId(entityId);
+    } catch {
+      const releaseItem = (releaseItems || []).find((ri: any) =>
+        ri.entity_id === entityId
+      );
+      const fallbackId = releaseItem?.entity_id || entityId;
       try {
-        const r = await partsApi.get(entityId);
-        const revId = r.latest_revision?.id;
-        if (revId) setEditEntity({ type: entityType, id: revId });
-      } catch { toast.error('加载失败'); }
-      return;
+        const rev = await partsApi.getRevision(fallbackId);
+        setViewPartMasterId(rev.master_id);
+        setViewPartRevisionId(fallbackId);
+      } catch {
+        setViewPartMasterId(fallbackId);
+        setViewPartRevisionId(null);
+      }
     }
-    setViewPartMasterId(entityId);
-    setViewPartRevisionId(null);
   };
 
   const handleExecuteAction = async (action: string, itemId: string, newEntityId?: string, entityInfo?: { entity_type: string; entity_id: string; entity_code: string; entity_name: string; action: string }) => {
@@ -239,9 +248,10 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
           updated.new_version = result.data?.new_version;
           updated.new_entity_status = 'draft';
         } else if (action === 'revert') {
-          updated.new_entity_id = undefined;
-          updated.new_version = undefined;
-          updated.new_entity_status = undefined;
+          const newStatus = result.data?.new_entity_status;
+          updated.new_entity_id = newStatus ? (result.data?.new_entity_id || updated.new_entity_id) : undefined;
+          updated.new_version = newStatus ? (result.data?.new_version || updated.new_version) : undefined;
+          updated.new_entity_status = newStatus || undefined;
         } else if (action === 'freeze') {
           updated.new_entity_status = 'frozen';
         }
