@@ -94,6 +94,9 @@ export const authApi = {
       old_password: oldPassword,
       new_password: newPassword,
     }),
+  feishuConfig: () => api.get('/auth/feishu/config'),
+  feishuJsapiLogin: (provider: string, code: string) =>
+    api.post('/auth/feishu/jsapi', { provider, code }),
 };
 
 // 零部件 API (v2 统一接口)
