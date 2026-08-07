@@ -37,7 +37,8 @@ export default function Login() {
       .then((res) => {
         const providers: FeishuProvider[] = res.data.providers ?? [];
         setFeishuProviders(providers);
-        if (isFeishuClient() && providers.length > 0) {
+        // 刚从 OAuth 回调带错回来时不再自动触发免登，避免跳转循环
+        if (!urlError && isFeishuClient() && providers.length > 0) {
           const want = getFeishuProviderParam();
           const provider =
             providers.find((p) => (want ? p.key === want : p.key === 'feishu')) ?? providers[0];
@@ -51,7 +52,10 @@ export default function Login() {
                 await finishLogin(access_token, refresh_token);
               })
               .catch((e: Error) => {
-                if (!cancelled) setError(e?.message || '飞书免登失败');
+                if (!cancelled) {
+                  console.error('[feishu] JSAPI 免登失败，回退到 OAuth 免登:', e);
+                  window.location.href = `/api/auth/feishu/authorize?provider=${provider.key}`;
+                }
               });
           }
         }
