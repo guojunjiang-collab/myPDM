@@ -105,13 +105,9 @@ async def startup_event():
             WHERE table_name = 'document_revisions' AND column_name = 'updated_at'
         """))
         if not result.fetchone():
-            try:
-                db.execute(text("ALTER TABLE document_revisions ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP"))
-                db.commit()
-                print("✓ Added column updated_at to document_revisions table")
-            except Exception:
-                db.rollback()
-                print("⚠ Skipped document_revisions.updated_at (table not present yet)")
+            db.execute(text("ALTER TABLE document_revisions ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP"))
+            db.commit()
+            print("✓ Added column updated_at to document_revisions table")
 
         # parts/assemblies 表已迁移至三层模型 (part_masters/part_revisions/part_iterations)，跳过旧表迁移
 
