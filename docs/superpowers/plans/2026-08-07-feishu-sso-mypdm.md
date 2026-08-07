@@ -1232,8 +1232,10 @@ Expected: 后端全部通过；前端构建成功
 - [ ] **Step 1: 向用户索取非 EH 的 App ID/App Secret，填入 `.env` 的 `FEISHU_APP_ID` / `FEISHU_APP_SECRET`**
 
 ```powershell
-docker restart bom_backend
+docker compose up -d --force-recreate backend
 ```
+
+前提：`docker-compose.yml` 的 backend 服务 `environment` 已追加 `FEISHU_APP_ID/FEISHU_APP_SECRET/FEISHU_EH_APP_ID/FEISHU_EH_APP_SECRET/FEISHU_REDIRECT_BASE`（容器不直接读根目录 `.env`，必须由 compose 注入）。
 
 - [ ] **Step 2: 用户确认飞书后台已登记回调并发布**
 
