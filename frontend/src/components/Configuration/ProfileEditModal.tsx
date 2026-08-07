@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { Modal } from '../Modal';
 import ConfigItemPicker from './ConfigItemPicker';
 import ConfigItemDetailModal from './ConfigItemDetailModal';
 import PartDetailModal from '../PartDetailModal';
 import ProfileStatusBadge from './ProfileStatusBadge';
 import ProfileReviewPanel from './ProfileReviewPanel';
-import { configurationApi, configurationProfileApi, usersApi } from '../../services/api';
+import { configurationApi, configurationProfileApi, usersApi, partsApi, customFieldsApi } from '../../services/api';
 import { exportProfilePdf, exportProfileExcel } from '../../services/configProfilePdfExport';
-import { isAdmin } from '../../stores/auth';
-import { useAuthStore } from '../../stores/auth';
+import { useAuthStore, isAdmin } from '../../stores/auth';
+import { useDataStore } from '../../stores/data';
 import type { ConfigurationProfileDetail, ConfigTreeNode, ProfileReviewer, ProfileCcUser } from '../../types';
 
 interface Props {
@@ -112,6 +113,140 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
   }, [form.remark]);
   const [profile, setProfile] = useState<ConfigurationProfileDetail | null>(null);
   const [configTree, setConfigTree] = useState<ConfigTreeNode | null>(null);
+  const [flattenLoading, setFlattenLoading] = useState(false);
+
+  const exportFlattenBom = async () => {
+    if (!configTree) return;
+    setFlattenLoading(true);
+    try {
+      // 从正式配置清单中收集所有选中/必选的零部件，递归展开部件BOM取叶节点
+      const partsToExpand: { revisionId: string; code: string; name: string; version: string; status: string; qty: number }[] = [];
+
+      const walkConfig = (node: ConfigTreeNode) => {
+        if (!node.is_selected && !node.is_required) return;
+        (node.parts || []).forEach((p: any) => {
+          if (!p.is_selected && !p.is_required) return;
+          const revId = p.part_revision_id || p.id || p.item_id;
+          if (revId && p.item_code) {
+            partsToExpand.push({
+              revisionId: revId,
+              code: p.item_code,
+              name: p.item_name || '',
+              version: p.item_version || '',
+              status: p.item_status || '',
+              qty: (p.quantity || 1) * (node.quantity || 1),
+            });
+          }
+        });
+        (node.children || []).forEach(walkConfig);
+      };
+      walkConfig(configTree);
+
+      // 收集所有字段定义
+      const allDefs = useDataStore.getState().customFieldDefs;
+      const partFieldDefs = allDefs.filter((d: any) => d.applies_to?.includes('part') || d.applies_to?.includes('component'));
+
+      // 展平：递归展开部件BOM
+      const flatMap = new Map<string, any>();
+      const recurringCheck = new Set<string>();
+      const customFieldCache = new Map<string, Record<string, any>>();
+
+      const expandAssembly = async (revId: string, multiplier: number) => {
+        if (!revId) return;
+        try {
+          const rev = await partsApi.getRevision(revId);
+          if (!rev) return;
+          const masterId = rev.master_id;
+          const master = await partsApi.get(masterId);
+          const isAssembly = master.type === 'assembly';
+
+          if (isAssembly) {
+            // 仅对部件做防循环（同一版本只展开一次BOM），叶节点零件不做此限制以保证用量累加
+            if (recurringCheck.has(revId)) return;
+            recurringCheck.add(revId);
+            const bomItems = await partsApi.getBOM(revId);
+            for (const bom of (bomItems || [])) {
+              await expandAssembly(bom.child_revision_id, multiplier * (bom.quantity || 1));
+            }
+          } else {
+            // 叶节点零件始终累加用量
+            const key = `${master.code}|${rev.version}`;
+            if (flatMap.has(key)) {
+              flatMap.get(key).quantity += multiplier;
+            } else {
+              flatMap.set(key, {
+                code: master.code, name: master.name, version: rev.version,
+                quantity: multiplier, status: rev.status, revisionId: revId,
+              });
+            }
+          }
+        } catch { /* skip */ }
+      };
+
+      // 展开每个配置零部件
+      for (const p of partsToExpand) {
+        try {
+          const rev = await partsApi.getRevision(p.revisionId);
+          if (!rev) continue;
+          const masterId = rev.master_id;
+          const master = await partsApi.get(masterId);
+          const isAssembly = master.type === 'assembly';
+
+          if (isAssembly) {
+            const bomItems = await partsApi.getBOM(p.revisionId);
+            for (const bom of (bomItems || [])) {
+              await expandAssembly(bom.child_revision_id, p.qty * (bom.quantity || 1));
+            }
+          } else {
+            const key = `${master.code}|${rev.version}`;
+            if (flatMap.has(key)) {
+              flatMap.get(key).quantity += p.qty;
+            } else {
+              flatMap.set(key, {
+                code: master.code,
+                name: master.name,
+                version: rev.version,
+                quantity: p.qty,
+                status: rev.status,
+                revisionId: p.revisionId,
+              });
+            }
+          }
+        } catch { /* skip */ }
+      }
+
+      // 批量获取自定义字段值
+      const revIds = Array.from(flatMap.values()).map((r: any) => r.revisionId);
+      await Promise.all(revIds.map(async (revId) => {
+        try {
+          const vals = await customFieldsApi.getValues('component', revId);
+          const map: Record<string, any> = {};
+          (vals.data || []).forEach((v: any) => { map[v.field_id] = v.value; });
+          customFieldCache.set(revId, map);
+        } catch { /* skip */ }
+      }));
+
+      // 构建 Excel
+      const items = Array.from(flatMap.values()).sort((a, b) => a.code.localeCompare(b.code, 'zh-CN'));
+      const statusLabel = (s: string) => ({ draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' })[s] || s;
+      const headers = ['件号', '名称', '版本', '数量', '状态', ...partFieldDefs.map((d: any) => d.name)];
+      const rows = items.map((row: any) => {
+        const cfVals = customFieldCache.get(row.revisionId) || {};
+        return [
+          row.code, row.name, row.version, row.quantity, statusLabel(row.status),
+          ...partFieldDefs.map((d: any) => cfVals[d.id] ?? ''),
+        ];
+      });
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '平铺BOM');
+      XLSX.writeFile(wb, `平铺BOM_${profile?.code || 'unknown'}.xlsx`);
+    } catch (err: any) {
+      setError(err?.message || '导出失败');
+    } finally {
+      setFlattenLoading(false);
+    }
+  };
 
   // ── Approval flow state ──
   const [reviewers, setReviewers] = useState<ProfileReviewer[]>([]);
@@ -684,6 +819,15 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
               title="在新标签页中3D预览配置清单中所有零部件"
             >
               🧊 3D预览
+            </button>
+            <button
+              type="button"
+              onClick={exportFlattenBom}
+              disabled={flattenLoading}
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 disabled:opacity-50"
+              title="将该构型配置下所有构型项关联的部件BOM递归展开为叶节点零件清单并导出为Excel"
+            >
+              📊 导出平铺BOM
             </button>
           </div>
         ) : undefined}

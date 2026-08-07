@@ -793,6 +793,8 @@ export const configurationApi = {
     api.get<any[]>(`/configurations/items/${revisionId}/iterations`).then(r => r.data),
   deleteIteration: (revisionId: string, iterationId: string) =>
     api.delete(`/configurations/items/${revisionId}/iterations/${iterationId}`).then(r => r.data),
+  flattenBom: (revisionId: string) =>
+    api.get<{ items: any[]; field_defs: { field_key: string; name: string }[] }>(`/configurations/items/${revisionId}/flatten-bom`).then(r => r.data),
 };
 
 export interface ConfigPreviewTreeNode {
