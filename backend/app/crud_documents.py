@@ -431,6 +431,21 @@ def freeze_document(
     return revision, None
 
 
+def unfreeze_document(
+    db: Session, revision_id: UUID
+) -> Tuple[Optional[models.DocumentRevision], Optional[str]]:
+    """解冻文档版本：frozen → draft"""
+    revision = get_document_revision(db, revision_id)
+    if not revision:
+        return None, "版本不存在"
+    if revision.status != "frozen":
+        return None, "仅冻结状态可解冻"
+    revision.status = "draft"
+    db.commit()
+    db.refresh(revision)
+    return revision, None
+
+
 def release_document(
     db: Session, revision_id: UUID
 ) -> Tuple[Optional[models.DocumentRevision], Optional[str]]:

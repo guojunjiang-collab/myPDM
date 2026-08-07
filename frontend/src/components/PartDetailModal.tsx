@@ -603,11 +603,11 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                   )}
                   {canCheckout && (
                     <button onClick={() => doAction(() => partsApi.checkout(revisionId!), '签出成功')}
-                      className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">签出</button>
+                      className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">签出/编辑</button>
                   )}
                   {canCheckin && (
                     <button onClick={() => setShowCheckinModal(true)}
-                      className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">签入</button>
+                      className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">签入/解锁</button>
                   )}
                   {canUndo && (
                     <button onClick={() => doAction(() => partsApi.undocheckout(revisionId!), '已撤销')}
@@ -754,9 +754,9 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                         )}
                         {!viewingIterationId && (<>
                         <button onClick={() => handleCascade('checkout')}
-                          className="px-3 py-1.5 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">级联签出</button>
+                          className="px-3 py-1.5 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">级联签出/编辑</button>
                         <button onClick={() => handleCascade('checkin')}
-                          className="px-3 py-1.5 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">级联签入</button>
+                          className="px-3 py-1.5 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">级联签入/解锁</button>
                         <button onClick={() => handleCascade('undo')}
                           className="px-3 py-1.5 bg-gray-500 text-white rounded text-xs hover:bg-gray-600">级联撤销</button>
                         </>)}

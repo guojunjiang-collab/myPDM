@@ -646,13 +646,31 @@ def freeze_document(
     revision_id: uuid.UUID,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("documents:update")),
+    current_user: User = Depends(require_permission("documents:freeze")),
 ):
+    """冻结文档版本"""
     revision, err = crud_documents.freeze_document(db, revision_id)
     if err:
         raise HTTPException(status_code=400, detail=err)
     ip = request.client.host if request.client else None
     crud.create_log(db, current_user.id, current_user.username, "图文档冻结", "document", str(revision_id), f"编号:{revision.master.code}", ip)
+    iteration = crud_documents._get_current_iteration(db, revision_id)
+    return _build_revision_response(db, revision, iteration)
+
+
+@router.post("/{revision_id}/unfreeze")
+def unfreeze_document(
+    revision_id: uuid.UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("documents:unfreeze")),
+):
+    """解冻文档版本"""
+    revision, err = crud_documents.unfreeze_document(db, revision_id)
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    ip = request.client.host if request.client else None
+    crud.create_log(db, current_user.id, current_user.username, "图文档解冻", "document", str(revision_id), f"编号:{revision.master.code}", ip)
     iteration = crud_documents._get_current_iteration(db, revision_id)
     return _build_revision_response(db, revision, iteration)
 

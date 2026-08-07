@@ -508,10 +508,23 @@ async def upgrade_config_item(
 async def freeze_config_item(
     revision_id: str,
     db: Session = Depends(get_db),
-    current_user=Depends(require_permission("configuration:update")),
+    current_user=Depends(require_permission("configuration:freeze")),
 ):
     """冻结构型项版本"""
     rev, err = crud.freeze_config_item(db, UUID(revision_id))
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    return {"ok": True, "status": rev.status}
+
+
+@router.post("/items/{revision_id}/unfreeze")
+async def unfreeze_config_item(
+    revision_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("configuration:unfreeze")),
+):
+    """解冻构型项版本"""
+    rev, err = crud.unfreeze_config_item(db, UUID(revision_id))
     if err:
         raise HTTPException(status_code=400, detail=err)
     return {"ok": True, "status": rev.status}

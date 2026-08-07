@@ -468,11 +468,11 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                 <div className="flex gap-1 flex-wrap items-center">
                   {canCheckout && (
                     <button onClick={() => doAction(() => documentsApi.checkout(doc.id), '签出成功')}
-                      className="px-3 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">签出</button>
+                      className="px-3 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">签出/编辑</button>
                   )}
                   {canCheckin && (
                     <button onClick={() => setShowCheckinModal(true)}
-                      className="px-3 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">签入</button>
+                      className="px-3 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">签入/解锁</button>
                   )}
                   {canUndo && (
                     <button onClick={() => doAction(() => documentsApi.undocheckout(doc.id), '已撤销签出')}

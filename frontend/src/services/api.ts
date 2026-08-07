@@ -243,6 +243,8 @@ export const documentsApi = {
   // 状态变更
   freeze: (revisionId: string) =>
     api.post(`/documents/${revisionId}/freeze`),
+  unfreeze: (revisionId: string) =>
+    api.post(`/documents/${revisionId}/unfreeze`),
   release: (revisionId: string) =>
     api.post(`/documents/${revisionId}/release`),
   obsolete: (revisionId: string) =>
@@ -282,8 +284,6 @@ export const documentsApi = {
   get: function(revisionId: string) { return api.get(`/documents/${revisionId}`); },
   /** @deprecated 使用 del() */
   delete: function(revisionId: string) { return api.delete(`/documents/${revisionId}`); },
-  /** @deprecated 后端不再支持 unfreeze，仅用于过渡期 */
-  unfreeze: function(revisionId: string) { return api.post(`/documents/${revisionId}/unfreeze`); },
 };
 
 // BOM API
@@ -779,6 +779,8 @@ export const configurationApi = {
     api.post(`/configurations/items/${revisionId}/upgrade`).then(r => r.data),
   freeze: (revisionId: string) =>
     api.post(`/configurations/items/${revisionId}/freeze`).then(r => r.data),
+  unfreeze: (revisionId: string) =>
+    api.post(`/configurations/items/${revisionId}/unfreeze`).then(r => r.data),
   release: (revisionId: string) =>
     api.post(`/configurations/items/${revisionId}/release`).then(r => r.data),
   obsolete: (revisionId: string) =>
