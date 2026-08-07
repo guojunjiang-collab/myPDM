@@ -97,6 +97,8 @@ export const authApi = {
   feishuConfig: () => api.get('/auth/feishu/config'),
   feishuJsapiLogin: (provider: string, code: string) =>
     api.post('/auth/feishu/jsapi', { provider, code }),
+  feishuBindIntent: (provider: string) => api.post('/auth/feishu/bind-intent', { provider }),
+  feishuBindings: () => api.get('/auth/feishu/bindings'),
 };
 
 // 零部件 API (v2 统一接口)

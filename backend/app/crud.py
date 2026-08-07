@@ -142,6 +142,38 @@ def find_or_create_feishu_user(db, provider, feishu_user):
     db.refresh(db_user)
     return db_user
 
+
+def bind_feishu_to_user(db, provider: str, union_id: str, user_id, feishu_user: dict):
+    """把 (provider, union_id) 绑定到指定用户。
+    已绑 guest 时改绑并停用 guest；已绑其他正式账号时抛 ValueError。"""
+    binding = get_feishu_binding(db, provider, union_id)
+    if binding and binding.user_id != user_id:
+        old_user = db.query(models.User).filter(models.User.id == binding.user_id).first()
+        if not (old_user and old_user.role == "guest"):
+            raise ValueError("该飞书身份已绑定其他账号")
+        old_user.status = "disabled"
+    if not binding:
+        binding = models.UserFeishuBinding(
+            provider=provider, union_id=union_id, user_id=user_id,
+        )
+        db.add(binding)
+    binding.user_id = user_id
+    binding.name = feishu_user.get("name") or binding.name
+    binding.avatar_url = feishu_user.get("avatar_url") or binding.avatar_url
+    binding.open_id = feishu_user.get("open_id") or binding.open_id
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if db_user and feishu_user.get("name"):
+        db_user.real_name = feishu_user["name"]
+    db.commit()
+    return db_user
+
+
+def get_user_feishu_bindings(db, user_id):
+    return db.query(models.UserFeishuBinding).filter(
+        models.UserFeishuBinding.user_id == user_id,
+    ).order_by(models.UserFeishuBinding.provider).all()
+
+
 # [REMOVED: old assert_entity_editable for component system]
 
 
