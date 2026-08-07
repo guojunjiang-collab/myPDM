@@ -65,7 +65,11 @@ export function requestAccessCode(appId: string): Promise<string> {
       fail: (err: any) => {
         const errno = err?.errno ?? err?.code;
         const hint = errno != null ? ERRNO_MESSAGES[Number(errno)] : '';
-        reject(new Error(hint || (errno != null ? `飞书免登失败(errno=${errno})` : err?.errMsg || '飞书免登失败')));
+        const detail = err?.errMsg ? `（${err.errMsg}）` : '';
+        console.error('[feishu] requestAccess fail:', err);
+        let msg = hint || (errno != null ? `飞书免登失败(errno=${errno})` : err?.errMsg || '飞书免登失败');
+        if (detail) msg += detail;
+        reject(new Error(msg));
       },
     });
   });
