@@ -82,6 +82,66 @@ def authenticate_user(db, username, password):
         return False
     return user
 
+def get_feishu_binding(db, provider, union_id):
+    return db.query(models.UserFeishuBinding).filter(
+        models.UserFeishuBinding.provider == provider,
+        models.UserFeishuBinding.union_id == union_id,
+    ).first()
+
+
+def _unique_username(db, name):
+    import re
+    import secrets
+    base = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff_-]", "", (name or "")).strip()[:32]
+    if len(base) < 2:
+        base = f"feishu_{secrets.token_hex(3)}"
+    candidate = base
+    i = 1
+    while db.query(models.User).filter(models.User.username == candidate).first():
+        candidate = f"{base[:24]}_{i}"
+        i += 1
+    return candidate
+
+
+def find_or_create_feishu_user(db, provider, feishu_user):
+    """按 (provider, union_id) 找绑定；不存在则自动建 guest 用户 + 绑定。"""
+    import secrets
+    union_id = feishu_user["union_id"]
+    binding = get_feishu_binding(db, provider, union_id)
+    if binding:
+        binding.name = feishu_user.get("name") or binding.name
+        binding.avatar_url = feishu_user.get("avatar_url") or binding.avatar_url
+        db_user = db.query(models.User).filter(models.User.id == binding.user_id).first()
+        if db_user and feishu_user.get("name"):
+            db_user.real_name = feishu_user["name"]
+        db.commit()
+        return db_user
+
+    name = feishu_user.get("name") or ""
+    username = _unique_username(db, name)
+    random_password = secrets.token_urlsafe(16)
+    db_user = models.User(
+        username=username,
+        password_hash=get_password_hash(random_password),
+        real_name=name or username,
+        role="guest",
+        status="active",
+        must_change_password=False,
+    )
+    db.add(db_user)
+    db.flush()
+    db.add(models.UserFeishuBinding(
+        provider=provider,
+        union_id=union_id,
+        open_id=feishu_user.get("open_id"),
+        name=name or None,
+        avatar_url=feishu_user.get("avatar_url"),
+        user_id=db_user.id,
+    ))
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
 # [REMOVED: old assert_entity_editable for component system]
 
 

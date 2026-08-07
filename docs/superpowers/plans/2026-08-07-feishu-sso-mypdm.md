@@ -19,6 +19,8 @@
 - 后端代码改完由 uvicorn `--reload` 自动生效；前端每次修改后必须执行 `npm run build`。
 - 不新增 Python 依赖（httpx 已在 requirements.txt）。
 - 测试沿用现有约定：`backend/tests/conftest.py` 提供内存 SQLite `db` fixture；路由测试用 `TestClient` + `app.dependency_overrides[get_db]`。
+- 若本机未安装项目 Python 依赖：先执行 `python -m venv backend/.venv`，再用 `backend/.venv/Scripts/pip install -r backend/requirements.txt` 安装；所有 pytest 命令通过 `backend/.venv/Scripts/python -m pytest` 运行。
+- `.env` 与 `.env.example` 均被 `.gitignore` 忽略，**不提交 git**（符合 secret 不入库规范）。
 
 ---
 
@@ -453,7 +455,7 @@ def _unique_username(db, name):
     import re
     import secrets
     base = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff_-]", "", (name or "")).strip()[:32]
-    if len(base) < 3:
+    if len(base) < 2:
         base = f"feishu_{secrets.token_hex(3)}"
     candidate = base
     i = 1
@@ -1211,12 +1213,9 @@ cd ..\frontend; npm run build
 
 Expected: 后端全部通过；前端构建成功
 
-- [ ] **Step 6: 提交**
+- [ ] **Step 6: 提交说明**
 
-```bash
-git add .env .env.example
-git commit -m "chore: 飞书免登环境变量与建表配置"
-```
+`.env` / `.env.example` 已被 `.gitignore` 忽略，本任务无文件提交；配置仅存本地。
 
 ---
 
