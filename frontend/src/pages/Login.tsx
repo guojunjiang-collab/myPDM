@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/auth';
 import { authApi } from '../services/api';
-import { getFeishuProviderParam, isFeishuClient, loadH5Sdk, requestAccessCode } from '../lib/feishu';
+import { getFeishuProviderParam, isFeishuClient } from '../lib/feishu';
 
 interface FeishuProvider {
   key: string;
@@ -42,22 +42,9 @@ export default function Login() {
           const want = getFeishuProviderParam();
           const provider =
             providers.find((p) => (want ? p.key === want : p.key === 'feishu')) ?? providers[0];
-          if (provider?.jsapi) {
-            loadH5Sdk()
-              .then(() => requestAccessCode(provider.app_id))
-              .then((code) => authApi.feishuJsapiLogin(provider.key, code))
-              .then(async (loginRes) => {
-                const { access_token, refresh_token } = loginRes.data;
-                if (cancelled) return;
-                await finishLogin(access_token, refresh_token);
-              })
-              .catch((e: Error) => {
-                if (!cancelled) {
-                  console.error('[feishu] JSAPI 免登失败，回退到 OAuth 免登:', e);
-                  window.location.href = `/api/auth/feishu/authorize?provider=${provider.key}`;
-                }
-              });
-          }
+          // 客户端内直接走 OAuth 免登：requestAccess 在当前客户端环境会失败并触发"授权失败"弹框，
+          // OAuth 在客户端内同样免确认跳转，体验一致且稳定。
+          window.location.href = `/api/auth/feishu/authorize?provider=${provider.key}`;
         }
       })
       .catch(() => {});
