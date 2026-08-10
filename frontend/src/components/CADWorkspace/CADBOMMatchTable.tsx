@@ -871,7 +871,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                 </table>
               </div>
               {/* 数据：在overflow内，可水平滚动；滚动时同步抬头横向位置使列头与列内容对齐 */}
-              <div className="overflow-x-auto" style={{ scrollbarGutter: 'stable', overflowY: 'clip' }}
+              <div className="overflow-x-scroll" style={{ scrollbarGutter: 'stable', overflowY: 'clip' }}
                 onScroll={e => { if (rightHeadRef.current) rightHeadRef.current.scrollLeft = e.currentTarget.scrollLeft; }}>
                 <table className="border-separate border-spacing-0 text-xs whitespace-nowrap w-full">
                   <tbody ref={rightBodyRef}>
