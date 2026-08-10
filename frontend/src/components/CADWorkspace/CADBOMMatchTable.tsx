@@ -97,7 +97,6 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
   const leftBodyRef = useRef<HTMLTableSectionElement>(null);
   const pushingKeys = useRef<Set<string>>(new Set());
   const rightBodyRef = useRef<HTMLTableSectionElement>(null);
-  const rightHeadRef = useRef<HTMLDivElement>(null);
   const leftScrollRef = useRef<HTMLDivElement>(null);
   const rightScrollRef = useRef<HTMLDivElement>(null);
   const isSyncingScroll = useRef(false);
@@ -218,9 +217,6 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
     isSyncingScroll.current = true;
     if (rightScrollRef.current && leftScrollRef.current) {
       leftScrollRef.current.scrollTop = rightScrollRef.current.scrollTop;
-    }
-    if (rightHeadRef.current) {
-      rightHeadRef.current.scrollLeft = e.currentTarget.scrollLeft;
     }
     requestAnimationFrame(() => { isSyncingScroll.current = false; });
   }, []);
@@ -987,76 +983,64 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
             </table>
         </div>
 
-        {/* ====== 右区：自定义字段 ====== */}
-        <div className="flex-1 min-w-0 border-l-2 border-gray-200 flex flex-col">
-          {/* 表头：固定在顶部，不随数据滚动 */}
-          <div ref={rightHeadRef} className="shrink-0 overflow-hidden" style={{ scrollbarGutter: 'stable' }}>
-            <table className="border-separate border-spacing-0 text-xs whitespace-nowrap w-full">
-              <thead>
-                <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
-                  {propertyColumns.map(col => (
-                    <th key={col} className="p-2 text-left" style={{ minWidth: 100 }}>{col}</th>
-                  ))}
+        {/* ====== 右区：自定义字段（单表结构，表头 sticky，保证列宽对齐） ====== */}
+        <div ref={rightScrollRef} className="flex-1 min-w-0 border-l-2 border-gray-200 overflow-auto" onScroll={handleRightScroll}>
+          <table className="border-collapse text-xs whitespace-nowrap w-full">
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
+                {propertyColumns.map(col => (
+                  <th key={col} className="p-2 text-left" style={{ width: 100 }}>{col}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody ref={rightBodyRef}>
+              {visibleRows.map((row, vi) => {
+                const ri = rows.indexOf(row);
+                return (
+                <tr key={row.path}
+                  onMouseEnter={() => setHoveredIndex(ri)}
+                  onMouseLeave={() => setHoveredIndex(null)}
+                  className={`border-b border-gray-200 transition-colors ${hoveredIndex === ri ? hoverClass(row) : ''}`}>
+                  {propertyColumns.map(col => {
+                    const catiaProp = getCatiaPropForPdmField(col);
+                    const fieldDef = fieldDefs.find((d: any) => d.name === col);
+                    const cadValue = catiaProp ? (row.user_properties[catiaProp] || '') : '';
+                    const revId = row.pdm_match?.revision_id;
+                    const pdmRaw = revId && fieldDef ? pdmCfValues[revId]?.[fieldDef.field_key] : undefined;
+                    const pdmValue = pdmRaw == null ? '' : (Array.isArray(pdmRaw) ? pdmRaw.join(', ') : String(pdmRaw));
+                    const fromPdm = cadValue === '' && pdmValue !== '';
+                    const sameVal = fieldDef?.field_type === 'number'
+                      ? Number(cadValue) === Number(pdmValue)
+                      : cadValue.trim() === pdmValue.trim();
+                    const conflict = cadValue !== '' && pdmValue !== '' && !sameVal;
+                    const value = fromPdm ? pdmValue : cadValue;
+                    const toneCls = fromPdm ? ' text-green-600 border-green-400'
+                      : conflict ? ' text-red-600 border-red-400' : '';
+                    const title = fromPdm ? `PDM 值（CAD 为空）: ${pdmValue}`
+                      : conflict ? `与 PDM 不同 — CAD: ${cadValue} / PDM: ${pdmValue}` : undefined;
+                    const isSelect = fieldDef?.field_type === 'select' && fieldDef?.options?.length > 0;
+                    return (
+                      <td key={col} className="p-2" style={{ width: 100 }} title={title}>
+                        {isSelect ? (
+                          <select value={value} disabled={!canEditProps(row) || !catiaProp}
+                            onChange={e => { if (!catiaProp) return; commitEdit(row, catiaProp, e.target.value); }}
+                            className={`border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200${toneCls}`}>
+                            <option value="">—</option>
+                            {fieldDef.options.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
+                          </select>
+                        ) : (
+                          <input value={value} disabled={!canEditProps(row) || !catiaProp}
+                            onChange={e => { if (!catiaProp) return; commitEdit(row, catiaProp, e.target.value); }}
+                            className={`border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200${toneCls}`} />
+                        )}
+                      </td>
+                    );
+                  })}
                 </tr>
-              </thead>
-            </table>
-          </div>
-          {/* 数据：垂直+水平滚动，水平滚动条始终在容器底部可见 */}
-          <div ref={rightScrollRef} className="flex-1 min-h-0 overflow-auto" style={{ scrollbarGutter: 'stable' }}
-            onScroll={handleRightScroll}>
-            <table className="border-separate border-spacing-0 text-xs whitespace-nowrap w-full">
-                  <tbody ref={rightBodyRef}>
-                    {visibleRows.map((row, vi) => {
-                      const ri = rows.indexOf(row);
-                      return (
-                      <tr key={row.path}
-                        onMouseEnter={() => setHoveredIndex(ri)}
-                        onMouseLeave={() => setHoveredIndex(null)}
-                        className={`transition-colors ${hoveredIndex === ri ? hoverClass(row) : ''}`}>
-                        {propertyColumns.map(col => {
-                          const catiaProp = getCatiaPropForPdmField(col);
-                          const fieldDef = fieldDefs.find((d: any) => d.name === col);
-                          const cadValue = catiaProp ? (row.user_properties[catiaProp] || '') : '';
-                          const revId = row.pdm_match?.revision_id;
-                          // 批量接口返回值按 field_key 索引（非 field_id）
-                          const pdmRaw = revId && fieldDef ? pdmCfValues[revId]?.[fieldDef.field_key] : undefined;
-                          const pdmValue = pdmRaw == null ? '' : (Array.isArray(pdmRaw) ? pdmRaw.join(', ') : String(pdmRaw));
-                          // CAD 有值显示 CAD；CAD 空且 PDM 有值→回退显示 PDM（绿色）；
-                          // CAD/PDM 都有但不同→显示 CAD（红色，提示冲突）
-                          const fromPdm = cadValue === '' && pdmValue !== '';
-                          const sameVal = fieldDef?.field_type === 'number'
-                            ? Number(cadValue) === Number(pdmValue)
-                            : cadValue.trim() === pdmValue.trim();
-                          const conflict = cadValue !== '' && pdmValue !== '' && !sameVal;
-                          const value = fromPdm ? pdmValue : cadValue;
-                          const toneCls = fromPdm ? ' text-green-600 border-green-400'
-                            : conflict ? ' text-red-600 border-red-400' : '';
-                          const title = fromPdm ? `PDM 值（CAD 为空）: ${pdmValue}`
-                            : conflict ? `与 PDM 不同 — CAD: ${cadValue} / PDM: ${pdmValue}` : undefined;
-                          const isSelect = fieldDef?.field_type === 'select' && fieldDef?.options?.length > 0;
-                          return (
-                            <td key={col} className="p-2 border-b border-gray-200" style={{ minWidth: 100 }} title={title}>
-                              {isSelect ? (
-                                <select value={value} disabled={!canEditProps(row) || !catiaProp}
-                                  onChange={e => { if (!catiaProp) return; commitEdit(row, catiaProp, e.target.value); }}
-                                  className={`border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200${toneCls}`}>
-                                  <option value="">—</option>
-                                  {fieldDef.options.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
-                                </select>
-                              ) : (
-                                <input value={value} disabled={!canEditProps(row) || !catiaProp}
-                                  onChange={e => { if (!catiaProp) return; commitEdit(row, catiaProp, e.target.value); }}
-                                  className={`border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200${toneCls}`} />
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-          </div>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
 
