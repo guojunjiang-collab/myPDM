@@ -99,6 +99,7 @@ export const authApi = {
     api.post('/auth/feishu/jsapi', { provider, code }),
   feishuBindIntent: (provider: string) => api.post('/auth/feishu/bind-intent', { provider }),
   feishuBindings: () => api.get('/auth/feishu/bindings'),
+  requestApproval: () => api.post('/notifications/request-approval').then((r) => r.data),
 };
 
 // 零部件 API (v2 统一接口)
@@ -310,7 +311,7 @@ export const bomApi = {
 
 // 用户 API
 export const usersApi = {
-  list: (params?: { page?: number; page_size?: number; search?: string; skip?: number; limit?: number }) =>
+  list: (params?: { page?: number; page_size?: number; search?: string; skip?: number; limit?: number; role?: string }) =>
     api.get('/users/', { params }),
   get: (id: string) => api.get(`/users/${id}`),
   create: (data: unknown) => api.post('/users/', data),
