@@ -255,11 +255,118 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
     Object.keys(pendingWrites.current).forEach(id => { void flushWrite(id); });
   }, [flushWrite]);
 
-  // 提交一次编辑：乐观更新表格 + 防抖写回 CAD
+  // PDM 写入防抖：行内编辑后自动同步字段值到 PDM，
+  // 避免用户清空输入框后 CAD 变空而 PDM 仍有旧值导致绿色回退显示
+  const pdmWriteTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const pdmPendingWrites = useRef<Record<string, {
+    masterId: string;
+    revisionId: string;
+    masterUpdates: Record<string, string>;
+    cfValues: Record<string, string | number>;
+  }>>({});
+
+  const flushPdmWrite = useCallback(async (revisionId: string) => {
+    const timer = pdmWriteTimers.current[revisionId];
+    if (timer) { clearTimeout(timer); delete pdmWriteTimers.current[revisionId]; }
+    const p = pdmPendingWrites.current[revisionId];
+    if (!p) return;
+    delete pdmPendingWrites.current[revisionId];
+
+    if (Object.keys(p.masterUpdates).length > 0) {
+      try {
+        await partsApi.update(p.masterId, p.masterUpdates);
+      } catch (e: any) {
+        toast.error(e?.response?.data?.detail || 'PDM 写入失败');
+      }
+    }
+
+    if (Object.keys(p.cfValues).length > 0) {
+      try {
+        const values = Object.entries(p.cfValues).map(([field_id, value]) => ({ field_id, value }));
+        await customFieldsApi.setValues('component', p.revisionId, values);
+      } catch { /* 忽略 */ }
+    }
+
+    // 刷新 PDM 对比基准，使编辑后的字段颜色恢复常态
+    try {
+      const cfRes = await customFieldsApi.getValuesBatch({ type: 'component', ids: p.revisionId });
+      setPdmCfValues(prev => ({ ...prev, ...(cfRes.data || {}) }));
+    } catch { /* 忽略 */ }
+    if (p.masterUpdates.name !== undefined) {
+      setRows(prev => prev.map(r => r.pdm_match?.revision_id === p.revisionId
+        ? { ...r, pdm_match: { ...r.pdm_match!, name: p.masterUpdates.name } }
+        : r));
+    }
+  }, []);
+
+  const schedulePdmWrite = useCallback((row: BOMRow, pdmTarget: string, value: string) => {
+    const revId = row.pdm_match?.revision_id;
+    const masterId = row.pdm_match?.master_id;
+    if (!revId || !masterId) return;
+
+    const id = revId;
+    if (!pdmPendingWrites.current[id]) {
+      pdmPendingWrites.current[id] = {
+        masterId,
+        revisionId: revId,
+        masterUpdates: {},
+        cfValues: {},
+      };
+    }
+
+    const entry = pdmPendingWrites.current[id];
+
+    if (pdmTarget === 'name' || pdmTarget === 'spec') {
+      entry.masterUpdates[pdmTarget] = value;
+    } else {
+      const def = fieldDefsRef.current?.find((d: any) => d.name === pdmTarget);
+      if (!def) return;
+      entry.cfValues[def.id] = def.field_type === 'number'
+        ? (parseFloat(value) || 0)
+        : value;
+    }
+
+    if (pdmWriteTimers.current[id]) clearTimeout(pdmWriteTimers.current[id]);
+    pdmWriteTimers.current[id] = setTimeout(() => { void flushPdmWrite(id); }, 300);
+  }, [flushPdmWrite]);
+
+  // 卸载时冲刷未落盘的 PDM 编辑
+  useEffect(() => () => {
+    Object.keys(pdmPendingWrites.current).forEach(id => { void flushPdmWrite(id); });
+  }, [flushPdmWrite]);
+
+  // 提交一次编辑：乐观更新表格 + 防抖写回 CAD + 同步写回 PDM
   const commitEdit = useCallback((row: BOMRow, key: string, value: string, target: 'user' | 'builtin' = 'user') => {
     setRows(prev => syncRowsByPartNumber(prev, row, key, value, target));
     scheduleWrite(row.path, key, value);
-  }, [scheduleWrite]);
+
+    if (row.pdm_match?.revision_id && row.pdm_match?.master_id) {
+      const revId = row.pdm_match.revision_id;
+      const m = mappingRef.current || DEFAULT_FIELD_MAPPING;
+      if (target === 'builtin') {
+        const pdmTarget = m.builtin[key];
+        if (pdmTarget === 'name') {
+          setRows(prev => prev.map(r => r.pdm_match?.revision_id === revId
+            ? { ...r, pdm_match: { ...r.pdm_match!, name: value } }
+            : r));
+          schedulePdmWrite(row, 'name', value);
+        }
+      } else {
+        const pdmTarget = m.properties[key];
+        if (pdmTarget) {
+          const def = fieldDefsRef.current?.find((d: any) => d.name === pdmTarget);
+          if (def) {
+            setPdmCfValues(prev => {
+              const revData = { ...(prev[revId] || {}) };
+              revData[def.field_key] = value;
+              return { ...prev, [revId]: revData };
+            });
+          }
+          schedulePdmWrite(row, pdmTarget, value);
+        }
+      }
+    }
+  }, [scheduleWrite, schedulePdmWrite]);
 
   const [matching, setMatching] = useState(false);
   // 各版本附件计数（cad/production），显示在附件列按钮上方
