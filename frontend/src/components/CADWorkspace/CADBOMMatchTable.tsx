@@ -98,6 +98,9 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
   const pushingKeys = useRef<Set<string>>(new Set());
   const rightBodyRef = useRef<HTMLTableSectionElement>(null);
   const rightHeadRef = useRef<HTMLDivElement>(null);
+  const leftScrollRef = useRef<HTMLDivElement>(null);
+  const rightScrollRef = useRef<HTMLDivElement>(null);
+  const isSyncingScroll = useRef(false);
 
   // 加载 PDM 自定义字段定义（筛选适用于零部件的）与 CATIA-PDM 字段映射
   useEffect(() => {
@@ -199,6 +202,28 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
     if (leftBodyRef.current) obs.observe(leftBodyRef.current);
     return () => obs.disconnect();
   }, [visibleRows, propertyColumns.length]);
+
+  // 左右两侧垂直滚动同步，防止水平滚动条被垂直滚动条推到底部不可见
+  const handleLeftScroll = useCallback(() => {
+    if (isSyncingScroll.current) return;
+    isSyncingScroll.current = true;
+    if (leftScrollRef.current && rightScrollRef.current) {
+      rightScrollRef.current.scrollTop = leftScrollRef.current.scrollTop;
+    }
+    requestAnimationFrame(() => { isSyncingScroll.current = false; });
+  }, []);
+
+  const handleRightScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    if (isSyncingScroll.current) return;
+    isSyncingScroll.current = true;
+    if (rightScrollRef.current && leftScrollRef.current) {
+      leftScrollRef.current.scrollTop = rightScrollRef.current.scrollTop;
+    }
+    if (rightHeadRef.current) {
+      rightHeadRef.current.scrollLeft = e.currentTarget.scrollLeft;
+    }
+    requestAnimationFrame(() => { isSyncingScroll.current = false; });
+  }, []);
 
   // 行内编辑写回 CAD：防抖处理。
   // 单元格值由 onChange 的乐观 setRows 立即更新（唯一显示事实源）；写回 CAD 用
@@ -715,11 +740,10 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
       </div>
 
       {/* 表格：左侧固定列 + 右侧自定义字段独立水平滚动 */}
-      <div className="flex-1 min-h-0">
-        <div className="h-full overflow-y-auto overflow-x-hidden">
-          <div className="flex items-start">
-            {/* ====== 左表：固定列 ====== */}
-            <table className="shrink-0 border-collapse text-xs whitespace-nowrap">
+      <div className="flex-1 min-h-0 flex">
+        <div ref={leftScrollRef} className="shrink-0 overflow-y-auto overflow-x-hidden" onScroll={handleLeftScroll}>
+          {/* ====== 左表：固定列 ====== */}
+          <table className="border-collapse text-xs whitespace-nowrap">
               <thead className="sticky top-0 z-10">
                 <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
                   <th className="p-2 text-left" style={{ width: 180, paddingLeft: 28 }}>件号</th>
@@ -854,26 +878,26 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                 })}
               </tbody>
             </table>
+        </div>
 
-            {/* ====== 右区：自定义字段 ====== */}
-            <div className="flex-1 min-w-0 border-l-2 border-gray-200">
-              {/* 表头：sticky top-0 纵向冻结；overflow-hidden 使其可被 JS 横向同步滚动，
-                  scrollbarGutter 与数据区一致以保证列宽像素对齐 */}
-              <div ref={rightHeadRef} className="sticky top-0 z-10 overflow-hidden" style={{ scrollbarGutter: 'stable' }}>
-                <table className="border-separate border-spacing-0 text-xs whitespace-nowrap w-full">
-                  <thead>
-                    <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
-                      {propertyColumns.map(col => (
-                        <th key={col} className="p-2 text-left" style={{ minWidth: 100 }}>{col}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                </table>
-              </div>
-              {/* 数据：在overflow内，可水平滚动；滚动时同步抬头横向位置使列头与列内容对齐 */}
-              <div className="overflow-x-auto" style={{ scrollbarGutter: 'stable', overflowY: 'clip' }}
-                onScroll={e => { if (rightHeadRef.current) rightHeadRef.current.scrollLeft = e.currentTarget.scrollLeft; }}>
-                <table className="border-separate border-spacing-0 text-xs whitespace-nowrap w-full">
+        {/* ====== 右区：自定义字段 ====== */}
+        <div className="flex-1 min-w-0 border-l-2 border-gray-200 flex flex-col">
+          {/* 表头：固定在顶部，不随数据滚动 */}
+          <div ref={rightHeadRef} className="shrink-0 overflow-hidden" style={{ scrollbarGutter: 'stable' }}>
+            <table className="border-separate border-spacing-0 text-xs whitespace-nowrap w-full">
+              <thead>
+                <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
+                  {propertyColumns.map(col => (
+                    <th key={col} className="p-2 text-left" style={{ minWidth: 100 }}>{col}</th>
+                  ))}
+                </tr>
+              </thead>
+            </table>
+          </div>
+          {/* 数据：垂直+水平滚动，水平滚动条始终在容器底部可见 */}
+          <div ref={rightScrollRef} className="flex-1 min-h-0 overflow-auto" style={{ scrollbarGutter: 'stable' }}
+            onScroll={handleRightScroll}>
+            <table className="border-separate border-spacing-0 text-xs whitespace-nowrap w-full">
                   <tbody ref={rightBodyRef}>
                     {visibleRows.map((row, vi) => {
                       const ri = rows.indexOf(row);
@@ -925,8 +949,6 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                     })}
                   </tbody>
                 </table>
-              </div>
-            </div>
           </div>
         </div>
       </div>
