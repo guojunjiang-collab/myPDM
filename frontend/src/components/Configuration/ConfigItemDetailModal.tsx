@@ -161,8 +161,8 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
     if (!internalRevId) return;
     if (cfTimerRef.current) clearTimeout(cfTimerRef.current);
     cfTimerRef.current = setTimeout(() => {
-      const fieldValues = cfDefs.map((def: any) => ({ field_id: def.id, value: fieldId === def.id ? value : cfValues[def.id] ?? null })).filter((fv: any) => fv.value !== null && fv.value !== '');
-      if (fieldValues.length > 0) customFieldsApi.setValues('configuration_item', internalRevId, fieldValues).catch(() => {});
+      const fieldValues = cfDefs.map((def: any) => ({ field_id: def.id, value: fieldId === def.id ? value : cfValues[def.id] ?? null }));
+      customFieldsApi.setValues('configuration_item', internalRevId, fieldValues).catch(() => {});
     }, 500);
   }, [internalRevId, cfDefs, cfValues]);
 

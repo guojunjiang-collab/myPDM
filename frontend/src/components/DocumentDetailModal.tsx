@@ -237,7 +237,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
           const fieldValues = cfDefs.map((def) => ({
             field_id: def.id,
             value: next[def.id] ?? null,
-          })).filter((fv) => fv.value !== null && fv.value !== '');
+          }));
           await customFieldsApi.setValues('document', effectiveRevisionId, fieldValues);
           onSaved();
         } catch (e: any) {

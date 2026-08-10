@@ -142,10 +142,8 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
       const fieldValues = cfDefs.map((def: any) => ({
         field_id: def.id,
         value: values[def.id] ?? null,
-      })).filter((fv: any) => fv.value !== null && fv.value !== '');
-      if (fieldValues.length > 0) {
-        customFieldsApi.setValues('component', revisionId!, fieldValues).catch(console.error);
-      }
+      }));
+      customFieldsApi.setValues('component', revisionId!, fieldValues).catch(console.error);
     }, 500);
   }, [revisionId, cfDefs]);
 
