@@ -716,10 +716,10 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
 
       {/* 表格：左侧固定列 + 右侧自定义字段独立水平滚动 */}
       <div className="flex-1 min-h-0">
-        <div className="h-full overflow-y-auto overflow-x-hidden">
-          <div className="flex items-stretch">
+        <div className="h-full overflow-y-auto overflow-x-scroll">
+          <div className="flex items-start">
             {/* ====== 左表：固定列 ====== */}
-            <table className="shrink-0 border-collapse text-xs whitespace-nowrap">
+            <table className="shrink-0 border-collapse text-xs whitespace-nowrap sticky left-0 z-20 bg-white">
               <thead className="sticky top-0 z-10">
                 <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
                   <th className="p-2 text-left" style={{ width: 180, paddingLeft: 28 }}>件号</th>
@@ -856,10 +856,10 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
             </table>
 
             {/* ====== 右区：自定义字段 ====== */}
-            <div className="flex-1 min-w-0 border-l-2 border-gray-200 flex flex-col">
+            <div className="flex-1 min-w-0 border-l-2 border-gray-200">
               {/* 表头：sticky top-0 纵向冻结；overflow-hidden 使其可被 JS 横向同步滚动，
                   scrollbarGutter 与数据区一致以保证列宽像素对齐 */}
-              <div ref={rightHeadRef} className="shrink-0 overflow-hidden">
+              <div ref={rightHeadRef} className="sticky top-0 z-10 overflow-hidden" style={{ scrollbarGutter: 'stable' }}>
                 <table className="border-separate border-spacing-0 text-xs whitespace-nowrap w-full">
                   <thead>
                     <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
@@ -871,7 +871,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                 </table>
               </div>
               {/* 数据：在overflow内，可水平滚动；滚动时同步抬头横向位置使列头与列内容对齐 */}
-              <div className="flex-1 overflow-auto" style={{ scrollbarGutter: 'stable' }}
+              <div style={{ overflowY: 'clip' }}
                 onScroll={e => { if (rightHeadRef.current) rightHeadRef.current.scrollLeft = e.currentTarget.scrollLeft; }}>
                 <table className="border-separate border-spacing-0 text-xs whitespace-nowrap w-full">
                   <tbody ref={rightBodyRef}>
