@@ -43,6 +43,20 @@ export default function FeishuBindPanel() {
     }
   };
 
+  const handleUnbind = async (provider: FeishuProvider) => {
+    if (!confirm(`确定要解除「${provider.name}」的绑定吗？`)) return;
+    try {
+      await authApi.feishuUnbind(provider.key);
+      setBindings((prev) => {
+        const next = { ...prev };
+        delete next[provider.key];
+        return next;
+      });
+    } catch {
+      setError('解除绑定失败，请重试');
+    }
+  };
+
   return (
     <div className="max-w-md">
       <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
@@ -81,7 +95,15 @@ export default function FeishuBindPanel() {
                   </div>
                 </div>
                 {b ? (
-                  <span className="text-xs px-2 py-1 bg-green-50 text-green-700 rounded-full">已绑定</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs px-2 py-1 bg-green-50 text-green-700 rounded-full">已绑定</span>
+                    <button
+                      onClick={() => handleUnbind(p)}
+                      className="text-xs text-red-500 hover:text-red-700 hover:underline"
+                    >
+                      解除
+                    </button>
+                  </div>
                 ) : (
                   <button
                     onClick={() => handleBind(p)}

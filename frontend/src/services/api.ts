@@ -99,6 +99,7 @@ export const authApi = {
     api.post('/auth/feishu/jsapi', { provider, code }),
   feishuBindIntent: (provider: string) => api.post('/auth/feishu/bind-intent', { provider }),
   feishuBindings: () => api.get('/auth/feishu/bindings'),
+  feishuUnbind: (provider: string) => api.delete(`/auth/feishu/bindings/${provider}`).then((r) => r.data),
   requestApproval: () => api.post('/notifications/request-approval').then((r) => r.data),
 };
 

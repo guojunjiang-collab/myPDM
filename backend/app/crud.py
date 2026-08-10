@@ -177,6 +177,16 @@ def get_user_feishu_bindings(db, user_id):
     ).order_by(models.UserFeishuBinding.provider).all()
 
 
+def unbind_feishu(db, user_id, provider):
+    """解除用户指定飞书入口的绑定。返回删除条数（0 或 1）。"""
+    n = db.query(models.UserFeishuBinding).filter(
+        models.UserFeishuBinding.user_id == user_id,
+        models.UserFeishuBinding.provider == provider,
+    ).delete(synchronize_session=False)
+    db.commit()
+    return n
+
+
 # [REMOVED: old assert_entity_editable for component system]
 
 

@@ -211,6 +211,19 @@ def feishu_bindings(
     }
 
 
+@router.delete("/bindings/{provider}")
+def feishu_unbind(
+    provider: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user_pwchange),
+):
+    """解除当前用户指定飞书入口的绑定。"""
+    n = crud.unbind_feishu(db, current_user.id, provider)
+    if n == 0:
+        raise HTTPException(404, "未找到该绑定记录")
+    return {"detail": "已解除绑定"}
+
+
 @router.post("/jsapi")
 def feishu_jsapi(req: JsapiRequest, db: Session = Depends(get_db)):
     user = _authenticate(req.code, req.provider, jsapi=True, db=db)
