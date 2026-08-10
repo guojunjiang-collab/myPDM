@@ -1,5 +1,5 @@
 {
-  "roles": ["admin", "engineer", "production", "guest"],
+  "roles": ["admin", "engineer", "production", "guest", "unverified"],
   "permissions": {
     "parts:create": ["admin", "engineer"],
     "parts:delete": ["admin"],
