@@ -10,8 +10,10 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import User
+from .. import models
 from ..permissions import require_permission
 from .. import notifications as notif_svc
+from ..routers.auth import get_current_user
 from ..schemas_notification import NotificationListResponse, NotificationResponse
 
 router = APIRouter(prefix="/notifications", tags=["通知中心"])
@@ -73,3 +75,36 @@ def clear_read(
 ):
     n = notif_svc.clear_read(db, current_user.id)
     return {"detail": "已清除", "count": n}
+
+
+@router.post("/request-approval")
+def request_approval(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """未验证用户请求管理员审批。可重复调用（防重复发送）。"""
+    if current_user.role != "unverified":
+        raise HTTPException(400, "仅未验证用户可申请审批")
+
+    if notif_svc.has_pending_approval_notification(db, current_user.id):
+        return {"notified_count": 0, "already_notified": True}
+
+    admin_ids = [
+        row[0] for row in
+        db.query(models.User.id).filter(models.User.role == "admin").all()
+    ]
+    if not admin_ids:
+        return {"notified_count": 0, "already_notified": False, "detail": "系统暂无管理员"}
+
+    count = notif_svc.create_notifications(
+        db,
+        recipient_ids=admin_ids,
+        sender_id=current_user.id,
+        event_type="approval_request",
+        title=f"用户 {current_user.real_name or current_user.username} 申请系统访问权限",
+        body=f"飞书免登用户 {current_user.real_name or current_user.username}（{current_user.username}）等待审批",
+        target_type="user",
+        target_id=str(current_user.id),
+    )
+
+    return {"notified_count": count}

@@ -34,8 +34,11 @@ def get_user(db, user_id):
 def get_user_by_username(db, username):
     return db.query(models.User).filter(models.User.username == username).first()
 
-def get_users(db, skip=0, limit=100):
-    return db.query(models.User).offset(skip).limit(limit).all()
+def get_users(db, skip=0, limit=100, role=None):
+    q = db.query(models.User)
+    if role:
+        q = q.filter(models.User.role == role)
+    return q.offset(skip).limit(limit).all()
 
 def create_user(db, user):
     hashed_password = get_password_hash(user.password)
@@ -124,7 +127,7 @@ def find_or_create_feishu_user(db, provider, feishu_user):
         username=username,
         password_hash=get_password_hash(random_password),
         real_name=name or username,
-        role="guest",
+        role="unverified",
         status="active",
         must_change_password=False,
     )

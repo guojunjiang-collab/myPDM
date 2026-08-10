@@ -121,3 +121,26 @@ def clear_read(db: Session, user_id: UUID) -> int:
     ).delete(synchronize_session=False)
     db.commit()
     return n
+
+
+def has_pending_approval_notification(db: Session, applicant_id) -> bool:
+    """检查指定申请人的审批通知是否已有未读记录（防重复发送）。"""
+    return db.query(Notification).filter(
+        Notification.event_type == "approval_request",
+        Notification.target_id == str(applicant_id),
+        Notification.is_read == False,  # noqa: E712
+    ).first() is not None
+
+
+def resolve_approval_notifications(db: Session, user_id) -> int:
+    """将指定用户的所有审批类未读通知批量标记为已读。返回更新条数。"""
+    n = db.query(Notification).filter(
+        Notification.event_type == "approval_request",
+        Notification.target_id == str(user_id),
+        Notification.is_read == False,  # noqa: E712
+    ).update(
+        {"is_read": True, "read_at": sqlfunc.now()},
+        synchronize_session=False,
+    )
+    db.commit()
+    return n
