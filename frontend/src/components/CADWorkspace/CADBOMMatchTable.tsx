@@ -989,7 +989,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
             <thead className="sticky top-0 z-10">
               <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
                 {propertyColumns.map(col => (
-                  <th key={col} className="p-2 text-left" style={{ width: 100 }}>{col}</th>
+                  <th key={col} className="p-2 text-left" style={{ width: 250 }}>{col}</th>
                 ))}
               </tr>
             </thead>
@@ -1020,18 +1020,20 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                       : conflict ? `与 PDM 不同 — CAD: ${cadValue} / PDM: ${pdmValue}` : undefined;
                     const isSelect = fieldDef?.field_type === 'select' && fieldDef?.options?.length > 0;
                     return (
-                      <td key={col} className="p-2" style={{ width: 100 }} title={title}>
+                      <td key={col} className="p-2" style={{ width: 250, maxWidth: 250 }} title={title}>
                         {isSelect ? (
                           <select value={value} disabled={!canEditProps(row) || !catiaProp}
                             onChange={e => { if (!catiaProp) return; commitEdit(row, catiaProp, e.target.value); }}
-                            className={`border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200${toneCls}`}>
+                            title={value || undefined}
+                            className={`border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200 truncate${toneCls}`}>
                             <option value="">—</option>
                             {fieldDef.options.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
                           </select>
                         ) : (
                           <input value={value} disabled={!canEditProps(row) || !catiaProp}
                             onChange={e => { if (!catiaProp) return; commitEdit(row, catiaProp, e.target.value); }}
-                            className={`border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200${toneCls}`} />
+                            title={value || undefined}
+                            className={`border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200 truncate${toneCls}`} />
                         )}
                       </td>
                     );
