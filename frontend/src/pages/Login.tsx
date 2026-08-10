@@ -73,7 +73,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-md">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-semibold">🏗️ PDM系统</h1>
+          <h1 className="text-2xl font-semibold">🏗️ {import.meta.env.VITE_APP_TITLE || 'PDM系统'}</h1>
           <p className="text-gray-500 mt-2">物料清单全生命周期数字化管理平台</p>
         </div>
 

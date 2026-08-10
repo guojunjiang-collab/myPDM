@@ -124,7 +124,7 @@ export default function Layout() {
       {/* 侧边栏 */}
       <aside className="w-56 min-w-56 bg-white border-r border-gray-200 flex flex-col">
         <div className="h-14 bg-white border-b border-gray-200 flex items-center px-4">
-          <h1 className="text-lg font-semibold">🏗️ PDM系统</h1>
+          <h1 className="text-lg font-semibold">🏗️ {import.meta.env.VITE_APP_TITLE || 'PDM系统'}</h1>
         </div>
         <nav className="flex-1 p-2">
           {visibleNavItems.map((item, idx) =>
@@ -152,7 +152,7 @@ export default function Layout() {
               {syncMsg}
             </div>
           )}
-          <div className="text-xs text-gray-400 text-center">{APP_VERSION} · PDM系统</div>
+          <div className="text-xs text-gray-400 text-center">{APP_VERSION} · {import.meta.env.VITE_APP_TITLE || 'PDM系统'}</div>
         </div>
       </aside>
 
