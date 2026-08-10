@@ -98,19 +98,6 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
   const pushingKeys = useRef<Set<string>>(new Set());
   const rightBodyRef = useRef<HTMLTableSectionElement>(null);
   const rightHeadRef = useRef<HTMLDivElement>(null);
-  const outerScrollRef = useRef<HTMLDivElement>(null);
-  const [rightDataMaxH, setRightDataMaxH] = useState(0);
-
-  // 监听外层滚动容器高度，约束右侧数据区高度使水平滚动条始终可见
-  useEffect(() => {
-    const el = outerScrollRef.current;
-    if (!el) return;
-    const update = () => setRightDataMaxH(el.clientHeight);
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
 
   // 加载 PDM 自定义字段定义（筛选适用于零部件的）与 CATIA-PDM 字段映射
   useEffect(() => {
@@ -729,7 +716,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
 
       {/* 表格：左侧固定列 + 右侧自定义字段独立水平滚动 */}
       <div className="flex-1 min-h-0">
-        <div ref={outerScrollRef} className="h-full overflow-y-auto overflow-x-hidden">
+        <div className="h-full overflow-y-auto overflow-x-hidden">
           <div className="flex items-start">
             {/* ====== 左表：固定列 ====== */}
             <table className="shrink-0 border-collapse text-xs whitespace-nowrap">
@@ -884,7 +871,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                 </table>
               </div>
               {/* 数据：在overflow内，可水平滚动；滚动时同步抬头横向位置使列头与列内容对齐 */}
-              <div className="overflow-x-scroll" style={{ scrollbarGutter: 'stable', maxHeight: rightDataMaxH || undefined, overflowY: rightDataMaxH ? 'auto' : 'clip' }}
+              <div className="overflow-x-auto" style={{ scrollbarGutter: 'stable', overflowY: 'clip' }}
                 onScroll={e => { if (rightHeadRef.current) rightHeadRef.current.scrollLeft = e.currentTarget.scrollLeft; }}>
                 <table className="border-separate border-spacing-0 text-xs whitespace-nowrap w-full">
                   <tbody ref={rightBodyRef}>
