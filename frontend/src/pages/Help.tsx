@@ -562,7 +562,7 @@ const sections: Section[] = [
         <Steps
           items={[
             <>
-              点击零部件列表工具栏的 <K>CAD入口</K> 按钮，打开 CAD 工作区。
+              点击零部件列表工具栏的 <K>CAD工作台</K> 按钮，打开 CAD 工作区。
             </>,
             <>
               <K>连接 CAD</K>：选择 CAD 类型，检测本地运行中的 CAD 软件并读取当前活动文档的产品结构树。

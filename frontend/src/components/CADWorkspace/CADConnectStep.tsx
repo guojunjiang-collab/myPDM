@@ -81,12 +81,6 @@ export function CADConnectStep({ bridge, cadType, onCadTypeChange, onAssemblyLoa
         </div>
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg mb-4 text-sm">
-          {error}
-        </div>
-      )}
-
       <div className="flex gap-3">
         <select
           value={cadType}
@@ -114,6 +108,12 @@ export function CADConnectStep({ bridge, cadType, onCadTypeChange, onAssemblyLoa
           </button>
         )}
       </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg mt-4 text-sm">
+          {error}
+        </div>
+      )}
     </div>
   );
 }

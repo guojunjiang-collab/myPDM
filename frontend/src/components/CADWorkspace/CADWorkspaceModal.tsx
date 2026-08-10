@@ -54,7 +54,7 @@ export function CADWorkspaceModal({ open, onClose }: Props) {
   };
 
   return (
-    <Modal open={open} onClose={handleClose} title="CAD 入口 · 工作台" width="max" height="85vh">
+    <Modal open={open} onClose={handleClose} title="CAD工作台" width="max" height="85vh">
       <div className="flex flex-col h-full">
         {/* 步骤标签 */}
         <div className="flex border-b border-gray-200 mb-4 shrink-0">
