@@ -96,7 +96,7 @@ def _unique_username(db, name):
     import re
     import secrets
     base = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff_-]", "", (name or "")).strip()[:32]
-    if len(base) < 2:
+    if len(base) < 3:
         base = f"feishu_{secrets.token_hex(3)}"
     candidate = base
     i = 1
