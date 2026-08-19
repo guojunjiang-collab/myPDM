@@ -5,6 +5,7 @@ import Layout from './components/Layout';
 import { ToastContainer } from './components/Toast';
 import Login from './pages/Login';
 import FeishuCallback from './pages/FeishuCallback';
+import WechatCallback from './pages/WechatCallback';
 import PendingApproval from './pages/PendingApproval';
 import ForcePasswordChange from './pages/ForcePasswordChange';
 import Dashboard from './pages/Dashboard';
@@ -57,6 +58,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/feishu-callback" element={<FeishuCallback />} />
+        <Route path="/wechat-callback" element={<WechatCallback />} />
         <Route path="/pending-approval" element={<PendingApproval />} />
         <Route path="/change-password" element={<ForcePasswordChangeRoute />} />
         <Route

@@ -11,6 +11,7 @@ import { exportAllData, exportCustomFieldDefs, importCustomFieldDefs, importAllD
 
 import Logs from './Logs';
 import FeishuBindPanel from '../components/FeishuBindPanel';
+import WechatBindPanel from '../components/WechatBindPanel';
 
 const FIELD_TYPES = [
   { value: 'text', label: '单行文本' },
@@ -50,7 +51,7 @@ export default function Settings() {
   const logout = useAuthStore((state) => state.logout);
   const [loading, setLoading] = useState(true);
 
-  type TabKey = 'password' | 'feishuBind' | 'logs' | 'customFields' | 'dataManagement';
+  type TabKey = 'password' | 'feishuBind' | 'wechatBind' | 'logs' | 'customFields' | 'dataManagement';
 
   const [activeTab, setActiveTab] = useState<TabKey>('password');
 
@@ -59,6 +60,7 @@ export default function Settings() {
     { key: 'dataManagement', label: '数据管理', enabled: true, adminOnly: true },
     { key: 'password', label: '修改密码', enabled: true, adminOnly: false },
     { key: 'feishuBind', label: '飞书绑定', enabled: true, adminOnly: false },
+    { key: 'wechatBind', label: '微信绑定', enabled: true, adminOnly: false },
     { key: 'logs', label: '操作日志', enabled: true, adminOnly: true },
   ];
 
@@ -790,6 +792,9 @@ export default function Settings() {
 
       {/* 飞书绑定 */}
       {activeTab === 'feishuBind' && <FeishuBindPanel />}
+
+      {/* 微信绑定 */}
+      {activeTab === 'wechatBind' && <WechatBindPanel />}
 
       {/* 自定义字段 Modal */}
       <Modal

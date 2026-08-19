@@ -26,20 +26,36 @@ def _provider_redirect_uri(redirect_base: str) -> str:
     return f"{redirect_base.rstrip('/')}/api/auth/feishu/callback"
 
 
+def provider_env_prefix(key: str) -> str:
+    """provider key → 环境变量前缀。feishu 为主入口（FEISHU_），其余任意 key 用 FEISHU_<KEY大写>_。"""
+    if key == "feishu":
+        return "FEISHU_"
+    return f"FEISHU_{key.upper()}_"
+
+
+def list_provider_keys() -> list[str]:
+    """启用的 provider key 列表：未设置 FEISHU_PROVIDERS 时默认仅主飞书入口（单路）。"""
+    raw = os.getenv("FEISHU_PROVIDERS", "feishu")
+    return [k.strip() for k in raw.split(",") if k.strip()]
+
+
 def get_provider(name: str):
-    """按 provider 名读取环境变量；未配置返回 None。"""
-    prefix = "FEISHU_EH_" if name == "feishu_eh" else "FEISHU_"
+    """按 provider key 读取环境变量；未配置返回 None。"""
+    prefix = provider_env_prefix(name)
     app_id = os.getenv(f"{prefix}APP_ID", "").strip()
     app_secret = os.getenv(f"{prefix}APP_SECRET", "").strip()
     if not app_id or not app_secret:
         return None
-    redirect_base = os.getenv("FEISHU_REDIRECT_BASE", "https://192.168.61.105:8080").strip()
+    redirect_base = os.getenv(
+        f"{prefix}REDIRECT_BASE",
+        os.getenv("FEISHU_REDIRECT_BASE", "https://192.168.61.105:8080"),
+    ).strip()
     return FeishuProvider(name=name, app_id=app_id, app_secret=app_secret,
                           redirect_uri=_provider_redirect_uri(redirect_base))
 
 
 def list_providers():
-    return [p for name in ("feishu", "feishu_eh") if (p := get_provider(name))]
+    return [p for key in list_provider_keys() if (p := get_provider(key))]
 
 
 class FeishuClient:

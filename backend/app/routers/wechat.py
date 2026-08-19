@@ -1,4 +1,4 @@
-"""飞书免登路由：config / authorize / callback / jsapi。"""
+"""微信免登路由（PC 扫码登录）：config / authorize / callback / bind-intent / bindings。"""
 import os
 import uuid
 from datetime import datetime, timedelta
@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from .. import crud, models
 from ..database import get_db
-from ..feishu_client import FeishuClient, FeishuError, get_provider, list_providers, provider_env_prefix
+from ..wechat_client import WechatClient, WechatError, get_provider, list_providers
 from .auth import (
     ALGORITHM,
     SECRET_KEY,
@@ -21,15 +21,10 @@ from .auth import (
     get_current_user_pwchange,
 )
 
-router = APIRouter(prefix="/auth/feishu", tags=["飞书认证"])
+router = APIRouter(prefix="/auth/wechat", tags=["微信认证"])
 
-FEISHU_STATE_EXPIRE_MINUTES = 10
-FEISHU_BIND_EXPIRE_MINUTES = 10
-
-
-class JsapiRequest(BaseModel):
-    provider: str
-    code: str
+WECHAT_STATE_EXPIRE_MINUTES = 10
+WECHAT_BIND_EXPIRE_MINUTES = 10
 
 
 class BindIntentRequest(BaseModel):
@@ -37,14 +32,14 @@ class BindIntentRequest(BaseModel):
 
 
 def _redirect_base() -> str:
-    return os.getenv("FEISHU_REDIRECT_BASE", "https://192.168.61.105:8080").rstrip("/")
+    return os.getenv("WECHAT_REDIRECT_BASE", os.getenv("FEISHU_REDIRECT_BASE", "https://192.168.61.105:8080")).rstrip("/")
 
 
 def _sign_state(provider: str, user_id: str | None = None) -> str:
     payload = {
         "provider": provider,
-        "typ": "feishu_state",
-        "exp": datetime.utcnow() + timedelta(minutes=FEISHU_STATE_EXPIRE_MINUTES),
+        "typ": "wechat_state",
+        "exp": datetime.utcnow() + timedelta(minutes=WECHAT_STATE_EXPIRE_MINUTES),
     }
     if user_id:
         payload["mode"] = "binding"
@@ -55,7 +50,7 @@ def _sign_state(provider: str, user_id: str | None = None) -> str:
 def _verify_state(state: str) -> dict:
     try:
         payload = jwt.decode(state, SECRET_KEY, algorithms=[ALGORITHM])
-        if payload.get("typ") != "feishu_state":
+        if payload.get("typ") != "wechat_state":
             raise KeyError
         return payload
     except (JWTError, KeyError):
@@ -64,10 +59,10 @@ def _verify_state(state: str) -> dict:
 
 def _sign_intent(user_id, provider: str) -> str:
     payload = {
-        "typ": "feishu_bind_intent",
+        "typ": "wechat_bind_intent",
         "user_id": str(user_id),
         "provider": provider,
-        "exp": datetime.utcnow() + timedelta(minutes=FEISHU_BIND_EXPIRE_MINUTES),
+        "exp": datetime.utcnow() + timedelta(minutes=WECHAT_BIND_EXPIRE_MINUTES),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -75,7 +70,7 @@ def _sign_intent(user_id, provider: str) -> str:
 def _verify_intent(intent: str) -> dict:
     try:
         payload = jwt.decode(intent, SECRET_KEY, algorithms=[ALGORITHM])
-        if payload.get("typ") != "feishu_bind_intent":
+        if payload.get("typ") != "wechat_bind_intent":
             raise KeyError
         return payload
     except (JWTError, KeyError):
@@ -97,60 +92,62 @@ def _login_response(user):
     }
 
 
-def _fetch_user_info(code: str, provider_name: str, jsapi: bool = False) -> dict:
+def _fetch_user_info(code: str, provider_name: str) -> dict:
+    """换取 access_token + 用户信息，返回统一结构 {union_id, open_id, name, avatar_url}。
+
+    union_id 优先取微信返回的 unionid；未返回（单应用未开通 unionid）时回退 openid，
+    保证绑定唯一键始终存在。
+    """
     provider = _provider_or_400(provider_name)
-    client = FeishuClient(provider)
+    client = WechatClient(provider)
     try:
-        token_data = client.exchange_jsapi_code(code) if jsapi else client.exchange_oauth_code(code)
-        user_info = client.get_user_info(token_data["access_token"])
-    except FeishuError as exc:
-        raise HTTPException(status_code=502, detail=f"飞书接口错误: {exc.message}")
-    except KeyError:
-        raise HTTPException(status_code=502, detail="飞书返回数据缺少 access_token")
-    if not user_info.get("union_id"):
-        raise HTTPException(status_code=502, detail="飞书未返回 union_id")
-    return user_info
+        token_data = client.exchange_oauth_code(code)
+        access_token = token_data["access_token"]
+        open_id = token_data["openid"]
+        user_info = client.get_user_info(access_token, open_id)
+    except WechatError as exc:
+        raise HTTPException(status_code=502, detail=f"微信接口错误: {exc.message}")
+    except KeyError as exc:
+        raise HTTPException(status_code=502, detail=f"微信返回数据缺少字段: {exc}")
+    union_id = user_info.get("unionid") or open_id
+    if not union_id:
+        raise HTTPException(status_code=502, detail="微信未返回可用身份标识")
+    return {
+        "union_id": union_id,
+        "open_id": open_id,
+        "name": user_info.get("nickname"),
+        "avatar_url": user_info.get("headimgurl"),
+    }
 
 
-def _authenticate(code: str, provider_name: str, jsapi: bool, db: Session):
-    user_info = _fetch_user_info(code, provider_name, jsapi=jsapi)
-    user = crud.find_or_create_feishu_user(db, provider_name, user_info)
+def _authenticate(code: str, provider_name: str, db: Session):
+    user_info = _fetch_user_info(code, provider_name)
+    user = crud.find_or_create_wechat_user(db, provider_name, user_info)
     if user.status != "active":
         raise HTTPException(status_code=403, detail="账号已禁用")
     return user
 
 
 def _error_redirect(detail: str) -> RedirectResponse:
-    return RedirectResponse(f"{_redirect_base()}/feishu-callback#error={quote(detail)}")
+    return RedirectResponse(f"{_redirect_base()}/wechat-callback#error={quote(detail)}")
 
 
 @router.get("/config")
-def feishu_config():
+def wechat_config():
     return {
         "providers": [
             {
                 "key": p.name,
-                "name": _provider_display_name(p),
+                "name": "微信登录",
                 "app_id": p.app_id,
-                "jsapi": True,
             }
             for p in list_providers()
         ]
     }
 
 
-def _provider_display_name(provider) -> str:
-    """显示名：优先取对应前缀的 NAME 环境变量，否则按 key 兜底。"""
-    name = os.getenv(f"{provider_env_prefix(provider.name)}NAME")
-    if name:
-        return name
-    if provider.name == "feishu":
-        return "飞书登录"
-    return f"飞书登录（{provider.name}）"
-
-
 @router.get("/authorize")
-def feishu_authorize(provider: str, intent: str | None = None):
+def wechat_authorize(provider: str, intent: str | None = None):
     provider_cfg = _provider_or_400(provider)
     if intent:
         payload = _verify_intent(intent)
@@ -159,30 +156,30 @@ def feishu_authorize(provider: str, intent: str | None = None):
         state = _sign_state(provider, user_id=payload["user_id"])
     else:
         state = _sign_state(provider)
-    client = FeishuClient(provider_cfg)
+    client = WechatClient(provider_cfg)
     return RedirectResponse(client.build_authorize_url(state))
 
 
 @router.get("/callback")
-def feishu_callback(code: str, state: str, db: Session = Depends(get_db)):
+def wechat_callback(code: str, state: str, db: Session = Depends(get_db)):
     try:
         payload = _verify_state(state)
         provider_name = payload["provider"]
         user_info = _fetch_user_info(code, provider_name)
         if payload.get("mode") == "binding":
             user_id = payload["user_id"]
-            crud.bind_feishu_to_user(
+            crud.bind_wechat_to_user(
                 db, provider_name, user_info["union_id"], uuid.UUID(user_id), user_info,
             )
             fragment = urlencode({
                 "mode": "binding", "result": "success", "provider": provider_name,
             })
-            return RedirectResponse(f"{_redirect_base()}/feishu-callback#{fragment}")
-        user = crud.find_or_create_feishu_user(db, provider_name, user_info)
+            return RedirectResponse(f"{_redirect_base()}/wechat-callback#{fragment}")
+        user = crud.find_or_create_wechat_user(db, provider_name, user_info)
         if user.status != "active":
             raise HTTPException(status_code=403, detail="账号已禁用")
         fragment = urlencode(_login_response(user))
-        return RedirectResponse(f"{_redirect_base()}/feishu-callback#{fragment}")
+        return RedirectResponse(f"{_redirect_base()}/wechat-callback#{fragment}")
     except HTTPException as exc:
         return _error_redirect(str(exc.detail))
     except ValueError as exc:
@@ -190,11 +187,11 @@ def feishu_callback(code: str, state: str, db: Session = Depends(get_db)):
             "mode": "binding", "result": "error",
             "provider": payload.get("provider", ""), "message": str(exc),
         })
-        return RedirectResponse(f"{_redirect_base()}/feishu-callback#{fragment}")
+        return RedirectResponse(f"{_redirect_base()}/wechat-callback#{fragment}")
 
 
 @router.post("/bind-intent")
-def feishu_bind_intent(
+def wechat_bind_intent(
     req: BindIntentRequest,
     current_user: models.User = Depends(get_current_user_pwchange),
 ):
@@ -203,11 +200,11 @@ def feishu_bind_intent(
 
 
 @router.get("/bindings")
-def feishu_bindings(
+def wechat_bindings(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_pwchange),
 ):
-    rows = crud.get_user_feishu_bindings(db, current_user.id)
+    rows = crud.get_user_wechat_bindings(db, current_user.id)
     return {
         "bindings": [
             {
@@ -222,19 +219,13 @@ def feishu_bindings(
 
 
 @router.delete("/bindings/{provider}")
-def feishu_unbind(
+def wechat_unbind(
     provider: str,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_pwchange),
 ):
-    """解除当前用户指定飞书入口的绑定。"""
-    n = crud.unbind_feishu(db, current_user.id, provider)
+    """解除当前用户指定微信入口的绑定。"""
+    n = crud.unbind_wechat(db, current_user.id, provider)
     if n == 0:
         raise HTTPException(404, "未找到该绑定记录")
     return {"detail": "已解除绑定"}
-
-
-@router.post("/jsapi")
-def feishu_jsapi(req: JsapiRequest, db: Session = Depends(get_db)):
-    user = _authenticate(req.code, req.provider, jsapi=True, db=db)
-    return _login_response(user)

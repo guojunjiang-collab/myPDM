@@ -4,11 +4,11 @@ import { useAuthStore } from '../stores/auth';
 import { authApi } from '../services/api';
 import { getFeishuProviderParam, isFeishuClient } from '../lib/feishu';
 
-interface FeishuProvider {
+interface OAuthProvider {
   key: string;
   name: string;
   app_id: string;
-  jsapi: boolean;
+  jsapi?: boolean;
 }
 
 export default function Login() {
@@ -17,7 +17,8 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [feishuProviders, setFeishuProviders] = useState<FeishuProvider[]>([]);
+  const [feishuProviders, setFeishuProviders] = useState<OAuthProvider[]>([]);
+  const [wechatProviders, setWechatProviders] = useState<OAuthProvider[]>([]);
 
   const finishLogin = async (accessToken: string, refreshToken?: string | null) => {
     useAuthStore.getState().setUser(null, accessToken);
@@ -35,7 +36,7 @@ export default function Login() {
     authApi
       .feishuConfig()
       .then((res) => {
-        const providers: FeishuProvider[] = res.data.providers ?? [];
+        const providers: OAuthProvider[] = res.data.providers ?? [];
         setFeishuProviders(providers);
         // 刚从 OAuth 回调带错回来时不再自动触发免登，避免跳转循环
         if (!urlError && isFeishuClient() && providers.length > 0) {
@@ -47,6 +48,11 @@ export default function Login() {
           window.location.href = `/api/auth/feishu/authorize?provider=${provider.key}`;
         }
       })
+      .catch(() => {});
+
+    authApi
+      .wechatConfig()
+      .then((res) => setWechatProviders(res.data.providers ?? []))
       .catch(() => {});
 
     return () => {
@@ -113,7 +119,7 @@ export default function Login() {
           </button>
         </form>
 
-        {feishuProviders.length > 0 && (
+        {(feishuProviders.length > 0 || wechatProviders.length > 0) && (
           <div className="mt-6">
             <div className="flex items-center gap-3 text-gray-400 text-sm">
               <span className="flex-1 border-t border-gray-200" />
@@ -123,10 +129,22 @@ export default function Login() {
             <div className="mt-4 space-y-2">
               {feishuProviders.map((p) => (
                 <button
-                  key={p.key}
+                  key={`feishu-${p.key}`}
                   type="button"
                   onClick={() => {
                     window.location.href = `/api/auth/feishu/authorize?provider=${p.key}`;
+                  }}
+                  className="w-full py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
+                >
+                  {p.name}
+                </button>
+              ))}
+              {wechatProviders.map((p) => (
+                <button
+                  key={`wechat-${p.key}`}
+                  type="button"
+                  onClick={() => {
+                    window.location.href = `/api/auth/wechat/authorize?provider=${p.key}`;
                   }}
                   className="w-full py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
                 >

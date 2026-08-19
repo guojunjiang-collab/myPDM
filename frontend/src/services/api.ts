@@ -100,6 +100,10 @@ export const authApi = {
   feishuBindIntent: (provider: string) => api.post('/auth/feishu/bind-intent', { provider }),
   feishuBindings: () => api.get('/auth/feishu/bindings'),
   feishuUnbind: (provider: string) => api.delete(`/auth/feishu/bindings/${provider}`).then((r) => r.data),
+  wechatConfig: () => api.get('/auth/wechat/config'),
+  wechatBindIntent: (provider: string) => api.post('/auth/wechat/bind-intent', { provider }),
+  wechatBindings: () => api.get('/auth/wechat/bindings'),
+  wechatUnbind: (provider: string) => api.delete(`/auth/wechat/bindings/${provider}`).then((r) => r.data),
   requestApproval: () => api.post('/notifications/request-approval').then((r) => r.data),
 };
 
