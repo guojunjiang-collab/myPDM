@@ -143,6 +143,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
   const canCheckin = isDraft && isCheckedOutByMe;
   const canUndo = isDraft && isCheckedOutByMe && (revision?.latest_iteration || 0) > 1;
   const canFreeze = revision?.status === 'draft' && !isCheckedOut;
+  const canUnfreeze = revision?.status === 'frozen' && isAdminUser;
   const canRelease = (revision?.status === 'draft' || revision?.status === 'frozen') && !isCheckedOut;
   const canUpgrade = revision?.status === 'released' || revision?.status === 'obsolete';
   const canObsolete = revision?.status === 'released';
@@ -160,8 +161,8 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
     if (!internalRevId) return;
     if (cfTimerRef.current) clearTimeout(cfTimerRef.current);
     cfTimerRef.current = setTimeout(() => {
-      const fieldValues = cfDefs.map((def: any) => ({ field_id: def.id, value: fieldId === def.id ? value : cfValues[def.id] ?? null })).filter((fv: any) => fv.value !== null && fv.value !== '');
-      if (fieldValues.length > 0) customFieldsApi.setValues('configuration_item', internalRevId, fieldValues).catch(() => {});
+      const fieldValues = cfDefs.map((def: any) => ({ field_id: def.id, value: fieldId === def.id ? value : cfValues[def.id] ?? null }));
+      customFieldsApi.setValues('configuration_item', internalRevId, fieldValues).catch(() => {});
     }, 500);
   }, [internalRevId, cfDefs, cfValues]);
 
@@ -361,11 +362,12 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
                 {isCheckedOut && <span className="text-xs text-orange-600">已签出：{revision?.check_out_user_name || revision?.check_out_user_id}</span>}
               </div>
               <div className="flex gap-1 flex-wrap items-center">
-                {(canCheckout || canCheckin || canUndo || canFreeze || canRelease || canUpgrade || canObsolete || canForceCheckin) && (<span className="mx-1 text-gray-300 self-center select-none">|</span>)}
-                {canCheckout && <button onClick={() => doAction(() => configurationApi.checkout(internalRevId), '签出成功')} className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">签出</button>}
-                {canCheckin && <button onClick={() => setShowCheckinModal(true)} className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">签入</button>}
+                {(canCheckout || canCheckin || canUndo || canFreeze || canUnfreeze || canRelease || canUpgrade || canObsolete || canForceCheckin) && (<span className="mx-1 text-gray-300 self-center select-none">|</span>)}
+                {canCheckout && <button onClick={() => doAction(() => configurationApi.checkout(internalRevId), '签出成功')} className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">签出/编辑</button>}
+                {canCheckin && <button onClick={() => setShowCheckinModal(true)} className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">签入/解锁</button>}
                 {canUndo && <button onClick={() => doAction(() => configurationApi.undocheckout(internalRevId), '已撤销签出')} className="px-3 py-1 bg-gray-500 text-white rounded text-xs hover:bg-gray-600">撤销签出</button>}
                 {canFreeze && <button onClick={() => doAction(() => configurationApi.freeze(internalRevId), '已冻结')} className="px-3 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600">冻结</button>}
+                {canUnfreeze && <button onClick={() => doAction(() => configurationApi.unfreeze(internalRevId), '已解冻')} className="px-3 py-1 bg-orange-500 text-white rounded text-xs hover:bg-orange-600">解冻</button>}
                 {canRelease && <button onClick={() => doAction(() => configurationApi.release(internalRevId), '已发布')} className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">发布</button>}
                 {canUpgrade && <button onClick={() => doAction(() => configurationApi.upgrade(internalRevId), '已升版')} className="px-3 py-1 bg-purple-600 text-white rounded text-xs hover:bg-purple-700">升版</button>}
                 {canObsolete && <button onClick={() => doAction(() => configurationApi.obsolete(internalRevId), '已作废')} className="px-3 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600">作废</button>}

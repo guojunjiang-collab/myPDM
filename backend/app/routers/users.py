@@ -6,14 +6,21 @@ from ..database import get_db
 from ..licensing.state import LicenseQuotaError, check_user_quota
 from ..models import User, UserGroupMember
 from .. import crud, schemas
+from .. import notifications as notif_svc
 from ..permissions import require_permission
 
 router = APIRouter(prefix="/users", tags=["用户管理"])
 
 @router.get("/", response_model=list[schemas.UserResponse])
-async def list_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(require_permission("users:read"))):
+async def list_users(
+    skip: int = 0,
+    limit: int = 100,
+    role: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("users:read")),
+):
     """用户列表。全角色可读（选人下拉依赖此接口），但手机号仅 admin 与本人可见。"""
-    users = crud.get_users(db, skip=skip, limit=limit)
+    users = crud.get_users(db, skip=skip, limit=limit, role=role)
     if current_user.role == "admin":
         return users
     return [
@@ -52,9 +59,15 @@ async def update_user(user_id: uuid.UUID, user_update: schemas.UserUpdate, db: S
             check_user_quota(db)
         except LicenseQuotaError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
+    old_role = existing.role
+
     db_user = crud.update_user(db, user_id, user_update)
     if not db_user:
         raise HTTPException(status_code=404, detail="用户不存在")
+
+    if old_role == "unverified" and user_update.role is not None and user_update.role != "unverified":
+        notif_svc.resolve_approval_notifications(db, user_id)
+
     # 管理员替他人重置密码 → 该用户下次登录必须重设；改自己的密码不算
     if user_update.password is not None and db_user.id != current_user.id:
         db_user.must_change_password = True

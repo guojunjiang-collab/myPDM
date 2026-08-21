@@ -234,10 +234,8 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
       const fieldValues = fieldDefs.map(def => ({
         field_id: def.id,
         value: customFieldValues[def.id] ?? null,
-      })).filter(fv => fv.value !== null && fv.value !== '');
-      if (fieldValues.length > 0) {
-        await customFieldsApi.setValues(cfType, entityId, fieldValues);
-      }
+      }));
+      await customFieldsApi.setValues(cfType, entityId, fieldValues);
       onSaved();
       onClose();
     } catch (error: any) {

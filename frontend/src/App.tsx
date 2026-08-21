@@ -4,6 +4,9 @@ import { useAuthStore } from './stores/auth';
 import Layout from './components/Layout';
 import { ToastContainer } from './components/Toast';
 import Login from './pages/Login';
+import FeishuCallback from './pages/FeishuCallback';
+import WechatCallback from './pages/WechatCallback';
+import PendingApproval from './pages/PendingApproval';
 import ForcePasswordChange from './pages/ForcePasswordChange';
 import Dashboard from './pages/Dashboard';
 import Board from './pages/Board';
@@ -31,6 +34,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (user?.must_change_password) {
     return <Navigate to="/change-password" replace />;
   }
+  if (user?.role === 'unverified') {
+    return <Navigate to="/pending-approval" replace />;
+  }
   return <>{children}</>;
 }
 
@@ -51,6 +57,9 @@ export default function App() {
       <ToastContainer />
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/feishu-callback" element={<FeishuCallback />} />
+        <Route path="/wechat-callback" element={<WechatCallback />} />
+        <Route path="/pending-approval" element={<PendingApproval />} />
         <Route path="/change-password" element={<ForcePasswordChangeRoute />} />
         <Route
           path="/stp-viewer"

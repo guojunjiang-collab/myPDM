@@ -34,6 +34,7 @@ const roleTag = (role: string) => {
     engineer: { label: '工程师', cls: 'bg-blue-100 text-blue-800' },
     production: { label: '生产人员', cls: 'bg-green-100 text-green-800' },
     guest: { label: '访客', cls: 'bg-gray-100 text-gray-800' },
+    unverified: { label: '未验证', cls: 'bg-yellow-100 text-yellow-800' },
   };
   return map[role] || { label: role, cls: 'bg-gray-100 text-gray-800' };
 };
@@ -62,7 +63,7 @@ export default function Users() {
   const [importStatus, setImportStatus] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [activeTab, setActiveTab] = useState<'users' | 'groups'>('users');
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'groups'>('all');
   const [groups, setGroups] = useState<Array<{ id: string; name: string; description?: string; member_count: number }>>([]);
   const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<{ id: string; name: string; description?: string } | null>(null);
@@ -92,6 +93,35 @@ export default function Users() {
     }
   };
 
+  const [unverifiedUsers, setUnverifiedUsers] = useState<User[]>([]);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+
+  const loadUnverifiedUsers = async () => {
+    try {
+      const res = await usersApi.list({ role: 'unverified', limit: 100 });
+      const data = res.data;
+      setUnverifiedUsers(Array.isArray(data) ? data : (data as any)?.items || []);
+    } catch {
+      /* handled silently */
+    }
+  };
+
+  const handleApprove = async (userId: string, newRole: string) => {
+    setApprovingId(userId);
+    try {
+      await usersApi.update(userId, { role: newRole });
+      await loadUnverifiedUsers();
+    } catch {
+      /* handled silently */
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'pending') loadUnverifiedUsers();
+  }, [activeTab]);
+
   const loadGroups = async () => {
     const res = await userGroupsApi.list();
     setGroups(Array.isArray(res.data) ? res.data : []);
@@ -115,7 +145,7 @@ export default function Users() {
       const rows = list.map((u) => ({
         '用户名': u.username,
         '姓名': u.real_name,
-        '角色': (() => { const m: Record<string, string> = { admin: '管理员', engineer: '工程师', production: '生产人员', guest: '访客' }; return m[u.role] || u.role; })(),
+        '角色': (() => { const m: Record<string, string> = { admin: '管理员', engineer: '工程师', production: '生产人员', guest: '访客', unverified: '未验证' }; return m[u.role] || u.role; })(),
         '部门': u.department || '',
         '电话': u.phone || '',
         '状态': u.status === 'active' ? '启用' : '禁用',
@@ -318,9 +348,22 @@ export default function Users() {
       {/* Tab 切换栏 */}
       <div className="flex gap-2 mb-4 border-b border-gray-200">
         <button
-          className={`px-4 py-2 -mb-px border-b-2 ${activeTab === 'users' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-gray-500'}`}
-          onClick={() => setActiveTab('users')}
-        >用户</button>
+          className={`px-4 py-2 -mb-px border-b-2 ${activeTab === 'all' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-gray-500'}`}
+          onClick={() => setActiveTab('all')}
+        >全部用户</button>
+        {isAdmin() && (
+          <button
+            className={`px-4 py-2 -mb-px border-b-2 ${activeTab === 'pending' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-gray-500'}`}
+            onClick={() => setActiveTab('pending')}
+          >
+            待审批
+            {unverifiedUsers.length > 0 && (
+              <span className="ml-1.5 px-1.5 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-800">
+                {unverifiedUsers.length}
+              </span>
+            )}
+          </button>
+        )}
         {can('user_groups:read' as any) && (
           <button
             className={`px-4 py-2 -mb-px border-b-2 ${activeTab === 'groups' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-gray-500'}`}
@@ -330,7 +373,7 @@ export default function Users() {
       </div>
 
       {/* 用户 Tab */}
-      {activeTab === 'users' && (
+      {activeTab === 'all' && (
         <>
       {/* 头部 */}
       <div className="flex items-center justify-between mb-4">
@@ -599,6 +642,61 @@ export default function Users() {
         onCancel={() => setResetId(null)}
       />
         </>
+      )}
+
+      {/* 待审批 Tab */}
+      {activeTab === 'pending' && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-700">
+              待审批用户 ({unverifiedUsers.length})
+            </h2>
+          </div>
+          {unverifiedUsers.length === 0 ? (
+            <div className="text-center py-16 text-gray-400">
+              <div className="text-4xl mb-3">&#x2705;</div>
+              <p>暂无待审批用户</p>
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead>
+                <tr className="border-b bg-gray-50 text-left text-sm text-gray-600">
+                  <th className="px-4 py-2.5">用户名</th>
+                  <th className="px-4 py-2.5">姓名</th>
+                  <th className="px-4 py-2.5">申请时间</th>
+                  <th className="px-4 py-2.5">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {unverifiedUsers.map((u) => (
+                  <tr key={u.id} className="border-b hover:bg-gray-50 text-sm">
+                    <td className="px-4 py-2.5 font-medium text-gray-800">{u.username}</td>
+                    <td className="px-4 py-2.5 text-gray-600">{u.real_name || '-'}</td>
+                    <td className="px-4 py-2.5 text-gray-500">{u.created_at?.slice(0, 10) || '-'}</td>
+                    <td className="px-4 py-2.5">
+                      {approvingId === u.id ? (
+                        <span className="text-gray-400 text-xs">处理中...</span>
+                      ) : (
+                        <select
+                          defaultValue=""
+                          onChange={(e) => {
+                            if (e.target.value) handleApprove(u.id, e.target.value);
+                          }}
+                          className="px-2 py-1 text-xs border border-gray-300 rounded bg-white cursor-pointer select-none whitespace-nowrap"
+                        >
+                          <option value="" disabled>审批</option>
+                          <option value="engineer">工程师</option>
+                          <option value="production">生产人员</option>
+                          <option value="guest">访客</option>
+                        </select>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       )}
 
       {/* 用户组 Tab */}

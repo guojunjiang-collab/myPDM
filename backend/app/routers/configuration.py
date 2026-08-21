@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
+from sqlalchemy import cast, String
 
 from app.database import get_db
 from app.models import DocumentRevision, DocumentMaster, DocumentIteration, DocumentAttachment, User as UModel
@@ -508,10 +509,23 @@ async def upgrade_config_item(
 async def freeze_config_item(
     revision_id: str,
     db: Session = Depends(get_db),
-    current_user=Depends(require_permission("configuration:update")),
+    current_user=Depends(require_permission("configuration:freeze")),
 ):
     """冻结构型项版本"""
     rev, err = crud.freeze_config_item(db, UUID(revision_id))
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    return {"ok": True, "status": rev.status}
+
+
+@router.post("/items/{revision_id}/unfreeze")
+async def unfreeze_config_item(
+    revision_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("configuration:unfreeze")),
+):
+    """解冻构型项版本"""
+    rev, err = crud.unfreeze_config_item(db, UUID(revision_id))
     if err:
         raise HTTPException(status_code=400, detail=err)
     return {"ok": True, "status": rev.status}
@@ -541,6 +555,121 @@ async def obsolete_config_item(
     if err:
         raise HTTPException(status_code=400, detail=err)
     return {"ok": True, "status": rev.status}
+
+
+@router.get("/items/{revision_id}/flatten-bom")
+async def get_flatten_bom(
+    revision_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_permission("configuration:read")),
+):
+    """展平BOM：递归展开该构型项关联的所有部件BOM，取叶节点零件，按(件号+版本)汇总数量并返回含自定义字段的清单"""
+    from app.models import CustomFieldValue, CustomFieldDefinition, BOMItem
+
+    current_iter = _get_current_iteration(db, UUID(revision_id))
+    if not current_iter:
+        raise HTTPException(status_code=400, detail="构型项无当前迭代")
+
+    parts = crud.get_iteration_parts(db, current_iter.id)
+
+    # 获取自定义字段定义（用于零部件）
+    cf_defs = db.query(CustomFieldDefinition).filter(
+        CustomFieldDefinition.applies_to.cast(String).like('%component%'),
+    ).order_by(CustomFieldDefinition.sort_order).all()
+
+    # 展平结果：{(master_id, revision_id): {code, name, spec, version, status, quantity, cf_values}}
+    flattened: dict[tuple, dict] = {}
+
+    def collect_leaf(revision_id: UUID, parent_qty: int, chain: list):
+        """递归收集叶节点零件"""
+        rev = db.query(PartRevision).filter(
+            PartRevision.id == revision_id, PartRevision.deleted_at.is_(None)
+        ).first()
+        if not rev:
+            return
+        master = db.query(PartMaster).filter(
+            PartMaster.id == rev.master_id, PartMaster.deleted_at.is_(None)
+        ).first()
+        if not master:
+            return
+
+        if master.type == "part":
+            key = (master.id, rev.id)
+            if key in flattened:
+                flattened[key]["quantity"] += parent_qty
+            else:
+                flattened[key] = {
+                    "code": master.code, "name": master.name, "spec": "",
+                    "version": rev.version, "status": rev.status, "quantity": parent_qty,
+                    "master_id": str(master.id), "revision_id": str(rev.id),
+                }
+        elif master.type == "assembly":
+            # 递归展开 BOM 子项
+            iteration = (
+                db.query(PartIteration)
+                .filter(
+                    PartIteration.revision_id == rev.id,
+                    PartIteration.iteration == rev.latest_iteration,
+                )
+                .first()
+            )
+            if not iteration:
+                return
+            bom_items = db.query(BOMItem).filter(
+                BOMItem.iteration_id == iteration.id, BOMItem.deleted_at.is_(None)
+            ).all()
+            for bom in bom_items:
+                child_qty = parent_qty * (bom.quantity or 1)
+                collect_leaf(bom.child_revision_id, child_qty, chain + [str(revision_id)])
+
+    for p in parts:
+        # 确定要展开的 revision_id
+        target_rev_id = p.revision_id
+        if not target_rev_id:
+            # 未指定版本时取最新版本
+            latest = (
+                db.query(PartRevision)
+                .filter(PartRevision.master_id == p.part_id, PartRevision.deleted_at.is_(None))
+                .order_by(PartRevision.created_at.desc())
+                .first()
+            )
+            target_rev_id = latest.id if latest else None
+        if target_rev_id:
+            collect_leaf(target_rev_id, p.quantity or 1, [])
+
+    # 批量查询自定义字段值
+    revision_ids = [UUID(item["revision_id"]) for item in flattened.values()]
+    cf_map: dict = {}
+    if revision_ids and cf_defs:
+        cf_rows = db.query(CustomFieldValue).filter(
+            CustomFieldValue.entity_type == "component",
+            CustomFieldValue.entity_id.in_(revision_ids),
+        ).all()
+        for row in cf_rows:
+            cf_map.setdefault(str(row.entity_id), {})[str(row.field_id)] = row.value
+
+    # 构建响应
+    items = []
+    for key, item in flattened.items():
+        cf_vals = cf_map.get(item["revision_id"], {})
+        row = {
+            "code": item["code"],
+            "name": item["name"],
+            "version": item["version"],
+            "quantity": item["quantity"],
+            "status": item["status"],
+        }
+        for d in cf_defs:
+            row[d.field_key] = cf_vals.get(str(d.id), "")
+        items.append(row)
+
+    # 按件号排序
+    items.sort(key=lambda x: x["code"])
+
+    return {
+        "items": items,
+        "field_defs": [{"field_key": d.field_key, "name": d.name} for d in cf_defs],
+    }
 
 
 @router.get("/items/{revision_id}/versions")
@@ -1591,6 +1720,7 @@ def _format_profile_item(item, entity_map: dict = None) -> dict:
         "source_config_item_iteration_id": str(item.source_config_item_iteration_id) if item.source_config_item_iteration_id else None,
         "item_type": item.item_type,
         "item_id": str(item.item_id),
+        "part_revision_id": str(item.part_revision_id) if item.part_revision_id else None,
         "item_code": item.item_code or "",
         "item_name": item.item_name or "",
         "item_version": entity.version if entity and hasattr(entity, 'version') else "",

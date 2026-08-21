@@ -8,7 +8,7 @@ import { useDataStore } from '../../stores/data';
 import { ECRStatusBadge, ECRPriorityBadge } from './ECRStatusBadge';
 import { ECRReviewPanel } from './ECRReviewPanel';
 import { ECRBomImpactView } from './ECRBomImpactView';
-import DocumentDetailContent from '../DocumentDetailContent';
+import DocumentDetailModal from '../DocumentDetailModal';
 import type { ECRRequest, ECRReviewRecord, ECRAffectedItem, ECRStatusLog, ECRDocumentLink, Document } from '../../types';
 
 const REASON_LABELS: Record<string, string> = {
@@ -75,7 +75,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
   const [actionLoading, setActionLoading] = useState(false);
   const [docDetails, setDocDetails] = useState<Record<string, any>>({});
   const [docAttachments, setDocAttachments] = useState<Record<string, any[]>>({});
-  const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
+  const [viewDocRevisionId, setViewDocRevisionId] = useState<string | null>(null);
   const [docCustomValues, setDocCustomValues] = useState<Record<string, Record<string, any>>>({});
 
   // Review action state
@@ -415,7 +415,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
                       return (
                         <tr key={link.document_id || idx}
                           className="hover:bg-gray-50 cursor-pointer"
-                          onClick={() => doc && setViewingDoc(doc)}>
+                          onClick={() => setViewDocRevisionId(link.document_id)}>
                           <td className="px-3 py-2 text-sm font-medium">{doc?.code || link.document_code}</td>
                           <td className="px-3 py-2 text-sm">{doc?.name || link.document_name}</td>
                           <td className="px-3 py-2 text-sm text-gray-500">{doc?.version || link.document_version || '-'}</td>
@@ -618,13 +618,14 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
     </Modal>
 
     {/* 图文档详情弹窗 */}
-    <Modal open={!!viewingDoc} title="图文档详情" onClose={() => setViewingDoc(null)} width="full">
-      {viewingDoc && (
-        <div className="max-h-[70vh] overflow-y-auto pr-1">
-          <DocumentDetailContent doc={viewingDoc} customFieldDefs={[]} customFieldValues={{}} />
-        </div>
-      )}
-    </Modal>
+    {viewDocRevisionId && (
+      <DocumentDetailModal
+        open={!!viewDocRevisionId}
+        revisionId={viewDocRevisionId}
+        onClose={() => setViewDocRevisionId(null)}
+        onSaved={() => loadDetail()}
+      />
+    )}
     </>
   );
 }

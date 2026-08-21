@@ -6,8 +6,7 @@ import { useAuthStore } from '../../stores/auth';
 import { useDataStore } from '../../stores/data';
 import type { ECORequest, ECRDocumentLink } from '../../types';
 import VersionSelectModal from '../VersionSelectModal';
-import PartDetailContent from '../PartDetailContent';
-import AssemblyDetailContent from '../AssemblyDetailContent';
+import PartDetailModal from '../PartDetailModal';
 import EntityEditModal from '../EntityEditModal';
 
 const statusTag = (s: string) => {
@@ -101,10 +100,8 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
   const [docCustomValues, setDocCustomValues] = useState<Record<string, Record<string, any>>>({});
   const [versionSelectState, setVersionSelectState] = useState<{ docId: string; oldDocId: string } | null>(null);
   const [releaseVersionState, setReleaseVersionState] = useState<{ itemIdx: number; entityType: string; entityId: string; entityName: string } | null>(null);
-  const [nestedDetail, setNestedDetail] = useState<{ type: string; id: string } | null>(null);
-  const [nestedData, setNestedData] = useState<any>(null);
-  const [nestedLoading, setNestedLoading] = useState(false);
-  const [nestedCustomFields, setNestedCustomFields] = useState<{ defs: any[]; values: Record<string, any> }>({ defs: [], values: {} });
+  const [viewPartMasterId, setViewPartMasterId] = useState<string | null>(null);
+  const [viewPartRevisionId, setViewPartRevisionId] = useState<string | null>(null);
   const [editEntity, setEditEntity] = useState<{ type: string; id: string } | null>(null);
   const [resetKey, setResetKey] = useState(0);
   const docFieldDefs = useDataStore((s) => s.customFieldDefs).filter((d) => d.applies_to?.includes('document'));
@@ -206,40 +203,25 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
   };
 
   const viewItem = async (entityType: string, entityId: string, mode?: 'view' | 'edit') => {
-    if (mode === 'edit') {
-      try {
-        const r = await partsApi.get(entityId);
-        const revId = r.latest_revision?.id;
-        if (revId) setEditEntity({ type: entityType, id: revId });
-      } catch { toast.error('加载失败'); }
-      return;
-    }
-    setNestedDetail({ type: entityType, id: entityId });
-    setNestedLoading(true);
+    // 统一使用最新的 PartDetailModal，不再区分为内联 EntityEditModal
     try {
-      const r = await partsApi.get(entityId);
-      const revId = r.latest_revision?.id;
-      setNestedData({
-        ...r,
-        master_id: r.id,
-        revision_id: revId,
-        version: r.latest_revision?.version,
-        status: r.latest_revision?.status,
-      });
+      const rev = await partsApi.getRevision(entityId);
+      setViewPartMasterId(rev.master_id);
+      setViewPartRevisionId(entityId);
+    } catch {
+      const releaseItem = (releaseItems || []).find((ri: any) =>
+        ri.entity_id === entityId
+      );
+      const fallbackId = releaseItem?.entity_id || entityId;
       try {
-        const allDefs = useDataStore.getState().customFieldDefs || [];
-        const defs = allDefs.filter((d: any) => d.applies_to?.includes('part'));
-        if (revId) {
-          const valsRes = await customFieldsApi.getValues('part', revId);
-          const vals: Record<string, any> = {};
-          (valsRes.data || []).forEach((v: any) => { vals[v.field_id] = v.value; });
-          setNestedCustomFields({ defs, values: vals });
-        } else {
-          setNestedCustomFields({ defs: [], values: {} });
-        }
-      } catch { setNestedCustomFields({ defs: [], values: {} }); }
-    } catch { toast.error('加载详情失败'); }
-    finally { setNestedLoading(false); }
+        const rev = await partsApi.getRevision(fallbackId);
+        setViewPartMasterId(rev.master_id);
+        setViewPartRevisionId(fallbackId);
+      } catch {
+        setViewPartMasterId(fallbackId);
+        setViewPartRevisionId(null);
+      }
+    }
   };
 
   const handleExecuteAction = async (action: string, itemId: string, newEntityId?: string, entityInfo?: { entity_type: string; entity_id: string; entity_code: string; entity_name: string; action: string }) => {
@@ -266,9 +248,10 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
           updated.new_version = result.data?.new_version;
           updated.new_entity_status = 'draft';
         } else if (action === 'revert') {
-          updated.new_entity_id = undefined;
-          updated.new_version = undefined;
-          updated.new_entity_status = undefined;
+          const newStatus = result.data?.new_entity_status;
+          updated.new_entity_id = newStatus ? (result.data?.new_entity_id || updated.new_entity_id) : undefined;
+          updated.new_version = newStatus ? (result.data?.new_version || updated.new_version) : undefined;
+          updated.new_entity_status = newStatus || undefined;
         } else if (action === 'freeze') {
           updated.new_entity_status = 'frozen';
         }
@@ -740,18 +723,14 @@ onExecuteFreeze={(itemId, newEntityId) => handleExecuteAction('freeze', itemId, 
           });
         }} />
 
-      {/* 嵌套详情弹窗 */}
-      {nestedDetail && (
-        <Modal open={true} title={nestedDetail.type === 'assembly' ? '部件详情' : '零件详情'} onClose={() => { setNestedDetail(null); setNestedData(null); }} width="full">
-          {nestedLoading ? <div className="text-center py-8 text-sm text-gray-400">加载中...</div>
-          : nestedData ? (
-            nestedDetail.type === 'assembly' ? (
-              <AssemblyDetailContent assembly={nestedData} customFieldDefs={nestedCustomFields.defs} customFieldValues={nestedCustomFields.values} />
-            ) : (
-              <PartDetailContent part={nestedData} customFieldDefs={nestedCustomFields.defs} customFieldValues={nestedCustomFields.values} />
-            )
-          ) : <div className="text-center py-8 text-sm text-gray-400">未找到数据</div>}
-        </Modal>
+      {/* 零件/部件详情弹窗 */}
+      {viewPartMasterId && (
+        <PartDetailModal
+          masterId={viewPartMasterId}
+          revisionId={viewPartRevisionId || undefined}
+          open={!!viewPartMasterId}
+          onClose={() => { setViewPartMasterId(null); setViewPartRevisionId(null); }}
+        />
       )}
 
       {/* 编辑弹窗 */}

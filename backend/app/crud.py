@@ -34,8 +34,11 @@ def get_user(db, user_id):
 def get_user_by_username(db, username):
     return db.query(models.User).filter(models.User.username == username).first()
 
-def get_users(db, skip=0, limit=100):
-    return db.query(models.User).offset(skip).limit(limit).all()
+def get_users(db, skip=0, limit=100, role=None):
+    q = db.query(models.User)
+    if role:
+        q = q.filter(models.User.role == role)
+    return q.offset(skip).limit(limit).all()
 
 def create_user(db, user):
     hashed_password = get_password_hash(user.password)
@@ -81,6 +84,198 @@ def authenticate_user(db, username, password):
     if not verify_password(password, user.password_hash):
         return False
     return user
+
+def get_feishu_binding(db, provider, union_id):
+    return db.query(models.UserFeishuBinding).filter(
+        models.UserFeishuBinding.provider == provider,
+        models.UserFeishuBinding.union_id == union_id,
+    ).first()
+
+
+def _unique_username(db, name):
+    import re
+    import secrets
+    base = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff_-]", "", (name or "")).strip()[:32]
+    if len(base) < 3:
+        base = f"feishu_{secrets.token_hex(3)}"
+    candidate = base
+    i = 1
+    while db.query(models.User).filter(models.User.username == candidate).first():
+        candidate = f"{base[:24]}_{i}"
+        i += 1
+    return candidate
+
+
+def find_or_create_feishu_user(db, provider, feishu_user):
+    """按 (provider, union_id) 找绑定；不存在则自动建 guest 用户 + 绑定。"""
+    import secrets
+    union_id = feishu_user["union_id"]
+    binding = get_feishu_binding(db, provider, union_id)
+    if binding:
+        binding.name = feishu_user.get("name") or binding.name
+        binding.avatar_url = feishu_user.get("avatar_url") or binding.avatar_url
+        db_user = db.query(models.User).filter(models.User.id == binding.user_id).first()
+        if db_user and feishu_user.get("name"):
+            db_user.real_name = feishu_user["name"]
+        db.commit()
+        return db_user
+
+    name = feishu_user.get("name") or ""
+    username = _unique_username(db, name)
+    random_password = secrets.token_urlsafe(16)
+    db_user = models.User(
+        username=username,
+        password_hash=get_password_hash(random_password),
+        real_name=name or username,
+        role="unverified",
+        status="active",
+        must_change_password=False,
+    )
+    db.add(db_user)
+    db.flush()
+    db.add(models.UserFeishuBinding(
+        provider=provider,
+        union_id=union_id,
+        open_id=feishu_user.get("open_id"),
+        name=name or None,
+        avatar_url=feishu_user.get("avatar_url"),
+        user_id=db_user.id,
+    ))
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+
+def bind_feishu_to_user(db, provider: str, union_id: str, user_id, feishu_user: dict):
+    """把 (provider, union_id) 绑定到指定用户。
+    已绑 guest 时改绑并停用 guest；已绑其他正式账号时抛 ValueError。"""
+    binding = get_feishu_binding(db, provider, union_id)
+    if binding and binding.user_id != user_id:
+        old_user = db.query(models.User).filter(models.User.id == binding.user_id).first()
+        if not (old_user and old_user.role == "guest"):
+            raise ValueError("该飞书身份已绑定其他账号")
+        old_user.status = "disabled"
+    if not binding:
+        binding = models.UserFeishuBinding(
+            provider=provider, union_id=union_id, user_id=user_id,
+        )
+        db.add(binding)
+    binding.user_id = user_id
+    binding.name = feishu_user.get("name") or binding.name
+    binding.avatar_url = feishu_user.get("avatar_url") or binding.avatar_url
+    binding.open_id = feishu_user.get("open_id") or binding.open_id
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if db_user and feishu_user.get("name"):
+        db_user.real_name = feishu_user["name"]
+    db.commit()
+    return db_user
+
+
+def get_user_feishu_bindings(db, user_id):
+    return db.query(models.UserFeishuBinding).filter(
+        models.UserFeishuBinding.user_id == user_id,
+    ).order_by(models.UserFeishuBinding.provider).all()
+
+
+def unbind_feishu(db, user_id, provider):
+    """解除用户指定飞书入口的绑定。返回删除条数（0 或 1）。"""
+    n = db.query(models.UserFeishuBinding).filter(
+        models.UserFeishuBinding.user_id == user_id,
+        models.UserFeishuBinding.provider == provider,
+    ).delete(synchronize_session=False)
+    db.commit()
+    return n
+
+
+# ───────────────────────── 微信免登绑定（PC 扫码登录） ─────────────────────────
+
+def get_wechat_binding(db, provider, union_id):
+    return db.query(models.UserWechatBinding).filter(
+        models.UserWechatBinding.provider == provider,
+        models.UserWechatBinding.union_id == union_id,
+    ).first()
+
+
+def find_or_create_wechat_user(db, provider, wechat_user):
+    """按 (provider, union_id) 找绑定；不存在则自动建 unverified 用户 + 绑定。"""
+    import secrets
+    union_id = wechat_user["union_id"]
+    binding = get_wechat_binding(db, provider, union_id)
+    if binding:
+        binding.name = wechat_user.get("name") or binding.name
+        binding.avatar_url = wechat_user.get("avatar_url") or binding.avatar_url
+        db_user = db.query(models.User).filter(models.User.id == binding.user_id).first()
+        if db_user and wechat_user.get("name"):
+            db_user.real_name = wechat_user["name"]
+        db.commit()
+        return db_user
+
+    name = wechat_user.get("name") or ""
+    username = _unique_username(db, name)
+    random_password = secrets.token_urlsafe(16)
+    db_user = models.User(
+        username=username,
+        password_hash=get_password_hash(random_password),
+        real_name=name or username,
+        role="unverified",
+        status="active",
+        must_change_password=False,
+    )
+    db.add(db_user)
+    db.flush()
+    db.add(models.UserWechatBinding(
+        provider=provider,
+        union_id=union_id,
+        open_id=wechat_user.get("open_id"),
+        name=name or None,
+        avatar_url=wechat_user.get("avatar_url"),
+        user_id=db_user.id,
+    ))
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+
+def bind_wechat_to_user(db, provider: str, union_id: str, user_id, wechat_user: dict):
+    """把 (provider, union_id) 绑定到指定用户。
+    已绑 guest 时改绑并停用 guest；已绑其他正式账号时抛 ValueError。"""
+    binding = get_wechat_binding(db, provider, union_id)
+    if binding and binding.user_id != user_id:
+        old_user = db.query(models.User).filter(models.User.id == binding.user_id).first()
+        if not (old_user and old_user.role == "guest"):
+            raise ValueError("该微信身份已绑定其他账号")
+        old_user.status = "disabled"
+    if not binding:
+        binding = models.UserWechatBinding(
+            provider=provider, union_id=union_id, user_id=user_id,
+        )
+        db.add(binding)
+    binding.user_id = user_id
+    binding.name = wechat_user.get("name") or binding.name
+    binding.avatar_url = wechat_user.get("avatar_url") or binding.avatar_url
+    binding.open_id = wechat_user.get("open_id") or binding.open_id
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if db_user and wechat_user.get("name"):
+        db_user.real_name = wechat_user["name"]
+    db.commit()
+    return db_user
+
+
+def get_user_wechat_bindings(db, user_id):
+    return db.query(models.UserWechatBinding).filter(
+        models.UserWechatBinding.user_id == user_id,
+    ).order_by(models.UserWechatBinding.provider).all()
+
+
+def unbind_wechat(db, user_id, provider):
+    """解除用户指定微信入口的绑定。返回删除条数（0 或 1）。"""
+    n = db.query(models.UserWechatBinding).filter(
+        models.UserWechatBinding.user_id == user_id,
+        models.UserWechatBinding.provider == provider,
+    ).delete(synchronize_session=False)
+    db.commit()
+    return n
+
 
 # [REMOVED: old assert_entity_editable for component system]
 

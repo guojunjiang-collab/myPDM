@@ -137,7 +137,7 @@ export default function Layout() {
       {/* 侧边栏 */}
       <aside className="w-56 min-w-56 bg-white border-r border-gray-200 flex flex-col">
         <div className="h-14 bg-white border-b border-gray-200 flex items-center px-4">
-          <h1 className="text-lg font-semibold">🏗️ PDM系统</h1>
+          <h1 className="text-lg font-semibold">🏗️ {import.meta.env.VITE_APP_TITLE || 'PDM系统'}</h1>
         </div>
         <nav className="flex-1 p-2">
           {visibleNavItems.map((item, idx) =>
@@ -165,7 +165,7 @@ export default function Layout() {
               {syncMsg}
             </div>
           )}
-          <div className="text-xs text-gray-400 text-center">{APP_VERSION} · PDM系统</div>
+          <div className="text-xs text-gray-400 text-center">{APP_VERSION} · {import.meta.env.VITE_APP_TITLE || 'PDM系统'}</div>
         </div>
       </aside>
 
@@ -200,7 +200,7 @@ export default function Layout() {
             <NotificationBell />
             <span className="text-sm text-gray-700">{user?.real_name}</span>
             <span className={`px-2 py-0.5 text-xs rounded-full ${user?.role === 'admin' ? 'bg-red-100 text-red-700' : user?.role === 'engineer' ? 'bg-blue-100 text-blue-700' : user?.role === 'production' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
-              {{ admin: '管理员', engineer: '工程师', production: '生产人员', guest: '访客' }[user?.role || 'guest'] || user?.role}
+              {{ admin: '管理员', engineer: '工程师', production: '生产人员', guest: '访客', unverified: '未验证' }[user?.role || 'guest'] || user?.role}
             </span>
             <span className="text-gray-300">|</span>
             {/* 自动同步已启用，手动检出改为小图标 */}

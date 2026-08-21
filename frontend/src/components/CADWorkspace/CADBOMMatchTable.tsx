@@ -97,7 +97,9 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
   const leftBodyRef = useRef<HTMLTableSectionElement>(null);
   const pushingKeys = useRef<Set<string>>(new Set());
   const rightBodyRef = useRef<HTMLTableSectionElement>(null);
-  const rightHeadRef = useRef<HTMLDivElement>(null);
+  const leftScrollRef = useRef<HTMLDivElement>(null);
+  const rightScrollRef = useRef<HTMLDivElement>(null);
+  const isSyncingScroll = useRef(false);
 
   // 加载 PDM 自定义字段定义（筛选适用于零部件的）与 CATIA-PDM 字段映射
   useEffect(() => {
@@ -200,6 +202,25 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
     return () => obs.disconnect();
   }, [visibleRows, propertyColumns.length]);
 
+  // 左右两侧垂直滚动同步，防止水平滚动条被垂直滚动条推到底部不可见
+  const handleLeftScroll = useCallback(() => {
+    if (isSyncingScroll.current) return;
+    isSyncingScroll.current = true;
+    if (leftScrollRef.current && rightScrollRef.current) {
+      rightScrollRef.current.scrollTop = leftScrollRef.current.scrollTop;
+    }
+    requestAnimationFrame(() => { isSyncingScroll.current = false; });
+  }, []);
+
+  const handleRightScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    if (isSyncingScroll.current) return;
+    isSyncingScroll.current = true;
+    if (rightScrollRef.current && leftScrollRef.current) {
+      leftScrollRef.current.scrollTop = rightScrollRef.current.scrollTop;
+    }
+    requestAnimationFrame(() => { isSyncingScroll.current = false; });
+  }, []);
+
   // 行内编辑写回 CAD：防抖处理。
   // 单元格值由 onChange 的乐观 setRows 立即更新（唯一显示事实源）；写回 CAD 用
   // 防抖，避免每敲一键就发一次 COM 写入——SolidWorks 写入含重建/保存(轻量化件还要
@@ -230,11 +251,118 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
     Object.keys(pendingWrites.current).forEach(id => { void flushWrite(id); });
   }, [flushWrite]);
 
-  // 提交一次编辑：乐观更新表格 + 防抖写回 CAD
+  // PDM 写入防抖：行内编辑后自动同步字段值到 PDM，
+  // 避免用户清空输入框后 CAD 变空而 PDM 仍有旧值导致绿色回退显示
+  const pdmWriteTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const pdmPendingWrites = useRef<Record<string, {
+    masterId: string;
+    revisionId: string;
+    masterUpdates: Record<string, string>;
+    cfValues: Record<string, string | number>;
+  }>>({});
+
+  const flushPdmWrite = useCallback(async (revisionId: string) => {
+    const timer = pdmWriteTimers.current[revisionId];
+    if (timer) { clearTimeout(timer); delete pdmWriteTimers.current[revisionId]; }
+    const p = pdmPendingWrites.current[revisionId];
+    if (!p) return;
+    delete pdmPendingWrites.current[revisionId];
+
+    if (Object.keys(p.masterUpdates).length > 0) {
+      try {
+        await partsApi.update(p.masterId, p.masterUpdates);
+      } catch (e: any) {
+        toast.error(e?.response?.data?.detail || 'PDM 写入失败');
+      }
+    }
+
+    if (Object.keys(p.cfValues).length > 0) {
+      try {
+        const values = Object.entries(p.cfValues).map(([field_id, value]) => ({ field_id, value }));
+        await customFieldsApi.setValues('component', p.revisionId, values);
+      } catch { /* 忽略 */ }
+    }
+
+    // 刷新 PDM 对比基准，使编辑后的字段颜色恢复常态
+    try {
+      const cfRes = await customFieldsApi.getValuesBatch({ type: 'component', ids: p.revisionId });
+      setPdmCfValues(prev => ({ ...prev, ...(cfRes.data || {}) }));
+    } catch { /* 忽略 */ }
+    if (p.masterUpdates.name !== undefined) {
+      setRows(prev => prev.map(r => r.pdm_match?.revision_id === p.revisionId
+        ? { ...r, pdm_match: { ...r.pdm_match!, name: p.masterUpdates.name } }
+        : r));
+    }
+  }, []);
+
+  const schedulePdmWrite = useCallback((row: BOMRow, pdmTarget: string, value: string) => {
+    const revId = row.pdm_match?.revision_id;
+    const masterId = row.pdm_match?.master_id;
+    if (!revId || !masterId) return;
+
+    const id = revId;
+    if (!pdmPendingWrites.current[id]) {
+      pdmPendingWrites.current[id] = {
+        masterId,
+        revisionId: revId,
+        masterUpdates: {},
+        cfValues: {},
+      };
+    }
+
+    const entry = pdmPendingWrites.current[id];
+
+    if (pdmTarget === 'name' || pdmTarget === 'spec') {
+      entry.masterUpdates[pdmTarget] = value;
+    } else {
+      const def = fieldDefsRef.current?.find((d: any) => d.name === pdmTarget);
+      if (!def) return;
+      entry.cfValues[def.id] = def.field_type === 'number'
+        ? (parseFloat(value) || 0)
+        : value;
+    }
+
+    if (pdmWriteTimers.current[id]) clearTimeout(pdmWriteTimers.current[id]);
+    pdmWriteTimers.current[id] = setTimeout(() => { void flushPdmWrite(id); }, 300);
+  }, [flushPdmWrite]);
+
+  // 卸载时冲刷未落盘的 PDM 编辑
+  useEffect(() => () => {
+    Object.keys(pdmPendingWrites.current).forEach(id => { void flushPdmWrite(id); });
+  }, [flushPdmWrite]);
+
+  // 提交一次编辑：乐观更新表格 + 防抖写回 CAD + 同步写回 PDM
   const commitEdit = useCallback((row: BOMRow, key: string, value: string, target: 'user' | 'builtin' = 'user') => {
     setRows(prev => syncRowsByPartNumber(prev, row, key, value, target));
     scheduleWrite(row.path, key, value);
-  }, [scheduleWrite]);
+
+    if (row.pdm_match?.revision_id && row.pdm_match?.master_id) {
+      const revId = row.pdm_match.revision_id;
+      const m = mappingRef.current || DEFAULT_FIELD_MAPPING;
+      if (target === 'builtin') {
+        const pdmTarget = m.builtin[key];
+        if (pdmTarget === 'name') {
+          setRows(prev => prev.map(r => r.pdm_match?.revision_id === revId
+            ? { ...r, pdm_match: { ...r.pdm_match!, name: value } }
+            : r));
+          schedulePdmWrite(row, 'name', value);
+        }
+      } else {
+        const pdmTarget = m.properties[key];
+        if (pdmTarget) {
+          const def = fieldDefsRef.current?.find((d: any) => d.name === pdmTarget);
+          if (def) {
+            setPdmCfValues(prev => {
+              const revData = { ...(prev[revId] || {}) };
+              revData[def.field_key] = value;
+              return { ...prev, [revId]: revData };
+            });
+          }
+          schedulePdmWrite(row, pdmTarget, value);
+        }
+      }
+    }
+  }, [scheduleWrite, schedulePdmWrite]);
 
   const [matching, setMatching] = useState(false);
   // 各版本附件计数（cad/production），显示在附件列按钮上方
@@ -715,11 +843,10 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
       </div>
 
       {/* 表格：左侧固定列 + 右侧自定义字段独立水平滚动 */}
-      <div className="flex-1 min-h-0">
-        <div className="h-full overflow-y-auto overflow-x-hidden">
-          <div className="flex items-start">
-            {/* ====== 左表：固定列 ====== */}
-            <table className="shrink-0 border-collapse text-xs whitespace-nowrap">
+      <div className="flex-1 min-h-0 flex">
+        <div ref={leftScrollRef} className="shrink-0 overflow-y-auto overflow-x-hidden" onScroll={handleLeftScroll}>
+          {/* ====== 左表：固定列 ====== */}
+          <table className="border-collapse text-xs whitespace-nowrap">
               <thead className="sticky top-0 z-10">
                 <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
                   <th className="p-2 text-left" style={{ width: 180, paddingLeft: 28 }}>件号</th>
@@ -854,80 +981,68 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                 })}
               </tbody>
             </table>
+        </div>
 
-            {/* ====== 右区：自定义字段 ====== */}
-            <div className="flex-1 min-w-0 border-l-2 border-gray-200">
-              {/* 表头：sticky top-0 纵向冻结；overflow-hidden 使其可被 JS 横向同步滚动，
-                  scrollbarGutter 与数据区一致以保证列宽像素对齐 */}
-              <div ref={rightHeadRef} className="sticky top-0 z-10 overflow-hidden" style={{ scrollbarGutter: 'stable' }}>
-                <table className="border-separate border-spacing-0 text-xs whitespace-nowrap w-full">
-                  <thead>
-                    <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
-                      {propertyColumns.map(col => (
-                        <th key={col} className="p-2 text-left" style={{ minWidth: 100 }}>{col}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                </table>
-              </div>
-              {/* 数据：在overflow内，可水平滚动；滚动时同步抬头横向位置使列头与列内容对齐 */}
-              <div className="overflow-x-auto" style={{ scrollbarGutter: 'stable', overflowY: 'clip' }}
-                onScroll={e => { if (rightHeadRef.current) rightHeadRef.current.scrollLeft = e.currentTarget.scrollLeft; }}>
-                <table className="border-separate border-spacing-0 text-xs whitespace-nowrap w-full">
-                  <tbody ref={rightBodyRef}>
-                    {visibleRows.map((row, vi) => {
-                      const ri = rows.indexOf(row);
-                      return (
-                      <tr key={row.path}
-                        onMouseEnter={() => setHoveredIndex(ri)}
-                        onMouseLeave={() => setHoveredIndex(null)}
-                        className={`transition-colors ${hoveredIndex === ri ? hoverClass(row) : ''}`}>
-                        {propertyColumns.map(col => {
-                          const catiaProp = getCatiaPropForPdmField(col);
-                          const fieldDef = fieldDefs.find((d: any) => d.name === col);
-                          const cadValue = catiaProp ? (row.user_properties[catiaProp] || '') : '';
-                          const revId = row.pdm_match?.revision_id;
-                          // 批量接口返回值按 field_key 索引（非 field_id）
-                          const pdmRaw = revId && fieldDef ? pdmCfValues[revId]?.[fieldDef.field_key] : undefined;
-                          const pdmValue = pdmRaw == null ? '' : (Array.isArray(pdmRaw) ? pdmRaw.join(', ') : String(pdmRaw));
-                          // CAD 有值显示 CAD；CAD 空且 PDM 有值→回退显示 PDM（绿色）；
-                          // CAD/PDM 都有但不同→显示 CAD（红色，提示冲突）
-                          const fromPdm = cadValue === '' && pdmValue !== '';
-                          const sameVal = fieldDef?.field_type === 'number'
-                            ? Number(cadValue) === Number(pdmValue)
-                            : cadValue.trim() === pdmValue.trim();
-                          const conflict = cadValue !== '' && pdmValue !== '' && !sameVal;
-                          const value = fromPdm ? pdmValue : cadValue;
-                          const toneCls = fromPdm ? ' text-green-600 border-green-400'
-                            : conflict ? ' text-red-600 border-red-400' : '';
-                          const title = fromPdm ? `PDM 值（CAD 为空）: ${pdmValue}`
-                            : conflict ? `与 PDM 不同 — CAD: ${cadValue} / PDM: ${pdmValue}` : undefined;
-                          const isSelect = fieldDef?.field_type === 'select' && fieldDef?.options?.length > 0;
-                          return (
-                            <td key={col} className="p-2 border-b border-gray-200" style={{ minWidth: 100 }} title={title}>
-                              {isSelect ? (
-                                <select value={value} disabled={!canEditProps(row) || !catiaProp}
-                                  onChange={e => { if (!catiaProp) return; commitEdit(row, catiaProp, e.target.value); }}
-                                  className={`border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200${toneCls}`}>
-                                  <option value="">—</option>
-                                  {fieldDef.options.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
-                                </select>
-                              ) : (
-                                <input value={value} disabled={!canEditProps(row) || !catiaProp}
-                                  onChange={e => { if (!catiaProp) return; commitEdit(row, catiaProp, e.target.value); }}
-                                  className={`border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200${toneCls}`} />
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+        {/* ====== 右区：自定义字段（单表结构，表头 sticky，保证列宽对齐） ====== */}
+        <div ref={rightScrollRef} className="flex-1 min-w-0 border-l-2 border-gray-200 overflow-auto" onScroll={handleRightScroll}>
+          <table className="border-collapse text-xs whitespace-nowrap w-full">
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
+                {propertyColumns.map(col => (
+                  <th key={col} className="p-2 text-left" style={{ width: 250 }}>{col}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody ref={rightBodyRef}>
+              {visibleRows.map((row, vi) => {
+                const ri = rows.indexOf(row);
+                return (
+                <tr key={row.path}
+                  onMouseEnter={() => setHoveredIndex(ri)}
+                  onMouseLeave={() => setHoveredIndex(null)}
+                  className={`border-b border-gray-200 transition-colors ${hoveredIndex === ri ? hoverClass(row) : ''}`}>
+                  {propertyColumns.map(col => {
+                    const catiaProp = getCatiaPropForPdmField(col);
+                    const fieldDef = fieldDefs.find((d: any) => d.name === col);
+                    const cadValue = catiaProp ? (row.user_properties[catiaProp] || '') : '';
+                    const revId = row.pdm_match?.revision_id;
+                    const pdmRaw = revId && fieldDef ? pdmCfValues[revId]?.[fieldDef.field_key] : undefined;
+                    const pdmValue = pdmRaw == null ? '' : (Array.isArray(pdmRaw) ? pdmRaw.join(', ') : String(pdmRaw));
+                    const fromPdm = cadValue === '' && pdmValue !== '';
+                    const sameVal = fieldDef?.field_type === 'number'
+                      ? Number(cadValue) === Number(pdmValue)
+                      : cadValue.trim() === pdmValue.trim();
+                    const conflict = cadValue !== '' && pdmValue !== '' && !sameVal;
+                    const value = fromPdm ? pdmValue : cadValue;
+                    const toneCls = fromPdm ? ' text-green-600 border-green-400'
+                      : conflict ? ' text-red-600 border-red-400' : '';
+                    const title = fromPdm ? `PDM 值（CAD 为空）: ${pdmValue}`
+                      : conflict ? `与 PDM 不同 — CAD: ${cadValue} / PDM: ${pdmValue}` : undefined;
+                    const isSelect = fieldDef?.field_type === 'select' && fieldDef?.options?.length > 0;
+                    return (
+                      <td key={col} className="p-2" style={{ width: 250, maxWidth: 250 }} title={title}>
+                        {isSelect ? (
+                          <select value={value} disabled={!canEditProps(row) || !catiaProp}
+                            onChange={e => { if (!catiaProp) return; commitEdit(row, catiaProp, e.target.value); }}
+                            title={value || undefined}
+                            className={`border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200 truncate${toneCls}`}>
+                            <option value="">—</option>
+                            {fieldDef.options.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
+                          </select>
+                        ) : (
+                          <input value={value} disabled={!canEditProps(row) || !catiaProp}
+                            onChange={e => { if (!catiaProp) return; commitEdit(row, catiaProp, e.target.value); }}
+                            title={value || undefined}
+                            className={`border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200 truncate${toneCls}`} />
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
 

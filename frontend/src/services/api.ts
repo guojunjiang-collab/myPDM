@@ -103,6 +103,17 @@ export const authApi = {
       old_password: oldPassword,
       new_password: newPassword,
     }),
+  feishuConfig: () => api.get('/auth/feishu/config'),
+  feishuJsapiLogin: (provider: string, code: string) =>
+    api.post('/auth/feishu/jsapi', { provider, code }),
+  feishuBindIntent: (provider: string) => api.post('/auth/feishu/bind-intent', { provider }),
+  feishuBindings: () => api.get('/auth/feishu/bindings'),
+  feishuUnbind: (provider: string) => api.delete(`/auth/feishu/bindings/${provider}`).then((r) => r.data),
+  wechatConfig: () => api.get('/auth/wechat/config'),
+  wechatBindIntent: (provider: string) => api.post('/auth/wechat/bind-intent', { provider }),
+  wechatBindings: () => api.get('/auth/wechat/bindings'),
+  wechatUnbind: (provider: string) => api.delete(`/auth/wechat/bindings/${provider}`).then((r) => r.data),
+  requestApproval: () => api.post('/notifications/request-approval').then((r) => r.data),
 };
 
 // 零部件 API (v2 统一接口)
@@ -252,6 +263,8 @@ export const documentsApi = {
   // 状态变更
   freeze: (revisionId: string) =>
     api.post(`/documents/${revisionId}/freeze`),
+  unfreeze: (revisionId: string) =>
+    api.post(`/documents/${revisionId}/unfreeze`),
   release: (revisionId: string) =>
     api.post(`/documents/${revisionId}/release`),
   obsolete: (revisionId: string) =>
@@ -291,8 +304,6 @@ export const documentsApi = {
   get: function(revisionId: string) { return api.get(`/documents/${revisionId}`); },
   /** @deprecated 使用 del() */
   delete: function(revisionId: string) { return api.delete(`/documents/${revisionId}`); },
-  /** @deprecated 后端不再支持 unfreeze，仅用于过渡期 */
-  unfreeze: function(revisionId: string) { return api.post(`/documents/${revisionId}/unfreeze`); },
 };
 
 // BOM API
@@ -314,7 +325,7 @@ export const bomApi = {
 
 // 用户 API
 export const usersApi = {
-  list: (params?: { page?: number; page_size?: number; search?: string; skip?: number; limit?: number }) =>
+  list: (params?: { page?: number; page_size?: number; search?: string; skip?: number; limit?: number; role?: string }) =>
     api.get('/users/', { params }),
   get: (id: string) => api.get(`/users/${id}`),
   create: (data: unknown) => api.post('/users/', data),
@@ -788,6 +799,8 @@ export const configurationApi = {
     api.post(`/configurations/items/${revisionId}/upgrade`).then(r => r.data),
   freeze: (revisionId: string) =>
     api.post(`/configurations/items/${revisionId}/freeze`).then(r => r.data),
+  unfreeze: (revisionId: string) =>
+    api.post(`/configurations/items/${revisionId}/unfreeze`).then(r => r.data),
   release: (revisionId: string) =>
     api.post(`/configurations/items/${revisionId}/release`).then(r => r.data),
   obsolete: (revisionId: string) =>
@@ -800,6 +813,8 @@ export const configurationApi = {
     api.get<any[]>(`/configurations/items/${revisionId}/iterations`).then(r => r.data),
   deleteIteration: (revisionId: string, iterationId: string) =>
     api.delete(`/configurations/items/${revisionId}/iterations/${iterationId}`).then(r => r.data),
+  flattenBom: (revisionId: string) =>
+    api.get<{ items: any[]; field_defs: { field_key: string; name: string }[] }>(`/configurations/items/${revisionId}/flatten-bom`).then(r => r.data),
 };
 
 export interface ConfigPreviewTreeNode {

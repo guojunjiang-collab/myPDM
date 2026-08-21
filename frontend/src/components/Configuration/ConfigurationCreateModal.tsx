@@ -181,10 +181,8 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
         const fieldValues = cfDefs.map(def => ({
           field_id: def.id,
           value: cfValues[def.id] ?? null,
-        })).filter(fv => fv.value !== null && fv.value !== '');
-        if (fieldValues.length > 0) {
-          await customFieldsApi.setValues('configuration_item', configId, fieldValues);
-        }
+        }));
+        await customFieldsApi.setValues('configuration_item', configId, fieldValues);
       }
       onSaved();
     } catch (e: any) {

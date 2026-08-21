@@ -49,3 +49,5 @@ tools/license_issuer/keys/
 licenses/
 issued.csv
 backend/*.tar
+# Vite 构建临时文件
+frontend/vite.config.ts.timestamp-*.mjs

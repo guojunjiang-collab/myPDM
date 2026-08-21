@@ -12,10 +12,9 @@ from datetime import datetime, timezone
 from app.database import SessionLocal
 from app.models_eco import ECO, ECOExecutionItem, ECOReviewRecord, ECOStatusLog
 from app.models import User, BOMItem
-from app.models_parts import PartMaster, PartRevision
+from app.models_parts import PartMaster, PartRevision, PartIteration
 from app.schemas_eco import ECOCreate, ECOEdit, ECOListParams, ECOExecutionItemCreate, ECOExecutionItemEdit
-from app.crud import _get_next_version
-from . import notifications as _notif
+from . import crud_parts, notifications as _notif
 
 # ─────────────────────────────────────────────────────
 # 状态流转规则
@@ -28,28 +27,6 @@ _ALLOWED_TRANSITIONS = {
     "completed": set(),
     "rejected":  {"draft"},
 }
-
-VERSION_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-
-def _next_version(current: str) -> str:
-    """计算下一个版本号：A→B, B→C, ..., Z→AA"""
-    if not current:
-        return "A"
-    chars = list(current.upper())
-    i = len(chars) - 1
-    while i >= 0:
-        idx = VERSION_CHARS.index(chars[i]) if chars[i] in VERSION_CHARS else -1
-        if idx >= 0 and idx < len(VERSION_CHARS) - 1:
-            chars[i] = VERSION_CHARS[idx + 1]
-            return "".join(chars)
-        elif idx == len(VERSION_CHARS) - 1:
-            chars[i] = "A"
-            i -= 1
-        else:
-            break
-    return "A" + "".join(chars)
-
 
 def _validate_transition(current_status: str, new_status: str):
     """校验状态流转合法性"""
@@ -361,10 +338,36 @@ def delete_eco(db: Session, eco_id: uuid.UUID) -> bool:
     return True
 
 
+def _resolve_revision(db: Session, entity_id) -> PartRevision | None:
+    """将 entity_id 解析为 PartRevision，兼容旧数据中的 master_id"""
+    eid = uuid.UUID(str(entity_id))
+    rev = db.query(PartRevision).filter(PartRevision.id == eid, PartRevision.deleted_at.is_(None)).first()
+    if rev:
+        return rev
+    # 旧数据兼容：entity_id 可能是 master_id，优先取 released/obsolete 版本
+    master = db.query(PartMaster).filter(PartMaster.id == eid, PartMaster.deleted_at.is_(None)).first()
+    if master:
+        revisions = (
+            db.query(PartRevision)
+            .filter(PartRevision.master_id == master.id, PartRevision.deleted_at.is_(None))
+            .order_by(PartRevision.created_at.desc())
+            .all()
+        )
+        # 优先返回已发布/已作废版本（ECO 升级的原始版本）
+        for r in revisions:
+            if r.status in ("released", "obsolete"):
+                return r
+        # 兜底返回最新版本
+        if revisions:
+            return revisions[0]
+    return None
+
+
 def collect_release_tree_entities(db: Session, release_items: list) -> list:
     """收集工程变更结果中所有关联件及其全部层级子项（去重、防循环、排除软删除）。
 
-    返回 [(entity_type, entity), ...]（entity 为 Part / Assembly ORM 对象）。
+    entity_id 为 PartRevision.id（兼容 master_id），通过 BOMItem.parent_revision_id/child_revision_id 遍历子项。
+    返回 [(entity_type, PartRevision), ...]。
     一键发布、发布状态校验、提交冻结共用同一遍历，确保对"树"的定义完全一致。
     """
     from app.models import BOMItem
@@ -388,22 +391,30 @@ def collect_release_tree_entities(db: Session, release_items: list) -> list:
             continue
         visited.add(key)
 
-        entity = db.query(PartMaster).filter(
-            PartMaster.id == entity_id, PartMaster.deleted_at.is_(None)
-        ).first()
-        if not entity:
+        revision = _resolve_revision(db, entity_id)
+        if not revision:
             continue
-        entities.append((entity_type, entity))
+        entities.append((entity_type, revision))
+        # 记录已访问的实际 revision_id，防止通过 master_id 重复入栈
+        actual_key = (entity_type, str(revision.id))
+        visited.add(actual_key)
 
         if entity_type != "part":
             children = db.query(BOMItem).filter(
-                BOMItem.parent_type.in_(("assembly", "component")),
-                BOMItem.parent_id == entity_id,
+                BOMItem.parent_revision_id == revision.id,
                 BOMItem.deleted_at.is_(None),
             ).all()
             for c in children:
-                child_type = "part" if c.child_type == "part" else "assembly"
-                stack.append((child_type, c.child_id))
+                child_rev = db.query(PartRevision).filter(
+                    PartRevision.id == c.child_revision_id, PartRevision.deleted_at.is_(None)
+                ).first()
+                if not child_rev:
+                    continue
+                master = db.query(PartMaster).filter(
+                    PartMaster.id == child_rev.master_id, PartMaster.deleted_at.is_(None)
+                ).first()
+                child_type = master.type if master else "part"
+                stack.append((child_type, c.child_revision_id))
     return entities
 
 
@@ -414,10 +425,10 @@ def freeze_release_tree_on_submit(db: Session, eco: ECO) -> int:
     这样撤回/驳回解冻时不会误动原本就冻结的件。不在此提交，由调用方统一提交。
     """
     frozen = []
-    for et, entity in collect_release_tree_entities(db, eco.release_items or []):
-        if entity.status == "draft":
-            entity.status = "frozen"
-            frozen.append({"entity_type": et, "entity_id": str(entity.id)})
+    for et, revision in collect_release_tree_entities(db, eco.release_items or []):
+        if revision.status == "draft":
+            revision.status = "frozen"
+            frozen.append({"entity_type": et, "entity_id": str(revision.id)})
     eco.frozen_entities = frozen
     return len(frozen)
 
@@ -437,9 +448,9 @@ def unfreeze_release_tree(db: Session, eco: ECO) -> int:
             uid = uuid.UUID(str(eid))
         except (ValueError, AttributeError):
             continue
-        entity = db.query(PartMaster).filter(PartMaster.id == uid, PartMaster.deleted_at.is_(None)).first()
-        if entity and entity.status == "frozen":
-            entity.status = "draft"
+        revision = db.query(PartRevision).filter(PartRevision.id == uid, PartRevision.deleted_at.is_(None)).first()
+        if revision and revision.status == "frozen":
+            revision.status = "draft"
             count += 1
     eco.frozen_entities = []
     return count
@@ -707,40 +718,12 @@ def remove_execution_item(db: Session, eco_id: uuid.UUID, item_id: uuid.UUID):
 # 执行逻辑（核心）
 # ─────────────────────────────────────────────────────
 
-def _clone_entity(db: Session, entity, entity_type: str) -> uuid.UUID:
-    """克隆实体创建新版本，返回新实体 ID。
-    零件：基础字段+自定义字段沿用，关联图文档清空。
-    部件：基础字段+自定义字段+子项列表沿用，关联图文档清空。"""
-    new_version = _get_next_version(db, PartMaster, entity.code)
-
-    new_entity = PartMaster(
-        code=entity.code,
-        name=entity.name,
-        spec=getattr(entity, 'spec', None),
-        type=entity_type if entity_type == "part" else "assembly",
-        creator_id=getattr(entity, 'creator_id', None),
-    )
-    db.add(new_entity)
-    db.flush()
-
-    # 复制子项列表（BOM）- 仅对部件类型
-    if entity_type not in ("part",):
-        from app.models import BOMItem
-        old_bom = db.query(BOMItem).filter(
-            BOMItem.parent_type.in_(("assembly", "component")),
-            BOMItem.parent_id == entity.id
-        ).all()
-        for bom in old_bom:
-            new_bom = BOMItem(
-                parent_type="component",
-                parent_id=new_entity.id,
-                child_type=bom.child_type,
-                child_id=bom.child_id,
-                quantity=bom.quantity,
-            )
-            db.add(new_bom)
-
-    return new_entity.id, new_version
+def _upgrade_revision(db: Session, revision_id: uuid.UUID, user_id: uuid.UUID) -> tuple:
+    """复用零部件升版功能：在同一 PartMaster 下创建新 PartRevision"""
+    new_rev, error = crud_parts.upgrade_part(db, revision_id, user_id)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    return str(new_rev.id), new_rev.version
 
 
 def _get_upward_chain_by_impact(db: Session, ecr_affected_items, entity_type: str, entity_id: uuid.UUID) -> list:
@@ -759,58 +742,68 @@ def _get_upward_chain_by_impact(db: Session, ecr_affected_items, entity_type: st
 
 
 def _execute_create(db: Session, item: ECOExecutionItem) -> dict:
-    """执行新建操作"""
-    entity_data = {
-        "code": item.entity_code or f"NEW-{uuid.uuid4().hex[:8].upper()}",
-        "name": item.entity_name,
-        "type": item.entity_type if item.entity_type in ("part", "assembly") else "assembly",
-    }
-    new_entity = PartMaster(**entity_data)
-    db.add(new_entity)
+    """执行新建操作：创建 PartMaster + PartRevision(draft) + PartIteration"""
+    code = item.entity_code or f"NEW-{uuid.uuid4().hex[:8].upper()}"
+    name = item.entity_name
+    ptype = item.entity_type if item.entity_type in ("part", "assembly") else "assembly"
+
+    # 创建主数据
+    master = PartMaster(code=code, name=name, type=ptype)
+    db.add(master)
     db.flush()
 
-    # 如果指定了父项，创建 BOM 关系（新零件不影响已有结构，不做 BOM 影响分析）
+    # 创建初始版本 A（草稿状态）
+    rev = PartRevision(master_id=master.id, version="A", status="draft", latest_iteration=1)
+    db.add(rev)
+    db.flush()
+
+    # 创建初始迭代
+    iter = PartIteration(revision_id=rev.id, iteration=1)
+    db.add(iter)
+    db.flush()
+
+    # 如果指定了父项，创建 BOM 关系
     if item.parent_entity_id:
         bom = BOMItem(
-            parent_type="component",
-            parent_id=item.parent_entity_id,
-            child_type=item.entity_type,
-            child_id=new_entity.id,
+            parent_revision_id=item.parent_entity_id,
+            child_revision_id=rev.id,
             quantity=1,
         )
         db.add(bom)
 
-    return {"new_entity_id": str(new_entity.id), "new_version": "A"}
+    return {"new_entity_id": str(rev.id), "new_version": "A"}
 
 
 def _execute_upgrade(db: Session, item: ECOExecutionItem, ecr_affected_items) -> dict:
     """执行升版操作"""
-    entity_id = item.entity_id
+    revision_id = item.entity_id
     entity_type = item.entity_type
 
-    entity = db.query(PartMaster).filter(PartMaster.id == entity_id).first()
-    if not entity:
-        raise HTTPException(status_code=404, detail=f"实体 {entity_id} 不存在")
+    revision = _resolve_revision(db, revision_id)
+    if not revision:
+        raise HTTPException(status_code=404, detail=f"版本 {revision_id} 不存在")
+    revision_id = revision.id
 
-    new_id, new_version = _clone_entity(db, entity, entity_type)
+    eco = db.query(ECO).filter(ECO.id == item.eco_id).first()
+    operator_id = eco.creator_id if eco else None
+    new_id, new_version = _upgrade_revision(db, revision_id, operator_id)
 
-    # 更新 BOM 引用（将 child_id 指向新版本）
+    # 更新 BOM 引用（将 child_revision_id 指向新版本）
     db.query(BOMItem).filter(
-        BOMItem.child_type == entity_type,
-        BOMItem.child_id == entity_id
-    ).update({"child_id": new_id})
+        BOMItem.child_revision_id == revision_id
+    ).update({"child_revision_id": uuid.UUID(new_id)})
 
     # 仅在 ECR 向上溯源链中有变更标记的父项才升版
-    cascade_parents = _get_upward_chain_by_impact(db, ecr_affected_items, entity_type, entity_id)
+    cascade_parents = _get_upward_chain_by_impact(db, ecr_affected_items, entity_type, revision_id)
     cascaded = []
     for parent_node in cascade_parents:
         parent_type = parent_node.get("entity_type", "assembly")
         parent_id_str = parent_node.get("entity_id")
         if parent_id_str:
             parent_id = uuid.UUID(parent_id_str)
-            parent = db.query(PartMaster).filter(PartMaster.id == parent_id).first()
-            if parent:
-                pnew_id, _ = _clone_entity(db, parent, parent_type)
+            parent_rev = db.query(PartRevision).filter(PartRevision.id == parent_id).first()
+            if parent_rev:
+                pnew_id, _ = _upgrade_revision(db, parent_id, operator_id)
                 cascaded.append(str(pnew_id))
 
     return {"new_entity_id": str(new_id), "new_version": new_version, "cascade_upgraded_parents": cascaded}
@@ -820,40 +813,35 @@ def _execute_qty_change(db: Session, item: ECOExecutionItem, ecr_affected_items)
     """执行数量变更"""
     parent_id = item.parent_entity_id
     entity_id = item.entity_id
-    entity_type = item.entity_type
 
     # 父项升版
-    parent = db.query(PartMaster).filter(PartMaster.id == parent_id).first()
-    if not parent:
+    parent_rev = db.query(PartRevision).filter(PartRevision.id == parent_id).first()
+    if not parent_rev:
         raise HTTPException(status_code=404, detail=f"父项装配件 {parent_id} 不存在")
 
-    new_parent_id, _ = _clone_entity(db, parent, "assembly")
+    eco = db.query(ECO).filter(ECO.id == item.eco_id).first()
+    operator_id = eco.creator_id if eco else None
+    new_parent_id, _ = _upgrade_revision(db, parent_id, operator_id)
 
     # 复制旧 BOM 项到新父项
     old_bom_items = db.query(BOMItem).filter(
-        BOMItem.parent_type.in_(("assembly", "component")),
-        BOMItem.parent_id == parent_id
+        BOMItem.parent_revision_id == parent_id
     ).all()
 
     for bom in old_bom_items:
         new_bom = BOMItem(
-            parent_type="component",
-            parent_id=new_parent_id,
-            child_type=bom.child_type,
-            child_id=bom.child_id,
+            parent_revision_id=uuid.UUID(new_parent_id),
+            child_revision_id=bom.child_revision_id,
             quantity=bom.quantity,
         )
         db.add(new_bom)
 
     # 修改目标 BOM 项的数量
     detail = item.detail or {}
-    old_qty = detail.get("old_quantity", 0)
     new_qty = detail.get("new_quantity", 0)
     target_bom = db.query(BOMItem).filter(
-        BOMItem.parent_type.in_(("assembly", "component")),
-        BOMItem.parent_id == new_parent_id,
-        BOMItem.child_type == entity_type,
-        BOMItem.child_id == entity_id
+        BOMItem.parent_revision_id == uuid.UUID(new_parent_id),
+        BOMItem.child_revision_id == entity_id
     ).first()
     if target_bom:
         target_bom.quantity = new_qty
@@ -865,41 +853,39 @@ def _execute_qty_change(db: Session, item: ECOExecutionItem, ecr_affected_items)
         p_id_str = parent_node.get("entity_id")
         if p_id_str:
             p_id = uuid.UUID(p_id_str)
-            p = db.query(PartMaster).filter(PartMaster.id == p_id).first()
+            p = db.query(PartRevision).filter(PartRevision.id == p_id).first()
             if p:
-                pnew_id, _ = _clone_entity(db, p, "assembly")
+                pnew_id, _ = _upgrade_revision(db, p_id, operator_id)
                 cascaded.append(str(pnew_id))
 
-    return {"parent_new_entity_id": str(new_parent_id), "old_quantity": old_qty, "new_quantity": new_qty}
+    return {"parent_new_entity_id": str(new_parent_id), "new_quantity": new_qty}
 
 
 def _execute_delete(db: Session, item: ECOExecutionItem, ecr_affected_items) -> dict:
     """执行删除 BOM 关系"""
     parent_id = item.parent_entity_id
     entity_id = item.entity_id
-    entity_type = item.entity_type
 
     # 父项升版
-    parent = db.query(PartMaster).filter(PartMaster.id == parent_id).first()
-    if not parent:
+    parent_rev = db.query(PartRevision).filter(PartRevision.id == parent_id).first()
+    if not parent_rev:
         raise HTTPException(status_code=404, detail=f"父项装配件 {parent_id} 不存在")
 
-    new_parent_id, _ = _clone_entity(db, parent, "assembly")
+    eco = db.query(ECO).filter(ECO.id == item.eco_id).first()
+    operator_id = eco.creator_id if eco else None
+    new_parent_id, _ = _upgrade_revision(db, parent_id, operator_id)
 
     # 复制旧 BOM 项到新父项（排除被删除项）
     old_bom_items = db.query(BOMItem).filter(
-        BOMItem.parent_type.in_(("assembly", "component")),
-        BOMItem.parent_id == parent_id
+        BOMItem.parent_revision_id == parent_id
     ).all()
 
     for bom in old_bom_items:
-        if str(bom.child_id) == str(entity_id):
+        if str(bom.child_revision_id) == str(entity_id):
             continue  # 跳过被删除项
         new_bom = BOMItem(
-            parent_type="component",
-            parent_id=new_parent_id,
-            child_type=bom.child_type,
-            child_id=bom.child_id,
+            parent_revision_id=uuid.UUID(new_parent_id),
+            child_revision_id=bom.child_revision_id,
             quantity=bom.quantity,
         )
         db.add(new_bom)
@@ -911,9 +897,9 @@ def _execute_delete(db: Session, item: ECOExecutionItem, ecr_affected_items) -> 
         p_id_str = parent_node.get("entity_id")
         if p_id_str:
             p_id = uuid.UUID(p_id_str)
-            p = db.query(PartMaster).filter(PartMaster.id == p_id).first()
+            p = db.query(PartRevision).filter(PartRevision.id == p_id).first()
             if p:
-                pnew_id, _ = _clone_entity(db, p, "assembly")
+                pnew_id, _ = _upgrade_revision(db, p_id, operator_id)
                 cascaded.append(str(pnew_id))
 
     return {"parent_new_entity_id": str(new_parent_id), "removed_child_id": str(entity_id)}

@@ -1,5 +1,5 @@
 {
-  "roles": ["admin", "engineer", "production", "guest"],
+  "roles": ["admin", "engineer", "production", "guest", "unverified"],
   "permissions": {
     "parts:create": ["admin", "engineer"],
     "parts:delete": ["admin"],
@@ -35,6 +35,8 @@
     "documents:checkin": ["admin", "engineer"],
     "documents:undocheckout": ["admin", "engineer"],
     "documents:force_checkin": ["admin"],
+    "documents:freeze": ["admin", "engineer"],
+    "documents:unfreeze": ["admin"],
 
     "attachments:list": ["admin", "engineer", "production", "guest"],
     "attachments:upload": ["admin", "engineer"],
@@ -63,6 +65,8 @@
     "configuration:checkin": ["admin", "engineer"],
     "configuration:undocheckout": ["admin", "engineer"],
     "configuration:force_checkin": ["admin"],
+    "configuration:freeze": ["admin", "engineer"],
+    "configuration:unfreeze": ["admin"],
     "configuration.item:manage": ["admin", "engineer"],
     "profile:read": ["admin", "engineer", "production", "guest"],
     "profile:create": ["admin", "engineer"],

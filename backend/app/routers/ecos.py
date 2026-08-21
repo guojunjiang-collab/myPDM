@@ -4,6 +4,7 @@ ECO (Engineering Change Order) - API Router
 变更管理 - ECO 模块 API 端点
 """
 import uuid
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session
 
@@ -25,6 +26,27 @@ def _latest_revision(db: Session, master_id):
         .order_by(PartRevision.created_at.desc())
         .first()
     )
+
+
+def _resolve_revision_id(db: Session, entity_id) -> uuid.UUID:
+    """将 entity_id 解析为 PartRevision.id，兼容旧数据中的 master_id"""
+    eid = uuid.UUID(str(entity_id))
+    rev = db.query(PartRevision).filter(PartRevision.id == eid, PartRevision.deleted_at.is_(None)).first()
+    if rev:
+        return rev.id
+    # 旧数据兼容：entity_id 可能是 master_id，优先取 released/obsolete 版本
+    revisions = (
+        db.query(PartRevision)
+        .filter(PartRevision.master_id == eid, PartRevision.deleted_at.is_(None))
+        .order_by(PartRevision.created_at.desc())
+        .all()
+    )
+    for r in revisions:
+        if r.status in ("released", "obsolete"):
+            return r.id
+    if revisions:
+        return revisions[0].id
+    raise HTTPException(status_code=404, detail="零部件版本不存在")
 
 
 # ─────────────────────────────────────────────────────
@@ -79,17 +101,23 @@ def _build_eco_detail(db: Session, eco: ECO) -> dict:
     ).order_by(ECOExecutionItem.sort_order).all()
     execution_item_list = []
     for ei in execution_items:
-        # 查询原始实体版本（版本在 revision 上）
+        # 查询原始实体版本（兼容 entity_id 为 master_id 或 revision_id）
         entity_version = None
         if ei.entity_id:
-            rev = _latest_revision(db, ei.entity_id)
-            if rev:
-                entity_version = rev.version
+            try:
+                rev_id = _resolve_revision_id(db, ei.entity_id)
+                rev = db.query(PartRevision).filter(PartRevision.id == rev_id).first()
+                if rev:
+                    entity_version = rev.version
+            except HTTPException:
+                pass
 
-        # 查询新版实体的状态（状态在 revision 上）
+        # 查询新版实体的状态（new_entity_id 为 revision_id）
         new_entity_status = None
         if ei.new_entity_id:
-            rev = _latest_revision(db, ei.new_entity_id)
+            rev = db.query(PartRevision).filter(
+                PartRevision.id == ei.new_entity_id, PartRevision.deleted_at.is_(None)
+            ).first()
             if rev:
                 new_entity_status = rev.status
 
@@ -495,22 +523,18 @@ async def manual_upgrade_item(
     item = crud_eco.get_execution_item(db, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="执行项不存在")
-    if item.entity_type not in ("part", "assembly"):
+    if item.entity_type not in ("part", "assembly", "component"):
         raise HTTPException(status_code=400, detail="仅零件/部件支持升版")
     if not item.entity_id:
         raise HTTPException(status_code=400, detail="执行项缺少 entity_id")
 
-    model = PartMaster
-    entity = db.query(model).filter(model.id == item.entity_id).first()
-    if not entity:
-        raise HTTPException(status_code=404, detail="实体不存在")
-
-    new_id, new_version = crud_eco._clone_entity(db, entity, item.entity_type)
-    item.new_entity_id = new_id
+    revision_id = _resolve_revision_id(db, item.entity_id)
+    new_id, new_version = crud_eco._upgrade_revision(db, revision_id, current_user.id)
+    item.new_entity_id = uuid.UUID(new_id)
     item.new_version = new_version
-    item.detail = {**(item.detail or {}), "new_entity_id": str(new_id), "new_version": new_version}
+    item.detail = {**(item.detail or {}), "new_entity_id": new_id, "new_version": new_version}
     db.commit()
-    return {"new_entity_id": str(new_id), "new_version": new_version}
+    return {"new_entity_id": new_id, "new_version": new_version}
 
 
 # ─────────────────────────────────────────────────────
@@ -527,49 +551,72 @@ async def manual_revert_item(
     if not item:
         raise HTTPException(status_code=404, detail="执行项不存在")
 
-    # 优先使用 DB 记录的 new_entity_id，其次使用请求中的（自动检测场景）
+    # 优先使用 DB 记录的 new_entity_id，其次使用请求中的
     target_entity_id = item.new_entity_id or (uuid.UUID(body.new_entity_id) if body and body.new_entity_id else None)
     if not target_entity_id:
         raise HTTPException(status_code=400, detail="尚未执行升版，无需还原")
 
-    model = PartMaster
-    new_entity = db.query(model).filter(model.id == target_entity_id).first()
-
-    if not new_entity:
-        # 实体已被删除，清理记录
+    # 查询目标 PartRevision（兼容 master_id）
+    try:
+        target_revision_id = _resolve_revision_id(db, target_entity_id)
+    except HTTPException:
+        # 版本已被删除，清理记录
         item.new_entity_id = None
         item.new_version = None
         item.detail = {**(item.detail or {}), "new_entity_id": "", "new_version": ""}
         db.commit()
         return {"detail": "已还原"}
 
-    if new_entity.status == "released":
-        raise HTTPException(status_code=400, detail="已发布的零部件不可还原")
+    new_revision = db.query(PartRevision).filter(PartRevision.id == target_revision_id).first()
+    if not new_revision:
+        # 版本已被删除，清理记录
+        item.new_entity_id = None
+        item.new_version = None
+        item.detail = {**(item.detail or {}), "new_entity_id": "", "new_version": ""}
+        db.commit()
+        return {"detail": "已还原"}
 
-    if new_entity.status == "draft":
-        # 已升版状态：删除新版本实体（完全撤销）
+    if new_revision.status == "released":
+        raise HTTPException(status_code=400, detail="已发布的版本不可还原")
+
+    if new_revision.status == "draft":
+        # 已升版状态：软删除新版本及其迭代
         from app.models import BOMItem
-        # 仅检查克隆体（target_entity_id）是否有父项引用
-        # 不检查原实体，因为 manual_upgrade 不会更新 BOM，原实体必然有引用
+        from app.models_parts import PartIteration
+        # 检查是否有父项引用此版本
         parent_count = db.query(BOMItem).filter(
-            BOMItem.child_id == target_entity_id
+            BOMItem.child_revision_id == target_revision_id
         ).count()
         if parent_count > 0:
-            raise HTTPException(status_code=400, detail="该零部件已被其他部件引用，无法删除")
-        # 清理该实体自身的子项 BOM 关系
+            raise HTTPException(status_code=400, detail="该版本已被其他部件引用，无法删除")
+        # 清理子项 BOM 关系
         db.query(BOMItem).filter(
-            BOMItem.parent_id == target_entity_id
+            BOMItem.parent_revision_id == target_revision_id
         ).delete()
-        db.delete(new_entity)
+        # 软删除迭代
+        db.query(PartIteration).filter(
+            PartIteration.revision_id == target_revision_id
+        ).update({"deleted_at": datetime.now(timezone.utc)})
+        # 软删除版本
+        new_revision.deleted_at = datetime.now(timezone.utc)
+        # 如果该主数据下所有版本都已软删除，同步软删除主数据
+        remaining = db.query(PartRevision).filter(
+            PartRevision.master_id == new_revision.master_id,
+            PartRevision.deleted_at.is_(None),
+        ).count()
+        if remaining == 0:
+            master = db.query(PartMaster).filter(PartMaster.id == new_revision.master_id).first()
+            if master:
+                master.deleted_at = datetime.now(timezone.utc)
         item.new_entity_id = None
         item.new_version = None
         item.detail = {**(item.detail or {}), "new_entity_id": "", "new_version": ""}
     else:
-        # 已冻结状态：仅将状态改回 draft（保留实体）
-        new_entity.status = "draft"
+        # 已冻结状态：仅将状态改回 draft
+        new_revision.status = "draft"
 
     db.commit()
-    return {"detail": "已还原", "new_entity_status": new_entity.status if new_entity else None}
+    return {"detail": "已还原", "new_entity_status": new_revision.status if new_revision else None}
 
 
 # ─────────────────────────────────────────────────────
@@ -586,17 +633,16 @@ async def manual_freeze_item(
     if not item:
         raise HTTPException(status_code=404, detail="执行项不存在")
 
-    # 优先使用 DB 记录的 new_entity_id，其次使用请求中的（自动检测场景）
+    # 优先使用 DB 记录的 new_entity_id，其次使用请求中的
     target_entity_id = item.new_entity_id or (uuid.UUID(body.new_entity_id) if body and body.new_entity_id else None)
     if not target_entity_id:
         raise HTTPException(status_code=400, detail="尚未执行升版，无法冻结")
 
-    model = PartMaster
-    new_entity = db.query(model).filter(model.id == target_entity_id).first()
-    if not new_entity:
+    revision = db.query(PartRevision).filter(PartRevision.id == _resolve_revision_id(db, target_entity_id)).first()
+    if not revision:
         raise HTTPException(status_code=404, detail="新版本实体不存在")
 
-    new_entity.status = "frozen"
+    revision.status = "frozen"
     # 同步更新执行项记录
     if not item.new_entity_id and target_entity_id:
         item.new_entity_id = target_entity_id
@@ -618,17 +664,16 @@ async def manual_release_item(
     if not item:
         raise HTTPException(status_code=404, detail="执行项不存在")
 
-    # 优先使用 DB 记录的 new_entity_id，其次使用请求中的（自动检测场景）
+    # 优先使用 DB 记录的 new_entity_id，其次使用请求中的
     target_entity_id = item.new_entity_id or (uuid.UUID(body.new_entity_id) if body and body.new_entity_id else None)
     if not target_entity_id:
         raise HTTPException(status_code=400, detail="尚未执行升版，无法发布")
 
-    model = PartMaster
-    new_entity = db.query(model).filter(model.id == target_entity_id).first()
-    if not new_entity:
+    revision = db.query(PartRevision).filter(PartRevision.id == _resolve_revision_id(db, target_entity_id)).first()
+    if not revision:
         raise HTTPException(status_code=404, detail="新版本实体不存在")
 
-    new_entity.status = "released"
+    revision.status = "released"
     db.commit()
     return {"detail": "已发布", "new_entity_status": "released"}
 
@@ -642,13 +687,9 @@ async def get_release_items_publish_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("eco:read"))
 ):
-    """校验工程变更结果：树中（含所有层级子项）是否仍有草稿/冻结状态的零部件。
-
-    用于在进入执行界面时决定是否激活"一键发布"——解决用户临时退改状态后需要再发布的场景。
-    """
     eco = crud_eco.get_eco(db, eco_id)
     entities = crud_eco.collect_release_tree_entities(db, eco.release_items or [])
-    pending = sum(1 for _et, e in entities if e.status in ("draft", "frozen"))
+    pending = sum(1 for _et, rev in entities if rev.status in ("draft", "frozen"))
     return {"has_pending": pending > 0, "pending_count": pending, "total": len(entities)}
 
 
@@ -666,11 +707,9 @@ async def publish_all_release_items(
         raise HTTPException(status_code=400, detail="暂无工程变更结果")
 
     published_count = 0
-    for _et, entity in crud_eco.collect_release_tree_entities(db, release_items):
-        # 草稿/冻结 → 发布；作废保持不变；已发布无需重复处理。
-        # published_count 仅统计本次实际改变状态的件，确保"已发布 N 个"语义准确（幂等再调用返回 0）。
-        if entity.status not in ("obsolete", "released"):
-            entity.status = "released"
+    for _et, revision in crud_eco.collect_release_tree_entities(db, release_items):
+        if revision.status not in ("obsolete", "released"):
+            revision.status = "released"
             published_count += 1
 
     db.commit()

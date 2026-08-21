@@ -751,6 +751,21 @@ def freeze_config_item(
     return rev, None
 
 
+def unfreeze_config_item(
+    db: Session, revision_id: UUID,
+) -> Tuple[Optional[models.ConfigurationItemRevision], Optional[str]]:
+    """解冻构型项版本：frozen → draft"""
+    rev = get_config_item_revision(db, revision_id)
+    if not rev:
+        return None, "版本不存在"
+    if rev.status != "frozen":
+        return None, "仅冻结状态可解冻"
+    rev.status = "draft"
+    db.commit()
+    db.refresh(rev)
+    return rev, None
+
+
 def release_config_item(
     db: Session, revision_id: UUID,
 ) -> Tuple[Optional[models.ConfigurationItemRevision], Optional[str]]:
