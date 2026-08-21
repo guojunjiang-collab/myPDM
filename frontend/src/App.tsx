@@ -63,6 +63,36 @@ function AppRoutes() {
         <Route path="/wechat-callback" element={<WechatCallback />} />
         <Route path="/pending-approval" element={<PendingApproval />} />
         <Route path="/change-password" element={<ForcePasswordChangeRoute />} />
+        <Route
+          path="/stp-viewer"
+          element={
+            <ProtectedRoute>
+              <Suspense fallback={<div className="w-screen h-screen flex items-center justify-center text-gray-400">加载中...</div>}>
+                <STPViewer />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/office-reader"
+          element={
+            <ProtectedRoute>
+              <Suspense fallback={<div className="w-screen h-screen flex items-center justify-center text-gray-400">加载中...</div>}>
+                <OfficeReader />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/markdown-reader"
+          element={
+            <ProtectedRoute>
+              <Suspense fallback={<div className="w-screen h-screen flex items-center justify-center text-gray-400">加载中...</div>}>
+                <MarkdownReader />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
         <Route path="/*" element={<ProtectedRoute><MobileRoot /></ProtectedRoute>} />
       </Routes>
     );
