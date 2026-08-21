@@ -1,12 +1,12 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { usePageHeader } from '../stores/pageHeader';
-import { can } from '../stores/auth';
+import { can, useAuthStore } from '../stores/auth';
 import NotificationBell from '../components/NotificationBell';
 import { MOBILE_TABS, filterVisible } from './nav';
 
-const tabs = filterVisible(MOBILE_TABS, can);
-
 export default function MobileLayout() {
+  const user = useAuthStore((s) => s.user); // 订阅登录态：登录/角色变化时触发重渲染
+  const tabs = filterVisible(MOBILE_TABS, can); // 组件体内重算，随 user 变化
   const headerContent = usePageHeader((s) => s.content);
   const location = useLocation();
   const current = tabs.find((t) => location.pathname.startsWith(t.path));
