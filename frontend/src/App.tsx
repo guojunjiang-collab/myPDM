@@ -22,6 +22,8 @@ import Inventory from './pages/Inventory';
 import Projects from './pages/Project/Projects';
 import DataManagement from './pages/DataManagement';
 import Help from './pages/Help';
+import { useIsMobile } from './hooks/useIsMobile';
+import MobileRoot from './mobile/MobileRoot';
 const STPViewer = lazy(() => import('./pages/STPViewer'));
 const OfficeReader = lazy(() => import('./pages/OfficeReader'));
 const MarkdownReader = lazy(() => import('./pages/MarkdownReader'));
@@ -51,10 +53,21 @@ function ForcePasswordChangeRoute() {
   return <ForcePasswordChange />;
 }
 
-export default function App() {
+function AppRoutes() {
+  const isMobile = useIsMobile();
+  if (isMobile) {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/feishu-callback" element={<FeishuCallback />} />
+        <Route path="/wechat-callback" element={<WechatCallback />} />
+        <Route path="/pending-approval" element={<PendingApproval />} />
+        <Route path="/change-password" element={<ForcePasswordChangeRoute />} />
+        <Route path="/*" element={<ProtectedRoute><MobileRoot /></ProtectedRoute>} />
+      </Routes>
+    );
+  }
   return (
-    <BrowserRouter>
-      <ToastContainer />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/feishu-callback" element={<FeishuCallback />} />
@@ -118,6 +131,14 @@ export default function App() {
           <Route path="datamanagement" element={<DataManagement />} />
         </Route>
       </Routes>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <ToastContainer />
+      <AppRoutes />
     </BrowserRouter>
   );
 }
