@@ -160,7 +160,16 @@ export default function PartDetailPage() {
               )}
             </div>
           )}
-          {activeTab !== 'overview' && (
+          {activeTab === 'bom' && (
+            <button
+              onClick={() => navigate(`/parts/${id}/bom`)}
+              className="w-full bg-white rounded-lg px-4 py-3 min-h-14 flex items-center justify-between shadow-sm"
+            >
+              <span className="text-sm text-gray-900">查看 BOM 结构</span>
+              <span className="text-gray-400">›</span>
+            </button>
+          )}
+          {activeTab !== 'overview' && activeTab !== 'bom' && (
             <div className="p-4 text-gray-500 text-sm">{activeLabel}（待实现）</div>
           )}
         </div>

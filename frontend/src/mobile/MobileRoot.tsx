@@ -3,6 +3,7 @@ import MobileLayout from './MobileLayout';
 import MorePage from './pages/MorePage';
 import PartsListPage from './pages/PartsListPage';
 import PartDetailPage from './pages/PartDetailPage';
+import PartBomPage from './pages/PartBomPage';
 
 // 后续任务逐步替换占位页为真实移动页面
 function Placeholder({ name }: { name: string }) {
@@ -18,6 +19,9 @@ export default function MobileRoot() {
         <Route path="board" element={<Placeholder name="看板" />} />
         <Route path="parts" element={<PartsListPage />} />
         <Route path="parts/:id" element={<PartDetailPage />} />
+        {/* BOM 逐级下钻：/parts/:id/bom（首层）与 /parts/:id/bom/:childId[/bom/:childId...]（任意深度）。
+            用 splat（*）而非固定段路由：下钻路径会累积 /bom/:childId 段，固定路由无法匹配第 3 层及更深。 */}
+        <Route path="parts/:id/bom/*" element={<PartBomPage />} />
         <Route path="documents" element={<Placeholder name="图文档" />} />
         <Route path="ec" element={<Placeholder name="变更" />} />
         <Route path="inventory" element={<Placeholder name="库存" />} />
