@@ -12,6 +12,7 @@ import ProjectsPage from './pages/ProjectsPage';
 import InventoryPage from './pages/InventoryPage';
 import ConfigurationPage from './pages/ConfigurationPage';
 import EcPage from './pages/EcPage';
+import NotificationsPage from './pages/NotificationsPage';
 
 // 后续任务逐步替换占位页为真实移动页面
 function Placeholder({ name }: { name: string }) {
@@ -40,7 +41,7 @@ export default function MobileRoot() {
         {/* 项目进度：/projects 列表 → /projects/:id 详情（两级视图共用 ProjectsPage） */}
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="projects/:id" element={<ProjectsPage />} />
-        <Route path="notifications" element={<Placeholder name="通知" />} />
+        <Route path="notifications" element={<NotificationsPage />} />
         <Route path="settings" element={<Placeholder name="设置" />} />
         <Route path="more" element={<MorePage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
