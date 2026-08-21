@@ -26,6 +26,7 @@ import { useIsMobile } from './hooks/useIsMobile';
 import MobileRoot from './mobile/MobileRoot';
 import MobileLogin from './mobile/MobileLogin';
 const STPViewer = lazy(() => import('./pages/STPViewer'));
+const StpViewerPage = lazy(() => import('./mobile/pages/StpViewerPage'));
 const OfficeReader = lazy(() => import('./pages/OfficeReader'));
 const MarkdownReader = lazy(() => import('./pages/MarkdownReader'));
 
@@ -69,7 +70,7 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <Suspense fallback={<div className="w-screen h-screen flex items-center justify-center text-gray-400">加载中...</div>}>
-                <STPViewer />
+                <StpViewerPage />
               </Suspense>
             </ProtectedRoute>
           }
