@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import MobileLayout from './MobileLayout';
+import MorePage from './pages/MorePage';
 
 // 后续任务逐步替换占位页为真实移动页面
 function Placeholder({ name }: { name: string }) {
@@ -21,7 +22,7 @@ export default function MobileRoot() {
         <Route path="projects" element={<Placeholder name="项目" />} />
         <Route path="notifications" element={<Placeholder name="通知" />} />
         <Route path="settings" element={<Placeholder name="设置" />} />
-        <Route path="more" element={<Placeholder name="更多" />} />
+        <Route path="more" element={<MorePage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
     </Routes>
