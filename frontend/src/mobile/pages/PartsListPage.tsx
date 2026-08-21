@@ -48,7 +48,11 @@ export default function PartsListPage() {
         }
       })
       .catch(() => {
-        if (alive) setError('加载失败，请稍后重试');
+        if (alive) {
+          // 失败时清空旧卡片，避免错误提示下方残留上一次成功的数据
+          setItems([]);
+          setError('加载失败，请稍后重试');
+        }
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -72,7 +76,7 @@ export default function PartsListPage() {
             <button
               key={f.key}
               onClick={() => setTypeFilter(f.key)}
-              className={`min-h-9 px-3 rounded-full text-xs ${typeFilter === f.key ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+              className={`min-h-10 px-3 rounded-full text-xs ${typeFilter === f.key ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
             >
               {f.label}
             </button>
