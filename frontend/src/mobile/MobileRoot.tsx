@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import MobileLayout from './MobileLayout';
 import MorePage from './pages/MorePage';
+import PartsListPage from './pages/PartsListPage';
 
 // 后续任务逐步替换占位页为真实移动页面
 function Placeholder({ name }: { name: string }) {
@@ -14,7 +15,7 @@ export default function MobileRoot() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Placeholder name="仪表盘" />} />
         <Route path="board" element={<Placeholder name="看板" />} />
-        <Route path="parts" element={<Placeholder name="零部件" />} />
+        <Route path="parts" element={<PartsListPage />} />
         <Route path="documents" element={<Placeholder name="图文档" />} />
         <Route path="ec" element={<Placeholder name="变更" />} />
         <Route path="inventory" element={<Placeholder name="库存" />} />
