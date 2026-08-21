@@ -13,11 +13,7 @@ import InventoryPage from './pages/InventoryPage';
 import ConfigurationPage from './pages/ConfigurationPage';
 import EcPage from './pages/EcPage';
 import NotificationsPage from './pages/NotificationsPage';
-
-// 后续任务逐步替换占位页为真实移动页面
-function Placeholder({ name }: { name: string }) {
-  return <div className="p-4 text-gray-500">{name}（待实现）</div>;
-}
+import DesktopOnlyCard from './components/DesktopOnlyCard';
 
 export default function MobileRoot() {
   return (
@@ -42,7 +38,7 @@ export default function MobileRoot() {
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="projects/:id" element={<ProjectsPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
-        <Route path="settings" element={<Placeholder name="设置" />} />
+        <Route path="settings" element={<DesktopOnlyCard feature="设置" />} />
         <Route path="more" element={<MorePage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>

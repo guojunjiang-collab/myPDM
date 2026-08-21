@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { partsApi } from '../../services/api';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
+import DesktopOnlyCard from '../components/DesktopOnlyCard';
 import type { PartMaster, PartRevisionBrief } from '../../types';
 
 /**
@@ -170,7 +171,7 @@ export default function PartDetailPage() {
             </button>
           )}
           {activeTab !== 'overview' && activeTab !== 'bom' && (
-            <div className="p-4 text-gray-500 text-sm">{activeLabel}（待实现）</div>
+            <DesktopOnlyCard feature={activeLabel} />
           )}
         </div>
       )}

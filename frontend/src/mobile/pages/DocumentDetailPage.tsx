@@ -5,6 +5,7 @@ import { documentsApi } from '../../services/api';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
 import AttachmentPreview from '../components/AttachmentPreview';
+import DesktopOnlyCard from '../components/DesktopOnlyCard';
 import type { DocumentRevision, DocumentAttachment } from '../../types';
 
 const STATUS_MAP: Record<string, { label: string; cls: string }> = {
@@ -187,7 +188,7 @@ export default function DocumentDetailPage() {
             </div>
           )}
           {activeTab !== 'overview' && activeTab !== 'attachments' && (
-            <div className="p-4 text-gray-500 text-sm">{activeLabel}（待实现）</div>
+            <DesktopOnlyCard feature={activeLabel} />
           )}
         </div>
       )}
