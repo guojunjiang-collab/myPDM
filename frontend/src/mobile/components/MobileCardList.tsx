@@ -1,0 +1,24 @@
+interface Props<T> {
+  items: T[];
+  renderMain: (item: T) => React.ReactNode;
+  renderMeta: (item: T) => React.ReactNode;
+  onClick?: (item: T) => void;
+  keyOf: (item: T) => string;
+}
+export default function MobileCardList<T>({ items, renderMain, renderMeta, onClick, keyOf }: Props<T>) {
+  if (items.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-2 p-3">
+      {items.map((item) => (
+        <button
+          key={keyOf(item)}
+          onClick={() => onClick?.(item)}
+          className="text-left bg-white rounded-lg px-4 py-3 min-h-14 flex flex-col gap-1 shadow-sm"
+        >
+          <div className="text-sm font-medium text-gray-900 break-all">{renderMain(item)}</div>
+          <div className="text-xs text-gray-500 break-all">{renderMeta(item)}</div>
+        </button>
+      ))}
+    </div>
+  );
+}
