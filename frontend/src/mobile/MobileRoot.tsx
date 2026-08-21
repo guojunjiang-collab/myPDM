@@ -1,6 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import MobileLayout from './MobileLayout';
 import MorePage from './pages/MorePage';
+import BoardPage from './pages/BoardPage';
+import DashboardPage from './pages/DashboardPage';
 import PartsListPage from './pages/PartsListPage';
 import PartDetailPage from './pages/PartDetailPage';
 import PartBomPage from './pages/PartBomPage';
@@ -17,8 +19,8 @@ export default function MobileRoot() {
     <Routes>
       <Route element={<MobileLayout />}>
         <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="dashboard" element={<Placeholder name="仪表盘" />} />
-        <Route path="board" element={<Placeholder name="看板" />} />
+        <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="board" element={<BoardPage />} />
         <Route path="parts" element={<PartsListPage />} />
         <Route path="parts/:id" element={<PartDetailPage />} />
         {/* BOM 逐级下钻：/parts/:id/bom（首层）与 /parts/:id/bom/:childId[/bom/:childId...]（任意深度）。
