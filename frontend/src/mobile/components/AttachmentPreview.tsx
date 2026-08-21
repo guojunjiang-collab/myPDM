@@ -47,6 +47,7 @@ export default function AttachmentPreview({ attachment }: { attachment: PreviewA
   const isOffice = OFFICE_EXTS.includes(ext);
 
   const [imgToken, setImgToken] = useState<string | null>(null);
+  const [imgFailed, setImgFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [converting, setConverting] = useState(false);
 
@@ -55,6 +56,7 @@ export default function AttachmentPreview({ attachment }: { attachment: PreviewA
     if (!isImage) return;
     let alive = true;
     setError(null);
+    setImgFailed(false);
     mediaApi
       .token(attachment.id, 'preview')
       .then((t) => {
@@ -131,12 +133,16 @@ export default function AttachmentPreview({ attachment }: { attachment: PreviewA
         <div className="mt-2">
           {error && <p className="text-xs text-red-500 py-2 text-center">{error}</p>}
           {!error && !imgToken && <p className="text-xs text-gray-400 py-2 text-center">加载中...</p>}
-          {!error && imgToken && (
+          {!error && imgToken && !imgFailed && (
             <img
               src={`/api/v2/attachments/${attachment.id}/preview?token=${encodeURIComponent(imgToken)}`}
               alt={fileName}
+              onError={() => setImgFailed(true)}
               className="max-w-full max-h-72 rounded-lg border border-gray-100 bg-gray-50 object-contain"
             />
+          )}
+          {!error && imgToken && imgFailed && (
+            <p className="text-xs text-red-500 py-2 text-center">图片加载失败，请重试</p>
           )}
         </div>
       )}

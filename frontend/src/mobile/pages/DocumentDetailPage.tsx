@@ -44,6 +44,7 @@ export default function DocumentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [attachmentsError, setAttachmentsError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
@@ -80,13 +81,21 @@ export default function DocumentDetailPage() {
     let alive = true;
     if (!id || activeTab !== 'attachments') return;
     setLoadingAttachments(true);
+    setAttachmentsError(null);
     documentsApi
       .listAttachments(id)
       .then((res) => {
-        if (alive) setAttachments((res.data ?? []) as DocumentAttachment[]);
+        if (alive) {
+          setAttachments((res.data ?? []) as DocumentAttachment[]);
+          setAttachmentsError(null);
+        }
       })
       .catch(() => {
-        if (alive) setAttachments([]);
+        if (alive) {
+          // 失败时清空附件并置错误态，与空态互斥
+          setAttachments([]);
+          setAttachmentsError('附件加载失败，请稍后重试');
+        }
       })
       .finally(() => {
         if (alive) setLoadingAttachments(false);
@@ -121,7 +130,7 @@ export default function DocumentDetailPage() {
           <button
             aria-label="返回"
             onClick={() => navigate(-1)}
-            className="shrink-0 min-w-9 h-9 flex items-center justify-center text-2xl leading-none text-gray-600"
+            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-gray-600"
           >
             ‹
           </button>
@@ -164,8 +173,14 @@ export default function DocumentDetailPage() {
           {activeTab === 'attachments' && (
             <div className="flex flex-col gap-2">
               {loadingAttachments && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
-              {!loadingAttachments && attachments.length === 0 && <EmptyState text="暂无附件" />}
+              {!loadingAttachments && attachmentsError && (
+                <p className="text-center text-xs text-red-400 py-3">{attachmentsError}</p>
+              )}
+              {!loadingAttachments && !attachmentsError && attachments.length === 0 && (
+                <EmptyState text="暂无附件" />
+              )}
               {!loadingAttachments &&
+                !attachmentsError &&
                 attachments.map((att) => (
                   <AttachmentPreview key={att.id} attachment={att} />
                 ))}
