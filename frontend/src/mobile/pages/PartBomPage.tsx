@@ -140,7 +140,7 @@ export default function PartBomPage() {
           <button
             aria-label="返回"
             onClick={() => navigate(-1)}
-            className="shrink-0 min-w-9 h-9 flex items-center justify-center text-2xl leading-none text-gray-600"
+            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-gray-600"
           >
             ‹
           </button>
