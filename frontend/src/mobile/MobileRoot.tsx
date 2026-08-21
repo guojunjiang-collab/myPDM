@@ -8,6 +8,7 @@ import PartDetailPage from './pages/PartDetailPage';
 import PartBomPage from './pages/PartBomPage';
 import DocumentsListPage from './pages/DocumentsListPage';
 import DocumentDetailPage from './pages/DocumentDetailPage';
+import ProjectsPage from './pages/ProjectsPage';
 
 // 后续任务逐步替换占位页为真实移动页面
 function Placeholder({ name }: { name: string }) {
@@ -31,7 +32,9 @@ export default function MobileRoot() {
         <Route path="ec" element={<Placeholder name="变更" />} />
         <Route path="inventory" element={<Placeholder name="库存" />} />
         <Route path="configuration" element={<Placeholder name="构型" />} />
-        <Route path="projects" element={<Placeholder name="项目" />} />
+        {/* 项目进度：/projects 列表 → /projects/:id 详情（两级视图共用 ProjectsPage） */}
+        <Route path="projects" element={<ProjectsPage />} />
+        <Route path="projects/:id" element={<ProjectsPage />} />
         <Route path="notifications" element={<Placeholder name="通知" />} />
         <Route path="settings" element={<Placeholder name="设置" />} />
         <Route path="more" element={<MorePage />} />
