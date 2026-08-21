@@ -24,6 +24,7 @@ import DataManagement from './pages/DataManagement';
 import Help from './pages/Help';
 import { useIsMobile } from './hooks/useIsMobile';
 import MobileRoot from './mobile/MobileRoot';
+import MobileLogin from './mobile/MobileLogin';
 const STPViewer = lazy(() => import('./pages/STPViewer'));
 const OfficeReader = lazy(() => import('./pages/OfficeReader'));
 const MarkdownReader = lazy(() => import('./pages/MarkdownReader'));
@@ -58,7 +59,7 @@ function AppRoutes() {
   if (isMobile) {
     return (
       <Routes>
-        <Route path="/login" element={<Login />} />
+        <Route path="/login" element={<MobileLogin />} />
         <Route path="/feishu-callback" element={<FeishuCallback />} />
         <Route path="/wechat-callback" element={<WechatCallback />} />
         <Route path="/pending-approval" element={<PendingApproval />} />
