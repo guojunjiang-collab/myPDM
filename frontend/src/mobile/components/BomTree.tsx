@@ -60,8 +60,17 @@ export default function BomTree({ rootItems }: { rootItems: BomChild[] }) {
     return (
       <Fragment key={b.id}>
         <div className="flex items-stretch min-h-10 border-b border-gray-50 bg-white">
-          {/* 缩进 + 层级连线 */}
-          <span className="shrink-0" style={{ width: depth * 16 + 4 }} />
+          {/* 缩进 + 层级竖线（每级一条，贯穿整行，便于识别同一层级） */}
+          <span className="relative shrink-0" style={{ width: depth * 16 + 4 }}>
+            {depth > 0 &&
+              Array.from({ length: depth }).map((_, i) => (
+                <span
+                  key={i}
+                  className="absolute top-0 bottom-0 border-l border-gray-200"
+                  style={{ left: i * 16 + 6 }}
+                />
+              ))}
+          </span>
           {b.has_children ? (
             <button
               type="button"
