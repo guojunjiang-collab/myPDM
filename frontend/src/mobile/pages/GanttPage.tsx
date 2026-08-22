@@ -101,7 +101,7 @@ export default function GanttPage({ projectId, onBack }: Props) {
       const nameW = t.assignee_name ? (ctx ? ctx.measureText(t.assignee_name).width : t.assignee_name.length * 6) : 0;
       max = Math.max(max, t.depth * 10 + codeW, t.depth * 10 + nameW);
     }
-    return Math.min(260, Math.max(96, Math.ceil(max) + 12));
+    return Math.min(300, Math.max(96, Math.ceil(max) + 12));
   }, [data]);
 
   return (
@@ -156,15 +156,16 @@ export default function GanttPage({ projectId, onBack }: Props) {
                   className="w-full text-left px-1.5 flex flex-col justify-center"
                   style={{ height: ROW_H }}
                 >
+                  {/* 编号：全部显示不省略（左列宽度按测量值自适应，已含保险余量） */}
                   <span
-                    className="text-xs font-medium text-gray-900 truncate leading-tight"
+                    className="text-xs font-medium text-gray-900 whitespace-nowrap leading-tight"
                     style={{ paddingLeft: t.depth * 10 }}
                   >
                     {t.code}
                   </span>
                   {/* 行2：负责人（更小字体）；无负责人/无日期时给出提醒 */}
                   <span
-                    className="text-[10px] leading-tight truncate"
+                    className="text-[10px] whitespace-nowrap leading-tight"
                     style={{ paddingLeft: t.depth * 10 }}
                   >
                     {t.assignee_name ? (
