@@ -3,7 +3,7 @@ import { projectApi } from '../../services/projectApi';
 import { useDetailOverlayPush } from '../hooks/useDetailOverlay';
 import EmptyState from '../components/EmptyState';
 import {
-  DAY_PX, ROW_H, BAR_H, daysBetween, computeRange, barBox, ticks, STATUS_FILL,
+  DAY_PX, ROW_H, daysBetween, computeRange, barBox, ticks, STATUS_FILL,
 } from '../../pages/Project/gantt/ganttUtils';
 import type { Scale } from '../../pages/Project/gantt/ganttUtils';
 import type { GanttData, GanttTask, ProjectTask } from '../../types/project';
@@ -124,7 +124,7 @@ export default function GanttPage({ projectId, onBack }: Props) {
       ) : (
         <div ref={scrollRef} className="flex-1 overflow-x-auto">
           <div className="flex min-w-max">
-            {/* 左列：任务名（固定，横向滚动不跟随） */}
+            {/* 左列：任务编号（固定，横向滚动不跟随）；名称显示在甘特条上 */}
             <div className="sticky left-0 z-10 bg-gray-50 w-36 shrink-0">
               {data.tasks.map((t) => (
                 <button
@@ -134,14 +134,14 @@ export default function GanttPage({ projectId, onBack }: Props) {
                   style={{ height: ROW_H }}
                 >
                   <span
-                    className="text-xs font-medium text-gray-900 truncate"
+                    className="text-xs font-medium text-gray-900 truncate leading-tight"
                     style={{ paddingLeft: t.depth * 10 }}
                   >
                     {t.code}
                   </span>
                   {(!t.planned_start || !t.planned_end) && (
-                    <span className="text-[10px] text-gray-400" style={{ paddingLeft: t.depth * 10 }}>
-                      无日期
+                    <span className="text-[10px] text-gray-400 leading-tight" style={{ paddingLeft: t.depth * 10 }}>
+                      （无日期）
                     </span>
                   )}
                 </button>
@@ -166,25 +166,32 @@ export default function GanttPage({ projectId, onBack }: Props) {
                 {todayX >= 0 && (
                   <div className="absolute top-0 bottom-0 w-0.5 bg-red-400 z-10" style={{ left: todayX }} />
                 )}
-                {/* 甘特条 */}
+                {/* 甘特条（条内显示任务名称） */}
                 {data.tasks.map((t, i) => {
                   const bb = range ? barBox(t, range.start, scale, i) : null;
                   if (!bb) return null;
+                  const barH = 20;
                   return (
                     <div
                       key={t.id}
-                      className="absolute"
+                      className="absolute flex items-center"
                       style={{
                         left: bb.x,
-                        top: bb.y,
+                        top: i * ROW_H + (ROW_H - barH) / 2,
                         width: bb.w,
-                        height: BAR_H,
-                        borderRadius: 3,
+                        height: barH,
+                        borderRadius: 4,
                         background: STATUS_FILL[t.status] ?? '#9ca3af',
                         opacity: t.is_critical ? 1 : 0.85,
                         ...(t.is_overdue ? { outline: '1px solid #ef4444' } : {}),
                       }}
-                    />
+                    >
+                      {bb.w >= 28 && (
+                        <span className="flex-1 min-w-0 px-1.5 text-[10px] leading-none text-white truncate">
+                          {t.name}
+                        </span>
+                      )}
+                    </div>
                   );
                 })}
                 {/* 行分隔线 */}
