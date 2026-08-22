@@ -1,0 +1,115 @@
+import { Fragment, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { partsApi } from '../../services/api';
+import StatusBadge from '../components/StatusBadge';
+import type { BomChild } from '../pages/PartBomPage';
+
+/**
+ * 移动端 BOM 树形组件。
+ * - 根层由父组件传入（当前版本 BOM 直接子层），子树懒加载：
+ *   点击展开箭头 → partsApi.getBOM(child_revision_id) 取该层子项，就地展开（无路由下钻）。
+ * - 点击行（非箭头区域）→ 打开子项详情页 /parts/{child_master_id}。
+ * - 触控目标 ≥40px：展开箭头 w-10，行内容 min-h-10。
+ */
+
+const STATUS_MAP: Record<string, { label: string; cls: string }> = {
+  draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
+  frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
+  released: { label: '发布', cls: 'bg-green-100 text-green-800' },
+  obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
+};
+
+function sortedByOrder(list: BomChild[]): BomChild[] {
+  return [...list].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+}
+
+export default function BomTree({ rootItems }: { rootItems: BomChild[] }) {
+  const navigate = useNavigate();
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [children, setChildren] = useState<Record<string, BomChild[]>>({});
+  const [loading, setLoading] = useState<Record<string, boolean>>({});
+  const [errors, setErrors] = useState<Record<string, boolean>>({});
+
+  const toggle = (revId: string) => {
+    const willExpand = !expanded[revId];
+    setExpanded((e) => ({ ...e, [revId]: willExpand }));
+    // 首次展开时懒加载子树（失败后可再次点击重试）
+    if (willExpand && !children[revId] && !loading[revId]) {
+      setLoading((l) => ({ ...l, [revId]: true }));
+      setErrors((er) => ({ ...er, [revId]: false }));
+      partsApi
+        .getBOM(revId)
+        .then((list) => {
+          setChildren((c) => ({ ...c, [revId]: sortedByOrder((list ?? []) as BomChild[]) }));
+        })
+        .catch(() => {
+          setErrors((er) => ({ ...er, [revId]: true }));
+        })
+        .finally(() => {
+          setLoading((l) => ({ ...l, [revId]: false }));
+        });
+    }
+  };
+
+  const renderNode = (b: BomChild, depth: number): ReactNode => {
+    const isOpen = !!expanded[b.child_revision_id];
+    const kids = children[b.child_revision_id];
+    const isLoading = !!loading[b.child_revision_id];
+    const hasError = !!errors[b.child_revision_id];
+    return (
+      <Fragment key={b.id}>
+        <div className="flex items-stretch min-h-10 border-b border-gray-50 bg-white">
+          {/* 缩进 + 层级连线 */}
+          <span className="shrink-0" style={{ width: depth * 16 + 4 }} />
+          {b.has_children ? (
+            <button
+              type="button"
+              aria-label={isOpen ? '折叠' : '展开'}
+              onClick={() => toggle(b.child_revision_id)}
+              className="shrink-0 w-10 flex items-center justify-center text-gray-500 text-sm"
+            >
+              {isLoading ? '⋯' : isOpen ? '▾' : '▸'}
+            </button>
+          ) : (
+            <span className="shrink-0 w-10 flex items-center justify-center text-gray-300 text-xs">•</span>
+          )}
+          {/* 点击行 → 打开子项详情页 */}
+          <button
+            type="button"
+            onClick={() => navigate(`/parts/${b.child_master_id}`)}
+            className="flex-1 min-w-0 flex flex-col items-start justify-center py-2 text-left"
+          >
+            <span className="w-full text-sm font-medium text-gray-900 truncate">
+              {b.child_code} {b.child_name}
+            </span>
+            <span className="text-xs text-gray-500 mt-0.5">
+              数量 ×{b.quantity} · 版本 {b.child_version}
+            </span>
+          </button>
+          <div className="shrink-0 flex items-center pr-2">
+            <StatusBadge status={b.child_status} map={STATUS_MAP} />
+          </div>
+        </div>
+        {isOpen && (
+          <div className="bg-white">
+            {isLoading && <div className="pl-10 py-2 text-xs text-gray-400">加载中...</div>}
+            {!isLoading && hasError && (
+              <div className="pl-10 py-2 text-xs text-red-400">加载失败，请重试</div>
+            )}
+            {!isLoading && !hasError && kids && kids.length === 0 && (
+              <div className="pl-10 py-2 text-xs text-gray-400">该零部件无下级 BOM</div>
+            )}
+            {!isLoading && !hasError && (kids ?? []).map((k) => renderNode(k, depth + 1))}
+          </div>
+        )}
+      </Fragment>
+    );
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+      {rootItems.map((b) => renderNode(b, 0))}
+    </div>
+  );
+}

@@ -4,10 +4,8 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { customFieldsApi, partsApi } from '../../services/api';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
-import MobileCardList from '../components/MobileCardList';
 import AttachmentPreview from '../components/AttachmentPreview';
-import { formatMeta } from '../components/formatMeta';
-import { bomPath } from './bomPath';
+import BomTree from '../components/BomTree';
 import PartWhereUsedTab from './PartWhereUsedTab';
 import type { BomChild } from './PartBomPage';
 import type { PartMaster, PartRevisionBrief, PartRevision, PartAttachment } from '../../types';
@@ -394,24 +392,8 @@ export default function PartDetailPage() {
                   <EmptyState text="该零部件暂无 BOM 子项" />
                 )}
                 {!bomLoading && !bomError && bomItems.length > 0 && (
-                  <MobileCardList
-                    items={bomItems}
-                    keyOf={(b) => b.id}
-                    renderMain={(b) => `${b.child_code} ${b.child_name}`}
-                    renderMeta={(b) => (
-                      <span className="flex flex-wrap items-center gap-2">
-                        <StatusBadge status={b.child_status} map={STATUS_MAP} />
-                        <span className="text-gray-500">数量 ×{b.quantity}</span>
-                        <span className="text-gray-500">{formatMeta([['版本', b.child_version]])}</span>
-                        {b.has_children && <span className="text-primary-600">可下钻 ›</span>}
-                      </span>
-                    )}
-                    onClick={(b) => {
-                      // 仅装配（has_children）可继续下钻；零件无子 BOM，点击无操作
-                      if (!b.has_children) return;
-                      navigate(bomPath(`/parts/${id}`, b.child_revision_id));
-                    }}
-                  />
+                  // 树形：箭头展开/折叠逐层查看，点击行打开子项详情
+                  <BomTree rootItems={bomItems} />
                 )}
               </div>
             ))}
