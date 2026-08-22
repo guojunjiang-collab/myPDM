@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { customFieldsApi, partsApi } from '../../services/api';
+import { customFieldsApi, entityDocumentsApi, partsApi } from '../../services/api';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
 import AttachmentPreview from '../components/AttachmentPreview';
@@ -31,10 +31,25 @@ const TYPE_LABEL: Record<string, string> = { part: '零件', assembly: '部件' 
 const TABS = [
   { key: 'overview', label: '概览' },
   { key: 'bom', label: 'BOM' },
+  { key: 'documents', label: '图文档' },
   { key: 'attachments', label: '附件' },
   { key: 'versions', label: '版本' },
   { key: 'whereused', label: '反查' },
 ];
+
+/** 零部件关联图文档（GET /parts/revisions/{revision_id}/documents） */
+interface PartDocLink {
+  id: string;
+  document_id: string;
+  category?: string;
+  document: {
+    id: string;
+    code: string;
+    name: string;
+    version: string;
+    status: string;
+  } | null;
+}
 
 function fmtDateTime(v?: string | null): string {
   if (!v) return '';
@@ -122,6 +137,11 @@ export default function PartDetailPage() {
   const [attachments, setAttachments] = useState<PartAttachment[]>([]);
   const [attLoading, setAttLoading] = useState(false);
   const [attError, setAttError] = useState<string | null>(null);
+
+  // 图文档段（激活时按最新版本加载关联文档）
+  const [docLinks, setDocLinks] = useState<PartDocLink[]>([]);
+  const [docLoading, setDocLoading] = useState(false);
+  const [docError, setDocError] = useState(false);
 
   // 版本段（激活时加载全部版本历史）
   const [versions, setVersions] = useState<PartRevision[]>([]);
@@ -223,6 +243,31 @@ export default function PartDetailPage() {
       })
       .finally(() => {
         if (alive) setAttLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [id, activeTab, revisionId]);
+
+  // 图文档：切到图文档段且详情就绪时加载关联文档
+  useEffect(() => {
+    let alive = true;
+    if (!id || activeTab !== 'documents' || !revisionId) return;
+    setDocLoading(true);
+    setDocError(false);
+    entityDocumentsApi
+      .list('part', revisionId)
+      .then((r: { data?: PartDocLink[] }) => {
+        if (alive) setDocLinks(r.data ?? []);
+      })
+      .catch(() => {
+        if (alive) {
+          setDocLinks([]);
+          setDocError(true);
+        }
+      })
+      .finally(() => {
+        if (alive) setDocLoading(false);
       });
     return () => {
       alive = false;
@@ -450,6 +495,41 @@ export default function PartDetailPage() {
                       title="生产附件"
                       items={attachments.filter((a) => a.category === 'production')}
                     />
+                  </div>
+                )}
+              </div>
+            ))}
+
+          {activeTab === 'documents' &&
+            (!revisionId ? (
+              <EmptyState text="该零部件暂无版本，无关联图文档" />
+            ) : (
+              <div>
+                {docLoading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+                {!docLoading && docError && (
+                  <p className="text-center text-xs text-red-400 py-3">图文档加载失败</p>
+                )}
+                {!docLoading && !docError && docLinks.length === 0 && (
+                  <EmptyState text="暂无关联图文档" />
+                )}
+                {!docLoading && !docError && docLinks.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    {docLinks.map((l) => (
+                      <button
+                        key={l.id}
+                        onClick={() => navigate(`/documents/${l.document_id}`)}
+                        className="w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
+                            {l.document?.code ?? '未知文档'}
+                          </span>
+                          <span className="shrink-0 text-xs text-gray-500">{l.document?.version}</span>
+                          <StatusBadge status={l.document?.status ?? 'draft'} map={STATUS_MAP} />
+                        </div>
+                        <div className="text-xs text-gray-500 truncate mt-0.5">{l.document?.name}</div>
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>

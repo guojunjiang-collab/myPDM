@@ -217,24 +217,31 @@ export default function PartWhereUsedTab({ revisionId }: { revisionId: string })
           <EmptyState text="暂无引用" />
         ) : (
           cfgs.map((r) => (
-            <RowCard
+            <button
               key={r.config_item_revision_id}
-              main={`${r.code} ${r.name}`}
-              meta={
-                <span className="flex flex-wrap items-center gap-2">
+              className="w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm cursor-default"
+            >
+              {/* 行1：编号 + 用量(中) + 版本(中) + 状态(右)——参考父项零部件排版 */}
+              <span className="flex items-center min-w-0">
+                <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">{r.code}</span>
+                <span className="shrink-0 w-8 truncate text-center text-xs text-gray-500">x{r.quantity ?? 1}</span>
+                <span className="shrink-0 w-7 truncate text-center text-xs text-gray-500">{r.version}</span>
+                <span className="shrink-0 w-12 flex justify-end">
                   {r.status && <StatusBadge status={r.status} map={STATUS_MAP} />}
-                  <span
-                    className={`px-1.5 py-0.5 rounded text-xs ${
-                      r.is_required ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
-                    }`}
-                  >
-                    {r.is_required ? '必选' : '可选'}
-                  </span>
-                  <span className="text-gray-500">{formatMeta([['版本', r.version]])}</span>
-                  <span className="text-gray-500">用量 ×{r.quantity ?? 1}</span>
                 </span>
-              }
-            />
+              </span>
+              {/* 行2：名称 + 必选/可选 */}
+              <span className="flex items-center min-w-0 mt-0.5">
+                <span className="flex-1 min-w-0 truncate text-xs text-gray-500">{r.name}</span>
+                <span
+                  className={`shrink-0 px-1.5 py-0.5 rounded text-xs ${
+                    r.is_required ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                  }`}
+                >
+                  {r.is_required ? '必选' : '可选'}
+                </span>
+              </span>
+            </button>
           ))
         )}
       </Section>
