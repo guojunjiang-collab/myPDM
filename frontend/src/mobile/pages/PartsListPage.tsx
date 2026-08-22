@@ -100,10 +100,10 @@ export default function PartsListPage() {
         renderMain={(p) => (
           <div className="flex items-center gap-2 min-w-0">
             <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">{p.code}</span>
-            <StatusBadge status={p.status} map={STATUS_MAP} />
             {p.check_out_user_name && (
               <span className="shrink-0 text-xs text-gray-500">{p.check_out_user_name}</span>
             )}
+            <StatusBadge status={p.status} map={STATUS_MAP} />
           </div>
         )}
         renderMeta={(p) => (
