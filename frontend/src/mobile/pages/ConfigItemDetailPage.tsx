@@ -76,8 +76,11 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
   const code = detail?.revision.code || detail?.master.code || revisionId || '';
   const name = detail?.revision.name || detail?.master.name || '';
 
-  const openPart = (revision_id?: string) => {
-    if (revision_id && onNavigate) onNavigate(`/parts/${revision_id}`);
+  const openPart = (masterId?: string, revId?: string) => {
+    // PartDetailPage 的 :id 是 master_id；rev 参数定位到关联版本
+    if (masterId && onNavigate) {
+      onNavigate(revId ? `/parts/${masterId}?rev=${revId}` : `/parts/${masterId}`);
+    }
   };
   const openChild = (childId?: string) => {
     if (childId && overlayPush) overlayPush.push({ kind: 'config-item', id: childId });
@@ -158,7 +161,7 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
               detail.parts.map((p) => (
                 <button
                   key={p.id}
-                  onClick={() => openPart(p.part_detail?.revision_id)}
+                  onClick={() => openPart(p.part_detail?.id, p.part_detail?.revision_id)}
                   className="w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm"
                 >
                   <div className="text-sm text-gray-900 break-all">
