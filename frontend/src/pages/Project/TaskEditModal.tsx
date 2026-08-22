@@ -147,6 +147,9 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
 
   const handleSave = async () => {
     const payload: any = { ...form, parent_id: task ? undefined : parentId };
+    // 补负责人显示名（项目详情任务表按 assignee_name 显示；清空负责人时置 null 及时刷新）
+    const u = users.find((x) => x.id === payload.assignee_id);
+    payload.assignee_name = u ? u.real_name : null;
     // 未填日期发送 null 而非空字符串,避免后端日期校验失败
     if (payload.planned_start === '') payload.planned_start = null;
     if (payload.planned_end === '') payload.planned_end = null;
