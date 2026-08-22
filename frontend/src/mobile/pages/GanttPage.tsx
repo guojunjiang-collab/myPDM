@@ -205,8 +205,8 @@ export default function GanttPage({ projectId, onBack }: Props) {
                         ...(t.is_overdue ? { outline: '1px solid #ef4444' } : {}),
                       }}
                     >
-                      {/* 名称始终显示，条内放不下时直接向右溢出（不截断、不省略） */}
-                      <span className="shrink-0 pl-1.5 pr-1 text-[10px] leading-none text-white whitespace-nowrap">
+                      {/* 名称始终显示，条内放不下时向右溢出；relative z-10 让溢出文字浮在其它甘特条背景之上 */}
+                      <span className="relative z-10 shrink-0 pl-1.5 pr-1 text-[10px] leading-none text-white whitespace-nowrap">
                         {t.name}
                       </span>
                     </div>
