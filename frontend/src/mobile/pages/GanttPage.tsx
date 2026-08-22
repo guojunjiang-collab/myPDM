@@ -125,14 +125,14 @@ export default function GanttPage({ projectId, onBack }: Props) {
         <div ref={scrollRef} className="flex-1 overflow-x-auto">
           <div className="flex min-w-max">
             {/* 左列：任务编号（固定，横向滚动不跟随）；名称显示在甘特条上 */}
-            <div className="sticky left-0 z-10 bg-gray-50 w-36 shrink-0 border-r border-gray-200">
+            <div className="sticky left-0 z-10 bg-gray-50 w-36 shrink-0 border-r border-gray-200 relative">
               {/* 与右区日期表头等高的占位，保证任务行对齐 */}
               <div style={{ height: 28 }} />
               {data.tasks.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => openTask(t)}
-                  className="w-full text-left px-2 flex flex-col justify-center border-b border-gray-100"
+                  className="w-full text-left px-2 flex flex-col justify-center"
                   style={{ height: ROW_H }}
                 >
                   <span
@@ -156,6 +156,14 @@ export default function GanttPage({ projectId, onBack }: Props) {
                     )}
                   </span>
                 </button>
+              ))}
+              {/* 行分隔线：与右侧日历区同画法（绝对定位 border-t），像素级对齐 */}
+              {data.tasks.map((t, i) => (
+                <div
+                  key={'lb' + t.id}
+                  className="absolute left-0 right-0 border-t border-gray-100"
+                  style={{ top: 28 + i * ROW_H }}
+                />
               ))}
             </div>
             {/* 右区：日期表头 + 甘特条（横向滚动） */}
