@@ -24,6 +24,9 @@ function sortedByOrder(list: BomChild[]): BomChild[] {
   return [...list].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 }
 
+// 每级缩进 = 展开按钮宽度，使缩进竖线正好与父项展开/折叠按钮的中心对齐
+const INDENT = 48;
+
 export default function BomTree({ rootItems }: { rootItems: BomChild[] }) {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -60,14 +63,14 @@ export default function BomTree({ rootItems }: { rootItems: BomChild[] }) {
     return (
       <Fragment key={b.id}>
         <div className="flex items-stretch min-h-10 border-b border-gray-50 bg-white">
-          {/* 缩进 + 层级竖线（每级一条，贯穿整行，便于识别同一层级） */}
-          <span className="relative shrink-0" style={{ width: depth * 16 + 4 }}>
+          {/* 缩进 + 层级竖线（每级一条，位于该级缩进区中心 = 父项展开按钮中心） */}
+          <span className="relative shrink-0" style={{ width: depth * INDENT }}>
             {depth > 0 &&
               Array.from({ length: depth }).map((_, i) => (
                 <span
                   key={i}
                   className="absolute top-0 bottom-0 border-l border-gray-200"
-                  style={{ left: i * 16 + 6 }}
+                  style={{ left: i * INDENT + INDENT / 2 }}
                 />
               ))}
           </span>
@@ -76,12 +79,12 @@ export default function BomTree({ rootItems }: { rootItems: BomChild[] }) {
               type="button"
               aria-label={isOpen ? '折叠' : '展开'}
               onClick={() => toggle(b.child_revision_id)}
-              className="shrink-0 w-10 flex items-center justify-center text-gray-500 text-sm"
+              className="shrink-0 w-12 flex items-center justify-center text-gray-500 text-lg"
             >
               {isLoading ? '⋯' : isOpen ? '▾' : '▸'}
             </button>
           ) : (
-            <span className="shrink-0 w-10 flex items-center justify-center text-gray-300 text-xs">•</span>
+            <span className="shrink-0 w-12 flex items-center justify-center text-gray-300 text-sm">•</span>
           )}
           {/* 点击行 → 打开子项详情页 */}
           <button
@@ -102,12 +105,21 @@ export default function BomTree({ rootItems }: { rootItems: BomChild[] }) {
         </div>
         {isOpen && (
           <div className="bg-white">
-            {isLoading && <div className="pl-10 py-2 text-xs text-gray-400">加载中...</div>}
+            {/* 提示对齐该节点子行内容起点：(depth+1) 级缩进 + 按钮宽 */}
+            {isLoading && (
+              <div className="py-2 text-xs text-gray-400" style={{ paddingLeft: (depth + 2) * INDENT }}>
+                加载中...
+              </div>
+            )}
             {!isLoading && hasError && (
-              <div className="pl-10 py-2 text-xs text-red-400">加载失败，请重试</div>
+              <div className="py-2 text-xs text-red-400" style={{ paddingLeft: (depth + 2) * INDENT }}>
+                加载失败，请重试
+              </div>
             )}
             {!isLoading && !hasError && kids && kids.length === 0 && (
-              <div className="pl-10 py-2 text-xs text-gray-400">该零部件无下级 BOM</div>
+              <div className="py-2 text-xs text-gray-400" style={{ paddingLeft: (depth + 2) * INDENT }}>
+                该零部件无下级 BOM
+              </div>
             )}
             {!isLoading && !hasError && (kids ?? []).map((k) => renderNode(k, depth + 1))}
           </div>
