@@ -9,15 +9,7 @@ import { ECRAffectedItemPicker } from './ECRAffectedItemPicker';
 import { ECRBomImpactView } from './ECRBomImpactView';
 import { ECRDocumentPicker } from './ECRDocumentPicker';
 import VersionSelectModal from '../VersionSelectModal';
-
-const statusTag = (s: string) => {
-  const labels: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' };
-  const colors: Record<string, string> = {
-    draft: 'bg-blue-100 text-blue-800', frozen: 'bg-orange-100 text-orange-800',
-    released: 'bg-green-100 text-green-800', obsolete: 'bg-red-100 text-red-800',
-  };
-  return { label: labels[s] || s, cls: colors[s] || 'bg-gray-100 text-gray-800' };
-};
+import Badge from '../ui/Badge';
 
 const REASON_OPTIONS = [
   { value: 'quality_defect', label: '质量缺陷' },
@@ -606,7 +598,7 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
                     <td className="px-3 py-2 text-sm font-medium">{doc?.code || link.document_code}</td>
                     <td className="px-3 py-2 text-sm">{doc?.name || link.document_name}</td>
                     <td className="px-3 py-2 text-sm text-gray-500">{doc?.version || link.document_version || '-'}</td>
-                    <td className="px-3 py-2">{doc ? <span className={`px-1.5 py-0.5 rounded text-xs ${statusTag(doc.status).cls}`}>{statusTag(doc.status).label}</span> : '-'}</td>
+                    <td className="px-3 py-2">{doc ? <Badge status={doc.status} /> : '-'}</td>
                     {docFieldDefs.map((def) => { const vals = docCustomValues[link.document_id] || {}; const val = vals[def.id];
                       return (<td key={def.id} className="px-3 py-2 text-sm text-gray-500">{val !== undefined && val !== null && val !== '' ? String(val) : '-'}</td>); })}
                     <td className="px-3 py-2 text-sm text-gray-500">{doc?.file_name || atts.map((a: any) => a.file_name).join(', ') || '-'}</td>
@@ -654,15 +646,10 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
               >
                 {/* Item header */}
                 <div className="flex items-center gap-3 p-3 bg-gray-50">
-                  <span
-                    className={`px-2 py-0.5 text-xs rounded ${
-                      item.entity_type === 'part'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-emerald-100 text-emerald-700'
-                    }`}
-                  >
-                    {item.entity_type === 'part' ? '零件' : '部件'}
-                  </span>
+                  <Badge
+                    tone={item.entity_type === 'part' ? 'blue' : 'gray'}
+                    label={item.entity_type === 'part' ? '零件' : '部件'}
+                  />
                   <span className="text-sm font-medium text-gray-900">{item.entity_code}</span>
                   <span className="text-sm text-gray-600">{item.entity_name}</span>
                   <span className="text-xs text-gray-400">{item.entity_version}</span>

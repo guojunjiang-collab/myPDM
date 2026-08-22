@@ -9,6 +9,7 @@ import { ECRStatusBadge, ECRPriorityBadge } from './ECRStatusBadge';
 import { ECRReviewPanel } from './ECRReviewPanel';
 import { ECRBomImpactView } from './ECRBomImpactView';
 import DocumentDetailModal from '../DocumentDetailModal';
+import Badge from '../ui/Badge';
 import type { ECRRequest, ECRReviewRecord, ECRAffectedItem, ECRStatusLog, ECRDocumentLink, Document } from '../../types';
 
 const REASON_LABELS: Record<string, string> = {
@@ -421,14 +422,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
                           <td className="px-3 py-2 text-sm text-gray-500">{doc?.version || link.document_version || '-'}</td>
                           <td className="px-3 py-2 text-sm">
                             {doc?.status ? (
-                              <span className={`px-1.5 py-0.5 rounded text-xs ${
-                                doc.status === 'draft' ? 'bg-blue-100 text-blue-800' :
-                                doc.status === 'frozen' ? 'bg-orange-100 text-orange-800' :
-                                doc.status === 'released' ? 'bg-green-100 text-green-800' :
-                                doc.status === 'obsolete' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
-                              }`}>
-                                {({draft:'草稿', frozen:'冻结', released:'发布', obsolete:'作废'} as Record<string, string>)[doc.status] || doc.status}
-                              </span>
+                              <Badge status={doc.status} />
                             ) : '-'}
                           </td>
                           {docFieldDefs.map((def) => {
@@ -483,22 +477,15 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
                   >
                     {/* Item header */}
                     <div className="flex items-center gap-3 p-3 bg-gray-50">
-                      <span
-                        className={`px-2 py-0.5 text-xs rounded ${
-                          item.entity_type === 'part'
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-emerald-100 text-emerald-700'
-                        }`}
-                      >
-                        {item.entity_type === 'part' ? '零件' : '部件'}
-                      </span>
+                      <Badge
+                        tone={item.entity_type === 'part' ? 'blue' : 'gray'}
+                        label={item.entity_type === 'part' ? '零件' : '部件'}
+                      />
                       <span className="text-sm font-medium text-gray-900">{item.entity_code}</span>
                       <span className="text-sm text-gray-600">{item.entity_name}</span>
                       <span className="text-xs text-gray-400">v{item.entity_version}</span>
                       {item.change_type && (
-                        <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">
-                          {item.change_type}
-                        </span>
+                        <Badge status={item.change_type} domain="action" />
                       )}
                       {item.change_description && (
                         <span className="text-xs text-gray-500 flex-1 truncate">

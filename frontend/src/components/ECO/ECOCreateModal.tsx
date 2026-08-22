@@ -8,15 +8,7 @@ import type { ECORequest, ECRDocumentLink } from '../../types';
 import VersionSelectModal from '../VersionSelectModal';
 import PartDetailModal from '../PartDetailModal';
 import EntityEditModal from '../EntityEditModal';
-
-const statusTag = (s: string) => {
-  const labels: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' };
-  const colors: Record<string, string> = {
-    draft: 'bg-blue-100 text-blue-800', frozen: 'bg-orange-100 text-orange-800',
-    released: 'bg-green-100 text-green-800', obsolete: 'bg-red-100 text-red-800',
-  };
-  return { label: labels[s] || s, cls: colors[s] || 'bg-gray-100 text-gray-800' };
-};
+import Badge from '../ui/Badge';
 import { ECOEditView } from './ECOEditView';
 import { ECRDocumentPicker } from '../ECR/ECRDocumentPicker';
 import AssemblyPartPicker from '../AssemblyPartPicker';
@@ -548,7 +540,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
                         <td className="px-3 py-2 text-sm font-medium">{doc?.code || link.document_code}</td>
                         <td className="px-3 py-2 text-sm">{doc?.name || link.document_name}</td>
                         <td className="px-3 py-2 text-sm text-gray-500">{doc?.version || link.document_version || '-'}</td>
-                        <td className="px-3 py-2">{doc ? <span className={`px-1.5 py-0.5 rounded text-xs ${statusTag(doc.status).cls}`}>{statusTag(doc.status).label}</span> : '-'}</td>
+                        <td className="px-3 py-2">{doc ? <Badge status={doc.status} /> : '-'}</td>
                         {docFieldDefs.map((def) => {
                           const vals = docCustomValues[link.document_id] || {};
                           const val = vals[def.id];
@@ -837,12 +829,12 @@ function ReleaseItemsTable({ items, onViewItem, onRemove, onVersionSelect }: { i
             <span>{'-'.repeat(level)}{level}</span>
             {isAssembly && <button onClick={(e) => { e.stopPropagation(); toggleExpand(idx, ri.entity_id, ri.entity_type); }} className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">{childRows ? '▼' : '▶'}</button>}
           </td>
-          <td className="px-3 py-1.5 text-xs"><span className={`px-1.5 py-0.5 rounded text-xs ${isAssembly ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>{isAssembly ? '部件' : '零件'}</span></td>
+          <td className="px-3 py-1.5 text-xs"><Badge tone={isAssembly ? 'blue' : 'gray'} label={isAssembly ? '部件' : '零件'} /></td>
           <td className="px-3 py-1.5 text-xs font-mono">{ri.entity_code}</td>
           <td className="px-3 py-1.5 text-xs">{ri.entity_name}</td>
           <td className="px-3 py-1.5 text-xs text-gray-500">{ri.spec || '-'}</td>
           <td className="px-3 py-1.5 text-xs">{ri.entity_version || 'A'}</td>
-          <td className="px-3 py-1.5 text-xs whitespace-nowrap">{ri.status ? <span className={`px-1.5 py-0.5 rounded text-xs ${statusTag(ri.status).cls}`}>{statusTag(ri.status).label}</span> : '-'}</td>
+          <td className="px-3 py-1.5 text-xs whitespace-nowrap">{ri.status ? <Badge status={ri.status} /> : '-'}</td>
           <td className="px-3 py-1.5 text-xs text-center">{ri.quantity || 1}</td>
           {(onRemove || onVersionSelect) && level === 0 && <td className="px-3 py-1.5 text-xs text-center" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-1 justify-center">

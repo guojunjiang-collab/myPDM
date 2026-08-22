@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ECRReviewer, ECRReviewRecord } from '../../types';
+import Badge from '../ui/Badge';
 
 interface ECRReviewPanelProps {
   reviewers: ECRReviewer[];
@@ -9,10 +10,10 @@ interface ECRReviewPanelProps {
   loading: boolean;
 }
 
-const decisionConfig: Record<string, { label: string; borderColor: string; bgColor: string; icon: string }> = {
-  approved: { label: '已通过', borderColor: 'border-l-green-500', bgColor: 'bg-green-50', icon: '✅' },
-  rejected: { label: '已驳回', borderColor: 'border-l-red-500', bgColor: 'bg-red-50', icon: '❌' },
-  returned: { label: '已退回', borderColor: 'border-l-orange-500', bgColor: 'bg-orange-50', icon: '↩️' },
+const decisionConfig: Record<string, { label: string; tone: 'green' | 'red' | 'orange'; borderColor: string; bgColor: string; icon: string }> = {
+  approved: { label: '已通过', tone: 'green', borderColor: 'border-l-green-500', bgColor: 'bg-green-50', icon: '✅' },
+  rejected: { label: '已驳回', tone: 'red', borderColor: 'border-l-red-500', bgColor: 'bg-red-50', icon: '❌' },
+  returned: { label: '已退回', tone: 'orange', borderColor: 'border-l-orange-500', bgColor: 'bg-orange-50', icon: '↩️' },
 };
 
 const pendingConfig = { label: '待审批', borderColor: 'border-l-gray-300', bgColor: 'bg-white', icon: '⏳' };
@@ -90,19 +91,7 @@ export function ECRReviewPanel({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span
-                    className={`px-2 py-0.5 text-xs rounded-full font-medium ${
-                      record
-                        ? record.decision === 'approved'
-                          ? 'bg-green-100 text-green-700'
-                          : record.decision === 'rejected'
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-orange-100 text-orange-700'
-                        : 'bg-gray-100 text-gray-600'
-                    }`}
-                  >
-                    {config ? config.label : pendingConfig.label}
-                  </span>
+                  <Badge tone={config?.tone ?? 'gray'} label={config?.label ?? '待审批'} />
                   {isCurrentReviewer && isPending && (
                     <button
                       onClick={() => handleStartReview(reviewer.user_id)}

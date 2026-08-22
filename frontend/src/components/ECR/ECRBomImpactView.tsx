@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState, useMemo } from 'react';
 import type { BomImpactNode } from '../../types';
+import Badge from '../ui/Badge';
+import { BADGE_DOMAINS } from '../../constants/badges';
 
 // ─── Action config ───────────────────────────────────────────────
 const ACTION_ROW_CLASS: Record<string, string> = {
@@ -7,13 +9,6 @@ const ACTION_ROW_CLASS: Record<string, string> = {
   qty_change: 'bg-orange-50',
   delete: 'bg-red-50',
   no_change: '',
-};
-
-const ACTION_CONFIG: Record<string, { label: string; color: string }> = {
-  upgrade: { label: '升版', color: 'bg-blue-100 text-blue-800' },
-  qty_change: { label: '数量修改', color: 'bg-orange-100 text-orange-800' },
-  delete: { label: '删除', color: 'bg-red-100 text-red-800' },
-  no_change: { label: '不变', color: 'bg-gray-100 text-gray-600' },
 };
 
 const UPWARD_ACTIONS = ['upgrade', 'qty_change', 'delete', 'no_change'] as const;
@@ -193,12 +188,7 @@ export function ECRBomImpactView({
 
   // ── Render helpers ─────────────────────────────────────────────
   const renderActionBadge = (action: string) => {
-    const cfg = ACTION_CONFIG[action] || { label: action, color: 'bg-gray-100 text-gray-600' };
-    return (
-      <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${cfg.color}`}>
-        {cfg.label}
-      </span>
-    );
+    return <Badge status={action} domain="action" />;
   };
 
   const renderActionSelect = (
@@ -212,7 +202,7 @@ export function ECRBomImpactView({
       className="w-full text-xs border border-gray-300 rounded px-1.5 py-1 bg-white focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
     >
       {options.map((opt) => {
-        const cfg = ACTION_CONFIG[opt];
+        const cfg = BADGE_DOMAINS.action[opt];
         return (
           <option key={opt} value={opt}>
             {cfg.label}

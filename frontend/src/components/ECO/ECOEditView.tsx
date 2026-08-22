@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { ecrApi, ecoApi, partsApi } from '../../services/api';
 import type { BomImpactNode } from '../../types';
 import { ECOActionBadge } from './ECOStatusBadge';
+import Badge from '../ui/Badge';
 import AssemblyPartPicker from '../AssemblyPartPicker';
 import { toast } from '../Toast';
 
@@ -141,10 +142,10 @@ function isAutoUpgraded(n: MutableNode): boolean {
 
 // ── 渲染变更状态 Badge ──
 function StatusBadge({ status }: { status: string | undefined }) {
-  if (status === 'released') return <span className="px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-700">已发布</span>;
-  if (status === 'frozen') return <span className="px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-700">已冻结</span>;
-  if (status === 'draft') return <span className="px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-700">已升版</span>;
-  return <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-500">未执行</span>;
+  // draft（已升版）为 ECO 执行语境下的业务文案，单独处理；released/frozen 走 part 域
+  if (status === 'draft') return <Badge tone="blue" label="已升版" />;
+  if (!status) return <Badge tone="gray" label="未执行" />;
+  return <Badge status={status} />;
 }
 
 function resultRow(n: MutableNode, isUpward = false) {
@@ -286,7 +287,7 @@ function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade, o
               {canExec && (
                 <>
                   <td className={td}>
-                    {unchanged ? <span className="px-1.5 py-0.5 rounded text-xs bg-gray-200 text-gray-500">不变更</span>
+                    {unchanged ? <Badge tone="gray" label="不变更" />
                     : <StatusBadge status={exec?.new_entity_status} />}
                   </td>
                   <td className={`${td} text-center`}>
@@ -360,7 +361,7 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade,
           {canExec && (
             <>
               <td className={td}>
-                {unchanged ? <span className="px-1.5 py-0.5 rounded text-xs bg-gray-200 text-gray-500">不变更</span>
+                {unchanged ? <Badge tone="gray" label="不变更" />
                 : <StatusBadge status={effStatus} />}
               </td>
               <td className={`${td} text-center`}>

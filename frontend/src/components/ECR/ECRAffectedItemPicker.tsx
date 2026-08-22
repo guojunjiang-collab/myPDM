@@ -3,6 +3,7 @@ import { Modal } from '../Modal';
 import { toast } from '../Toast';
 import { partsApi } from '../../services/api';
 import { useTableSort } from '../../hooks/useTableSort';
+import Badge from '../ui/Badge';
 import type { Part, Assembly } from '../../types';
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -265,9 +266,7 @@ export function ECRAffectedItemPicker({
                       />
                     </td>
                     <td className="px-2 py-1.5">
-                      <span className="px-1.5 py-0.5 text-xs rounded bg-purple-50 text-purple-700">
-                        零部件
-                      </span>
+                      <Badge tone="purple" label="零部件" />
                     </td>
                     <td className="px-2 py-1.5 text-xs font-mono text-gray-700">{row.entity_code}</td>
                     <td className="px-2 py-1.5 text-xs text-gray-700">{row.entity_name}</td>

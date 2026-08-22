@@ -27,11 +27,15 @@ const FLOW_STATUS: Record<string, BadgeDef> = { // 审批流程：draft=灰（�
 
 export const BADGE_DOMAINS: Record<BadgeDomain, Record<string, BadgeDef>> = {
   part: PART_STATUS,
-  ecr: FLOW_STATUS,
+  ecr: {
+    ...FLOW_STATUS,
+    closed: { label: '已关闭', tone: 'gray' },
+  },
   eco: {
     ...FLOW_STATUS,
     executing: { label: '执行中', tone: 'amber' },
     completed: { label: '已完成', tone: 'teal' },
+    closed: { label: '已关闭', tone: 'gray' },
   },
   profile: {
     draft: { label: '草稿', tone: 'gray' },
@@ -68,6 +72,7 @@ export const BADGE_DOMAINS: Record<BadgeDomain, Record<string, BadgeDef>> = {
     in_progress: { label: '执行中', tone: 'amber' },
     completed: { label: '已完成', tone: 'green' },
     failed: { label: '失败', tone: 'red' },
+    skipped: { label: '已跳过', tone: 'gray' },
   },
   checkout: {
     not_checked_out: { label: '未签出', tone: 'gray' },

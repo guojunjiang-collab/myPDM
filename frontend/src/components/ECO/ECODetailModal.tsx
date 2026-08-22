@@ -15,12 +15,7 @@ import VersionSelectModal from '../VersionSelectModal';
 import PartDetailModal from '../PartDetailModal';
 import DocumentDetailModal from '../DocumentDetailModal';
 import EntityEditModal from '../EntityEditModal';
-
-const statusTag = (s: string) => {
-  const labels: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' };
-  const colors: Record<string, string> = { draft: 'bg-blue-100 text-blue-800', frozen: 'bg-orange-100 text-orange-800', released: 'bg-green-100 text-green-800', obsolete: 'bg-red-100 text-gray-800' };
-  return { label: labels[s] || s, cls: colors[s] || 'bg-gray-100 text-gray-800' };
-};
+import Badge from '../ui/Badge';
 
 interface Props { ecoId: string; onClose: () => void; onRefresh: () => void; executionMode?: boolean; }
 
@@ -270,7 +265,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
                             <td className="px-3 py-2 text-sm font-medium">{doc.code}</td>
                             <td className="px-3 py-2 text-sm">{doc.name}</td>
                             <td className="px-3 py-2 text-sm text-gray-500">{doc.version || '-'}</td>
-                            <td className="px-3 py-2 text-sm"><span className={`px-1.5 py-0.5 rounded text-xs ${statusTag(doc.status).cls}`}>{statusTag(doc.status).label}</span></td>
+                            <td className="px-3 py-2 text-sm"><Badge status={doc.status} /></td>
                             {docFieldDefs.map((def) => { const vals = docCustomValues[doc.id] || {}; const val = vals[def.id]; return <td key={def.id} className="px-3 py-2 text-sm text-gray-500">{val !== undefined && val !== null && val !== '' ? String(val) : '-'}</td>; })}
                             <td className="px-3 py-2 text-sm text-gray-500">{atts.length > 0 ? atts.map((a: any) => <div key={a.id} className="text-xs">{a.file_name} ({formatFileSize(a.file_size)})</div>) : (doc.file_name || '-')}</td>
                             <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
@@ -539,12 +534,12 @@ function ReleaseItemsTable({ items, onViewItem, publishedNonce }: { items: any[]
             <span>{'-'.repeat(level)}{level}</span>
             {isAssembly && <button onClick={(e) => { e.stopPropagation(); toggleExpand(idx, ri.entity_id, ri.entity_type); }} className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">{childRows ? '▼' : '▶'}</button>}
           </td>
-          <td className="px-3 py-1.5 text-xs"><span className={`px-1.5 py-0.5 rounded text-xs ${isAssembly ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>{isAssembly ? '部件' : '零件'}</span></td>
+          <td className="px-3 py-1.5 text-xs"><Badge tone={isAssembly ? 'blue' : 'gray'} label={isAssembly ? '部件' : '零件'} /></td>
           <td className="px-3 py-1.5 text-xs font-mono">{ri.entity_code}</td>
           <td className="px-3 py-1.5 text-xs">{ri.entity_name}</td>
           <td className="px-3 py-1.5 text-xs text-gray-500">{ri.spec || '-'}</td>
           <td className="px-3 py-1.5 text-xs">{ri.entity_version || 'A'}</td>
-          <td className="px-3 py-1.5 text-xs whitespace-nowrap">{ri.status ? <span className={`px-1.5 py-0.5 rounded text-xs ${statusTag(ri.status).cls}`}>{statusTag(ri.status).label}</span> : '-'}</td>
+          <td className="px-3 py-1.5 text-xs whitespace-nowrap">{ri.status ? <Badge status={ri.status} /> : '-'}</td>
           <td className="px-3 py-1.5 text-xs text-center">{ri.quantity || 1}</td>
         </tr>
         {childRows && childRows.map((child: any, j: number) => renderRow(child, level + 1, `${idx}-${j}`))}
