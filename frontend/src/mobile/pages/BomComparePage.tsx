@@ -257,13 +257,22 @@ export default function BomComparePage() {
             setError(null);
           }}
         />
-        <button
-          onClick={handleCompare}
-          disabled={!leftId || !rightId || loading}
-          className="w-full min-h-11 rounded-lg bg-primary-600 text-white text-sm font-medium disabled:opacity-50"
-        >
-          {loading ? '对比中...' : '开始对比'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleCompare}
+            disabled={!leftId || !rightId || loading}
+            className="flex-1 min-h-11 rounded-lg bg-primary-600 text-white text-sm font-medium disabled:opacity-50"
+          >
+            {loading ? '对比中...' : '开始对比'}
+          </button>
+          <button
+            onClick={() => navigate(`/stp-viewer?compare-left=${leftId}&compare-right=${rightId}`)}
+            disabled={!leftId || !rightId}
+            className="flex-1 min-h-11 rounded-lg bg-white border border-primary-600 text-primary-600 text-sm font-medium disabled:opacity-50"
+          >
+            🧊 3D 对比
+          </button>
+        </div>
         {error && <p className="text-center text-xs text-red-500 py-1">{error}</p>}
       </div>
 

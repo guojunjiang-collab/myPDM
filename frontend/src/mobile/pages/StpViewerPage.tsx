@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { assemblyViewerApi } from '../../services/api';
+import { assemblyViewerApi, bomApi } from '../../services/api';
 import type { AssemblyInstance, AssemblyTreeNode } from '../../services/api';
+import type { BOMCompareResponse } from '../../types';
 import { ViewerCanvas } from '../../components/STPViewer/ViewerCanvas';
 import { ModelTreePanel } from '../../components/STPViewer/ModelTreePanel';
+import { CompareTreePanel } from '../../components/STPViewer/CompareTreePanel';
+import { buildCompareTree } from '../../components/STPViewer/buildCompareTree';
 import { useViewerStore } from '../../stores/viewerStore';
 import { backInterceptReducer } from '../hooks/backIntercept';
 import type { BackAction, BackLayer } from '../hooks/backIntercept';
 
 /**
- * 移动端 STP 3D 查看器（Task 12 + 装配模式扩展）。
+ * 移动端 STP 3D 查看器（Task 12 + 装配/对比模式扩展）。
  *
  * 参数约定与桌面版 pages/STPViewer.tsx 完全一致：
  *   单件预览：/stp-viewer?id=<附件id>&token=<媒体令牌>[&code=&version=&name=]
@@ -18,8 +21,10 @@ import type { BackAction, BackLayer } from '../hooks/backIntercept';
  *   装配预览：/stp-viewer?assembly=<版本id>[&code=&version=&name=]
  *     → assemblyViewerApi.instances/tree 加载全部叶项实例（含变换矩阵），
  *       ViewerCanvas kind='assembly' 按矩阵摆放渲染。
- * 配置清单（config-profile）/BOM 对比（compare-left+compare-right）模式
- * 为桌面工程流程，移动端暂不支持，给出明确的桌面端提示。
+ *   BOM 对比：/stp-viewer?compare-left=<版本id>&compare-right=<版本id>
+ *     → bomApi.compare + 两侧 instances/tree → buildCompareTree 配对树（CompareTreePanel），
+ *       ViewerCanvas kind='compare' 左右叠加渲染（新增绿 / 删除红）。
+ * 配置清单（config-profile）模式为桌面工程流程，移动端暂不支持，给出明确的桌面端提示。
  *
  * 交互：
  * - 画布容器 touch-action: none，防止页面手势（滚动/双指缩放浏览器级手势）抢走
@@ -149,23 +154,25 @@ export default function StpViewerPage() {
   const id = params.get('id');
   const token = params.get('token');
   const assemblyRevId = params.get('assembly');
+  const compareLeftId = params.get('compare-left');
+  const compareRightId = params.get('compare-right');
   const partCode = params.get('code') || undefined;
   const partVersion = params.get('version') || undefined;
   const partName = params.get('name') || undefined;
-  const unsupportedMode = !!(
-    params.get('config-profile') ||
-    params.get('compare-left') ||
-    params.get('compare-right')
-  );
+  const compareMode = !!(compareLeftId && compareRightId);
+  const unsupportedMode = !!params.get('config-profile');
 
-  // —— 模型加载（单件复刻桌面 checkAndLoad / downloadFile / poll 逻辑；装配走 instances/tree）——
+  // —— 模型加载（单件复刻桌面 checkAndLoad / downloadFile / poll 逻辑；装配/对比走 instances/tree）——
   const [phase, setPhase] = useState<Phase>('checking');
   const [url, setUrl] = useState<string | null>(null);
   const [downloadPct, setDownloadPct] = useState(0);
   const [asmInstances, setAsmInstances] = useState<AssemblyInstance[] | null>(null);
   const [asmTree, setAsmTree] = useState<AssemblyTreeNode[]>([]);
+  const [cmpLeftInstances, setCmpLeftInstances] = useState<AssemblyInstance[]>([]);
+  const [cmpRightInstances, setCmpRightInstances] = useState<AssemblyInstance[]>([]);
   const blobUrlRef = useRef<string | null>(null);
   const resetStore = useViewerStore((s) => s.reset);
+  const setCompareTree = useViewerStore((s) => s.setCompareTree);
   const loadingState = useViewerStore((s) => s.loadingState);
   const errorMessage = useViewerStore((s) => s.errorMessage);
 
@@ -174,6 +181,36 @@ export default function StpViewerPage() {
     blobUrlRef.current = null;
     setUrl(null);
     if (unsupportedMode) return;
+    if (compareLeftId && compareRightId) {
+      // 对比模式：BOM 对比 + 两侧装配实例/树 → 配对树（与桌面 pages/STPViewer.tsx 一致）
+      let cancelled = false;
+      setPhase('loading');
+      setCmpLeftInstances([]);
+      setCmpRightInstances([]);
+      Promise.all([
+        bomApi.compare(compareLeftId, compareRightId),
+        assemblyViewerApi.instances(compareLeftId).catch(() => [] as AssemblyInstance[]),
+        assemblyViewerApi.tree(compareLeftId).catch(() => [] as AssemblyTreeNode[]),
+        assemblyViewerApi.instances(compareRightId).catch(() => [] as AssemblyInstance[]),
+        assemblyViewerApi.tree(compareRightId).catch(() => [] as AssemblyTreeNode[]),
+      ])
+        .then(([cmpRes, li, lt, ri, rt]) => {
+          if (cancelled) return;
+          const result = cmpRes.data as BOMCompareResponse;
+          const tree = buildCompareTree(result, lt, rt);
+          setCompareTree(tree, { leftMissing: li.length === 0, rightMissing: ri.length === 0 });
+          setCmpLeftInstances(li);
+          setCmpRightInstances(ri);
+          setPhase('ready');
+        })
+        .catch(() => {
+          if (!cancelled) setPhase('error');
+        });
+      return () => {
+        cancelled = true;
+        resetStore();
+      };
+    }
     if (assemblyRevId) {
       // 装配模式：加载全部叶项实例（含变换矩阵）与模型树，按矩阵摆放渲染
       let cancelled = false;
@@ -281,7 +318,7 @@ export default function StpViewerPage() {
       if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
       resetStore();
     };
-  }, [id, token, unsupportedMode, assemblyRevId, resetStore]);
+  }, [id, token, unsupportedMode, assemblyRevId, compareLeftId, compareRightId, resetStore, setCompareTree]);
 
   // —— 返回拦截：左右抽屉 + history 哨兵（backInterceptReducer）——
   const [backLayer, dispatch] = useReducer<React.Reducer<BackLayer, BackAction>>(
@@ -337,8 +374,10 @@ export default function StpViewerPage() {
   }, [dispatchLayer]);
 
   const drawer = backLayer.kind === 'drawer' ? (backLayer.drawerId as DrawerId) : null;
-  const displayTitle =
-    [partCode, partVersion, partName].filter(Boolean).join('_') || (assemblyRevId ? '装配 3D 模型' : '3D 模型');
+  const displayTitle = compareMode
+    ? '3D 对比'
+    : [partCode, partVersion, partName].filter(Boolean).join('_') ||
+      (assemblyRevId ? '装配 3D 模型' : '3D 模型');
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-gray-100 flex flex-col">
@@ -363,8 +402,13 @@ export default function StpViewerPage() {
         {phase === 'ready' && assemblyRevId && asmInstances && (
           <ViewerCanvas source={{ kind: 'assembly', instances: asmInstances, tree: asmTree }} />
         )}
+        {phase === 'ready' && compareMode && (
+          <ViewerCanvas
+            source={{ kind: 'compare', leftInstances: cmpLeftInstances, rightInstances: cmpRightInstances }}
+          />
+        )}
 
-        {/* 桌面工程模式（配置清单/BOM 对比）暂不支持移动端 */}
+        {/* 桌面工程模式（配置清单）暂不支持移动端 */}
         {unsupportedMode && (
           <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-gray-100">
             <div className="text-sm text-gray-500">该模式暂不支持移动端查看，请使用电脑浏览器</div>
@@ -392,9 +436,13 @@ export default function StpViewerPage() {
         {!unsupportedMode && phase === 'loading' && (
           <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-white/90">
             <div className="text-sm text-gray-600">
-              {assemblyRevId ? '正在加载装配模型...' : `正在下载模型... ${downloadPct}%`}
+              {compareMode
+                ? '正在加载对比模型...'
+                : assemblyRevId
+                  ? '正在加载装配模型...'
+                  : `正在下载模型... ${downloadPct}%`}
             </div>
-            {!assemblyRevId && (
+            {!assemblyRevId && !compareMode && (
               <div className="w-64 h-2 bg-gray-200 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-primary-500 rounded-full transition-all duration-300"
@@ -402,6 +450,18 @@ export default function StpViewerPage() {
                 />
               </div>
             )}
+          </div>
+        )}
+        {!unsupportedMode && phase === 'ready' && compareMode && cmpLeftInstances.length === 0 && cmpRightInstances.length === 0 && (
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-gray-50">
+            <div className="text-sm text-gray-500">两侧装配均无已摆位的零件（先导入装配 STEP）</div>
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="min-h-11 px-4 rounded-lg bg-primary-600 text-white text-sm"
+            >
+              返回
+            </button>
           </div>
         )}
         {!unsupportedMode && phase === 'ready' && assemblyRevId && asmInstances && asmInstances.length === 0 && (
@@ -445,7 +505,7 @@ export default function StpViewerPage() {
         )}
 
         {/* 浮动按钮（抽屉打开时被遮罩盖住不可点） */}
-        {!unsupportedMode && phase === 'ready' && (url || asmInstances) && (
+        {!unsupportedMode && phase === 'ready' && (url || asmInstances || compareMode) && (
           <>
             <button
               type="button"
@@ -481,7 +541,7 @@ export default function StpViewerPage() {
                 </button>
               </div>
               <div className="flex-1 min-h-0 overflow-hidden">
-                <ModelTreePanel />
+                {compareMode ? <CompareTreePanel /> : <ModelTreePanel />}
               </div>
             </div>
           </>
