@@ -88,6 +88,18 @@ export default function GanttPage({ projectId, onBack }: Props) {
   const totalPx = range ? (daysBetween(range.start, range.end) + 1) * DAY_PX[scale] : 0;
   const todayX = range ? daysBetween(range.start, new Date()) * DAY_PX[scale] : -1;
 
+  // 左列宽度自适应内容（按最长编号/负责人估算），右侧竖线分割符随左列宽度自动贴合
+  const leftW = useMemo(() => {
+    if (!data) return 144;
+    let max = 0;
+    for (const t of data.tasks) {
+      const codeW = t.code.length * 8 + 16; // text-xs 中文约 12px/字，编号约 8px/字符
+      const nameW = (t.assignee_name?.length ?? 2) * 7 + 16; // 负责人 text-[10px]
+      max = Math.max(max, codeW, nameW);
+    }
+    return Math.min(208, Math.max(132, max));
+  }, [data]);
+
   return (
     <div className="flex flex-col h-full">
       {/* 顶部：返回 + 标题 + 缩放切换 */}
@@ -124,8 +136,12 @@ export default function GanttPage({ projectId, onBack }: Props) {
       ) : (
         <div ref={scrollRef} className="flex-1 overflow-x-auto">
           <div className="flex min-w-max">
-            {/* 左列：任务编号（固定，横向滚动不跟随）；名称显示在甘特条上 */}
-            <div className="sticky left-0 z-10 bg-gray-50 w-36 shrink-0 border-r border-gray-200 relative">
+            {/* 左列：任务编号（固定，横向滚动不跟随）；名称显示在甘特条上。
+                宽度按内容自适应（leftW），右侧 border-r 竖线分割符随左列宽度自动贴合 */}
+            <div
+              className="sticky left-0 z-10 bg-gray-50 shrink-0 border-r border-gray-200 relative"
+              style={{ width: leftW }}
+            >
               {/* 与右区日期表头等高的占位，保证任务行对齐 */}
               <div style={{ height: 28 }} />
               {data.tasks.map((t) => (
@@ -205,8 +221,8 @@ export default function GanttPage({ projectId, onBack }: Props) {
                         ...(t.is_overdue ? { outline: '1px solid #ef4444' } : {}),
                       }}
                     >
-                      {/* 名称始终显示，条内放不下时向右溢出；深色文字在灰/蓝/绿/黄条背景上均清晰可读 */}
-                      <span className="relative z-10 shrink-0 pl-1.5 pr-1 text-[10px] leading-none text-gray-900 whitespace-nowrap">
+                      {/* 名称始终显示，条内放不下时向右溢出；z-[5] 高于兄弟条背景、低于左列 sticky z-10（不盖任务编号列） */}
+                      <span className="relative z-[5] shrink-0 pl-1.5 pr-1 text-[10px] leading-none text-gray-900 whitespace-nowrap">
                         {t.name}
                       </span>
                     </div>
