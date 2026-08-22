@@ -366,39 +366,7 @@ export default function PartDetailPage() {
     value: cfDisplay(cfValues[d.id]) ?? undefined,
   }));
 
-  /* ---------------- 工具栏：3D 预览 + 版本对比 ---------------- */
-
-  // 版本对比浮层：左 = 当前版本（固定），右 = 选择其他版本 → 跳转 BOM 对比页（?left=&right= 深链）
-  const [showCompare, setShowCompare] = useState(false);
-  const [cmpRight, setCmpRight] = useState<string | null>(null);
-  const [cmpLoading, setCmpLoading] = useState(false);
-
-  // 浮层打开时若版本列表尚未加载（未进过版本 Tab）则拉取
-  useEffect(() => {
-    if (!showCompare || !id) return;
-    if (versions.length > 0 || verLoading) return;
-    let alive = true;
-    setCmpLoading(true);
-    partsApi
-      .revisions(id)
-      .then((list) => {
-        if (alive) setVersions((list ?? []) as PartRevision[]);
-      })
-      .catch(() => {
-        if (alive) setCmpRight(null);
-      })
-      .finally(() => {
-        if (alive) setCmpLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [showCompare, id, versions.length, verLoading]);
-
-  const startCompare = () => {
-    if (!revisionId || !cmpRight) return;
-    navigate(`/parts/compare?left=${encodeURIComponent(revisionId)}&right=${encodeURIComponent(cmpRight)}`);
-  };
+  /* ---------------- 工具栏：3D 预览（标题右侧）+ 版本 Tab 内对比 ---------------- */
 
   // 3D 预览：部件 → 装配模式（现有 /stp-viewer?assembly=）；零件 → 查 STP 附件单模型
   const [stpLoading, setStpLoading] = useState(false);
@@ -429,6 +397,22 @@ export default function PartDetailPage() {
     }
   };
 
+  // 版本对比（版本 Tab 内多选两个版本 → BOM 对比页深链）
+  const [cmpSel, setCmpSel] = useState<string[]>([]);
+  const toggleCmpSel = (vid: string) => {
+    setCmpSel((prev) => {
+      if (prev.includes(vid)) return prev.filter((x) => x !== vid);
+      if (prev.length < 2) return [...prev, vid];
+      return [prev[0], vid]; // 已选满 2 个时，替换第二个
+    });
+  };
+  const startVersionCompare = () => {
+    if (cmpSel.length !== 2) return;
+    navigate(
+      `/parts/compare?left=${encodeURIComponent(cmpSel[0])}&right=${encodeURIComponent(cmpSel[1])}`,
+    );
+  };
+
   return (
     <div className="flex flex-col">
       {/* 顶部：返回按钮 + 标题（编号/名称）+ 分段 Tab（sticky 跟随列表页模式） */}
@@ -442,28 +426,17 @@ export default function PartDetailPage() {
             ‹
           </button>
           <div className="min-w-0 flex-1 text-base font-medium text-gray-900 truncate">{title}</div>
-        </div>
-        {/* 工具栏：TAB 上方常驻（3D 预览 / 版本对比） */}
-        {revisionId && (
-          <div className="flex gap-2 mt-1">
+          {/* 标题行最右侧：3D 预览（参考图文档预览按钮位置） */}
+          {revisionId && (
             <button
               onClick={on3DPreview}
               disabled={stpLoading}
-              className="flex-1 min-h-8 rounded-lg bg-primary-50 text-primary-600 border border-primary-200 text-xs disabled:opacity-60"
+              className="shrink-0 min-h-8 px-3 rounded-lg bg-primary-50 text-primary-600 border border-primary-200 text-xs disabled:opacity-60"
             >
               {stpLoading ? '加载中...' : '3D 预览'}
             </button>
-            <button
-              onClick={() => {
-                setCmpRight(null);
-                setShowCompare(true);
-              }}
-              className="flex-1 min-h-8 rounded-lg bg-primary-50 text-primary-600 border border-primary-200 text-xs"
-            >
-              版本对比
-            </button>
-          </div>
-        )}
+          )}
+        </div>
         <div className="flex mt-1 bg-white rounded-lg border border-gray-200 overflow-hidden">
           {TABS.map((t) => (
             <button
@@ -606,36 +579,71 @@ export default function PartDetailPage() {
             ))}
 
           {activeTab === 'versions' && (
-            <div className="flex flex-col gap-2">
-              {verLoading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
-              {!verLoading && verError && (
-                <p className="text-center text-xs text-red-400 py-3">{verError}</p>
-              )}
-              {!verLoading && !verError && versions.length === 0 && (
-                <EmptyState text="暂无版本记录" />
-              )}
-              {!verLoading &&
-                !verError &&
-                versions.map((v) => (
-                  <div
-                    key={v.id}
-                    className={`rounded-lg px-4 py-3 shadow-sm ${
-                      v.id === revisionId
-                        ? 'bg-primary-50 border border-primary-300'
-                        : 'bg-white'
-                    }`}
+            <div>
+              <p className="text-xs text-gray-400 px-1 mb-2">点击选择两个版本进行 BOM 对比</p>
+              <div className="flex flex-col gap-2">
+                {verLoading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+                {!verLoading && verError && (
+                  <p className="text-center text-xs text-red-400 py-3">{verError}</p>
+                )}
+                {!verLoading && !verError && versions.length === 0 && (
+                  <EmptyState text="暂无版本记录" />
+                )}
+                {!verLoading &&
+                  !verError &&
+                  versions.map((v) => {
+                    const selected = cmpSel.includes(v.id);
+                    return (
+                      <button
+                        key={v.id}
+                        onClick={() => toggleCmpSel(v.id)}
+                        className={`rounded-lg px-4 py-3 shadow-sm text-left ${
+                          v.id === revisionId
+                            ? 'bg-primary-50 border border-primary-300'
+                            : 'bg-white'
+                        } ${selected ? 'ring-2 ring-primary-500' : ''}`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-base font-medium text-gray-900">版本 {v.version}</span>
+                          <span className="flex items-center gap-2">
+                            <StatusBadge status={v.status} map={STATUS_MAP} />
+                            <span
+                              className={`w-5 h-5 rounded-full border flex items-center justify-center text-xs ${
+                                selected
+                                  ? 'bg-primary-600 border-primary-600 text-white'
+                                  : 'border-gray-300 text-transparent'
+                              }`}
+                            >
+                              ✓
+                            </span>
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1.5 space-y-0.5">
+                          <div>最新迭代：{v.latest_iteration}</div>
+                          {v.check_out_user_name && <div>检出人：{v.check_out_user_name}</div>}
+                          <div>创建时间：{fmtDateTime(v.created_at)}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+              </div>
+              {/* 底部操作条：选中 ≥1 个版本时显示 */}
+              {cmpSel.length > 0 && (
+                <div className="sticky bottom-0 bg-white border-t border-gray-200 px-3 py-2 mt-3 flex items-center gap-2">
+                  <span className="flex-1 text-xs text-gray-500 min-w-0 truncate">
+                    {cmpSel.length === 2
+                      ? `已选：${versions.find((v) => v.id === cmpSel[0])?.version ?? '?'} vs ${versions.find((v) => v.id === cmpSel[1])?.version ?? '?'}`
+                      : '请再选择一个版本'}
+                  </span>
+                  <button
+                    onClick={startVersionCompare}
+                    disabled={cmpSel.length !== 2}
+                    className="shrink-0 min-h-10 px-4 rounded-lg bg-primary-600 text-white text-sm font-medium disabled:opacity-40"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-base font-medium text-gray-900">版本 {v.version}</span>
-                      <StatusBadge status={v.status} map={STATUS_MAP} />
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1.5 space-y-0.5">
-                      <div>最新迭代：{v.latest_iteration}</div>
-                      {v.check_out_user_name && <div>检出人：{v.check_out_user_name}</div>}
-                      <div>创建时间：{fmtDateTime(v.created_at)}</div>
-                    </div>
-                  </div>
-                ))}
+                    开始对比
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -645,65 +653,6 @@ export default function PartDetailPage() {
             ) : (
               <PartWhereUsedTab revisionId={revisionId} />
             ))}
-        </div>
-      )}
-
-      {/* 版本对比浮层：左 = 当前版本，右 = 选择其他版本 */}
-      {showCompare && (
-        <div
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-8"
-          onClick={() => setShowCompare(false)}
-        >
-          <div
-            className="bg-white rounded-lg w-80 p-4 shadow-xl max-h-[80vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="text-sm font-bold text-gray-900 mb-1">版本对比</div>
-            <div className="text-xs text-gray-500 mb-3">
-              左：当前版本 {curRev?.version ?? '-'}（{detail?.code}）
-              <br />
-              右：选择对比版本
-            </div>
-            {cmpLoading ? (
-              <p className="text-center text-xs text-gray-400 py-3">加载中...</p>
-            ) : versions.length === 0 ? (
-              <p className="text-center text-xs text-gray-400 py-3">暂无其他版本</p>
-            ) : (
-              <div className="flex flex-col gap-1.5 mb-3">
-                {versions
-                  .filter((v) => v.id !== revisionId)
-                  .map((v) => (
-                    <button
-                      key={v.id}
-                      onClick={() => setCmpRight(v.id)}
-                      className={`w-full text-left px-3 py-2 min-h-10 rounded-lg border flex items-center gap-2 ${
-                        cmpRight === v.id
-                          ? 'border-primary-500 bg-primary-50'
-                          : 'border-gray-200 bg-white'
-                      }`}
-                    >
-                      <span className="flex-1 text-sm text-gray-800 truncate">版本 {v.version}</span>
-                      <StatusBadge status={v.status} map={STATUS_MAP} />
-                    </button>
-                  ))}
-              </div>
-            )}
-            <div className="flex gap-2">
-              <button
-                onClick={startCompare}
-                disabled={!cmpRight}
-                className="flex-1 min-h-10 rounded-lg bg-primary-600 text-white text-sm font-medium disabled:opacity-40"
-              >
-                开始对比
-              </button>
-              <button
-                onClick={() => setShowCompare(false)}
-                className="flex-1 min-h-10 rounded-lg bg-gray-100 text-gray-600 text-sm"
-              >
-                取消
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </div>
