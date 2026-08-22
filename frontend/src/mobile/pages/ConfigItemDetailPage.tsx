@@ -206,18 +206,19 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                     {p.part_detail?.version && (
                       <span className="shrink-0 text-center text-xs text-gray-500">{p.part_detail.version}</span>
                     )}
-                    <span
-                      className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
-                        p.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
-                      }`}
-                    >
-                      {p.is_required ? '必装' : '选装'}
-                    </span>
-                    {p.part_detail?.status && (
-                      <span className="shrink-0 w-14 flex justify-start">
-                        <StatusBadge status={p.part_detail.status} map={STATUS_MAP} />
+                    {/* 必装/选装徽标与状态徽标成组靠右，间距紧凑；状态徽标位置不动 */}
+                    <span className="shrink-0 flex items-center gap-1.5">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          p.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+                        }`}
+                      >
+                        {p.is_required ? '必装' : '选装'}
                       </span>
-                    )}
+                      {p.part_detail?.status && (
+                        <StatusBadge status={p.part_detail.status} map={STATUS_MAP} />
+                      )}
+                    </span>
                   </span>
                   {/* 行2：名称（左）+ 类型徽标（固定位置）+ 预览按钮占位（无 3D 时留空，徽标不跳动） */}
                   <span className="mt-1 flex items-center gap-1.5 min-w-0 min-h-7">
