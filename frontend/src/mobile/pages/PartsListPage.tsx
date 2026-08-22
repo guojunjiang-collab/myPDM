@@ -27,6 +27,8 @@ export default function PartsListPage() {
   const [search, setSearch] = useState('');
   const debounced = useDebounced(search, 400);
   const [typeFilter, setTypeFilter] = useState('');
+  // 全部版本：显示每个物料的所有版本行（对齐桌面 show_all_versions 开关）
+  const [showAllVersions, setShowAllVersions] = useState(false);
   const [items, setItems] = useState<PartListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +41,7 @@ export default function PartsListPage() {
       .list({
         search: debounced || undefined,
         type: typeFilter || undefined,
+        show_all_versions: showAllVersions || undefined,
         page_size: 50,
       })
       .then((data: { items?: PartListItem[] }) => {
@@ -60,7 +63,7 @@ export default function PartsListPage() {
     return () => {
       alive = false;
     };
-  }, [debounced, typeFilter]);
+  }, [debounced, typeFilter, showAllVersions]);
 
   return (
     <div className="flex flex-col h-full">
@@ -81,6 +84,12 @@ export default function PartsListPage() {
               {f.label}
             </button>
           ))}
+          <button
+            onClick={() => setShowAllVersions((v) => !v)}
+            className={`min-h-10 px-3 rounded-full text-xs ${showAllVersions ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+          >
+            全部版本
+          </button>
         </div>
       </div>
       {loading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
@@ -88,15 +97,29 @@ export default function PartsListPage() {
       {!loading && !error && items.length === 0 && <EmptyState text="未找到零部件" />}
       <MobileCardList
         items={items}
-        keyOf={(p) => p.master_id}
+        keyOf={(p) => (showAllVersions ? p.revision_id : p.master_id)}
         renderMain={(p) => `${p.code} ${p.name}`}
         renderMeta={(p) => (
           <span className="flex flex-wrap items-center gap-2">
             <StatusBadge status={p.status} map={STATUS_MAP} />
-            <span>{formatMeta([['版本', p.version], ['更新时间', p.updated_at ? new Date(p.updated_at).toLocaleDateString('zh-CN') : '']])}</span>
+            <span>
+              {formatMeta([
+                ['版本', p.version],
+                ['更新时间', p.updated_at ? new Date(p.updated_at).toLocaleDateString('zh-CN') : ''],
+              ])}
+            </span>
+            {!showAllVersions && p.version_count && p.version_count > 1 && (
+              <span className="px-1.5 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600">
+                {p.version_count} 个版本
+              </span>
+            )}
           </span>
         )}
-        onClick={(p) => navigate(`/parts/${p.master_id}`)}
+        onClick={(p) =>
+          navigate(
+            showAllVersions ? `/parts/${p.master_id}?rev=${p.revision_id}` : `/parts/${p.master_id}`
+          )
+        }
       />
     </div>
   );

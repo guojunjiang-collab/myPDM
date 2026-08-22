@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { customFieldsApi, partsApi } from '../../services/api';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
@@ -95,8 +95,12 @@ function AttachmentSection({ title, items }: { title: string; items: PartAttachm
 
 export default function PartDetailPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams<{ id: string }>();
+  // 可选深链参数 rev：指定查看某个历史版本（列表"全部版本"行进入）
+  const revParam = new URLSearchParams(location.search).get('rev') ?? undefined;
   const [detail, setDetail] = useState<PartDetail | null>(null);
+  const [selectedRev, setSelectedRev] = useState<PartRevisionBrief | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
@@ -131,6 +135,7 @@ export default function PartDetailPage() {
     }
     setLoading(true);
     setError(null);
+    setSelectedRev(null);
     partsApi
       .get(id)
       .then((data: PartDetail) => {
@@ -146,12 +151,25 @@ export default function PartDetailPage() {
       .finally(() => {
         if (alive) setLoading(false);
       });
+    // 深链指定版本：加载该版本信息（失败回退最新版本展示）
+    if (revParam) {
+      partsApi
+        .getRevision(revParam)
+        .then((rev: PartRevisionBrief) => {
+          if (alive) setSelectedRev(rev);
+        })
+        .catch(() => {
+          // 忽略：回退最新版本
+        });
+    }
     return () => {
       alive = false;
     };
-  }, [id]);
+  }, [id, revParam]);
 
-  const revisionId = detail?.latest_revision?.id;
+  // 当前展示版本：深链指定版本优先，否则最新版本
+  const curRev = selectedRev ?? detail?.latest_revision;
+  const revisionId = revParam ?? detail?.latest_revision?.id;
 
   // BOM：切到 BOM 段且详情就绪时加载首层（latest_revision 的 BOM）
   useEffect(() => {
@@ -266,7 +284,7 @@ export default function PartDetailPage() {
   }, [revisionId]);
 
   const title = detail
-    ? `${detail.code} ${detail.name}${detail.latest_revision?.version ? `（${detail.latest_revision.version}）` : ''}`
+    ? `${detail.code} ${detail.name}${curRev?.version ? `（${curRev.version}）` : ''}`
     : id ?? '零部件详情';
 
   // 概览标准字段（空值渲染为 "-"；字段以后端 PartMasterResponse 实际返回字段为准）
@@ -276,20 +294,15 @@ export default function PartDetailPage() {
     { label: '类型', value: detail?.type ? TYPE_LABEL[detail.type] ?? detail.type : undefined },
     {
       label: '状态',
-      value: detail?.latest_revision?.status ? (
-        <StatusBadge status={detail.latest_revision.status} map={STATUS_MAP} />
-      ) : undefined,
+      value: curRev?.status ? <StatusBadge status={curRev.status} map={STATUS_MAP} /> : undefined,
     },
-    { label: '最新版本', value: detail?.latest_revision?.version },
+    { label: '最新版本', value: curRev?.version },
     {
       label: '最新迭代',
-      value:
-        detail?.latest_revision?.latest_iteration != null
-          ? String(detail.latest_revision.latest_iteration)
-          : undefined,
+      value: curRev?.latest_iteration != null ? String(curRev.latest_iteration) : undefined,
     },
-    { label: '检出人', value: detail?.latest_revision?.check_out_user_name },
-    { label: '检出时间', value: fmtDateTime(detail?.latest_revision?.check_out_date) },
+    { label: '检出人', value: curRev?.check_out_user_name },
+    { label: '检出时间', value: fmtDateTime(curRev?.check_out_date) },
     { label: '创建时间', value: fmtDateTime(detail?.created_at) },
     { label: '更新时间', value: fmtDateTime(detail?.updated_at) },
   ];
@@ -440,7 +453,14 @@ export default function PartDetailPage() {
               {!verLoading &&
                 !verError &&
                 versions.map((v) => (
-                  <div key={v.id} className="bg-white rounded-lg px-4 py-3 shadow-sm">
+                  <div
+                    key={v.id}
+                    className={`rounded-lg px-4 py-3 shadow-sm ${
+                      v.id === revisionId
+                        ? 'bg-primary-50 border border-primary-300'
+                        : 'bg-white'
+                    }`}
+                  >
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-base font-medium text-gray-900">版本 {v.version}</span>
                       <StatusBadge status={v.status} map={STATUS_MAP} />
