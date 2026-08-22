@@ -384,10 +384,9 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
                     <button
                       type="button"
                       onClick={() => setExpandOpen((o) => !o)}
-                      className="w-24 min-h-8 rounded-lg bg-white border border-gray-200 text-xs text-gray-600 flex items-center justify-center gap-1"
+                      className="w-14 min-h-8 rounded-lg bg-white border border-gray-200 text-xs text-gray-600"
                     >
-                      <span>{expandLabel}</span>
-                      <span className={`text-gray-400 text-[10px] transition-transform ${expandOpen ? 'rotate-180' : ''}`}>▾</span>
+                      {expandLabel}
                     </button>
                     {expandOpen && (
                       <>
