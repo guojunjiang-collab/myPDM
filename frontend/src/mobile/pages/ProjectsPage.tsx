@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { projectApi } from '../../services/projectApi';
 import { useDebounced } from '../../hooks/useDebounced';
-import { useDetailOverlayPush } from '../hooks/useDetailOverlay';
+import { useDetailOverlayPush, useDetailOverlay } from '../hooks/useDetailOverlay';
+import DetailOverlayStack from '../components/DetailOverlayStack';
 import MobileCardList from '../components/MobileCardList';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
@@ -276,23 +277,17 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
     setExpanded((prev) => ({ ...prev, [tid]: !(prev[tid] === true) }));
   };
 
-  /* ---- 任务详情：详情栈内（Context push）或独立路由本地覆盖层 ---- */
+  /* ---- 任务/关联对象详情：全局详情栈（从零部件反查进入）或本地详情栈（独立路由模式） ---- */
   const overlayPush = useDetailOverlayPush();
-  const [taskOverlay, setTaskOverlay] = useState<ProjectTask | null>(null);
-  // 本地任务覆盖层哨兵的 popstate 由 TaskDetailPage 统一处理（子任务逐级 → 关闭覆盖层），
-  // 避免多个 popstate 消费者互相冲突
+  const localOverlay = useDetailOverlay();
+  // 详情栈模式：overlayPush 存在 → 任务详情进全局栈（返回链：任务→项目→零部件→列表）；
+  // 独立路由模式 → 进本地详情栈（关联对象跳转也入本地栈，返回逐级回任务详情，不离开项目路由）
   const openTask = (task: ProjectTask) => {
     if (overlayPush && id) {
-      // 详情栈模式（如从零部件反查进入）：推入详情栈，全面屏手势逐级返回
       overlayPush.push({ kind: 'task', projectId: id, task });
-    } else {
-      setTaskOverlay(task);
-      window.history.pushState({ mobileTaskOverlay: true }, '');
+    } else if (id) {
+      localOverlay.pushTarget({ kind: 'task', projectId: id, task });
     }
-  };
-  const closeTaskOverlay = () => {
-    setTaskOverlay(null);
-    window.history.back();
   };
 
   /* ---------------- 详情视图（/projects/:id） ---------------- */
@@ -404,17 +399,14 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
           </div>
         )}
 
-        {/* 独立路由模式：任务详情本地覆盖层（详情栈模式由 DetailOverlayStack 渲染） */}
-        {taskOverlay && (
-          <div className="fixed inset-0 z-50 bg-gray-50 overflow-y-auto">
-            <TaskDetailPage
-              projectId={id}
-              task={taskOverlay}
-              onBack={closeTaskOverlay}
-              onCloseOverlay={() => setTaskOverlay(null)}
-              onNavigate={(to) => navigate(to)}
-            />
-          </div>
+        {/* 独立路由模式：本地详情栈（任务详情/关联对象跳转都在栈内，返回逐级回任务详情；
+            全局详情栈模式不需要——任务/关联对象已在全局栈） */}
+        {!overlayPush && (
+          <DetailOverlayStack
+            stack={localOverlay.stack}
+            onNavigate={localOverlay.handleDetailNavigate}
+            pushTarget={localOverlay.pushTarget}
+          />
         )}
       </div>
     );
