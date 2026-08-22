@@ -54,10 +54,10 @@ function fmtDate(v?: string | null): string {
   return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString('zh-CN');
 }
 
-function OverviewRow({ label, children }: { label: string; children?: ReactNode }) {
+function FieldCard({ label, children }: { label: string; children?: ReactNode }) {
   return (
-    <div className="py-2.5">
-      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
+    <div className="bg-white rounded-lg px-3 py-3 shadow-sm min-h-14">
+      <div className="text-xs text-gray-500 mb-1">{label}</div>
       <div className="text-sm text-gray-900 break-all">{children}</div>
     </div>
   );
@@ -317,30 +317,42 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
       </div>
 
       <div className="p-3">
-        {/* 概览 */}
+        {/* 概览（卡片式：字段网格 + 时间计划 + 说明） */}
         {tab === 'overview' && (
-          <div className="bg-white rounded-lg px-4 py-2 shadow-sm">
-            <OverviewRow label="类型">{TASK_TYPE_LABEL[cur.task_type] ?? cur.task_type}</OverviewRow>
-            <OverviewRow label="状态">
-              <StatusBadge status={cur.status} map={STATUS_MAP} />
-            </OverviewRow>
-            <OverviewRow label="优先级">
-              <StatusBadge status={cur.priority} map={PRIORITY_MAP} />
-            </OverviewRow>
-            <OverviewRow label="负责人">{cur.assignee_name || '—'}</OverviewRow>
-            <OverviewRow label="计划">
-              {formatMeta([
-                ['开始', fmtDate(cur.planned_start)],
-                ['完成', fmtDate(cur.planned_end)],
-              ])}
-            </OverviewRow>
-            <OverviewRow label="实际">
-              {formatMeta([
-                ['开始', fmtDate(cur.actual_start)],
-                ['完成', fmtDate(cur.actual_end)],
-              ])}
-            </OverviewRow>
-            {cur.description && <OverviewRow label="说明">{cur.description}</OverviewRow>}
+          <div className="flex flex-col gap-2">
+            <div className="grid grid-cols-2 gap-2">
+              <FieldCard label="类型">
+                <span>{TASK_TYPE_LABEL[cur.task_type] ?? cur.task_type}</span>
+              </FieldCard>
+              <FieldCard label="状态">
+                <StatusBadge status={cur.status} map={STATUS_MAP} />
+              </FieldCard>
+              <FieldCard label="优先级">
+                <StatusBadge status={cur.priority} map={PRIORITY_MAP} />
+              </FieldCard>
+              <FieldCard label="负责人">
+                <span>{cur.assignee_name || '—'}</span>
+              </FieldCard>
+            </div>
+            <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+              <div className="text-sm font-bold text-gray-900 mb-2">时间计划</div>
+              <div className="text-xs text-gray-500 space-y-1">
+                <div>
+                  <span className="text-gray-400">计划</span>
+                  <span className="ml-2">{fmtDate(cur.planned_start)} ~ {fmtDate(cur.planned_end)}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400">实际</span>
+                  <span className="ml-2">{fmtDate(cur.actual_start)} ~ {fmtDate(cur.actual_end)}</span>
+                </div>
+              </div>
+            </div>
+            {cur.description && (
+              <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+                <div className="text-sm font-bold text-gray-900 mb-1.5">说明</div>
+                <div className="text-xs text-gray-700 whitespace-pre-wrap break-all">{cur.description}</div>
+              </div>
+            )}
           </div>
         )}
 
