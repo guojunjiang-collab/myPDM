@@ -249,6 +249,40 @@ export default function PartDetailPage() {
     };
   }, [id, activeTab, revisionId]);
 
+  // 标题栏 3D 按钮可见性：装配体始终可用；零件需存在生产附件 STP（进入详情即判断）
+  useEffect(() => {
+    let alive = true;
+    if (!revisionId || !detail) return;
+    if (detail.type === 'assembly') {
+      setHasStp(true);
+      return () => {
+        alive = false;
+      };
+    }
+    setHasStp(null);
+    partsApi
+      .listAttachments(revisionId)
+      .then((list) => {
+        if (alive) {
+          const arr = (list ?? []) as PartAttachment[];
+          setHasStp(
+            arr.some(
+              (a) =>
+                a.category === 'production' &&
+                /\.(stp|step)$/i.test(a.file_name ?? ''),
+            ),
+          );
+        }
+      })
+      .catch(() => {
+        if (alive) setHasStp(false);
+      });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revisionId, detail?.type]);
+
   // 图文档：切到图文档段且详情就绪时加载关联文档
   useEffect(() => {
     let alive = true;
@@ -370,6 +404,8 @@ export default function PartDetailPage() {
 
   // 3D 预览：部件 → 装配模式（现有 /stp-viewer?assembly=）；零件 → 查 STP 附件单模型
   const [stpLoading, setStpLoading] = useState(false);
+  // 标题栏 3D 按钮是否显示：装配体恒 true；零件需生产附件有 STP
+  const [hasStp, setHasStp] = useState<boolean | null>(null);
   const on3DPreview = async () => {
     if (!revisionId || stpLoading) return;
     if (detail?.type === 'assembly') {
@@ -426,8 +462,8 @@ export default function PartDetailPage() {
             ‹
           </button>
           <div className="min-w-0 flex-1 text-base font-medium text-gray-900 truncate">{title}</div>
-          {/* 标题行最右侧：3D 预览（参考图文档预览按钮位置） */}
-          {revisionId && (
+          {/* 标题行最右侧：3D（无生产附件 STP 的零件不显示） */}
+          {revisionId && hasStp === true && (
             <button
               onClick={on3DPreview}
               disabled={stpLoading}
