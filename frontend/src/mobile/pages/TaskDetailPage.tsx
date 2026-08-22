@@ -198,6 +198,40 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
 
   // 快速预览：零部件/装配 → STP 3D 预览（新标签）；图文档 → 首个可预览附件
   const [previewingId, setPreviewingId] = useState<string | null>(null);
+  // 预查可预览性：document → 有可预览附件；part → 有 STP；assembly → 恒可预览
+  // 无可预览内容不显示预览按钮（避免点击后才提示）
+  const [previewableMap, setPreviewableMap] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    if (tab !== 'links' || links.length === 0) return;
+    const targets = links.filter((l) => l.entity_type === 'part' || l.entity_type === 'assembly' || l.entity_type === 'document');
+    if (targets.length === 0) return;
+    let alive = true;
+    const check = async (l: TaskLink): Promise<[string, boolean]> => {
+      if (l.entity_type === 'assembly') return [l.id, true];
+      try {
+        if (l.entity_type === 'document') {
+          const res = await documentsApi.listAttachments(l.entity_id);
+          const atts = ((res.data ?? []) as PreviewAttachment[]).filter((a) => a.file_name);
+          return [l.id, atts.some((a) => isAttachmentPreviewable(a.file_name))];
+        }
+        const list = (await partsApi.listAttachments(l.entity_id)) as Array<{ id: string; file_name?: string }>;
+        return [l.id, list.some((a) => /\.(stp|step)$/i.test(a.file_name ?? ''))];
+      } catch {
+        return [l.id, false];
+      }
+    };
+    Promise.allSettled(targets.map(check)).then((results) => {
+      if (!alive) return;
+      const map: Record<string, boolean> = {};
+      results.forEach((r, i) => {
+        if (r.status === 'fulfilled') map[targets[i].id] = r.value[1];
+      });
+      setPreviewableMap(map);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [tab, links]);
   const onPreview = async (l: TaskLink, e: ReactMouseEvent) => {
     e.stopPropagation();
     if (previewingId) return;
@@ -361,39 +395,41 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
                           onClick={() => openLink(l)}
                           className="w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm"
                         >
-                          {/* 行1：编号 + 预览按钮 + 版本（类型已由分区标题区分） */}
+                          {/* 行1：编号 + 版本（左）+ 状态徽标 + ›（右） */}
                           <span className="flex items-center gap-2 min-w-0">
                             <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
                               {l.entity_code || l.entity_name || '未知对象'}
                             </span>
-                            {(l.entity_type === 'part' || l.entity_type === 'assembly' || l.entity_type === 'document') && (
+                            {l.entity_version && (
+                              <span className="shrink-0 text-xs text-gray-400">{l.entity_version}</span>
+                            )}
+                            {l.entity_status && (
+                              <StatusBadge status={l.entity_status} map={ENTITY_STATUS_MAP} />
+                            )}
+                            <span className="shrink-0 text-gray-300">›</span>
+                          </span>
+                          {/* 行2：名称 */}
+                          {l.entity_name && (
+                            <div className="mt-1 text-xs text-gray-500 truncate">{l.entity_name}</div>
+                          )}
+                          {/* 行3：备注（左）+ 预览按钮（右下角，预查确认可预览才显示） */}
+                          <div className="mt-1 flex items-center gap-2 min-h-7">
+                            <span className="flex-1 min-w-0">
+                              {l.entity_remark && (
+                                <span className="block text-xs text-gray-400 truncate">{l.entity_remark}</span>
+                              )}
+                            </span>
+                            {previewableMap[l.id] === true && (
                               <button
                                 type="button"
                                 onClick={(e) => onPreview(l, e)}
                                 disabled={previewingId === l.id}
-                                className="shrink-0 px-2 min-h-7 rounded bg-primary-50 text-primary-600 text-xs font-medium disabled:opacity-60"
+                                className="shrink-0 px-2.5 min-h-7 rounded bg-primary-50 text-primary-600 text-xs font-medium disabled:opacity-60"
                               >
                                 {previewingId === l.id ? '加载中...' : '预览'}
                               </button>
                             )}
-                            {l.entity_version && (
-                              <span className="shrink-0 text-xs text-gray-400">{l.entity_version}</span>
-                            )}
-                            <span className="shrink-0 text-gray-300">›</span>
-                          </span>
-                          {/* 行2：名称 + 状态 */}
-                          {l.entity_name && (
-                            <span className="flex items-center gap-2 min-w-0 mt-1">
-                              <span className="flex-1 min-w-0 truncate text-xs text-gray-500">{l.entity_name}</span>
-                              {l.entity_status && (
-                                <StatusBadge status={l.entity_status} map={ENTITY_STATUS_MAP} />
-                              )}
-                            </span>
-                          )}
-                          {/* 行3：备注/描述（有则显示） */}
-                          {l.entity_remark && (
-                            <div className="mt-1 text-xs text-gray-400 truncate">{l.entity_remark}</div>
-                          )}
+                          </div>
                         </button>
                       ))}
                     </div>
