@@ -253,14 +253,16 @@ function FolderTreeNode({
   return (
     <>
       <div className="flex items-stretch min-h-11 border-b border-gray-50 last:border-b-0">
-        {/* 缩进 + 层级竖线（竖线对齐箭头区中心，同 BOM 树：depth*INDENT + 18） */}
+        {/* 缩进 + 层级竖线（每级一条，对齐对应祖先箭头区中心，同 BOM 树 i*INDENT + 18） */}
         <span className="relative shrink-0" style={{ width: depth * INDENT }}>
-          {depth > 0 && (
-            <span
-              className="absolute top-0 bottom-0 border-l border-gray-200"
-              style={{ left: depth * INDENT + 18 }}
-            />
-          )}
+          {depth > 0 &&
+            Array.from({ length: depth }).map((_, i) => (
+              <span
+                key={i}
+                className="absolute top-0 bottom-0 border-l border-gray-200"
+                style={{ left: i * INDENT + 18 }}
+              />
+            ))}
         </span>
         {/* 展开箭头（有子文件夹或条目才可展开） */}
         {hasContent ? (
@@ -329,12 +331,14 @@ function ItemRow({ item, depth, onClick }: { item: DashboardItem; depth: number;
     >
       {/* 缩进 + 层级竖线（与文件夹行同构，竖线对齐箭头区中心） */}
       <span className="relative shrink-0" style={{ width: depth * INDENT }}>
-        {depth > 0 && (
-          <span
-            className="absolute top-0 bottom-0 border-l border-gray-200"
-            style={{ left: depth * INDENT + 18 }}
-          />
-        )}
+        {depth > 0 &&
+          Array.from({ length: depth }).map((_, i) => (
+            <span
+              key={i}
+              className="absolute top-0 bottom-0 border-l border-gray-200"
+              style={{ left: i * INDENT + 18 }}
+            />
+          ))}
       </span>
       {/* 圆点区（与文件夹行的箭头/圆点对齐） */}
       <span className="shrink-0 w-9 flex items-center justify-center text-gray-300 text-sm">•</span>
