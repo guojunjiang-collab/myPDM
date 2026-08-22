@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { partsApi } from '../../services/api';
 import { useDebounced } from '../../hooks/useDebounced';
 import MobileCardList from '../components/MobileCardList';
@@ -24,6 +24,7 @@ const TYPE_FILTERS = [
 
 export default function PartsListPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [search, setSearch] = useState('');
   const debounced = useDebounced(search, 400);
   const [typeFilter, setTypeFilter] = useState('');
@@ -34,6 +35,14 @@ export default function PartsListPage() {
   const [items, setItems] = useState<PartListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // 清理历史残留的 ?tab= 参数（旧版详情覆盖层把 Tab 写进列表 URL，会污染下次进入详情的默认 Tab）
+  useEffect(() => {
+    if (location.search.includes('tab=')) {
+      navigate(location.pathname, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 详情覆盖层模式：点卡片在列表上方打开全屏详情（列表不卸载、不重新加载、滚动位置天然保留），
   // 返回 = 关闭覆盖层，列表原地不动

@@ -488,10 +488,13 @@ export default function PartDetailPage({ masterId: propMasterId, revisionId: pro
               key={t.key}
               onClick={() => {
                 setActiveTab(t.key);
-                // replace 更新 URL 的 tab 参数（保留 rev 等其他参数），供退回时恢复
-                const sp = new URLSearchParams(location.search);
-                sp.set('tab', t.key);
-                navigate(`?${sp.toString()}`, { replace: true });
+                // replace 更新 URL 的 tab 参数（保留 rev 等其他参数），供退回时恢复；
+                // 覆盖层模式（onBack 存在）不写 URL，避免污染列表页 URL 导致下次进入误读
+                if (!onBack) {
+                  const sp = new URLSearchParams(location.search);
+                  sp.set('tab', t.key);
+                  navigate(`?${sp.toString()}`, { replace: true });
+                }
               }}
               className={`flex-1 min-h-10 text-xs whitespace-nowrap ${
                 activeTab === t.key ? 'bg-primary-600 text-white font-medium' : 'text-gray-500'
