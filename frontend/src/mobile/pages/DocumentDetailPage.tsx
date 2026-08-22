@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { documentsApi } from '../../services/api';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { customFieldsApi, documentsApi } from '../../services/api';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
 import AttachmentPreview from '../components/AttachmentPreview';
-import DesktopOnlyCard from '../components/DesktopOnlyCard';
+import DocWhereUsedTab from './DocWhereUsedTab';
 import type { DocumentRevision, DocumentAttachment } from '../../types';
 
 const STATUS_MAP: Record<string, { label: string; cls: string }> = {
@@ -28,6 +28,23 @@ function fmtDateTime(v?: string | null): string {
   return Number.isNaN(d.getTime()) ? v : d.toLocaleString('zh-CN', { hour12: false });
 }
 
+/** 自定义字段定义（document 适用） */
+interface CfDef {
+  id: string;
+  name: string;
+  field_key?: string;
+  field_type?: string;
+  applies_to?: string[];
+}
+
+/** 自定义字段值展示：null/undefined/空数组/空串 → null（渲染为 "-"） */
+function cfDisplay(v: unknown): string | null {
+  if (v == null) return null;
+  if (Array.isArray(v)) return v.length ? v.join('、') : null;
+  const s = String(v);
+  return s.trim() ? s : null;
+}
+
 function OverviewRow({ label, children }: { label: string; children?: ReactNode }) {
   return (
     <div className="py-2.5">
@@ -39,6 +56,7 @@ function OverviewRow({ label, children }: { label: string; children?: ReactNode 
 
 export default function DocumentDetailPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams<{ id: string }>();
   const [detail, setDetail] = useState<DocumentRevision | null>(null);
   const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
@@ -46,7 +64,59 @@ export default function DocumentDetailPage() {
   const [loadingAttachments, setLoadingAttachments] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attachmentsError, setAttachmentsError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('overview');
+  // Tab 状态记录在 URL（?tab=），进入新详情默认概览；退回时浏览器还原上一级 URL → 恢复对应 Tab
+  const [activeTab, setActiveTab] = useState(() => {
+    const t = new URLSearchParams(location.search).get('tab');
+    return t && TABS.some((x) => x.key === t) ? t : 'overview';
+  });
+
+  // 路由变化（进入/退回）时按 URL tab 同步；无 tab 一律回概览
+  useEffect(() => {
+    const t = new URLSearchParams(location.search).get('tab');
+    setActiveTab(t && TABS.some((x) => x.key === t) ? t : 'overview');
+  }, [location.search, id]);
+
+  // 自定义字段：详情就绪后加载 document 定义与值
+  const [cfDefs, setCfDefs] = useState<CfDef[]>([]);
+  const [cfValues, setCfValues] = useState<Record<string, unknown>>({});
+  const [cfLoading, setCfLoading] = useState(false);
+  const [cfError, setCfError] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    if (!id) return;
+    setCfLoading(true);
+    setCfError(false);
+    customFieldsApi
+      .listDefinitions()
+      .then((res: any) => {
+        const defs = ((res?.data ?? res ?? []) as CfDef[]).filter((d) =>
+          (d.applies_to || []).includes('document')
+        );
+        if (alive) setCfDefs(defs);
+      })
+      .catch(() => {
+        if (alive) setCfError(true);
+      });
+    customFieldsApi
+      .getValues('document', id)
+      .then((res: any) => {
+        const vals: Record<string, unknown> = {};
+        ((res?.data ?? res ?? []) as Array<{ field_id: string; value: unknown }>).forEach((v) => {
+          vals[v.field_id] = v.value;
+        });
+        if (alive) setCfValues(vals);
+      })
+      .catch(() => {
+        // 值加载失败不阻塞字段展示（显示 "-"）
+      })
+      .finally(() => {
+        if (alive) setCfLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [id]);
 
   useEffect(() => {
     let alive = true;
@@ -107,7 +177,6 @@ export default function DocumentDetailPage() {
   }, [id, activeTab]);
 
   const title = detail ? `${detail.code} ${detail.name}` : id ?? '图文档详情';
-  const activeLabel = TABS.find((t) => t.key === activeTab)?.label ?? '';
 
   // 概览字段以 GET /api/documents/{revision_id} 实际返回字段为准
   const overviewRows: Array<{ label: string; value?: ReactNode }> = [
@@ -122,6 +191,12 @@ export default function DocumentDetailPage() {
     { label: '创建时间', value: fmtDateTime(detail?.created_at) },
     { label: '更新时间', value: fmtDateTime(detail?.updated_at) },
   ].filter((r) => r.value !== undefined && r.value !== null && r.value !== '');
+
+  // 自定义字段（document 定义 + 值，空值 "-"）
+  const cfRows: Array<{ label: string; value?: ReactNode }> = cfDefs.map((d) => ({
+    label: d.name,
+    value: cfDisplay(cfValues[d.id]) ?? undefined,
+  }));
 
   return (
     <div className="flex flex-col">
@@ -141,7 +216,13 @@ export default function DocumentDetailPage() {
           {TABS.map((t) => (
             <button
               key={t.key}
-              onClick={() => setActiveTab(t.key)}
+              onClick={() => {
+                setActiveTab(t.key);
+                // replace 更新 URL 的 tab 参数，供退回时恢复
+                const sp = new URLSearchParams(location.search);
+                sp.set('tab', t.key);
+                navigate(`?${sp.toString()}`, { replace: true });
+              }}
               className={`flex-1 min-h-10 text-xs whitespace-nowrap ${
                 activeTab === t.key ? 'bg-primary-600 text-white font-medium' : 'text-gray-500'
               }`}
@@ -159,15 +240,42 @@ export default function DocumentDetailPage() {
       {!loading && !error && detail && (
         <div className="p-3">
           {activeTab === 'overview' && (
-            <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
-              {overviewRows.length === 0 ? (
-                <EmptyState text="暂无概览信息" />
-              ) : (
-                overviewRows.map((r, i) => (
-                  <div key={r.label} className={i > 0 ? 'border-t border-gray-100' : ''}>
-                    <OverviewRow label={r.label}>{r.value}</OverviewRow>
+            <div>
+              {cfLoading && <p className="text-center text-xs text-gray-400 py-2">自定义字段加载中...</p>}
+              {!cfLoading && cfError && (
+                <p className="text-center text-xs text-red-400 py-2">自定义字段加载失败</p>
+              )}
+              {/* 基本信息区 */}
+              <div className="mb-3">
+                <div className="text-sm font-bold text-gray-900 mb-2">基本信息</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {overviewRows.length === 0 ? (
+                    <div className="col-span-2">
+                      <EmptyState text="暂无概览信息" />
+                    </div>
+                  ) : (
+                    overviewRows.map((r) => (
+                      <div key={r.label} className="bg-white rounded-lg px-3 py-2.5 min-h-14 shadow-sm">
+                        <div className="text-xs text-gray-500 mb-0.5 truncate">{r.label}</div>
+                        <div className="text-sm text-gray-900 break-all">{r.value ?? '-'}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+              {/* 自定义字段区（无定义时不显示） */}
+              {!cfLoading && !cfError && cfRows.length > 0 && (
+                <div>
+                  <div className="text-sm font-bold text-gray-900 mb-2">自定义字段</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {cfRows.map((r) => (
+                      <div key={r.label} className="bg-white rounded-lg px-3 py-2.5 min-h-14 shadow-sm">
+                        <div className="text-xs text-gray-500 mb-0.5 truncate">{r.label}</div>
+                        <div className="text-sm text-gray-900 break-all">{r.value ?? '-'}</div>
+                      </div>
+                    ))}
                   </div>
-                ))
+                </div>
               )}
             </div>
           )}
@@ -187,9 +295,8 @@ export default function DocumentDetailPage() {
                 ))}
             </div>
           )}
-          {activeTab !== 'overview' && activeTab !== 'attachments' && (
-            <DesktopOnlyCard feature={activeLabel} />
-          )}
+          {activeTab === 'versions' && <EmptyState text="版本历史请在桌面端查看" />}
+          {activeTab === 'whereused' && id && <DocWhereUsedTab revisionId={id} />}
         </div>
       )}
     </div>

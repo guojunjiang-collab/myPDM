@@ -1,0 +1,212 @@
+import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { documentsApi } from '../../services/api';
+import StatusBadge from '../components/StatusBadge';
+import EmptyState from '../components/EmptyState';
+import { formatMeta } from '../components/formatMeta';
+
+/**
+ * 移动端"Where-Used"Tab（只读，对齐零部件反查 Tab 的分区 + 卡片风格）：
+ * - 被构型项引用（documentsApi.whereUsedConfigurations）
+ * - 被零部件引用（documentsApi.whereUsedParts）
+ * - 被项目任务引用（documentsApi.whereUsedTasks）
+ * - 被 ECO 引用（documentsApi.whereUsedEcos）
+ * - 被 ECR 引用（documentsApi.whereUsedEcrs）
+ * 零部件/任务/ECO/ECR 可跳转对应移动路由；构型项暂无可跳深链，仅只读展示。
+ */
+
+const STATUS_MAP: Record<string, { label: string; cls: string }> = {
+  draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
+  frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
+  released: { label: '发布', cls: 'bg-green-100 text-green-800' },
+  obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
+};
+
+function fmtDate(v?: string): string {
+  if (!v) return '';
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString('zh-CN');
+}
+
+function useLazy<T>(fetcher: () => Promise<T[]>, dep: string) {
+  const [data, setData] = useState<T[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    setError(false);
+    fetcher()
+      .then((d) => {
+        if (alive) setData(d || []);
+      })
+      .catch(() => {
+        if (alive) setError(true);
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [dep]);
+  return { data, loading, error };
+}
+
+function Section({ title, count, children }: { title: string; count: number; children: ReactNode }) {
+  return (
+    <div className="mb-4">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-sm font-bold text-gray-900">{title}</span>
+        <span className="px-1.5 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">{count}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function State({
+  loading,
+  error,
+  empty,
+  children,
+}: {
+  loading: boolean;
+  error: boolean;
+  empty: boolean;
+  children: ReactNode;
+}) {
+  if (loading) return <p className="text-center text-xs text-gray-400 py-3">加载中...</p>;
+  if (error) return <p className="text-center text-xs text-red-400 py-3">加载失败，请稍后重试</p>;
+  if (empty) return <EmptyState text="暂无引用" />;
+  return <div className="flex flex-col gap-2">{children}</div>;
+}
+
+/** 两行卡片：行1 编号+版本+状态；行2 名称+附加徽标（参考零部件反查排版） */
+function RowCard({
+  code,
+  name,
+  version,
+  status,
+  badge,
+  onClick,
+}: {
+  code: string;
+  name?: string;
+  version?: string;
+  status?: string;
+  badge?: ReactNode;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm ${
+        onClick ? '' : 'cursor-default'
+      }`}
+    >
+      <span className="flex items-center min-w-0">
+        <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">{code}</span>
+        <span className="shrink-0 w-7 truncate text-center text-xs text-gray-500">{version}</span>
+        <span className="shrink-0 w-12 flex justify-end">
+          {status && <StatusBadge status={status} map={STATUS_MAP} />}
+        </span>
+      </span>
+      <span className="flex items-center min-w-0 mt-0.5">
+        <span className="flex-1 min-w-0 truncate text-xs text-gray-500">{name}</span>
+        {badge}
+      </span>
+    </button>
+  );
+}
+
+export default function DocWhereUsedTab({ revisionId }: { revisionId: string }) {
+  const navigate = useNavigate();
+  const cfg = useLazy<any>(() => documentsApi.whereUsedConfigurations(revisionId), revisionId);
+  const prt = useLazy<any>(() => documentsApi.whereUsedParts(revisionId), revisionId);
+  const tsk = useLazy<any>(() => documentsApi.whereUsedTasks(revisionId), revisionId);
+  const eco = useLazy<any>(() => documentsApi.whereUsedEcos(revisionId), revisionId);
+  const ecr = useLazy<any>(() => documentsApi.whereUsedEcrs(revisionId), revisionId);
+
+  return (
+    <div>
+      <Section title="被构型项引用" count={cfg.loading ? 0 : cfg.data.length}>
+        <State loading={cfg.loading} error={cfg.error} empty={cfg.data.length === 0}>
+          {cfg.data.map((r: any) => (
+            <RowCard
+              key={r.config_item_revision_id}
+              code={r.code}
+              name={r.name}
+              version={r.version}
+              status={r.status}
+            />
+          ))}
+        </State>
+      </Section>
+
+      <Section title="被零部件引用" count={prt.loading ? 0 : prt.data.length}>
+        <State loading={prt.loading} error={prt.error} empty={prt.data.length === 0}>
+          {prt.data.map((r: any) => (
+            <RowCard
+              key={r.master_id}
+              code={r.code}
+              name={r.name}
+              version={r.version}
+              status={r.status}
+              onClick={() => r.master_id && navigate(`/parts/${r.master_id}`)}
+            />
+          ))}
+        </State>
+      </Section>
+
+      <Section title="被项目任务引用" count={tsk.loading ? 0 : tsk.data.length}>
+        <State loading={tsk.loading} error={tsk.error} empty={tsk.data.length === 0}>
+          {tsk.data.map((r: any) => (
+            <RowCard
+              key={r.task.id}
+              code={r.task.name}
+              name={formatMeta([
+                ['项目', r.project_name],
+                ['编号', r.task.code],
+                ['负责人', r.task.assignee_name],
+                ['开始', fmtDate(r.task.planned_start)],
+                ['完成', fmtDate(r.task.planned_end)],
+              ])}
+              status={r.task.status}
+              onClick={() => navigate(`/projects/${r.project_id}`)}
+            />
+          ))}
+        </State>
+      </Section>
+
+      <Section title="被 ECO 引用" count={eco.loading ? 0 : eco.data.length}>
+        <State loading={eco.loading} error={eco.error} empty={eco.data.length === 0}>
+          {eco.data.map((r: any) => (
+            <RowCard
+              key={r.eco_id}
+              code={r.eco_number}
+              name={r.title}
+              status={r.status}
+              onClick={() => navigate(`/ec/eco/${r.eco_id}`)}
+            />
+          ))}
+        </State>
+      </Section>
+
+      <Section title="被 ECR 引用" count={ecr.loading ? 0 : ecr.data.length}>
+        <State loading={ecr.loading} error={ecr.error} empty={ecr.data.length === 0}>
+          {ecr.data.map((r: any) => (
+            <RowCard
+              key={r.ecr_id}
+              code={r.ecr_number}
+              name={r.title}
+              status={r.status}
+              onClick={() => navigate(`/ec/ecr/${r.ecr_id}`)}
+            />
+          ))}
+        </State>
+      </Section>
+    </div>
+  );
+}
