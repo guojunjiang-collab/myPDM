@@ -18,6 +18,15 @@ const ROLE_LABEL: Record<string, string> = {
   unverified: '待审批',
 };
 
+// 角色徽标配色（参考桌面 Users.tsx）
+const ROLE_MAP: Record<string, { label: string; cls: string }> = {
+  admin: { label: '管理员', cls: 'bg-red-100 text-red-800' },
+  engineer: { label: '工程师', cls: 'bg-blue-100 text-blue-800' },
+  production: { label: '生产', cls: 'bg-green-100 text-green-800' },
+  guest: { label: '访客', cls: 'bg-gray-100 text-gray-800' },
+  unverified: { label: '待审批', cls: 'bg-yellow-100 text-yellow-800' },
+};
+
 const ROLE_FILTERS = [
   { key: '', label: '全部' },
   { key: 'admin', label: '管理员' },
@@ -78,8 +87,10 @@ function UserCard({
           <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
             {u.real_name || u.username}
           </span>
-          <span className="shrink-0 text-xs px-1.5 py-0.5 rounded-lg bg-gray-100 text-gray-600">
-            {ROLE_LABEL[u.role ?? ''] ?? u.role}
+          <span
+            className={`shrink-0 text-xs px-1.5 py-0.5 rounded-lg ${ROLE_MAP[u.role ?? '']?.cls ?? 'bg-gray-100 text-gray-600'}`}
+          >
+            {ROLE_MAP[u.role ?? '']?.label ?? u.role}
           </span>
           <span
             className={`shrink-0 text-xs px-1.5 py-0.5 rounded-lg ${STATUS_MAP[u.status ?? '']?.cls ?? 'bg-gray-100 text-gray-500'}`}
