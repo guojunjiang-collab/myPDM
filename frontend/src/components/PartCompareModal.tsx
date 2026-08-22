@@ -8,6 +8,11 @@ import type { PartListItem, BOMCompareNode, BOMCompareResponse } from '../types'
 interface Props {
   open: boolean;
   onClose: () => void;
+  /** 预选左右版本（PartRevision id + 展示 item），传入时打开即自动对比（PartDetailModal 版本 Tab 使用） */
+  initialLeftId?: string;
+  initialRightId?: string;
+  initialLeftItem?: PartListItem;
+  initialRightItem?: PartListItem;
 }
 
 const STATUS_LABEL: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' };
@@ -144,7 +149,7 @@ function PartPicker({ label, valueId, onPick, onSearch, filterType }: {
       <div className="relative">
         <input
           type="text"
-          value={open ? q : selected ? `${selected.code} - ${selected.name}` : ''}
+          value={open ? q : selected ? `${selected.code}_${selected.name}_${selected.version}` : ''}
           placeholder="输入件号或名称搜索..."
           onFocus={() => { setOpen(true); setQ(''); }}
           onChange={(e) => doSearch(e.target.value)}
@@ -181,7 +186,14 @@ function PartPicker({ label, valueId, onPick, onSearch, filterType }: {
   );
 }
 
-export default function PartCompareModal({ open, onClose }: Props) {
+export default function PartCompareModal({
+  open,
+  onClose,
+  initialLeftId,
+  initialRightId,
+  initialLeftItem,
+  initialRightItem,
+}: Props) {
   const [leftId, setLeftId] = useState<string | null>(null);
   const [rightId, setRightId] = useState<string | null>(null);
   const [leftItem, setLeftItem] = useState<PartListItem | null>(null);
@@ -195,13 +207,42 @@ export default function PartCompareModal({ open, onClose }: Props) {
   const [onlyDiff, setOnlyDiff] = useState(false);
   const [detail, setDetail] = useState<{ masterId: string; revisionId: string } | null>(null);
   const [activeTab, setActiveTab] = useState<'property' | 'bom'>('property');
+  const autoStartedRef = useRef(false);
 
+  // 打开时初始化：有预选（版本 Tab BOM 对比）→ 直接设置左右并自动对比；否则重置为空
   useEffect(() => {
     if (!open) return;
-    setLeftId(null); setRightId(null); setLeftItem(null); setRightItem(null);
-    setLockedType(null);
+    autoStartedRef.current = false;
     setResult(null); setError(''); setOnlyDiff(false); setActiveTab('property'); setResetKey(0);
-  }, [open]);
+    if (initialLeftId && initialRightId) {
+      setLeftId(initialLeftId);
+      setRightId(initialRightId);
+      setLeftItem(initialLeftItem ?? null);
+      setRightItem(initialRightItem ?? null);
+      setLockedType(initialLeftItem?.type ?? null);
+      // 自动触发对比（state 更新后执行；用 timeout 保证左右 state 已写入）
+      setTimeout(() => {
+        setLoading(true); setError('');
+        bomApi
+          .compare(initialLeftId, initialRightId)
+          .then((res) => {
+            setResult(res.data as BOMCompareResponse);
+            setExpanded(new Set(['ROOT']));
+          })
+          .catch((err) => {
+            const msg = (err as AxiosError<{ detail: string }>)?.response?.data?.detail || '对比失败，请重试';
+            setError(msg);
+            setResult(null);
+          })
+          .finally(() => setLoading(false));
+      }, 0);
+    } else {
+      setLeftId(null); setRightId(null); setLeftItem(null); setRightItem(null);
+      setLockedType(null);
+    }
+    // 预选参数变化视为新的对比请求
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialLeftId, initialRightId]);
 
   /** 服务端搜索，按 lockedType 过滤 */
   const handleSearch = async (query: string, filterType: string | null): Promise<PartListItem[]> => {
