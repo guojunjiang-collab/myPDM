@@ -16,6 +16,7 @@ import TaskEditModal from '../pages/Project/TaskEditModal';
 import { ECODetailModal } from './ECO/ECODetailModal';
 import { ECRDetailModal } from './ECR/ECRDetailModal';
 import Badge from './ui/Badge';
+import Button from './ui/Button';
 import type { DocumentRevision, DocumentIteration, CustomFieldDefinition } from '../types';
 
 interface Props {
@@ -91,6 +92,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
   }, [iterations]);
 
   const loadSeq = useRef(0);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
 
   const loadDoc = useCallback(async () => {
     if (!effectiveRevisionId) return;
@@ -361,14 +363,12 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
       headerAction={(isViewingOtherVersion && doc) ? (
         <span className="flex items-center gap-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 px-2 py-0.5 rounded">
           正在查看版本 {doc.version}（只读）
-          <button onClick={() => setViewingVersionId(null)}
-            className="text-primary-600 hover:text-primary-800 hover:underline">返回当前</button>
+          <Button variant="link" size="xs" onClick={() => setViewingVersionId(null)}>返回当前</Button>
         </span>
       ) : (isViewingHistorical && viewingIteration && !isViewingOtherVersion) ? (
         <span className="flex items-center gap-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 px-2 py-0.5 rounded">
           正在查看 Iteration #{viewingIteration.iteration} 历史数据（只读）
-          <button onClick={() => setViewingIterationId(null)}
-            className="text-primary-600 hover:text-primary-800 hover:underline">返回当前</button>
+          <Button variant="link" size="xs" onClick={() => setViewingIterationId(null)}>返回当前</Button>
         </span>
       ) : undefined}
     >
@@ -456,40 +456,31 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                 </div>
                 <div className="flex gap-1 flex-wrap items-center">
                   {canCheckout && (
-                    <button onClick={() => doAction(() => documentsApi.checkout(doc.id), '签出成功')}
-                      className="px-3 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">签出/编辑</button>
+                    <Button size="sm" onClick={() => doAction(() => documentsApi.checkout(doc.id), '签出成功')}>签出/编辑</Button>
                   )}
                   {canCheckin && (
-                    <button onClick={() => setShowCheckinModal(true)}
-                      className="px-3 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">签入/解锁</button>
+                    <Button size="sm" onClick={() => setShowCheckinModal(true)}>签入/解锁</Button>
                   )}
                   {canUndo && (
-                    <button onClick={() => doAction(() => documentsApi.undocheckout(doc.id), '已撤销签出')}
-                      className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600">撤销签出</button>
+                    <Button variant="dark" size="sm" onClick={() => doAction(() => documentsApi.undocheckout(doc.id), '已撤销签出')}>撤销签出</Button>
                   )}
                   {canFreeze && (
-                    <button onClick={() => doAction(() => documentsApi.freeze(doc.id), '已冻结')}
-                      className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600">冻结</button>
+                    <Button size="sm" onClick={() => doAction(() => documentsApi.freeze(doc.id), '已冻结')}>冻结</Button>
                   )}
                   {canUnfreeze && (
-                    <button onClick={() => doAction(() => documentsApi.unfreeze(doc.id), '已解冻')}
-                      className="px-3 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">解冻</button>
+                    <Button variant="dark" size="sm" onClick={() => doAction(() => documentsApi.unfreeze(doc.id), '已解冻')}>解冻</Button>
                   )}
                   {canRelease && (
-                    <button onClick={() => doAction(() => documentsApi.release(doc.id), '已发布')}
-                      className="px-3 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">发布</button>
+                    <Button size="sm" onClick={() => doAction(() => documentsApi.release(doc.id), '已发布')}>发布</Button>
                   )}
                   {canUpgrade && (
-                    <button onClick={() => doAction(() => documentsApi.upgrade(doc.id), '已升版')}
-                      className="px-3 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700">升版</button>
+                    <Button size="sm" onClick={() => doAction(() => documentsApi.upgrade(doc.id), '已升版')}>升版</Button>
                   )}
                   {canObsolete && (
-                    <button onClick={() => doAction(() => documentsApi.obsolete(doc.id), '已作废')}
-                      className="px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600">作废</button>
+                    <Button variant="danger" size="sm" onClick={() => doAction(() => documentsApi.obsolete(doc.id), '已作废')}>作废</Button>
                   )}
                   {canForceCheckin && (
-                    <button onClick={() => doAction(() => documentsApi.forceCheckin(doc.id), '已强制签入')}
-                      className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700">强制签入</button>
+                    <Button variant="danger" size="sm" onClick={() => doAction(() => documentsApi.forceCheckin(doc.id), '已强制签入')}>强制签入</Button>
                   )}
                 </div>
               </div>
@@ -516,10 +507,12 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="text-sm font-semibold text-gray-700">附件列表</h4>
                       {canEdit && !isViewingHistorical && !isViewingOtherVersion && (
-                        <label className="inline-block px-3 py-1 text-sm bg-primary-600 text-white rounded cursor-pointer hover:bg-primary-700">
-                          {uploading ? '上传中...' : '+ 上传附件'}
-                          <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} />
-                        </label>
+                        <>
+                          <Button size="sm" type="button" onClick={() => uploadInputRef.current?.click()} disabled={uploading}>
+                            {uploading ? '上传中...' : '+ 上传附件'}
+                          </Button>
+                          <input ref={uploadInputRef} type="file" className="hidden" onChange={handleUpload} disabled={uploading} />
+                        </>
                       )}
                     </div>
                     {attachments.length === 0 ? (
@@ -544,17 +537,14 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                                 <td className="px-3 py-2 text-gray-500">{formatFileSize(att.file_size || 0)}</td>
                                 <td className="px-3 py-2 text-gray-500">{formatDateTime(att.created_at)}</td>
                                 <td className="px-3 py-2 text-right">
-                                  <button
+                                  <Button variant="link" size="xs" className="mr-2"
                                     onClick={() => previewAttachment(att.id, att.file_name || 'preview', {
                                       onArchive: (id, name) => setArchivePreview({ attId: id, fileName: name }),
-                                    })}
-                                    className="text-blue-600 hover:text-blue-800 mr-2">预览</button>
-                                  <button
-                                    onClick={() => handleDownload(att.id, att.file_name || 'download')}
-                                    className="text-primary-600 hover:text-primary-800 mr-2">下载</button>
+                                    })}>预览</Button>
+                                  <Button variant="link" size="xs" className="mr-2"
+                                    onClick={() => handleDownload(att.id, att.file_name || 'download')}>下载</Button>
                                   {canEdit && !isViewingHistorical && (
-                                    <button onClick={() => handleDeleteAtt(att.id)}
-                                      className="text-red-600 hover:text-red-800">删除</button>
+                                    <Button variant="danger" size="xs" onClick={() => handleDeleteAtt(att.id)}>删除</Button>
                                   )}
                                 </td>
                               </tr>
@@ -632,10 +622,10 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                                 {isCurrent ? (
                                   <span className="text-primary-600 text-xs">当前</span>
                                 ) : (
-                                  <button onClick={() => setViewingVersionId(v.id)}
-                                    className={`text-xs hover:underline ${isViewing ? 'text-orange-600' : 'text-primary-600 hover:text-primary-800'}`}>
+                                  <Button variant="link" size="xs" className={isViewing ? 'text-orange-600' : ''}
+                                    onClick={() => setViewingVersionId(v.id)}>
                                     {isViewing ? '查看中' : '切换'}
-                                  </button>
+                                  </Button>
                                 )}
                               </td>
                             </tr>
@@ -681,13 +671,13 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                                   {isCurrent ? (
                                     <span className="text-primary-600 text-xs">当前</span>
                                   ) : (
-                                    <button onClick={() => setViewingIterationId(it.id)}
-                                      className={`text-xs hover:underline ${isViewing ? 'text-orange-600' : 'text-primary-600 hover:text-primary-800'}`}>
+                                    <Button variant="link" size="xs" className={isViewing ? 'text-orange-600' : ''}
+                                      onClick={() => setViewingIterationId(it.id)}>
                                       {isViewing ? '查看中' : '查看数据'}
-                                    </button>
+                                    </Button>
                                   )}
                                   {it.iteration > 1 && checkIsAdmin() && (
-                                    <button onClick={async () => {
+                                    <Button variant="danger" size="xs" onClick={async () => {
                                       if (!doc || !confirm(`确定删除迭代 #${it.iteration}？该迭代的附件也将被删除。`)) return;
                                       try {
                                         await documentsApi.deleteIteration(doc.id, it.id);
@@ -698,7 +688,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                                       } catch (e: any) {
                                         toast.error(e?.response?.data?.detail || '删除失败');
                                       }
-                                    }} className="text-xs text-red-600 hover:text-red-800 hover:underline">删除</button>
+                                    }}>删除</Button>
                                   )}
                                 </div>
                               </td>
@@ -739,14 +729,13 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
             className="w-full text-sm px-3 py-2 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
           <div className="flex justify-end gap-2 mt-3">
-            <button onClick={() => setShowCheckinModal(false)}
-              className="px-3 py-1 text-sm border border-gray-300 rounded text-gray-600">取消</button>
-            <button onClick={async () => {
+            <Button variant="secondary" size="sm" onClick={() => setShowCheckinModal(false)}>取消</Button>
+            <Button variant="success" size="sm" onClick={async () => {
               if (!doc) return;
               await doAction(() => documentsApi.checkin(doc.id, checkinNote || undefined), '签入成功');
               setShowCheckinModal(false);
               setCheckinNote('');
-            }} className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700">确认签入</button>
+            }}>确认签入</Button>
           </div>
         </Modal>
       )}

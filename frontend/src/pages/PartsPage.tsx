@@ -11,6 +11,7 @@ import PartDetailModal from '../components/PartDetailModal';
 import { CADWorkspaceModal } from '../components/CADWorkspace/CADWorkspaceModal';
 import PartCompareModal from '../components/PartCompareModal';
 import Badge from '../components/ui/Badge';
+import Button from '../components/ui/Button';
 
 type SortField = 'code' | 'name' | 'created_at' | 'version' | 'status' | 'check_out_user_name' | 'type';
 type SortOrder = 'asc' | 'desc';
@@ -186,29 +187,20 @@ export default function PartsPage() {
           仅顶层零部件
         </label>
 
-        <button
-          onClick={() => setShowCADWorkspace(true)}
-          className="px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 text-sm flex items-center gap-1.5"
-        >
+        <Button onClick={() => setShowCADWorkspace(true)}>
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
           CAD工作台
-        </button>
-        <button
-          onClick={() => setShowCompareModal(true)}
-          className="px-4 py-2 border border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50 text-sm"
-        >
+        </Button>
+        <Button variant="secondary" onClick={() => setShowCompareModal(true)}>
           ⇄ BOM对比
-        </button>
+        </Button>
         <div className="flex-1" />
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm"
-        >
+        <Button onClick={() => setShowCreateModal(true)}>
           + 新增零件
-        </button>
+        </Button>
       </div>
 
       <div className="relative bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
@@ -281,12 +273,11 @@ export default function PartsPage() {
                   </td>
                   <td className="px-4 py-3 text-center text-sm" onClick={(e) => e.stopPropagation()}>
                     {user?.role === 'admin' && (
-                      <button
+                      <Button variant="danger" size="xs"
                         onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); }}
-                        className="text-red-500 hover:text-red-700"
                       >
                         删除
-                      </button>
+                      </Button>
                     )}
                   </td>
                 </tr>
@@ -298,11 +289,9 @@ export default function PartsPage() {
         <div className="sticky bottom-0 flex justify-center py-2 pointer-events-none">
           <div className="inline-flex items-center gap-3 text-sm text-gray-600 bg-white border border-gray-200 rounded-full shadow-lg px-4 py-2 pointer-events-auto">
             共 <span className="font-medium">{total}</span> 条
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1 || loading}
-              className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-40">上一页</button>
+            <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1 || loading}>上一页</Button>
             <span className="tabular-nums">第 {page} / {pageCount} 页</span>
-            <button onClick={() => setPage(p => Math.min(pageCount, p + 1))} disabled={page >= pageCount || loading}
-              className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-40">下一页</button>
+            <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.min(pageCount, p + 1))} disabled={page >= pageCount || loading}>下一页</Button>
           </div>
         </div>
        </div>
@@ -328,12 +317,10 @@ export default function PartsPage() {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
           </div>
           <div className="flex justify-end gap-3 pt-2">
-            <button onClick={() => setShowCreateModal(false)}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">取消</button>
-            <button onClick={handleCreate} disabled={createSaving}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
+            <Button variant="secondary" onClick={() => setShowCreateModal(false)}>取消</Button>
+            <Button onClick={handleCreate} disabled={createSaving}>
               {createSaving ? '创建中...' : '创建'}
-            </button>
+            </Button>
           </div>
         </div>
       </Modal>

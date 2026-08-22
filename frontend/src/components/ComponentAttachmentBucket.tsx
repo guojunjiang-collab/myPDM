@@ -3,6 +3,7 @@ import { componentAttachmentsApi, mediaApi, v2UploadApi, CHUNK_THRESHOLD, CHUNK_
 import type { ComponentAttachment } from '../services/api';
 import { previewAttachment } from '../utils/attachmentPreview';
 import ArchiveTreeModal from './ArchiveTreeModal';
+import Button from './ui/Button';
 
 interface Props {
   componentId: string;
@@ -102,7 +103,7 @@ export default function ComponentAttachmentBucket({ componentId, category, label
         <h4 className="text-sm font-bold text-gray-700">{label}</h4>
         {editable && !uploading && (
           <>
-            <button type="button" onClick={() => fileInputRef.current?.click()} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 上传附件</button>
+            <Button size="sm" type="button" onClick={() => fileInputRef.current?.click()}>+ 上传附件</Button>
             <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} accept="*/*" />
           </>
         )}
@@ -141,12 +142,12 @@ export default function ComponentAttachmentBucket({ componentId, category, label
                   <td className="px-3 py-2 text-gray-500">{fmtSize(att.file_size)}</td>
                   <td className="px-3 py-2 text-center whitespace-nowrap">
                     <span className="inline-flex items-center gap-2">
-                      <button type="button" onClick={() => handlePreview(att.id, att.file_name)} className="text-blue-600 hover:text-blue-800 text-xs">预览</button>
-                      <button type="button" onClick={() => handleDownload(att.id, att.file_name)} className="text-primary-600 hover:text-primary-800 text-xs">下载</button>
+                      <Button variant="link" size="xs" type="button" onClick={() => handlePreview(att.id, att.file_name)}>预览</Button>
+                      <Button variant="link" size="xs" type="button" onClick={() => handleDownload(att.id, att.file_name)}>下载</Button>
                       {editable && (
-                        <button type="button" onClick={() => handleDelete(att.id)} disabled={deletingId === att.id} className="text-red-500 hover:text-red-700 disabled:opacity-50 text-xs">
+                        <Button variant="danger" size="xs" type="button" onClick={() => handleDelete(att.id)} disabled={deletingId === att.id}>
                           {deletingId === att.id ? '删除中...' : '删除'}
-                        </button>
+                        </Button>
                       )}
                     </span>
                   </td>

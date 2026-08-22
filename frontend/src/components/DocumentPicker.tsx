@@ -3,6 +3,7 @@ import { useDataStore } from '../stores/data';
 import { documentsApi, customFieldsApi } from '../services/api';
 import { Modal } from './Modal';
 import Badge from './ui/Badge';
+import Button from './ui/Button';
 import type { Document, CustomFieldDefinition, CustomFieldValue } from '../types';
 
 /* ----------------------------------------------------------------
@@ -271,7 +272,7 @@ export default function DocumentPicker({
                         </td>
                       ))}
                       <td className="px-3 py-2 text-right">
-                        <button type="button" onClick={() => removeFromSelected(item.id)} className="text-red-500 hover:text-red-700 text-xs" title="移除">✕</button>
+                        <Button variant="danger" size="xs" type="button" onClick={() => removeFromSelected(item.id)} title="移除">✕</Button>
                       </td>
                     </tr>
                   ))}
@@ -305,10 +306,10 @@ export default function DocumentPicker({
 
         {/* ---- 快速新建 ---- */}
         <div className="border rounded-lg overflow-hidden">
-          <button type="button" onClick={() => setQuickOpen(!quickOpen)} className="w-full px-4 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 flex items-center gap-1">
+          <Button variant="ghost" size="sm" className="w-full !justify-start" type="button" onClick={() => setQuickOpen(!quickOpen)}>
             <span className="text-xs">{quickOpen ? '▼' : '▶'}</span>
             快速新建图文档
-          </button>
+          </Button>
           {quickOpen && (
             <div className="px-4 py-3 border-t space-y-2 bg-gray-50">
               <div className="flex gap-2">
@@ -317,9 +318,9 @@ export default function DocumentPicker({
               </div>
               <div className="flex gap-2">
                 <input value={quickForm.remark} onChange={e => setQuickForm({ ...quickForm, remark: e.target.value })} placeholder="备注" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
-                <button type="button" onClick={handleQuickCreate} disabled={quickCreating} className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 whitespace-nowrap">
+                <Button size="sm" type="button" onClick={handleQuickCreate} disabled={quickCreating} className="whitespace-nowrap">
                   {quickCreating ? '创建中...' : '新建并添加'}
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -367,9 +368,9 @@ export default function DocumentPicker({
                           {isAdded ? (
                             <span className="text-xs text-green-600">已关联</span>
                           ) : (
-                            <button type="button" onClick={() => addToSelected(item)} className="px-2.5 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">
+                            <Button size="xs" type="button" onClick={() => addToSelected(item)}>
                               关联
-                            </button>
+                            </Button>
                           )}
                         </td>
                       </tr>
@@ -385,10 +386,10 @@ export default function DocumentPicker({
         <div className="flex justify-between items-center pt-2 border-t">
           <span className="text-sm text-gray-500">已选 <span className="font-medium text-gray-700">{selectedList.length}</span> 项</span>
           <div className="flex gap-2">
-            <button type="button" onClick={handleCancel} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-            <button type="button" onClick={handleConfirm} disabled={selectedList.length === 0} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+            <Button variant="secondary" type="button" onClick={handleCancel}>取消</Button>
+            <Button type="button" onClick={handleConfirm} disabled={selectedList.length === 0}>
               确认关联
-            </button>
+            </Button>
           </div>
         </div>
       </div>

@@ -3,6 +3,7 @@ import { partsApi, documentsApi } from '../services/api';
 import { formatDateTime } from '../utils/date';
 import { Modal } from './Modal';
 import Badge from './ui/Badge';
+import Button from './ui/Button';
 
 interface VersionItem {
   id: string;
@@ -94,13 +95,14 @@ export default function VersionSelectModal({
                     <td className="px-3 py-2 text-gray-500 break-words whitespace-normal">{v.remark || '-'}</td>
                     <td className="px-3 py-2 text-center">
                       {!isCurrent ? (
-                        <button
+                        <Button
+                          variant="link"
+                          size="xs"
                           type="button"
                           onClick={() => onSelect(v.id)}
-                          className="text-primary-600 hover:text-primary-800 text-xs"
                         >
                           选择
-                        </button>
+                        </Button>
                       ) : (
                         <span className="text-gray-300 text-xs">当前</span>
                       )}

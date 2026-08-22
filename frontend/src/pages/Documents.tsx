@@ -12,6 +12,7 @@ import { useDataStore } from '../stores/data';
 import { useDebounced } from '../hooks/useDebounced';
 import ArchiveTreeModal from '../components/ArchiveTreeModal';
 import Badge from '../components/ui/Badge';
+import Button from '../components/ui/Button';
 
 type SortField = 'code' | 'name' | 'created_at' | 'version' | 'status' | 'check_out_user_name';
 type SortOrder = 'asc' | 'desc';
@@ -232,7 +233,7 @@ export default function Documents() {
 
         <div className="flex-1" />
         {canEdit() && (
-          <button onClick={handleAdd} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新增图文档</button>
+          <Button onClick={handleAdd}>+ 新增图文档</Button>
         )}
       </div>
 
@@ -279,7 +280,7 @@ export default function Documents() {
                   </td>
                   <td className="px-4 py-3 text-center text-sm" onClick={(e) => e.stopPropagation()}>
                     {isAdmin() && (doc as any).accessible !== false && (
-                      <button onClick={() => setDeleteId(doc.id)} className="text-red-500 hover:text-red-700">删除</button>
+                      <Button variant="danger" size="xs" onClick={() => setDeleteId(doc.id)}>删除</Button>
                     )}
                   </td>
                 </tr>
@@ -291,11 +292,9 @@ export default function Documents() {
         <div className="sticky bottom-0 flex justify-center py-2 pointer-events-none">
           <div className="inline-flex items-center gap-3 text-sm text-gray-600 bg-white border border-gray-200 rounded-full shadow-lg px-4 py-2 pointer-events-auto">
             共 <span className="font-medium">{total}</span> 条
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1 || loading}
-              className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-40">上一页</button>
+            <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1 || loading}>上一页</Button>
             <span className="tabular-nums">第 {page} / {pageCount} 页</span>
-            <button onClick={() => setPage(p => Math.min(pageCount, p + 1))} disabled={page >= pageCount || loading}
-              className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-40">下一页</button>
+            <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.min(pageCount, p + 1))} disabled={page >= pageCount || loading}>下一页</Button>
           </div>
         </div>
        </div>
@@ -359,10 +358,10 @@ export default function Documents() {
             </div>
           )}
           <div className="flex justify-end gap-2 pt-4 border-t">
-            <button type="button" onClick={() => setCreateModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-            <button type="submit" disabled={createSaving} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+            <Button variant="secondary" type="button" onClick={() => setCreateModalOpen(false)}>取消</Button>
+            <Button type="submit" disabled={createSaving}>
               {createSaving ? '创建中...' : '创建'}
-            </button>
+            </Button>
           </div>
         </form>
       </Modal>

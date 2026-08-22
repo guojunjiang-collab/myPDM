@@ -3,6 +3,7 @@ import { bomApi, partsApi } from '../services/api';
 import { Modal } from './Modal';
 import { toast } from './Toast';
 import Badge from './ui/Badge';
+import Button from './ui/Button';
 
 /* ----------------------------------------------------------------
    Types
@@ -291,13 +292,14 @@ export default function AssemblyPartPicker({
                         />
                       </td>
                       <td className="px-3 py-2 text-right">
-                        <button
+                        <Button
+                          variant="danger"
+                          size="xs"
                           onClick={() => removeFromSelected(item.id)}
-                          className="text-red-500 hover:text-red-700 text-xs"
                           title="移除"
                         >
                           ✕
-                        </button>
+                        </Button>
                       </td>
                     </tr>
                   ))}
@@ -331,10 +333,10 @@ export default function AssemblyPartPicker({
 
         {/* ---- 快速新建 ---- */}
         <div className="border rounded-lg overflow-hidden">
-          <button onClick={() => setQuickOpen(!quickOpen)} className="w-full px-4 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 flex items-center gap-1">
+          <Button variant="ghost" size="sm" className="w-full !justify-start" onClick={() => setQuickOpen(!quickOpen)}>
             <span className="text-xs">{quickOpen ? '▼' : '▶'}</span>
             快速新建零部件
-          </button>
+          </Button>
           {quickOpen && (
             <div className="px-4 py-3 border-t space-y-2 bg-gray-50">
               <div className="flex gap-2">
@@ -343,7 +345,7 @@ export default function AssemblyPartPicker({
               </div>
               <div className="flex gap-2">
                 <input value={quickForm.spec} onChange={e => setQuickForm({ ...quickForm, spec: e.target.value })} placeholder="规格型号" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
-                <button onClick={async () => {
+                <Button size="sm" onClick={async () => {
                   if (!quickForm.code.trim() || !quickForm.name.trim()) return;
                   setQuickCreating(true);
                   try {
@@ -360,9 +362,9 @@ export default function AssemblyPartPicker({
                   } catch (e: any) {
                     toast.error(e?.response?.data?.detail || e?.message || '创建失败');
                   } finally { setQuickCreating(false); }
-                }} disabled={quickCreating} className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 whitespace-nowrap">
+                }} disabled={quickCreating} className="whitespace-nowrap">
                   {quickCreating ? '创建中...' : '新建并添加'}
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -403,12 +405,12 @@ export default function AssemblyPartPicker({
                           {isAdded ? (
                             <span className="text-xs text-green-600">已添加</span>
                           ) : (
-                            <button
+                            <Button
+                              size="xs"
                               onClick={() => addToSelected(item)}
-                              className="px-2.5 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700"
                             >
                               添加
-                            </button>
+                            </Button>
                           )}
                         </td>
                       </tr>
@@ -426,19 +428,18 @@ export default function AssemblyPartPicker({
             已选 <span className="font-medium text-gray-700">{selectedList.length}</span> 项
           </span>
           <div className="flex gap-2">
-            <button
+            <Button
+              variant="secondary"
               onClick={handleCancel}
-              className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
             >
               取消
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={handleConfirm}
               disabled={selectedList.length === 0}
-              className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
             >
               确认添加
-            </button>
+            </Button>
           </div>
         </div>
       </div>

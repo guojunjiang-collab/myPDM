@@ -15,6 +15,7 @@ import TaskEditModal from '../pages/Project/TaskEditModal';
 import ProfileEditModal from './Configuration/ProfileEditModal';
 import { useTableSort } from '../hooks/useTableSort';
 import Badge from './ui/Badge';
+import Button from './ui/Button';
 
 /** BOM 结构树的展开箭头，与 STPViewer 模型树(ModelTreePanel)保持同一风格 */
 function BomChevron({ expanded }: { expanded: boolean }) {
@@ -403,13 +404,12 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
             ) : <span className="text-gray-300">—</span>}
           </td>
           <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
-            <button type="button" onClick={(e) => { e.stopPropagation(); preview3D(item); }}
-              className="text-primary-600 hover:text-primary-800 text-xs whitespace-nowrap">3D预览</button>
+            <Button variant="link" size="xs" type="button" className="whitespace-nowrap" onClick={(e) => { e.stopPropagation(); preview3D(item); }}>3D预览</Button>
           </td>
           {canEdit && !viewingIterationId && (
             <td className="px-3 py-2 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
               <span className="inline-flex items-center gap-1">
-                <button type="button" onClick={(e) => {
+                <Button variant="link" size="xs" type="button" onClick={(e) => {
                   e.stopPropagation();
                   setVersionSelectItem(item);
                   setVersionSelectLoading(true);
@@ -417,13 +417,11 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                     .then((revs: any[]) => setVersionSelectRevisions(revs || []))
                     .catch(() => setVersionSelectRevisions([]))
                     .finally(() => setVersionSelectLoading(false));
-                }}
-                  className="text-primary-600 hover:text-primary-800 text-xs">选择</button>
+                }}>选择</Button>
                 {hasChildren && (
-                  <button type="button" onClick={(e) => { e.stopPropagation(); setNestedPickerRevId(item.child_revision_id); }}
-                    className="text-primary-600 hover:text-primary-800 text-xs">+子项</button>
+                  <Button variant="link" size="xs" type="button" onClick={(e) => { e.stopPropagation(); setNestedPickerRevId(item.child_revision_id); }}>+子项</Button>
                 )}
-                <button type="button" onClick={async (e) => {
+                <Button variant="danger" size="xs" type="button" onClick={async (e) => {
                   e.stopPropagation();
                   if (!revisionId) return;
                   if (!confirm('确定移除此子项？')) return;
@@ -433,8 +431,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                     toast.success('已删除');
                     refreshChildren(targetRevId);
                   } catch (e2: any) { toast.error(e2?.response?.data?.detail || '删除失败'); }
-                }}
-                  className="text-red-500 hover:text-red-700 text-xs">移除</button>
+                }}>移除</Button>
               </span>
             </td>
           )}
@@ -534,14 +531,12 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
       headerAction={viewingIterationId ? (
         <span className="flex items-center gap-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 px-2 py-0.5 rounded">
           正在查看 Iteration #{viewingIteration?.iteration} 的历史数据（只读）
-          <button onClick={() => { setViewingIterationId(null); setViewingIteration(null); }}
-            className="text-primary-600 hover:text-primary-800 hover:underline">返回当前迭代</button>
+          <Button variant="link" size="xs" onClick={() => { setViewingIterationId(null); setViewingIteration(null); }}>返回当前迭代</Button>
         </span>
       ) : (internalRevisionId && propRevisionId && internalRevisionId !== propRevisionId) ? (
         <span className="flex items-center gap-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 px-2 py-0.5 rounded">
           正在查看版本 {versions.find((v: any) => v.id === internalRevisionId)?.version || '?'}（只读）
-          <button onClick={() => setInternalRevisionId(null)}
-            className="text-primary-600 hover:text-primary-800 hover:underline">返回当前版本</button>
+          <Button variant="link" size="xs" onClick={() => setInternalRevisionId(null)}>返回当前版本</Button>
         </span>
       ) : undefined}
     >
@@ -603,11 +598,10 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                   {/* 3D 预览入口（操作按钮群左侧，"|" 分隔） */}
                   {isAssembly ? (
                     <>
-                      <button onClick={() => window.open(`/stp-viewer?assembly=${revisionId}`, '_blank')}
-                        className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">3D预览</button>
+                      <Button size="sm" onClick={() => window.open(`/stp-viewer?assembly=${revisionId}`, '_blank')}>3D预览</Button>
                     </>
                   ) : (
-                    <button onClick={async () => {
+                    <Button size="sm" onClick={async () => {
                       if (!revisionId) return;
                       try {
                         const atts = await partsApi.listAttachments(revisionId, 'production');
@@ -622,47 +616,37 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
             alert('该零件没有 STP/STEP 附件，请先上传');
           }
         } catch { alert('预览失败'); }
-      }}
-        className="px-3 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700">3D预览</button>
+      }}>3D预览</Button>
                   )}
                   {(canCheckout || canCheckin || canUndo || canFreeze || canUnfreeze || canRelease || canUpgrade || canObsolete || canForceCheckin) && (
                     <span className="mx-1 text-gray-300 self-center select-none">|</span>
                   )}
                   {canCheckout && (
-                    <button onClick={() => doAction(() => partsApi.checkout(revisionId!), '签出成功')}
-                      className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">签出/编辑</button>
+                    <Button size="sm" onClick={() => doAction(() => partsApi.checkout(revisionId!), '签出成功')}>签出/编辑</Button>
                   )}
                   {canCheckin && (
-                    <button onClick={() => setShowCheckinModal(true)}
-                      className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">签入/解锁</button>
+                    <Button size="sm" onClick={() => setShowCheckinModal(true)}>签入/解锁</Button>
                   )}
                   {canUndo && (
-                    <button onClick={() => doAction(() => partsApi.undocheckout(revisionId!), '已撤销')}
-                      className="px-3 py-1 bg-gray-500 text-white rounded text-xs hover:bg-gray-600">撤销签出</button>
+                    <Button variant="dark" size="sm" onClick={() => doAction(() => partsApi.undocheckout(revisionId!), '已撤销')}>撤销签出</Button>
                   )}
                   {canFreeze && (
-                    <button onClick={() => doAction(() => partsApi.freeze(revisionId!), '已冻结')}
-                      className="px-3 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600">冻结</button>
+                    <Button size="sm" onClick={() => doAction(() => partsApi.freeze(revisionId!), '已冻结')}>冻结</Button>
                   )}
                   {canUnfreeze && (
-                    <button onClick={() => doAction(() => partsApi.unfreeze(revisionId!), '已解冻')}
-                      className="px-3 py-1 bg-orange-500 text-white rounded text-xs hover:bg-orange-600">解冻</button>
+                    <Button variant="dark" size="sm" onClick={() => doAction(() => partsApi.unfreeze(revisionId!), '已解冻')}>解冻</Button>
                   )}
                   {canRelease && (
-                    <button onClick={() => doAction(() => partsApi.release(revisionId!), '已发布')}
-                      className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">发布</button>
+                    <Button size="sm" onClick={() => doAction(() => partsApi.release(revisionId!), '已发布')}>发布</Button>
                   )}
                   {canUpgrade && (
-                    <button onClick={() => doAction(() => partsApi.upgrade(revisionId!), '已升版')}
-                      className="px-3 py-1 bg-purple-600 text-white rounded text-xs hover:bg-purple-700">升版</button>
+                    <Button size="sm" onClick={() => doAction(() => partsApi.upgrade(revisionId!), '已升版')}>升版</Button>
                   )}
                   {canObsolete && (
-                    <button onClick={() => doAction(() => partsApi.obsolete(revisionId!), '已作废')}
-                      className="px-3 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600">作废</button>
+                    <Button variant="danger" size="sm" onClick={() => doAction(() => partsApi.obsolete(revisionId!), '已作废')}>作废</Button>
                   )}
                   {canForceCheckin && (
-                    <button onClick={() => doAction(() => partsApi.forceCheckin(revisionId!), '已强制签入')}
-                      className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700">强制签入</button>
+                    <Button variant="danger" size="sm" onClick={() => doAction(() => partsApi.forceCheckin(revisionId!), '已强制签入')}>强制签入</Button>
                   )}
                 </div>
               </div>
@@ -774,18 +758,14 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                       <h4 className="text-sm font-bold text-gray-700">子项清单</h4>
                       <div className="flex gap-2">
                         {canEdit && !viewingIterationId && (
-                          <button onClick={() => setBomPickerOpen(true)}
-                            className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700">
+                          <Button variant="success" size="sm" onClick={() => setBomPickerOpen(true)}>
                             + 添加子项
-                          </button>
+                          </Button>
                         )}
                         {!viewingIterationId && (<>
-                        <button onClick={() => handleCascade('checkout')}
-                          className="px-3 py-1.5 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">级联签出/编辑</button>
-                        <button onClick={() => handleCascade('checkin')}
-                          className="px-3 py-1.5 bg-primary-600 text-white rounded text-xs hover:bg-primary-700">级联签入/解锁</button>
-                        <button onClick={() => handleCascade('undo')}
-                          className="px-3 py-1.5 bg-gray-500 text-white rounded text-xs hover:bg-gray-600">级联撤销</button>
+                        <Button size="sm" onClick={() => handleCascade('checkout')}>级联签出/编辑</Button>
+                        <Button size="sm" onClick={() => handleCascade('checkin')}>级联签入/解锁</Button>
+                        <Button variant="dark" size="sm" onClick={() => handleCascade('undo')}>级联撤销</Button>
                         </>)}
                       </div>
                     </div>
@@ -888,7 +868,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                               {v.id === revision?.id ? (
                                 <span className="text-primary-600 text-xs">当前</span>
                               ) : (
-                                <button onClick={() => setInternalRevisionId(v.id)} className="text-primary-600 hover:text-primary-800 hover:underline text-xs">切换</button>
+                                <Button variant="link" size="xs" onClick={() => setInternalRevisionId(v.id)}>切换</Button>
                               )}
                             </td>
                           </tr>
@@ -902,13 +882,12 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                             ? `已选：版本 ${versions.find((x) => x.id === cmpSel[0])?.version ?? '?'} vs 版本 ${versions.find((x) => x.id === cmpSel[1])?.version ?? '?'}`
                             : '请再选择一个版本'}
                         </span>
-                        <button
+                        <Button
                           onClick={openCompare}
                           disabled={cmpSel.length !== 2}
-                          className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm disabled:opacity-40 hover:bg-primary-700"
                         >
                           BOM 对比
-                        </button>
+                        </Button>
                       </div>
                     )}
                   </>
@@ -937,10 +916,12 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                               {it.id === iteration?.id ? (
                                 <span className="text-primary-600 text-xs">当前</span>
                               ) : (
-                                <button onClick={() => handleViewIteration(it.id)} className="text-primary-600 hover:text-primary-800 hover:underline text-xs">查看数据</button>
+                                <Button variant="link" size="xs" onClick={() => handleViewIteration(it.id)}>查看数据</Button>
                               )}
                               {it.iteration > 1 && isAdminUser && (
-                                <button
+                                <Button
+                                  variant="danger"
+                                  size="xs"
                                   onClick={async () => {
                                     if (!revisionId || !confirm(`确定删除迭代 #${it.iteration}？该迭代的附件也将被删除。`)) return;
                                     try {
@@ -951,10 +932,9 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                                       toast.error(e?.response?.data?.detail || '删除失败');
                                     }
                                   }}
-                                  className="text-xs text-red-600 hover:text-red-800 hover:underline"
                                 >
                                   删除
-                                </button>
+                                </Button>
                               )}
                             </div>
                           </td>
@@ -975,16 +955,16 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
             <textarea className="w-full border rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" rows={3} placeholder="请输入签入说明（选填）..."
               value={checkinNote} onChange={(e) => setCheckinNote(e.target.value)} />
             <div className="flex justify-end gap-2 mt-4">
-              <button onClick={() => setShowCheckinModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">取消</button>
-              <button onClick={async () => {
+              <Button variant="secondary" onClick={() => setShowCheckinModal(false)}>取消</Button>
+              <Button onClick={async () => {
                 setSaving(true);
                 await doAction(() => partsApi.checkin(revisionId!, checkinNote || undefined), '签入成功');
                 setSaving(false);
                 setShowCheckinModal(false);
                 setCheckinNote('');
-              }} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm disabled:opacity-50" disabled={saving}>
+              }} disabled={saving}>
                 {saving ? '保存中...' : '确认签入'}
-              </button>
+              </Button>
             </div>
           </div>
         </Modal>

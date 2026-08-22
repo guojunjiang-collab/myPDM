@@ -4,6 +4,7 @@ import { Modal } from './Modal';
 import PartDetailModal from './PartDetailModal';
 import { partsApi, bomApi } from '../services/api';
 import type { PartListItem, BOMCompareNode, BOMCompareResponse } from '../types';
+import Button from './ui/Button';
 
 interface Props {
   open: boolean;
@@ -378,14 +379,16 @@ export default function PartCompareModal({
         <div className="flex flex-col h-full space-y-4">
           <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-end">
             <PartPicker key={`left-${resetKey}`} label="左零部件" valueId={leftId} onPick={pickLeft} onSearch={handleSearch} filterType={lockedType} />
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => { setLeftId(null); setRightId(null); setLeftItem(null); setRightItem(null); setLockedType(null); setResetKey(k => k + 1); }}
               disabled={!leftId && !rightId}
-              className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-30 mb-1"
+              className="mb-1"
               title="清空两侧已选零部件"
             >
               重置
-            </button>
+            </Button>
             <PartPicker key={`right-${resetKey}`} label="右零部件" valueId={rightId} onPick={pickRight} onSearch={handleSearch} filterType={lockedType} />
           </div>
           {lockedType && (
@@ -394,18 +397,16 @@ export default function PartCompareModal({
             </div>
           )}
           <div className="flex items-center gap-3">
-            <button onClick={handleCompare} disabled={!leftId || !rightId || loading}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 text-sm">
+            <Button onClick={handleCompare} disabled={!leftId || !rightId || loading}>
               {loading ? '对比中...' : '开始对比'}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => window.open(`/stp-viewer?compare-left=${leftId}&compare-right=${rightId}`, '_blank')}
               disabled={!leftId || !rightId}
               title="在新标签页中叠加对比两个零部件的 3D 模型"
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm"
             >
               🧊 3D对比
-            </button>
+            </Button>
             {result && (
               <label className="flex items-center gap-1 text-sm text-gray-600 cursor-pointer select-none">
                 <input type="checkbox" checked={onlyDiff} onChange={(e) => setOnlyDiff(e.target.checked)} />

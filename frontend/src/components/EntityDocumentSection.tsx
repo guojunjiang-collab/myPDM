@@ -11,6 +11,7 @@ import VersionSelectModal from './VersionSelectModal';
 import ArchiveTreeModal from './ArchiveTreeModal';
 import DocumentDetailContent from './DocumentDetailContent';
 import Badge from './ui/Badge';
+import Button from './ui/Button';
 
 /* ----------------------------------------------------------------
    Types
@@ -299,9 +300,9 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
       <div className="flex items-center justify-between mb-2">
         <h4 className="text-sm font-bold text-gray-700">关联图文档</h4>
         {hasEditableAction && (
-          <button type="button" onClick={() => setPickerOpen(true)} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">
+          <Button size="sm" type="button" onClick={() => setPickerOpen(true)}>
             + 关联图文档
-          </button>
+          </Button>
         )}
       </div>
 
@@ -362,45 +363,49 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
                           {hasEditableAction ? (
                             <>
                               {ed.document.file_id && (
-                                <button
+                                <Button
+                                  variant="link"
+                                  size="xs"
                                   type="button"
                                   onClick={(e) => { e.stopPropagation(); handlePreviewAttachment(ed.document.file_id!, ed.document.file_name!); }}
-                                  className="text-blue-600 hover:text-blue-800 text-xs"
                                   title="预览"
                                 >
                                   预览
-                                </button>
+                                </Button>
                               )}
-                              <button
+                              <Button
+                                variant="link"
+                                size="xs"
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); setVersionSelectState({ edocId: ed.id, documentId: ed.document_id, docCode: ed.document.code }); }}
-                                className="text-primary-600 hover:text-primary-800 text-xs"
                                 title="选择版本"
                               >
                                 选择
-                              </button>
-                              <button type="button" onClick={(e) => { e.stopPropagation(); handleRemove(ed.id); }} className="text-red-500 hover:text-red-700 text-xs" title="移除关联">移除</button>
+                              </Button>
+                              <Button variant="danger" size="xs" type="button" onClick={(e) => { e.stopPropagation(); handleRemove(ed.id); }} title="移除关联">移除</Button>
                             </>
                           ) : (
                             ed.document.file_id && (
                               isAccessible ? (
                                 <>
-                                  <button
+                                  <Button
+                                    variant="link"
+                                    size="xs"
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); handlePreviewAttachment(ed.document.file_id!, ed.document.file_name!); }}
-                                    className="text-blue-600 hover:text-blue-800 text-xs"
                                     title="预览"
                                   >
                                     预览
-                                  </button>
-                                  <button
+                                  </Button>
+                                  <Button
+                                    variant="link"
+                                    size="xs"
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); handleDownload(ed.document.file_id!, ed.document.file_name!); }}
-                                    className="text-primary-600 hover:text-primary-800 text-xs"
                                     title={`下载 ${ed.document.file_name}`}
                                   >
                                     下载
-                                  </button>
+                                  </Button>
                                 </>
                               ) : (
                                 <span className="text-gray-400 text-xs" title="无权限：需关联用户组成员">🔒 不可预览/下载</span>
@@ -490,7 +495,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
                 <h4 className="text-sm font-medium text-gray-700">附件管理</h4>
                 {!editUploading && (
                   <>
-                    <button type="button" onClick={() => editFileInputRef.current?.click()} className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 上传附件</button>
+                    <Button size="sm" type="button" onClick={() => editFileInputRef.current?.click()}>+ 上传附件</Button>
                     <input ref={editFileInputRef} type="file" className="hidden" onChange={handleEditFileChange} accept="*/*" />
                   </>
                 )}
@@ -526,9 +531,9 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
                           <td className="px-3 py-2"><span className="text-primary-600">{att.file_name}</span></td>
                           <td className="px-3 py-2 text-gray-500">{att.file_size != null ? (att.file_size < 1024 ? att.file_size + ' B' : att.file_size < 1048576 ? (att.file_size / 1024).toFixed(1) + ' KB' : (att.file_size / 1048576).toFixed(1) + ' MB') : '-'}</td>
                           <td className="px-3 py-2 text-right">
-                            <button type="button" onClick={() => handleEditDeleteAttachment(att.id)} disabled={editDeletingAttId === att.id} className="text-red-600 hover:text-red-800 disabled:opacity-50 text-xs">
+                            <Button variant="danger" size="xs" type="button" onClick={() => handleEditDeleteAttachment(att.id)} disabled={editDeletingAttId === att.id}>
                               {editDeletingAttId === att.id ? '删除中...' : '删除'}
-                            </button>
+                            </Button>
                           </td>
                         </tr>
                       ))}
@@ -543,12 +548,12 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
             <div className="flex justify-between items-center gap-2 pt-4 border-t">
               <div>
                 {editingDoc && (editingDoc.status === 'released' || editingDoc.status === 'obsolete') && (
-                  <button type="button" onClick={handleEditUpgrade} disabled={editSaving} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">升版</button>
+                  <Button type="button" onClick={handleEditUpgrade} disabled={editSaving}>升版</Button>
                 )}
               </div>
               <div className="flex gap-2">
-                <button type="button" onClick={() => setEditingDoc(null)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-                <button type="button" onClick={handleEditSave} disabled={editSaving} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">{editSaving ? '保存中...' : '保存'}</button>
+                <Button variant="secondary" type="button" onClick={() => setEditingDoc(null)}>取消</Button>
+                <Button type="button" onClick={handleEditSave} disabled={editSaving}>{editSaving ? '保存中...' : '保存'}</Button>
               </div>
             </div>
           </div>

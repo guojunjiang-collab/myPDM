@@ -9,6 +9,7 @@ import VersionSelectModal from './VersionSelectModal';
 import type { CustomFieldDefinition, AssemblyPartItem } from '../types';
 import CustomFieldInput from './CustomFieldInput';
 import Badge from './ui/Badge';
+import Button from './ui/Button';
 
 interface EntityEditModalProps {
   open: boolean;
@@ -284,16 +285,16 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
           <td className="px-3 py-2 text-right whitespace-nowrap">
             {locked ? <span className="text-gray-300 text-xs">—</span> : (
             <span className="inline-flex items-center gap-1">
-              <button type="button" onClick={() => setVersionSelectState({ itemId: part.id, childType: part.childType === 'assembly' ? 'assembly' : part.childType })} className="text-primary-600 hover:text-primary-800 text-xs" title="选择版本">选择</button>
+              <Button variant="link" size="xs" type="button" onClick={() => setVersionSelectState({ itemId: part.id, childType: part.childType === 'assembly' ? 'assembly' : part.childType })} title="选择版本">选择</Button>
               {isAssembly && (
-                <button type="button" onClick={() => {
+                <Button variant="link" size="xs" type="button" onClick={() => {
                   setPickerTargetId(part.child_id); setPickerOpen(true);
-                }} className="text-primary-600 hover:text-primary-800 text-xs" title="添加子项">+子项</button>
+                }} title="添加子项">+子项</Button>
               )}
-              <button type="button" onClick={() => {
+              <Button variant="danger" size="xs" type="button" onClick={() => {
                 if (level === 0) { handleRemovePart(part.id); }
                 else { handleNestedRemove(part.parent_id || entityId, part.id); }
-              }} className="text-red-500 hover:text-red-700 text-xs" title="移除子项">移除</button>
+              }} title="移除子项">移除</Button>
             </span>
             )}
           </td>
@@ -380,7 +381,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
             <div className="border-t pt-4">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-sm font-bold text-gray-700">子项清单</h4>
-                {!locked && <button type="button" onClick={() => { setPickerTargetId(null); setExpandedParts({}); setPickerOpen(true); }} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 添加子项</button>}
+                {!locked && <Button size="sm" type="button" onClick={() => { setPickerTargetId(null); setExpandedParts({}); setPickerOpen(true); }}>+ 添加子项</Button>}
               </div>
               <div className="border rounded-lg overflow-hidden">
                 {loadingEditParts ? (
@@ -418,11 +419,11 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
           )}
 
           <div className="flex justify-end gap-2 pt-4 border-t">
-            <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">{locked ? '关闭' : '取消'}</button>
+            <Button variant="secondary" type="button" onClick={onClose}>{locked ? '关闭' : '取消'}</Button>
             {!locked && (
-              <button type="submit" disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+              <Button type="submit" disabled={saving}>
                 {saving ? '保存中...' : '保存'}
-              </button>
+              </Button>
             )}
           </div>
         </form>
