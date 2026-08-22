@@ -265,7 +265,9 @@ export default function PartDetailPage() {
     };
   }, [revisionId]);
 
-  const title = detail ? `${detail.code} ${detail.name}` : id ?? '零部件详情';
+  const title = detail
+    ? `${detail.code} ${detail.name}${detail.latest_revision?.version ? `（${detail.latest_revision.version}）` : ''}`
+    : id ?? '零部件详情';
 
   // 概览标准字段（空值渲染为 "-"；字段以后端 PartMasterResponse 实际返回字段为准）
   const overviewRows: Array<{ label: string; value?: ReactNode }> = [
