@@ -411,13 +411,24 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
                           onClick={() => openLink(l)}
                           className="w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm"
                         >
-                          {/* 行1：编号 + 版本（左）+ 状态徽标（右） */}
+                          {/* 行1：编号 + 版本 + 类型徽标（零部件）+ 状态徽标（右） */}
                           <span className="flex items-center gap-2 min-w-0">
                             <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
                               {l.entity_code || l.entity_name || '未知对象'}
                             </span>
                             {l.entity_version && (
                               <span className="shrink-0 text-xs text-gray-400">{l.entity_version}</span>
+                            )}
+                            {(l.entity_type === 'part' || l.entity_type === 'assembly') && (
+                              <span
+                                className={`shrink-0 px-2 py-0.5 rounded-full text-xs ${
+                                  isAssembly(l)
+                                    ? 'bg-purple-100 text-purple-800'
+                                    : 'bg-gray-100 text-gray-800'
+                                }`}
+                              >
+                                {isAssembly(l) ? '部件' : '零件'}
+                              </span>
                             )}
                             {l.entity_status && (
                               <StatusBadge status={l.entity_status} map={ENTITY_STATUS_MAP} />
