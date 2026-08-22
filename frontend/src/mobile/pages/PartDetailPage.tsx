@@ -431,9 +431,9 @@ export default function PartDetailPage() {
             <button
               onClick={on3DPreview}
               disabled={stpLoading}
-              className="shrink-0 min-h-8 px-3 rounded-lg bg-primary-50 text-primary-600 border border-primary-200 text-xs disabled:opacity-60"
+              className="shrink-0 min-h-8 px-3 rounded-lg bg-primary-600 text-white text-xs disabled:opacity-60"
             >
-              {stpLoading ? '加载中...' : '3D 预览'}
+              {stpLoading ? '加载中...' : '3D'}
             </button>
           )}
         </div>

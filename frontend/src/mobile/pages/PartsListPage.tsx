@@ -83,7 +83,7 @@ export default function PartsListPage() {
           />
           <button
             onClick={() => navigate('/parts/compare')}
-            className="shrink-0 min-h-11 px-3 rounded-lg bg-white text-primary-600 border border-primary-600 text-sm font-medium"
+            className="shrink-0 min-h-11 px-3 rounded-lg bg-primary-600 text-white text-sm font-medium"
           >
             ⇄ 对比
           </button>
