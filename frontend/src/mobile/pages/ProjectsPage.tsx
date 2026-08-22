@@ -76,7 +76,11 @@ function fmtDate(v?: string | null): string {
 }
 
 /* 任务树节点：层级缩进 + 展开箭头 + 行内容；点击行打开任务详情。
-   当前登录人负责的任务：整行浅主色底 + 名称前主色圆点（高亮标识） */
+   展开箭头/缩进/竖线参照用户看板文件夹层级（箭头区 w-9、缩进 24、竖线对齐箭头中心）。
+   当前登录人负责的任务：整行浅主色底（bg-primary-100）高亮标识 */
+const INDENT = 24;
+const BTN = 36;
+
 function TaskTreeNode({
   task,
   depth,
@@ -98,14 +102,24 @@ function TaskTreeNode({
   return (
     <>
       <div
-        className={`rounded-lg shadow-sm flex items-center gap-1 py-2 pr-3 ${isMine ? 'bg-primary-100' : 'bg-white'}`}
-        style={{ paddingLeft: 10 + depth * 14 }}
+        className={`rounded-lg shadow-sm flex items-stretch ${isMine ? 'bg-primary-100' : 'bg-white'}`}
       >
+        {/* 缩进 + 层级竖线（每级一条，位置 = 该级箭头中心，同看板文件夹树） */}
+        <span className="relative shrink-0" style={{ width: depth * INDENT }}>
+          {depth > 0 &&
+            Array.from({ length: depth }).map((_, i) => (
+              <span
+                key={i}
+                className="absolute top-0 bottom-0 border-l border-gray-200"
+                style={{ left: i * INDENT + BTN / 2 }}
+              />
+            ))}
+        </span>
         <button
           type="button"
           aria-label={hasChildren ? (isOpen ? '折叠' : '展开') : '无子任务'}
           onClick={() => hasChildren && onToggle(task.id)}
-          className={`shrink-0 w-7 h-7 flex items-center justify-center text-sm leading-none ${
+          className={`shrink-0 w-9 flex items-center justify-center text-lg leading-none ${
             hasChildren ? 'text-gray-500' : 'text-gray-300'
           }`}
         >
@@ -114,7 +128,7 @@ function TaskTreeNode({
         <button
           type="button"
           onClick={() => onOpen(task)}
-          className="flex-1 min-w-0 flex flex-col justify-center text-left"
+          className="flex-1 min-w-0 flex flex-col justify-center py-2 pr-3 text-left"
         >
           <span className="flex items-center gap-2 min-w-0">
             <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
