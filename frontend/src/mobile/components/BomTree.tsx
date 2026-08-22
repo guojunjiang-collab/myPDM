@@ -24,10 +24,10 @@ function sortedByOrder(list: BomChild[]): BomChild[] {
   return [...list].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 }
 
-// 每级缩进 24px（多层级不占屏）；展开按钮 48px。
+// 每级缩进 24px（多层级不占屏）；展开按钮 36px（根行件号距左框 36px）。
 // 竖线位置 = i*INDENT + BTN/2 = 父项按钮中心，保证竖线与父项展开按钮对齐。
 const INDENT = 24;
-const BTN = 48;
+const BTN = 36;
 
 export default function BomTree({ rootItems }: { rootItems: BomChild[] }) {
   const navigate = useNavigate();
@@ -81,12 +81,12 @@ export default function BomTree({ rootItems }: { rootItems: BomChild[] }) {
               type="button"
               aria-label={isOpen ? '折叠' : '展开'}
               onClick={() => toggle(b.child_revision_id)}
-              className="shrink-0 w-12 flex items-center justify-center text-gray-500 text-lg"
+              className="shrink-0 w-9 flex items-center justify-center text-gray-500 text-lg"
             >
               {isLoading ? '⋯' : isOpen ? '▾' : '▸'}
             </button>
           ) : (
-            <span className="shrink-0 w-12 flex items-center justify-center text-gray-300 text-sm">•</span>
+            <span className="shrink-0 w-9 flex items-center justify-center text-gray-300 text-sm">•</span>
           )}
           {/* 点击行 → 打开子项详情页 */}
           <button
