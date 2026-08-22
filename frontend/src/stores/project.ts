@@ -41,8 +41,17 @@ export const useProjectStore = create<ProjectState>((set) => ({
     }
   },
   patchTask: (taskId, patch) => {
-    set(state => ({
-      tasks: state.tasks.map(t => t.id === taskId ? { ...t, ...patch } : t),
-    }));
+    set(state => {
+      // 递归更新：任务可能位于任意层级（children 子树内），保证子任务编辑后原地刷新生效
+      const update = (list: ProjectTask[]): ProjectTask[] =>
+        list.map(t =>
+          t.id === taskId
+            ? { ...t, ...patch }
+            : t.children
+              ? { ...t, children: update(t.children) }
+              : t,
+        );
+      return { tasks: update(state.tasks) };
+    });
   },
 }));
