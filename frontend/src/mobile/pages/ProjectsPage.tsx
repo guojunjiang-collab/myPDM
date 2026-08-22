@@ -98,7 +98,7 @@ function TaskTreeNode({
   return (
     <>
       <div
-        className={`rounded-lg shadow-sm flex items-center gap-1 py-2 pr-3 ${isMine ? 'bg-primary-50/60' : 'bg-white'}`}
+        className={`rounded-lg shadow-sm flex items-center gap-1 py-2 pr-3 ${isMine ? 'bg-primary-100' : 'bg-white'}`}
         style={{ paddingLeft: 10 + depth * 14 }}
       >
         <button
@@ -117,7 +117,6 @@ function TaskTreeNode({
           className="flex-1 min-w-0 flex flex-col justify-center text-left"
         >
           <span className="flex items-center gap-2 min-w-0">
-            {isMine && <span className="w-1.5 h-1.5 rounded-full bg-primary-500 shrink-0" />}
             <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
               {task.code} {task.name}
             </span>
