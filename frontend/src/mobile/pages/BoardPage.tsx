@@ -260,8 +260,6 @@ function FolderTreeNode({
   const items = (filterTab === 'all' ? folder.items : folder.items.filter((i) => (filterTab === 'component' ? isComponentType(i.entity_type) : i.entity_type === filterTab))) as DashboardItem[];
   const hasContent = folder.children.length > 0 || folder.items.length > 0;
   const isOpen = expanded[folder.id] === true; // 默认折叠
-  const count = folder.items?.length ?? 0;
-  const childCount = folder.children?.length ?? 0;
   return (
     <>
       <div className="flex items-stretch min-h-11 border-b border-gray-50 last:border-b-0">
@@ -299,14 +297,6 @@ function FolderTreeNode({
           <span className="flex-1 min-w-0 truncate text-sm text-gray-800">{folder.name}</span>
           {shared && folder.shared_from && (
             <span className="text-xs text-gray-400 shrink-0">{folder.shared_from.real_name}</span>
-          )}
-          {count > 0 && (
-            <span className="text-xs px-1.5 py-0.5 rounded-lg bg-gray-100 text-gray-500 shrink-0">{count}</span>
-          )}
-          {childCount > 0 && (
-            <span className="text-xs px-1.5 py-0.5 rounded-lg bg-primary-50 text-primary-600 shrink-0">
-              {childCount} 子
-            </span>
           )}
         </button>
       </div>
