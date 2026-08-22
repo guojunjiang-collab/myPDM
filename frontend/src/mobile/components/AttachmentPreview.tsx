@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import { mediaApi } from '../../services/api';
 
 /**
@@ -10,12 +13,16 @@ import { mediaApi } from '../../services/api';
  * - Office       → mediaApi.token(id,'office-pdf') + 新标签打开 /office-pdf
  *                  （后端 office-pdf 端点同步 LibreOffice 转 PDF，命中缓存直接返回）
  * - STP/STEP     → mediaApi.token(id,'gltf') + SPA 跳转 /stp-viewer 三维预览
+ * - Markdown     → 内嵌 react-markdown 渲染（md/markdown/qmd）
+ * - 文本          → 内嵌纯文本显示（txt/csv/log/json/xml，json 自动美化）
  * - 其余          → 普通附件卡片（文件名+大小），不提示用电脑浏览器
  */
 
 const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
 const OFFICE_EXTS = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'];
 const STP_EXTS = ['stp', 'step'];
+const MD_EXTS = ['md', 'markdown', 'qmd'];
+const TEXT_EXTS = ['txt', 'csv', 'log', 'json', 'xml'];
 
 export interface PreviewAttachment {
   id: string;
@@ -34,6 +41,15 @@ function fmtSize(bytes?: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** JSON 内容美化（解析失败返回原文） */
+function prettyJson(s: string): string {
+  try {
+    return JSON.stringify(JSON.parse(s), null, 2);
+  } catch {
+    return s;
+  }
+}
+
 function isPermissionError(e: unknown): boolean {
   if (e && typeof e === 'object' && 'response' in e) {
     return (e as any).response?.status === 403;
@@ -49,11 +65,45 @@ export default function AttachmentPreview({ attachment }: { attachment: PreviewA
   const isPdf = ext === 'pdf';
   const isOffice = OFFICE_EXTS.includes(ext);
   const isStp = STP_EXTS.includes(ext);
+  const isMd = MD_EXTS.includes(ext);
+  const isText = TEXT_EXTS.includes(ext);
 
   const [imgToken, setImgToken] = useState<string | null>(null);
   const [imgFailed, setImgFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [converting, setConverting] = useState(false);
+  // Markdown / 文本：内嵌内容
+  const [textContent, setTextContent] = useState<string | null>(null);
+  const [textLoading, setTextLoading] = useState(false);
+  const [textFailed, setTextFailed] = useState(false);
+
+  // 文本/Markdown：挂载时取令牌并拉取内容（令牌 ttl 300s，足够本次浏览）
+  useEffect(() => {
+    if (!isText && !isMd) return;
+    let alive = true;
+    setTextLoading(true);
+    setTextFailed(false);
+    setTextContent(null);
+    mediaApi
+      .token(attachment.id, 'preview')
+      .then(async (t) => {
+        const resp = await fetch(
+          `/api/v2/attachments/${attachment.id}/preview?token=${encodeURIComponent(t)}`,
+        );
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const text = await resp.text();
+        if (alive) setTextContent(text);
+      })
+      .catch(() => {
+        if (alive) setTextFailed(true);
+      })
+      .finally(() => {
+        if (alive) setTextLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [attachment.id, isText, isMd]);
 
   // 图片：挂载时取媒体令牌，<img> 直链内嵌显示（令牌 ttl 300s，足够本次浏览）
   useEffect(() => {
@@ -115,7 +165,7 @@ export default function AttachmentPreview({ attachment }: { attachment: PreviewA
     }
   };
 
-  if (!isImage && !isPdf && !isOffice && !isStp) {
+  if (!isImage && !isPdf && !isOffice && !isStp && !isMd && !isText) {
     // 无法预览的格式（如 CAD 源文件 .CATPart）：给出附件列表即可，不提示用电脑浏览器
     return (
       <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
@@ -190,6 +240,31 @@ export default function AttachmentPreview({ attachment }: { attachment: PreviewA
       {isPdf && error && <p className="text-xs text-red-500 mt-2">{error}</p>}
       {isOffice && !converting && error && <p className="text-xs text-red-500 mt-2">{error}</p>}
       {isStp && !converting && error && <p className="text-xs text-red-500 mt-2">{error}</p>}
+
+      {/* Markdown / 文本：内嵌内容 */}
+      {(isMd || isText) && (
+        <div className="mt-2">
+          {textLoading && <p className="text-xs text-gray-400 py-2 text-center">加载中...</p>}
+          {!textLoading && textFailed && (
+            <p className="text-xs text-red-500 py-2 text-center">内容加载失败，请重试</p>
+          )}
+          {!textLoading && !textFailed && textContent != null && (
+            isMd ? (
+              <div className="max-h-80 overflow-y-auto rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                <div className="prose prose-sm max-w-none prose-headings:font-semibold">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                    {textContent}
+                  </ReactMarkdown>
+                </div>
+              </div>
+            ) : (
+              <pre className="max-h-80 overflow-y-auto text-xs text-gray-700 whitespace-pre-wrap break-words rounded-lg border border-gray-100 bg-gray-50 p-3">
+                {ext === 'json' ? prettyJson(textContent) : textContent}
+              </pre>
+            )
+          )}
+        </div>
+      )}
     </div>
   );
 }
