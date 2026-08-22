@@ -18,7 +18,8 @@ import type {
 
 /* ================================================================
    变更管理移动页（只读）
-   - 两段列表：ECR（工程变更请求）/ ECO（工程变更指令），对应桌面 EC.tsx 两个 tab
+   - 独立界面：/ec/ecr 仅显示 ECR（工程变更请求）、/ec/eco 仅显示 ECO（工程变更指令），
+     对应桌面 EC.tsx 两个 tab，移动端拆分为两个独立入口界面（无 Tab 切换）
    - 详情为独立子路由（ec/ecr/:id、ec/eco/:id，浏览器返回/深链可用）：
      · ECR 详情：基础信息 + 影响项 + 审批记录 + 状态流转
      · ECO 详情：基础信息 + 执行项 + 审批记录 + 状态流转
@@ -31,8 +32,6 @@ import type {
      · ecoApi.detail(id)                   → GET /api/ecos/{id} → res.data（含 execution_items/review_records/status_logs）
      · ecoApi.getStatusLogs(id)            → GET /api/ecos/{id}/status-logs → res.data.items
    ================================================================ */
-
-type Tab = 'ecr' | 'eco';
 
 const ECR_STATUS_MAP: Record<string, { label: string; cls: string }> = {
   draft: { label: '草稿', cls: 'bg-gray-100 text-gray-700' },
@@ -171,8 +170,8 @@ export default function EcPage({ detail, onBack }: Props = {}) {
     }
   }, [id]);
 
-  const [tab, setTab] = useState<Tab>(() =>
-    // 拆分入口：/ec/ecr 默认 ECR、/ec/eco 默认 ECO（详情路由同理）
+  const [tab] = useState<'ecr' | 'eco'>(() =>
+    // 独立界面：/ec/ecr → ECR、/ec/eco → ECO（详情路由同理）；tab 仅作为当前界面标识
     location.pathname.includes('/eco') ? 'eco' : 'ecr',
   );
 
@@ -262,35 +261,20 @@ export default function EcPage({ detail, onBack }: Props = {}) {
     );
   }
 
-  /* ---------------- 列表视图（两段：ECR / ECO） ---------------- */
+  /* ---------------- 列表视图（独立界面：ECR 或 ECO，无 Tab 切换） ---------------- */
   return (
     <div className="flex flex-col h-full">
       <div className="sticky top-0 bg-gray-50 px-3 pt-2 pb-1 z-10">
+        <div className="text-sm font-semibold text-gray-900 mb-2">{isEco ? 'ECO 变更单' : 'ECR 变更请求'}</div>
         <input
           className="w-full h-11 px-4 rounded-lg bg-white border border-gray-200 text-base"
           placeholder="搜索编号/标题..."
-          value={tab === 'ecr' ? ecrSearch : ecoSearch}
-          onChange={(e) => (tab === 'ecr' ? setEcrSearch(e.target.value) : setEcoSearch(e.target.value))}
+          value={isEco ? ecoSearch : ecrSearch}
+          onChange={(e) => (isEco ? setEcoSearch(e.target.value) : setEcrSearch(e.target.value))}
         />
-        <div className="flex gap-1 mt-2">
-          {([
-            { key: 'ecr', label: 'ECR' },
-            { key: 'eco', label: 'ECO' },
-          ] as { key: Tab; label: string }[]).map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`flex-1 h-11 rounded-lg text-sm font-medium transition-colors ${
-                tab === t.key ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
       </div>
 
-      {tab === 'ecr' && (
+      {!isEco && (
         <>
           {ecrsLoading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
           {!ecrsLoading && ecrsError && <p className="text-center text-xs text-red-400 py-3">{ecrsError}</p>}
@@ -321,7 +305,7 @@ export default function EcPage({ detail, onBack }: Props = {}) {
         </>
       )}
 
-      {tab === 'eco' && (
+      {isEco && (
         <>
           {ecosLoading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
           {!ecosLoading && ecosError && <p className="text-center text-xs text-red-400 py-3">{ecosError}</p>}
