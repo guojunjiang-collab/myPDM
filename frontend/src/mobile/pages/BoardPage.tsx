@@ -441,17 +441,19 @@ function ItemRow({ item, depth, onClick }: { item: DashboardItem; depth: number;
           {item.check_out_user_name && (
             <span className="shrink-0 text-xs text-gray-500">{item.check_out_user_name}</span>
           )}
-          {/* 预览按钮（第二行最右侧）：无可用预览附件时不显示 */}
-          {previewable === true && (
-            <button
-              type="button"
-              onClick={onPreview}
-              disabled={previewingId === item.id}
-              className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-primary-600 text-white disabled:opacity-60"
-            >
-              {previewingId === item.id ? '加载中...' : '预览'}
-            </button>
-          )}
+          {/* 预览按钮固定占位（w-16）：即使无按钮也预留空间，检出状态位置稳定 */}
+          <span className="shrink-0 w-16 flex justify-end">
+            {previewable === true && (
+              <button
+                type="button"
+                onClick={onPreview}
+                disabled={previewingId === item.id}
+                className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-primary-600 text-white disabled:opacity-60"
+              >
+                {previewingId === item.id ? '加载中...' : '预览'}
+              </button>
+            )}
+          </span>
         </span>
       </span>
     </button>
