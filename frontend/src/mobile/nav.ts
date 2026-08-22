@@ -22,7 +22,7 @@ export const MORE_ITEMS: MobileTab[] = [
   { key: 'inventory', path: '/inventory', label: '库存管理', icon: '🏬', perm: 'nav.inventory' },
   { key: 'configuration', path: '/configuration', label: '构型管理', icon: '📐', perm: 'nav.configuration' },
   { key: 'notifications', path: '/notifications', label: '通知中心', icon: '🔔', perm: 'nav.settings' },
-  { key: 'settings', path: '/settings', label: '系统设置', icon: '⚙️', perm: 'nav.settings' },
+  { key: 'users', path: '/users', label: '用户管理', icon: '👥', perm: 'nav.users' },
 ];
 
 export function filterVisible(items: MobileTab[], can: (p: Permission) => boolean): MobileTab[] {

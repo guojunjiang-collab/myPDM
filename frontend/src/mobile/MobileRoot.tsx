@@ -14,6 +14,7 @@ import InventoryPage from './pages/InventoryPage';
 import ConfigurationPage from './pages/ConfigurationPage';
 import EcPage from './pages/EcPage';
 import NotificationsPage from './pages/NotificationsPage';
+import UsersListPage from './pages/UsersListPage';
 import DesktopOnlyCard from './components/DesktopOnlyCard';
 
 export default function MobileRoot() {
@@ -40,6 +41,7 @@ export default function MobileRoot() {
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="projects/:id" element={<ProjectsPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
+        <Route path="users" element={<UsersListPage />} />
         <Route path="settings" element={<DesktopOnlyCard feature="设置" />} />
         <Route path="more" element={<MorePage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

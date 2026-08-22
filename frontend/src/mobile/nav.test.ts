@@ -16,9 +16,9 @@ describe('filterVisible', () => {
     const r = filterVisible(MOBILE_TABS, can as never);
     expect(r.map((t) => t.path)).toEqual(['/parts']);
   });
-  it('更多页包含 6 个入口', () => {
+  it('更多页包含 6 个入口（系统设置已移除，新增用户管理）', () => {
     expect(MORE_ITEMS.map((t) => t.path)).toEqual([
-      '/dashboard', '/ec', '/inventory', '/configuration', '/notifications', '/settings',
+      '/dashboard', '/ec', '/inventory', '/configuration', '/notifications', '/users',
     ]);
   });
 });
