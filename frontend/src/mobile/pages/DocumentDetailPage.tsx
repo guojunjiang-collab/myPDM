@@ -250,7 +250,7 @@ export default function DocumentDetailPage() {
                   /* 静默：失败不阻塞页面 */
                 }
               }}
-              className="shrink-0 min-h-8 px-3 rounded-lg bg-primary-50 text-primary-600 border border-primary-200 text-xs"
+              className="shrink-0 min-h-8 px-3 rounded-lg bg-primary-600 text-white text-xs"
             >
               预览
             </button>
