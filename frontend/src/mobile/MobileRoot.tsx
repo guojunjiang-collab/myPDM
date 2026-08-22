@@ -11,7 +11,8 @@ import DocumentsListPage from './pages/DocumentsListPage';
 import DocumentDetailPage from './pages/DocumentDetailPage';
 import ProjectsPage from './pages/ProjectsPage';
 import InventoryPage from './pages/InventoryPage';
-import ConfigurationPage from './pages/ConfigurationPage';
+import ConfigurationItemsPage from './pages/ConfigurationItemsPage';
+import ConfigurationProfilesPage from './pages/ConfigurationProfilesPage';
 import EcPage from './pages/EcPage';
 import NotificationsPage from './pages/NotificationsPage';
 import UsersListPage from './pages/UsersListPage';
@@ -38,9 +39,9 @@ export default function MobileRoot() {
         <Route path="ec/ecr/:id" element={<EcPage />} />
         <Route path="ec/eco/:id" element={<EcPage />} />
         <Route path="inventory" element={<InventoryPage />} />
-        <Route path="configuration" element={<ConfigurationPage />} />
-        <Route path="configuration/items" element={<ConfigurationPage />} />
-        <Route path="configuration/profiles" element={<ConfigurationPage />} />
+        <Route path="configuration" element={<ConfigurationItemsPage />} />
+        <Route path="configuration/items" element={<ConfigurationItemsPage />} />
+        <Route path="configuration/profiles" element={<ConfigurationProfilesPage />} />
         {/* 项目进度：/projects 列表 → /projects/:id 详情（两级视图共用 ProjectsPage） */}
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="projects/:id" element={<ProjectsPage />} />

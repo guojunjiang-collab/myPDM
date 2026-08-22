@@ -4,6 +4,7 @@ import ProjectsPage from '../pages/ProjectsPage';
 import EcPage from '../pages/EcPage';
 import TaskDetailPage from '../pages/TaskDetailPage';
 import GanttPage from '../pages/GanttPage';
+import ConfigItemDetailPage from '../pages/ConfigItemDetailPage';
 import { DetailOverlayContext } from '../hooks/useDetailOverlay';
 import type { DetailTarget } from '../hooks/useDetailOverlay';
 
@@ -50,5 +51,7 @@ function renderLayer(d: DetailTarget, onNavigate: (to: string) => void) {
       return <TaskDetailPage projectId={d.projectId} task={d.task} onBack={onBack} onNavigate={onNavigate} />;
     case 'gantt':
       return <GanttPage projectId={d.projectId} onBack={onBack} onNavigate={onNavigate} />;
+    case 'config-item':
+      return <ConfigItemDetailPage revisionId={d.id} onBack={onBack} onNavigate={onNavigate} />;
   }
 }

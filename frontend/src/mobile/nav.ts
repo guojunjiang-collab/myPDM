@@ -21,7 +21,7 @@ export const MORE_ITEMS: MobileTab[] = [
   { key: 'ecr', path: '/ec/ecr', label: 'ECR', icon: '📝', perm: 'nav.ec' },
   { key: 'eco', path: '/ec/eco', label: 'ECO', icon: '🔄', perm: 'nav.ec' },
   { key: 'inventory', path: '/inventory', label: '库存管理', icon: '🏬', perm: 'nav.inventory' },
-  { key: 'config-items', path: '/configuration/items', label: '构型项管理', icon: '🧩', perm: 'nav.configuration' },
+  { key: 'config-items', path: '/configuration/items', label: '构型项', icon: '🧩', perm: 'nav.configuration' },
   { key: 'config-profiles', path: '/configuration/profiles', label: '构型配置', icon: '📐', perm: 'nav.configuration' },
   { key: 'notifications', path: '/notifications', label: '通知中心', icon: '🔔', perm: 'nav.settings' },
   { key: 'users', path: '/users', label: '用户管理', icon: '👥', perm: 'nav.users' },
