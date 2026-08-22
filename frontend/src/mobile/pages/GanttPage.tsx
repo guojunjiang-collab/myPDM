@@ -206,7 +206,8 @@ export default function GanttPage({ projectId, onBack }: Props) {
                       }}
                     >
                       {bb.w >= 28 && (
-                        <span className="flex-1 min-w-0 px-1.5 text-[10px] leading-none text-white truncate">
+                        // 名称显示不下时直接向右溢出（不截断省略），保证任务名可读
+                        <span className="shrink-0 pl-1.5 pr-1 text-[10px] leading-none text-white whitespace-nowrap">
                           {t.name}
                         </span>
                       )}
