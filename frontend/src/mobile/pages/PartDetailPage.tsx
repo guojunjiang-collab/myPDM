@@ -429,7 +429,7 @@ export default function PartDetailPage() {
               )}
               {/* 基本信息区 */}
               <div className="mb-3">
-                <div className="text-sm font-medium text-gray-700 mb-2">基本信息</div>
+                <div className="text-sm font-bold text-gray-900 mb-2">基本信息</div>
                 <div className="grid grid-cols-2 gap-2">
                   {overviewRows.map((r) => (
                     <div key={r.label} className="bg-white rounded-lg px-3 py-2.5 min-h-14 shadow-sm">
@@ -442,7 +442,7 @@ export default function PartDetailPage() {
               {/* 自定义字段区（无定义时不显示） */}
               {!cfLoading && !cfError && cfRows.length > 0 && (
                 <div>
-                  <div className="text-sm font-medium text-gray-700 mb-2">自定义字段</div>
+                  <div className="text-sm font-bold text-gray-900 mb-2">自定义字段</div>
                   <div className="grid grid-cols-2 gap-2">
                     {cfRows.map((r) => (
                       <div key={r.label} className="bg-white rounded-lg px-3 py-2.5 min-h-14 shadow-sm">
