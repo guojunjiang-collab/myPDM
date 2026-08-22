@@ -216,7 +216,10 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
           >
             ‹
           </button>
-          <div className="min-w-0 flex-1 text-base font-medium text-gray-900 truncate">{code}</div>
+          {/* 标题：构型号 | 版本 | 名称（版本前置，避免名称过长遮挡版本） */}
+          <div className="min-w-0 flex-1 text-base font-medium text-gray-900 truncate">
+            {code} | {detail?.revision.version ?? ''} | {name}
+          </div>
         </div>
         <div className="flex mt-1 bg-white rounded-lg border border-gray-200 overflow-hidden">
           {TABS.map((t) => (

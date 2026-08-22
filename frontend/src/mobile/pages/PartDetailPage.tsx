@@ -407,7 +407,7 @@ export default function PartDetailPage({
   }, [revisionId]);
 
   const title = detail
-    ? `${detail.code} ${detail.name}${curRev?.version ? `（${curRev.version}）` : ''}`
+    ? `${detail.code} | ${curRev?.version ?? ''} | ${detail.name ?? ''}`
     : id ?? '零部件详情';
 
   // 概览标准字段（空值渲染为 "-"；字段以后端 PartMasterResponse 实际返回字段为准）

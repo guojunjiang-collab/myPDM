@@ -1,7 +1,7 @@
 import { Fragment, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { partsApi } from '../../services/api';
+import { mediaApi, partsApi } from '../../services/api';
 import StatusBadge from '../components/StatusBadge';
 import type { BomChild } from '../pages/PartBomPage';
 
@@ -41,6 +41,35 @@ export default function BomTree({ rootItems, onNavigate }: Props) {
   const [children, setChildren] = useState<Record<string, BomChild[]>>({});
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, boolean>>({});
+  // 预览中（按钮显示"加载中..."）：装配体 → 装配模式 3D 预览；零件 → 附件 STP 单模型
+  const [previewingId, setPreviewingId] = useState<string | null>(null);
+
+  const onPreview = async (b: BomChild, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!b.child_revision_id || previewingId) return;
+    setPreviewingId(b.child_revision_id);
+    try {
+      const win = window.open('', '_blank');
+      if (b.child_type === 'assembly') {
+        const url = `/stp-viewer?assembly=${b.child_revision_id}&code=${encodeURIComponent(b.child_code ?? '')}&name=${encodeURIComponent(b.child_name ?? '')}`;
+        if (win) win.location.href = url;
+        return;
+      }
+      const list = (await partsApi.listAttachments(b.child_revision_id)) as Array<{ id: string; file_name?: string }>;
+      const stp = list.find((a) => /\.(stp|step)$/i.test(a.file_name ?? ''));
+      if (!stp) {
+        window.alert('该零件暂无 STP 三维模型');
+        return;
+      }
+      const t = await mediaApi.token(stp.id, 'gltf');
+      const url = `/stp-viewer?id=${encodeURIComponent(stp.id)}&token=${encodeURIComponent(t)}&code=${encodeURIComponent(b.child_code ?? '')}&version=${encodeURIComponent(b.child_version ?? '')}&name=${encodeURIComponent(b.child_name ?? '')}`;
+      if (win) win.location.href = url;
+    } catch {
+      window.alert('3D 模型加载失败，请稍后重试');
+    } finally {
+      setPreviewingId(null);
+    }
+  };
 
   const toggle = (revId: string) => {
     const willExpand = !expanded[revId];
@@ -117,7 +146,7 @@ export default function BomTree({ rootItems, onNavigate }: Props) {
                 <StatusBadge status={b.child_status} map={STATUS_MAP} />
               </span>
             </span>
-            {/* 行2：名称(左) + 检出状态(右) */}
+            {/* 行2：名称(左) + 检出状态 + 预览按钮（靠右） */}
             <span className="flex items-center min-w-0 mt-0.5">
               <span className="flex-1 min-w-0 truncate text-xs text-gray-500">{b.child_name}</span>
               {b.child_check_out_user_name && (
@@ -125,6 +154,15 @@ export default function BomTree({ rootItems, onNavigate }: Props) {
                   {b.child_check_out_user_name}
                 </span>
               )}
+              {/* 预览按钮（深色小按钮，同状态徽标尺寸）；装配体/零件均提供 3D 预览 */}
+              <button
+                type="button"
+                onClick={(e) => onPreview(b, e)}
+                disabled={previewingId === b.child_revision_id}
+                className="shrink-0 ml-2 px-2 py-0.5 rounded text-xs font-medium bg-primary-600 text-white disabled:opacity-60"
+              >
+                {previewingId === b.child_revision_id ? '加载中...' : '预览'}
+              </button>
             </span>
           </button>
         </div>

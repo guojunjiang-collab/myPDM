@@ -215,7 +215,9 @@ export default function DocumentDetailPage({ id: propId, onBack, onNavigate }: P
     };
   }, [id]);
 
-  const title = detail ? `${detail.code} ${detail.name}` : id ?? '图文档详情';
+  const title = detail
+    ? `${detail.code} | ${detail.version ?? ''} | ${detail.name ?? ''}`
+    : id ?? '图文档详情';
 
   // 概览字段以 GET /api/documents/{revision_id} 实际返回字段为准
   const overviewRows: Array<{ label: string; value?: ReactNode }> = [
