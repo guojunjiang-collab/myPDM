@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { configurationApi } from '../../services/api';
+import { configurationApi, mediaApi, partsApi } from '../../services/api';
 import { useDetailOverlayPush } from '../hooks/useDetailOverlay';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
 import ConfigTree from '../components/ConfigTree';
 import { formatMeta } from '../components/formatMeta';
-import type { ConfigurationItemDetail } from '../../types';
+import type { ConfigPartItem, ConfigurationItemDetail } from '../../types';
 
 function fmtDate(v?: string | null): string {
   if (!v) return '';
@@ -90,6 +90,36 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
     if (documentId && onNavigate) onNavigate(`/documents/${documentId}`);
   };
 
+  // 零部件卡片"预览"按钮：装配体 → 3D 预览入口（stp-viewer?assembly=）；零件 → 附件 STP 单模型入口
+  const [previewingId, setPreviewingId] = useState<string | null>(null);
+  const onPreviewPart = async (p: ConfigPartItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const pd = p.part_detail;
+    if (!pd?.revision_id || previewingId) return;
+    setPreviewingId(p.id);
+    try {
+      const win = window.open('', '_blank');
+      if (p.part_type === 'assembly') {
+        const url = `/stp-viewer?assembly=${pd.revision_id}&code=${encodeURIComponent(pd.code ?? '')}&name=${encodeURIComponent(pd.name ?? '')}`;
+        if (win) win.location.href = url;
+        return;
+      }
+      const list = (await partsApi.listAttachments(pd.revision_id)) as Array<{ id: string; file_name?: string }>;
+      const stp = list.find((a) => /\.(stp|step)$/i.test(a.file_name ?? ''));
+      if (!stp) {
+        window.alert('该零件暂无 STP 三维模型');
+        return;
+      }
+      const t = await mediaApi.token(stp.id, 'gltf');
+      const url = `/stp-viewer?id=${encodeURIComponent(stp.id)}&token=${encodeURIComponent(t)}&code=${encodeURIComponent(pd.code ?? '')}&version=${encodeURIComponent(pd.version ?? '')}&name=${encodeURIComponent(pd.name ?? '')}`;
+      if (win) win.location.href = url;
+    } catch {
+      window.alert('3D 模型加载失败，请稍后重试');
+    } finally {
+      setPreviewingId(null);
+    }
+  };
+
   const TABS: Array<{ key: TabKey; label: string }> = [
     { key: 'overview', label: '概览' },
     { key: 'parts', label: `零部件${detail?.parts.length ? ` (${detail.parts.length})` : ''}` },
@@ -165,17 +195,39 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                   onClick={() => openPart(p.part_detail?.id, p.part_detail?.revision_id)}
                   className="w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm"
                 >
-                  <div className="text-sm text-gray-900 break-all">
-                    {p.part_detail ? `${p.part_detail.code} ${p.part_detail.name}` : p.part_id}
-                  </div>
-                  <div className="mt-0.5 text-xs text-gray-500">
-                    {formatMeta([
-                      ['类型', p.part_type === 'assembly' ? '部件' : '零件'],
-                      ['要求', p.is_required ? '必装' : '选装'],
-                      ['数量', p.quantity != null ? String(p.quantity) : undefined],
-                      ['版本', p.part_detail?.version || undefined],
-                    ])}
-                  </div>
+                  {/* 行1：编号（左）+ 版本 + 状态（右） */}
+                  <span className="flex items-center gap-2 min-w-0">
+                    <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
+                      {p.part_detail?.code ?? p.part_id}
+                    </span>
+                    {p.part_detail?.version && (
+                      <span className="shrink-0 text-xs text-gray-400">{p.part_detail.version}</span>
+                    )}
+                    {p.part_detail?.status && (
+                      <StatusBadge status={p.part_detail.status} map={STATUS_MAP} />
+                    )}
+                  </span>
+                  {/* 行2：名称/类型信息（左）+ 预览按钮（右对齐；has_3d 可 3D 预览才显示） */}
+                  <span className="mt-1 flex items-center gap-2 min-w-0 min-h-7">
+                    <span className="flex-1 min-w-0 truncate text-xs text-gray-500">
+                      {p.part_detail?.name || ''}
+                      {formatMeta([
+                        ['类型', p.part_type === 'assembly' ? '部件' : '零件'],
+                        ['要求', p.is_required ? '必装' : '选装'],
+                        ['数量', p.quantity != null ? String(p.quantity) : undefined],
+                      ])}
+                    </span>
+                    {p.part_detail?.has_3d === true && (
+                      <button
+                        type="button"
+                        onClick={(e) => onPreviewPart(p, e)}
+                        disabled={previewingId === p.id}
+                        className="shrink-0 px-2.5 min-h-7 rounded bg-primary-50 text-primary-600 text-xs font-medium disabled:opacity-60"
+                      >
+                        {previewingId === p.id ? '加载中...' : '预览'}
+                      </button>
+                    )}
+                  </span>
                 </button>
               ))
             )}
