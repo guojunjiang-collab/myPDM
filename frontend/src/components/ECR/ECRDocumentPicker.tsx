@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Modal } from '../Modal';
 import { documentsApi } from '../../services/api';
 import type { ECRDocumentLink, Document } from '../../types';
+import Button from '../ui/Button';
 
 interface ECRDocumentPickerProps {
   open: boolean;
@@ -166,19 +167,15 @@ export function ECRDocumentPicker({ open, onClose, onSelect, alreadyLinked }: EC
             )}
           </span>
           <div className="flex gap-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm rounded border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
-            >
+            <Button variant="secondary" onClick={onClose}>
               取消
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={handleConfirm}
               disabled={selectedIds.size === 0}
-              className="px-4 py-2 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               确认关联 ({selectedIds.size})
-            </button>
+            </Button>
           </div>
         </div>
       </div>

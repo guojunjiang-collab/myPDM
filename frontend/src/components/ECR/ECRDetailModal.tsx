@@ -10,6 +10,7 @@ import { ECRReviewPanel } from './ECRReviewPanel';
 import { ECRBomImpactView } from './ECRBomImpactView';
 import DocumentDetailModal from '../DocumentDetailModal';
 import Badge from '../ui/Badge';
+import Button from '../ui/Button';
 import type { ECRRequest, ECRReviewRecord, ECRAffectedItem, ECRStatusLog, ECRDocumentLink, Document } from '../../types';
 
 const REASON_LABELS: Record<string, string> = {
@@ -272,10 +273,9 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
         return (
           <div className="flex gap-2 flex-wrap">
             {isCreator && (
-              <button onClick={handleWithdraw} disabled={busy}
-                className="px-4 py-2 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50">
+              <Button size="sm" onClick={handleWithdraw} disabled={busy}>
                 {busy ? '处理中...' : '撤回评审'}
-              </button>
+              </Button>
             )}
             {isCurrentReviewer() && hasPendingReview() && (
               <span className="text-sm text-blue-600 self-center">👆 请在上方审批区域进行操作</span>
@@ -301,13 +301,12 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold">ECR 详情</h3>
         {detail && canDownload() && (
-          <button
+          <Button variant="secondary" size="sm"
             onClick={() => { try { exportEcrPdf(detail, statusLogs); } catch { toast.error('导出失败'); } }}
-            className="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
             title="导出为 PDF 文档（展开所有信息，打印另存为 PDF）"
           >
             📄 导出PDF
-          </button>
+          </Button>
         )}
       </div>
       {loading && !detail ? (
@@ -442,14 +441,12 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
                           <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-center gap-1">
                               {atts.length > 0 && (
-                                <button onClick={() => handleDocPreview(atts[0].id, atts[0].file_name)}
-                                  className="px-2 py-0.5 text-xs text-blue-600 hover:text-blue-800"
-                                  title="预览">预览</button>
+                                <Button variant="link" size="xs" onClick={() => handleDocPreview(atts[0].id, atts[0].file_name)}
+                                  title="预览">预览</Button>
                               )}
                               {atts.length > 0 && (
-                                <button onClick={() => handleDocDownload(atts[0].id, atts[0].file_name)}
-                                  className="px-2 py-0.5 text-xs text-green-600 hover:text-green-800"
-                                  title="下载">下载</button>
+                                <Button variant="link" size="xs" onClick={() => handleDocDownload(atts[0].id, atts[0].file_name)}
+                                  title="下载">下载</Button>
                               )}
                               {atts.length === 0 && <span className="text-xs text-gray-400">-</span>}
                             </div>
@@ -576,22 +573,20 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
                 placeholder="关闭原因（可选）"
               />
               <div className="flex gap-2 mt-2">
-                <button
+                <Button variant="danger" size="sm"
                   onClick={handleClose}
                   disabled={actionLoading}
-                  className="px-4 py-1.5 text-sm rounded bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {actionLoading ? '处理中...' : '确认关闭'}
-                </button>
-                <button
+                </Button>
+                <Button variant="secondary" size="sm"
                   onClick={() => {
                     setShowCloseForm(false);
                     setCloseComment('');
                   }}
-                  className="px-4 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
                 >
                   取消
-                </button>
+                </Button>
               </div>
             </div>
           )}

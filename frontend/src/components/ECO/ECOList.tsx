@@ -8,6 +8,7 @@ import { ECOCreateModal } from './ECOCreateModal';
 import { ECODetailModal } from './ECODetailModal';
 import { ECRCcPicker } from '../ECR/ECRCcPicker';
 import { ECOCcPicker } from './ECOCcPicker';
+import Button from '../ui/Button';
 
 const PAGE_SIZE = 20;
 
@@ -97,44 +98,37 @@ export function ECOList() {
     const isCreator = user?.id === eco.creator_id;
     const admin = isAdmin();
     const ccBtn = (
-      <button onClick={(e) => { e.stopPropagation(); setCcEcoId(eco.id); }}
-        className="text-purple-600 hover:text-purple-800 text-sm">
+      <Button variant="link" size="xs" onClick={(e) => { e.stopPropagation(); setCcEcoId(eco.id); }}>
         知会
-      </button>
+      </Button>
     );
     switch (eco.status) {
       case 'draft':
         return (
           <div className="flex gap-1 justify-end">
             {(isCreator || admin) && <>
-              <button onClick={(e) => { e.stopPropagation(); handleSubmit(eco.id); }} disabled={busy}
-                className="text-blue-600 hover:text-blue-800 text-sm disabled:opacity-50 mr-2">{busy ? '...' : '提交'}</button>
-              <button onClick={(e) => { e.stopPropagation(); handleEdit(eco); }}
-                className="text-primary-600 hover:text-primary-800 text-sm mr-2">编辑</button>
-              <button onClick={(e) => { e.stopPropagation(); handleDelete(eco.id); }} disabled={busy}
-                className="text-red-600 hover:text-red-800 text-sm disabled:opacity-50 mr-2">{busy ? '...' : '删除'}</button>
+              <Button variant="link" size="xs" className="mr-2" onClick={(e) => { e.stopPropagation(); handleSubmit(eco.id); }} disabled={busy}>{busy ? '...' : '提交'}</Button>
+              <Button variant="link" size="xs" className="mr-2" onClick={(e) => { e.stopPropagation(); handleEdit(eco); }}>编辑</Button>
+              <Button variant="danger" size="xs" className="mr-2" onClick={(e) => { e.stopPropagation(); handleDelete(eco.id); }} disabled={busy}>{busy ? '...' : '删除'}</Button>
             </>}
             {ccBtn}
           </div>);
       case 'reviewing':
         return (
           <div className="flex gap-1 justify-end">
-            {isCreator && <button onClick={(e) => { e.stopPropagation(); handleWithdraw(eco.id); }} disabled={busy}
-              className="text-blue-600 hover:text-blue-800 text-sm disabled:opacity-50 mr-2">{busy ? '...' : '撤回'}</button>}
+            {isCreator && <Button variant="link" size="xs" className="mr-2" onClick={(e) => { e.stopPropagation(); handleWithdraw(eco.id); }} disabled={busy}>{busy ? '...' : '撤回'}</Button>}
             {ccBtn}
           </div>);
       case 'approved':
         return (
           <div className="flex gap-1 justify-end">
-            {(isCreator || admin) && <button onClick={(e) => { e.stopPropagation(); handleExecute(eco.id); }} disabled={busy}
-              className="text-green-600 hover:text-green-800 text-sm disabled:opacity-50 mr-2">{busy ? '...' : '开始执行'}</button>}
+            {(isCreator || admin) && <Button variant="link" size="xs" className="mr-2" onClick={(e) => { e.stopPropagation(); handleExecute(eco.id); }} disabled={busy}>{busy ? '...' : '开始执行'}</Button>}
             {ccBtn}
           </div>);
       case 'executing':
         return (
           <div className="flex gap-1 justify-end">
-            {(isCreator || admin) && <button onClick={(e) => { e.stopPropagation(); setExecId(eco.id); }}
-              className="text-orange-600 hover:text-orange-800 text-sm mr-2">执行</button>}
+            {(isCreator || admin) && <Button variant="link" size="xs" className="mr-2" onClick={(e) => { e.stopPropagation(); setExecId(eco.id); }}>执行</Button>}
             {ccBtn}
           </div>);
       case 'completed':
@@ -168,7 +162,7 @@ export function ECOList() {
           {Object.entries(priorityLabels).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
         <div className="flex-1" />
-        {canEdit() && <button onClick={() => { editReqId.current++; setEditingEco(null); setCreateOpen(true); }} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建 ECO</button>}
+        {canEdit() && <Button onClick={() => { editReqId.current++; setEditingEco(null); setCreateOpen(true); }}>+ 新建 ECO</Button>}
       </div>
       <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
@@ -204,14 +198,12 @@ export function ECOList() {
         <div className="flex items-center justify-between mt-4 shrink-0">
           <span className="text-sm text-gray-500">共 {total} 条，第 {page} / {totalPages} 页</span>
           <div className="flex gap-1 justify-end">
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
-              className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">上一页</button>
+            <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}>上一页</Button>
             {Array.from({ length: totalPages }, (_, i) => i + 1).filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2).map((p, idx, arr) => (
               <span key={p}>{idx > 0 && arr[idx - 1] !== p - 1 && <span className="px-1 text-gray-400">...</span>}
-                <button onClick={() => setPage(p)} className={`px-3 py-1 border rounded text-sm ${p === page ? 'bg-primary-600 text-white border-primary-600' : 'border-gray-300 hover:bg-gray-50'}`}>{p}</button></span>
+                <Button variant={p === page ? 'primary' : 'secondary'} size="sm" onClick={() => setPage(p)}>{p}</Button></span>
             ))}
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
-              className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">下一页</button>
+            <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>下一页</Button>
           </div>
         </div>
       )}

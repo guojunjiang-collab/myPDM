@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ProfileReviewer, ProfileReviewRecord } from '../../types';
+import Button from '../ui/Button';
 
 interface Props {
   reviewers: ProfileReviewer[];
@@ -57,24 +58,21 @@ export default function ProfileReviewPanel({ reviewers, records, reviewMode, can
             onChange={(e) => setComment(e.target.value)}
           />
           <div className="flex gap-2">
-            <button
-              className="px-3 py-1 rounded bg-green-600 text-white text-sm hover:bg-green-700"
+            <Button variant="success" size="sm"
               onClick={() => onReview('approved', comment)}
             >
               通过
-            </button>
-            <button
-              className="px-3 py-1 rounded bg-red-600 text-white text-sm hover:bg-red-700"
+            </Button>
+            <Button variant="danger" size="sm"
               onClick={() => onReview('rejected', comment)}
             >
               驳回
-            </button>
-            <button
-              className="px-3 py-1 rounded bg-gray-500 text-white text-sm hover:bg-gray-600"
+            </Button>
+            <Button variant="dark" size="sm"
               onClick={() => onReview('returned', comment)}
             >
               退回
-            </button>
+            </Button>
           </div>
         </div>
       )}

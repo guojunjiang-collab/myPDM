@@ -9,6 +9,7 @@ import type { ConfigurationItem, CustomFieldDefinition } from '../../types';
 import { useDataStore } from '../../stores/data';
 import CustomFieldInput from '../CustomFieldInput';
 import Badge from '../ui/Badge';
+import Button from '../ui/Button';
 
 interface Props {
   open: boolean;
@@ -364,18 +365,16 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
           </td>
           <td className="px-3 py-2 text-center text-sm">
             <div className="flex items-center justify-center gap-1 whitespace-nowrap">
-              <button onClick={() => {
+              <Button variant="link" size="xs" onClick={() => {
                 setPickerParentId(c.child_id); setPickerParentIdx(idx); setCfgSearch(''); setPickerSelected([]);
                 setQuickCreateOpen(false); setQuickForm({ code: '', name: '' });
                 setCfgResults([]);
                 setCfgPickerOpen(true);
-              }}
-                className="text-sm text-primary-600 hover:text-primary-800">＋子项</button>
-              <button onClick={() => {
+              }}>＋子项</Button>
+              <Button variant="danger" size="xs" onClick={() => {
                 if (isRoot) { setChildren(prev => prev.filter((_, j) => j !== arrIndex)); }
                 else { removeNestedChild(c); }
-              }}
-                className="text-sm text-red-500 hover:text-red-700">移除</button>
+              }}>移除</Button>
             </div>
           </td>
         </tr>
@@ -468,8 +467,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-sm font-bold text-gray-700">关联零部件 ({parts.length})</h4>
-            <button type="button" onClick={() => setPickerOpen(true)}
-              className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">关联零部件</button>
+            <Button size="sm" type="button" onClick={() => setPickerOpen(true)}>关联零部件</Button>
           </div>
           {parts.length === 0 ? (
             <p className="text-xs text-gray-400">暂无关联零部件，点击"关联零部件"添加</p>
@@ -515,10 +513,8 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                        </td>
                        <td className="px-3 py-1.5 text-center" onClick={e => e.stopPropagation()}>
                          <div className="flex gap-1 justify-center">
-                           <button onClick={() => setVersionSelectIdx(i)}
-                             className="text-xs text-blue-600 hover:text-blue-800">选择</button>
-                           <button onClick={() => setParts(prev => prev.filter((_, j) => j !== i))}
-                             className="text-xs text-red-500 hover:text-red-700">移除</button>
+                           <Button variant="link" size="xs" onClick={() => setVersionSelectIdx(i)}>选择</Button>
+                           <Button variant="danger" size="xs" onClick={() => setParts(prev => prev.filter((_, j) => j !== i))}>移除</Button>
                          </div>
                        </td>
                      </tr>
@@ -533,12 +529,11 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-sm font-bold text-gray-700">子构型项 ({children.length})</h4>
-            <button type="button" onClick={() => {
+            <Button size="sm" type="button" onClick={() => {
               setPickerParentId(null); setCfgSearch(''); setPickerSelected([]);
               setQuickCreateOpen(false); setQuickForm({ code: '', name: '' });
               setCfgResults([]); setCfgPickerOpen(true);
-            }}
-              className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">添加子构型项</button>
+            }}>添加子构型项</Button>
           </div>
 
           {/* 构型项选择器弹窗 */}
@@ -569,8 +564,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                               <td className="px-3 py-2 font-medium text-xs">{s.code}</td>
                               <td className="px-3 py-2 text-xs">{s.name}</td>
                               <td className="px-3 py-2 text-right">
-                                <button onClick={() => setPickerSelected(prev => prev.filter(x => x.id !== s.id))}
-                                  className="text-xs text-red-500 hover:text-red-700">移除</button>
+                                <Button variant="danger" size="xs" onClick={() => setPickerSelected(prev => prev.filter(x => x.id !== s.id))}>移除</Button>
                               </td>
                             </tr>
                           ))}
@@ -590,11 +584,10 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
 
                   {/* 快速新建构型项 */}
                   <div className="border rounded-lg overflow-hidden mb-3 flex-shrink-0">
-                     <button onClick={() => { setQuickCreateOpen(!quickCreateOpen); if (!quickCreateOpen) setQuickForm({ code: '', name: '' }); }}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 flex items-center gap-1">
+                     <Button variant="ghost" size="sm" className="w-full !justify-start" onClick={() => { setQuickCreateOpen(!quickCreateOpen); if (!quickCreateOpen) setQuickForm({ code: '', name: '' }); }}>
                       <span className="text-xs">{quickCreateOpen ? '▼' : '▶'}</span>
                       快速新建构型项
-                    </button>
+                    </Button>
                     {quickCreateOpen && (
                       <div className="px-4 py-3 border-t space-y-2 bg-gray-50">
                         <div className="flex gap-2">
@@ -602,7 +595,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                             placeholder="构型号 *" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
                           <input value={quickForm.name} onChange={e => setQuickForm({ ...quickForm, name: e.target.value })}
                             placeholder="名称 *" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
-                          <button onClick={async () => {
+                          <Button size="sm" className="whitespace-nowrap" onClick={async () => {
                             if (!quickForm.code.trim() || !quickForm.name.trim()) return;
                             setQuickCreating(true);
                             try {
@@ -612,10 +605,9 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                               setQuickForm({ code: '', name: '' });
                             } catch (e: any) {}
                             finally { setQuickCreating(false); }
-                          }} disabled={quickCreating}
-                            className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 whitespace-nowrap">
+                          }} disabled={quickCreating}>
                             {quickCreating ? '创建中...' : '新建并添加'}
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     )}
@@ -641,8 +633,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                               <td className="px-3 py-2 text-xs">{r.name}</td>
                               <td className="px-3 py-2 text-xs text-gray-400">{r.spec || '-'}</td>
                               <td className="px-3 py-2 text-center">
-                                <button onClick={() => setPickerSelected(prev => [...prev, r])}
-                                  className="px-2.5 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">添加</button>
+                                <Button size="xs" onClick={() => setPickerSelected(prev => [...prev, r])}>添加</Button>
                               </td>
                             </tr>
                           ))}
@@ -654,9 +645,8 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
 
                 {/* 底部按钮 */}
                 <div className="px-4 py-3 border-t flex justify-end gap-2">
-                  <button onClick={() => { setCfgPickerOpen(false); setPickerParentId(null); }}
-                    className="px-4 py-2 border border-gray-300 rounded text-sm text-gray-600 hover:bg-gray-50">取消</button>
-                  <button onClick={async () => {
+                  <Button variant="secondary" onClick={() => { setCfgPickerOpen(false); setPickerParentId(null); }}>取消</Button>
+                  <Button onClick={async () => {
                     if (pickerParentId) {
                       // 向指定父级添加子项 → 即时 API
                       if (pickerSelected.length > 0) {
@@ -674,8 +664,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                     }
                     setCfgPickerOpen(false);
                     setPickerParentId(null); setPickerParentIdx(null);
-                  }}
-                    className="px-4 py-2 bg-primary-600 text-white rounded text-sm hover:bg-primary-700">确认添加 ({pickerSelected.length})</button>
+                  }}>确认添加 ({pickerSelected.length})</Button>
                 </div>
               </div>
             </div>
@@ -712,11 +701,10 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
 
         </div>
         <div className="flex-shrink-0 flex justify-end gap-2 pt-2 border-t">
-          <button onClick={onClose} className="px-4 py-2 border border-gray-200 rounded-lg text-sm">取消</button>
-          <button onClick={handleSubmit} disabled={saving}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm disabled:opacity-50">
+          <Button variant="secondary" onClick={onClose}>取消</Button>
+          <Button onClick={handleSubmit} disabled={saving}>
             {saving ? '保存中...' : '保存'}
-          </button>
+          </Button>
         </div>
       </div>
 

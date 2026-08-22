@@ -16,6 +16,7 @@ import PartDetailModal from '../PartDetailModal';
 import DocumentDetailModal from '../DocumentDetailModal';
 import EntityEditModal from '../EntityEditModal';
 import Badge from '../ui/Badge';
+import Button from '../ui/Button';
 
 interface Props { ecoId: string; onClose: () => void; onRefresh: () => void; executionMode?: boolean; }
 
@@ -193,11 +194,10 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
     <>
     <Modal open={true} title={executionMode ? 'ECO 执行' : 'ECO 详情'} onClose={onClose} width="3xl"
       headerAction={eco && canDownload() ? (
-        <button
+        <Button variant="secondary" size="sm"
           onClick={() => { if (eco) exportEcoPdf(eco).catch(() => toast.error('导出失败')); }}
-          className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
           title="导出为 PDF 文档"
-        >📄 导出PDF</button>
+        >📄 导出PDF</Button>
       ) : undefined}
     >
       {loading ? <div className="py-8 text-center text-gray-400 text-sm">加载中...</div>
@@ -270,8 +270,8 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
                             <td className="px-3 py-2 text-sm text-gray-500">{atts.length > 0 ? atts.map((a: any) => <div key={a.id} className="text-xs">{a.file_name} ({formatFileSize(a.file_size)})</div>) : (doc.file_name || '-')}</td>
                             <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center justify-center gap-1">
-                                {doc.file_id && <button onClick={() => handleDocPreview(doc.file_id!, doc.file_name || '')} className="px-2 py-0.5 text-xs text-blue-600 hover:text-blue-800 whitespace-nowrap">预览</button>}
-                                {doc.file_id && <button onClick={() => handleDocDownload(doc.file_id!, doc.file_name || '')} className="px-2 py-0.5 text-xs text-green-600 hover:text-green-800 whitespace-nowrap">下载</button>}
+                                {doc.file_id && <Button variant="link" size="xs" onClick={() => handleDocPreview(doc.file_id!, doc.file_name || '')} className="whitespace-nowrap">预览</Button>}
+                                {doc.file_id && <Button variant="link" size="xs" onClick={() => handleDocDownload(doc.file_id!, doc.file_name || '')} className="whitespace-nowrap">下载</Button>}
                               </div>
                             </td>
                           </tr>
@@ -350,10 +350,9 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-bold text-gray-700">工程变更结果</h4>
               {executionMode && eco.status === 'executing' && releaseItems.length > 0 && (
-                <button onClick={() => setShowPublishAll(true)} disabled={actionLoading || !canPublishAll}
-                  title={canPublishAll ? '存在草稿/冻结状态的零部件，可一键发布' : '工程变更结果已全部发布'}
-                  className={`px-3 py-1 text-sm rounded-lg disabled:cursor-not-allowed disabled:opacity-60 ${canPublishAll ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-300 text-gray-500'}`}>
-                  {canPublishAll ? '一键发布' : '已全部发布'}</button>
+                <Button variant={canPublishAll ? 'success' : 'secondary'} size="sm" onClick={() => setShowPublishAll(true)} disabled={actionLoading || !canPublishAll}
+                  title={canPublishAll ? '存在草稿/冻结状态的零部件，可一键发布' : '工程变更结果已全部发布'}>
+                  {canPublishAll ? '一键发布' : '已全部发布'}</Button>
               )}
             </div>
             {releaseItems.length === 0 ? (
@@ -392,7 +391,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
           <div className="flex items-center justify-between pt-4 border-t border-gray-200">
             <div>
               {eco.status === 'executing' && (
-                <button onClick={() => act(() => ecoApi.completeExecution(ecoId), '执行已完成')} disabled={actionLoading} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">完成执行</button>
+                <Button variant="success" size="sm" onClick={() => act(() => ecoApi.completeExecution(ecoId), '执行已完成')} disabled={actionLoading}>完成执行</Button>
               )}
             </div>
           </div>

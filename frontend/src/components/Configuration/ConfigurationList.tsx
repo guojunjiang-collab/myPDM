@@ -6,6 +6,7 @@ import { canEdit, isAdmin } from '../../stores/auth';
 import { useDataStore } from '../../stores/data';
 import { ConfirmModal } from '../Modal';
 import Badge from '../ui/Badge';
+import Button from '../ui/Button';
 import ConfigurationCreateModal from './ConfigurationCreateModal';
 import type { CustomFieldDefinition } from '../../types';
 
@@ -176,7 +177,7 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
 
         <div className="flex-1" />
         {canEdit() && (
-          <button onClick={() => setCreateOpen(true)} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建构型</button>
+          <Button onClick={() => setCreateOpen(true)}>+ 新建构型</Button>
         )}
       </div>
 
@@ -224,7 +225,7 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
                   </td>
                   <td className="px-2 py-3 text-sm text-center" onClick={(e) => e.stopPropagation()}>
                     {isAdmin() && (
-                      <button onClick={(e) => { e.stopPropagation(); setDeleteId(item.revision_id); }} className="text-red-600 hover:text-red-800">删除</button>
+                      <Button variant="danger" size="xs" onClick={(e) => { e.stopPropagation(); setDeleteId(item.revision_id); }}>删除</Button>
                     )}
                   </td>
                 </tr>
@@ -236,11 +237,9 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
         <div className="sticky bottom-0 flex justify-center py-2 pointer-events-none">
           <div className="inline-flex items-center gap-3 text-sm text-gray-600 bg-white border border-gray-200 rounded-full shadow-lg px-4 py-2 pointer-events-auto">
             共 <span className="font-medium">{total}</span> 条
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1 || loading}
-              className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-40">上一页</button>
+            <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1 || loading}>上一页</Button>
             <span className="tabular-nums">第 {page} / {pageCount} 页</span>
-            <button onClick={() => setPage(p => Math.min(pageCount, p + 1))} disabled={page >= pageCount || loading}
-              className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-40">下一页</button>
+            <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.min(pageCount, p + 1))} disabled={page >= pageCount || loading}>下一页</Button>
           </div>
         </div>
       </div>

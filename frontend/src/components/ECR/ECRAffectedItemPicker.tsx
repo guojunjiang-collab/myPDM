@@ -4,6 +4,7 @@ import { toast } from '../Toast';
 import { partsApi } from '../../services/api';
 import { useTableSort } from '../../hooks/useTableSort';
 import Badge from '../ui/Badge';
+import Button from '../ui/Button';
 import type { Part, Assembly } from '../../types';
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -284,19 +285,15 @@ export function ECRAffectedItemPicker({
             已选择 <span className="font-semibold text-primary-600">{selectedMap.size}</span> 项
           </span>
           <div className="flex gap-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-            >
+            <Button variant="secondary" onClick={onClose}>
               取消
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={handleConfirm}
               disabled={selectedMap.size === 0}
-              className="px-4 py-2 text-sm text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               确认 ({selectedMap.size})
-            </button>
+            </Button>
           </div>
         </div>
       </div>

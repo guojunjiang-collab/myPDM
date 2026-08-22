@@ -8,6 +8,7 @@ import { ConfirmModal } from '../Modal';
 import { ECRCreateModal } from './ECRCreateModal';
 import { ECRDetailModal } from './ECRDetailModal';
 import { ECRCcPicker } from './ECRCcPicker';
+import Button from '../ui/Button';
 
 const PAGE_SIZE = 20;
 
@@ -182,30 +183,25 @@ export function ECRList() {
           <div className="flex gap-1 justify-end">
             {(isCreator || admin) && (
               <>
-                <button onClick={() => handleSubmit(ecr.id)} disabled={isBusy}
-                  className="text-blue-600 hover:text-blue-800 text-sm disabled:opacity-50 mr-2">
+                <Button variant="link" size="xs" className="mr-2" onClick={() => handleSubmit(ecr.id)} disabled={isBusy}>
                   {isBusy ? '...' : '提交'}
-                </button>
-                <button onClick={() => handleEdit(ecr)}
-                  className="text-primary-600 hover:text-primary-800 text-sm mr-2">
+                </Button>
+                <Button variant="link" size="xs" className="mr-2" onClick={() => handleEdit(ecr)}>
                   编辑
-                </button>
-                <button onClick={() => handleClose(ecr.id)} disabled={isBusy}
-                  className="text-gray-600 hover:text-gray-800 text-sm disabled:opacity-50 mr-2">
+                </Button>
+                <Button variant="link" size="xs" className="mr-2" onClick={() => handleClose(ecr.id)} disabled={isBusy}>
                   {isBusy ? '...' : '关闭'}
-                </button>
+                </Button>
               </>
             )}
             {(isCreator || admin) && (
-              <button onClick={() => setDeleteId(ecr.id)}
-                className="text-red-600 hover:text-red-800 text-sm mr-2">
+              <Button variant="danger" size="xs" className="mr-2" onClick={() => setDeleteId(ecr.id)}>
                 删除
-              </button>
+              </Button>
             )}
-            <button onClick={(e) => { e.stopPropagation(); setCcEcrId(ecr.id); }}
-              className="text-purple-600 hover:text-purple-800 text-sm">
+            <Button variant="link" size="xs" onClick={(e) => { e.stopPropagation(); setCcEcrId(ecr.id); }}>
               知会
-            </button>
+            </Button>
           </div>
         );
       case 'reviewing':
@@ -213,42 +209,35 @@ export function ECRList() {
           <div className="flex gap-1 justify-end">
             {isCreator && (
               <>
-                <button onClick={() => handleSubmit(ecr.id, true)} disabled={isBusy}
-                  className="text-blue-600 hover:text-blue-800 text-sm disabled:opacity-50 mr-2">
+                <Button variant="link" size="xs" className="mr-2" onClick={() => handleSubmit(ecr.id, true)} disabled={isBusy}>
                   {isBusy ? '...' : '撤回'}
-                </button>
-                <button onClick={() => handleEdit(ecr)}
-                  className="text-primary-600 hover:text-primary-800 text-sm mr-2">
+                </Button>
+                <Button variant="link" size="xs" className="mr-2" onClick={() => handleEdit(ecr)}>
                   编辑
-                </button>
+                </Button>
               </>
             )}
             {(isReviewer || admin) && (
               <>
-                <button onClick={() => handleReviewAction(ecr.id, 'approved')} disabled={isBusy}
-                  className="text-green-600 hover:text-green-800 text-sm disabled:opacity-50 mr-2">
+                <Button variant="link" size="xs" className="mr-2" onClick={() => handleReviewAction(ecr.id, 'approved')} disabled={isBusy}>
                   {isBusy ? '...' : '通过'}
-                </button>
-                <button onClick={() => handleReviewAction(ecr.id, 'rejected')} disabled={isBusy}
-                  className="text-red-600 hover:text-red-800 text-sm disabled:opacity-50 mr-2">
+                </Button>
+                <Button variant="link" size="xs" className="mr-2" onClick={() => handleReviewAction(ecr.id, 'rejected')} disabled={isBusy}>
                   {isBusy ? '...' : '驳回'}
-                </button>
-                <button onClick={() => handleReviewAction(ecr.id, 'returned')} disabled={isBusy}
-                  className="text-orange-600 hover:text-orange-800 text-sm disabled:opacity-50 mr-2">
+                </Button>
+                <Button variant="link" size="xs" className="mr-2" onClick={() => handleReviewAction(ecr.id, 'returned')} disabled={isBusy}>
                   {isBusy ? '...' : '退回'}
-                </button>
+                </Button>
               </>
             )}
             {admin && (
-              <button onClick={() => setDeleteId(ecr.id)}
-                className="text-red-600 hover:text-red-800 text-sm mr-2">
+              <Button variant="danger" size="xs" className="mr-2" onClick={() => setDeleteId(ecr.id)}>
                 删除
-              </button>
+              </Button>
             )}
-            <button onClick={(e) => { e.stopPropagation(); setCcEcrId(ecr.id); }}
-              className="text-purple-600 hover:text-purple-800 text-sm">
+            <Button variant="link" size="xs" onClick={(e) => { e.stopPropagation(); setCcEcrId(ecr.id); }}>
               知会
-            </button>
+            </Button>
           </div>
         );
       case 'approved':
@@ -256,36 +245,31 @@ export function ECRList() {
         return (
           <div className="flex gap-1 justify-end">
             {admin && (
-              <button onClick={() => handleClose(ecr.id)} disabled={isBusy}
-                className="text-gray-600 hover:text-gray-800 text-sm disabled:opacity-50 mr-2">
+              <Button variant="link" size="xs" className="mr-2" onClick={() => handleClose(ecr.id)} disabled={isBusy}>
                 {isBusy ? '...' : '关闭'}
-              </button>
+              </Button>
             )}
             {admin && (
-              <button onClick={() => setDeleteId(ecr.id)}
-                className="text-red-600 hover:text-red-800 text-sm mr-2">
+              <Button variant="danger" size="xs" className="mr-2" onClick={() => setDeleteId(ecr.id)}>
                 删除
-              </button>
+              </Button>
             )}
-            <button onClick={(e) => { e.stopPropagation(); setCcEcrId(ecr.id); }}
-              className="text-purple-600 hover:text-purple-800 text-sm">
+            <Button variant="link" size="xs" onClick={(e) => { e.stopPropagation(); setCcEcrId(ecr.id); }}>
               知会
-            </button>
+            </Button>
           </div>
         );
       case 'closed':
         return (
           <div className="flex gap-1 justify-end">
             {admin && (
-              <button onClick={() => setDeleteId(ecr.id)}
-                className="text-red-600 hover:text-red-800 text-sm mr-2">
+              <Button variant="danger" size="xs" className="mr-2" onClick={() => setDeleteId(ecr.id)}>
                 删除
-              </button>
+              </Button>
             )}
-            <button onClick={(e) => { e.stopPropagation(); setCcEcrId(ecr.id); }}
-              className="text-purple-600 hover:text-purple-800 text-sm">
+            <Button variant="link" size="xs" onClick={(e) => { e.stopPropagation(); setCcEcrId(ecr.id); }}>
               知会
-            </button>
+            </Button>
           </div>
         );
       default:
@@ -335,12 +319,9 @@ export function ECRList() {
         </select>
         <div className="flex-1" />
         {canEdit() && (
-          <button
-            onClick={() => setCreateOpen(true)}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm"
-          >
+          <Button onClick={() => setCreateOpen(true)}>
             + 新建 ECR
-          </button>
+          </Button>
         )}
       </div>
 
@@ -427,13 +408,12 @@ export function ECRList() {
             共 {total} 条，第 {page} / {totalPages} 页
           </span>
           <div className="flex gap-1 justify-end">
-            <button
+            <Button variant="secondary" size="sm"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               上一页
-            </button>
+            </Button>
             {Array.from({ length: totalPages }, (_, i) => i + 1)
               .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
               .map((p, idx, arr) => (
@@ -441,25 +421,19 @@ export function ECRList() {
                   {idx > 0 && arr[idx - 1] !== p - 1 && (
                     <span className="px-1 text-gray-400">...</span>
                   )}
-                  <button
+                  <Button variant={p === page ? 'primary' : 'secondary'} size="sm"
                     onClick={() => setPage(p)}
-                    className={`px-3 py-1 border rounded text-sm ${
-                      p === page
-                        ? 'bg-primary-600 text-white border-primary-600'
-                        : 'border-gray-300 hover:bg-gray-50'
-                    }`}
                   >
                     {p}
-                  </button>
+                  </Button>
                 </span>
               ))}
-            <button
+            <Button variant="secondary" size="sm"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
-              className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               下一页
-            </button>
+            </Button>
           </div>
         </div>
       )}

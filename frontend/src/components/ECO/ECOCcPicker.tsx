@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Modal } from '../Modal';
 import { toast } from '../Toast';
 import { ecoApi, usersApi } from '../../services/api';
+import Button from '../ui/Button';
 
 interface Props { open: boolean; ecoId: string; onClose: () => void; }
 
@@ -59,16 +60,15 @@ export function ECOCcPicker({ open, ecoId, onClose }: Props) {
                   onChange={() => toggle(u.id)} className="rounded" />
                 <span className="flex-1 text-sm">{u.real_name || u.username}</span>
                 <span className="text-xs text-gray-400">{u.role}</span>
-                {alreadyCc && <button className="text-xs text-red-400 hover:text-red-600" onClick={() => handleUncc(u.id)} disabled={unccLoading === u.id}>取消</button>}
+                {alreadyCc && <Button variant="danger" size="xs" className="ml-auto" onClick={() => handleUncc(u.id)} disabled={unccLoading === u.id}>取消</Button>}
               </label>
             );
           })}
         </div>
       )}
       <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
-        <button onClick={onClose} className="px-4 py-1.5 border rounded text-sm">取消</button>
-        <button onClick={submit} disabled={submitting || !selectedIds.length}
-          className="px-4 py-1.5 bg-primary-600 text-white rounded text-sm disabled:opacity-50">知会</button>
+        <Button variant="secondary" onClick={onClose}>取消</Button>
+        <Button onClick={submit} disabled={submitting || !selectedIds.length}>知会</Button>
       </div>
     </Modal>
   );

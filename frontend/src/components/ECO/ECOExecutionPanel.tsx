@@ -3,6 +3,7 @@ import { ecoApi } from '../../services/api';
 import type { ECOExecutionItem } from '../../types';
 import { ECOExecStatusBadge, ECOActionBadge } from './ECOStatusBadge';
 import { toast } from '../Toast';
+import Button from '../ui/Button';
 
 interface Props { ecoId: string; status: string; onRefresh: () => void; }
 
@@ -38,15 +39,15 @@ export function ECOExecutionPanel({ ecoId, status, onRefresh }: Props) {
         {canExecute && (
           <div className="flex gap-2">
             {status === 'approved' && (
-              <button className="px-3 py-1 bg-blue-600 text-white rounded text-xs"
+              <Button size="sm"
                 disabled={executing} onClick={() => ecoApi.startExecution(ecoId).then(() => { toast.success('已开始'); onRefresh(); })}>
                 开始执行
-              </button>
+              </Button>
             )}
-            <button className="px-3 py-1 bg-green-600 text-white rounded text-xs"
+            <Button variant="success" size="sm"
               disabled={executing} onClick={executeAll}>
               一键执行
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -79,10 +80,10 @@ export function ECOExecutionPanel({ ecoId, status, onRefresh }: Props) {
                   <td className="p-1.5 text-gray-400">{item.executed_at?.slice(0, 16) || '-'}</td>
                   <td className="p-1.5">
                     {canExecute && (item.status === 'pending' || item.status === 'failed') && (
-                      <button className="text-blue-500 text-xs hover:underline"
+                      <Button variant="link" size="xs"
                         disabled={executing} onClick={() => executeItem(item.id)}>
                         执行
-                      </button>
+                      </Button>
                     )}
                   </td>
                 </tr>

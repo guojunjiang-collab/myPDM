@@ -7,6 +7,7 @@ import PartDetailModal from '../PartDetailModal';
 import ProfileStatusBadge from './ProfileStatusBadge';
 import ProfileReviewPanel from './ProfileReviewPanel';
 import Badge from '../ui/Badge';
+import Button from '../ui/Button';
 import { configurationApi, configurationProfileApi, usersApi, partsApi, customFieldsApi } from '../../services/api';
 import { exportProfilePdf, exportProfileExcel } from '../../services/configProfilePdfExport';
 import { useAuthStore, isAdmin } from '../../stores/auth';
@@ -774,41 +775,37 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         width="3xl"
         headerAction={isView && profile && configTree ? (
           <div className="flex items-center gap-2">
-            <button
+            <Button variant="secondary" size="sm"
               type="button"
               onClick={() => { try { exportProfileExcel(profile, configTree); } catch (e: any) { setError(e?.message || '导出失败'); } }}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
               title="导出正式配置清单为 Excel 表格"
             >
               📊 导出表格
-            </button>
-            <button
+            </Button>
+            <Button variant="secondary" size="sm"
               type="button"
               onClick={() => { try { exportProfilePdf(profile, configTree); } catch (e: any) { setError(e?.message || '导出失败'); } }}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
               title="导出为 PDF（正式配置清单全展开）"
             >
               📄 导出PDF
-            </button>
-            <button
+            </Button>
+            <Button size="sm"
               type="button"
               onClick={() => {
                 window.open(`/stp-viewer?config-profile=${profile.id}`, '_blank');
               }}
-              className="px-3 py-1.5 text-sm border border-blue-300 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700"
               title="在新标签页中3D预览配置清单中所有零部件"
             >
               🧊 3D预览
-            </button>
-            <button
+            </Button>
+            <Button variant="secondary" size="sm"
               type="button"
               onClick={exportFlattenBom}
               disabled={flattenLoading}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 disabled:opacity-50"
               title="将该构型配置下所有构型项关联的部件BOM递归展开为叶节点零件清单并导出为Excel"
             >
               📊 导出平铺BOM
-            </button>
+            </Button>
           </div>
         ) : undefined}
       >
@@ -919,22 +916,19 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
             {!isCreate && !isView && profile && (
               <div className="flex items-center gap-2 border-t pt-3">
                 {profile.status === 'reviewing' && (
-                  <button onClick={handleWithdraw} disabled={saving}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50">
+                  <Button variant="secondary" size="sm" onClick={handleWithdraw} disabled={saving}>
                     撤回
-                  </button>
+                  </Button>
                 )}
                 {profile.status === 'rejected' && (
-                  <button onClick={handleReopen} disabled={saving}
-                    className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50">
+                  <Button size="sm" onClick={handleReopen} disabled={saving}>
                     重新编辑
-                  </button>
+                  </Button>
                 )}
                 {(profile.status === 'active' || profile.status === 'rejected') && isAdmin() && (
-                  <button onClick={handleArchive} disabled={saving}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50">
+                  <Button variant="secondary" size="sm" onClick={handleArchive} disabled={saving}>
                     归档
-                  </button>
+                  </Button>
                 )}
               </div>
             )}
@@ -944,10 +938,9 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
               <div className="space-y-3 border-t pt-3">
                 <div className="flex items-center justify-between mb-1">
                     <label className="text-sm font-medium">审批人</label>
-                    <button type="button" onClick={addReviewer}
-                      className="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100">
+                    <Button size="xs" type="button" onClick={addReviewer}>
                       + 添加
-                    </button>
+                    </Button>
                   </div>
                   <div className="space-y-1">
                     {reviewers.length === 0 && (
@@ -965,8 +958,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                             <option key={u.id} value={u.id}>{u.real_name} ({u.username})</option>
                           ))}
                         </select>
-                        <button type="button" onClick={() => removeReviewer(i)}
-                          className="text-red-400 hover:text-red-600 text-sm">✕</button>
+                        <Button variant="danger" size="xs" type="button" onClick={() => removeReviewer(i)}>✕</Button>
                       </div>
                     ))}
                   </div>
@@ -998,23 +990,20 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                   <div className="flex items-center gap-2">
                     {form.configuration_item_revision_id && (
                       <>
-                        <button type="button" onClick={handleRegenerate} disabled={saving}
-                          className="text-xs text-blue-600 hover:text-blue-700 border border-blue-200 px-2 py-1 rounded hover:bg-blue-50 disabled:opacity-50">
+                        <Button size="xs" type="button" onClick={handleRegenerate} disabled={saving}>
                           更新
-                        </button>
-                        <button type="button" onClick={handleRemoveConfigItem} disabled={saving}
-                          className="text-xs text-red-600 hover:text-red-700 border border-red-200 px-2 py-1 rounded hover:bg-red-50 disabled:opacity-50">
+                        </Button>
+                        <Button variant="danger" size="xs" type="button" onClick={handleRemoveConfigItem} disabled={saving}>
                           删除
-                        </button>
+                        </Button>
                       </>
                     )}
-                    <button
+                    <Button size="sm"
                       type="button"
                       onClick={() => setCfgPickOpen(true)}
-                      className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700"
                     >
                       {form.configuration_item_revision_id ? '更换构型项' : '+ 关联构型项'}
-                    </button>
+                    </Button>
                   </div>
                 </div>
                 <ConfigItemPicker
@@ -1103,37 +1092,31 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
 
       {/* Footer Buttons — 置于滚动容器外侧，始终可见 */}
       <div className="flex justify-end gap-2 pt-3 mt-3 border-t border-gray-200">
-        <button
-          onClick={onClose}
-          className="px-4 py-2 border border-gray-200 rounded-lg text-sm"
-        >
+        <Button variant="secondary" onClick={onClose}>
           关闭
-        </button>
+        </Button>
         {isCreate && (
-          <button
+          <Button
             onClick={handleSubmit}
             disabled={saving}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm disabled:opacity-50"
           >
             {saving ? '保存中...' : '保存'}
-          </button>
+          </Button>
         )}
         {canEdit && (
           <>
-            <button
+            <Button
               onClick={handleUpdate}
               disabled={saving}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm disabled:opacity-50"
             >
               {saving ? '保存中...' : '保存'}
-            </button>
-            <button
+            </Button>
+            <Button variant="success"
               onClick={handleSubmitReview}
               disabled={saving}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm disabled:opacity-50"
             >
               提交
-            </button>
+            </Button>
           </>
         )}
       </div>

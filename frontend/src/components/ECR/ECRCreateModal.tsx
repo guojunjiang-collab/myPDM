@@ -10,6 +10,7 @@ import { ECRBomImpactView } from './ECRBomImpactView';
 import { ECRDocumentPicker } from './ECRDocumentPicker';
 import VersionSelectModal from '../VersionSelectModal';
 import Badge from '../ui/Badge';
+import Button from '../ui/Button';
 
 const REASON_OPTIONS = [
   { value: 'quality_defect', label: '质量缺陷' },
@@ -499,13 +500,12 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
             <label className="text-sm font-medium text-gray-700">
               👤 审批人
             </label>
-            <button
+            <Button size="xs"
               type="button"
               onClick={addReviewer}
-              className="text-xs px-3 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
             >
               + 添加审批人
-            </button>
+            </Button>
           </div>
 
           {reviewers.length === 0 && (
@@ -554,14 +554,13 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
                   className="w-16 border border-gray-300 rounded px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   min={1}
                 />
-                <button
+                <Button variant="danger" size="xs"
                   type="button"
                   onClick={() => removeReviewer(index)}
-                  className="text-red-400 hover:text-red-600 text-sm px-2"
                   title="移除"
                 >
                   ✕
-                </button>
+                </Button>
               </div>
             ))}
           </div>
@@ -575,8 +574,7 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-sm font-bold text-gray-700">关联图文档</h4>
-            <button type="button" onClick={() => setShowDocPicker(true)}
-              className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 关联图文档</button>
+            <Button size="sm" type="button" onClick={() => setShowDocPicker(true)}>+ 关联图文档</Button>
           </div>
           <div className="border rounded-lg overflow-hidden">
             {documentLinks.length === 0 ? (
@@ -603,10 +601,8 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
                       return (<td key={def.id} className="px-3 py-2 text-sm text-gray-500">{val !== undefined && val !== null && val !== '' ? String(val) : '-'}</td>); })}
                     <td className="px-3 py-2 text-sm text-gray-500">{doc?.file_name || atts.map((a: any) => a.file_name).join(', ') || '-'}</td>
                     <td className="px-3 py-2 text-center"><div className="flex items-center justify-center gap-1">
-                      <button type="button" onClick={() => setVersionSelectState({ docId: link.document_id, oldDocId: link.document_id })}
-                        className="px-2 py-0.5 text-xs text-blue-600 hover:text-blue-800">选择</button>
-                      <button type="button" onClick={() => removeDocumentLink(link.document_id)}
-                        className="px-2 py-0.5 text-xs text-red-400 hover:text-red-600">移除</button>
+                      <Button variant="link" size="xs" type="button" onClick={() => setVersionSelectState({ docId: link.document_id, oldDocId: link.document_id })}>选择</Button>
+                      <Button variant="danger" size="xs" type="button" onClick={() => removeDocumentLink(link.document_id)}>移除</Button>
                     </div></td>
                   </tr>);
                 })}</tbody>
@@ -622,13 +618,12 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
               📦 BOM 影响分析
             </label>
             <div className="flex gap-2">
-              <button
+              <Button size="xs"
                 type="button"
                 onClick={() => setShowAffectedPicker(true)}
-                className="text-xs px-3 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
               >
                 + 添加零部件
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -657,14 +652,13 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
                   <div className="flex-1" />
                   <span className="text-xs text-gray-400">变更操作：升版</span>
 
-                  <button
+                  <Button variant="danger" size="xs"
                     type="button"
                     onClick={() => removeAffectedItem(index)}
-                    className="text-red-400 hover:text-red-600 text-sm px-1"
                     title="移除"
                   >
                     ✕
-                  </button>
+                  </Button>
                 </div>
 
                 {/* Bom impact result */}
@@ -693,19 +687,15 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
 
       {/* Footer */}
       <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
-        <button
-          onClick={handleClose}
-          className="px-4 py-2 text-sm rounded border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
-        >
+        <Button variant="secondary" onClick={handleClose}>
           取消
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={handleSubmit}
           disabled={loading}
-          className="px-4 py-2 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {loading ? '提交中...' : isEditing ? '保存修改' : '创建 ECR'}
-        </button>
+        </Button>
       </div>
     </Modal>
 

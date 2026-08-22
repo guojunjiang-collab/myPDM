@@ -9,6 +9,7 @@ import VersionSelectModal from '../VersionSelectModal';
 import PartDetailModal from '../PartDetailModal';
 import EntityEditModal from '../EntityEditModal';
 import Badge from '../ui/Badge';
+import Button from '../ui/Button';
 import { ECOEditView } from './ECOEditView';
 import { ECRDocumentPicker } from '../ECR/ECRDocumentPicker';
 import AssemblyPartPicker from '../AssemblyPartPicker';
@@ -455,10 +456,9 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         {editingEco && <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-gray-700">👤 审批人</label>
-            <button type="button" onClick={addReviewer}
-              className="text-xs px-3 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
+            <Button size="xs" type="button" onClick={addReviewer}>
               + 添加审批人
-            </button>
+            </Button>
           </div>
 
           {reviewers.length === 0 && (
@@ -484,8 +484,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
                   onChange={(e) => updateReviewer(index, 'seq', parseInt(e.target.value) || 1)}
                   className="w-16 border border-gray-300 rounded px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   min={1} />
-                <button type="button" onClick={() => removeReviewer(index)}
-                  className="text-red-400 hover:text-red-600 text-sm px-2" title="移除">✕</button>
+                <Button variant="danger" size="xs" type="button" onClick={() => removeReviewer(index)} title="移除">✕</Button>
               </div>
             ))}
           </div>
@@ -510,8 +509,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-sm font-bold text-gray-700">关联图文档</h4>
-            <button type="button" onClick={() => setShowDocPicker(true)}
-              className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 关联图文档</button>
+            <Button size="sm" type="button" onClick={() => setShowDocPicker(true)}>+ 关联图文档</Button>
           </div>
           <div className="border rounded-lg overflow-hidden">
             {documentLinks.length === 0 ? (
@@ -553,10 +551,8 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
                         <td className="px-3 py-2 text-sm text-gray-500">{doc?.file_name || atts.map((a: any) => a.file_name).join(', ') || '-'}</td>
                         <td className="px-3 py-2 text-center">
                           <div className="flex items-center justify-center gap-1">
-                            <button type="button" onClick={() => setVersionSelectState({ docId: link.document_id, oldDocId: link.document_id })}
-                              className="px-2 py-0.5 text-xs text-blue-600 hover:text-blue-800">选择</button>
-                            <button type="button" onClick={() => setDocumentLinks((prev) => prev.filter((d) => d.document_id !== link.document_id))}
-                              className="px-2 py-0.5 text-xs text-red-400 hover:text-red-600">移除</button>
+                            <Button variant="link" size="xs" type="button" onClick={() => setVersionSelectState({ docId: link.document_id, oldDocId: link.document_id })}>选择</Button>
+                            <Button variant="danger" size="xs" type="button" onClick={() => setDocumentLinks((prev) => prev.filter((d) => d.document_id !== link.document_id))}>移除</Button>
                           </div>
                         </td>
                       </tr>
@@ -575,21 +571,19 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-sm font-bold text-gray-700">ECR 变更分析{localEco.ecr_number ? `（${localEco.ecr_number}）` : ''}</h4>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setShowEcrPicker(true)}
-                className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">
+              <Button size="sm" type="button" onClick={() => setShowEcrPicker(true)}>
                 {localEco.ecr_id ? '更换' : '+ 关联 ECR'}
-              </button>
+              </Button>
               {localEco.ecr_id && (
                 <>
-                  <button type="button" onClick={() => setResetKey(k => k + 1)}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded text-gray-600 hover:bg-gray-50">还原</button>
-                  <button type="button" onClick={async () => {
+                  <Button variant="secondary" size="sm" type="button" onClick={() => setResetKey(k => k + 1)}>还原</Button>
+                  <Button variant="secondary" size="sm" type="button" onClick={async () => {
                     try {
                       await ecoApi.update(localEco.id, { ecr_id: null } as any);
                       setLocalEco({ ...localEco, ecr_id: undefined, ecr_number: undefined });
                       toast.success('已解除 ECR 关联');
                     } catch { toast.error('操作失败'); }
-                  }} className="px-3 py-1 text-sm border border-gray-300 rounded text-gray-500 hover:bg-gray-50">解除关联</button>
+                  }}>解除关联</Button>
                 </>
               )}
             </div>
@@ -618,7 +612,7 @@ onExecuteFreeze={(itemId, newEntityId) => handleExecuteAction('freeze', itemId, 
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-sm font-bold text-gray-700">工程变更结果</h4>
-            <button type="button" onClick={() => setShowReleasePicker(true)} className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">+ 关联零部件</button>
+            <Button size="sm" type="button" onClick={() => setShowReleasePicker(true)}>+ 关联零部件</Button>
           </div>
           {releaseItems.length === 0 ? (
             <div className="border rounded-lg px-4 py-6 text-center text-sm text-gray-400">暂无工程变更结果</div>
@@ -631,13 +625,12 @@ onExecuteFreeze={(itemId, newEntityId) => handleExecuteAction('freeze', itemId, 
 
       {/* 按钮 */}
       <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-        <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">
+        <Button variant="secondary" onClick={onClose}>
           取消
-        </button>
-        <button onClick={handleSubmit} disabled={loading}
-          className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed">
+        </Button>
+        <Button onClick={handleSubmit} disabled={loading}>
           {loading ? '保存中...' : (localEco ? '保存' : '创建')}
-        </button>
+        </Button>
       </div>
 
       {/* 图文档选择器 — 独立弹窗 */}
@@ -773,8 +766,7 @@ function EcrPicker({ onSelect }: { onSelect: (id: string, number: string) => voi
         <input value={search} onChange={e => setSearch(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSearch()}
           placeholder="搜索 ECR 编号或标题..." className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm" />
-        <button onClick={handleSearch} disabled={searching}
-          className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm disabled:opacity-50">搜索</button>
+        <Button size="sm" onClick={handleSearch} disabled={searching}>搜索</Button>
       </div>
       {searching ? <p className="text-xs text-gray-400 text-center py-4">加载中...</p> : (
         <table className="w-full text-sm border-collapse">
@@ -838,8 +830,8 @@ function ReleaseItemsTable({ items, onViewItem, onRemove, onVersionSelect }: { i
           <td className="px-3 py-1.5 text-xs text-center">{ri.quantity || 1}</td>
           {(onRemove || onVersionSelect) && level === 0 && <td className="px-3 py-1.5 text-xs text-center" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-1 justify-center">
-              {onVersionSelect && <button onClick={() => onVersionSelect(rowNum)} className="px-2 py-0.5 text-xs text-blue-500 hover:text-blue-700 rounded whitespace-nowrap">选择</button>}
-              {onRemove && <button onClick={() => onRemove(rowNum)} className="px-2 py-0.5 text-xs text-red-400 hover:text-red-600 whitespace-nowrap">移除</button>}
+              {onVersionSelect && <Button variant="link" size="xs" onClick={() => onVersionSelect(rowNum)} className="whitespace-nowrap">选择</Button>}
+              {onRemove && <Button variant="danger" size="xs" onClick={() => onRemove(rowNum)} className="whitespace-nowrap">移除</Button>}
             </div>
           </td>}
           {(onRemove || onVersionSelect) && level > 0 && <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}></td>}

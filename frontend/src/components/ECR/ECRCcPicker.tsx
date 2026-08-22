@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Modal } from '../Modal';
 import { toast } from '../Toast';
 import { ecrApi, usersApi } from '../../services/api';
+import Button from '../ui/Button';
 
 interface CcPickerApi {
   get: (id: string) => Promise<any>;
@@ -100,13 +101,13 @@ export function ECRCcPicker({ open, ecrId, onClose, api }: ECRCcPickerProps) {
                 <span className="text-sm">{u.real_name}</span>
                 <span className="text-xs text-gray-400">({u.username})</span>
                 {alreadyCc && (
-                  <button
+                  <Button variant="danger" size="xs"
                     onClick={(e) => { e.preventDefault(); handleUncc(u.id); }}
                     disabled={unccLoading === u.id}
-                    className="ml-auto text-xs text-red-500 hover:text-red-700 disabled:opacity-50"
+                    className="ml-auto"
                   >
                     {unccLoading === u.id ? '...' : '取消'}
-                  </button>
+                  </Button>
                 )}
               </label>
             );
@@ -114,16 +115,15 @@ export function ECRCcPicker({ open, ecrId, onClose, api }: ECRCcPickerProps) {
         </div>
       )}
       <div className="flex justify-end gap-2 mt-4 pt-3 border-t">
-        <button onClick={onClose} className="px-4 py-2 text-sm border rounded hover:bg-gray-50">
+        <Button variant="secondary" onClick={onClose}>
           取消
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={handleSubmit}
           disabled={submitting || selectedIds.length === 0}
-          className="px-4 py-2 text-sm bg-purple-500 text-white rounded hover:bg-purple-600 disabled:opacity-50"
         >
           {submitting ? '提交中...' : `知会 (${selectedIds.length})`}
-        </button>
+        </Button>
       </div>
     </Modal>
   );

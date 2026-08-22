@@ -7,6 +7,7 @@ import { configurationProfileApi } from '../../services/api';
 import { diffProfileTrees } from '../../lib/profileCompare';
 import type { ProfileCompareNode, ProfileComparePart, ProfileCompareResult } from '../../lib/profileCompare';
 import type { ConfigurationProfile } from '../../types';
+import Button from '../ui/Button';
 
 interface Props {
   open: boolean;
@@ -245,10 +246,9 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
             </div>
           )}
           <div className="flex items-center gap-3">
-            <button onClick={handleCompare} disabled={!leftId || !rightId || loading}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+            <Button onClick={handleCompare} disabled={!leftId || !rightId || loading}>
               {loading ? '对比中...' : '开始对比'}
-            </button>
+            </Button>
             {result && (
               <label className="flex items-center gap-1 text-sm text-gray-600 cursor-pointer">
                 <input type="checkbox" checked={onlyDiff} onChange={(e) => setOnlyDiff(e.target.checked)} />

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ECRReviewer, ECRReviewRecord } from '../../types';
 import Badge from '../ui/Badge';
+import Button from '../ui/Button';
 
 interface ECRReviewPanelProps {
   reviewers: ECRReviewer[];
@@ -93,12 +94,11 @@ export function ECRReviewPanel({
                 <div className="flex items-center gap-2">
                   <Badge tone={config?.tone ?? 'gray'} label={config?.label ?? '待审批'} />
                   {isCurrentReviewer && isPending && (
-                    <button
+                    <Button size="sm"
                       onClick={() => handleStartReview(reviewer.user_id)}
-                      className="text-xs px-3 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 transition-colors"
                     >
                       {isExpanded ? '收起' : '审批'}
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -157,19 +157,17 @@ export function ECRReviewPanel({
                     />
                   </div>
                   <div className="flex gap-2">
-                    <button
+                    <Button size="sm"
                       onClick={() => handleSubmitReview(reviewer.user_id)}
                       disabled={!decision || loading}
-                      className="px-4 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       {loading ? '提交中...' : '确认审批'}
-                    </button>
-                    <button
+                    </Button>
+                    <Button variant="secondary" size="sm"
                       onClick={() => setActiveReviewerId(null)}
-                      className="px-4 py-1.5 text-sm rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
                     >
                       取消
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}

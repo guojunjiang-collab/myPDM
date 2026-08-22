@@ -6,6 +6,7 @@ import { ConfirmModal } from '../Modal';
 import ProfileEditModal from './ProfileEditModal';
 import ProfileStatusBadge from './ProfileStatusBadge';
 import ProfileCompareModal from './ProfileCompareModal';
+import Button from '../ui/Button';
 
 export default function ProfileList() {
   const [items, setItems] = useState<ConfigurationProfile[]>([]);
@@ -143,15 +144,12 @@ export default function ProfileList() {
           <option value="rejected">已驳回</option>
           <option value="archived">已归档</option>
         </select>
-        <button
-          onClick={() => setCompareOpen(true)}
-          className="px-4 py-2 border border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50 text-sm"
-        >
+        <Button variant="secondary" onClick={() => setCompareOpen(true)}>
           ⇄ 配置对比
-        </button>
+        </Button>
         <div className="flex-1" />
         {canEdit() && (
-          <button onClick={() => setCreateOpen(true)} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建配置</button>
+          <Button onClick={() => setCreateOpen(true)}>+ 新建配置</Button>
         )}
       </div>
 
@@ -186,40 +184,40 @@ export default function ProfileList() {
                   {profile.status === 'draft' && (
                     <>
                       {canEdit() && (
-                        <button onClick={() => setEditId(profile.id)} className="text-primary-600 hover:text-primary-800">编辑</button>
+                        <Button variant="link" size="xs" onClick={() => setEditId(profile.id)}>编辑</Button>
                       )}
-                      <button onClick={() => handleSubmit(profile)} className="text-green-600 hover:text-green-800">提交评审</button>
+                      <Button variant="link" size="xs" onClick={() => handleSubmit(profile)}>提交评审</Button>
                     </>
                   )}
                   {profile.status === 'reviewing' && (
                     <>
-                      <button onClick={() => setDetailId(profile.id)} className="text-primary-600 hover:text-primary-800">审批</button>
-                      <button onClick={() => handleWithdraw(profile.id)} className="text-orange-600 hover:text-orange-800">撤回</button>
-                      <button onClick={() => handleCcOpen(profile.id)} className="text-blue-600 hover:text-blue-800">知会</button>
+                      <Button variant="link" size="xs" onClick={() => setDetailId(profile.id)}>审批</Button>
+                      <Button variant="link" size="xs" onClick={() => handleWithdraw(profile.id)}>撤回</Button>
+                      <Button variant="link" size="xs" onClick={() => handleCcOpen(profile.id)}>知会</Button>
                     </>
                   )}
                   {profile.status === 'active' && (
                     <>
                       {isAdmin() && (
-                        <button onClick={() => handleArchive(profile.id)} className="text-gray-600 hover:text-gray-800">归档</button>
+                        <Button variant="link" size="xs" onClick={() => handleArchive(profile.id)}>归档</Button>
                       )}
-                      <button onClick={() => handleCcOpen(profile.id)} className="text-blue-600 hover:text-blue-800">知会</button>
+                      <Button variant="link" size="xs" onClick={() => handleCcOpen(profile.id)}>知会</Button>
                     </>
                   )}
                   {profile.status === 'rejected' && (
                     <>
-                      <button onClick={() => handleReopen(profile.id)} className="text-primary-600 hover:text-primary-800">重新编辑</button>
+                      <Button variant="link" size="xs" onClick={() => handleReopen(profile.id)}>重新编辑</Button>
                       {isAdmin() && (
-                        <button onClick={() => handleArchive(profile.id)} className="text-gray-600 hover:text-gray-800">归档</button>
+                        <Button variant="link" size="xs" onClick={() => handleArchive(profile.id)}>归档</Button>
                       )}
-                      <button onClick={() => handleCcOpen(profile.id)} className="text-blue-600 hover:text-blue-800">知会</button>
+                      <Button variant="link" size="xs" onClick={() => handleCcOpen(profile.id)}>知会</Button>
                     </>
                   )}
                   {profile.status === 'archived' && (
-                    <button onClick={() => setDetailId(profile.id)} className="text-gray-600 hover:text-gray-800">查看</button>
+                    <Button variant="link" size="xs" onClick={() => setDetailId(profile.id)}>查看</Button>
                   )}
                   {isAdmin() && (
-                    <button onClick={() => setDeleteId(profile.id)} className="text-red-600 hover:text-red-800">删除</button>
+                    <Button variant="danger" size="xs" onClick={() => setDeleteId(profile.id)}>删除</Button>
                   )}
                 </td>
               </tr>
@@ -242,7 +240,7 @@ export default function ProfileList() {
               <option key={u.id} value={u.id}>{u.real_name}</option>
             ))}
           </select>
-          <button onClick={() => setCcTargetId(null)} className="text-gray-400 hover:text-gray-600 text-sm">取消</button>
+          <Button variant="link" size="xs" onClick={() => setCcTargetId(null)}>取消</Button>
         </div>
       )}
 
@@ -250,9 +248,9 @@ export default function ProfileList() {
       {totalPages > 1 && (
         <div className="flex justify-center gap-1 mt-4">
           {Array.from({ length: totalPages }, (_, i) => (
-            <button key={i} onClick={() => setPage(i + 1)}
-              className={`px-3 py-1 text-xs rounded ${page === i + 1 ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-            >{i + 1}</button>
+            <Button key={i} onClick={() => setPage(i + 1)}
+              variant={page === i + 1 ? 'primary' : 'ghost'} size="xs"
+            >{i + 1}</Button>
           ))}
         </div>
       )}

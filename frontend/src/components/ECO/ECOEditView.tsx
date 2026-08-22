@@ -3,6 +3,7 @@ import { ecrApi, ecoApi, partsApi } from '../../services/api';
 import type { BomImpactNode } from '../../types';
 import { ECOActionBadge } from './ECOStatusBadge';
 import Badge from '../ui/Badge';
+import Button from '../ui/Button';
 import AssemblyPartPicker from '../AssemblyPartPicker';
 import { toast } from '../Toast';
 
@@ -241,7 +242,7 @@ function EditableDownward({ rows, onUpdate, displayOnly = false, onRemove }: { r
               : <input type="text" value={(n._desc ?? n.change_description) || ''} placeholder="说明" onChange={e => onUpdate(i, { _desc: e.target.value })} className="w-full border border-gray-300 rounded px-1 py-0.5 text-xs" />}
             </td>
             {onRemove && (n.action === 'add_new' || n.action === 'add_existing') && (
-              <td className={td}><button onClick={() => onRemove(i)} className="text-red-400 hover:text-red-600 text-xs" title="移除">✕</button></td>
+              <td className={td}><Button variant="danger" size="xs" onClick={() => onRemove(i)} title="移除">✕</Button></td>
             )}
             {onRemove && !(n.action === 'add_new' || n.action === 'add_existing') && <td className={td}></td>}
           </tr>
@@ -298,26 +299,21 @@ function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade, o
                       exec?.new_entity_status === 'draft' ? (
                         // 已升版：还原 + 冻结
                         <>
-                          <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
-                            className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
-                          <button onClick={(e) => { e.stopPropagation(); onFreeze?.(exec?.id || '', exec?.new_entity_id); }}
-                            className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">冻结</button>
+                          <Button variant="danger" size="xs" onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}>还原</Button>
+                          <Button variant="dark" size="xs" onClick={(e) => { e.stopPropagation(); onFreeze?.(exec?.id || '', exec?.new_entity_id); }}>冻结</Button>
                         </>
                       ) : exec?.new_entity_status === 'frozen' ? (
                         // 已冻结：解冻
-                        <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
-                          className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">解冻</button>
+                        <Button variant="dark" size="xs" onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}>解冻</Button>
                       ) : !exec?.new_entity_status ? (
                         // 未执行：升版
-                        <button onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || '', { entity_type: n.entity_type || 'component', entity_id: n.entity_id, entity_code: n.entity_code || '', entity_name: n.entity_name || '', action: n.action || 'upgrade' }); }}
-                          className="px-1.5 py-0.5 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">升版</button>
+                        <Button size="xs" onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || '', { entity_type: n.entity_type || 'component', entity_id: n.entity_id, entity_code: n.entity_code || '', entity_name: n.entity_name || '', action: n.action || 'upgrade' }); }}>升版</Button>
                       ) : null
                     ) : ecoStatus === 'executing' ? (
                       // 执行阶段
                       exec?.new_entity_status === 'frozen' ? (
                         // 已冻结：发布
-                        <button onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || '', exec?.new_entity_id); }}
-                          className="px-1.5 py-0.5 text-xs bg-green-500 text-white rounded hover:bg-green-600">发布</button>
+                        <Button variant="success" size="xs" onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || '', exec?.new_entity_id); }}>发布</Button>
                       ) : null
                     ) : null}
                   </div>
@@ -371,7 +367,7 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade,
                       effStatus === 'draft' ? (
                         // 新增的零部件：隐藏"还原"按钮，避免误删
                         n.action === 'add_existing' ? (
-                          <button onClick={async (e) => {
+                          <Button variant="dark" size="xs" onClick={async (e) => {
                             e.stopPropagation();
                             let itemId = exec?.id || '';
                             if (!itemId && ecoId) {
@@ -379,10 +375,10 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade,
                               itemId = created.data?.id;
                             }
                             onFreeze?.(itemId, n.entity_id);
-                          }} className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">冻结</button>
+                          }}>冻结</Button>
                         ) : (
                           <>
-                            <button onClick={async (e) => {
+                            <Button variant="danger" size="xs" onClick={async (e) => {
                               e.stopPropagation();
                               let itemId = exec?.id || '';
                               if (!itemId && ecoId) {
@@ -390,8 +386,8 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade,
                                 itemId = created.data?.id;
                               }
                               onRelease?.(itemId, n.entity_id);
-                            }} className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
-                            <button onClick={async (e) => {
+                            }}>还原</Button>
+                            <Button variant="dark" size="xs" onClick={async (e) => {
                               e.stopPropagation();
                               let itemId = exec?.id || '';
                               if (!itemId && ecoId) {
@@ -399,20 +395,17 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade,
                                 itemId = created.data?.id;
                               }
                               onFreeze?.(itemId, n.entity_id);
-                            }} className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">冻结</button>
+                            }}>冻结</Button>
                           </>
                         )
                       ) : effStatus === 'frozen' ? (
-                        <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
-                          className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">解冻</button>
+                        <Button variant="dark" size="xs" onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}>解冻</Button>
                       ) : !effStatus ? (
-                        <button onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || '', { entity_type: n.entity_type || 'component', entity_id: n.entity_id, entity_code: n.entity_code || '', entity_name: n.entity_name || '', action: n.action || 'upgrade' }); }}
-                          className="px-1.5 py-0.5 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">升版</button>
+                        <Button size="xs" onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || '', { entity_type: n.entity_type || 'component', entity_id: n.entity_id, entity_code: n.entity_code || '', entity_name: n.entity_name || '', action: n.action || 'upgrade' }); }}>升版</Button>
                       ) : null
                     ) : ecoStatus === 'executing' ? (
                       effStatus === 'frozen' ? (
-                        <button onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || '', exec?.new_entity_id); }}
-                          className="px-1.5 py-0.5 text-xs bg-green-500 text-white rounded hover:bg-green-600">发布</button>
+                        <Button variant="success" size="xs" onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || '', exec?.new_entity_id); }}>发布</Button>
                       ) : null
                     ) : null}
                   </div>
@@ -466,22 +459,17 @@ function AffectedTable({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade, on
                     {ecoStatus === 'draft' ? (
                       effStatus === 'draft' ? (
                         <>
-                          <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
-                            className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">还原</button>
-                          <button onClick={(e) => { e.stopPropagation(); onFreeze?.(exec?.id || '', exec?.new_entity_id); }}
-                            className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">冻结</button>
+                          <Button variant="danger" size="xs" onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}>还原</Button>
+                          <Button variant="dark" size="xs" onClick={(e) => { e.stopPropagation(); onFreeze?.(exec?.id || '', exec?.new_entity_id); }}>冻结</Button>
                         </>
                       ) : effStatus === 'frozen' ? (
-                        <button onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}
-                          className="px-1.5 py-0.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600">解冻</button>
+                        <Button variant="dark" size="xs" onClick={(e) => { e.stopPropagation(); onRelease?.(exec?.id || '', exec?.new_entity_id); }}>解冻</Button>
                       ) : !effStatus ? (
-                        <button onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || '', { entity_type: n.entity_type || 'component', entity_id: n.entity_id, entity_code: n.entity_code || '', entity_name: n.entity_name || '', action: 'upgrade' }); }}
-                          className="px-1.5 py-0.5 text-xs bg-primary-600 text-white rounded hover:bg-primary-700">升版</button>
+                        <Button size="xs" onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || '', { entity_type: n.entity_type || 'component', entity_id: n.entity_id, entity_code: n.entity_code || '', entity_name: n.entity_name || '', action: 'upgrade' }); }}>升版</Button>
                       ) : null
                     ) : ecoStatus === 'executing' ? (
                       effStatus === 'frozen' ? (
-                        <button onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || '', exec?.new_entity_id); }}
-                          className="px-1.5 py-0.5 text-xs bg-green-500 text-white rounded hover:bg-green-600">发布</button>
+                        <Button variant="success" size="xs" onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || '', exec?.new_entity_id); }}>发布</Button>
                       ) : null
                     ) : null}
                   </div>
@@ -683,7 +671,7 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
       {ecrId && loading && <p className="text-xs text-gray-400 text-center py-4">加载中...</p>}
       {ecrId && !loading && ecrData && (<>
         <div className="flex items-center justify-end mb-2">
-          {!readOnly && !hideResetButton && <button onClick={resetToEcr} className="text-xs px-3 py-1 border border-gray-300 rounded text-gray-600 hover:bg-gray-50">还原</button>}
+          {!readOnly && !hideResetButton && <Button variant="secondary" size="xs" onClick={resetToEcr}>还原</Button>}
         </div>
 
         {/* Per-group analysis cards */}
@@ -727,7 +715,7 @@ export function ECOEditView({ ecrId, onEcrLinked, onBomChange, readOnly, executi
                 {!readOnly && (
                   <div className="mt-2 flex gap-2 items-center">
                     <span className="text-xs text-gray-400">+ 添加子项到本部件</span>
-                    <button onClick={async () => { setPickerParentId(ai.entity_id || ai.entity_code || ''); setPickerOpen(true); }} className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100">添加子项</button>
+                    <Button size="xs" onClick={async () => { setPickerParentId(ai.entity_id || ai.entity_code || ''); setPickerOpen(true); }}>添加子项</Button>
                   </div>
                 )}
               </>)}
