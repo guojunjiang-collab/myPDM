@@ -55,6 +55,8 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
   const empty = { name: '', task_type: '任务' as TaskType, assignee_id: '', status: '未开始' as TaskStatus,
     priority: '中' as TaskPriority, planned_start: '', planned_end: '', actual_start: '', actual_end: '', description: '' };
   const [form, setForm] = useState(empty);
+  // 有子任务的任务：计划周期由其子任务统计（rollup）而来，编辑时不可手动修改
+  const hasChildren = (task?.children?.length ?? 0) > 0;
   const [statusSaving, setStatusSaving] = useState(false);
   const [tab, setTab] = useState<'info' | 'links' | 'comments' | 'logs'>('info');
   const [taskLogs, setTaskLogs] = useState<OperationLog[]>([]);
@@ -156,7 +158,14 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
     if (payload.actual_start === '') payload.actual_start = null;
     if (payload.actual_end === '') payload.actual_end = null;
     try {
-      if (task) { await projectApi.updateTask(projectId, task.id, payload); onSaved({ taskId: task.id, ...payload }); }
+      if (task) {
+        // 有子任务：计划周期由子任务汇总，不提交手动修改（后端按子任务统计）
+        if (hasChildren) {
+          delete payload.planned_start;
+          delete payload.planned_end;
+        }
+        await projectApi.updateTask(projectId, task.id, payload); onSaved({ taskId: task.id, ...payload });
+      }
       else { await projectApi.createTask(projectId, payload); onSaved(); }
     } catch (err: any) {
       alert(err?.response?.data?.detail || '保存失败');
@@ -352,14 +361,24 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                     <h4 className="text-sm font-semibold text-gray-700 mb-2">计划周期</h4>
                     <div className="grid grid-cols-4 gap-3">
                       <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                        <div className="text-xs text-gray-500 mb-0.5">计划开始</div>
-                        <input type="date" value={form.planned_start} onChange={(e) => setForm({ ...form, planned_start: e.target.value })}
-                               className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                        <div className="text-xs text-gray-500 mb-0.5">
+                          计划开始{hasChildren && <span className="text-primary-600 ml-1">（子任务汇总）</span>}
+                        </div>
+                        <input type="date" value={form.planned_start}
+                               onChange={(e) => setForm({ ...form, planned_start: e.target.value })}
+                               disabled={hasChildren}
+                               title={hasChildren ? '有子任务，计划周期由子任务统计而来，不可手动修改' : undefined}
+                               className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
                       </div>
                       <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                        <div className="text-xs text-gray-500 mb-0.5">计划完成</div>
-                        <input type="date" value={form.planned_end} onChange={(e) => setForm({ ...form, planned_end: e.target.value })}
-                               className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                        <div className="text-xs text-gray-500 mb-0.5">
+                          计划完成{hasChildren && <span className="text-primary-600 ml-1">（子任务汇总）</span>}
+                        </div>
+                        <input type="date" value={form.planned_end}
+                               onChange={(e) => setForm({ ...form, planned_end: e.target.value })}
+                               disabled={hasChildren}
+                               title={hasChildren ? '有子任务，计划周期由子任务统计而来，不可手动修改' : undefined}
+                               className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
                       </div>
                       <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                         <div className="text-xs text-gray-500 mb-0.5">实际开始</div>
@@ -630,14 +649,22 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
               <h4 className="text-sm font-semibold text-gray-700 mb-2">计划周期</h4>
               <div className="grid grid-cols-4 gap-3">
                 <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                  <div className="text-xs text-gray-500 mb-0.5">计划开始</div>
+                  <div className="text-xs text-gray-500 mb-0.5">
+                    计划开始{hasChildren && <span className="text-primary-600 ml-1">（子任务汇总）</span>}
+                  </div>
                   <input type="date" value={form.planned_start} onChange={(e) => setForm({ ...form, planned_start: e.target.value })}
-                         className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                         disabled={hasChildren}
+                         title={hasChildren ? '有子任务，计划周期由子任务统计而来，不可手动修改' : undefined}
+                         className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
                 </div>
                 <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                  <div className="text-xs text-gray-500 mb-0.5">计划完成</div>
+                  <div className="text-xs text-gray-500 mb-0.5">
+                    计划完成{hasChildren && <span className="text-primary-600 ml-1">（子任务汇总）</span>}
+                  </div>
                   <input type="date" value={form.planned_end} onChange={(e) => setForm({ ...form, planned_end: e.target.value })}
-                         className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                         disabled={hasChildren}
+                         title={hasChildren ? '有子任务，计划周期由子任务统计而来，不可手动修改' : undefined}
+                         className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
                 </div>
                 <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                   <div className="text-xs text-gray-500 mb-0.5">实际开始</div>
