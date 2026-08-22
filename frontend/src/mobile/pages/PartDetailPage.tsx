@@ -4,7 +4,8 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { customFieldsApi, entityDocumentsApi, mediaApi, partsApi } from '../../services/api';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
-import AttachmentPreview from '../components/AttachmentPreview';
+import AttachmentPreview, { openAttachmentInNewTab } from '../components/AttachmentPreview';
+import type { PreviewAttachment } from '../components/AttachmentPreview';
 import BomTree from '../components/BomTree';
 import PartWhereUsedTab from './PartWhereUsedTab';
 import type { BomChild } from './PartBomPage';
@@ -48,6 +49,9 @@ interface PartDocLink {
     name: string;
     version: string;
     status: string;
+    /** 首个附件（用于"预览"按钮；无附件时为空） */
+    file_id?: string | null;
+    file_name?: string | null;
   } | null;
 }
 
@@ -158,6 +162,22 @@ export default function PartDetailPage({
   const [docLinks, setDocLinks] = useState<PartDocLink[]>([]);
   const [docLoading, setDocLoading] = useState(false);
   const [docError, setDocError] = useState(false);
+  // 图文档卡片"预览"按钮：直接读取该图文档首个附件（无附件不显示按钮）
+  const [previewingId, setPreviewingId] = useState<string | null>(null);
+
+  const onPreviewDoc = async (l: PartDocLink, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const doc = l.document;
+    if (!doc?.file_id || previewingId) return;
+    setPreviewingId(l.id);
+    try {
+      await openAttachmentInNewTab({ id: doc.file_id, file_name: doc.file_name ?? '' } as PreviewAttachment);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : '预览失败，请重试');
+    } finally {
+      setPreviewingId(null);
+    }
+  };
 
   // 版本段（激活时加载全部版本历史）
   const [versions, setVersions] = useState<PartRevision[]>([]);
@@ -638,14 +658,30 @@ export default function PartDetailPage({
                         }}
                         className="w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm"
                       >
-                        <div className="flex items-center gap-2 min-w-0">
+                        {/* 行1：编号（左）+ 版本 + 状态（右） */}
+                        <span className="flex items-center gap-2 min-w-0">
                           <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
                             {l.document?.code ?? '未知文档'}
                           </span>
                           <span className="shrink-0 text-xs text-gray-500">{l.document?.version}</span>
                           <StatusBadge status={l.document?.status ?? 'draft'} map={STATUS_MAP} />
-                        </div>
-                        <div className="text-xs text-gray-500 truncate mt-0.5">{l.document?.name}</div>
+                        </span>
+                        {/* 行2：名称（左）+ 预览按钮（右对齐，有附件才显示） */}
+                        <span className="mt-1 flex items-center gap-2 min-w-0 min-h-7">
+                          <span className="flex-1 min-w-0 truncate text-xs text-gray-500">
+                            {l.document?.name || ''}
+                          </span>
+                          {l.document?.file_id && (
+                            <button
+                              type="button"
+                              onClick={(e) => onPreviewDoc(l, e)}
+                              disabled={previewingId === l.id}
+                              className="shrink-0 px-2.5 min-h-7 rounded bg-primary-50 text-primary-600 text-xs font-medium disabled:opacity-60"
+                            >
+                              {previewingId === l.id ? '加载中...' : '预览'}
+                            </button>
+                          )}
+                        </span>
                       </button>
                     ))}
                   </div>
