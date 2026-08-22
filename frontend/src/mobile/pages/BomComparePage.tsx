@@ -202,10 +202,13 @@ export default function BomComparePage() {
   }, [show3D]);
 
   // 打开 3D 浮层时压入哨兵；系统返回（popstate）弹哨兵 → 仅关闭浮层，不离开对比页
+  // 抽屉哨兵在 overlay3d 之上：关抽屉 back() 弹掉 drawer 后栈顶仍是 overlay3d（popstate 的
+  // history.state 是弹出后的当前项），此时不能关浮层；只有 overlay3d 本身被弹出
+  // （栈顶不再是 overlay3d）才关闭浮层。
   useEffect(() => {
-    const onPop = (e: PopStateEvent) => {
-      const st = e.state as { drawer?: string; overlay3d?: boolean } | null;
-      if (st?.overlay3d || (show3DRef.current && !st?.drawer)) {
+    const onPop = () => {
+      const cur = window.history.state as { drawer?: string; overlay3d?: boolean } | null;
+      if (!cur?.overlay3d && show3DRef.current) {
         setShow3D(false);
       }
     };
