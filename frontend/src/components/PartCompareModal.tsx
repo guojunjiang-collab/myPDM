@@ -149,7 +149,7 @@ function PartPicker({ label, valueId, onPick, onSearch, filterType }: {
       <div className="relative">
         <input
           type="text"
-          value={open ? q : selected ? `${selected.code} - ${selected.name}` : ''}
+          value={open ? q : selected ? `${selected.code} - ${selected.name} - ${selected.version}` : ''}
           placeholder="输入件号或名称搜索..."
           onFocus={() => { setOpen(true); setQ(''); }}
           onChange={(e) => doSearch(e.target.value)}
