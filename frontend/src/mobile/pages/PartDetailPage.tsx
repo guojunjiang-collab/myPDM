@@ -6,9 +6,9 @@ import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
 import MobileCardList from '../components/MobileCardList';
 import AttachmentPreview from '../components/AttachmentPreview';
-import DesktopOnlyCard from '../components/DesktopOnlyCard';
 import { formatMeta } from '../components/formatMeta';
 import { bomPath } from './bomPath';
+import PartWhereUsedTab from './PartWhereUsedTab';
 import type { BomChild } from './PartBomPage';
 import type { PartMaster, PartRevisionBrief, PartRevision, PartAttachment } from '../../types';
 
@@ -35,7 +35,7 @@ const TABS = [
   { key: 'bom', label: 'BOM' },
   { key: 'attachments', label: '附件' },
   { key: 'versions', label: '版本' },
-  { key: 'whereused', label: 'Where-Used' },
+  { key: 'whereused', label: '反查' },
 ];
 
 function fmtDateTime(v?: string | null): string {
@@ -194,7 +194,6 @@ export default function PartDetailPage() {
   }, [id, activeTab]);
 
   const title = detail ? `${detail.code} ${detail.name}` : id ?? '零部件详情';
-  const activeLabel = TABS.find((t) => t.key === activeTab)?.label ?? '';
 
   // 概览字段以后端 PartMasterResponse 实际返回字段为准
   const overviewRows: Array<{ label: string; value?: ReactNode }> = [
@@ -350,7 +349,12 @@ export default function PartDetailPage() {
             </div>
           )}
 
-          {activeTab === 'whereused' && <DesktopOnlyCard feature={activeLabel} />}
+          {activeTab === 'whereused' &&
+            (!revisionId ? (
+              <EmptyState text="该零部件暂无版本，无法反查" />
+            ) : (
+              <PartWhereUsedTab revisionId={revisionId} />
+            ))}
         </div>
       )}
     </div>
