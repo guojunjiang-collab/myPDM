@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ecrApi, ecoApi, partsApi, documentsApi, configurationApi, dashboardApi } from '../../services/api';
+import { useNavigate } from 'react-router-dom';
+import { partsApi, documentsApi, configurationApi, dashboardApi } from '../../services/api';
+import { inventoryApi } from '../../services/inventoryApi';
+import { projectApi } from '../../services/projectApi';
 import { notificationApi } from '../../services/notificationApi';
 import { useAuthStore } from '../../stores/auth';
 import EmptyState from '../components/EmptyState';
-import type { MyTodoItem, Notification } from '../../types';
+import type { MyTodoItem, MyTaskItem, Notification } from '../../types';
 
 /* ================================================================
    仪表盘移动页
@@ -22,6 +25,18 @@ const TYPE_TAG: Record<string, { label: string; cls: string }> = {
   eco: { label: 'ECO', cls: 'bg-amber-50 text-amber-800' },
 };
 const PRIO_DOT: Record<string, string> = { urgent: '#E24B4A', high: '#EF9F27', normal: '#378ADD', low: '#888780' };
+// 任务状态徽章（与桌面 MyTasksTile / 项目详情表一致）
+const TASK_STATUS_CLS: Record<string, string> = {
+  未开始: 'bg-gray-100 text-gray-600',
+  进行中: 'bg-blue-50 text-blue-700',
+  挂起: 'bg-amber-50 text-amber-700',
+  已完成: 'bg-green-50 text-green-700',
+};
+
+function fmtDate(d: string | null): string {
+  if (!d) return '';
+  return d.slice(0, 10);
+}
 
 function greeting(hour: number): string {
   if (hour >= 5 && hour < 12) return '早上好';
@@ -61,11 +76,16 @@ function Section({ title, badge, children }: { title: string; badge?: number; ch
 }
 
 export default function DashboardPage() {
+  const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
 
   /* ---- 关键统计（实时取数，页面挂载时一次性加载） ---- */
-  const [stats, setStats] = useState({ parts: 0, documents: 0, configItems: 0, changeOpen: 0 });
+  const [stats, setStats] = useState({ parts: 0, documents: 0, configItems: 0, stockItems: 0 });
   const [statsState, setStatsState] = useState<'loading' | 'ok' | 'error'>('loading');
+
+  /* ---- 我的任务（桌面 MyTasksTile 数据接口） ---- */
+  const [tasks, setTasks] = useState<MyTaskItem[]>([]);
+  const [tasksState, setTasksState] = useState<'loading' | 'ok' | 'error'>('loading');
 
   /* ---- 待办摘要 ---- */
   const [todos, setTodos] = useState<MyTodoItem[]>([]);
@@ -83,8 +103,8 @@ export default function DashboardPage() {
       partsApi.list({ page_size: 1 }),
       documentsApi.list({ page_size: 1 }),
       configurationApi.listItems({ page_size: 1 }),
-      ecrApi.list({ status: 'reviewing', page_size: 1 }),
-      ecoApi.list({ status: 'reviewing', page_size: 1 }),
+      // 有库存的物料项：库存数量 > 0 的物料（按物料去重）
+      inventoryApi.listStock(),
     ]).then((rs) => {
       if (!alive) return;
       const num = (r: PromiseSettledResult<unknown>, pick: (v: any) => number) =>
@@ -93,10 +113,34 @@ export default function DashboardPage() {
         parts: num(rs[0], (v) => v?.total ?? 0),
         documents: num(rs[1], (v) => v?.data?.total ?? 0),
         configItems: num(rs[2], (v) => v?.data?.total ?? 0),
-        changeOpen: num(rs[3], (v) => v?.data?.total ?? 0) + num(rs[4], (v) => v?.data?.total ?? 0),
+        stockItems: num(rs[3], (v) => {
+          const items = v?.data?.items ?? [];
+          return new Set(items.filter((i: any) => (i.quantity ?? 0) > 0).map((i: any) => i.material_id)).size;
+        }),
       });
       setStatsState(rs.every((r) => r.status === 'rejected') ? 'error' : 'ok');
     });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    projectApi
+      .myTasks()
+      .then((res) => {
+        if (alive) {
+          setTasks(res.data?.items ?? []);
+          setTasksState('ok');
+        }
+      })
+      .catch(() => {
+        if (alive) {
+          setTasks([]);
+          setTasksState('error');
+        }
+      });
     return () => {
       alive = false;
     };
@@ -144,8 +188,30 @@ export default function DashboardPage() {
     { label: '零部件', value: stats.parts },
     { label: '图文档', value: stats.documents },
     { label: '构型项', value: stats.configItems },
-    { label: '变更进行中', value: stats.changeOpen, highlight: stats.changeOpen > 0 },
+    { label: '有库存物料', value: stats.stockItems },
   ];
+  // 我的任务：逾期数（planned_end < 今天）
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const overdueCount = tasks.filter((t) => t.planned_end && t.planned_end.slice(0, 10) < fmtDate(today.toISOString())).length;
+  // 按项目分组（同桌面 MyTasksTile）
+  const taskGroups = (() => {
+    const map = new Map<string, { projectCode: string; projectName: string; tasks: MyTaskItem[] }>();
+    for (const t of tasks) {
+      if (!map.has(t.project_id)) {
+        map.set(t.project_id, { projectCode: t.project_code, projectName: t.project_name, tasks: [] });
+      }
+      map.get(t.project_id)!.tasks.push(t);
+    }
+    for (const [, g] of map) {
+      g.tasks.sort((a, b) => {
+        if (!a.planned_start) return 1;
+        if (!b.planned_start) return -1;
+        return a.planned_start.localeCompare(b.planned_start);
+      });
+    }
+    return Array.from(map.values());
+  })();
 
   return (
     <div className="p-3 flex flex-col gap-3">
@@ -171,6 +237,50 @@ export default function DashboardPage() {
               <div key={c.label} className="bg-gray-50 rounded-lg px-4 py-3 flex flex-col items-center">
                 <span className={`text-xl font-medium ${c.highlight ? 'text-red-600' : 'text-gray-900'}`}>{c.value}</span>
                 <span className="text-xs text-gray-500 mt-1">{c.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      {/* 我的任务（桌面 MyTasksTile 数据接口，按项目分组） */}
+      <Section title="我的任务" badge={overdueCount}>
+        {tasksState === 'loading' ? (
+          <p className="text-center text-xs text-gray-400 py-3">加载中...</p>
+        ) : tasksState === 'error' ? (
+          <p className="text-center text-xs text-red-400 py-3">任务加载失败</p>
+        ) : tasks.length === 0 ? (
+          <EmptyState text="暂无指派给你的任务" />
+        ) : (
+          <div className="flex flex-col gap-3">
+            {taskGroups.map((g) => (
+              <div key={g.projectCode} className="rounded-lg border border-gray-100 bg-gray-50 overflow-hidden">
+                <div className="px-3 py-1.5 border-b border-gray-200 text-sm font-medium text-gray-500 truncate">
+                  {g.projectCode} · {g.projectName}
+                  <span className="text-gray-400 ml-1">({g.tasks.length})</span>
+                </div>
+                {g.tasks.map((t) => {
+                  const od = !!(t.planned_end && t.planned_end.slice(0, 10) < fmtDate(today.toISOString()));
+                  return (
+                    <button
+                      key={t.task_id}
+                      type="button"
+                      onClick={() => navigate(`/projects/${t.project_id}`)}
+                      className={`w-full flex items-center gap-2 px-3 py-1.5 text-left ${od ? 'bg-red-50/50' : ''}`}
+                    >
+                      <span className="shrink-0 text-xs font-mono text-gray-500">{t.code}</span>
+                      <span className={`flex-1 min-w-0 truncate text-sm ${od ? 'text-red-700' : 'text-gray-800'}`}>
+                        {t.name}
+                      </span>
+                      <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded ${TASK_STATUS_CLS[t.status] || 'bg-gray-100 text-gray-600'}`}>
+                        {t.status}
+                      </span>
+                      <span className="shrink-0 text-xs text-gray-400">
+                        {fmtDate(t.planned_start)}~{fmtDate(t.planned_end)}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             ))}
           </div>
