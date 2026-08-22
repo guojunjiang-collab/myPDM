@@ -271,15 +271,25 @@ function FolderTreeNode({
   );
 }
 
-/** 树内条目行（缩进对齐子文件夹，两行排版） */
+/** 树内条目行（缩进 + 圆点对齐文件夹，两行排版） */
 function ItemRow({ item, depth, onClick }: { item: DashboardItem; depth: number; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className="w-full flex items-stretch min-h-11 text-left border-b border-gray-50 last:border-b-0"
-      style={{ paddingLeft: depth * INDENT + 8 }}
     >
+      {/* 缩进 + 层级竖线（与文件夹行同构） */}
+      <span className="relative shrink-0" style={{ width: depth * INDENT }}>
+        {depth > 0 && (
+          <span
+            className="absolute top-0 bottom-0 border-l border-gray-200"
+            style={{ left: depth * INDENT - INDENT / 2 }}
+          />
+        )}
+      </span>
+      {/* 圆点区（与文件夹行的箭头/圆点对齐） */}
+      <span className="shrink-0 w-9 flex items-center justify-center text-gray-300 text-sm">•</span>
       <span className="flex-1 min-w-0 flex flex-col justify-center py-1.5">
         <span className="flex items-center gap-2 min-w-0">
           <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
