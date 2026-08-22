@@ -214,12 +214,15 @@ export default function UsersListPage() {
 
   const pending = useMemo(() => users.filter((u) => u.role === 'unverified'), [users]);
 
-  const onApprove = (u: UserRow) => {
-    if (!window.confirm(`审批通过「${u.real_name || u.username}」为工程师？`)) return;
+  // 待审批角色选择面板
+  const [choosingRole, setChoosingRole] = useState<UserRow | null>(null);
+
+  const onApprove = (u: UserRow, role: string) => {
     usersApi
-      .update(u.id, { role: 'engineer' })
+      .update(u.id, { role })
       .then(() => {
-        window.alert('已通过，账号升级为工程师');
+        window.alert(`已通过，「${u.real_name || u.username}」升级为${ROLE_LABEL[role] ?? role}`);
+        setChoosingRole(null);
         loadUsers();
       })
       .catch(() => window.alert('操作失败，请稍后重试'));
@@ -366,7 +369,7 @@ export default function UsersListPage() {
                     canManage ? (
                       <div className="shrink-0 flex gap-2">
                         <button
-                          onClick={() => onApprove(u)}
+                          onClick={() => setChoosingRole(u)}
                           className="min-h-10 px-3 rounded-lg text-xs text-green-700 border border-green-200 bg-green-50"
                         >
                           通过
@@ -384,6 +387,41 @@ export default function UsersListPage() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* 待审批：选择角色面板 */}
+      {choosingRole && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-8"
+          onClick={() => setChoosingRole(null)}
+        >
+          <div
+            className="bg-white rounded-lg w-72 p-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-sm font-medium text-gray-900 mb-1">
+              审批通过「{choosingRole.real_name || choosingRole.username}」
+            </div>
+            <div className="text-xs text-gray-500 mb-3">选择分配的角色：</div>
+            <div className="flex flex-col gap-2">
+              {(['engineer', 'production', 'guest'] as const).map((r) => (
+                <button
+                  key={r}
+                  onClick={() => onApprove(choosingRole, r)}
+                  className="min-h-11 rounded-lg text-sm font-medium bg-primary-50 text-primary-700 border border-primary-200"
+                >
+                  {ROLE_LABEL[r]}
+                </button>
+              ))}
+              <button
+                onClick={() => setChoosingRole(null)}
+                className="min-h-11 rounded-lg text-sm text-gray-500 bg-gray-100"
+              >
+                取消
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
