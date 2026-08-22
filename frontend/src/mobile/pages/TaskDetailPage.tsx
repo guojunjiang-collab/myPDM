@@ -30,22 +30,6 @@ const PRIORITY_MAP: Record<TaskPriority, { label: string; cls: string }> = {
   低: { label: '低', cls: 'bg-blue-50 text-blue-700' },
 };
 
-const ENTITY_LABEL: Record<string, string> = {
-  part: '零件',
-  assembly: '装配',
-  document: '图文档',
-  config_item: '构型项',
-  ec: '变更单',
-};
-
-const ENTITY_ICON: Record<string, string> = {
-  part: '🔩',
-  assembly: '🧩',
-  document: '📄',
-  config_item: '🧬',
-  ec: '📋',
-};
-
 /** 通用状态徽标（draft/frozen/released/obsolete，与移动端其它页一致） */
 const ENTITY_STATUS_MAP: Record<string, { label: string; cls: string }> = {
   draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
@@ -331,12 +315,8 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
                           onClick={() => openLink(l)}
                           className="w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm"
                         >
-                          {/* 行1：类型徽标 + 编号 + 版本 */}
+                          {/* 行1：编号 + 版本（类型已由分区标题区分） */}
                           <span className="flex items-center gap-2 min-w-0">
-                            <span className="shrink-0 text-base leading-none">{ENTITY_ICON[l.entity_type]}</span>
-                            <span className="shrink-0 px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 text-xs">
-                              {ENTITY_LABEL[l.entity_type] ?? l.entity_type}
-                            </span>
                             <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
                               {l.entity_code || l.entity_name || '未知对象'}
                             </span>
