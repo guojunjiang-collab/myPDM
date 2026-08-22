@@ -216,9 +216,15 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
           >
             ‹
           </button>
-          {/* 标题：构型号 | 版本 | 名称（版本前置，避免名称过长遮挡版本） */}
-          <div className="min-w-0 flex-1 text-base font-medium text-gray-900 truncate">
-            {code} | {detail?.revision.version ?? ''} | {name}
+          {/* 标题：构型号 + 版本徽标 + 名称（版本徽标主色浅底，名称过长省略不影响版本可见） */}
+          <div className="min-w-0 flex-1 flex items-center gap-1.5 text-base font-medium text-gray-900 truncate">
+            <span className="shrink-0">{code}</span>
+            {detail?.revision.version && (
+              <span className="shrink-0 px-1.5 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-700">
+                {detail.revision.version}
+              </span>
+            )}
+            <span className="flex-1 min-w-0 truncate">{name}</span>
           </div>
         </div>
         <div className="flex mt-1 bg-white rounded-lg border border-gray-200 overflow-hidden">

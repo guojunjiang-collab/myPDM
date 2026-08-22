@@ -251,7 +251,16 @@ export default function DocumentDetailPage({ id: propId, onBack, onNavigate }: P
           >
             ‹
           </button>
-          <div className="min-w-0 flex-1 text-base font-medium text-gray-900 truncate">{title}</div>
+          {/* 标题：编号 + 版本徽标 + 名称（版本徽标主色浅底，名称过长省略不影响版本可见） */}
+          <div className="min-w-0 flex-1 flex items-center gap-1.5 text-base font-medium text-gray-900 truncate">
+            <span className="shrink-0">{detail?.code ?? id}</span>
+            {detail?.version && (
+              <span className="shrink-0 px-1.5 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-700">
+                {detail.version}
+              </span>
+            )}
+            <span className="flex-1 min-w-0 truncate">{detail?.name ?? ''}</span>
+          </div>
           {/* 标题栏最右侧：附件"预览"按钮（图文档只有一个附件，一直显示便于快速点击） */}
           {!attachmentsError && attachments.length > 0 && (
             <button
