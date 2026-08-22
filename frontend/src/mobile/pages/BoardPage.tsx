@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { boardApi } from '../../services/api';
+import type { MouseEvent as ReactMouseEvent } from 'react';
+import { boardApi, partsApi, documentsApi, mediaApi } from '../../services/api';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
 import DetailOverlayStack from '../components/DetailOverlayStack';
 import { useDetailOverlay } from '../hooks/useDetailOverlay';
+import { openAttachmentInNewTab, isAttachmentPreviewable } from '../components/AttachmentPreview';
+import type { PreviewAttachment } from '../components/AttachmentPreview';
 
 /* ================================================================
    看板数据结构（与桌面 pages/Board.tsx 一致，由 GET /api/dashboard/ 返回）
@@ -329,8 +332,77 @@ function FolderTreeNode({
   );
 }
 
-/** 树内条目行（缩进 + 圆点对齐文件夹，两行排版） */
+/** 树内条目行（缩进 + 圆点对齐文件夹，两行排版）；零件/部件/图文档行2 最右侧提供「预览」按钮（无可预览附件时不显示） */
 function ItemRow({ item, depth, onClick }: { item: DashboardItem; depth: number; onClick: () => void }) {
+  const [previewingId, setPreviewingId] = useState<string | null>(null);
+  // 预查可预览性：部件（装配模式）恒可预览；零件/旧零件 → 有 STP 附件；图文档 → 有可预览附件
+  const [previewable, setPreviewable] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    setPreviewable(null);
+    const check = async (): Promise<boolean> => {
+      if (item.entity_type === 'assembly') return true;
+      try {
+        if (item.entity_type === 'document') {
+          const res = await documentsApi.listAttachments(item.entity_id);
+          const atts = ((res.data ?? []) as PreviewAttachment[]).filter((a) => a.file_name);
+          return atts.some((a) => isAttachmentPreviewable(a.file_name));
+        }
+        // part / component：STP 附件
+        const list = (await partsApi.listAttachments(item.entity_id)) as Array<{ id: string; file_name?: string }>;
+        return list.some((a) => /\.(stp|step)$/i.test(a.file_name ?? ''));
+      } catch {
+        return false;
+      }
+    };
+    check().then((v) => {
+      if (alive) setPreviewable(v);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [item.id, item.entity_type, item.entity_id]);
+
+  const onPreview = async (e: ReactMouseEvent) => {
+    e.stopPropagation();
+    if (previewingId) return;
+    setPreviewingId(item.id);
+    try {
+      if (item.entity_type === 'document') {
+        const res = await documentsApi.listAttachments(item.entity_id);
+        const atts = ((res.data ?? []) as PreviewAttachment[]).filter((a) => a.file_name);
+        const att = atts.find((a) => isAttachmentPreviewable(a.file_name));
+        if (!att) {
+          window.alert('该图文档暂无可用预览附件');
+          return;
+        }
+        await openAttachmentInNewTab(att);
+        return;
+      }
+      const win = window.open('', '_blank');
+      if (item.entity_type === 'assembly') {
+        const url = `/stp-viewer?assembly=${item.entity_id}&code=${encodeURIComponent(item.code)}&name=${encodeURIComponent(item.name)}`;
+        if (win) win.location.href = url;
+        return;
+      }
+      // 零件（part/component）：STP 单模型
+      const list = (await partsApi.listAttachments(item.entity_id)) as Array<{ id: string; file_name?: string }>;
+      const stp = list.find((a) => /\.(stp|step)$/i.test(a.file_name ?? ''));
+      if (!stp) {
+        window.alert('该零件暂无 STP 三维模型');
+        return;
+      }
+      const t = await mediaApi.token(stp.id, 'gltf');
+      const url = `/stp-viewer?id=${encodeURIComponent(stp.id)}&token=${encodeURIComponent(t)}&code=${encodeURIComponent(item.code)}&version=${encodeURIComponent(item.version)}&name=${encodeURIComponent(item.name)}`;
+      if (win) win.location.href = url;
+    } catch {
+      window.alert('预览失败，请稍后重试');
+    } finally {
+      setPreviewingId(null);
+    }
+  };
+
   return (
     <button
       type="button"
@@ -368,6 +440,17 @@ function ItemRow({ item, depth, onClick }: { item: DashboardItem; depth: number;
           <span className="flex-1 min-w-0 truncate text-xs text-gray-500">{item.name}</span>
           {item.check_out_user_name && (
             <span className="shrink-0 text-xs text-gray-500">{item.check_out_user_name}</span>
+          )}
+          {/* 预览按钮（第二行最右侧）：无可用预览附件时不显示 */}
+          {previewable === true && (
+            <button
+              type="button"
+              onClick={onPreview}
+              disabled={previewingId === item.id}
+              className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-primary-600 text-white disabled:opacity-60"
+            >
+              {previewingId === item.id ? '加载中...' : '预览'}
+            </button>
           )}
         </span>
       </span>
