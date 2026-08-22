@@ -30,7 +30,7 @@ export default function MobileLayout() {
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
-      <header className="h-12 shrink-0 relative flex items-center justify-center px-3 bg-white border-b border-gray-200">
+      <header className="h-12 shrink-0 sticky top-0 z-30 relative flex items-center justify-center px-3 bg-white border-b border-gray-200">
         <span className="min-w-0 text-center text-base font-medium truncate">{title}</span>
         {/* 帮助文档页：目录按钮固定在标题栏右侧 */}
         {isHelpPage && (
