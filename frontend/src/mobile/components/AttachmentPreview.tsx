@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mediaApi } from '../../services/api';
-import DesktopOnlyCard from './DesktopOnlyCard';
 
 /**
  * 移动端附件预览组件（只读）。
@@ -11,7 +10,7 @@ import DesktopOnlyCard from './DesktopOnlyCard';
  * - Office       → mediaApi.token(id,'office-pdf') + 新标签打开 /office-pdf
  *                  （后端 office-pdf 端点同步 LibreOffice 转 PDF，命中缓存直接返回）
  * - STP/STEP     → mediaApi.token(id,'gltf') + SPA 跳转 /stp-viewer 三维预览
- * - 其余          → DesktopOnlyCard（暂不支持手机，请使用电脑浏览器）
+ * - 其余          → 普通附件卡片（文件名+大小），不提示用电脑浏览器
  */
 
 const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
@@ -117,7 +116,20 @@ export default function AttachmentPreview({ attachment }: { attachment: PreviewA
   };
 
   if (!isImage && !isPdf && !isOffice && !isStp) {
-    return <DesktopOnlyCard feature={fileName} />;
+    // 无法预览的格式（如 CAD 源文件 .CATPart）：给出附件列表即可，不提示用电脑浏览器
+    return (
+      <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-gray-900 break-all">{fileName}</div>
+            {attachment.file_size != null && (
+              <div className="text-xs text-gray-500 mt-0.5">{fmtSize(attachment.file_size)}</div>
+            )}
+          </div>
+          <span className="shrink-0 text-xs text-gray-400">附件</span>
+        </div>
+      </div>
+    );
   }
 
   return (
