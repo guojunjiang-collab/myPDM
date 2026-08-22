@@ -801,7 +801,7 @@ export interface ConfigChildItem {
   sort_order: number;
   has_children?: boolean;
   has_parts?: boolean;
-  child_detail?: { id: string; code: string; name: string; spec?: string; status?: string };
+  child_detail?: { id: string; code: string; name: string; spec?: string; status?: string; version?: string; master_id?: string; check_out_user_id?: string | null; check_out_user_name?: string | null };
 }
 
 // ──────────────────────────────────────────

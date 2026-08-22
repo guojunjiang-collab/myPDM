@@ -3,6 +3,7 @@ import { configurationApi } from '../../services/api';
 import { useDetailOverlayPush } from '../hooks/useDetailOverlay';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
+import ConfigTree from '../components/ConfigTree';
 import { formatMeta } from '../components/formatMeta';
 import type { ConfigurationItemDetail } from '../../types';
 
@@ -186,23 +187,8 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
             {detail.children.length === 0 ? (
               <EmptyState text="暂无子构型项" />
             ) : (
-              detail.children.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => openChild(c.child_detail?.id ?? c.child_id)}
-                  className="w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm"
-                >
-                  <div className="text-sm text-gray-900 break-all">
-                    {c.child_detail ? `${c.child_detail.code} ${c.child_detail.name}` : c.child_id}
-                  </div>
-                  <div className="mt-0.5 text-xs text-gray-500">
-                    {formatMeta([
-                      ['要求', c.is_required ? '必装' : '选装'],
-                      ['数量', c.quantity != null ? String(c.quantity) : undefined],
-                    ])}
-                  </div>
-                </button>
-              ))
+              // 树形：箭头展开/折叠逐层查看（懒加载子树），点击行逐级下钻子构型项详情
+              <ConfigTree rootItems={detail.children} onOpenChild={openChild} />
             )}
           </div>
         )}
