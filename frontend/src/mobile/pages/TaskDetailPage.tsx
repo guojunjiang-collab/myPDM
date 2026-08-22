@@ -395,7 +395,7 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
                           onClick={() => openLink(l)}
                           className="w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm"
                         >
-                          {/* 行1：编号 + 版本（左）+ 状态徽标 + ›（右） */}
+                          {/* 行1：编号 + 版本（左）+ 状态徽标（右） */}
                           <span className="flex items-center gap-2 min-w-0">
                             <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
                               {l.entity_code || l.entity_name || '未知对象'}
@@ -406,18 +406,11 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
                             {l.entity_status && (
                               <StatusBadge status={l.entity_status} map={ENTITY_STATUS_MAP} />
                             )}
-                            <span className="shrink-0 text-gray-300">›</span>
                           </span>
-                          {/* 行2：名称 */}
-                          {l.entity_name && (
-                            <div className="mt-1 text-xs text-gray-500 truncate">{l.entity_name}</div>
-                          )}
-                          {/* 行3：备注（左）+ 预览按钮（右下角，预查确认可预览才显示） */}
-                          <div className="mt-1 flex items-center gap-2 min-h-7">
-                            <span className="flex-1 min-w-0">
-                              {l.entity_remark && (
-                                <span className="block text-xs text-gray-400 truncate">{l.entity_remark}</span>
-                              )}
+                          {/* 行2：名称/描述（左）+ 预览按钮（右下角，预查确认可预览才显示） */}
+                          <span className="mt-1 flex items-center gap-2 min-w-0 min-h-7">
+                            <span className="flex-1 min-w-0 truncate text-xs text-gray-500">
+                              {l.entity_name || l.entity_remark || ''}
                             </span>
                             {previewableMap[l.id] === true && (
                               <button
@@ -429,7 +422,7 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
                                 {previewingId === l.id ? '加载中...' : '预览'}
                               </button>
                             )}
-                          </div>
+                          </span>
                         </button>
                       ))}
                     </div>
