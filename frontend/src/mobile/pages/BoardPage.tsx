@@ -438,19 +438,19 @@ function ItemRow({ item, depth, onClick }: { item: DashboardItem; depth: number;
         </span>
         <span className="flex items-center gap-2 min-w-0 mt-0.5">
           <span className="flex-1 min-w-0 truncate text-xs text-gray-500">{item.name}</span>
-          {item.check_out_user_name && (
-            <span className="shrink-0 text-xs text-gray-500">{item.check_out_user_name}</span>
-          )}
-          {/* 预览按钮固定占位：按钮 w-14 大小确定，与前面间距 = 行内 gap-2（同版本~状态间距），无按钮时同样留空 */}
-          <span className="shrink-0 w-14 flex justify-end">
+          {/* 检出状态向右靠：与预览按钮成组靠右，间距 gap-2（无按钮时检出人单独靠右） */}
+          <span className="ml-auto shrink-0 min-w-0 flex items-center gap-2">
+            {item.check_out_user_name && (
+              <span className="text-xs text-gray-500 truncate">{item.check_out_user_name}</span>
+            )}
             {previewable === true && (
               <button
                 type="button"
                 onClick={onPreview}
                 disabled={previewingId === item.id}
-                className="w-14 px-0 py-0.5 rounded text-xs font-medium bg-primary-600 text-white disabled:opacity-60 text-center"
+                className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-primary-600 text-white disabled:opacity-60"
               >
-                {previewingId === item.id ? '加载中' : '预览'}
+                {previewingId === item.id ? '加载中...' : '预览'}
               </button>
             )}
           </span>
