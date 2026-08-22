@@ -220,7 +220,7 @@ function FolderTreeNode({
             type="button"
             aria-label={isOpen ? '折叠' : '展开'}
             onClick={() => onToggle(folder.id)}
-            className="shrink-0 w-9 flex items-center justify-center text-gray-500 text-sm"
+            className="shrink-0 w-9 flex items-center justify-center text-gray-500 text-lg"
           >
             {isOpen ? '▾' : '▸'}
           </button>
