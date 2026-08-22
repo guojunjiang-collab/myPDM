@@ -16,9 +16,9 @@ describe('filterVisible', () => {
     const r = filterVisible(MOBILE_TABS, can as never);
     expect(r.map((t) => t.path)).toEqual(['/parts']);
   });
-  it('更多页包含 8 个入口（ECR/ECO、构型项管理/构型配置 拆分）', () => {
+  it('更多页包含 9 个入口（仪表盘、构型、库存、ECR/ECO、通知、用户、帮助）', () => {
     expect(MORE_ITEMS.map((t) => t.path)).toEqual([
-      '/dashboard', '/ec/ecr', '/ec/eco', '/inventory', '/configuration/items', '/configuration/profiles', '/notifications', '/users',
+      '/dashboard', '/configuration/items', '/configuration/profiles', '/inventory', '/ec/ecr', '/ec/eco', '/notifications', '/users', '/help',
     ]);
   });
 });
