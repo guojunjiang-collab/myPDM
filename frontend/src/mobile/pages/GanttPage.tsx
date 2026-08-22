@@ -101,7 +101,7 @@ export default function GanttPage({ projectId, onBack }: Props) {
       const nameW = t.assignee_name ? (ctx ? ctx.measureText(t.assignee_name).width : t.assignee_name.length * 6) : 0;
       max = Math.max(max, t.depth * 10 + codeW, t.depth * 10 + nameW);
     }
-    return Math.min(260, Math.max(120, Math.ceil(max) + 16));
+    return Math.min(260, Math.max(96, Math.ceil(max) + 12));
   }, [data]);
 
   return (
@@ -153,7 +153,7 @@ export default function GanttPage({ projectId, onBack }: Props) {
                 <button
                   key={t.id}
                   onClick={() => openTask(t)}
-                  className="w-full text-left px-2 flex flex-col justify-center"
+                  className="w-full text-left px-1.5 flex flex-col justify-center"
                   style={{ height: ROW_H }}
                 >
                   <span
