@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { boardApi } from '../../services/api';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
+import PartDetailPage from './PartDetailPage';
+import DocumentDetailPage from './DocumentDetailPage';
 
 /* ================================================================
    看板数据结构（与桌面 pages/Board.tsx 一致，由 GET /api/dashboard/ 返回）
@@ -58,7 +59,6 @@ const BOARD_STATE_KEY = 'mobile.board.state';
 const BOARD_SCROLL_KEY = 'mobile.board.scroll';
 
 export default function BoardPage() {
-  const navigate = useNavigate();
   const [myFolders, setMyFolders] = useState<FolderNode[]>([]);
   const [sharedFolders, setSharedFolders] = useState<FolderNode[]>([]);
   // 会话级持久化：进入详情返回后保留看板状态（展开/筛选/滚动）
@@ -144,13 +144,39 @@ export default function BoardPage() {
   }, []);
 
   const handleItemClick = (item: DashboardItem) => {
+    // 覆盖层模式：在列表上方打开详情（看板不卸载、展开/滚动位置保留），
     // 跳转目标与桌面版一致：零部件 → 零部件详情（master_id），图文档 → 图文档详情（revision_id）
     if (isComponentType(item.entity_type)) {
-      navigate(`/parts/${item.master_id || item.entity_id}`);
+      openItemDetail('part', item.master_id || item.entity_id);
     } else if (item.entity_type === 'document') {
-      navigate(`/documents/${item.entity_id}`);
+      openItemDetail('document', item.entity_id);
     }
     // configuration：移动端暂无构型详情页，不跳转（详见报告 §4）
+  };
+
+  // 条目详情覆盖层：看板保持原状，详情叠在上方（系统返回弹哨兵关闭）
+  const [itemDetail, setItemDetail] = useState<{ kind: 'part' | 'document'; id: string } | null>(null);
+  const itemOverlayRef = useRef(false);
+  useEffect(() => {
+    itemOverlayRef.current = itemDetail != null;
+  }, [itemDetail]);
+  useEffect(() => {
+    const onPop = () => {
+      const cur = window.history.state as { mobileBoardOverlay?: boolean } | null;
+      if (!cur?.mobileBoardOverlay && itemOverlayRef.current) {
+        setItemDetail(null);
+      }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+  const openItemDetail = (kind: 'part' | 'document', id: string) => {
+    setItemDetail({ kind, id });
+    window.history.pushState({ mobileBoardOverlay: true }, '');
+  };
+  const closeItemDetail = () => {
+    setItemDetail(null);
+    window.history.back();
   };
 
   /* ---------------- 渲染：文件夹按树形结构展开 ---------------- */
@@ -218,6 +244,17 @@ export default function BoardPage() {
           </section>
         )}
       </div>
+
+      {/* 条目详情覆盖层：看板保持原状（展开/筛选/滚动位置全保留），详情叠在上方 */}
+      {itemDetail && (
+        <div className="fixed inset-0 z-50 bg-gray-50 overflow-y-auto">
+          {itemDetail.kind === 'part' ? (
+            <PartDetailPage masterId={itemDetail.id} onBack={closeItemDetail} />
+          ) : (
+            <DocumentDetailPage id={itemDetail.id} onBack={closeItemDetail} />
+          )}
+        </div>
+      )}
     </div>
   );
 }

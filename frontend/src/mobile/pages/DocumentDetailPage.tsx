@@ -54,10 +54,18 @@ function OverviewRow({ label, children }: { label: string; children?: ReactNode 
   );
 }
 
-export default function DocumentDetailPage() {
+interface Props {
+  /** 覆盖层模式（列表页内嵌）传入的文档版本 id；路由模式缺省时从 /documents/:id 读取 */
+  id?: string;
+  /** 覆盖层模式返回回调（缺省时返回按钮走 navigate(-1)） */
+  onBack?: () => void;
+}
+
+export default function DocumentDetailPage({ id: propId, onBack }: Props = {}) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { id } = useParams<{ id: string }>();
+  const { id: paramId } = useParams<{ id: string }>();
+  const id = propId ?? paramId;
   const [detail, setDetail] = useState<DocumentRevision | null>(null);
   const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -234,7 +242,7 @@ export default function DocumentDetailPage() {
         <div className="flex items-center gap-1 min-h-10">
           <button
             aria-label="返回"
-            onClick={() => navigate(-1)}
+            onClick={() => (onBack ? onBack() : navigate(-1))}
             className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-gray-600"
           >
             ‹
@@ -262,10 +270,13 @@ export default function DocumentDetailPage() {
               key={t.key}
               onClick={() => {
                 setActiveTab(t.key);
-                // replace 更新 URL 的 tab 参数，供退回时恢复
-                const sp = new URLSearchParams(location.search);
-                sp.set('tab', t.key);
-                navigate(`?${sp.toString()}`, { replace: true });
+                // replace 更新 URL 的 tab 参数，供退回时恢复；
+                // 覆盖层模式（onBack 存在）不写 URL，避免污染列表页 URL 导致下次进入误读
+                if (!onBack) {
+                  const sp = new URLSearchParams(location.search);
+                  sp.set('tab', t.key);
+                  navigate(`?${sp.toString()}`, { replace: true });
+                }
               }}
               className={`flex-1 min-h-10 text-xs whitespace-nowrap ${
                 activeTab === t.key ? 'bg-primary-600 text-white font-medium' : 'text-gray-500'

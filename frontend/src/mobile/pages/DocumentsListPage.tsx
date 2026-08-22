@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
 import { documentsApi } from '../../services/api';
 import { useDebounced } from '../../hooks/useDebounced';
 import MobileCardList from '../components/MobileCardList';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
+import DocumentDetailPage from './DocumentDetailPage';
 import type { DocumentRevision } from '../../types';
 
 const STATUS_MAP: Record<string, { label: string; cls: string }> = {
@@ -24,7 +24,6 @@ const STATUS_FILTERS = [
 ];
 
 export default function DocumentsListPage() {
-  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const debounced = useDebounced(search, 400);
   const [statusFilter, setStatusFilter] = useState('');
@@ -33,6 +32,32 @@ export default function DocumentsListPage() {
   const [items, setItems] = useState<DocumentRevision[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // 详情覆盖层模式：点卡片在列表上方打开全屏详情（列表不卸载、滚动位置天然保留）
+  const [selected, setSelected] = useState<string | null>(null);
+  const overlayRef = useRef(false);
+  useEffect(() => {
+    overlayRef.current = selected != null;
+  }, [selected]);
+  // 系统返回（popstate）：弹掉哨兵后关闭覆盖层
+  useEffect(() => {
+    const onPop = () => {
+      const cur = window.history.state as { mobileDocsOverlay?: boolean } | null;
+      if (!cur?.mobileDocsOverlay && overlayRef.current) {
+        setSelected(null);
+      }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+  const openDetail = (id: string) => {
+    setSelected(id);
+    window.history.pushState({ mobileDocsOverlay: true }, '');
+  };
+  const closeDetail = () => {
+    setSelected(null);
+    window.history.back();
+  };
 
   useEffect(() => {
     let alive = true;
@@ -131,8 +156,14 @@ export default function DocumentsListPage() {
             )}
           </div>
         )}
-        onClick={(d) => navigate(`/documents/${d.id}`)}
+        onClick={(d) => openDetail(d.id)}
       />
+      {/* 详情覆盖层：列表保持原状，详情叠在上方 */}
+      {selected && (
+        <div className="fixed inset-0 z-50 bg-gray-50 overflow-y-auto">
+          <DocumentDetailPage id={selected} onBack={closeDetail} />
+        </div>
+      )}
     </div>
   );
 }
