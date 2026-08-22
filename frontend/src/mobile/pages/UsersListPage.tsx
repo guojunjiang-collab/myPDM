@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { usersApi } from '../../services/api';
+import { userGroupsApi, usersApi } from '../../services/api';
 import { can } from '../../stores/auth';
 import EmptyState from '../components/EmptyState';
 import { useDebounced } from '../../hooks/useDebounced';
 
 /**
- * 移动端用户管理（只读列表 + admin 重置密码）：
- * - GET /api/users/ 拉取用户（limit=100），搜索/角色前端本地过滤
- * - 重置密码：与桌面一致 PUT /users/{id} { password: '123456' }
+ * 移动端用户管理（三 Tab：全部用户 / 用户组 / 待审批）：
+ * - 全部用户、用户组：只读（搜索/角色筛选/成员查看）
+ * - 待审批：管理员可"通过"（设为工程师）或"拒绝"（删除）
  */
 
 const ROLE_LABEL: Record<string, string> = {
@@ -31,6 +31,12 @@ const STATUS_MAP: Record<string, { label: string; cls: string }> = {
   disabled: { label: '停用', cls: 'bg-gray-100 text-gray-500' },
 };
 
+const TABS = [
+  { key: 'users', label: '全部用户' },
+  { key: 'groups', label: '用户组' },
+  { key: 'pending', label: '待审批' },
+];
+
 interface UserRow {
   id: string;
   username: string;
@@ -40,20 +46,91 @@ interface UserRow {
   created_at?: string;
 }
 
+interface GroupRow {
+  id: string;
+  name: string;
+  description?: string;
+  member_count?: number;
+  created_at?: string;
+}
+
 function fmtDate(v?: string): string {
   if (!v) return '';
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString('zh-CN');
 }
 
+/** 用户卡片（头像 + 姓名 + 角色/状态徽标 + 用户名；右侧可选操作区） */
+function UserCard({
+  u,
+  actions,
+}: {
+  u: UserRow;
+  actions?: React.ReactNode;
+}) {
+  return (
+    <div className="bg-white rounded-lg px-4 py-3 shadow-sm flex items-center gap-3">
+      <span className="shrink-0 w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center text-base">
+        {u.real_name?.[0] ?? u.username?.[0] ?? '?'}
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
+            {u.real_name || u.username}
+          </span>
+          <span className="shrink-0 text-xs px-1.5 py-0.5 rounded-lg bg-gray-100 text-gray-600">
+            {ROLE_LABEL[u.role ?? ''] ?? u.role}
+          </span>
+          <span
+            className={`shrink-0 text-xs px-1.5 py-0.5 rounded-lg ${STATUS_MAP[u.status ?? '']?.cls ?? 'bg-gray-100 text-gray-500'}`}
+          >
+            {STATUS_MAP[u.status ?? '']?.label ?? u.status}
+          </span>
+        </div>
+        <div className="text-xs text-gray-500 mt-0.5 truncate">
+          {u.username}
+          {u.created_at ? ` · ${fmtDate(u.created_at)}` : ''}
+        </div>
+      </div>
+      {actions}
+    </div>
+  );
+}
+
 export default function UsersListPage() {
+  const [activeTab, setActiveTab] = useState('users');
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  // 全部用户 Tab：搜索 + 角色筛选（本地过滤）
   const [search, setSearch] = useState('');
   const debounced = useDebounced(search, 300);
   const [roleFilter, setRoleFilter] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const canReset = can('users:update');
+
+  // 用户组 Tab：组列表 + 展开成员（懒加载）
+  const [groups, setGroups] = useState<GroupRow[]>([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
+  const [groupsError, setGroupsError] = useState(false);
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+  const [membersByGroup, setMembersByGroup] = useState<Record<string, string[]>>({});
+
+  const canManage = can('users:update') && can('users:delete');
+
+  const loadUsers = () => {
+    setLoading(true);
+    usersApi
+      .list({ limit: 100 })
+      .then((res) => {
+        setUsers(((res.data?.items ?? res.data ?? []) as UserRow[]) || []);
+        setError(false);
+      })
+      .catch(() => {
+        setUsers([]);
+        setError(true);
+      })
+      .finally(() => setLoading(false));
+  };
 
   useEffect(() => {
     let alive = true;
@@ -79,6 +156,51 @@ export default function UsersListPage() {
     };
   }, []);
 
+  // 用户组：切到该 Tab 时加载
+  useEffect(() => {
+    let alive = true;
+    if (activeTab !== 'groups') return;
+    setGroupsLoading(true);
+    setGroupsError(false);
+    userGroupsApi
+      .list()
+      .then((res) => {
+        if (alive) setGroups(((res.data ?? []) as GroupRow[]) || []);
+      })
+      .catch(() => {
+        if (alive) {
+          setGroups([]);
+          setGroupsError(true);
+        }
+      })
+      .finally(() => {
+        if (alive) setGroupsLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [activeTab]);
+
+  const userById = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
+
+  const toggleGroup = (gid: string) => {
+    if (expandedGroup === gid) {
+      setExpandedGroup(null);
+      return;
+    }
+    setExpandedGroup(gid);
+    if (!membersByGroup[gid]) {
+      userGroupsApi
+        .getMembers(gid)
+        .then((res) => {
+          setMembersByGroup((prev) => ({ ...prev, [gid]: ((res.data as { user_ids?: string[] })?.user_ids ?? []) as string[] }));
+        })
+        .catch(() => {
+          setMembersByGroup((prev) => ({ ...prev, [gid]: [] }));
+        });
+    }
+  };
+
   const filtered = useMemo(() => {
     const kw = debounced.trim().toLowerCase();
     return users.filter(
@@ -90,76 +212,178 @@ export default function UsersListPage() {
     );
   }, [users, debounced, roleFilter]);
 
-  const onResetPassword = (u: UserRow) => {
-    if (!window.confirm(`确定将用户「${u.real_name || u.username}」的密码重置为 123456 吗？`)) return;
+  const pending = useMemo(() => users.filter((u) => u.role === 'unverified'), [users]);
+
+  const onApprove = (u: UserRow) => {
+    if (!window.confirm(`审批通过「${u.real_name || u.username}」为工程师？`)) return;
     usersApi
-      .update(u.id, { password: '123456' })
-      .then(() => window.alert('密码已重置为 123456'))
-      .catch(() => window.alert('重置密码失败'));
+      .update(u.id, { role: 'engineer' })
+      .then(() => {
+        window.alert('已通过，账号升级为工程师');
+        loadUsers();
+      })
+      .catch(() => window.alert('操作失败，请稍后重试'));
+  };
+
+  const onReject = (u: UserRow) => {
+    if (!window.confirm(`确定拒绝并删除「${u.real_name || u.username}」的账号？`)) return;
+    usersApi
+      .delete(u.id)
+      .then(() => {
+        window.alert('已拒绝并删除账号');
+        loadUsers();
+      })
+      .catch(() => window.alert('操作失败，请稍后重试'));
   };
 
   return (
     <div className="flex flex-col h-full">
-      <div className="sticky top-0 bg-gray-50 px-3 pt-2 pb-1 z-10">
-        <input
-          className="w-full h-11 px-4 rounded-lg bg-white border border-gray-200 text-base"
-          placeholder="搜索姓名/用户名..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <div className="flex items-center gap-2 mt-2">
-          {ROLE_FILTERS.map((f) => (
+      {/* Tab 切换 */}
+      <div className="sticky top-0 bg-gray-50 px-2 pt-2 pb-1 z-10">
+        <div className="flex bg-white rounded-lg border border-gray-200 overflow-hidden">
+          {TABS.map((t) => (
             <button
-              key={f.key}
-              onClick={() => setRoleFilter(f.key)}
-              className={`min-h-10 px-3 rounded-lg text-xs ${roleFilter === f.key ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+              key={t.key}
+              onClick={() => setActiveTab(t.key)}
+              className={`flex-1 min-h-10 text-xs whitespace-nowrap ${
+                activeTab === t.key ? 'bg-primary-600 text-white font-medium' : 'text-gray-500'
+              }`}
             >
-              {f.label}
+              {t.label}
             </button>
           ))}
         </div>
+        {activeTab === 'users' && (
+          <>
+            <input
+              className="w-full h-11 px-4 mt-2 rounded-lg bg-white border border-gray-200 text-base"
+              placeholder="搜索姓名/用户名..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <div className="flex items-center gap-2 mt-2">
+              {ROLE_FILTERS.map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => setRoleFilter(f.key)}
+                  className={`min-h-10 px-3 rounded-lg text-xs ${roleFilter === f.key ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
-      {loading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
-      {!loading && error && <p className="text-center text-xs text-red-400 py-3">加载失败，请稍后重试</p>}
-      {!loading && !error && filtered.length === 0 && <EmptyState text="未找到用户" />}
-
-      {!loading && !error && filtered.length > 0 && (
-        <div className="p-3 flex flex-col gap-2 overflow-y-auto">
-          {filtered.map((u) => (
-            <div key={u.id} className="bg-white rounded-lg px-4 py-3 shadow-sm flex items-center gap-3">
-              <span className="shrink-0 w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center text-base">
-                {u.real_name?.[0] ?? u.username?.[0] ?? '?'}
-              </span>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
-                    {u.real_name || u.username}
-                  </span>
-                  <span className="shrink-0 text-xs px-1.5 py-0.5 rounded-lg bg-gray-100 text-gray-600">
-                    {ROLE_LABEL[u.role ?? ''] ?? u.role}
-                  </span>
-                  <span
-                    className={`shrink-0 text-xs px-1.5 py-0.5 rounded-lg ${STATUS_MAP[u.status ?? '']?.cls ?? 'bg-gray-100 text-gray-500'}`}
-                  >
-                    {STATUS_MAP[u.status ?? '']?.label ?? u.status}
-                  </span>
-                </div>
-                <div className="text-xs text-gray-500 mt-0.5 truncate">
-                  {u.username}
-                  {u.created_at ? ` · ${fmtDate(u.created_at)}` : ''}
-                </div>
-              </div>
-              {canReset && (
-                <button
-                  onClick={() => onResetPassword(u)}
-                  className="shrink-0 min-h-10 px-3 rounded-lg text-xs text-orange-600 border border-orange-200 bg-orange-50"
-                >
-                  重置密码
-                </button>
-              )}
+      {/* Tab1 全部用户（只读） */}
+      {activeTab === 'users' && (
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {loading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+          {!loading && error && <p className="text-center text-xs text-red-400 py-3">加载失败，请稍后重试</p>}
+          {!loading && !error && filtered.length === 0 && <EmptyState text="未找到用户" />}
+          {!loading && !error && filtered.length > 0 && (
+            <div className="p-3 flex flex-col gap-2">
+              {filtered.map((u) => (
+                <UserCard key={u.id} u={u} />
+              ))}
             </div>
-          ))}
+          )}
+        </div>
+      )}
+
+      {/* Tab2 用户组（只读） */}
+      {activeTab === 'groups' && (
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {groupsLoading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+          {!groupsLoading && groupsError && (
+            <p className="text-center text-xs text-red-400 py-3">加载失败，请稍后重试</p>
+          )}
+          {!groupsLoading && !groupsError && groups.length === 0 && <EmptyState text="暂无用户组" />}
+          {!groupsLoading && !groupsError && groups.length > 0 && (
+            <div className="p-3 flex flex-col gap-2">
+              {groups.map((g) => (
+                <div key={g.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
+                  <button
+                    onClick={() => toggleGroup(g.id)}
+                    className="w-full text-left px-4 py-3 min-h-12 flex items-center gap-2"
+                  >
+                    <span className="text-base">{expandedGroup === g.id ? '▾' : '▸'}</span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm text-gray-800 truncate">{g.name}</span>
+                      {g.description && (
+                        <span className="block text-xs text-gray-500 truncate mt-0.5">{g.description}</span>
+                      )}
+                    </span>
+                    <span className="shrink-0 text-xs px-1.5 py-0.5 rounded-lg bg-gray-100 text-gray-600">
+                      {g.member_count ?? 0} 人
+                    </span>
+                  </button>
+                  {expandedGroup === g.id && (
+                    <div className="border-t border-gray-100 px-4 py-2 flex flex-col">
+                      {!membersByGroup[g.id] ? (
+                        <p className="text-xs text-gray-400 py-2">加载中...</p>
+                      ) : membersByGroup[g.id].length === 0 ? (
+                        <p className="text-xs text-gray-400 py-2">暂无成员</p>
+                      ) : (
+                        membersByGroup[g.id].map((uid) => {
+                          const m = userById.get(uid);
+                          return (
+                            <div key={uid} className="py-2 border-b border-gray-50 last:border-b-0 flex items-center gap-2">
+                              <span className="shrink-0 w-7 h-7 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xs">
+                                {m?.real_name?.[0] ?? m?.username?.[0] ?? '?'}
+                              </span>
+                              <span className="text-sm text-gray-800 truncate">{m?.real_name || m?.username || uid}</span>
+                              {m?.real_name && m.username !== m.real_name && (
+                                <span className="text-xs text-gray-400 truncate">{m.username}</span>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab3 待审批 */}
+      {activeTab === 'pending' && (
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {loading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+          {!loading && error && <p className="text-center text-xs text-red-400 py-3">加载失败，请稍后重试</p>}
+          {!loading && !error && pending.length === 0 && <EmptyState text="暂无待审批账号" />}
+          {!loading && !error && pending.length > 0 && (
+            <div className="p-3 flex flex-col gap-2">
+              {pending.map((u) => (
+                <UserCard
+                  key={u.id}
+                  u={u}
+                  actions={
+                    canManage ? (
+                      <div className="shrink-0 flex gap-2">
+                        <button
+                          onClick={() => onApprove(u)}
+                          className="min-h-10 px-3 rounded-lg text-xs text-green-700 border border-green-200 bg-green-50"
+                        >
+                          通过
+                        </button>
+                        <button
+                          onClick={() => onReject(u)}
+                          className="min-h-10 px-3 rounded-lg text-xs text-red-600 border border-red-200 bg-red-50"
+                        >
+                          拒绝
+                        </button>
+                      </div>
+                    ) : undefined
+                  }
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
