@@ -5,7 +5,6 @@ import { useDebounced } from '../../hooks/useDebounced';
 import MobileCardList from '../components/MobileCardList';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
-import { formatMeta } from '../components/formatMeta';
 import type { PartListItem } from '../../types';
 
 const STATUS_MAP: Record<string, { label: string; cls: string }> = {
@@ -98,22 +97,25 @@ export default function PartsListPage() {
       <MobileCardList
         items={items}
         keyOf={(p) => (showAllVersions ? p.revision_id : p.master_id)}
-        renderMain={(p) => `${p.code} ${p.name}`}
-        renderMeta={(p) => (
-          <span className="flex flex-wrap items-center gap-2">
+        renderMain={(p) => (
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">{p.code}</span>
             <StatusBadge status={p.status} map={STATUS_MAP} />
-            <span>
-              {formatMeta([
-                ['版本', p.version],
-                ['更新时间', p.updated_at ? new Date(p.updated_at).toLocaleDateString('zh-CN') : ''],
-              ])}
-            </span>
+            {p.check_out_user_name && (
+              <span className="shrink-0 text-xs text-gray-500">{p.check_out_user_name}</span>
+            )}
+          </div>
+        )}
+        renderMeta={(p) => (
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="flex-1 min-w-0 truncate text-xs text-gray-500">{p.name}</span>
             {!showAllVersions && p.version_count && p.version_count > 1 && (
-              <span className="px-1.5 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600">
+              <span className="shrink-0 px-1.5 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600">
                 {p.version_count} 个版本
               </span>
             )}
-          </span>
+            <span className="shrink-0 text-xs text-gray-500">版本 {p.version}</span>
+          </div>
         )}
         onClick={(p) =>
           navigate(
