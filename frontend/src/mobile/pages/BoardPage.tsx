@@ -1,10 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { boardApi } from '../../services/api';
-import MobileCardList from '../components/MobileCardList';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
-import { formatMeta } from '../components/formatMeta';
 
 /* ================================================================
    看板数据结构（与桌面 pages/Board.tsx 一致，由 GET /api/dashboard/ 返回）
@@ -54,35 +52,19 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: 'configuration', label: '构型项' },
 ];
 
-function findFolder(folders: FolderNode[], id: string): FolderNode | null {
-  for (const f of folders) {
-    if (f.id === id) return f;
-    const found = findFolder(f.children, id);
-    if (found) return found;
-  }
-  return null;
-}
-
-function folderPath(folders: FolderNode[], id: string): string {
-  const parts: string[] = [];
-  const walk = (list: FolderNode[], trail: string[]) => {
-    for (const f of list) {
-      if (f.id === id) { parts.push(...trail, f.name); return; }
-      walk(f.children, [...trail, f.name]);
-    }
-  };
-  walk(folders, []);
-  return parts.join(' / ');
-}
-
 export default function BoardPage() {
   const navigate = useNavigate();
   const [myFolders, setMyFolders] = useState<FolderNode[]>([]);
   const [sharedFolders, setSharedFolders] = useState<FolderNode[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
+  // 树形展开状态：expanded[id] === false 表示已折叠，默认全部展开
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const toggleFolder = (id: string) => {
+    setExpanded((prev) => ({ ...prev, [id]: prev[id] === false }));
+  };
 
   // 加载看板数据（桌面 loadDashboard 照搬：boardApi.getDashboard）
   useEffect(() => {
@@ -113,26 +95,6 @@ export default function BoardPage() {
     };
   }, []);
 
-  const allFolders = useMemo(() => [...myFolders, ...sharedFolders], [myFolders, sharedFolders]);
-  const selectedFolder = useMemo(() => (selectedId ? findFolder(allFolders, selectedId) : null), [selectedId, allFolders]);
-  const selectedItems = useMemo(() => (selectedFolder ? [...selectedFolder.items] : []), [selectedFolder]);
-  const filteredItems = useMemo(
-    () =>
-      filterTab === 'all'
-        ? selectedItems
-        : selectedItems.filter((i) => (filterTab === 'component' ? isComponentType(i.entity_type) : i.entity_type === filterTab)),
-    [selectedItems, filterTab],
-  );
-  const tabCounts = useMemo(
-    () => ({
-      all: selectedItems.length,
-      component: selectedItems.filter((i) => isComponentType(i.entity_type)).length,
-      document: selectedItems.filter((i) => i.entity_type === 'document').length,
-      configuration: selectedItems.filter((i) => i.entity_type === 'configuration').length,
-    }),
-    [selectedItems],
-  );
-
   const handleItemClick = (item: DashboardItem) => {
     // 跳转目标与桌面版一致：零部件 → 零部件详情（master_id），图文档 → 图文档详情（revision_id）
     if (isComponentType(item.entity_type)) {
@@ -143,135 +105,195 @@ export default function BoardPage() {
     // configuration：移动端暂无构型详情页，不跳转（详见报告 §4）
   };
 
-  /* ---------------- 渲染 ---------------- */
+  /* ---------------- 渲染：文件夹按树形结构展开 ---------------- */
 
   if (loading) return <p className="text-center text-xs text-gray-400 py-3">加载中...</p>;
   if (error) return <p className="text-center text-xs text-red-400 py-3">{error}</p>;
 
-  // 根视图：我的文件夹 + 共享给我的
-  if (!selectedFolder) {
-    if (myFolders.length === 0 && sharedFolders.length === 0) {
-      return <EmptyState text="暂无文件夹" />;
-    }
-    return (
-      <div className="p-3 flex flex-col gap-4">
-        <section>
-          <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide px-1 mb-1">📁 我的文件夹</h2>
-          {myFolders.length === 0 ? (
-            <EmptyState text="暂无文件夹" />
-          ) : (
-            <div className="flex flex-col gap-2">
-              {myFolders.map((f) => (
-                <FolderRow key={f.id} folder={f} shared={false} onOpen={() => setSelectedId(f.id)} />
-              ))}
-            </div>
-          )}
-        </section>
-        {sharedFolders.length > 0 && (
-          <section>
-            <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide px-1 mb-1">📂 共享给我的</h2>
-            <div className="flex flex-col gap-2">
-              {sharedFolders.map((f) => (
-                <FolderRow key={`s-${f.id}`} folder={f} shared onOpen={() => setSelectedId(f.id)} />
-              ))}
-            </div>
-          </section>
-        )}
-      </div>
-    );
+  if (myFolders.length === 0 && sharedFolders.length === 0) {
+    return <EmptyState text="暂无文件夹" />;
   }
 
-  // 文件夹视图：面包屑 + 子文件夹 + 类型筛选 + 项目条目卡片
-  const children = selectedFolder.children ?? [];
   return (
-    <div className="flex flex-col">
-      <div className="sticky top-0 bg-gray-50 px-2 pt-2 pb-1 z-10 border-b border-gray-100">
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setSelectedId(null)}
-            className="min-w-10 min-h-10 rounded-lg text-gray-600 text-lg leading-none flex items-center justify-center"
-            aria-label="返回文件夹列表"
-          >
-            ‹
-          </button>
-          <span className="flex-1 text-xs text-gray-500 truncate">{folderPath(allFolders, selectedFolder.id)}</span>
-        </div>
-        <div className="flex gap-2 px-1 pb-1">
+    <div className="flex flex-col h-full">
+      {/* 顶部：类型筛选（过滤树中所有层级的条目） */}
+      <div className="sticky top-0 bg-gray-50 px-3 pt-2 pb-1 z-10">
+        <div className="flex gap-2">
           {FILTER_TABS.map((f) => (
             <button
               key={f.key}
               type="button"
               onClick={() => setFilterTab(f.key)}
-              className={`min-h-10 px-3 rounded-full text-xs ${filterTab === f.key ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+              className={`min-h-10 px-3 rounded-lg text-xs ${filterTab === f.key ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
             >
-              {f.label} ({tabCounts[f.key]})
+              {f.label}
             </button>
           ))}
         </div>
       </div>
 
-      {children.length === 0 && filteredItems.length === 0 ? (
-        <EmptyState text="暂无关联项目" />
-      ) : (
-        <div className="flex flex-col">
-          {children.length > 0 && (
-            <div className="p-3 pb-1 flex flex-col gap-2">
-              {children.map((c) => (
-                <FolderRow key={c.id} folder={c} shared={!!c.shared_from} onOpen={() => setSelectedId(c.id)} />
+      <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-4">
+        <section>
+          <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide px-1 mb-1">📁 我的文件夹</h2>
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            {myFolders.map((f) => (
+              <FolderTreeNode
+                key={f.id}
+                folder={f}
+                shared={false}
+                depth={0}
+                expanded={expanded}
+                onToggle={toggleFolder}
+                filterTab={filterTab}
+                onItemClick={handleItemClick}
+              />
+            ))}
+          </div>
+        </section>
+        {sharedFolders.length > 0 && (
+          <section>
+            <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide px-1 mb-1">📂 共享给我的</h2>
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+              {sharedFolders.map((f) => (
+                <FolderTreeNode
+                  key={f.id}
+                  folder={f}
+                  shared
+                  depth={0}
+                  expanded={expanded}
+                  onToggle={toggleFolder}
+                  filterTab={filterTab}
+                  onItemClick={handleItemClick}
+                />
               ))}
             </div>
-          )}
-          {filteredItems.length > 0 && (
-            <MobileCardList
-              items={filteredItems}
-              keyOf={(i) => i.id}
-              renderMain={(i) => (
-                <span className="flex items-center gap-1.5 flex-wrap">
-                  <span>{ENTITY_ICON[i.entity_type]}</span>
-                  <span className="font-medium">{i.code}</span>
-                  <span className="text-gray-500 font-normal">{ENTITY_LABEL[i.entity_type]}</span>
-                </span>
-              )}
-              renderMeta={(i) => (
-                <span className="flex flex-wrap items-center gap-2">
-                  <StatusBadge status={i.status} map={STATUS_MAP} />
-                  <span>{formatMeta([['名称', i.name], ['版本', i.version]])}</span>
-                </span>
-              )}
-              onClick={handleItemClick}
-            />
-          )}
-        </div>
-      )}
+          </section>
+        )}
+      </div>
     </div>
   );
 }
 
 /* ================================================================
-   文件夹行（触控目标 ≥ 40px）
+   文件夹树节点（递归）：缩进 + 竖线 + 展开箭头 + 文件夹行 + 子文件夹/条目
    ================================================================ */
 
-function FolderRow({ folder, shared, onOpen }: { folder: FolderNode; shared: boolean; onOpen: () => void }) {
+const INDENT = 24;
+
+function FolderTreeNode({
+  folder,
+  shared,
+  depth,
+  expanded,
+  onToggle,
+  filterTab,
+  onItemClick,
+}: {
+  folder: FolderNode;
+  shared: boolean;
+  depth: number;
+  expanded: Record<string, boolean>;
+  onToggle: (id: string) => void;
+  filterTab: FilterTab;
+  onItemClick: (item: DashboardItem) => void;
+}) {
+  const items = (filterTab === 'all' ? folder.items : folder.items.filter((i) => (filterTab === 'component' ? isComponentType(i.entity_type) : i.entity_type === filterTab))) as DashboardItem[];
+  const hasContent = folder.children.length > 0 || folder.items.length > 0;
+  const isOpen = expanded[folder.id] !== false; // 默认展开
   const count = folder.items?.length ?? 0;
   const childCount = folder.children?.length ?? 0;
   return (
+    <>
+      <div className="flex items-stretch min-h-11 border-b border-gray-50 last:border-b-0">
+        {/* 缩进 + 层级竖线 */}
+        <span className="relative shrink-0" style={{ width: depth * INDENT }}>
+          {depth > 0 && (
+            <span
+              className="absolute top-0 bottom-0 border-l border-gray-200"
+              style={{ left: depth * INDENT - INDENT / 2 }}
+            />
+          )}
+        </span>
+        {/* 展开箭头（有子文件夹或条目才可展开） */}
+        {hasContent ? (
+          <button
+            type="button"
+            aria-label={isOpen ? '折叠' : '展开'}
+            onClick={() => onToggle(folder.id)}
+            className="shrink-0 w-9 flex items-center justify-center text-gray-500 text-sm"
+          >
+            {isOpen ? '▾' : '▸'}
+          </button>
+        ) : (
+          <span className="shrink-0 w-9 flex items-center justify-center text-gray-300 text-sm">•</span>
+        )}
+        {/* 文件夹行（点击切换展开） */}
+        <button
+          type="button"
+          onClick={() => hasContent && onToggle(folder.id)}
+          className="flex-1 min-w-0 flex items-center gap-2 text-left"
+        >
+          <span className="text-sm shrink-0">{shared ? '📂' : '📁'}</span>
+          <span className="flex-1 min-w-0 truncate text-sm text-gray-800">{folder.name}</span>
+          {shared && folder.shared_from && (
+            <span className="text-xs text-gray-400 shrink-0">{folder.shared_from.real_name}</span>
+          )}
+          {count > 0 && (
+            <span className="text-xs px-1.5 py-0.5 rounded-lg bg-gray-100 text-gray-500 shrink-0">{count}</span>
+          )}
+          {childCount > 0 && (
+            <span className="text-xs px-1.5 py-0.5 rounded-lg bg-primary-50 text-primary-600 shrink-0">
+              {childCount} 子
+            </span>
+          )}
+        </button>
+      </div>
+      {isOpen && (
+        <>
+          {folder.children.map((c) => (
+            <FolderTreeNode
+              key={c.id}
+              folder={c}
+              shared={shared || !!c.shared_from}
+              depth={depth + 1}
+              expanded={expanded}
+              onToggle={onToggle}
+              filterTab={filterTab}
+              onItemClick={onItemClick}
+            />
+          ))}
+          {items.map((i) => (
+            <ItemRow key={i.id} item={i} depth={depth + 1} onClick={() => onItemClick(i)} />
+          ))}
+        </>
+      )}
+    </>
+  );
+}
+
+/** 树内条目行（缩进对齐子文件夹，两行排版） */
+function ItemRow({ item, depth, onClick }: { item: DashboardItem; depth: number; onClick: () => void }) {
+  return (
     <button
       type="button"
-      onClick={onOpen}
-      className="flex items-center gap-2 bg-white rounded-lg px-4 py-3 min-h-12 shadow-sm text-left"
+      onClick={onClick}
+      className="w-full flex items-stretch min-h-11 text-left border-b border-gray-50 last:border-b-0"
+      style={{ paddingLeft: depth * INDENT + 8 }}
     >
-      <span className="text-base">{shared ? '📂' : '📁'}</span>
-      <span className="flex-1 text-sm text-gray-800 truncate">{folder.name}</span>
-      {shared && folder.shared_from && (
-        <span className="text-xs text-gray-400 shrink-0">{folder.shared_from.real_name}</span>
-      )}
-      {count > 0 && (
-        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 shrink-0">{count}</span>
-      )}
-      {childCount > 0 && (
-        <span className="text-xs px-2 py-0.5 rounded-full bg-primary-50 text-primary-600 shrink-0">{childCount} 子</span>
-      )}
+      <span className="flex-1 min-w-0 flex flex-col justify-center py-1.5">
+        <span className="flex items-center gap-2 min-w-0">
+          <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
+            {ENTITY_ICON[item.entity_type]} {item.code}
+          </span>
+          <span className="shrink-0 text-xs text-gray-500">{item.version}</span>
+          <StatusBadge status={item.status} map={STATUS_MAP} />
+        </span>
+        <span className="flex items-center gap-2 min-w-0 mt-0.5">
+          <span className="flex-1 min-w-0 truncate text-xs text-gray-500">
+            {ENTITY_LABEL[item.entity_type]} {item.name}
+          </span>
+        </span>
+      </span>
     </button>
   );
 }
