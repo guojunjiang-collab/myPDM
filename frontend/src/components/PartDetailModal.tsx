@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { partsApi, customFieldsApi, mediaApi } from '../services/api';
 import { useAuthStore } from '../stores/auth';
-import type { PartMaster, PartRevision, PartIteration, PartStatus, CascadeResult } from '../types';
+import type { PartMaster, PartRevision, PartIteration, PartStatus, CascadeResult, PartListItem } from '../types';
 import { Loading } from './Loading';
 import { toast } from './Toast';
 import { Modal } from './Modal';
 import EntityDocumentSection from './EntityDocumentSection';
 import PartAttachmentBucket from './PartAttachmentBucket';
 import AssemblyPartPicker from './AssemblyPartPicker';
+import PartCompareModal from './PartCompareModal';
 import PartWhereUsedTab from './PartDetailModal/PartWhereUsedTab';
 import ConfigItemDetailModal from './Configuration/ConfigItemDetailModal';
 import TaskEditModal from '../pages/Project/TaskEditModal';
@@ -79,6 +80,9 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const [wuConfigRevId, setWuConfigRevId] = useState<string | null>(null);
   const [wuTask, setWuTask] = useState<{ projectId: string; task: any } | null>(null);
   const [wuProfileId, setWuProfileId] = useState<string | null>(null);
+  // 版本 Tab BOM 对比：勾选两个版本（当前版本默认选中）→ 打开预选对比弹窗
+  const [cmpSel, setCmpSel] = useState<string[]>([]);
+  const [showCompare, setShowCompare] = useState(false);
 
   const bomScrollRef = useRef<HTMLDivElement>(null);
 
@@ -228,6 +232,44 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   }, [revisionId, activeTab, masterId]);
 
   useEffect(() => { loadTabs(); }, [loadTabs]);
+
+  // 版本 Tab BOM 对比：版本列表首次加载完成且未做过选择时，默认勾选当前查看版本
+  useEffect(() => {
+    if (versions.length > 0 && cmpSel.length === 0 && revision?.id) {
+      setCmpSel([revision.id]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [versions.length]);
+
+  /** 勾选切换：最多 2 个，已满 2 个时新勾选替换第二个 */
+  const toggleCmpSel = (vid: string) => {
+    setCmpSel((prev) => {
+      if (prev.includes(vid)) return prev.filter((x) => x !== vid);
+      if (prev.length < 2) return [...prev, vid];
+      return [prev[0], vid];
+    });
+  };
+
+  /** 版本 id → PartListItem（PartCompareModal 预选展示用） */
+  const toPartListItem = (vid: string): PartListItem | undefined => {
+    const v = versions.find((x) => x.id === vid);
+    if (!v || !master) return undefined;
+    return {
+      master_id: master.id,
+      code: master.code,
+      name: master.name,
+      type: (master.type as 'part' | 'assembly') || 'part',
+      revision_id: vid,
+      version: v.version,
+      status: v.status as PartStatus,
+      latest_iteration: v.latest_iteration ?? 0,
+    };
+  };
+
+  const openCompare = () => {
+    if (cmpSel.length !== 2) return;
+    setShowCompare(true);
+  };
 
   const isCheckedOut = !!revision?.check_out_user_id;
   const isAssembly = master?.type === 'assembly' || hasBomChildren;
@@ -824,36 +866,67 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                 )}
 
                 {activeTab === 'versions' && (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">版本</th>
-                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">状态</th>
-                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">创建时间</th>
-                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">操作</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {versions.map((v: any) => (
-                        <tr key={v.id} className={`hover:bg-gray-50 ${v.id === revision?.id ? 'bg-blue-50' : ''}`}>
-                          <td className="px-4 py-3">{v.version}</td>
-                          <td className="px-4 py-3">
-                            <span className={`px-2 py-1 text-xs rounded-full ${statusTag(v.status as PartStatus).cls}`}>
-                              {statusTag(v.status as PartStatus).label}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-gray-500">{v.created_at ? new Date(v.created_at).toLocaleDateString('zh-CN') : ''}</td>
-                          <td className="px-4 py-3">
-                            {v.id === revision?.id ? (
-                              <span className="text-primary-600 text-xs">当前</span>
-                            ) : (
-                              <button onClick={() => setInternalRevisionId(v.id)} className="text-primary-600 hover:text-primary-800 hover:underline text-xs">切换</button>
-                            )}
-                          </td>
+                  <>
+                    <p className="text-sm text-gray-500 px-4 py-2 border-b border-gray-100">
+                      勾选两个版本进行 BOM 对比（当前版本默认已选）
+                    </p>
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200">
+                          <th className="px-4 py-3 w-10"></th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">版本</th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">状态</th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">创建时间</th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">操作</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {versions.map((v: any) => (
+                          <tr key={v.id} className={`hover:bg-gray-50 ${v.id === revision?.id ? 'bg-blue-50' : ''}`}>
+                            <td className="px-4 py-3">
+                              <input
+                                type="checkbox"
+                                checked={cmpSel.includes(v.id)}
+                                onChange={() => toggleCmpSel(v.id)}
+                                className="w-4 h-4 accent-primary-600"
+                                title="勾选参与 BOM 对比"
+                              />
+                            </td>
+                            <td className="px-4 py-3">{v.version}</td>
+                            <td className="px-4 py-3">
+                              <span className={`px-2 py-1 text-xs rounded-full ${statusTag(v.status as PartStatus).cls}`}>
+                                {statusTag(v.status as PartStatus).label}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-gray-500">{v.created_at ? new Date(v.created_at).toLocaleDateString('zh-CN') : ''}</td>
+                            <td className="px-4 py-3">
+                              {v.id === revision?.id ? (
+                                <span className="text-primary-600 text-xs">当前</span>
+                              ) : (
+                                <button onClick={() => setInternalRevisionId(v.id)} className="text-primary-600 hover:text-primary-800 hover:underline text-xs">切换</button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {cmpSel.length > 0 && (
+                      <div className="mt-3 px-4 py-2.5 bg-gray-50 border-t border-gray-200 flex items-center gap-3">
+                        <span className="text-sm text-gray-600 flex-1">
+                          {cmpSel.length === 2
+                            ? `已选：版本 ${versions.find((x) => x.id === cmpSel[0])?.version ?? '?'} vs 版本 ${versions.find((x) => x.id === cmpSel[1])?.version ?? '?'}`
+                            : '请再选择一个版本'}
+                        </span>
+                        <button
+                          onClick={openCompare}
+                          disabled={cmpSel.length !== 2}
+                          className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm disabled:opacity-40 hover:bg-primary-700"
+                        >
+                          BOM 对比
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {activeTab === 'iterations' && (
@@ -1070,6 +1143,16 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
       {wuProfileId && (
         <ProfileEditModal open={!!wuProfileId} profileId={wuProfileId} readOnly
           onClose={() => setWuProfileId(null)} onSaved={() => {}} />
+      )}
+      {showCompare && (
+        <PartCompareModal
+          open={showCompare}
+          onClose={() => setShowCompare(false)}
+          initialLeftId={cmpSel[0]}
+          initialRightId={cmpSel[1]}
+          initialLeftItem={toPartListItem(cmpSel[0])}
+          initialRightItem={toPartListItem(cmpSel[1])}
+        />
       )}
     </Modal>
   );
