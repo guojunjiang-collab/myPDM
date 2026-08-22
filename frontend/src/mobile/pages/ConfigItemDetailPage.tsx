@@ -195,17 +195,10 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                   onClick={() => openPart(p.part_detail?.id, p.part_detail?.revision_id)}
                   className="w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm"
                 >
-                  {/* 行1：编号（左）+ 必装/选装徽标（紧随编号）+ 用量 + 版本 + 状态（右） */}
+                  {/* 行1：编号（左）+ 用量 + 版本 + 必装/选装徽标 + 状态（右）；徽标列与行2 类型徽标右对齐 */}
                   <span className="flex items-center gap-2 min-w-0">
                     <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
                       {p.part_detail?.code ?? p.part_id}
-                    </span>
-                    <span
-                      className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
-                        p.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
-                      }`}
-                    >
-                      {p.is_required ? '必装' : '选装'}
                     </span>
                     {p.quantity != null && (
                       <span className="shrink-0 truncate text-center text-xs text-gray-500">x{p.quantity}</span>
@@ -213,8 +206,15 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                     {p.part_detail?.version && (
                       <span className="shrink-0 text-center text-xs text-gray-500">{p.part_detail.version}</span>
                     )}
+                    <span
+                      className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
+                        p.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+                      }`}
+                    >
+                      {p.is_required ? '必装' : '选装'}
+                    </span>
                     {p.part_detail?.status && (
-                      <span className="shrink-0 w-12 flex justify-end">
+                      <span className="shrink-0 w-14 flex justify-end">
                         <StatusBadge status={p.part_detail.status} map={STATUS_MAP} />
                       </span>
                     )}
