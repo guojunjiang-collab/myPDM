@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 import { projectApi } from '../../services/projectApi';
-import { logsApi, ecrApi, ecoApi } from '../../services/api';
+import { logsApi, ecrApi, ecoApi, partsApi, documentsApi, mediaApi } from '../../services/api';
 import { useDetailOverlayPush } from '../hooks/useDetailOverlay';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
+import AttachmentPreview, { openAttachmentInNewTab, isAttachmentPreviewable } from '../components/AttachmentPreview';
+import type { PreviewAttachment } from '../components/AttachmentPreview';
 import { formatMeta } from '../components/formatMeta';
 import type { ProjectTask, TaskLink, TaskStatus, TaskPriority } from '../../types/project';
 
@@ -194,6 +196,50 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
     // config_item：移动端暂无构型详情，只读
   };
 
+  // 快速预览：零部件/装配 → STP 3D 预览（新标签）；图文档 → 首个可预览附件
+  const [previewingId, setPreviewingId] = useState<string | null>(null);
+  const onPreview = async (l: TaskLink, e: ReactMouseEvent) => {
+    e.stopPropagation();
+    if (previewingId) return;
+    setPreviewingId(l.id);
+    try {
+      if (l.entity_type === 'document') {
+        const res = await documentsApi.listAttachments(l.entity_id);
+        const atts = ((res.data ?? []) as PreviewAttachment[]).filter((a) => a.file_name);
+        const att = atts.find((a) => isAttachmentPreviewable(a.file_name));
+        if (!att) {
+          window.alert('该图文档暂无可用预览附件');
+          return;
+        }
+        await openAttachmentInNewTab(att);
+        return;
+      }
+      // 零部件/装配：STP 三维预览（同步占位空标签，异步取 token 后写入，防弹窗拦截）
+      if (l.entity_type === 'assembly') {
+        const url = `/stp-viewer?assembly=${l.entity_id}&code=${encodeURIComponent(l.entity_code ?? '')}&name=${encodeURIComponent(l.entity_name ?? '')}`;
+        const w = window.open('', '_blank');
+        if (w) w.location.href = url;
+        return;
+      }
+      if (l.entity_type === 'part') {
+        const list = (await partsApi.listAttachments(l.entity_id)) as Array<{ id: string; file_name?: string }>;
+        const stp = list.find((a) => /\.(stp|step)$/i.test(a.file_name ?? ''));
+        if (!stp) {
+          window.alert('该零件暂无 STP 三维模型');
+          return;
+        }
+        const t = await mediaApi.token(stp.id, 'gltf');
+        const url = `/stp-viewer?id=${encodeURIComponent(stp.id)}&token=${encodeURIComponent(t)}&code=${encodeURIComponent(l.entity_code ?? '')}&version=${encodeURIComponent(l.entity_version ?? '')}&name=${encodeURIComponent(l.entity_name ?? '')}`;
+        const w = window.open('', '_blank');
+        if (w) w.location.href = url;
+      }
+    } catch {
+      window.alert('预览失败，请重试');
+    } finally {
+      setPreviewingId(null);
+    }
+  };
+
   const TABS: Array<{ key: typeof tab; label: string }> = [
     { key: 'overview', label: '概览' },
     { key: 'children', label: `子任务${cur.children?.length ? ` (${cur.children.length})` : ''}` },
@@ -315,11 +361,21 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
                           onClick={() => openLink(l)}
                           className="w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm"
                         >
-                          {/* 行1：编号 + 版本（类型已由分区标题区分） */}
+                          {/* 行1：编号 + 预览按钮 + 版本（类型已由分区标题区分） */}
                           <span className="flex items-center gap-2 min-w-0">
                             <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
                               {l.entity_code || l.entity_name || '未知对象'}
                             </span>
+                            {(l.entity_type === 'part' || l.entity_type === 'assembly' || l.entity_type === 'document') && (
+                              <button
+                                type="button"
+                                onClick={(e) => onPreview(l, e)}
+                                disabled={previewingId === l.id}
+                                className="shrink-0 px-2 min-h-7 rounded bg-primary-50 text-primary-600 text-xs font-medium disabled:opacity-60"
+                              >
+                                {previewingId === l.id ? '加载中...' : '预览'}
+                              </button>
+                            )}
                             {l.entity_version && (
                               <span className="shrink-0 text-xs text-gray-400">{l.entity_version}</span>
                             )}
