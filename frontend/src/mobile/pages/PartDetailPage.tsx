@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { partsApi } from '../../services/api';
+import { customFieldsApi, partsApi } from '../../services/api';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
 import MobileCardList from '../components/MobileCardList';
@@ -55,13 +55,21 @@ function sortedByOrder(list: BomChild[]): BomChild[] {
   return [...list].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 }
 
-function OverviewRow({ label, children }: { label: string; children?: ReactNode }) {
-  return (
-    <div className="py-2.5">
-      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-      <div className="text-sm text-gray-900 break-all">{children}</div>
-    </div>
-  );
+/** 自定义字段定义（component 适用） */
+interface CfDef {
+  id: string;
+  name: string;
+  field_key?: string;
+  field_type?: string;
+  applies_to?: string[];
+}
+
+/** 自定义字段值展示：null/undefined/空数组/空串 → null（渲染为 "-"） */
+function cfDisplay(v: unknown): string | null {
+  if (v == null) return null;
+  if (Array.isArray(v)) return v.length ? v.join('、') : null;
+  const s = String(v);
+  return s.trim() ? s : null;
 }
 
 export default function PartDetailPage() {
@@ -86,6 +94,12 @@ export default function PartDetailPage() {
   const [versions, setVersions] = useState<PartRevision[]>([]);
   const [verLoading, setVerLoading] = useState(false);
   const [verError, setVerError] = useState<string | null>(null);
+
+  // 自定义字段（component 定义 + 最新版本的值）
+  const [cfDefs, setCfDefs] = useState<CfDef[]>([]);
+  const [cfValues, setCfValues] = useState<Record<string, unknown>>({});
+  const [cfLoading, setCfLoading] = useState(false);
+  const [cfError, setCfError] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -193,9 +207,46 @@ export default function PartDetailPage() {
     };
   }, [id, activeTab]);
 
+  // 自定义字段：详情就绪后加载 component 定义与最新版本值
+  useEffect(() => {
+    let alive = true;
+    if (!revisionId) return;
+    setCfLoading(true);
+    setCfError(false);
+    customFieldsApi
+      .listDefinitions()
+      .then((res: any) => {
+        const defs = ((res?.data ?? res ?? []) as CfDef[]).filter((d) =>
+          (d.applies_to || []).includes('component')
+        );
+        if (alive) setCfDefs(defs);
+      })
+      .catch(() => {
+        if (alive) setCfError(true);
+      });
+    customFieldsApi
+      .getValues('component', revisionId)
+      .then((res: any) => {
+        const vals: Record<string, unknown> = {};
+        ((res?.data ?? res ?? []) as Array<{ field_id: string; value: unknown }>).forEach((v) => {
+          vals[v.field_id] = v.value;
+        });
+        if (alive) setCfValues(vals);
+      })
+      .catch(() => {
+        // 值加载失败不阻塞字段展示（显示 "-"）
+      })
+      .finally(() => {
+        if (alive) setCfLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [revisionId]);
+
   const title = detail ? `${detail.code} ${detail.name}` : id ?? '零部件详情';
 
-  // 概览字段以后端 PartMasterResponse 实际返回字段为准
+  // 概览标准字段（空值渲染为 "-"；字段以后端 PartMasterResponse 实际返回字段为准）
   const overviewRows: Array<{ label: string; value?: ReactNode }> = [
     { label: '件号', value: detail?.code },
     { label: '名称', value: detail?.name },
@@ -218,7 +269,15 @@ export default function PartDetailPage() {
     { label: '检出时间', value: fmtDateTime(detail?.latest_revision?.check_out_date) },
     { label: '创建时间', value: fmtDateTime(detail?.created_at) },
     { label: '更新时间', value: fmtDateTime(detail?.updated_at) },
-  ].filter((r) => r.value !== undefined && r.value !== null && r.value !== '');
+  ];
+
+  // 自定义字段（component 定义 + 值，空值 "-"）
+  const cfRows: Array<{ label: string; value?: ReactNode }> = cfDefs.map((d) => ({
+    label: d.name,
+    value: cfDisplay(cfValues[d.id]) ?? undefined,
+  }));
+
+  const allRows = [...overviewRows, ...cfRows];
 
   return (
     <div className="flex flex-col">
@@ -256,16 +315,19 @@ export default function PartDetailPage() {
       {!loading && !error && detail && (
         <div className="p-3">
           {activeTab === 'overview' && (
-            <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
-              {overviewRows.length === 0 ? (
-                <EmptyState text="暂无概览信息" />
-              ) : (
-                overviewRows.map((r, i) => (
-                  <div key={r.label} className={i > 0 ? 'border-t border-gray-100' : ''}>
-                    <OverviewRow label={r.label}>{r.value}</OverviewRow>
-                  </div>
-                ))
+            <div>
+              {cfLoading && <p className="text-center text-xs text-gray-400 py-2">自定义字段加载中...</p>}
+              {!cfLoading && cfError && (
+                <p className="text-center text-xs text-red-400 py-2">自定义字段加载失败</p>
               )}
+              <div className="grid grid-cols-2 gap-2">
+                {allRows.map((r) => (
+                  <div key={r.label} className="bg-white rounded-lg px-3 py-2.5 min-h-14 shadow-sm">
+                    <div className="text-xs text-gray-500 mb-0.5 truncate">{r.label}</div>
+                    <div className="text-sm text-gray-900 break-all">{r.value ?? '-'}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
