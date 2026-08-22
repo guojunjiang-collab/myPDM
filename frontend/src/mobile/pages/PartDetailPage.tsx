@@ -106,12 +106,21 @@ function AttachmentSection({ title, items }: { title: string; items: PartAttachm
   );
 }
 
-export default function PartDetailPage() {
+interface Props {
+  /** 覆盖层模式（列表页内嵌）传入；路由模式缺省时从 /parts/:id 读取 */
+  masterId?: string;
+  revisionId?: string;
+  /** 覆盖层模式返回回调（缺省时返回按钮走 navigate(-1)） */
+  onBack?: () => void;
+}
+
+export default function PartDetailPage({ masterId: propMasterId, revisionId: propRevisionId, onBack }: Props = {}) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { id } = useParams<{ id: string }>();
+  const { id: paramId } = useParams<{ id: string }>();
+  const id = propMasterId ?? paramId;
   // 可选深链参数 rev：指定查看某个历史版本（列表"全部版本"行进入）
-  const revParam = new URLSearchParams(location.search).get('rev') ?? undefined;
+  const revParam = new URLSearchParams(location.search).get('rev') ?? propRevisionId;
   const [detail, setDetail] = useState<PartDetail | null>(null);
   const [selectedRev, setSelectedRev] = useState<PartRevisionBrief | null>(null);
   const [loading, setLoading] = useState(true);
@@ -456,7 +465,7 @@ export default function PartDetailPage() {
         <div className="flex items-center gap-1 min-h-10">
           <button
             aria-label="返回"
-            onClick={() => navigate(-1)}
+            onClick={() => (onBack ? onBack() : navigate(-1))}
             className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-gray-600"
           >
             ‹

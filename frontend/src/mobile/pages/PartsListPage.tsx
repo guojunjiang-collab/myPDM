@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { partsApi } from '../../services/api';
 import { useDebounced } from '../../hooks/useDebounced';
 import MobileCardList from '../components/MobileCardList';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
+import PartDetailPage from './PartDetailPage';
 import type { PartListItem } from '../../types';
 
 const STATUS_MAP: Record<string, { label: string; cls: string }> = {
@@ -33,6 +34,33 @@ export default function PartsListPage() {
   const [items, setItems] = useState<PartListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // 详情覆盖层模式：点卡片在列表上方打开全屏详情（列表不卸载、不重新加载、滚动位置天然保留），
+  // 返回 = 关闭覆盖层，列表原地不动
+  const [selected, setSelected] = useState<{ masterId: string; rev?: string } | null>(null);
+  const overlayRef = useRef(false);
+  useEffect(() => {
+    overlayRef.current = selected != null;
+  }, [selected]);
+  // 系统返回（popstate）：弹掉哨兵后关闭覆盖层
+  useEffect(() => {
+    const onPop = () => {
+      const cur = window.history.state as { mobilePartsOverlay?: boolean } | null;
+      if (!cur?.mobilePartsOverlay && overlayRef.current) {
+        setSelected(null);
+      }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+  const openDetail = (masterId: string, rev?: string) => {
+    setSelected({ masterId, rev });
+    window.history.pushState({ mobilePartsOverlay: true }, '');
+  };
+  const closeDetail = () => {
+    setSelected(null);
+    window.history.back();
+  };
 
   useEffect(() => {
     let alive = true;
@@ -143,11 +171,19 @@ export default function PartsListPage() {
           </div>
         )}
         onClick={(p) =>
-          navigate(
-            showAllVersions ? `/parts/${p.master_id}?rev=${p.revision_id}` : `/parts/${p.master_id}`
-          )
+          openDetail(p.master_id, showAllVersions ? p.revision_id : undefined)
         }
       />
+      {/* 详情覆盖层：列表保持原状，详情叠在上方 */}
+      {selected && (
+        <div className="fixed inset-0 z-50 bg-gray-50 overflow-y-auto">
+          <PartDetailPage
+            masterId={selected.masterId}
+            revisionId={selected.rev}
+            onBack={closeDetail}
+          />
+        </div>
+      )}
     </div>
   );
 }
