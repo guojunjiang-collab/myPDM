@@ -433,7 +433,7 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
                                 type="button"
                                 onClick={(e) => onPreview(l, e)}
                                 disabled={previewingId === l.id}
-                                className="shrink-0 px-2.5 min-h-7 rounded bg-primary-50 text-primary-600 text-xs font-medium disabled:opacity-60"
+                                className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-primary-600 text-white disabled:opacity-60"
                               >
                                 {previewingId === l.id ? '加载中...' : '预览'}
                               </button>
