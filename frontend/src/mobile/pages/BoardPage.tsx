@@ -158,6 +158,7 @@ export default function BoardPage() {
   const {
     stack: itemStack,
     openDetail: openItemDetail,
+    pushTarget,
     handleDetailNavigate,
   } = useDetailOverlay();
 
@@ -228,7 +229,7 @@ export default function BoardPage() {
       </div>
 
       {/* 条目详情覆盖层栈：看板保持原状（展开/筛选/滚动位置全保留），逐级返回 */}
-      <DetailOverlayStack stack={itemStack} onNavigate={handleDetailNavigate} />
+      <DetailOverlayStack stack={itemStack} onNavigate={handleDetailNavigate} pushTarget={pushTarget} />
     </div>
   );
 }

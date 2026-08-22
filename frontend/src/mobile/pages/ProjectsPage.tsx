@@ -2,10 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { projectApi } from '../../services/projectApi';
 import { useDebounced } from '../../hooks/useDebounced';
+import { useDetailOverlayPush } from '../hooks/useDetailOverlay';
 import MobileCardList from '../components/MobileCardList';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
 import { formatMeta } from '../components/formatMeta';
+import TaskDetailPage from './TaskDetailPage';
 import type { Project, ProjectTask } from '../../types/project';
 
 /* ================================================================
@@ -38,19 +40,7 @@ const TASK_STATUS_MAP: Record<string, { label: string; cls: string }> = {
 };
 
 /** GET /api/projects/{id}/tasks 返回嵌套任务树（backend crud_project.get_task_tree），
- *  此处拍平为带层级的行序列，供移动端逐行展示。 */
-interface FlatTask {
-  task: ProjectTask;
-  depth: number;
-}
-
-function flattenTasks(roots: ProjectTask[], depth = 0, out: FlatTask[] = []): FlatTask[] {
-  for (const t of roots) {
-    out.push({ task: t, depth });
-    if (t.children?.length) flattenTasks(t.children, depth + 1, out);
-  }
-  return out;
-}
+ *  移动端以可展开/折叠树呈现（默认展开第 1 层级，工具按钮展开各层级）。 */
 
 interface TaskStats {
   total: number;
@@ -81,6 +71,75 @@ function fmtDate(v?: string | null): string {
   if (!v) return '';
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString('zh-CN');
+}
+
+/* 任务树节点：层级缩进 + 展开箭头 + 行内容；点击行打开任务详情 */
+function TaskTreeNode({
+  task,
+  depth,
+  expanded,
+  onToggle,
+  onOpen,
+}: {
+  task: ProjectTask;
+  depth: number;
+  expanded: Record<string, boolean>;
+  onToggle: (tid: string) => void;
+  onOpen: (task: ProjectTask) => void;
+}) {
+  const hasChildren = (task.children?.length ?? 0) > 0;
+  const isOpen = expanded[task.id] === true;
+  return (
+    <>
+      <div
+        className="bg-white rounded-lg shadow-sm flex items-center gap-1 py-2 pr-3"
+        style={{ paddingLeft: 10 + depth * 14 }}
+      >
+        <button
+          type="button"
+          aria-label={hasChildren ? (isOpen ? '折叠' : '展开') : '无子任务'}
+          onClick={() => hasChildren && onToggle(task.id)}
+          className={`shrink-0 w-7 h-7 flex items-center justify-center text-sm leading-none ${
+            hasChildren ? 'text-gray-500' : 'text-gray-300'
+          }`}
+        >
+          {hasChildren ? (isOpen ? '▾' : '▸') : '•'}
+        </button>
+        <button
+          type="button"
+          onClick={() => onOpen(task)}
+          className="flex-1 min-w-0 flex flex-col justify-center text-left"
+        >
+          <span className="flex items-center gap-2 min-w-0">
+            <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
+              {task.code} {task.name}
+            </span>
+            <StatusBadge status={task.status} map={TASK_STATUS_MAP} />
+          </span>
+          <span className="mt-0.5 text-xs text-gray-500 flex flex-wrap items-center gap-2">
+            <span>
+              {formatMeta([
+                ['计划', `${task.planned_start || '—'} ~ ${task.planned_end || '—'}`],
+                ['负责人', task.assignee_name || '—'],
+              ])}
+            </span>
+          </span>
+        </button>
+      </div>
+      {hasChildren &&
+        isOpen &&
+        task.children!.map((c) => (
+          <TaskTreeNode
+            key={c.id}
+            task={c}
+            depth={depth + 1}
+            expanded={expanded}
+            onToggle={onToggle}
+            onOpen={onOpen}
+          />
+        ))}
+    </>
+  );
 }
 
 interface Props {
@@ -189,8 +248,62 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
   );
 
   const stats = useMemo(() => taskStats(tasks), [tasks]);
-  const flatTasks = useMemo(() => flattenTasks(tasks), [tasks]);
   const percent = stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : 0;
+
+  /* ---- 任务树展开状态：默认展开第 1 层级（根任务） ---- */
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    // 任务加载完成时重置：默认展开根任务（第 1 层级）
+    const init: Record<string, boolean> = {};
+    for (const t of tasks) init[t.id] = true;
+    setExpanded(init);
+  }, [tasks]);
+
+  /** 展开到指定层级（0=收起全部，null=全部展开） */
+  const expandToLevel = (level: number | null) => {
+    const next: Record<string, boolean> = {};
+    const walk = (ts: ProjectTask[], d: number) => {
+      for (const t of ts) {
+        next[t.id] = level === null || d < level;
+        if (t.children?.length) walk(t.children, d + 1);
+      }
+    };
+    walk(tasks, 0);
+    setExpanded(next);
+  };
+
+  const toggleTask = (tid: string) => {
+    setExpanded((prev) => ({ ...prev, [tid]: !(prev[tid] === true) }));
+  };
+
+  /* ---- 任务详情：详情栈内（Context push）或独立路由本地覆盖层 ---- */
+  const overlayPush = useDetailOverlayPush();
+  const [taskOverlay, setTaskOverlay] = useState<ProjectTask | null>(null);
+  const taskOverlayRef = useRef(false);
+  useEffect(() => {
+    taskOverlayRef.current = taskOverlay != null;
+  }, [taskOverlay]);
+  // 独立路由模式本地任务覆盖层：压哨兵，系统返回/‹ 关闭
+  useEffect(() => {
+    const onPop = () => {
+      if (taskOverlayRef.current) setTaskOverlay(null);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+  const openTask = (task: ProjectTask) => {
+    if (overlayPush && id) {
+      // 详情栈模式（如从零部件反查进入）：推入详情栈，全面屏手势逐级返回
+      overlayPush.push({ kind: 'task', projectId: id, task });
+    } else {
+      setTaskOverlay(task);
+      window.history.pushState({ mobileTaskOverlay: true }, '');
+    }
+  };
+  const closeTaskOverlay = () => {
+    setTaskOverlay(null);
+    window.history.back();
+  };
 
   /* ---------------- 详情视图（/projects/:id） ---------------- */
   if (id) {
@@ -244,32 +357,72 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
               </div>
             </div>
 
-            {/* 任务列表（甘特图不渲染：任务 + 日期文本，按层级缩进） */}
+            {/* 任务树：默认展开第 1 层级；工具按钮提供各层级展开/收起；行点击打开任务详情（多 Tab） */}
             <div className="flex flex-col gap-2">
-              <div className="px-1 text-xs text-gray-400">任务列表（{stats.total}）</div>
+              <div className="flex items-center justify-between gap-2 px-1">
+                <span className="text-xs text-gray-400">任务列表（{stats.total}）</span>
+                <div className="flex gap-1">
+                  {(
+                    [
+                      { lv: 1, label: '1层' },
+                      { lv: 2, label: '2层' },
+                      { lv: 3, label: '3层' },
+                    ] as const
+                  ).map((b) => (
+                    <button
+                      key={b.lv}
+                      type="button"
+                      onClick={() => expandToLevel(b.lv)}
+                      className="min-h-8 px-2.5 rounded-lg bg-white border border-gray-200 text-xs text-gray-600"
+                    >
+                      {b.label}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => expandToLevel(null)}
+                    className="min-h-8 px-2.5 rounded-lg bg-primary-600 text-white text-xs"
+                  >
+                    全部
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => expandToLevel(0)}
+                    className="min-h-8 px-2.5 rounded-lg bg-white border border-gray-200 text-xs text-gray-600"
+                  >
+                    收起
+                  </button>
+                </div>
+              </div>
               {tasks.length === 0 ? (
                 <EmptyState text="暂无任务" />
               ) : (
-                flatTasks.map(({ task, depth }) => (
-                  <div
-                    key={task.id}
-                    className="bg-white rounded-lg px-4 py-2.5 shadow-sm"
-                    style={{ paddingLeft: 16 + depth * 14 }}
-                  >
-                    <div className="text-sm text-gray-900 break-all">{task.code} {task.name}</div>
-                    <div className="mt-1 text-xs text-gray-500 flex flex-wrap items-center gap-2">
-                      <StatusBadge status={task.status} map={TASK_STATUS_MAP} />
-                      <span>
-                        {formatMeta([
-                          ['计划', `${task.planned_start || '—'} ~ ${task.planned_end || '—'}`],
-                          ['负责人', task.assignee_name || '—'],
-                        ])}
-                      </span>
-                    </div>
-                  </div>
-                ))
+                <div className="flex flex-col gap-1.5">
+                  {tasks.map((t) => (
+                    <TaskTreeNode
+                      key={t.id}
+                      task={t}
+                      depth={0}
+                      expanded={expanded}
+                      onToggle={toggleTask}
+                      onOpen={openTask}
+                    />
+                  ))}
+                </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* 独立路由模式：任务详情本地覆盖层（详情栈模式由 DetailOverlayStack 渲染） */}
+        {taskOverlay && (
+          <div className="fixed inset-0 z-50 bg-gray-50 overflow-y-auto">
+            <TaskDetailPage
+              projectId={id}
+              task={taskOverlay}
+              onBack={closeTaskOverlay}
+              onNavigate={(to) => navigate(to)}
+            />
           </div>
         )}
       </div>

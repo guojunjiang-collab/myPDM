@@ -61,6 +61,8 @@ export interface TaskLink {
   entity_name?: string | null;
   entity_spec?: string | null;
   entity_remark?: string | null;
+  /** 零部件/构型项等实体的主数据 id（跳转详情用），后端 _link_dict 返回 */
+  entity_master_id?: string | null;
 }
 
 export interface TaskComment {

@@ -1,10 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import type { ProjectTask } from '../../types/project';
 
 export type DetailTarget =
   | { kind: 'part'; id: string; rev?: string }
   | { kind: 'document'; id: string }
   | { kind: 'project'; id: string }
-  | { kind: 'ec'; ecType: 'eco' | 'ecr'; id: string };
+  | { kind: 'ec'; ecType: 'eco' | 'ecr'; id: string }
+  | { kind: 'task'; projectId: string; task: ProjectTask };
+
+/**
+ * 详情覆盖层栈上下文：详情内容（如项目详情）需要把任务详情等无路由目标推入详情栈时使用，
+ * 与栈共用同一 popstate 哨兵（逐级返回），避免多个 popstate 消费者互相冲突。
+ */
+export const DetailOverlayContext = createContext<{ push: (t: DetailTarget) => void } | null>(null);
 
 /**
  * 详情覆盖层栈（零部件/图文档/看板等主界面共用）：
@@ -36,36 +44,42 @@ export function useDetailOverlay() {
     window.history.pushState({ mobileDetailOverlay: true }, '');
   };
 
+  /** 直接把详情目标推入栈（供详情内容通过 Context 使用，如项目详情打开任务详情） */
+  const pushTarget = (t: DetailTarget) => {
+    setStack((prev) => [...prev, t]);
+    window.history.pushState({ mobileDetailOverlay: true }, '');
+  };
+
   /** 详情内跳转分流：零部件/图文档/项目/EC → 栈内导航（压哨兵，可逐级返回）；其他 → 新标签 */
   const handleDetailNavigate = (to: string) => {
     const seg = to.split('?')[0].split('/').filter(Boolean);
     if (seg[0] === 'parts' && seg[1] && seg[1] !== 'compare') {
-      setStack((prev) => [...prev, { kind: 'part', id: seg[1] }]);
-      window.history.pushState({ mobileDetailOverlay: true }, '');
+      pushTarget({ kind: 'part', id: seg[1] });
       return;
     }
     if (seg[0] === 'documents' && seg[1]) {
-      setStack((prev) => [...prev, { kind: 'document', id: seg[1] }]);
-      window.history.pushState({ mobileDetailOverlay: true }, '');
+      pushTarget({ kind: 'document', id: seg[1] });
       return;
     }
     if (seg[0] === 'projects' && seg[1]) {
-      setStack((prev) => [...prev, { kind: 'project', id: seg[1] }]);
-      window.history.pushState({ mobileDetailOverlay: true }, '');
+      pushTarget({ kind: 'project', id: seg[1] });
       return;
     }
     if (seg[0] === 'ec' && seg[1] === 'eco' && seg[2]) {
-      setStack((prev) => [...prev, { kind: 'ec', ecType: 'eco', id: seg[2] }]);
-      window.history.pushState({ mobileDetailOverlay: true }, '');
+      pushTarget({ kind: 'ec', ecType: 'eco', id: seg[2] });
       return;
     }
     if (seg[0] === 'ec' && seg[1] === 'ecr' && seg[2]) {
-      setStack((prev) => [...prev, { kind: 'ec', ecType: 'ecr', id: seg[2] }]);
-      window.history.pushState({ mobileDetailOverlay: true }, '');
+      pushTarget({ kind: 'ec', ecType: 'ecr', id: seg[2] });
       return;
     }
     window.open(to, '_blank');
   };
 
-  return { stack, openDetail, handleDetailNavigate };
+  return { stack, openDetail, pushTarget, handleDetailNavigate };
+}
+
+/** 详情栈内内容取 push（无 Provider 时返回 null，调用方回落本地覆盖层） */
+export function useDetailOverlayPush() {
+  return useContext(DetailOverlayContext);
 }

@@ -47,7 +47,7 @@ export default function PartsListPage() {
 
   // 详情覆盖层栈：点卡片打开第一层，详情内跳转（BOM 下钻/反查）逐级入栈，返回逐级弹出；
   // 列表不卸载、滚动位置天然保留
-  const { stack, openDetail, handleDetailNavigate } = useDetailOverlay();
+  const { stack, openDetail, pushTarget, handleDetailNavigate } = useDetailOverlay();
 
   // 兜底：覆盖层主路径不卸载、位置天然保留；但详情内跳转（新标签外的路由跳转）会离开
   // /parts 路由导致列表重挂载 → 卸载时保存 main 滚动位置，重挂载首次加载完成后恢复
@@ -183,7 +183,7 @@ export default function PartsListPage() {
         }
       />
       {/* 详情覆盖层栈：全部渲染保留状态，只显示栈顶；逐级返回 */}
-      <DetailOverlayStack stack={stack} onNavigate={handleDetailNavigate} />
+      <DetailOverlayStack stack={stack} onNavigate={handleDetailNavigate} pushTarget={pushTarget} />
     </div>
   );
 }
