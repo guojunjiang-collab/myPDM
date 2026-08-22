@@ -62,6 +62,27 @@ export default function PartsListPage() {
     window.history.back();
   };
 
+  // 兜底：覆盖层主路径不卸载、位置天然保留；但详情内跳转（BOM 子项/图文档/对比/3D 等）会离开
+  // /parts 路由导致列表重挂载 → 卸载时保存 main 滚动位置，重挂载首次加载完成后恢复
+  const restoredRef = useRef(false);
+  const [loadedOnce, setLoadedOnce] = useState(false);
+  useEffect(() => {
+    if (loading) return;
+    if (!loadedOnce) setLoadedOnce(true);
+  }, [loading, loadedOnce]);
+  useEffect(() => {
+    if (!loadedOnce || restoredRef.current) return;
+    restoredRef.current = true;
+    const saved = Number(sessionStorage.getItem('mobile.parts.scroll') || '0');
+    if (saved > 0) document.querySelector('main')?.scrollTo(0, saved);
+  }, [loadedOnce]);
+  useEffect(() => {
+    return () => {
+      const main = document.querySelector('main');
+      if (main) sessionStorage.setItem('mobile.parts.scroll', String(main.scrollTop));
+    };
+  }, []);
+
   useEffect(() => {
     let alive = true;
     setLoading(true);
