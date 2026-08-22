@@ -10,6 +10,7 @@ import { mediaApi } from '../../services/api';
  * - STP/STEP     → /stp-viewer（三维查看器）
  * - Markdown     → /markdown-reader（react-markdown 渲染）
  * - 文本          → /preview（浏览器原生显示纯文本）
+ * - HTML         → /preview（浏览器原生渲染网页）
  * - 其余          → 不可预览（仅附件卡片）
  */
 
@@ -18,6 +19,7 @@ const OFFICE_EXTS = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'];
 const STP_EXTS = ['stp', 'step'];
 const MD_EXTS = ['md', 'markdown', 'qmd'];
 const TEXT_EXTS = ['txt', 'csv', 'log', 'json', 'xml'];
+const HTML_EXTS = ['html', 'htm'];
 
 export interface PreviewAttachment {
   id: string;
@@ -52,7 +54,8 @@ export function isAttachmentPreviewable(fileName?: string): boolean {
     OFFICE_EXTS.includes(ext) ||
     STP_EXTS.includes(ext) ||
     MD_EXTS.includes(ext) ||
-    TEXT_EXTS.includes(ext)
+    TEXT_EXTS.includes(ext) ||
+    HTML_EXTS.includes(ext)
   );
 }
 
