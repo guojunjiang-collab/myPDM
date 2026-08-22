@@ -296,8 +296,8 @@ export default function Projects() {
     [currentProject?.is_manager],
   );
 
-  // 展开层级下拉的受控值:'collapsed'|'all'|数字字符串|'custom'
-  const [expandSel, setExpandSel] = useState<string>('all');
+  // 展开层级下拉的受控值:'collapsed'|'all'|数字字符串|'custom'（默认与 expanded 空集一致 = 全部折叠）
+  const [expandSel, setExpandSel] = useState<string>('collapsed');
 
   const toggle = (tid: string) => {
     const next = new Set(expanded);
