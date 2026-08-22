@@ -6,6 +6,7 @@ import DashboardPage from './pages/DashboardPage';
 import PartsListPage from './pages/PartsListPage';
 import PartDetailPage from './pages/PartDetailPage';
 import PartBomPage from './pages/PartBomPage';
+import BomComparePage from './pages/BomComparePage';
 import DocumentsListPage from './pages/DocumentsListPage';
 import DocumentDetailPage from './pages/DocumentDetailPage';
 import ProjectsPage from './pages/ProjectsPage';
@@ -23,6 +24,7 @@ export default function MobileRoot() {
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="board" element={<BoardPage />} />
         <Route path="parts" element={<PartsListPage />} />
+        <Route path="parts/compare" element={<BomComparePage />} />
         <Route path="parts/:id" element={<PartDetailPage />} />
         {/* BOM 逐级下钻：/parts/:id/bom（首层）与 /parts/:id/bom/:childId[/bom/:childId...]（任意深度）。
             用 splat（*）而非固定段路由：下钻路径会累积 /bom/:childId 段，固定路由无法匹配第 3 层及更深。 */}

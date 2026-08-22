@@ -28,6 +28,8 @@ export default function PartsListPage() {
   const [typeFilter, setTypeFilter] = useState('');
   // 全部版本：显示每个物料的所有版本行（对齐桌面 show_all_versions 开关）
   const [showAllVersions, setShowAllVersions] = useState(false);
+  // 仅顶层：只显示没有父项的最顶层零部件（对齐桌面 top_level 参数）
+  const [topLevel, setTopLevel] = useState(false);
   const [items, setItems] = useState<PartListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +43,7 @@ export default function PartsListPage() {
         search: debounced || undefined,
         type: typeFilter || undefined,
         show_all_versions: showAllVersions || undefined,
+        top_level: topLevel || undefined,
         page_size: 50,
       })
       .then((data: { items?: PartListItem[] }) => {
@@ -62,7 +65,7 @@ export default function PartsListPage() {
     return () => {
       alive = false;
     };
-  }, [debounced, typeFilter, showAllVersions]);
+  }, [debounced, typeFilter, showAllVersions, topLevel]);
 
   return (
     <div className="flex flex-col h-full">
@@ -84,10 +87,22 @@ export default function PartsListPage() {
             </button>
           ))}
           <button
+            onClick={() => setTopLevel((v) => !v)}
+            className={`min-h-10 px-3 rounded-full text-xs ${topLevel ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+          >
+            顶层
+          </button>
+          <button
             onClick={() => setShowAllVersions((v) => !v)}
             className={`min-h-10 px-3 rounded-full text-xs ${showAllVersions ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
           >
             全部版本
+          </button>
+          <button
+            onClick={() => navigate('/parts/compare')}
+            className="min-h-10 px-3 rounded-full text-xs bg-white text-primary-600 border border-primary-600"
+          >
+            ⇄ BOM对比
           </button>
         </div>
       </div>
