@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { configurationApi, mediaApi, partsApi } from '../../services/api';
+import type { ReactNode } from 'react';
+import { configurationApi, customFieldsApi, mediaApi, partsApi } from '../../services/api';
 import { useDetailOverlayPush } from '../hooks/useDetailOverlay';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
@@ -13,6 +14,12 @@ function fmtDate(v?: string | null): string {
   if (!v) return '';
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString('zh-CN');
+}
+
+function fmtDateTime(v?: string | null): string {
+  if (!v) return '';
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? v : d.toLocaleString('zh-CN', { hour12: false });
 }
 
 /* ================================================================
@@ -78,6 +85,59 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
 
   const code = detail?.revision.code || detail?.master.code || revisionId || '';
   const name = detail?.revision.name || detail?.master.name || '';
+
+  // 自定义字段（configuration_item 定义 + 当前版本值，参照零部件详情-概览）
+  const [cfDefs, setCfDefs] = useState<Array<{ id: string; name: string; field_type?: string }>>([]);
+  const [cfValues, setCfValues] = useState<Record<string, unknown>>({});
+  const [cfLoading, setCfLoading] = useState(false);
+  const [cfError, setCfError] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    if (!revisionId) return;
+    setCfLoading(true);
+    setCfError(false);
+    customFieldsApi
+      .listDefinitions()
+      .then((res: any) => {
+        const defs = ((res?.data ?? res ?? []) as Array<{ id: string; name: string; field_type?: string; applies_to?: string[] }>).filter((d) =>
+          (d.applies_to || []).includes('configuration_item'),
+        );
+        if (alive) setCfDefs(defs);
+      })
+      .catch(() => {
+        // 定义加载失败不阻塞字段展示
+      });
+    customFieldsApi
+      .getValues('configuration_item', revisionId)
+      .then((res: any) => {
+        const vals: Record<string, unknown> = {};
+        ((res?.data ?? res ?? []) as Array<{ field_id: string; value: unknown }>).forEach((v) => {
+          vals[v.field_id] = v.value;
+        });
+        if (alive) setCfValues(vals);
+      })
+      .catch(() => {
+        // 值加载失败不阻塞字段展示（显示 "-"）
+      })
+      .finally(() => {
+        if (alive) setCfLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [revisionId]);
+
+  // 自定义字段值展示：null/undefined/空数组/空串 → null（渲染为 "-"）
+  const cfDisplay = (v: unknown): string | null => {
+    if (v == null) return null;
+    if (Array.isArray(v)) return v.length ? v.join('、') : null;
+    const s = String(v);
+    return s.trim() ? s : null;
+  };
+  const cfRows: Array<{ label: string; value?: ReactNode }> = cfDefs.map((d) => ({
+    label: d.name,
+    value: cfDisplay(cfValues[d.id]) ?? undefined,
+  }));
 
   const openPart = (masterId?: string, revId?: string) => {
     // PartDetailPage 的 :id 是 master_id；rev 参数定位到关联版本
@@ -179,24 +239,61 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
         {!loading && !error && !detail && <EmptyState text="未找到构型项" />}
 
         {!loading && !error && detail && tab === 'overview' && (
-          <div className="flex flex-col gap-2">
-            <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
-              <div className="flex items-center gap-2">
-                <StatusBadge status={detail.revision.status} map={STATUS_MAP} />
-                <span className="text-xs text-gray-500">版本 {detail.revision.version}</span>
-              </div>
-              <div className="mt-2 text-sm font-medium text-gray-900 break-all">{code} {name}</div>
-              <div className="mt-1 text-xs text-gray-500">
-                {formatMeta([
-                  ['签出', detail.revision.check_out_user_name || detail.revision.check_out_user_id || undefined],
-                  ['迭代', detail.revision.latest_iteration != null ? String(detail.revision.latest_iteration) : undefined],
-                  ['创建时间', fmtDate(detail.revision.created_at)],
-                ])}
-              </div>
-              {detail.revision.remark && (
-                <div className="mt-2 text-xs text-gray-600 whitespace-pre-wrap">{detail.revision.remark}</div>
-              )}
+          <div>
+            {/* 基本信息区：2 列网格卡片（参照零部件详情-概览） */}
+            <div className="text-sm font-bold text-gray-900 mb-2">基本信息</div>
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  { label: '构型号', value: code },
+                  { label: '名称', value: name },
+                  {
+                    label: '状态',
+                    value: detail.revision.status ? <StatusBadge status={detail.revision.status} map={STATUS_MAP} /> : undefined,
+                  },
+                  { label: '版本', value: detail.revision.version },
+                  {
+                    label: '迭代',
+                    value: detail.revision.latest_iteration != null ? String(detail.revision.latest_iteration) : undefined,
+                  },
+                  { label: '检出人', value: detail.revision.check_out_user_name || detail.revision.check_out_user_id },
+                  { label: '创建时间', value: fmtDate(detail.revision.created_at) },
+                  { label: '更新时间', value: fmtDate(detail.revision.check_out_date) },
+                ] as Array<{ label: string; value?: ReactNode }>
+              ).map((r) => (
+                <div key={r.label} className="bg-white rounded-lg px-3 py-2.5 min-h-14 shadow-sm">
+                  <div className="text-xs text-gray-500 mb-0.5 truncate">{r.label}</div>
+                  <div className="text-sm text-gray-900 break-all">{r.value ?? '-'}</div>
+                </div>
+              ))}
             </div>
+            {/* 备注（有内容时单独展示） */}
+            {detail.revision.remark && (
+              <div className="mt-2">
+                <div className="text-sm font-bold text-gray-900 mb-2">备注</div>
+                <div className="bg-white rounded-lg px-4 py-3 shadow-sm text-xs text-gray-600 whitespace-pre-wrap">
+                  {detail.revision.remark}
+                </div>
+              </div>
+            )}
+            {/* 自定义字段区（无定义时不显示） */}
+            {cfLoading && <p className="text-center text-xs text-gray-400 py-2 mt-2">自定义字段加载中...</p>}
+            {!cfLoading && cfError && (
+              <p className="text-center text-xs text-red-400 py-2 mt-2">自定义字段加载失败</p>
+            )}
+            {!cfLoading && !cfError && cfRows.length > 0 && (
+              <div className="mt-2">
+                <div className="text-sm font-bold text-gray-900 mb-2">自定义字段</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {cfRows.map((r) => (
+                    <div key={r.label} className="bg-white rounded-lg px-3 py-2.5 min-h-14 shadow-sm">
+                      <div className="text-xs text-gray-500 mb-0.5 truncate">{r.label}</div>
+                      <div className="text-sm text-gray-900 break-all">{r.value ?? '-'}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -327,21 +424,26 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
         )}
 
         {!loading && !error && detail && tab === 'versions' && (
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             {detail.versions.length === 0 ? (
               <EmptyState text="暂无版本历史" />
             ) : (
               detail.versions.map((v) => (
-                <div key={v.id} className="bg-white rounded-lg px-4 py-3 shadow-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-mono text-gray-900">{v.version}</span>
+                // 卡片式（参照零部件详情-版本）：当前版本高亮，行1 版本号+状态，行2 迭代/检出人/创建时间
+                <div
+                  key={v.id}
+                  className={`rounded-lg px-4 py-3 shadow-sm ${
+                    v.id === revisionId ? 'bg-primary-50 border border-primary-300' : 'bg-white'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-base font-medium text-gray-900">版本 {v.version}</span>
                     <StatusBadge status={v.status} map={STATUS_MAP} />
                   </div>
-                  <div className="mt-0.5 text-xs text-gray-500">
-                    {formatMeta([
-                      ['签出', v.check_out_user_name || undefined],
-                      ['创建时间', fmtDate(v.created_at)],
-                    ])}
+                  <div className="text-xs text-gray-500 mt-1.5 space-y-0.5">
+                    <div>最新迭代：{v.latest_iteration}</div>
+                    {v.check_out_user_name && <div>检出人：{v.check_out_user_name}</div>}
+                    <div>创建时间：{fmtDateTime(v.created_at)}</div>
                   </div>
                 </div>
               ))
