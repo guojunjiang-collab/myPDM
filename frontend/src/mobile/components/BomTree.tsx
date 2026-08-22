@@ -92,13 +92,13 @@ export default function BomTree({ rootItems }: { rootItems: BomChild[] }) {
             <span className="w-full text-sm font-medium text-gray-900 truncate">
               {b.child_code} {b.child_name}
             </span>
-            <span className="text-xs text-gray-500 mt-0.5">
-              数量 ×{b.quantity} · 版本 {b.child_version}
+            <span className="flex items-center gap-1.5 mt-0.5">
+              <span className="text-xs text-gray-500">
+                数量 ×{b.quantity} · 版本 {b.child_version}
+              </span>
+              <StatusBadge status={b.child_status} map={STATUS_MAP} />
             </span>
           </button>
-          <div className="shrink-0 flex items-center pr-2">
-            <StatusBadge status={b.child_status} map={STATUS_MAP} />
-          </div>
         </div>
         {isOpen && (
           <div className="bg-white">
