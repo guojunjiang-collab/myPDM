@@ -195,16 +195,21 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                   onClick={() => openPart(p.part_detail?.id, p.part_detail?.revision_id)}
                   className="w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm"
                 >
-                  {/* 行1：编号（左）+ 版本 + 状态（右） */}
+                  {/* 行1：编号（左）+ 用量 + 版本 + 状态（右，参照零部件 BOM Tab） */}
                   <span className="flex items-center gap-2 min-w-0">
                     <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
                       {p.part_detail?.code ?? p.part_id}
                     </span>
+                    {p.quantity != null && (
+                      <span className="shrink-0 truncate text-center text-xs text-gray-500">x{p.quantity}</span>
+                    )}
                     {p.part_detail?.version && (
-                      <span className="shrink-0 text-xs text-gray-400">{p.part_detail.version}</span>
+                      <span className="shrink-0 text-center text-xs text-gray-500">{p.part_detail.version}</span>
                     )}
                     {p.part_detail?.status && (
-                      <StatusBadge status={p.part_detail.status} map={STATUS_MAP} />
+                      <span className="shrink-0 w-12 flex justify-end">
+                        <StatusBadge status={p.part_detail.status} map={STATUS_MAP} />
+                      </span>
                     )}
                   </span>
                   {/* 行2：名称/类型信息（左）+ 预览按钮（右对齐；has_3d 可 3D 预览才显示） */}
@@ -214,7 +219,6 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                       {formatMeta([
                         ['类型', p.part_type === 'assembly' ? '部件' : '零件'],
                         ['要求', p.is_required ? '必装' : '选装'],
-                        ['数量', p.quantity != null ? String(p.quantity) : undefined],
                       ])}
                     </span>
                     {p.part_detail?.has_3d === true && (
