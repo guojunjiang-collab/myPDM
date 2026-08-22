@@ -54,6 +54,12 @@ function fmtDate(v?: string | null): string {
   return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString('zh-CN');
 }
 
+function fmtDateTime(v?: string | null): string {
+  if (!v) return '—';
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? v : d.toLocaleString('zh-CN', { hour12: false });
+}
+
 function FieldCard({ label, children }: { label: string; children?: ReactNode }) {
   return (
     <div className="bg-white rounded-lg px-3 py-3 shadow-sm min-h-14">
@@ -539,7 +545,7 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
                   <div key={c.id} className="bg-white rounded-lg px-4 py-2.5 shadow-sm">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-medium text-gray-900">{c.user_name || '用户'}</span>
-                      <span className="shrink-0 text-xs text-gray-400">{fmtDate(c.created_at)}</span>
+                      <span className="shrink-0 text-xs text-gray-400">{fmtDateTime(c.created_at)}</span>
                     </div>
                     <div className="mt-1 text-sm text-gray-700 whitespace-pre-wrap break-all">{c.content}</div>
                   </div>
