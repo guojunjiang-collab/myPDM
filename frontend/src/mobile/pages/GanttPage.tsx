@@ -141,11 +141,20 @@ export default function GanttPage({ projectId, onBack }: Props) {
                   >
                     {t.code}
                   </span>
-                  {(!t.planned_start || !t.planned_end) && (
-                    <span className="text-[10px] text-gray-400 leading-tight" style={{ paddingLeft: t.depth * 10 }}>
-                      （无日期）
-                    </span>
-                  )}
+                  {/* 行2：负责人（更小字体）；无负责人/无日期时给出提醒 */}
+                  <span
+                    className="text-[10px] leading-tight truncate"
+                    style={{ paddingLeft: t.depth * 10 }}
+                  >
+                    {t.assignee_name ? (
+                      <span className="text-gray-500">{t.assignee_name}</span>
+                    ) : (
+                      <span className="text-amber-500">未分配</span>
+                    )}
+                    {(!t.planned_start || !t.planned_end) && (
+                      <span className="text-red-400 ml-1">无日期</span>
+                    )}
+                  </span>
                 </button>
               ))}
             </div>
