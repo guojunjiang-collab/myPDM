@@ -11,6 +11,37 @@
   --color-success: #22c55e;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
+
+  /* ===== 风格统一 ui 变量（默认风格；html[data-theme] 可整体覆盖） ===== */
+  /* 徽标 tone（9 组，值 = 现状 Tailwind 色阶） */
+  --ui-blue-bg: #dbeafe;   --ui-blue-text: #1e40af;
+  --ui-orange-bg: #ffedd5; --ui-orange-text: #9a3412;
+  --ui-green-bg: #dcfce7;  --ui-green-text: #166534;
+  --ui-red-bg: #fee2e2;    --ui-red-text: #991b1b;
+  --ui-gray-bg: #f3f4f6;   --ui-gray-text: #374151;
+  --ui-amber-bg: #fef3c7;  --ui-amber-text: #92400e;
+  --ui-teal-bg: #ccfbf1;   --ui-teal-text: #115e59;
+  --ui-purple-bg: #f3e8ff; --ui-purple-text: #6b21a8;
+  --ui-indigo-bg: #e0e7ff; --ui-indigo-text: #3730a3;
+
+  /* 按钮 variant */
+  --ui-btn-primary-bg: #0284c7;      --ui-btn-primary-hover: #0369a1;
+  --ui-btn-primary-active: #075985;  --ui-btn-primary-text: #ffffff;
+  --ui-btn-secondary-bg: #ffffff;    --ui-btn-secondary-hover: #f9fafb;
+  --ui-btn-secondary-border: #d1d5db; --ui-btn-secondary-text: #374151;
+  --ui-btn-ghost-bg: #f3f4f6;        --ui-btn-ghost-hover: #e5e7eb;
+  --ui-btn-ghost-text: #374151;
+  --ui-btn-danger-bg: #dc2626;       --ui-btn-danger-hover: #b91c1c;
+  --ui-btn-danger-active: #991b1b;
+  --ui-btn-success-bg: #16a34a;      --ui-btn-success-hover: #15803d;
+  --ui-btn-dark-bg: #6b7280;         --ui-btn-dark-hover: #4b5563;
+  --ui-btn-link-text: #0284c7;       --ui-btn-link-hover: #075985;
+
+  /* 表单 */
+  --ui-input-bg: #ffffff;            --ui-input-border: #d1d5db;
+  --ui-input-text: #374151;          --ui-input-placeholder: #9ca3af;
+  --ui-input-focus-ring: #38bdf8;    --ui-input-focus-border: #0ea5e9;
+  --ui-input-disabled-bg: #f3f4f6;   --ui-input-disabled-text: #6b7280;
 }
 
 * {
