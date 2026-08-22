@@ -72,6 +72,27 @@ function cfDisplay(v: unknown): string | null {
   return s.trim() ? s : null;
 }
 
+/** 附件分区：标题 + 计数 + 卡片列表（空区显示空态） */
+function AttachmentSection({ title, items }: { title: string; items: PartAttachment[] }) {
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-sm font-medium text-gray-700">{title}</span>
+        <span className="px-1.5 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">{items.length}</span>
+      </div>
+      {items.length === 0 ? (
+        <EmptyState text={`暂无${title}`} />
+      ) : (
+        <div className="flex flex-col gap-2">
+          {items.map((att) => (
+            <AttachmentPreview key={att.id} attachment={att} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PartDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -384,17 +405,24 @@ export default function PartDetailPage() {
             (!revisionId ? (
               <EmptyState text="该零部件暂无版本，无附件" />
             ) : (
-              <div className="flex flex-col gap-2">
+              <div>
                 {attLoading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
                 {!attLoading && attError && (
                   <p className="text-center text-xs text-red-400 py-3">{attError}</p>
                 )}
-                {!attLoading && !attError && attachments.length === 0 && (
-                  <EmptyState text="暂无附件" />
+                {!attLoading && !attError && (
+                  <div className="flex flex-col gap-3">
+                    {/* CAD 附件 / 生产附件 两个区域（未知分类兜底归 CAD） */}
+                    <AttachmentSection
+                      title="CAD 附件"
+                      items={attachments.filter((a) => a.category !== 'production')}
+                    />
+                    <AttachmentSection
+                      title="生产附件"
+                      items={attachments.filter((a) => a.category === 'production')}
+                    />
+                  </div>
                 )}
-                {!attLoading &&
-                  !attError &&
-                  attachments.map((att) => <AttachmentPreview key={att.id} attachment={att} />)}
               </div>
             ))}
 
