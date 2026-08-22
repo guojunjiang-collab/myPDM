@@ -101,7 +101,17 @@ export default function PartDetailPage() {
   const [selectedRev, setSelectedRev] = useState<PartRevisionBrief | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('overview');
+  // Tab 状态记录在 URL（?tab=），进入新详情默认概览；退回时浏览器还原上一级 URL → 恢复对应 Tab
+  const [activeTab, setActiveTab] = useState(() => {
+    const t = new URLSearchParams(location.search).get('tab');
+    return t && TABS.some((x) => x.key === t) ? t : 'overview';
+  });
+
+  // 路由变化（进入/退回）时按 URL tab 同步；无 tab 一律回概览
+  useEffect(() => {
+    const t = new URLSearchParams(location.search).get('tab');
+    setActiveTab(t && TABS.some((x) => x.key === t) ? t : 'overview');
+  }, [location.search, id]);
 
   // BOM 段（激活时按最新版本加载首层）
   const [bomItems, setBomItems] = useState<BomChild[]>([]);
@@ -331,7 +341,13 @@ export default function PartDetailPage() {
           {TABS.map((t) => (
             <button
               key={t.key}
-              onClick={() => setActiveTab(t.key)}
+              onClick={() => {
+                setActiveTab(t.key);
+                // replace 更新 URL 的 tab 参数（保留 rev 等其他参数），供退回时恢复
+                const sp = new URLSearchParams(location.search);
+                sp.set('tab', t.key);
+                navigate(`?${sp.toString()}`, { replace: true });
+              }}
               className={`flex-1 min-h-10 text-xs whitespace-nowrap ${
                 activeTab === t.key ? 'bg-primary-600 text-white font-medium' : 'text-gray-500'
               }`}
