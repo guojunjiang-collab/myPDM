@@ -125,7 +125,7 @@ export default function GanttPage({ projectId, onBack }: Props) {
         <div ref={scrollRef} className="flex-1 overflow-x-auto">
           <div className="flex min-w-max">
             {/* 左列：任务编号（固定，横向滚动不跟随）；名称显示在甘特条上 */}
-            <div className="sticky left-0 z-10 bg-gray-50 w-36 shrink-0">
+            <div className="sticky left-0 z-10 bg-gray-50 w-36 shrink-0 border-r border-gray-200">
               {/* 与右区日期表头等高的占位，保证任务行对齐 */}
               <div style={{ height: 28 }} />
               {data.tasks.map((t) => (
