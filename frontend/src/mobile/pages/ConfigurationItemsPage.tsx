@@ -128,24 +128,23 @@ export default function ConfigurationItemsPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="sticky top-0 bg-gray-50 px-3 pt-2 pb-1 z-10">
-        <input
-          className="w-full h-11 px-4 rounded-lg bg-white border border-gray-200 text-base"
-          placeholder="搜索构型号/名称..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        {/* 工具栏：顶层 / 全部版本 */}
-        <div className="flex items-center gap-2 mt-2">
-          <div className="flex-1" />
+        {/* 搜索框 + 工具栏（顶层/全部版本）同一行 */}
+        <div className="flex items-center gap-2">
+          <input
+            className="flex-1 min-w-0 h-11 px-4 rounded-lg bg-white border border-gray-200 text-base"
+            placeholder="搜索构型号/名称..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
           <button
             onClick={() => setTopLevel((v) => !v)}
-            className={`min-h-10 px-3 rounded-lg text-xs ${topLevel ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+            className={`shrink-0 min-h-11 px-3 rounded-lg text-xs ${topLevel ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
           >
             顶层
           </button>
           <button
             onClick={() => setShowAllVersions((v) => !v)}
-            className={`min-h-10 px-3 rounded-lg text-xs ${showAllVersions ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+            className={`shrink-0 min-h-11 px-3 rounded-lg text-xs ${showAllVersions ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
           >
             全部版本
           </button>
