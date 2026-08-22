@@ -275,6 +275,14 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
 
   // 展开层级下拉受控值：'collapsed' | 'all' | 数字字符串 | 'custom'（参考桌面版）
   const [expandSel, setExpandSel] = useState<string>('1');
+  const [expandOpen, setExpandOpen] = useState(false);
+  const expandLabel = useMemo(() => {
+    if (expandSel === 'collapsed') return '全部折叠';
+    if (expandSel === 'all') return '全部展开';
+    if (expandSel === 'custom') return '自定义';
+    if (/^\d+$/.test(expandSel)) return `L${expandSel}`;
+    return '展开层级';
+  }, [expandSel]);
   const handleExpandChange = (v: string) => {
     setExpandSel(v);
     if (v === 'collapsed') expandToLevel(0);
@@ -367,23 +375,56 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
               </div>
             </div>
 
-            {/* 任务树：默认展开第 1 层级；工具按钮提供各层级展开/收起；行点击打开任务详情（多 Tab） */}
+            {/* 任务树：默认展开第 1 层级；下拉控件展开各层级/收起；行点击打开任务详情（多 Tab） */}
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between gap-2 px-1">
                 <span className="text-xs text-gray-400">任务列表（{stats.total}）</span>
                 {maxTreeDepth > 0 && (
-                  <select
-                    value={expandSel}
-                    onChange={(e) => handleExpandChange(e.target.value)}
-                    className="min-h-8 px-2 rounded-lg bg-white border border-gray-200 text-xs text-gray-600"
-                  >
-                    <option value="collapsed">全部折叠</option>
-                    {Array.from({ length: maxTreeDepth }, (_, i) => i + 1).map((k) => (
-                      <option key={k} value={String(k)}>L{k}</option>
-                    ))}
-                    <option value="all">全部展开</option>
-                    {expandSel === 'custom' && <option value="custom">自定义</option>}
-                  </select>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setExpandOpen((o) => !o)}
+                      className="min-h-8 px-2.5 rounded-lg bg-white border border-gray-200 text-xs text-gray-600 flex items-center gap-1"
+                    >
+                      <span>{expandLabel}</span>
+                      <span className={`text-gray-400 text-[10px] transition-transform ${expandOpen ? 'rotate-180' : ''}`}>▾</span>
+                    </button>
+                    {expandOpen && (
+                      <>
+                        {/* 点击外部关闭 */}
+                        <div className="fixed inset-0 z-30" onClick={() => setExpandOpen(false)} />
+                        <div className="absolute right-0 top-full mt-1 z-40 min-w-32 bg-white rounded-lg shadow-lg border border-gray-200 py-1">
+                          {(
+                            [
+                              { value: 'collapsed', label: '全部折叠' },
+                              ...Array.from({ length: maxTreeDepth }, (_, i) => i + 1).map((k) => ({
+                                value: String(k),
+                                label: `L${k}`,
+                              })),
+                              { value: 'all', label: '全部展开' },
+                              ...(expandSel === 'custom' ? [{ value: 'custom', label: '自定义' }] : []),
+                            ] as Array<{ value: string; label: string }>
+                          ).map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => {
+                                handleExpandChange(opt.value);
+                                setExpandOpen(false);
+                              }}
+                              className={`w-full text-left px-3 py-2 text-sm ${
+                                expandSel === opt.value
+                                  ? 'text-primary-600 font-medium bg-primary-50'
+                                  : 'text-gray-700'
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
               {tasks.length === 0 ? (
