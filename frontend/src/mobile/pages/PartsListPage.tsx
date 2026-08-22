@@ -23,12 +23,73 @@ const TYPE_FILTERS = [
   { key: 'assembly', label: '部件' },
 ];
 
+// 状态筛选（与桌面 PartsPage 一致）：空串 = 全部状态
+const STATUS_FILTERS = [
+  { key: '', label: '全部状态' },
+  { key: 'draft', label: '草稿' },
+  { key: 'frozen', label: '冻结' },
+  { key: 'released', label: '发布' },
+  { key: 'obsolete', label: '作废' },
+];
+
+/** 自定义下拉（参考项目详情-层级下拉样式） */
+function FilterDropdown({
+  value,
+  options,
+  onChange,
+  className,
+}: {
+  value: string;
+  options: Array<{ key: string; label: string }>;
+  onChange: (key: string) => void;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const current = options.find((o) => o.key === value) ?? options[0];
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`min-h-10 px-3 rounded-lg bg-white border border-gray-200 text-xs text-gray-600 ${className ?? ''}`}
+      >
+        {current?.label ?? ''}
+      </button>
+      {open && (
+        <>
+          {/* 点击外部关闭 */}
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-full mt-1 z-40 min-w-28 bg-white rounded-lg shadow-lg border border-gray-200 py-1">
+            {options.map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => {
+                  onChange(opt.key);
+                  setOpen(false);
+                }}
+                className={`w-full text-left px-3 py-2 text-sm ${
+                  value === opt.key ? 'text-primary-600 font-medium bg-primary-50' : 'text-gray-700'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function PartsListPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [search, setSearch] = useState('');
   const debounced = useDebounced(search, 400);
   const [typeFilter, setTypeFilter] = useState('');
+  // 状态筛选（空串 = 全部状态）
+  const [statusFilter, setStatusFilter] = useState('');
   // 全部版本：显示每个物料的所有版本行（对齐桌面 show_all_versions 开关）
   const [showAllVersions, setShowAllVersions] = useState(false);
   // 仅顶层：只显示没有父项的最顶层零部件（对齐桌面 top_level 参数）
@@ -79,6 +140,7 @@ export default function PartsListPage() {
       .list({
         search: debounced || undefined,
         type: typeFilter || undefined,
+        status: statusFilter || undefined,
         show_all_versions: showAllVersions || undefined,
         top_level: topLevel || undefined,
         sort_field: 'code',
@@ -104,7 +166,7 @@ export default function PartsListPage() {
     return () => {
       alive = false;
     };
-  }, [debounced, typeFilter, showAllVersions, topLevel]);
+  }, [debounced, typeFilter, statusFilter, showAllVersions, topLevel]);
 
   return (
     <div className="flex flex-col h-full">
@@ -124,17 +186,10 @@ export default function PartsListPage() {
             ⇄ 对比
           </button>
         </div>
-        {/* 行2：类型筛选（左）+ 顶层/全部版本开关（右） */}
+        {/* 行2：类型下拉（左）+ 状态下拉 + 顶层/全部版本开关（右） */}
         <div className="flex items-center gap-2 mt-2">
-          {TYPE_FILTERS.map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setTypeFilter(f.key)}
-              className={`min-h-10 px-3 rounded-lg text-xs ${typeFilter === f.key ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
-            >
-              {f.label}
-            </button>
-          ))}
+          <FilterDropdown value={typeFilter} options={TYPE_FILTERS} onChange={setTypeFilter} />
+          <FilterDropdown value={statusFilter} options={STATUS_FILTERS} onChange={setStatusFilter} />
           <div className="flex-1" />
           <button
             onClick={() => setTopLevel((v) => !v)}
