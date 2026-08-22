@@ -232,14 +232,14 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                     >
                       {p.part_type === 'assembly' ? '部件' : '零件'}
                     </span>
-                    {/* 预览按钮固定占位：无 3D 模型时留空，保证类型徽标位置一致 */}
-                    <span className="shrink-0 w-14 flex justify-end">
+                    {/* 预览按钮固定占位（w-10 = 状态徽标内容宽度）：无 3D 时留空，类型徽标与必装徽标对齐 */}
+                    <span className="shrink-0 w-10 flex justify-end">
                       {p.part_detail?.has_3d === true && (
                         <button
                           type="button"
                           onClick={(e) => onPreviewPart(p, e)}
                           disabled={previewingId === p.id}
-                          className="shrink-0 px-2.5 min-h-7 rounded bg-primary-50 text-primary-600 text-xs font-medium disabled:opacity-60"
+                          className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-primary-600 text-white disabled:opacity-60"
                         >
                           {previewingId === p.id ? '加载中...' : '预览'}
                         </button>
