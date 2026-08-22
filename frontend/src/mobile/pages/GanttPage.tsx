@@ -205,12 +205,10 @@ export default function GanttPage({ projectId, onBack }: Props) {
                         ...(t.is_overdue ? { outline: '1px solid #ef4444' } : {}),
                       }}
                     >
-                      {bb.w >= 28 && (
-                        // 名称显示不下时直接向右溢出（不截断省略），保证任务名可读
-                        <span className="shrink-0 pl-1.5 pr-1 text-[10px] leading-none text-white whitespace-nowrap">
-                          {t.name}
-                        </span>
-                      )}
+                      {/* 名称始终显示，条内放不下时直接向右溢出（不截断、不省略） */}
+                      <span className="shrink-0 pl-1.5 pr-1 text-[10px] leading-none text-white whitespace-nowrap">
+                        {t.name}
+                      </span>
                     </div>
                   );
                 })}
