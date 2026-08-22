@@ -11,6 +11,7 @@ import VersionHistory from '../components/VersionHistory';
 import { useDataStore } from '../stores/data';
 import { useDebounced } from '../hooks/useDebounced';
 import ArchiveTreeModal from '../components/ArchiveTreeModal';
+import Badge from '../components/ui/Badge';
 
 type SortField = 'code' | 'name' | 'created_at' | 'version' | 'status' | 'check_out_user_name';
 type SortOrder = 'asc' | 'desc';
@@ -176,16 +177,6 @@ export default function Documents() {
     }
   };
 
-  const getStatusTag = (s: string) => {
-    const tags: Record<string, { label: string; class: string }> = {
-      draft: { label: '草稿', class: 'bg-blue-100 text-blue-800' },
-      frozen: { label: '冻结', class: 'bg-orange-100 text-orange-800' },
-      released: { label: '发布', class: 'bg-green-100 text-green-800' },
-      obsolete: { label: '作废', class: 'bg-red-100 text-red-800' },
-    };
-    return tags[s] || { label: s, class: 'bg-gray-100 text-gray-800' };
-  };
-
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center gap-2 mb-4 shrink-0">
@@ -279,9 +270,7 @@ export default function Documents() {
                   <td className="px-2 py-3 text-sm text-gray-500 text-center whitespace-nowrap">{formatDate(doc.created_at, 'YYYY-MM-DD HH:mm')}</td>
                   <td className="px-4 py-3 text-sm text-gray-500 text-center">{doc.version || '-'}</td>
                   <td className="px-4 py-3 text-center">
-                    <span className={`px-2 py-1 text-xs rounded-full ${getStatusTag(doc.status).class}`}>
-                      {getStatusTag(doc.status).label}
-                    </span>
+                    <Badge status={doc.status} />
                   </td>
                   <td className="px-4 py-3 text-sm text-center">
                     {doc.check_out_user_name

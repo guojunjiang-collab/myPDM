@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useDataStore } from '../stores/data';
 import { documentsApi, customFieldsApi } from '../services/api';
 import { Modal } from './Modal';
+import Badge from './ui/Badge';
 import type { Document, CustomFieldDefinition, CustomFieldValue } from '../types';
 
 /* ----------------------------------------------------------------
@@ -37,21 +38,6 @@ interface DocumentPickerProps {
 /* ----------------------------------------------------------------
    Helpers
    ---------------------------------------------------------------- */
-
-const statusTag = (s: string) => {
-  const map: Record<string, string> = {
-    draft: 'bg-blue-100 text-blue-800',
-    frozen: 'bg-orange-100 text-orange-800',
-    released: 'bg-green-100 text-green-800',
-    obsolete: 'bg-red-100 text-red-800',
-  };
-  return map[s] || 'bg-gray-100 text-gray-800';
-};
-
-const statusLabel = (s: string) => {
-  const map: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' };
-  return map[s] || s;
-};
 
 const renderFieldValue = (v: unknown) => {
   if (v === undefined || v === null || v === '') return <span className="text-gray-300">-</span>;
@@ -277,9 +263,7 @@ export default function DocumentPicker({
                       <td className="px-3 py-2">{item.name}</td>
                       <td className="px-3 py-2 text-gray-500">{item.version}</td>
                       <td className="px-3 py-2">
-                        <span className={`px-1.5 py-0.5 text-xs rounded-full ${statusTag(item.status)}`}>
-                          {statusLabel(item.status)}
-                        </span>
+                        <Badge status={item.status} />
                       </td>
                       {fieldDefs.map((def) => (
                         <td key={def.id} className="px-3 py-2 text-gray-600 whitespace-nowrap">
@@ -372,9 +356,7 @@ export default function DocumentPicker({
                         <td className="px-3 py-2">{item.name}</td>
                         <td className="px-3 py-2 text-gray-500">{item.version}</td>
                         <td className="px-3 py-2">
-                          <span className={`px-1.5 py-0.5 text-xs rounded-full ${statusTag(item.status)}`}>
-                            {statusLabel(item.status)}
-                          </span>
+                          <Badge status={item.status} />
                         </td>
                         {fieldDefs.map((def) => (
                           <td key={def.id} className="px-3 py-2 text-gray-600 whitespace-nowrap">

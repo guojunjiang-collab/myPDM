@@ -10,6 +10,7 @@ import DocumentPicker from './DocumentPicker';
 import VersionSelectModal from './VersionSelectModal';
 import ArchiveTreeModal from './ArchiveTreeModal';
 import DocumentDetailContent from './DocumentDetailContent';
+import Badge from './ui/Badge';
 
 /* ----------------------------------------------------------------
    Types
@@ -26,21 +27,6 @@ interface EntityDocumentSectionProps {
 /* ----------------------------------------------------------------
    Helpers
    ---------------------------------------------------------------- */
-
-const statusTag = (s: string) => {
-  const map: Record<string, string> = {
-    draft: 'bg-blue-100 text-blue-800',
-    frozen: 'bg-orange-100 text-orange-800',
-    released: 'bg-green-100 text-green-800',
-    obsolete: 'bg-red-100 text-red-800',
-  };
-  return map[s] || 'bg-gray-100 text-gray-800';
-};
-
-const statusLabel = (s: string) => {
-  const map: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' };
-  return map[s] || s;
-};
 
 /** 渲染单个自定义字段值 */
 const renderFieldValue = (v: unknown) => {
@@ -356,9 +342,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
                       <td className="px-3 py-2">{ed.document.name}</td>
                       <td className="px-3 py-2 text-gray-500">{ed.document.version}</td>
                       <td className="px-3 py-2">
-                        <span className={`px-1.5 py-0.5 text-xs rounded-full ${statusTag(ed.document.status)}`}>
-                          {statusLabel(ed.document.status)}
-                        </span>
+                        <Badge status={ed.document.status} />
                       </td>
                       {/* 动态自定义字段值 */}
                       {docFieldDefs.map((def) => (

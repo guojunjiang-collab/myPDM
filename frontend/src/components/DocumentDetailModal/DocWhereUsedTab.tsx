@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { documentsApi } from '../../services/api';
 import { getStatusLabel } from '../../pages/BOM/helpers';
 import { formatDateTime } from '../../utils/date';
+import Badge from '../ui/Badge';
 
 interface Props {
   revisionId: string;
@@ -30,7 +31,7 @@ const Section = ({ title, count, children }: any) => (
   <div className="mb-4">
     <div className="flex items-center gap-2 mb-2">
       <span className="text-sm font-semibold text-gray-700">{title}</span>
-      <span className="px-1.5 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">{count}</span>
+      <Badge tone="gray" label={count} size="xs" />
     </div>
     {children}
   </div>

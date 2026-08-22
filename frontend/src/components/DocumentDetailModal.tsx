@@ -15,6 +15,7 @@ import PartDetailModal from './PartDetailModal';
 import TaskEditModal from '../pages/Project/TaskEditModal';
 import { ECODetailModal } from './ECO/ECODetailModal';
 import { ECRDetailModal } from './ECR/ECRDetailModal';
+import Badge from './ui/Badge';
 import type { DocumentRevision, DocumentIteration, CustomFieldDefinition } from '../types';
 
 interface Props {
@@ -29,16 +30,6 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
-
-const statusTag = (s: string) => {
-  const tags: Record<string, { label: string; class: string }> = {
-    draft: { label: '草稿', class: 'bg-blue-100 text-blue-800' },
-    frozen: { label: '冻结', class: 'bg-orange-100 text-orange-800' },
-    released: { label: '发布', class: 'bg-green-100 text-green-800' },
-    obsolete: { label: '作废', class: 'bg-red-100 text-red-800' },
-  };
-  return tags[s] || { label: s, class: 'bg-gray-100 text-gray-800' };
-};
 
 type TabKey = 'attachments' | 'versions' | 'iterations' | 'custom-fields' | 'whereused';
 
@@ -365,8 +356,6 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
     savedPatchRef.current = {};
   };
 
-  const tag = doc ? statusTag(doc.status) : { label: '', class: '' };
-
   return (
     <Modal open={open} title="图文档详情" onClose={handleClose} width="full"
       headerAction={(isViewingOtherVersion && doc) ? (
@@ -458,7 +447,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className="font-semibold text-sm">版本：{doc.version || '-'}</span>
-                  <span className={`px-2 py-0.5 text-xs rounded-full ${tag.class}`}>{tag.label}</span>
+                  <Badge status={doc.status} />
                   {isCheckedOut ? (
                     <span className="text-xs text-orange-600">已签出：{doc.check_out_user_name || '未知'}</span>
                   ) : (
@@ -636,9 +625,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                             <tr key={v.id} className={`hover:bg-gray-50 ${isViewing ? 'bg-blue-50' : ''}`}>
                               <td className="px-3 py-2">{v.version}</td>
                               <td className="px-3 py-2">
-                                <span className={`px-1.5 py-0.5 text-xs rounded-full ${statusTag(v.status).class}`}>
-                                  {statusTag(v.status).label}
-                                </span>
+                                <Badge status={v.status} />
                               </td>
                               <td className="px-3 py-2 text-gray-500">{formatDateTime(v.created_at)}</td>
                               <td className="px-3 py-2 text-right">
