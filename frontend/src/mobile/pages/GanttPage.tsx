@@ -88,16 +88,17 @@ export default function GanttPage({ projectId, onBack }: Props) {
   const totalPx = range ? (daysBetween(range.start, range.end) + 1) * DAY_PX[scale] : 0;
   const todayX = range ? daysBetween(range.start, new Date()) * DAY_PX[scale] : -1;
 
-  // 左列宽度自适应内容（按最长编号/负责人估算），右侧竖线分割符随左列宽度自动贴合
+  // 左列宽度自适应内容（按最长编号/负责人估算，中文 12px/字、编号 7px/字符），
+  // 右侧 border-r 竖线分割符随左列宽度自动贴合；z-20 高于右区全部元素（含今日线 z-10），滚动时分割线永不被遮盖
   const leftW = useMemo(() => {
-    if (!data) return 144;
+    if (!data) return 160;
     let max = 0;
     for (const t of data.tasks) {
-      const codeW = t.code.length * 8 + 16; // text-xs 中文约 12px/字，编号约 8px/字符
-      const nameW = (t.assignee_name?.length ?? 2) * 7 + 16; // 负责人 text-[10px]
+      const codeW = Array.from(t.code).reduce((s, ch) => s + (/[\u4e00-\u9fa5]/.test(ch) ? 12 : 7), 0) + 20;
+      const nameW = (t.assignee_name ? Array.from(t.assignee_name).reduce((s, ch) => s + (/[\u4e00-\u9fa5]/.test(ch) ? 7 : 6), 0) : 16) + 20;
       max = Math.max(max, codeW, nameW);
     }
-    return Math.min(208, Math.max(132, max));
+    return Math.min(220, Math.max(160, max));
   }, [data]);
 
   return (
@@ -137,9 +138,10 @@ export default function GanttPage({ projectId, onBack }: Props) {
         <div ref={scrollRef} className="flex-1 overflow-x-auto">
           <div className="flex min-w-max">
             {/* 左列：任务编号（固定，横向滚动不跟随）；名称显示在甘特条上。
-                宽度按内容自适应（leftW），右侧 border-r 竖线分割符随左列宽度自动贴合 */}
+                宽度按内容自适应（leftW），右侧 border-r 竖线分割符随左列宽度自动贴合；
+                z-20 高于右区全部元素（含今日线 z-10），滚动时分割线不被右区内容遮盖 */}
             <div
-              className="sticky left-0 z-10 bg-gray-50 shrink-0 border-r border-gray-200 relative"
+              className="sticky left-0 z-20 bg-gray-50 shrink-0 border-r border-gray-200 relative"
               style={{ width: leftW }}
             >
               {/* 与右区日期表头等高的占位，保证任务行对齐 */}
