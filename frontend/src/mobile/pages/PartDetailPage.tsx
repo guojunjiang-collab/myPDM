@@ -321,8 +321,6 @@ export default function PartDetailPage() {
     value: cfDisplay(cfValues[d.id]) ?? undefined,
   }));
 
-  const allRows = [...overviewRows, ...cfRows];
-
   return (
     <div className="flex flex-col">
       {/* 顶部：返回按钮 + 标题（编号/名称）+ 分段 Tab（sticky 跟随列表页模式） */}
@@ -384,14 +382,32 @@ export default function PartDetailPage() {
               {!cfLoading && cfError && (
                 <p className="text-center text-xs text-red-400 py-2">自定义字段加载失败</p>
               )}
-              <div className="grid grid-cols-2 gap-2">
-                {allRows.map((r) => (
-                  <div key={r.label} className="bg-white rounded-lg px-3 py-2.5 min-h-14 shadow-sm">
-                    <div className="text-xs text-gray-500 mb-0.5 truncate">{r.label}</div>
-                    <div className="text-sm text-gray-900 break-all">{r.value ?? '-'}</div>
-                  </div>
-                ))}
+              {/* 基本信息区 */}
+              <div className="mb-3">
+                <div className="text-sm font-medium text-gray-700 mb-2">基本信息</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {overviewRows.map((r) => (
+                    <div key={r.label} className="bg-white rounded-lg px-3 py-2.5 min-h-14 shadow-sm">
+                      <div className="text-xs text-gray-500 mb-0.5 truncate">{r.label}</div>
+                      <div className="text-sm text-gray-900 break-all">{r.value ?? '-'}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
+              {/* 自定义字段区（无定义时不显示） */}
+              {!cfLoading && !cfError && cfRows.length > 0 && (
+                <div>
+                  <div className="text-sm font-medium text-gray-700 mb-2">自定义字段</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {cfRows.map((r) => (
+                      <div key={r.label} className="bg-white rounded-lg px-3 py-2.5 min-h-14 shadow-sm">
+                        <div className="text-xs text-gray-500 mb-0.5 truncate">{r.label}</div>
+                        <div className="text-sm text-gray-900 break-all">{r.value ?? '-'}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
