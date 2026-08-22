@@ -214,7 +214,7 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                       {p.is_required ? '必装' : '选装'}
                     </span>
                     {p.part_detail?.status && (
-                      <span className="shrink-0 w-14 flex justify-end">
+                      <span className="shrink-0 w-14 flex justify-start">
                         <StatusBadge status={p.part_detail.status} map={STATUS_MAP} />
                       </span>
                     )}
