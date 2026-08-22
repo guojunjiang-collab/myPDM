@@ -1,15 +1,15 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-// 直接复用桌面端帮助文档内容组件（自身内部滚动；左侧目录在移动端自动隐藏）
+import { useHelpDrawer } from '../helpDrawer';
+// 直接复用桌面端帮助文档内容组件（自身内部滚动；左侧目录在移动端自动隐藏）。
+// 目录按钮在顶部标题栏右侧（MobileLayout 渲染），本页不再有独立标题栏。
 import Help, { sections } from '../../pages/Help';
 
 /* ================================================================
-   帮助文档（移动端）：返回条 + 标题 + 目录抽屉 + 桌面端 Help 内容复用
+   帮助文档（移动端）：桌面端 Help 内容复用 + 目录抽屉（按钮在顶部标题栏右侧）
    ================================================================ */
 
 export default function HelpPage() {
-  const navigate = useNavigate();
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawerOpen = useHelpDrawer((s) => s.open);
+  const setDrawerOpen = useHelpDrawer((s) => s.setOpen);
 
   const jumpTo = (id: string) => {
     setDrawerOpen(false);
@@ -18,34 +18,9 @@ export default function HelpPage() {
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* 标题栏：fixed 相对视口（顶部 header 高 48px 之下），滚动内容时始终可见不滑走 */}
-      <div
-        className="fixed left-0 right-0 z-30 bg-gray-50 px-2 pt-2 pb-1 border-b border-gray-100"
-        style={{ top: 48 }}
-      >
-        <div className="flex items-center gap-1 min-h-10">
-          <button
-            aria-label="返回"
-            onClick={() => navigate(-1)}
-            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-gray-600"
-          >
-            ‹
-          </button>
-          <div className="min-w-0 flex-1 text-base font-medium text-gray-900 truncate">帮助文档</div>
-          <button
-            type="button"
-            onClick={() => setDrawerOpen(true)}
-            className="shrink-0 min-h-8 px-2.5 rounded-lg bg-white border border-gray-200 text-xs text-gray-600 flex items-center gap-1"
-          >
-            <span>☰</span> 目录
-          </button>
-        </div>
-      </div>
-      {/* 桌面端帮助文档内容（h-full + 内部滚动）；padding-top 补偿固定标题栏高度 */}
-      <div className="flex-1 min-h-0 pt-[52px]">
-        <Help />
-      </div>
+    <div className="h-full">
+      {/* 桌面端帮助文档内容（h-full + 内部滚动） */}
+      <Help />
 
       {/* 目录抽屉（右侧滑出 + 遮罩） */}
       {drawerOpen && (
