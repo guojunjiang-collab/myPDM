@@ -24,8 +24,10 @@ function sortedByOrder(list: BomChild[]): BomChild[] {
   return [...list].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 }
 
-// 每级缩进 = 展开按钮宽度，使缩进竖线正好与父项展开/折叠按钮的中心对齐
-const INDENT = 48;
+// 每级缩进 24px（多层级不占屏）；展开按钮 48px。
+// 竖线位置 = i*INDENT + BTN/2 = 父项按钮中心，保证竖线与父项展开按钮对齐。
+const INDENT = 24;
+const BTN = 48;
 
 export default function BomTree({ rootItems }: { rootItems: BomChild[] }) {
   const navigate = useNavigate();
@@ -63,14 +65,14 @@ export default function BomTree({ rootItems }: { rootItems: BomChild[] }) {
     return (
       <Fragment key={b.id}>
         <div className="flex items-stretch min-h-10 border-b border-gray-50 bg-white">
-          {/* 缩进 + 层级竖线（每级一条，位于该级缩进区中心 = 父项展开按钮中心） */}
+          {/* 缩进 + 层级竖线（每级一条，位置 = 父项展开按钮中心） */}
           <span className="relative shrink-0" style={{ width: depth * INDENT }}>
             {depth > 0 &&
               Array.from({ length: depth }).map((_, i) => (
                 <span
                   key={i}
                   className="absolute top-0 bottom-0 border-l border-gray-200"
-                  style={{ left: i * INDENT + INDENT / 2 }}
+                  style={{ left: i * INDENT + BTN / 2 }}
                 />
               ))}
           </span>
@@ -114,17 +116,17 @@ export default function BomTree({ rootItems }: { rootItems: BomChild[] }) {
           <div className="bg-white">
             {/* 提示对齐该节点子行内容起点：(depth+1) 级缩进 + 按钮宽 */}
             {isLoading && (
-              <div className="py-2 text-xs text-gray-400" style={{ paddingLeft: (depth + 2) * INDENT }}>
+              <div className="py-2 text-xs text-gray-400" style={{ paddingLeft: (depth + 1) * INDENT + BTN }}>
                 加载中...
               </div>
             )}
             {!isLoading && hasError && (
-              <div className="py-2 text-xs text-red-400" style={{ paddingLeft: (depth + 2) * INDENT }}>
+              <div className="py-2 text-xs text-red-400" style={{ paddingLeft: (depth + 1) * INDENT + BTN }}>
                 加载失败，请重试
               </div>
             )}
             {!isLoading && !hasError && kids && kids.length === 0 && (
-              <div className="py-2 text-xs text-gray-400" style={{ paddingLeft: (depth + 2) * INDENT }}>
+              <div className="py-2 text-xs text-gray-400" style={{ paddingLeft: (depth + 1) * INDENT + BTN }}>
                 该零部件无下级 BOM
               </div>
             )}
