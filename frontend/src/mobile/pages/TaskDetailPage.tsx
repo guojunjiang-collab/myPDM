@@ -8,7 +8,7 @@ import EmptyState from '../components/EmptyState';
 import AttachmentPreview, { openAttachmentInNewTab, isAttachmentPreviewable } from '../components/AttachmentPreview';
 import type { PreviewAttachment } from '../components/AttachmentPreview';
 import { formatMeta } from '../components/formatMeta';
-import type { ProjectTask, TaskLink, TaskStatus, TaskPriority } from '../../types/project';
+import type { ProjectTask, TaskLink, TaskStatus, TaskPriority, TaskComment } from '../../types/project';
 
 /* ================================================================
    任务详情覆盖层（移动端，只读）：
@@ -109,11 +109,53 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
     window.history.pushState({ mobileTaskSub: true }, '');
   };
 
-  const [tab, setTab] = useState<'overview' | 'children' | 'links' | 'logs'>('overview');
+  const [tab, setTab] = useState<'overview' | 'children' | 'links' | 'comments' | 'logs'>('overview');
   const [links, setLinks] = useState<TaskLink[]>([]);
   const [linksLoading, setLinksLoading] = useState(false);
   const [logs, setLogs] = useState<Array<{ created_at: string; user_name?: string; action?: string; detail?: string }>>([]);
   const [logsLoading, setLogsLoading] = useState(false);
+
+  // 评论（桌面任务评论接口：listComments/addComment）
+  const [comments, setComments] = useState<TaskComment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [commentSending, setCommentSending] = useState(false);
+
+  useEffect(() => {
+    if (tab !== 'comments') return;
+    let alive = true;
+    setCommentsLoading(true);
+    projectApi
+      .listComments(projectId, cur.id)
+      .then((res) => {
+        if (alive) setComments(((res.data ?? {}) as { items?: TaskComment[] }).items ?? []);
+      })
+      .catch(() => {
+        if (alive) setComments([]);
+      })
+      .finally(() => {
+        if (alive) setCommentsLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [tab, cur.id, projectId]);
+
+  const sendComment = async () => {
+    const content = commentText.trim();
+    if (!content || commentSending) return;
+    setCommentSending(true);
+    try {
+      const res = await projectApi.addComment(projectId, cur.id, content);
+      const created = (res.data ?? res) as TaskComment;
+      setComments((prev) => [...prev, created]);
+      setCommentText('');
+    } catch {
+      window.alert('评论发送失败，请稍后重试');
+    } finally {
+      setCommentSending(false);
+    }
+  };
 
   // 关联对象 / 操作记录：跟随当前显示的任务（含子任务切换）
   useEffect(() => {
@@ -282,6 +324,7 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
     { key: 'overview', label: '概览' },
     { key: 'children', label: `子任务${cur.children?.length ? ` (${cur.children.length})` : ''}` },
     { key: 'links', label: '关联对象' },
+    { key: 'comments', label: `评论${comments.length ? ` (${comments.length})` : ''}` },
     { key: 'logs', label: '操作记录' },
   ];
 
@@ -480,6 +523,47 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
                 </div>
               ))
             )}
+          </div>
+        )}
+
+        {/* 评论：列表 + 输入框（桌面任务评论接口） */}
+        {tab === 'comments' && (
+          <div className="flex flex-col gap-3">
+            {commentsLoading ? (
+              <p className="text-center text-xs text-gray-400 py-3">加载中...</p>
+            ) : comments.length === 0 ? (
+              <EmptyState text="暂无评论" />
+            ) : (
+              <div className="flex flex-col gap-2">
+                {comments.map((c) => (
+                  <div key={c.id} className="bg-white rounded-lg px-4 py-2.5 shadow-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium text-gray-900">{c.user_name || '用户'}</span>
+                      <span className="shrink-0 text-xs text-gray-400">{fmtDate(c.created_at)}</span>
+                    </div>
+                    <div className="mt-1 text-sm text-gray-700 whitespace-pre-wrap break-all">{c.content}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* 输入区 */}
+            <div className="bg-white rounded-lg p-2 shadow-sm flex items-end gap-2">
+              <textarea
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                placeholder="写下评论..."
+                rows={2}
+                className="flex-1 min-w-0 text-sm px-2 py-1.5 border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-1 focus:ring-primary-500"
+              />
+              <button
+                type="button"
+                onClick={sendComment}
+                disabled={!commentText.trim() || commentSending}
+                className="shrink-0 min-h-9 px-3 rounded-lg bg-primary-600 text-white text-sm font-medium disabled:opacity-50"
+              >
+                {commentSending ? '发送中...' : '发送'}
+              </button>
+            </div>
           </div>
         )}
       </div>
