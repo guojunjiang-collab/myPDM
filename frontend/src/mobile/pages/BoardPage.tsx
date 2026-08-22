@@ -4,6 +4,7 @@ import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
 import PartDetailPage from './PartDetailPage';
 import DocumentDetailPage from './DocumentDetailPage';
+import { useDetailOverlay } from '../hooks/useDetailOverlay';
 
 /* ================================================================
    看板数据结构（与桌面 pages/Board.tsx 一致，由 GET /api/dashboard/ 返回）
@@ -147,37 +148,15 @@ export default function BoardPage() {
     // 覆盖层模式：在列表上方打开详情（看板不卸载、展开/滚动位置保留），
     // 跳转目标与桌面版一致：零部件 → 零部件详情（master_id），图文档 → 图文档详情（revision_id）
     if (isComponentType(item.entity_type)) {
-      openItemDetail('part', item.master_id || item.entity_id);
+      openItemDetail({ kind: 'part', id: item.master_id || item.entity_id });
     } else if (item.entity_type === 'document') {
-      openItemDetail('document', item.entity_id);
+      openItemDetail({ kind: 'document', id: item.entity_id });
     }
     // configuration：移动端暂无构型详情页，不跳转（详见报告 §4）
   };
 
-  // 条目详情覆盖层：看板保持原状，详情叠在上方（系统返回弹哨兵关闭）
-  const [itemDetail, setItemDetail] = useState<{ kind: 'part' | 'document'; id: string } | null>(null);
-  const itemOverlayRef = useRef(false);
-  useEffect(() => {
-    itemOverlayRef.current = itemDetail != null;
-  }, [itemDetail]);
-  useEffect(() => {
-    const onPop = () => {
-      const cur = window.history.state as { mobileBoardOverlay?: boolean } | null;
-      if (!cur?.mobileBoardOverlay && itemOverlayRef.current) {
-        setItemDetail(null);
-      }
-    };
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-  }, []);
-  const openItemDetail = (kind: 'part' | 'document', id: string) => {
-    setItemDetail({ kind, id });
-    window.history.pushState({ mobileBoardOverlay: true }, '');
-  };
-  const closeItemDetail = () => {
-    setItemDetail(null);
-    window.history.back();
-  };
+  // 条目详情覆盖层栈：看板保持原状，详情叠在上方，详情内跳转逐级入栈返回
+  const { stack: itemStack, openDetail: openItemDetail, closeDetail: closeItemDetail, handleDetailNavigate, popTo: popItemTo } = useDetailOverlay();
 
   /* ---------------- 渲染：文件夹按树形结构展开 ---------------- */
 
@@ -245,16 +224,27 @@ export default function BoardPage() {
         )}
       </div>
 
-      {/* 条目详情覆盖层：看板保持原状（展开/筛选/滚动位置全保留），详情叠在上方 */}
-      {itemDetail && (
-        <div className="fixed inset-0 z-50 bg-gray-50 overflow-y-auto">
-          {itemDetail.kind === 'part' ? (
-            <PartDetailPage masterId={itemDetail.id} onBack={closeItemDetail} />
+      {/* 条目详情覆盖层栈：看板保持原状（展开/筛选/滚动位置全保留），逐级返回 */}
+      {itemStack.map((d, idx) => (
+        <div
+          key={idx}
+          className={`fixed inset-0 z-50 bg-gray-50 overflow-y-auto ${idx === itemStack.length - 1 ? '' : 'hidden'}`}
+        >
+          {d.kind === 'part' ? (
+            <PartDetailPage
+              masterId={d.id}
+              onBack={() => (idx === 0 ? closeItemDetail() : popItemTo(idx))}
+              onNavigate={handleDetailNavigate}
+            />
           ) : (
-            <DocumentDetailPage id={itemDetail.id} onBack={closeItemDetail} />
+            <DocumentDetailPage
+              id={d.id}
+              onBack={() => (idx === 0 ? closeItemDetail() : popItemTo(idx))}
+              onNavigate={handleDetailNavigate}
+            />
           )}
         </div>
-      )}
+      ))}
     </div>
   );
 }

@@ -6,6 +6,8 @@ import MobileCardList from '../components/MobileCardList';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
 import PartDetailPage from './PartDetailPage';
+import DocumentDetailPage from './DocumentDetailPage';
+import { useDetailOverlay } from '../hooks/useDetailOverlay';
 import type { PartListItem } from '../../types';
 
 const STATUS_MAP: Record<string, { label: string; cls: string }> = {
@@ -44,34 +46,11 @@ export default function PartsListPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 详情覆盖层模式：点卡片在列表上方打开全屏详情（列表不卸载、不重新加载、滚动位置天然保留），
-  // 返回 = 关闭覆盖层，列表原地不动
-  const [selected, setSelected] = useState<{ masterId: string; rev?: string } | null>(null);
-  const overlayRef = useRef(false);
-  useEffect(() => {
-    overlayRef.current = selected != null;
-  }, [selected]);
-  // 系统返回（popstate）：弹掉哨兵后关闭覆盖层
-  useEffect(() => {
-    const onPop = () => {
-      const cur = window.history.state as { mobilePartsOverlay?: boolean } | null;
-      if (!cur?.mobilePartsOverlay && overlayRef.current) {
-        setSelected(null);
-      }
-    };
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-  }, []);
-  const openDetail = (masterId: string, rev?: string) => {
-    setSelected({ masterId, rev });
-    window.history.pushState({ mobilePartsOverlay: true }, '');
-  };
-  const closeDetail = () => {
-    setSelected(null);
-    window.history.back();
-  };
+  // 详情覆盖层栈：点卡片打开第一层，详情内跳转（BOM 下钻/反查）逐级入栈，返回逐级弹出；
+  // 列表不卸载、滚动位置天然保留
+  const { stack, openDetail, closeDetail, handleDetailNavigate, popTo } = useDetailOverlay();
 
-  // 兜底：覆盖层主路径不卸载、位置天然保留；但详情内跳转（BOM 子项/图文档/对比/3D 等）会离开
+  // 兜底：覆盖层主路径不卸载、位置天然保留；但详情内跳转（新标签外的路由跳转）会离开
   // /parts 路由导致列表重挂载 → 卸载时保存 main 滚动位置，重挂载首次加载完成后恢复
   const restoredRef = useRef(false);
   const [loadedOnce, setLoadedOnce] = useState(false);
@@ -201,19 +180,31 @@ export default function PartsListPage() {
           </div>
         )}
         onClick={(p) =>
-          openDetail(p.master_id, showAllVersions ? p.revision_id : undefined)
+          openDetail({ kind: 'part', id: p.master_id, rev: showAllVersions ? p.revision_id : undefined })
         }
       />
-      {/* 详情覆盖层：列表保持原状，详情叠在上方 */}
-      {selected && (
-        <div className="fixed inset-0 z-50 bg-gray-50 overflow-y-auto">
-          <PartDetailPage
-            masterId={selected.masterId}
-            revisionId={selected.rev}
-            onBack={closeDetail}
-          />
+      {/* 详情覆盖层栈：全部渲染保留状态，只显示栈顶；逐级返回 */}
+      {stack.map((d, idx) => (
+        <div
+          key={idx}
+          className={`fixed inset-0 z-50 bg-gray-50 overflow-y-auto ${idx === stack.length - 1 ? '' : 'hidden'}`}
+        >
+          {d.kind === 'part' ? (
+            <PartDetailPage
+              masterId={d.id}
+              revisionId={d.rev}
+              onBack={() => (idx === 0 ? closeDetail() : popTo(idx))}
+              onNavigate={handleDetailNavigate}
+            />
+          ) : (
+            <DocumentDetailPage
+              id={d.id}
+              onBack={() => (idx === 0 ? closeDetail() : popTo(idx))}
+              onNavigate={handleDetailNavigate}
+            />
+          )}
         </div>
-      )}
+      ))}
     </div>
   );
 }

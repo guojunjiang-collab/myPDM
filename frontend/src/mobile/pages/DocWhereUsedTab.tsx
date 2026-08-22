@@ -121,7 +121,13 @@ function RowCard({
   );
 }
 
-export default function DocWhereUsedTab({ revisionId }: { revisionId: string }) {
+interface Props {
+  revisionId: string;
+  /** 覆盖层模式跳转回调（详情栈内导航）；缺省时走路由 navigate */
+  onNavigate?: (to: string) => void;
+}
+
+export default function DocWhereUsedTab({ revisionId, onNavigate }: Props) {
   const navigate = useNavigate();
   const cfg = useLazy<any>(() => documentsApi.whereUsedConfigurations(revisionId), revisionId);
   const prt = useLazy<any>(() => documentsApi.whereUsedParts(revisionId), revisionId);
@@ -154,7 +160,10 @@ export default function DocWhereUsedTab({ revisionId }: { revisionId: string }) 
               name={r.name}
               version={r.version}
               status={r.status}
-              onClick={() => r.master_id && navigate(`/parts/${r.master_id}`)}
+              onClick={() =>
+                r.master_id &&
+                (onNavigate ? onNavigate(`/parts/${r.master_id}`) : navigate(`/parts/${r.master_id}`))
+              }
             />
           ))}
         </State>
@@ -174,7 +183,11 @@ export default function DocWhereUsedTab({ revisionId }: { revisionId: string }) 
                 ['完成', fmtDate(r.task.planned_end)],
               ])}
               status={r.task.status}
-              onClick={() => navigate(`/projects/${r.project_id}`)}
+              onClick={() =>
+                onNavigate
+                  ? onNavigate(`/projects/${r.project_id}`)
+                  : navigate(`/projects/${r.project_id}`)
+              }
             />
           ))}
         </State>
@@ -188,7 +201,9 @@ export default function DocWhereUsedTab({ revisionId }: { revisionId: string }) 
               code={r.eco_number}
               name={r.title}
               status={r.status}
-              onClick={() => navigate(`/ec/eco/${r.eco_id}`)}
+              onClick={() =>
+                onNavigate ? onNavigate(`/ec/eco/${r.eco_id}`) : navigate(`/ec/eco/${r.eco_id}`)
+              }
             />
           ))}
         </State>
@@ -202,7 +217,9 @@ export default function DocWhereUsedTab({ revisionId }: { revisionId: string }) 
               code={r.ecr_number}
               name={r.title}
               status={r.status}
-              onClick={() => navigate(`/ec/ecr/${r.ecr_id}`)}
+              onClick={() =>
+                onNavigate ? onNavigate(`/ec/ecr/${r.ecr_id}`) : navigate(`/ec/ecr/${r.ecr_id}`)
+              }
             />
           ))}
         </State>

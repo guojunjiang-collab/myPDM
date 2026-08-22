@@ -96,7 +96,13 @@ function RowCard({
   );
 }
 
-export default function PartWhereUsedTab({ revisionId }: { revisionId: string }) {
+interface Props {
+  revisionId: string;
+  /** 覆盖层模式跳转回调（详情栈内导航）；缺省时走路由 navigate */
+  onNavigate?: (to: string) => void;
+}
+
+export default function PartWhereUsedTab({ revisionId, onNavigate }: Props) {
   const navigate = useNavigate();
 
   const [trace, setTrace] = useState<BOMTraceItem[]>([]);
@@ -183,7 +189,12 @@ export default function PartWhereUsedTab({ revisionId }: { revisionId: string })
           parents.map((p, i) => (
             <button
               key={trace[i]?.bom_item_id ?? i}
-              onClick={() => p.master_id && navigate(`/parts/${p.master_id}`)}
+              onClick={() =>
+                p.master_id &&
+                (onNavigate
+                  ? onNavigate(`/parts/${p.master_id}`)
+                  : navigate(`/parts/${p.master_id}`))
+              }
               className={`w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm ${
                 p.master_id ? '' : 'cursor-default'
               }`}
@@ -271,7 +282,11 @@ export default function PartWhereUsedTab({ revisionId }: { revisionId: string })
                   </span>
                 </span>
               }
-              onClick={() => navigate(`/projects/${r.project_id}`)}
+              onClick={() =>
+                onNavigate
+                  ? onNavigate(`/projects/${r.project_id}`)
+                  : navigate(`/projects/${r.project_id}`)
+              }
             />
           ))
         )}

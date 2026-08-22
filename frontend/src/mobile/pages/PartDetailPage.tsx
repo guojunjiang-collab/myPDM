@@ -112,9 +112,16 @@ interface Props {
   revisionId?: string;
   /** 覆盖层模式返回回调（缺省时返回按钮走 navigate(-1)） */
   onBack?: () => void;
+  /** 覆盖层模式跳转回调（详情栈内导航：BOM 下钻/反查跳转）；缺省时走路由 navigate */
+  onNavigate?: (to: string) => void;
 }
 
-export default function PartDetailPage({ masterId: propMasterId, revisionId: propRevisionId, onBack }: Props = {}) {
+export default function PartDetailPage({
+  masterId: propMasterId,
+  revisionId: propRevisionId,
+  onBack,
+  onNavigate,
+}: Props = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const { id: paramId } = useParams<{ id: string }>();
@@ -577,7 +584,7 @@ export default function PartDetailPage({ masterId: propMasterId, revisionId: pro
                 )}
                 {!bomLoading && !bomError && bomItems.length > 0 && (
                   // 树形：箭头展开/折叠逐层查看，点击行打开子项详情
-                  <BomTree rootItems={bomItems} />
+                  <BomTree rootItems={bomItems} onNavigate={onNavigate} />
                 )}
               </div>
             ))}
@@ -624,7 +631,11 @@ export default function PartDetailPage({ masterId: propMasterId, revisionId: pro
                     {docLinks.map((l) => (
                       <button
                         key={l.id}
-                        onClick={() => navigate(`/documents/${l.document_id}`)}
+                        onClick={() => {
+                          const to = `/documents/${l.document_id}`;
+                          if (onNavigate) onNavigate(to);
+                          else navigate(to);
+                        }}
                         className="w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm"
                       >
                         <div className="flex items-center gap-2 min-w-0">
@@ -715,7 +726,7 @@ export default function PartDetailPage({ masterId: propMasterId, revisionId: pro
             (!revisionId ? (
               <EmptyState text="该零部件暂无版本，无法反查" />
             ) : (
-              <PartWhereUsedTab revisionId={revisionId} />
+              <PartWhereUsedTab revisionId={revisionId} onNavigate={onNavigate} />
             ))}
         </div>
       )}

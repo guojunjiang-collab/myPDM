@@ -59,9 +59,11 @@ interface Props {
   id?: string;
   /** 覆盖层模式返回回调（缺省时返回按钮走 navigate(-1)） */
   onBack?: () => void;
+  /** 覆盖层模式跳转回调（详情栈内导航：反查跳转）；缺省时走路由 navigate */
+  onNavigate?: (to: string) => void;
 }
 
-export default function DocumentDetailPage({ id: propId, onBack }: Props = {}) {
+export default function DocumentDetailPage({ id: propId, onBack, onNavigate }: Props = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const { id: paramId } = useParams<{ id: string }>();
@@ -381,7 +383,7 @@ export default function DocumentDetailPage({ id: propId, onBack }: Props = {}) {
                 ))}
             </div>
           )}
-          {activeTab === 'whereused' && id && <DocWhereUsedTab revisionId={id} />}
+          {activeTab === 'whereused' && id && <DocWhereUsedTab revisionId={id} onNavigate={onNavigate} />}
         </div>
       )}
     </div>

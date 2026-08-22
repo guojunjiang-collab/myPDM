@@ -29,7 +29,13 @@ function sortedByOrder(list: BomChild[]): BomChild[] {
 const INDENT = 24;
 const BTN = 36;
 
-export default function BomTree({ rootItems }: { rootItems: BomChild[] }) {
+interface Props {
+  rootItems: BomChild[];
+  /** 覆盖层模式跳转回调（详情栈内导航）；缺省时走路由 navigate */
+  onNavigate?: (to: string) => void;
+}
+
+export default function BomTree({ rootItems, onNavigate }: Props) {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [children, setChildren] = useState<Record<string, BomChild[]>>({});
@@ -88,10 +94,14 @@ export default function BomTree({ rootItems }: { rootItems: BomChild[] }) {
           ) : (
             <span className="shrink-0 w-9 flex items-center justify-center text-gray-300 text-sm">•</span>
           )}
-          {/* 点击行 → 打开子项详情页 */}
+          {/* 点击行 → 打开子项详情页（覆盖层模式走回调，逐级返回） */}
           <button
             type="button"
-            onClick={() => navigate(`/parts/${b.child_master_id}`)}
+            onClick={() => {
+              const to = `/parts/${b.child_master_id}`;
+              if (onNavigate) onNavigate(to);
+              else navigate(to);
+            }}
             className="flex-1 min-w-0 flex flex-col justify-center py-1.5 pr-4 text-left"
           >
             {/* 行1：件号(左) + 用量 + 版本 + 状态(右) */}
