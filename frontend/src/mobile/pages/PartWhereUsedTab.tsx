@@ -181,18 +181,29 @@ export default function PartWhereUsedTab({ revisionId }: { revisionId: string })
           <EmptyState text="暂无父项零部件" />
         ) : (
           parents.map((p, i) => (
-            <RowCard
+            <button
               key={trace[i]?.bom_item_id ?? i}
-              main={`${p.code} ${p.name}`}
-              meta={
-                <span className="flex flex-wrap items-center gap-2">
-                  {p.status && <StatusBadge status={p.status} map={STATUS_MAP} />}
-                  <span className="text-gray-500">{formatMeta([['版本', p.version]])}</span>
-                  <span className="text-gray-500">用量 ×{trace[i]?.quantity ?? 1}</span>
-                </span>
-              }
               onClick={() => p.master_id && navigate(`/parts/${p.master_id}`)}
-            />
+              className={`w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm ${
+                p.master_id ? '' : 'cursor-default'
+              }`}
+            >
+              {/* 行1：件号(左) + 用量(中) + 版本(中) + 状态(右)——参考 BOM Tab 排版 */}
+              <span className="flex items-center min-w-0">
+                <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">{p.code}</span>
+                <span className="shrink-0 w-8 truncate text-center text-xs text-gray-500">
+                  x{trace[i]?.quantity ?? 1}
+                </span>
+                <span className="shrink-0 w-7 truncate text-center text-xs text-gray-500">{p.version}</span>
+                <span className="shrink-0 w-12 flex justify-end">
+                  {p.status && <StatusBadge status={p.status} map={STATUS_MAP} />}
+                </span>
+              </span>
+              {/* 行2：名称（反查链无检出人字段，仅显示名称） */}
+              <span className="flex items-center min-w-0 mt-0.5">
+                <span className="flex-1 min-w-0 truncate text-xs text-gray-500">{p.name}</span>
+              </span>
+            </button>
           ))
         )}
       </Section>
