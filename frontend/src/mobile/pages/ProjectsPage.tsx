@@ -382,70 +382,66 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
               </div>
             </div>
 
-            {/* 甘特图入口 */}
-            <button
-              type="button"
-              onClick={openGantt}
-              className="w-full text-left bg-white rounded-lg px-4 py-3 shadow-sm flex items-center gap-2 min-h-12"
-            >
-              <span className="text-base leading-none">📊</span>
-              <span className="flex-1 min-w-0">
-                <span className="block text-sm font-medium text-gray-900">甘特图</span>
-                <span className="block text-xs text-gray-500">任务时间轴（日/周/月）</span>
-              </span>
-              <span className="text-gray-300">›</span>
-            </button>
-
-            {/* 任务树：默认展开第 1 层级；下拉控件展开各层级/收起；行点击打开任务详情（多 Tab） */}
+            {/* 任务树：默认展开第 1 层级；下拉控件展开各层级/收起；甘特图按钮；行点击打开任务详情（多 Tab） */}
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between gap-2 px-1">
                 <span className="text-xs text-gray-400">任务列表（{stats.total}）</span>
-                {maxTreeDepth > 0 && (
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setExpandOpen((o) => !o)}
-                      className="w-14 min-h-8 rounded-lg bg-white border border-gray-200 text-xs text-gray-600"
-                    >
-                      {expandLabel}
-                    </button>
-                    {expandOpen && (
-                      <>
-                        {/* 点击外部关闭 */}
-                        <div className="fixed inset-0 z-30" onClick={() => setExpandOpen(false)} />
-                        <div className="absolute right-0 top-full mt-1 z-40 min-w-32 bg-white rounded-lg shadow-lg border border-gray-200 py-1">
-                          {(
-                            [
-                              { value: 'collapsed', label: '全部折叠' },
-                              ...Array.from({ length: maxTreeDepth }, (_, i) => i + 1).map((k) => ({
-                                value: String(k),
-                                label: `L${k}`,
-                              })),
-                              { value: 'all', label: '全部展开' },
-                              ...(expandSel === 'custom' ? [{ value: 'custom', label: '自定义' }] : []),
-                            ] as Array<{ value: string; label: string }>
-                          ).map((opt) => (
-                            <button
-                              key={opt.value}
-                              type="button"
-                              onClick={() => {
-                                handleExpandChange(opt.value);
-                                setExpandOpen(false);
-                              }}
-                              className={`w-full text-left px-3 py-2 text-sm ${
-                                expandSel === opt.value
-                                  ? 'text-primary-600 font-medium bg-primary-50'
-                                  : 'text-gray-700'
-                              }`}
-                            >
-                              {opt.label}
-                            </button>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
+                <div className="flex items-center gap-1.5">
+                  {maxTreeDepth > 0 && (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setExpandOpen((o) => !o)}
+                        className="w-14 min-h-8 rounded-lg bg-white border border-gray-200 text-xs text-gray-600"
+                      >
+                        {expandLabel}
+                      </button>
+                      {expandOpen && (
+                        <>
+                          {/* 点击外部关闭 */}
+                          <div className="fixed inset-0 z-30" onClick={() => setExpandOpen(false)} />
+                          <div className="absolute right-0 top-full mt-1 z-40 min-w-32 bg-white rounded-lg shadow-lg border border-gray-200 py-1">
+                            {(
+                              [
+                                { value: 'collapsed', label: '全部折叠' },
+                                ...Array.from({ length: maxTreeDepth }, (_, i) => i + 1).map((k) => ({
+                                  value: String(k),
+                                  label: `L${k}`,
+                                })),
+                                { value: 'all', label: '全部展开' },
+                                ...(expandSel === 'custom' ? [{ value: 'custom', label: '自定义' }] : []),
+                              ] as Array<{ value: string; label: string }>
+                            ).map((opt) => (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => {
+                                  handleExpandChange(opt.value);
+                                  setExpandOpen(false);
+                                }}
+                                className={`w-full text-left px-3 py-2 text-sm ${
+                                  expandSel === opt.value
+                                    ? 'text-primary-600 font-medium bg-primary-50'
+                                    : 'text-gray-700'
+                                }`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {/* 甘特图入口（层级下拉右侧） */}
+                  <button
+                    type="button"
+                    onClick={openGantt}
+                    className="min-h-8 px-2.5 rounded-lg bg-white border border-gray-200 text-xs text-gray-600"
+                  >
+                    甘特图
+                  </button>
+                </div>
               </div>
               {tasks.length === 0 ? (
                 <EmptyState text="暂无任务" />
