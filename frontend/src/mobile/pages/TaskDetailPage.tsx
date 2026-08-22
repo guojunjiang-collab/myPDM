@@ -196,9 +196,12 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
     // config_item：移动端暂无构型详情，只读
   };
 
-  // 快速预览：零部件/装配 → STP 3D 预览（新标签）；图文档 → 首个可预览附件
+  // 快速预览：装配体 → 装配体模式 3D 预览（stp-viewer?assembly=，从装配体预览入口进）；
+  // 零件 → STP 附件单模型预览；图文档 → 首个可预览附件
+  const isAssembly = (l: TaskLink) =>
+    l.entity_type === 'assembly' || (l.entity_type === 'part' && l.entity_kind === 'assembly');
   const [previewingId, setPreviewingId] = useState<string | null>(null);
-  // 预查可预览性：document → 有可预览附件；part → 有 STP；assembly → 恒可预览
+  // 预查可预览性：装配体（按实际类型）→ 恒可预览；零件 → 有 STP 附件；图文档 → 有可预览附件
   // 无可预览内容不显示预览按钮（避免点击后才提示）
   const [previewableMap, setPreviewableMap] = useState<Record<string, boolean>>({});
   useEffect(() => {
@@ -207,7 +210,7 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
     if (targets.length === 0) return;
     let alive = true;
     const check = async (l: TaskLink): Promise<[string, boolean]> => {
-      if (l.entity_type === 'assembly') return [l.id, true];
+      if (isAssembly(l)) return [l.id, true];
       try {
         if (l.entity_type === 'document') {
           const res = await documentsApi.listAttachments(l.entity_id);
@@ -248,13 +251,14 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
         await openAttachmentInNewTab(att);
         return;
       }
-      // 零部件/装配：STP 三维预览（同步占位空标签，异步取 token 后写入，防弹窗拦截）
-      if (l.entity_type === 'assembly') {
+      // 装配体：从装配体模式 3D 预览入口进（stp-viewer?assembly=，不直接预览 STP 附件）
+      if (isAssembly(l)) {
         const url = `/stp-viewer?assembly=${l.entity_id}&code=${encodeURIComponent(l.entity_code ?? '')}&name=${encodeURIComponent(l.entity_name ?? '')}`;
         const w = window.open('', '_blank');
         if (w) w.location.href = url;
         return;
       }
+      // 零件：STP 附件单模型预览
       if (l.entity_type === 'part') {
         const list = (await partsApi.listAttachments(l.entity_id)) as Array<{ id: string; file_name?: string }>;
         const stp = list.find((a) => /\.(stp|step)$/i.test(a.file_name ?? ''));

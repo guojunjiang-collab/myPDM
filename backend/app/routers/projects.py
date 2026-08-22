@@ -503,15 +503,15 @@ _ENTITY_TABLE = {"part": "part_masters", "assembly": "part_masters", "component"
 
 def _link_dict(db, l):
     from sqlalchemy import text
-    code = name = spec = remark = master_id = version = status = None
+    code = name = spec = remark = master_id = version = status = kind = None
     table = _ENTITY_TABLE.get(l.entity_type)
     if table == "part_masters":
         row = db.execute(
-            text("SELECT pm.code, pm.name, NULL AS spec, pm.id as master_id, pr.version, pr.status FROM part_masters pm JOIN part_revisions pr ON pr.master_id = pm.id WHERE pr.id = :id"),
+            text("SELECT pm.code, pm.name, NULL AS spec, pm.id as master_id, pr.version, pr.status, pm.type FROM part_masters pm JOIN part_revisions pr ON pr.master_id = pm.id WHERE pr.id = :id"),
             {"id": str(l.entity_id)}
         ).fetchone()
         if row:
-            code, name, spec, master_id, version, status = row[0], row[1], row[2], row[3], row[4], row[5]
+            code, name, spec, master_id, version, status, kind = row[0], row[1], row[2], row[3], row[4], row[5], row[6]
     elif table == "document_revisions":
         row = db.execute(
             text("SELECT dm.code, dm.name, NULL AS spec, dr.remark, dm.id as master_id, dr.version, dr.status FROM document_revisions dr JOIN document_masters dm ON dm.id = dr.master_id WHERE dr.id = :id"),
@@ -546,7 +546,7 @@ def _link_dict(db, l):
     return {"id": str(l.id), "task_id": str(l.task_id), "entity_type": l.entity_type,
             "entity_id": str(l.entity_id), "entity_code": code, "entity_name": name,
             "entity_spec": spec, "entity_remark": remark, "entity_master_id": str(master_id) if master_id else None,
-            "entity_version": version, "entity_status": status}
+            "entity_version": version, "entity_status": status, "entity_kind": kind}
 
 
 def _comment_dict(db, c):

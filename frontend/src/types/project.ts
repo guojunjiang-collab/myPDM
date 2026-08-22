@@ -66,6 +66,8 @@ export interface TaskLink {
   /** 零部件/图文档关联的版本号与状态（后端 _link_dict 返回） */
   entity_version?: string | null;
   entity_status?: string | null;
+  /** 零部件实际类型（'part' | 'assembly'，后端 _link_dict 返回；关联可能统一存 part） */
+  entity_kind?: string | null;
 }
 
 export interface TaskComment {
