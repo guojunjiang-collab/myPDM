@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { boardApi } from '../../services/api';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
-import PartDetailPage from './PartDetailPage';
-import DocumentDetailPage from './DocumentDetailPage';
+import DetailOverlayStack from '../components/DetailOverlayStack';
 import { useDetailOverlay } from '../hooks/useDetailOverlay';
 
 /* ================================================================
@@ -229,26 +228,7 @@ export default function BoardPage() {
       </div>
 
       {/* 条目详情覆盖层栈：看板保持原状（展开/筛选/滚动位置全保留），逐级返回 */}
-      {itemStack.map((d, idx) => (
-        <div
-          key={idx}
-          className={`fixed inset-0 z-50 bg-gray-50 overflow-y-auto ${idx === itemStack.length - 1 ? '' : 'hidden'}`}
-        >
-          {d.kind === 'part' ? (
-            <PartDetailPage
-              masterId={d.id}
-              onBack={() => window.history.back()}
-              onNavigate={handleDetailNavigate}
-            />
-          ) : (
-            <DocumentDetailPage
-              id={d.id}
-              onBack={() => window.history.back()}
-              onNavigate={handleDetailNavigate}
-            />
-          )}
-        </div>
-      ))}
+      <DetailOverlayStack stack={itemStack} onNavigate={handleDetailNavigate} />
     </div>
   );
 }

@@ -5,8 +5,7 @@ import { useDebounced } from '../../hooks/useDebounced';
 import MobileCardList from '../components/MobileCardList';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
-import PartDetailPage from './PartDetailPage';
-import DocumentDetailPage from './DocumentDetailPage';
+import DetailOverlayStack from '../components/DetailOverlayStack';
 import { useDetailOverlay } from '../hooks/useDetailOverlay';
 import type { PartListItem } from '../../types';
 
@@ -184,27 +183,7 @@ export default function PartsListPage() {
         }
       />
       {/* 详情覆盖层栈：全部渲染保留状态，只显示栈顶；逐级返回 */}
-      {stack.map((d, idx) => (
-        <div
-          key={idx}
-          className={`fixed inset-0 z-50 bg-gray-50 overflow-y-auto ${idx === stack.length - 1 ? '' : 'hidden'}`}
-        >
-          {d.kind === 'part' ? (
-            <PartDetailPage
-              masterId={d.id}
-              revisionId={d.rev}
-              onBack={() => window.history.back()}
-              onNavigate={handleDetailNavigate}
-            />
-          ) : (
-            <DocumentDetailPage
-              id={d.id}
-              onBack={() => window.history.back()}
-              onNavigate={handleDetailNavigate}
-            />
-          )}
-        </div>
-      ))}
+      <DetailOverlayStack stack={stack} onNavigate={handleDetailNavigate} />
     </div>
   );
 }

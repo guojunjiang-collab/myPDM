@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ecrApi, ecoApi } from '../../services/api';
 import { useDebounced } from '../../hooks/useDebounced';
@@ -140,12 +140,36 @@ function StatusLogs({ logs, map }: { logs: Array<{ id?: string; to_status?: stri
   );
 }
 
-export default function EcPage() {
+interface Props {
+  /** 覆盖层模式（详情栈内嵌）传入的详情信息；路由模式缺省时从 /ec/ecr/:id、/ec/eco/:id 读取 */
+  detail?: { kind: 'eco' | 'ecr'; id: string };
+  /** 覆盖层模式返回回调（缺省时返回按钮走 navigate(-1)） */
+  onBack?: () => void;
+}
+
+export default function EcPage({ detail, onBack }: Props = {}) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { id } = useParams<{ id?: string }>();
-  // 详情路由区分：/ec/ecr/:id 与 /ec/eco/:id
-  const isEco = location.pathname.includes('/eco/');
+  const { id: paramId } = useParams<{ id?: string }>();
+  // 详情路由区分：/ec/ecr/:id 与 /ec/eco/:id（覆盖层模式由 detail 决定）
+  const id = detail?.id ?? paramId;
+  const isEco = detail ? detail.kind === 'eco' : location.pathname.includes('/eco/');
+
+  // 独立路由模式（列表 ↔ 详情同组件切换）：进入详情保存列表滚动位置，返回列表恢复
+  const hadDetailRef = useRef(false);
+  useEffect(() => {
+    if (id) {
+      hadDetailRef.current = true;
+      return;
+    }
+    if (hadDetailRef.current) {
+      hadDetailRef.current = false;
+      const saved = Number(sessionStorage.getItem('mobile.ec.scroll') || '0');
+      if (saved > 0) {
+        requestAnimationFrame(() => document.querySelector('main')?.scrollTo(0, saved));
+      }
+    }
+  }, [id]);
 
   const [tab, setTab] = useState<Tab>('ecr');
 
@@ -225,12 +249,13 @@ export default function EcPage() {
     return ecos.filter((e) => e.eco_number.toLowerCase().includes(kw) || e.title.toLowerCase().includes(kw));
   }, [ecos, debouncedEco]);
 
-  /* ---------------- 详情视图（子路由 /ec/ecr/:id 或 /ec/eco/:id） ---------------- */
+  /* ---------------- 详情视图（子路由 /ec/ecr/:id 或 /ec/eco/:id / 覆盖层 detail） ---------------- */
   if (id) {
+    const back = onBack ? onBack : () => navigate(-1);
     return isEco ? (
-      <EcoDetailView ecoId={id} onBack={() => navigate(-1)} />
+      <EcoDetailView ecoId={id} onBack={back} />
     ) : (
-      <EcrDetailView ecrId={id} onBack={() => navigate(-1)} />
+      <EcrDetailView ecrId={id} onBack={back} />
     );
   }
 
@@ -284,7 +309,11 @@ export default function EcPage() {
                 </span>
               </span>
             )}
-            onClick={(e) => navigate(`/ec/ecr/${e.id}`)}
+            onClick={(e) => {
+              // 保存列表滚动位置（详情返回时恢复）
+              sessionStorage.setItem('mobile.ec.scroll', String(document.querySelector('main')?.scrollTop ?? 0));
+              navigate(`/ec/ecr/${e.id}`);
+            }}
           />
         </>
       )}
@@ -311,7 +340,11 @@ export default function EcPage() {
                 </span>
               </span>
             )}
-            onClick={(e) => navigate(`/ec/eco/${e.id}`)}
+            onClick={(e) => {
+              // 保存列表滚动位置（详情返回时恢复）
+              sessionStorage.setItem('mobile.ec.scroll', String(document.querySelector('main')?.scrollTop ?? 0));
+              navigate(`/ec/eco/${e.id}`);
+            }}
           />
         </>
       )}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { projectApi } from '../../services/projectApi';
 import { useDebounced } from '../../hooks/useDebounced';
@@ -83,9 +83,34 @@ function fmtDate(v?: string | null): string {
   return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString('zh-CN');
 }
 
-export default function ProjectsPage() {
+interface Props {
+  /** 覆盖层模式（详情栈内嵌）传入的项目 id；路由模式缺省时从 /projects/:id 读取 */
+  detailId?: string;
+  /** 覆盖层模式返回回调（缺省时返回按钮走 navigate(-1)） */
+  onBack?: () => void;
+}
+
+export default function ProjectsPage({ detailId, onBack }: Props = {}) {
   const navigate = useNavigate();
-  const { id } = useParams<{ id: string }>();
+  const { id: paramId } = useParams<{ id: string }>();
+  const id = detailId ?? paramId;
+
+  // 独立路由模式（列表 ↔ /projects/:id 详情同组件切换）：进入详情保存列表滚动位置，
+  // 返回列表（全面屏返回手势 / ‹ 均触发 id 变 undefined）恢复——覆盖层模式列表不卸载，天然保留
+  const hadDetailRef = useRef(false);
+  useEffect(() => {
+    if (id) {
+      hadDetailRef.current = true;
+      return;
+    }
+    if (hadDetailRef.current) {
+      hadDetailRef.current = false;
+      const saved = Number(sessionStorage.getItem('mobile.projects.scroll') || '0');
+      if (saved > 0) {
+        requestAnimationFrame(() => document.querySelector('main')?.scrollTo(0, saved));
+      }
+    }
+  }, [id]);
 
   /* ---- 列表视图状态 ---- */
   const [projects, setProjects] = useState<Project[]>([]);
@@ -176,7 +201,7 @@ export default function ProjectsPage() {
           <div className="flex items-center gap-1 min-h-10">
             <button
               aria-label="返回"
-              onClick={() => navigate(-1)}
+              onClick={() => (onBack ? onBack() : navigate(-1))}
               className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-gray-600"
             >
               ‹
@@ -281,7 +306,14 @@ export default function ProjectsPage() {
             </span>
           </span>
         )}
-        onClick={(p) => navigate(`/projects/${p.id}`)}
+        onClick={(p) => {
+          // 保存列表滚动位置（详情返回时恢复）
+          sessionStorage.setItem(
+            'mobile.projects.scroll',
+            String(document.querySelector('main')?.scrollTop ?? 0)
+          );
+          navigate(`/projects/${p.id}`);
+        }}
       />
     </div>
   );

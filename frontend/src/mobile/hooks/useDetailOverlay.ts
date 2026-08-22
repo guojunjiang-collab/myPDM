@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 
-export type DetailTarget = { kind: 'part' | 'document'; id: string; rev?: string };
+export type DetailTarget =
+  | { kind: 'part'; id: string; rev?: string }
+  | { kind: 'document'; id: string }
+  | { kind: 'project'; id: string }
+  | { kind: 'ec'; ecType: 'eco' | 'ecr'; id: string };
 
 /**
- * 详情覆盖层栈（零部件/图文档列表、看板共用）：
+ * 详情覆盖层栈（零部件/图文档/看板等主界面共用）：
  * - 主界面点卡片 → openDetail 打开第一层（覆盖在主界面上，主界面不卸载、滚动位置保留）
- * - 详情内跳转（BOM 下钻 / 反查跳转零部件/图文档）→ handleDetailNavigate 逐级入栈并压入 history 哨兵
+ * - 详情内跳转（BOM 下钻 / 反查 / 零部件 / 图文档 / 项目 / EC）→ handleDetailNavigate 逐级入栈并压入 history 哨兵
  * - 页面 ‹ 返回 / 全面屏返回手势（popstate）每次弹掉一层详情，可逐级返回
- * - 不可嵌入的目标（项目/EC 等无独立详情组件）→ 新标签打开
+ * - 不可嵌入的目标（如 /users 等）→ 新标签打开
  */
 export function useDetailOverlay() {
   const [stack, setStack] = useState<DetailTarget[]>([]);
@@ -32,7 +36,7 @@ export function useDetailOverlay() {
     window.history.pushState({ mobileDetailOverlay: true }, '');
   };
 
-  /** 详情内跳转分流：零部件/图文档 → 栈内导航（压哨兵，可逐级返回）；其他 → 新标签 */
+  /** 详情内跳转分流：零部件/图文档/项目/EC → 栈内导航（压哨兵，可逐级返回）；其他 → 新标签 */
   const handleDetailNavigate = (to: string) => {
     const seg = to.split('?')[0].split('/').filter(Boolean);
     if (seg[0] === 'parts' && seg[1] && seg[1] !== 'compare') {
@@ -42,6 +46,21 @@ export function useDetailOverlay() {
     }
     if (seg[0] === 'documents' && seg[1]) {
       setStack((prev) => [...prev, { kind: 'document', id: seg[1] }]);
+      window.history.pushState({ mobileDetailOverlay: true }, '');
+      return;
+    }
+    if (seg[0] === 'projects' && seg[1]) {
+      setStack((prev) => [...prev, { kind: 'project', id: seg[1] }]);
+      window.history.pushState({ mobileDetailOverlay: true }, '');
+      return;
+    }
+    if (seg[0] === 'ec' && seg[1] === 'eco' && seg[2]) {
+      setStack((prev) => [...prev, { kind: 'ec', ecType: 'eco', id: seg[2] }]);
+      window.history.pushState({ mobileDetailOverlay: true }, '');
+      return;
+    }
+    if (seg[0] === 'ec' && seg[1] === 'ecr' && seg[2]) {
+      setStack((prev) => [...prev, { kind: 'ec', ecType: 'ecr', id: seg[2] }]);
       window.history.pushState({ mobileDetailOverlay: true }, '');
       return;
     }
