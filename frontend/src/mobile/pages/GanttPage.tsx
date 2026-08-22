@@ -213,6 +213,17 @@ export default function GanttPage({ projectId, onBack }: Props) {
                     style={{ top: i * ROW_H }}
                   />
                 ))}
+                {/* 整行点击层（最上层透明，点击甘特条任意处进入任务详情） */}
+                {data.tasks.map((t, i) => (
+                  <button
+                    key={'c' + t.id}
+                    type="button"
+                    onClick={() => openTask(t)}
+                    className="absolute left-0 right-0"
+                    style={{ top: i * ROW_H, height: ROW_H }}
+                    aria-label={`打开任务 ${t.code}`}
+                  />
+                ))}
               </div>
             </div>
           </div>
