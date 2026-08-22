@@ -503,22 +503,22 @@ _ENTITY_TABLE = {"part": "part_masters", "assembly": "part_masters", "component"
 
 def _link_dict(db, l):
     from sqlalchemy import text
-    code = name = spec = remark = master_id = None
+    code = name = spec = remark = master_id = version = status = None
     table = _ENTITY_TABLE.get(l.entity_type)
     if table == "part_masters":
         row = db.execute(
-            text("SELECT pm.code, pm.name, NULL AS spec, pm.id as master_id FROM part_masters pm JOIN part_revisions pr ON pr.master_id = pm.id WHERE pr.id = :id"),
+            text("SELECT pm.code, pm.name, NULL AS spec, pm.id as master_id, pr.version, pr.status FROM part_masters pm JOIN part_revisions pr ON pr.master_id = pm.id WHERE pr.id = :id"),
             {"id": str(l.entity_id)}
         ).fetchone()
         if row:
-            code, name, spec, master_id = row[0], row[1], row[2], row[3]
+            code, name, spec, master_id, version, status = row[0], row[1], row[2], row[3], row[4], row[5]
     elif table == "document_revisions":
         row = db.execute(
-            text("SELECT dm.code, dm.name, NULL AS spec, dr.remark, dm.id as master_id FROM document_revisions dr JOIN document_masters dm ON dm.id = dr.master_id WHERE dr.id = :id"),
+            text("SELECT dm.code, dm.name, NULL AS spec, dr.remark, dm.id as master_id, dr.version, dr.status FROM document_revisions dr JOIN document_masters dm ON dm.id = dr.master_id WHERE dr.id = :id"),
             {"id": str(l.entity_id)}
         ).fetchone()
         if row:
-            code, name, spec, remark, master_id = row[0], row[1], row[2], row[3], row[4]
+            code, name, spec, remark, master_id, version, status = row[0], row[1], row[2], row[3], row[4], row[5], row[6]
     elif table == "configuration_item_masters":
         # 关联存的是版本(revision)id，需 JOIN 版本表取主数据 code/name（主表仅 code/name，无 spec/remark 列）
         row = db.execute(
@@ -545,7 +545,8 @@ def _link_dict(db, l):
             code, name, remark = row[0], row[1], row[2] if len(row) > 2 else None
     return {"id": str(l.id), "task_id": str(l.task_id), "entity_type": l.entity_type,
             "entity_id": str(l.entity_id), "entity_code": code, "entity_name": name,
-            "entity_spec": spec, "entity_remark": remark, "entity_master_id": str(master_id) if master_id else None}
+            "entity_spec": spec, "entity_remark": remark, "entity_master_id": str(master_id) if master_id else None,
+            "entity_version": version, "entity_status": status}
 
 
 def _comment_dict(db, c):

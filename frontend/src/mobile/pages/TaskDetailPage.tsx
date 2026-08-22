@@ -30,12 +30,36 @@ const PRIORITY_MAP: Record<TaskPriority, { label: string; cls: string }> = {
 };
 
 const ENTITY_LABEL: Record<string, string> = {
-  part: '零部件',
-  assembly: '装配体',
+  part: '零件',
+  assembly: '装配',
   document: '图文档',
   config_item: '构型项',
   ec: '变更单',
 };
+
+const ENTITY_ICON: Record<string, string> = {
+  part: '🔩',
+  assembly: '🧩',
+  document: '📄',
+  config_item: '🧬',
+  ec: '📋',
+};
+
+/** 通用状态徽标（draft/frozen/released/obsolete，与移动端其它页一致） */
+const ENTITY_STATUS_MAP: Record<string, { label: string; cls: string }> = {
+  draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
+  frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
+  released: { label: '发布', cls: 'bg-green-100 text-green-800' },
+  obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
+};
+
+/** 关联对象分区顺序与聚合键 */
+const LINK_SECTIONS: Array<{ key: string; title: string; match: (t: string) => boolean }> = [
+  { key: 'part', title: '零部件', match: (t) => t === 'part' || t === 'assembly' },
+  { key: 'document', title: '图文档', match: (t) => t === 'document' },
+  { key: 'ec', title: '变更单', match: (t) => t === 'ec' },
+  { key: 'config_item', title: '构型项', match: (t) => t === 'config_item' },
+];
 
 function fmtDate(v?: string | null): string {
   if (!v) return '—';
@@ -247,32 +271,65 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
           </div>
         )}
 
-        {/* 关联对象 */}
+        {/* 关联对象（按数据类型分区展示） */}
         {tab === 'links' && (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-4">
             {linksLoading ? (
               <p className="text-center text-xs text-gray-400 py-3">加载中...</p>
             ) : links.length === 0 ? (
               <EmptyState text="暂无关联对象" />
             ) : (
-              links.map((l) => (
-                <button
-                  key={l.id}
-                  onClick={() => openLink(l)}
-                  className="w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="shrink-0 text-xs text-gray-400">{ENTITY_LABEL[l.entity_type] ?? l.entity_type}</span>
-                    <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
-                      {l.entity_code || l.entity_name || '未知对象'}
-                    </span>
-                  </div>
-                  {l.entity_name && (
-                    <div className="mt-0.5 text-xs text-gray-500 truncate">{l.entity_name}</div>
-                  )}
-                  {l.entity_spec && <div className="mt-0.5 text-xs text-gray-400 truncate">{l.entity_spec}</div>}
-                </button>
-              ))
+              LINK_SECTIONS.map((sec) => {
+                const secLinks = links.filter((l) => sec.match(l.entity_type));
+                if (secLinks.length === 0) return null;
+                return (
+                  <section key={sec.key}>
+                    <div className="flex items-center gap-1.5 px-1 mb-1.5">
+                      <span className="text-sm font-bold text-gray-900">{sec.title}</span>
+                      <span className="min-w-5 h-5 px-1.5 rounded-full bg-gray-100 text-gray-500 text-xs flex items-center justify-center">
+                        {secLinks.length}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      {secLinks.map((l) => (
+                        <button
+                          key={l.id}
+                          onClick={() => openLink(l)}
+                          className="w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm"
+                        >
+                          {/* 行1：类型徽标 + 编号 + 版本 */}
+                          <span className="flex items-center gap-2 min-w-0">
+                            <span className="shrink-0 text-base leading-none">{ENTITY_ICON[l.entity_type]}</span>
+                            <span className="shrink-0 px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 text-xs">
+                              {ENTITY_LABEL[l.entity_type] ?? l.entity_type}
+                            </span>
+                            <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
+                              {l.entity_code || l.entity_name || '未知对象'}
+                            </span>
+                            {l.entity_version && (
+                              <span className="shrink-0 text-xs text-gray-400">{l.entity_version}</span>
+                            )}
+                            <span className="shrink-0 text-gray-300">›</span>
+                          </span>
+                          {/* 行2：名称 + 状态 */}
+                          {l.entity_name && (
+                            <span className="flex items-center gap-2 min-w-0 mt-1">
+                              <span className="flex-1 min-w-0 truncate text-xs text-gray-500">{l.entity_name}</span>
+                              {l.entity_status && (
+                                <StatusBadge status={l.entity_status} map={ENTITY_STATUS_MAP} />
+                              )}
+                            </span>
+                          )}
+                          {/* 行3：备注/描述（有则显示） */}
+                          {l.entity_remark && (
+                            <div className="mt-1 text-xs text-gray-400 truncate">{l.entity_remark}</div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                );
+              })
             )}
           </div>
         )}

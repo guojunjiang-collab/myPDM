@@ -63,6 +63,9 @@ export interface TaskLink {
   entity_remark?: string | null;
   /** 零部件/构型项等实体的主数据 id（跳转详情用），后端 _link_dict 返回 */
   entity_master_id?: string | null;
+  /** 零部件/图文档关联的版本号与状态（后端 _link_dict 返回） */
+  entity_version?: string | null;
+  entity_status?: string | null;
 }
 
 export interface TaskComment {
