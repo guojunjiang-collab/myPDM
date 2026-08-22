@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../../components/Modal';
+import Badge from '../../components/ui/Badge';
 import { projectApi } from '../../services/projectApi';
 import { usersApi } from '../../services/api';
 import type { ProjectMember } from '../../types/project';
@@ -113,7 +114,7 @@ export default function MemberManageModal({ open, projectId, ownerId, onClose, o
               <span className="font-medium">{m.user_name}</span>
               <span className="text-xs text-gray-400">{m.username}</span>
               {isOwner ? (
-                <span className="text-xs px-2 py-0.5 rounded bg-primary-50 text-primary-700">负责人</span>
+                <Badge size="xs" tone="blue" label="负责人" />
               ) : (
                 <select value={m.role_in_project} onChange={(e) => stageRole(m.user_id, e.target.value)}
                         className="text-xs border border-gray-300 rounded px-1.5 py-0.5 text-gray-600">

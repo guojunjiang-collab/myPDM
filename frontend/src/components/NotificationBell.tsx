@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotificationStore } from '../stores/notification';
+import Badge from './ui/Badge';
 import { notificationIcon, NOTIFICATION_TARGET_ROUTE } from '../lib/notification';
 import { fromNow } from '../lib/date';
 import type { Notification } from '../types';
@@ -34,9 +35,7 @@ export default function NotificationBell() {
       <button onClick={() => setOpen((v) => !v)} className="relative text-gray-500 hover:text-blue-500" title="通知" aria-label="通知">
         <span className="text-lg">🔔</span>
         {unread > 0 && (
-          <span className="absolute -top-1.5 -right-2 bg-red-500 text-white text-[10px] rounded-full px-1 leading-4 min-w-[16px] text-center">
-            {unread > 99 ? '99+' : unread}
-          </span>
+          <Badge tone="red" label={unread > 99 ? '99+' : unread} size="xs" className="absolute -top-1.5 -right-2" />
         )}
       </button>
       {open && (

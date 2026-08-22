@@ -1,15 +1,10 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Tile, EmptyState } from './tiles';
+import Badge from '../../components/ui/Badge';
 import { projectApi } from '../../services/projectApi';
 import { overdueDays } from './lib/aggregate';
 import type { MyTaskItem } from '../../types';
-
-const STATUS_CLS: Record<string, string> = {
-  '未开始': 'bg-gray-100 text-gray-600',
-  '进行中': 'bg-blue-50 text-blue-700',
-  '挂起': 'bg-amber-50 text-amber-700',
-};
 
 function fmtDate(d: string | null): string {
   if (!d) return '';
@@ -87,7 +82,7 @@ export function MyTasksTile({ onOverdue }: { onOverdue?: (n: number) => void }) 
                       <span className="text-gray-500 shrink-0" title={t.code}>{t.code}</span>
                       <span className={`shrink-0 ${od > 0 ? 'text-red-700' : 'text-gray-800'}`} title={t.name}>{t.name}</span>
                       <span className="text-gray-400 truncate flex-1 min-w-0" title={t.description || ''}>{t.description || ''}</span>
-                      <span className={`px-1 rounded shrink-0 ${STATUS_CLS[t.status] || 'bg-gray-100 text-gray-600'}`}>{t.status}</span>
+                      <Badge status={t.status} domain="task" className="shrink-0" />
                       <span className="text-gray-400 shrink-0">{startStr}</span>
                       <span className="text-gray-400 shrink-0">{endStr}</span>
                     </div>

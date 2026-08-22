@@ -6,6 +6,8 @@ import PartDetailModal from '../components/PartDetailModal';
 import DocumentDetailModal from '../components/DocumentDetailModal';
 import ArchiveTreeModal from '../components/ArchiveTreeModal';
 import ConfigItemDetailModal from '../components/Configuration/ConfigItemDetailModal';
+import Badge from '../components/ui/Badge';
+import type { BadgeTone } from '../constants/badges';
 import { useAuthStore } from '../stores/auth';
 
 /* ================================================================
@@ -49,18 +51,17 @@ const ENTITY_ICON: Record<string, string> = { part: '📦', assembly: '📦', co
 // 零件/部件已统一为「零部件」，旧数据 entity_type 可能仍为 part/assembly
 const isComponentType = (t: string) => t === 'component' || t === 'part' || t === 'assembly';
 
-const STATUS_TAG: Record<string, { label: string; cls: string }> = {
-  draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
-  active: { label: '有效', cls: 'bg-green-100 text-green-800' },
-  frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
-  released: { label: '发布', cls: 'bg-green-100 text-green-800' },
-  obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
+const STATUS_TAG: Record<string, { label: string; tone: BadgeTone }> = {
+  draft: { label: '草稿', tone: 'blue' },
+  active: { label: '有效', tone: 'green' },
+  frozen: { label: '冻结', tone: 'orange' },
+  released: { label: '发布', tone: 'green' },
+  obsolete: { label: '作废', tone: 'red' },
 };
 
-const StatusTag = ({ status }: { status: string }) => {
-  const s = STATUS_TAG[status] || { label: status, cls: 'bg-gray-100 text-gray-800' };
-  return <span className={`px-1.5 py-0.5 text-xs rounded-full ${s.cls}`}>{s.label}</span>;
-};
+const StatusTag = ({ status }: { status: string }) => (
+  <Badge tone={STATUS_TAG[status]?.tone ?? 'gray'} label={STATUS_TAG[status]?.label ?? status} />
+);
 
 /* ================================================================
    Helpers
@@ -667,9 +668,7 @@ function BoardTreeNode({
           <span className="text-xs text-gray-400">{node.shared_from.real_name}</span>
         )}
         {count > 0 && (
-          <span className={`text-xs px-1.5 py-0.5 rounded-full ${isSelected ? 'bg-primary-100 text-primary-600' : 'bg-gray-200 text-gray-500'}`}>
-            {count}
-          </span>
+          <Badge size="xs" tone={isSelected ? 'blue' : 'gray'} label={count} />
         )}
         <button
           type="button"

@@ -1,9 +1,18 @@
 import { useEffect, useState } from 'react';
 import { logsApi } from '../services/api';
+import Badge from '../components/ui/Badge';
+import type { BadgeTone } from '../constants/badges';
 import type { OperationLog } from '../types';
 import { formatDateTime } from '../utils/date';
 
 const PAGE_SIZE = 20;
+
+const actionTone = (action: string): BadgeTone => {
+  if (action.includes('创建') || action.includes('create')) return 'green';
+  if (action.includes('删除') || action.includes('delete')) return 'red';
+  if (action.includes('登录') || action.includes('login')) return 'blue';
+  return 'gray';
+};
 
 const ACTION_OPTIONS = [
   { value: '', label: '全部操作' },
@@ -190,17 +199,7 @@ export default function Logs() {
                   </td>
                   <td className="px-4 py-3 text-sm">{log.username}</td>
                   <td className="px-4 py-3 text-sm">
-                    <span className={`px-2 py-0.5 text-xs rounded-full ${
-                      log.action.includes('创建') || log.action.includes('create')
-                        ? 'bg-green-100 text-green-800'
-                        : log.action.includes('删除') || log.action.includes('delete')
-                        ? 'bg-red-100 text-red-800'
-                        : log.action.includes('登录') || log.action.includes('login')
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {log.action}
-                    </span>
+                    <Badge tone={actionTone(log.action)} label={log.action} />
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {TARGET_TYPE_OPTIONS.find(t => t.value === log.target_type)?.label || log.target_type}

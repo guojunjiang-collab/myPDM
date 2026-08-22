@@ -4,6 +4,7 @@ import { usersApi, userGroupsApi } from '../services/api';
 import type { User } from '../types';
 import { isAdmin, can } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
+import Badge from '../components/ui/Badge';
 import { useTableSort } from '../hooks/useTableSort';
 import { formatDateTime } from '../utils/date';
 import { previewUsersImport, executeUsersImport } from '../services/importExport';
@@ -28,24 +29,8 @@ const initialFormData: UserFormData = {
   password: '',
 };
 
-const roleTag = (role: string) => {
-  const map: Record<string, { label: string; cls: string }> = {
-    admin: { label: '管理员', cls: 'bg-red-100 text-red-800' },
-    engineer: { label: '工程师', cls: 'bg-blue-100 text-blue-800' },
-    production: { label: '生产人员', cls: 'bg-green-100 text-green-800' },
-    guest: { label: '访客', cls: 'bg-gray-100 text-gray-800' },
-    unverified: { label: '未验证', cls: 'bg-yellow-100 text-yellow-800' },
-  };
-  return map[role] || { label: role, cls: 'bg-gray-100 text-gray-800' };
-};
-
-const statusTag = (s: string) => {
-  const map: Record<string, { label: string; cls: string }> = {
-    active: { label: '正常', cls: 'bg-green-100 text-green-800' },
-    disabled: { label: '禁用', cls: 'bg-red-100 text-red-800' },
-  };
-  return map[s] || { label: s, cls: 'bg-gray-100 text-gray-800' };
-};
+const RoleTag = ({ role }: { role: string }) => <Badge status={role} domain="role" />;
+const StatusTag = ({ status }: { status: string }) => <Badge status={status} domain="user" />;
 
 export default function Users() {
   const [users, setUsers] = useState<User[]>([]);
@@ -358,9 +343,7 @@ export default function Users() {
           >
             待审批
             {unverifiedUsers.length > 0 && (
-              <span className="ml-1.5 px-1.5 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-800">
-                {unverifiedUsers.length}
-              </span>
+              <span className="ml-1.5"><Badge size="xs" tone="amber" label={unverifiedUsers.length} /></span>
             )}
           </button>
         )}
@@ -446,15 +429,11 @@ export default function Users() {
                   <td className="px-4 py-3 text-sm font-medium">{user.username}</td>
                   <td className="px-4 py-3 text-sm">{user.real_name}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 text-xs rounded-full ${roleTag(user.role).cls}`}>
-                      {roleTag(user.role).label}
-                    </span>
+                    <RoleTag role={user.role} />
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-500">{user.department || '-'}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 text-xs rounded-full ${statusTag(user.status).cls}`}>
-                      {statusTag(user.status).label}
-                    </span>
+                    <StatusTag status={user.status} />
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-500">{formatDateTime(user.created_at)}</td>
                 <td className="px-4 py-3 text-right">
@@ -846,7 +825,7 @@ export default function Users() {
                         <tr key={u.id}>
                           <td className="px-3 py-2">{u.real_name}</td>
                           <td className="px-3 py-2 text-gray-500">{u.username}</td>
-                          <td className="px-3 py-2"><span className={`px-2 py-0.5 text-xs rounded-full ${roleTag(u.role).cls}`}>{roleTag(u.role).label}</span></td>
+                          <td className="px-3 py-2"><RoleTag role={u.role} /></td>
                         </tr>
                       ))}
                     </tbody>

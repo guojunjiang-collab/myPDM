@@ -5,6 +5,7 @@ import { projectApi } from '../../services/projectApi';
 import { usersApi } from '../../services/api';
 import { can, useAuthStore } from '../../stores/auth';
 import { Modal, ConfirmModal } from '../../components/Modal';
+import Badge from '../../components/ui/Badge';
 import { toast } from '../../components/Toast';
 import { useHeaderTabs } from '../../hooks/useHeaderTabs';
 import { usePersistedTabState } from '../../hooks/usePersistedTabState';
@@ -16,19 +17,6 @@ import SharedLeftPanel from './SharedLeftPanel';
 import type { Project, ProjectStatus, ProjectTask, TaskStatus, TaskLink, TaskComment, GanttTask } from '../../types/project';
 
 const STATUSES: ProjectStatus[] = ['待启动', '进行中', '已完成', '已暂停', '已归档'];
-const STATUS_CLASS: Record<ProjectStatus, string> = {
-  待启动: 'bg-gray-100 text-gray-500',
-  进行中: 'bg-blue-100 text-blue-800',
-  已完成: 'bg-green-100 text-green-800',
-  已暂停: 'bg-amber-100 text-amber-800',
-  已归档: 'bg-gray-100 text-gray-600',
-};
-const TASK_STATUS_CLASS: Record<TaskStatus, string> = {
-  未开始: 'bg-gray-100 text-gray-600',
-  进行中: 'bg-blue-50 text-blue-700',
-  已完成: 'bg-green-50 text-green-700',
-  挂起: 'bg-amber-50 text-amber-700',
-};
 
 function isOverdue(t: ProjectTask): boolean {
   if (!t.planned_end || t.status === '已完成') return false;
@@ -635,7 +623,7 @@ export default function Projects() {
                         <td className="px-4 py-2 text-sm">{p.name}</td>
                         <td className="px-4 py-2 text-sm text-gray-600">{p.owner_name}</td>
                         <td className="px-4 py-2">
-                          <span className={`px-2 py-1 text-xs rounded-full ${STATUS_CLASS[p.status]}`}>{p.status}</span>
+                          <Badge status={p.status} domain="project" />
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-500">{p.planned_start || '—'} ~ {p.planned_end || '—'}</td>
                         <td className="px-4 py-2 text-sm text-gray-500">{p.member_count ?? 0}</td>
@@ -666,7 +654,7 @@ export default function Projects() {
               <>
                 <div className="flex items-center gap-3 mb-4 shrink-0 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2">
                   <span className="font-semibold">{currentProject.code} · {currentProject.name}</span>
-                  <span className={`px-2 py-0.5 text-xs rounded-full ${STATUS_CLASS[currentProject.status]}`}>{currentProject.status}</span>
+                  <Badge status={currentProject.status} domain="project" />
                   <span className="text-sm text-gray-500">负责人 {currentProject.owner_name}</span>
                   <div className="flex-1" />
                   <button onClick={() => setDeliverableOpen(true)}

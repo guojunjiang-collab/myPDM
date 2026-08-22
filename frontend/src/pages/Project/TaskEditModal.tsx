@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from '../../components/Modal';
+import Badge from '../../components/ui/Badge';
+import type { BadgeTone } from '../../constants/badges';
 import { projectApi } from '../../services/projectApi';
 import { partsApi, documentsApi, ecrApi, ecoApi, logsApi, customFieldsApi } from '../../services/api';
 import { useDataStore } from '../../stores/data';
@@ -33,22 +35,20 @@ interface Props {
 const TYPES: TaskType[] = ['任务', '里程碑', '评审'];
 const STATUSES: TaskStatus[] = ['未开始', '进行中', '已完成', '挂起'];
 const PRIORITIES: TaskPriority[] = ['高', '中', '低'];
-const STATUS_CLASS: Record<string, string> = {
-  未开始: 'bg-gray-100 text-gray-600',
-  进行中: 'bg-blue-50 text-blue-700',
-  已完成: 'bg-green-50 text-green-700',
-  挂起: 'bg-amber-50 text-amber-700',
+const LINK_BADGE: Record<string, { tone: BadgeTone; label: string }> = {
+  part: { tone: 'blue', label: '零部件' },
+  assembly: { tone: 'blue', label: '零部件' },
+  component: { tone: 'blue', label: '零部件' },
+  config_item: { tone: 'teal', label: '构型项' },
+  ec: { tone: 'amber', label: 'EC' },
+  document: { tone: 'blue', label: '图文档' },
 };
-const LINK_LABEL: Record<string, string> = {
-  part: '零部件', assembly: '零部件', component: '零部件', config_item: '构型项', ec: 'EC', document: '图文档',
-};
-const LINK_COLOR: Record<string, string> = {
-  part: 'bg-primary-50 text-primary-700',
-  assembly: 'bg-primary-50 text-primary-700',
-  component: 'bg-primary-50 text-primary-700',
-  config_item: 'bg-teal-50 text-teal-700',
-  ec: 'bg-amber-50 text-amber-700',
-  document: 'bg-blue-50 text-blue-700',
+
+const logActionTone = (action: string): BadgeTone => {
+  if (action === '创建任务') return 'green';
+  if (action === '删除任务') return 'red';
+  if (action === '任务状态变更') return 'blue';
+  return 'gray';
 };
 
 export default function TaskEditModal({ open, projectId, task, parentId, onClose, onSaved, onRefresh }: Props) {
@@ -313,7 +313,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
             </div>
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">状态</label>
-              <span className={`inline-block px-2 py-1 text-xs rounded-full ${STATUS_CLASS[form.status]}`}>{form.status}</span>
+              <Badge status={form.status} domain="task" />
             </div>
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">优先级</label>
@@ -487,7 +487,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                           const other = allTasks.find((t) => t.id === otherId);
                           return (
                             <li key={d.id} className="flex items-center gap-2 text-sm">
-                              <span className={`px-1.5 py-0.5 rounded text-xs ${d.is_violation ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'}`}>{d.dep_type}</span>
+                              <Badge size="xs" tone={d.is_violation ? 'red' : 'gray'} label={d.dep_type} />
                               <span className="text-gray-500">{isPred ? '后置→' : '←前置'}</span>
                               <span className="truncate">{other ? `${other.code} ${other.name}` : otherId}</span>
                               {d.lag_days ? <span className="text-gray-400">lag {d.lag_days}d</span> : null}
@@ -540,7 +540,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                                     }
                                   }}>
                                 <td className="px-3 py-2 whitespace-nowrap">
-                                  <span className={`text-xs px-1.5 py-0.5 rounded ${LINK_COLOR[l.entity_type] ?? 'bg-gray-100 text-gray-600'}`}>{LINK_LABEL[l.entity_type]}</span>
+                                  <Badge size="xs" tone={LINK_BADGE[l.entity_type]?.tone ?? 'gray'} label={LINK_BADGE[l.entity_type]?.label ?? l.entity_type} />
                                 </td>
                                 <td className="px-3 py-2 font-mono text-gray-700 whitespace-nowrap">{l.entity_code || '—'}</td>
                                 <td className="px-3 py-2 text-gray-700">{l.entity_name || '—'}</td>
@@ -613,12 +613,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                             <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{formatDateTime(l.created_at)}</td>
                             <td className="px-3 py-2">{l.username}</td>
                             <td className="px-3 py-2">
-                              <span className={`px-2 py-0.5 text-xs rounded-full ${
-                                l.action === '创建任务' ? 'bg-green-100 text-green-800' :
-                                l.action === '删除任务' ? 'bg-red-100 text-red-800' :
-                                l.action === '任务状态变更' ? 'bg-blue-100 text-blue-800' :
-                                'bg-gray-100 text-gray-700'
-                              }`}>{l.action}</span>
+                              <Badge tone={logActionTone(l.action)} label={l.action} />
                             </td>
                             <td className="px-3 py-2 text-gray-500">{l.detail || '-'}</td>
                           </tr>
