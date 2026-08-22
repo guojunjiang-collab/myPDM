@@ -208,22 +208,42 @@ function ToolsPanel() {
   );
 }
 
-export default function StpViewerPage() {
-  const navigate = useNavigate();
-  const location = useLocation();
+/** 查看器参数（与桌面 pages/STPViewer.tsx 约定一致），路由壳从 URL 解析，BOM 对比内嵌时直接传入 */
+export interface ViewerParams {
+  id?: string | null;
+  token?: string | null;
+  assembly?: string | null;
+  compareLeft?: string | null;
+  compareRight?: string | null;
+  configProfile?: string | null;
+  code?: string;
+  version?: string;
+  name?: string;
+}
 
-  // —— 参数解析（与桌面 pages/STPViewer.tsx 约定一致）——
-  const params = new URLSearchParams(location.search);
-  const id = params.get('id');
-  const token = params.get('token');
-  const assemblyRevId = params.get('assembly');
-  const compareLeftId = params.get('compare-left');
-  const compareRightId = params.get('compare-right');
-  const partCode = params.get('code') || undefined;
-  const partVersion = params.get('version') || undefined;
-  const partName = params.get('name') || undefined;
+/**
+ * 查看器主体（可复用）：
+ * - 路由场景：/stp-viewer?...
+ * - BOM 对比内嵌：作为全屏浮层（返回仅关闭浮层，对比页状态不丢）
+ */
+export function StpViewerCore({
+  params,
+  onBack,
+}: {
+  params: ViewerParams;
+  onBack: () => void;
+}) {
+  // —— 参数（与桌面 pages/STPViewer.tsx 约定一致）——
+  const id = params.id;
+  const token = params.token;
+  const assemblyRevId = params.assembly;
+  const compareLeftId = params.compareLeft;
+  const compareRightId = params.compareRight;
+  const partCode = params.code;
+  const partVersion = params.version;
+  const partName = params.name;
   const compareMode = !!(compareLeftId && compareRightId);
-  const unsupportedMode = !!params.get('config-profile');
+  const unsupportedMode = !!params.configProfile;
 
   // —— 模型加载（单件复刻桌面 checkAndLoad / downloadFile / poll 逻辑；装配/对比走 instances/tree）——
   const [phase, setPhase] = useState<Phase>('checking');
@@ -449,7 +469,7 @@ export default function StpViewerPage() {
         <button
           type="button"
           aria-label="返回"
-          onClick={() => navigate(-1)}
+          onClick={onBack}
           className="shrink-0 min-w-11 h-11 flex items-center justify-center text-2xl leading-none text-gray-600"
         >
           ‹
@@ -477,7 +497,7 @@ export default function StpViewerPage() {
             <div className="text-sm text-gray-500">该模式暂不支持移动端查看，请使用电脑浏览器</div>
             <button
               type="button"
-              onClick={() => navigate(-1)}
+              onClick={onBack}
               className="min-h-11 px-4 rounded-lg bg-primary-600 text-white text-sm"
             >
               返回
@@ -520,7 +540,7 @@ export default function StpViewerPage() {
             <div className="text-sm text-gray-500">两侧装配均无已摆位的零件（先导入装配 STEP）</div>
             <button
               type="button"
-              onClick={() => navigate(-1)}
+              onClick={onBack}
               className="min-h-11 px-4 rounded-lg bg-primary-600 text-white text-sm"
             >
               返回
@@ -532,7 +552,7 @@ export default function StpViewerPage() {
             <div className="text-sm text-gray-500">该装配暂无已摆位的零件（先导入装配 STEP）</div>
             <button
               type="button"
-              onClick={() => navigate(-1)}
+              onClick={onBack}
               className="min-h-11 px-4 rounded-lg bg-primary-600 text-white text-sm"
             >
               返回
@@ -544,7 +564,7 @@ export default function StpViewerPage() {
             <div className="text-sm text-red-500">加载失败，请关闭后重试</div>
             <button
               type="button"
-              onClick={() => navigate(-1)}
+              onClick={onBack}
               className="min-h-11 px-4 rounded-lg bg-primary-600 text-white text-sm"
             >
               返回
@@ -635,4 +655,23 @@ export default function StpViewerPage() {
       </div>
     </div>
   );
+}
+
+/** 路由壳：/stp-viewer 参数解析 → StpViewerCore（单件/装配/对比模式） */
+export default function StpViewerPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const viewerParams: ViewerParams = {
+    id: params.get('id'),
+    token: params.get('token'),
+    assembly: params.get('assembly'),
+    compareLeft: params.get('compare-left'),
+    compareRight: params.get('compare-right'),
+    configProfile: params.get('config-profile'),
+    code: params.get('code') || undefined,
+    version: params.get('version') || undefined,
+    name: params.get('name') || undefined,
+  };
+  return <StpViewerCore params={viewerParams} onBack={() => navigate(-1)} />;
 }

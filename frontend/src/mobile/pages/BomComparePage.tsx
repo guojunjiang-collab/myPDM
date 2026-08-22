@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { bomApi, partsApi } from '../../services/api';
 import type { BOMCompareNode, BOMCompareResponse } from '../../types';
 import type { PartListItem } from '../../types';
+import { StpViewerCore } from './StpViewerPage';
 
 /**
  * 移动端 BOM 对比页（/parts/compare）。
@@ -193,6 +194,35 @@ export default function BomComparePage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [onlyDiff, setOnlyDiff] = useState(false);
   const [activeTab, setActiveTab] = useState<'tree' | 'property'>('tree');
+  // 3D 对比：内嵌全屏浮层（不离开当前页），关闭后左侧/右侧/结果全部保留
+  const [show3D, setShow3D] = useState(false);
+  const show3DRef = useRef(show3D);
+  useEffect(() => {
+    show3DRef.current = show3D;
+  }, [show3D]);
+
+  // 打开 3D 浮层时压入哨兵；系统返回（popstate）弹哨兵 → 仅关闭浮层，不离开对比页
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => {
+      const st = e.state as { drawer?: string; overlay3d?: boolean } | null;
+      if (st?.overlay3d || (show3DRef.current && !st?.drawer)) {
+        setShow3D(false);
+      }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  const open3D = () => {
+    if (!leftId || !rightId) return;
+    setShow3D(true);
+    window.history.pushState({ overlay3d: true }, '');
+  };
+  const close3D = () => {
+    setShow3D(false);
+    // 用户主动关闭：弹出哨兵，保持 history 栈一致（popstate 关闭路径由 onPop 处理）
+    window.history.back();
+  };
 
   const handleCompare = async () => {
     if (!leftId || !rightId) return;
@@ -328,7 +358,7 @@ export default function BomComparePage() {
             {loading ? '对比中...' : '开始对比'}
           </button>
           <button
-            onClick={() => navigate(`/stp-viewer?compare-left=${leftId}&compare-right=${rightId}`)}
+            onClick={open3D}
             disabled={!leftId || !rightId}
             className="flex-1 min-h-11 rounded-lg bg-white border border-primary-600 text-primary-600 text-sm font-medium disabled:opacity-50"
           >
@@ -470,6 +500,16 @@ export default function BomComparePage() {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* 3D 对比浮层：内嵌查看器，返回仅关闭浮层（对比信息保留） */}
+      {show3D && leftId && rightId && (
+        <div className="fixed inset-0 z-50 bg-gray-100">
+          <StpViewerCore
+            params={{ compareLeft: leftId, compareRight: rightId }}
+            onBack={close3D}
+          />
         </div>
       )}
     </div>
