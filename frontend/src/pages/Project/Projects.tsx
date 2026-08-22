@@ -851,22 +851,16 @@ export default function Projects() {
                                onClose={() => setEditOpen(false)}
                                onSaved={(saved) => {
                                  setEditOpen(false);
-                                 if (saved?.taskId) {
-                                   patchTask(saved.taskId, saved);
-                                   setGanttKey((k) => k + 1);
-                                 } else {
-                                   reload();
-                                   setDeliverableKey((k) => k + 1);
-                                 }
+                                 // 项目详情下显示的全部任务信息原地刷新：
+                                 // patchTask 立即本地更新（不闪屏）+ reload 全量重拉任务树（父级日期汇总/所有层级）+ 甘特图 + 交付物
+                                 if (saved?.taskId) patchTask(saved.taskId, saved);
+                                 reload();
+                                 setDeliverableKey((k) => k + 1);
                                }}
                                onRefresh={(payload) => {
-                                 if (payload?.taskId) {
-                                   patchTask(payload.taskId, payload);
-                                   setGanttKey((k) => k + 1);
-                                 } else {
-                                   reload();
-                                   setDeliverableKey((k) => k + 1);
-                                 }
+                                 // 弹窗内状态流转等：本地更新 + 全量校准（父级汇总等）
+                                 if (payload?.taskId) patchTask(payload.taskId, payload);
+                                 reload();
                                }} />
                 <ConfirmModal open={!!delTask} content={`确认删除任务"${delTask?.name}"及其所有子任务?`}
                               onConfirm={confirmDelete} onCancel={() => setDelTask(null)} />

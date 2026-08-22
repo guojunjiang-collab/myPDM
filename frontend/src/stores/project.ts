@@ -32,7 +32,8 @@ export const useProjectStore = create<ProjectState>((set) => ({
     set({ currentProject: res.data });
   },
   loadTasks: async (id) => {
-    set({ loading: true, tasks: [] });
+    // 不清空 tasks：编辑保存后的 reload 原地刷新不闪屏（项目切换处已显式清空）
+    set({ loading: true });
     try {
       const res = await projectApi.listTasks(id);
       set({ tasks: res.data.items });
