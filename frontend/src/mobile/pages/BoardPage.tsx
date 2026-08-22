@@ -34,8 +34,14 @@ interface FolderNode {
 // 零件/部件已统一为「零部件」，旧数据 entity_type 可能仍为 part/assembly
 const isComponentType = (t: string) => t === 'component' || t === 'part' || t === 'assembly';
 
-const ENTITY_LABEL: Record<string, string> = { part: '零部件', assembly: '零部件', component: '零部件', document: '图文档', configuration: '构型项' };
-const ENTITY_ICON: Record<string, string> = { part: '📦', assembly: '📦', component: '📦', document: '📄', configuration: '⚙️' };
+// 类型徽标（行1 件号与版本之间）：零件灰 / 部件紫 / 图文档天蓝 / 构型项青绿（与状态徽标色系区分）
+const ENTITY_BADGE: Record<string, { label: string; cls: string }> = {
+  part: { label: '零件', cls: 'bg-gray-100 text-gray-800' },
+  component: { label: '零件', cls: 'bg-gray-100 text-gray-800' },
+  assembly: { label: '部件', cls: 'bg-purple-100 text-purple-800' },
+  document: { label: '图文档', cls: 'bg-sky-100 text-sky-700' },
+  configuration: { label: '构型项', cls: 'bg-teal-100 text-teal-700' },
+};
 
 const STATUS_MAP: Record<string, { label: string; cls: string }> = {
   draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
@@ -346,16 +352,20 @@ function ItemRow({ item, depth, onClick }: { item: DashboardItem; depth: number;
       <span className="shrink-0 w-9 flex items-center justify-center text-gray-300 text-sm">•</span>
       <span className="flex-1 min-w-0 flex flex-col justify-center py-1.5 pr-3">
         <span className="flex items-center gap-2 min-w-0">
-          <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
-            {ENTITY_ICON[item.entity_type]} {item.code}
+          <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">{item.code}</span>
+          {/* 类型徽标：件号与版本之间（零件/部件/图文档/构型项） */}
+          <span
+            className={`shrink-0 text-xs px-1.5 py-0.5 rounded ${
+              ENTITY_BADGE[item.entity_type]?.cls ?? 'bg-gray-100 text-gray-600'
+            }`}
+          >
+            {ENTITY_BADGE[item.entity_type]?.label ?? '对象'}
           </span>
           <span className="shrink-0 text-xs text-gray-500">{item.version}</span>
           <StatusBadge status={item.status} map={STATUS_MAP} />
         </span>
         <span className="flex items-center gap-2 min-w-0 mt-0.5">
-          <span className="flex-1 min-w-0 truncate text-xs text-gray-500">
-            {ENTITY_LABEL[item.entity_type]} {item.name}
-          </span>
+          <span className="flex-1 min-w-0 truncate text-xs text-gray-500">{item.name}</span>
           {item.check_out_user_name && (
             <span className="shrink-0 text-xs text-gray-500">{item.check_out_user_name}</span>
           )}
