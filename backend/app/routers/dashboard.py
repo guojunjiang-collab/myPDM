@@ -26,11 +26,12 @@ def _checkout_name(db: Session, check_out_user_id) -> str | None:
 
 
 def _build_component_item(item, rev: PartRevision, db: Session) -> dict:
-    """构建零部件看板项：直接使用关联时指定的 revision"""
+    """构建零部件看板项：直接使用关联时指定的 revision；entity_type 按主档类型区分零件(part)/部件(assembly)"""
     master = db.query(PartMaster).filter(PartMaster.id == rev.master_id).first()
+    mtype = master.type if master and master.type in ("part", "assembly") else "part"
     return {
         "id": item.id,
-        "entity_type": "component",
+        "entity_type": mtype,
         "entity_id": str(rev.id),
         "master_id": str(rev.master_id),
         "code": master.code if master else "",
