@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { customFieldsApi, entityDocumentsApi, partsApi } from '../../services/api';
+import { customFieldsApi, entityDocumentsApi, mediaApi, partsApi } from '../../services/api';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
 import AttachmentPreview from '../components/AttachmentPreview';
@@ -366,6 +366,69 @@ export default function PartDetailPage() {
     value: cfDisplay(cfValues[d.id]) ?? undefined,
   }));
 
+  /* ---------------- 工具栏：3D 预览 + 版本对比 ---------------- */
+
+  // 版本对比浮层：左 = 当前版本（固定），右 = 选择其他版本 → 跳转 BOM 对比页（?left=&right= 深链）
+  const [showCompare, setShowCompare] = useState(false);
+  const [cmpRight, setCmpRight] = useState<string | null>(null);
+  const [cmpLoading, setCmpLoading] = useState(false);
+
+  // 浮层打开时若版本列表尚未加载（未进过版本 Tab）则拉取
+  useEffect(() => {
+    if (!showCompare || !id) return;
+    if (versions.length > 0 || verLoading) return;
+    let alive = true;
+    setCmpLoading(true);
+    partsApi
+      .revisions(id)
+      .then((list) => {
+        if (alive) setVersions((list ?? []) as PartRevision[]);
+      })
+      .catch(() => {
+        if (alive) setCmpRight(null);
+      })
+      .finally(() => {
+        if (alive) setCmpLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [showCompare, id, versions.length, verLoading]);
+
+  const startCompare = () => {
+    if (!revisionId || !cmpRight) return;
+    navigate(`/parts/compare?left=${encodeURIComponent(revisionId)}&right=${encodeURIComponent(cmpRight)}`);
+  };
+
+  // 3D 预览：部件 → 装配模式（现有 /stp-viewer?assembly=）；零件 → 查 STP 附件单模型
+  const [stpLoading, setStpLoading] = useState(false);
+  const on3DPreview = async () => {
+    if (!revisionId || stpLoading) return;
+    if (detail?.type === 'assembly') {
+      navigate(
+        `/stp-viewer?assembly=${revisionId}&code=${encodeURIComponent(detail.code ?? '')}&name=${encodeURIComponent(detail.name ?? '')}`
+      );
+      return;
+    }
+    setStpLoading(true);
+    try {
+      const list = (await partsApi.listAttachments(revisionId)) as PartAttachment[];
+      const stp = list.find((a) => /\.(stp|step)$/i.test(a.file_name ?? ''));
+      if (!stp) {
+        window.alert('该零件暂无 STP 三维模型');
+        return;
+      }
+      const t = await mediaApi.token(stp.id, 'gltf');
+      navigate(
+        `/stp-viewer?id=${encodeURIComponent(stp.id)}&token=${encodeURIComponent(t)}&code=${encodeURIComponent(detail?.code ?? '')}&version=${encodeURIComponent(curRev?.version ?? '')}&name=${encodeURIComponent(detail?.name ?? '')}`
+      );
+    } catch {
+      window.alert('3D 模型加载失败，请稍后重试');
+    } finally {
+      setStpLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-col">
       {/* 顶部：返回按钮 + 标题（编号/名称）+ 分段 Tab（sticky 跟随列表页模式） */}
@@ -380,6 +443,27 @@ export default function PartDetailPage() {
           </button>
           <div className="min-w-0 flex-1 text-base font-medium text-gray-900 truncate">{title}</div>
         </div>
+        {/* 工具栏：TAB 上方常驻（3D 预览 / 版本对比） */}
+        {revisionId && (
+          <div className="flex gap-2 mt-1">
+            <button
+              onClick={on3DPreview}
+              disabled={stpLoading}
+              className="flex-1 min-h-8 rounded-lg bg-primary-50 text-primary-600 border border-primary-200 text-xs disabled:opacity-60"
+            >
+              {stpLoading ? '加载中...' : '3D 预览'}
+            </button>
+            <button
+              onClick={() => {
+                setCmpRight(null);
+                setShowCompare(true);
+              }}
+              className="flex-1 min-h-8 rounded-lg bg-primary-50 text-primary-600 border border-primary-200 text-xs"
+            >
+              版本对比
+            </button>
+          </div>
+        )}
         <div className="flex mt-1 bg-white rounded-lg border border-gray-200 overflow-hidden">
           {TABS.map((t) => (
             <button
@@ -409,20 +493,6 @@ export default function PartDetailPage() {
         <div className="p-3">
           {activeTab === 'overview' && (
             <div>
-              {/* 装配体 3D 预览入口（加载全部叶项并摆放，/stp-viewer 装配模式） */}
-              {detail?.type === 'assembly' && revisionId && (
-                <button
-                  onClick={() =>
-                    navigate(
-                      `/stp-viewer?assembly=${revisionId}&code=${encodeURIComponent(detail.code ?? '')}&name=${encodeURIComponent(detail.name ?? '')}`
-                    )
-                  }
-                  className="w-full mb-2 bg-primary-600 text-white rounded-lg px-4 py-3 min-h-11 text-sm font-medium flex items-center justify-between shadow-sm"
-                >
-                  <span>3D 预览（装配体）</span>
-                  <span>›</span>
-                </button>
-              )}
               {cfLoading && <p className="text-center text-xs text-gray-400 py-2">自定义字段加载中...</p>}
               {!cfLoading && cfError && (
                 <p className="text-center text-xs text-red-400 py-2">自定义字段加载失败</p>
@@ -575,6 +645,65 @@ export default function PartDetailPage() {
             ) : (
               <PartWhereUsedTab revisionId={revisionId} />
             ))}
+        </div>
+      )}
+
+      {/* 版本对比浮层：左 = 当前版本，右 = 选择其他版本 */}
+      {showCompare && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-8"
+          onClick={() => setShowCompare(false)}
+        >
+          <div
+            className="bg-white rounded-lg w-80 p-4 shadow-xl max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-sm font-bold text-gray-900 mb-1">版本对比</div>
+            <div className="text-xs text-gray-500 mb-3">
+              左：当前版本 {curRev?.version ?? '-'}（{detail?.code}）
+              <br />
+              右：选择对比版本
+            </div>
+            {cmpLoading ? (
+              <p className="text-center text-xs text-gray-400 py-3">加载中...</p>
+            ) : versions.length === 0 ? (
+              <p className="text-center text-xs text-gray-400 py-3">暂无其他版本</p>
+            ) : (
+              <div className="flex flex-col gap-1.5 mb-3">
+                {versions
+                  .filter((v) => v.id !== revisionId)
+                  .map((v) => (
+                    <button
+                      key={v.id}
+                      onClick={() => setCmpRight(v.id)}
+                      className={`w-full text-left px-3 py-2 min-h-10 rounded-lg border flex items-center gap-2 ${
+                        cmpRight === v.id
+                          ? 'border-primary-500 bg-primary-50'
+                          : 'border-gray-200 bg-white'
+                      }`}
+                    >
+                      <span className="flex-1 text-sm text-gray-800 truncate">版本 {v.version}</span>
+                      <StatusBadge status={v.status} map={STATUS_MAP} />
+                    </button>
+                  ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={startCompare}
+                disabled={!cmpRight}
+                className="flex-1 min-h-10 rounded-lg bg-primary-600 text-white text-sm font-medium disabled:opacity-40"
+              >
+                开始对比
+              </button>
+              <button
+                onClick={() => setShowCompare(false)}
+                className="flex-1 min-h-10 rounded-lg bg-gray-100 text-gray-600 text-sm"
+              >
+                取消
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

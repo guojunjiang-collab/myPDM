@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { bomApi, partsApi } from '../../services/api';
 import type { BOMCompareNode, BOMCompareResponse } from '../../types';
 import type { PartListItem } from '../../types';
@@ -186,8 +186,11 @@ function buildDesc(n: BOMCompareNode): string {
 
 export default function BomComparePage() {
   const navigate = useNavigate();
-  const [leftId, setLeftId] = useState<string | null>(null);
-  const [rightId, setRightId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  // 深链支持：?left=<revisionId>&right=<revisionId>（零部件详情"版本对比"跳转）预选并自动对比
+  const [leftId, setLeftId] = useState<string | null>(() => searchParams.get('left'));
+  const [rightId, setRightId] = useState<string | null>(() => searchParams.get('right'));
+  const autoStartedRef = useRef(false);
   const [result, setResult] = useState<BOMCompareResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -200,6 +203,26 @@ export default function BomComparePage() {
   useEffect(() => {
     show3DRef.current = show3D;
   }, [show3D]);
+
+  // URL 深链：left+right 就绪时自动开始对比（仅一次）
+  useEffect(() => {
+    if (autoStartedRef.current || !leftId || !rightId) return;
+    autoStartedRef.current = true;
+    setLoading(true);
+    setError(null);
+    bomApi
+      .compare(leftId, rightId)
+      .then((res) => {
+        setResult(res.data as BOMCompareResponse);
+        setExpanded(new Set(['ROOT']));
+      })
+      .catch((e) => {
+        setResult(null);
+        const detail = (e as any)?.response?.data?.detail;
+        setError(typeof detail === 'string' ? detail : '对比失败，请稍后重试');
+      })
+      .finally(() => setLoading(false));
+  }, [leftId, rightId]);
 
   // 打开 3D 浮层时压入哨兵；系统返回（popstate）弹哨兵 → 仅关闭浮层，不离开对比页
   // 抽屉哨兵在 overlay3d 之上：关抽屉 back() 弹掉 drawer 后栈顶仍是 overlay3d（popstate 的
