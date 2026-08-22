@@ -38,12 +38,15 @@ export default function PartsListPage() {
     let alive = true;
     setLoading(true);
     // partsApi.list 直接返回响应体 { items, total, page, page_size }（.then((r) => r.data)）
+    // 默认按件号升序（后端支持 sort_field=code / sort_order=asc）
     partsApi
       .list({
         search: debounced || undefined,
         type: typeFilter || undefined,
         show_all_versions: showAllVersions || undefined,
         top_level: topLevel || undefined,
+        sort_field: 'code',
+        sort_order: 'asc',
         page_size: 50,
       })
       .then((data: { items?: PartListItem[] }) => {
