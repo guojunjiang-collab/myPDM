@@ -8,6 +8,7 @@ import EntityEditModal from '../EntityEditModal';
 import type { ConfigurationItem, CustomFieldDefinition } from '../../types';
 import { useDataStore } from '../../stores/data';
 import CustomFieldInput from '../CustomFieldInput';
+import Badge from '../ui/Badge';
 
 interface Props {
   open: boolean;
@@ -492,18 +493,14 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                    {parts.map((p, i) => (
                      <tr key={i} className="hover:bg-gray-50 cursor-pointer" onClick={() => setEditingPartEntity({ type: p.part_type as 'part' | 'assembly', id: p.part_id })}>
                        <td className="px-3 py-1.5 text-xs">
-                         <span className={`px-1.5 py-0.5 rounded text-xs ${p.part_type === 'assembly' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
-                           {p.part_type === 'assembly' ? '部件' : '零件'}
-                         </span>
+                         <Badge tone={p.part_type === 'assembly' ? 'blue' : 'gray'} label={p.part_type === 'assembly' ? '部件' : '零件'} />
                        </td>
                        <td className="px-3 py-1.5 text-xs font-mono">{p.part_code}</td>
                        <td className="px-3 py-1.5 text-xs">{p.part_name}</td>
                        <td className="px-3 py-1.5 text-xs text-gray-500">{p.part_spec || '-'}</td>
                        <td className="px-3 py-1.5 text-xs">{p.part_version || '-'}</td>
                        <td className="px-3 py-1.5 text-xs">
-                         <span className={`px-1.5 py-0.5 rounded text-xs ${p.part_status === 'draft' ? 'bg-blue-100 text-blue-800' : p.part_status === 'frozen' ? 'bg-orange-100 text-orange-800' : p.part_status === 'released' ? 'bg-green-100 text-green-800' : p.part_status === 'obsolete' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>
-                           {p.part_status === 'draft' ? '草稿' : p.part_status === 'frozen' ? '冻结' : p.part_status === 'released' ? '发布' : p.part_status === 'obsolete' ? '作废' : '-'}
-                         </span>
+                         <Badge status={p.part_status} />
                        </td>
                        <td className="px-3 py-1.5 text-center" onClick={e => e.stopPropagation()}>
                          <input type="number" min={1} value={p.quantity ?? 1}

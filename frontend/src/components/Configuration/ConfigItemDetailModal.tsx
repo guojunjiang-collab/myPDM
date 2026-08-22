@@ -12,16 +12,7 @@ import ConfigItemPicker from './ConfigItemPicker';
 import PartDetailModal from '../PartDetailModal';
 import AssemblyPartPicker from '../AssemblyPartPicker';
 import VersionSelectModal from '../VersionSelectModal';
-
-const statusTag = (s: string) => {
-  const map: Record<string, { label: string; cls: string }> = {
-    draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
-    frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
-    released: { label: '发布', cls: 'bg-green-100 text-green-800' },
-    obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
-  };
-  return map[s] || { label: s, cls: 'bg-gray-100 text-gray-800' };
-};
+import Badge from '../ui/Badge';
 
 function BomChevron({ expanded }: { expanded: boolean }) {
   return (
@@ -286,7 +277,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
         </td>
         <td className="px-3 py-2">{c.child_detail?.name || '—'}</td>
         <td className="px-3 py-2 text-center text-gray-500 text-xs">{c.child_detail?.version || '—'}</td>
-        <td className="px-3 py-2 text-center"><span className={`px-1.5 py-0.5 text-xs rounded-full ${statusTag(c.child_detail?.status || 'draft').cls}`}>{statusTag(c.child_detail?.status || 'draft').label}</span></td>
+        <td className="px-3 py-2 text-center"><Badge status={c.child_detail?.status || 'draft'} /></td>
         <td className="px-3 py-2 text-center">{c.child_detail?.check_out_user_name ? (<span className="text-xs text-orange-600">{c.child_detail.check_out_user_name}</span>) : (<span className="text-xs text-gray-400">—</span>)}</td>
         <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
           {canEdit ? (
@@ -358,7 +349,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-3">
                 <span className="font-semibold text-sm">版本：{revision?.version}</span>
-                <span className={`px-2 py-1 text-xs rounded-full ${statusTag(revision?.status || 'draft').cls}`}>{statusTag(revision?.status || 'draft').label}</span>
+                <Badge status={revision?.status || 'draft'} />
                 {isCheckedOut && <span className="text-xs text-orange-600">已签出：{revision?.check_out_user_name || revision?.check_out_user_id}</span>}
               </div>
               <div className="flex gap-1 flex-wrap items-center">
@@ -431,7 +422,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
                               <td className="px-3 py-2">{pd.name || '—'}</td>
                               <td className="px-3 py-2 text-center text-gray-500">{pd.version || '—'}</td>
                               <td className="px-3 py-2 text-center">
-                                <span className={`px-1.5 py-0.5 text-xs rounded-full ${statusTag(pd.status || 'draft').cls}`}>{statusTag(pd.status || 'draft').label}</span>
+                                <Badge status={pd.status || 'draft'} />
                               </td>
                               <td className="px-3 py-2 text-center">
                                 {pd.check_out_user_name ? (<span className="text-xs text-orange-600">{pd.check_out_user_name}</span>) : (<span className="text-xs text-gray-400">—</span>)}
@@ -488,7 +479,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
               {activeTab === 'versions' && (
                 <table className="w-full text-sm"><thead><tr className="bg-gray-50 border-b border-gray-200"><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">版本</th><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">状态</th><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">创建时间</th><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">操作</th></tr></thead><tbody className="divide-y divide-gray-200">
                   {versions.map((v: any) => (
-                    <tr key={v.id} className={`hover:bg-gray-50 ${v.id === revision?.id ? 'bg-blue-50' : ''}`}><td className="px-4 py-3">{v.version}</td><td className="px-4 py-3"><span className={`px-2 py-1 text-xs rounded-full ${statusTag(v.status).cls}`}>{statusTag(v.status).label}</span></td><td className="px-4 py-3 text-gray-500">{v.created_at ? new Date(v.created_at).toLocaleDateString('zh-CN') : ''}</td><td className="px-4 py-3">{v.id === revision?.id ? (<span className="text-primary-600 text-xs">当前</span>) : (<button onClick={() => setInternalRevId(v.id)} className="text-primary-600 hover:text-primary-800 hover:underline text-xs">切换</button>)}</td></tr>
+                    <tr key={v.id} className={`hover:bg-gray-50 ${v.id === revision?.id ? 'bg-blue-50' : ''}`}><td className="px-4 py-3">{v.version}</td><td className="px-4 py-3"><Badge status={v.status} /></td><td className="px-4 py-3 text-gray-500">{v.created_at ? new Date(v.created_at).toLocaleDateString('zh-CN') : ''}</td><td className="px-4 py-3">{v.id === revision?.id ? (<span className="text-primary-600 text-xs">当前</span>) : (<button onClick={() => setInternalRevId(v.id)} className="text-primary-600 hover:text-primary-800 hover:underline text-xs">切换</button>)}</td></tr>
                   ))}
                 </tbody></table>
               )}

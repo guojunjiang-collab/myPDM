@@ -6,6 +6,7 @@ import ConfigItemDetailModal from './ConfigItemDetailModal';
 import PartDetailModal from '../PartDetailModal';
 import ProfileStatusBadge from './ProfileStatusBadge';
 import ProfileReviewPanel from './ProfileReviewPanel';
+import Badge from '../ui/Badge';
 import { configurationApi, configurationProfileApi, usersApi, partsApi, customFieldsApi } from '../../services/api';
 import { exportProfilePdf, exportProfileExcel } from '../../services/configProfilePdfExport';
 import { useAuthStore, isAdmin } from '../../stores/auth';
@@ -571,22 +572,9 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
     setCcUsers(ccUsers.filter((c) => c.user_id !== user_id));
   };
 
-  const getStatusLabel = (s: string | undefined) => {
-    if (!s) return '-';
-    const map: Record<string, string> = { draft: '草稿', active: '生效', archived: '归档', released: '发布' };
-    return map[s] || s;
-  };
-
   const partStatusBadge = (s: string | undefined) => {
     if (!s || s === '-') return <span className="text-gray-400">-</span>;
-    const colorMap: Record<string, string> = {
-      draft: 'bg-blue-100 text-blue-800',
-      frozen: 'bg-orange-100 text-orange-800',
-      released: 'bg-green-100 text-green-800',
-      obsolete: 'bg-red-100 text-red-800',
-    };
-    const labelMap: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' };
-    return <span className={`px-1.5 py-0.5 rounded text-xs ${colorMap[s] || 'bg-gray-100 text-gray-800'}`}>{labelMap[s] || s}</span>;
+    return <Badge status={s} />;
   };
 
   // ── Formal checklist: only selected items, default collapsed ──
@@ -624,7 +612,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         <td className="px-3 py-2 text-sm font-medium text-gray-700">{node.code}</td>
         <td className="px-3 py-2 text-sm text-gray-600">{node.name}</td>
         <td className="px-3 py-2 text-xs whitespace-nowrap">
-          <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">构型项</span>
+          <Badge tone="purple" label="构型项" />
         </td>
         <td className="px-3 py-2 text-sm text-gray-500">{node.version || '-'}</td>
         <td className="px-3 py-2 text-sm text-gray-500">{partStatusBadge(node.status)}</td>
@@ -644,9 +632,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
             <td className="px-3 py-2 text-sm font-mono text-gray-600">{part.item_code}</td>
             <td className="px-3 py-2 text-sm text-gray-600">{part.item_name || '-'}</td>
             <td className="px-3 py-2 text-sm whitespace-nowrap">
-              <span className={`px-1.5 py-0.5 rounded text-xs ${part.item_type === 'assembly' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
-                {part.item_type === 'assembly' ? '部件' : '零件'}
-              </span>
+              <Badge tone={part.item_type === 'assembly' ? 'blue' : 'gray'} label={part.item_type === 'assembly' ? '部件' : '零件'} />
             </td>
             <td className="px-3 py-2 text-sm text-gray-500">{part.item_version || '-'}</td>
             <td className="px-3 py-2 text-sm text-gray-500">{partStatusBadge(part.item_status)}</td>
@@ -690,7 +676,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         <td className="px-3 py-2 text-sm font-medium text-gray-700">{node.code}</td>
         <td className="px-3 py-2 text-sm text-gray-600">{node.name}</td>
         <td className="px-3 py-2 text-xs whitespace-nowrap">
-          <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">构型项</span>
+          <Badge tone="purple" label="构型项" />
         </td>
         <td className="px-3 py-2 text-sm text-gray-500">{node.version || '-'}</td>
         <td className="px-3 py-2 text-sm text-gray-500">{partStatusBadge(node.status)}</td>
@@ -704,9 +690,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
               onChange={() => { if (!node.is_required && canEdit) handleToggleConfigNode(node.id); }}
               className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500 disabled:opacity-50"
             />
-            <span className={`text-xs px-1.5 py-0.5 rounded ${node.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-              {node.is_required ? '必选' : '可选'}
-            </span>
+            <Badge tone={node.is_required ? 'blue' : 'gray'} label={node.is_required ? '必选' : '可选'} />
           </label>
         </td>
       </tr>
@@ -725,9 +709,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
           <td className="px-3 py-2 text-sm font-mono text-gray-600">{part.item_code}</td>
           <td className="px-3 py-2 text-sm text-gray-600">{part.item_name || '-'}</td>
           <td className="px-3 py-2 text-sm whitespace-nowrap">
-            <span className={`px-1.5 py-0.5 rounded text-xs ${part.item_type === 'assembly' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
-              {part.item_type === 'assembly' ? '部件' : '零件'}
-            </span>
+            <Badge tone={part.item_type === 'assembly' ? 'blue' : 'gray'} label={part.item_type === 'assembly' ? '部件' : '零件'} />
           </td>
           <td className="px-3 py-2 text-sm text-gray-500">{part.item_version || '-'}</td>
           <td className="px-3 py-2 text-sm text-gray-500">{partStatusBadge(part.item_status)}</td>
@@ -741,9 +723,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                 onChange={() => { if (canEdit && node.is_selected) handleTogglePart(part.id, part.is_selected); }}
                 className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500 disabled:opacity-50"
               />
-              <span className={`text-xs px-1.5 py-0.5 rounded ${part.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-                {part.is_required ? '必选' : '可选'}
-              </span>
+              <Badge tone={part.is_required ? 'blue' : 'gray'} label={part.is_required ? '必选' : '可选'} />
             </label>
           </td>
         </tr>

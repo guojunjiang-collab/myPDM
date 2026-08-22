@@ -5,6 +5,7 @@ import { configurationApi } from '../../services/api';
 import { canEdit, isAdmin } from '../../stores/auth';
 import { useDataStore } from '../../stores/data';
 import { ConfirmModal } from '../Modal';
+import Badge from '../ui/Badge';
 import ConfigurationCreateModal from './ConfigurationCreateModal';
 import type { CustomFieldDefinition } from '../../types';
 
@@ -133,23 +134,6 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
     }
   };
 
-  const statusTagLabel = (s: string) => {
-    const map: Record<string, string> = {
-      draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废',
-    };
-    return map[s] || s;
-  };
-
-  const statusTagClass = (s: string) => {
-    const map: Record<string, string> = {
-      draft: 'bg-blue-100 text-blue-800',
-      frozen: 'bg-orange-100 text-orange-800',
-      released: 'bg-green-100 text-green-800',
-      obsolete: 'bg-red-100 text-red-800',
-    };
-    return map[s] || 'bg-gray-100 text-gray-800';
-  };
-
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       <div className="flex gap-2 mb-4 shrink-0">
@@ -229,9 +213,7 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
                   <td className="px-2 py-3 text-sm text-gray-500 text-center whitespace-nowrap">{formatDate(item.created_at, 'YYYY-MM-DD HH:mm')}</td>
                   <td className="px-2 py-3 text-sm font-mono text-center">{item.version}</td>
                   <td className="px-2 py-3 text-sm text-center">
-                    <span className={`px-2 py-0.5 text-xs rounded-full ${statusTagClass(item.status)}`}>
-                      {statusTagLabel(item.status)}
-                    </span>
+                    <Badge status={item.status} />
                   </td>
                   <td className="px-2 py-3 text-sm text-center">
                     {item.check_out_user_name ? (

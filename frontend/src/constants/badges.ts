@@ -38,6 +38,7 @@ export const BADGE_DOMAINS: Record<BadgeDomain, Record<string, BadgeDef>> = {
     reviewing: { label: '评审中', tone: 'blue' },
     active: { label: '生效中', tone: 'green' },
     rejected: { label: '已驳回', tone: 'red' },
+    archived: { label: '已归档', tone: 'gray' },
   },
   inventoryDoc: {
     draft: { label: '草稿', tone: 'gray' },

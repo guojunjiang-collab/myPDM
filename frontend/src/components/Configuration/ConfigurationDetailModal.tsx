@@ -8,6 +8,7 @@ import AssemblyDetailContent from '../AssemblyDetailContent';
 import PartDetailModal from '../PartDetailModal';
 import { useDataStore } from '../../stores/data';
 import CustomFieldInput from '../CustomFieldInput';
+import Badge from '../ui/Badge';
 
 interface Props {
   itemId: string | null;
@@ -194,23 +195,17 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
             )}
           </td>
           <td className={`px-3 py-2 text-sm ${rowCls}`} onClick={onClickRow}>
-            <span className={`px-1.5 py-0.5 rounded text-xs ${isAssembly ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
-              {isAssembly ? '部件' : '零件'}
-            </span>
+            <Badge tone={isAssembly ? 'blue' : 'gray'} label={isAssembly ? '部件' : '零件'} />
           </td>
           <td className={`px-3 py-2 text-sm font-medium ${rowCls}`} onClick={onClickRow}>{p.part_detail?.code || p.entity_code || p.part_id}</td>
           <td className={`px-3 py-2 text-sm ${rowCls}`} onClick={onClickRow}>{p.part_detail?.name || p.entity_name || '-'}</td>
           <td className={`px-3 py-2 text-sm ${rowCls}`} onClick={onClickRow}>{p.part_detail?.version || p.entity_version || '-'}</td>
           <td className={`px-3 py-2 text-sm whitespace-nowrap ${rowCls}`} onClick={onClickRow}>
-            <span className={`px-1.5 py-0.5 rounded text-sm ${(p.part_detail?.status || p.status) === 'draft' ? 'bg-blue-100 text-blue-800' : (p.part_detail?.status || p.status) === 'frozen' ? 'bg-orange-100 text-orange-800' : (p.part_detail?.status || p.status) === 'released' ? 'bg-green-100 text-green-800' : (p.part_detail?.status || p.status) === 'obsolete' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>
-              {(p.part_detail?.status || p.status) === 'draft' ? '草稿' : (p.part_detail?.status || p.status) === 'released' ? '发布' : (p.part_detail?.status || p.status) === 'frozen' ? '冻结' : (p.part_detail?.status || p.status) === 'obsolete' ? '作废' : '-'}
-            </span>
+            <Badge status={p.part_detail?.status || p.status} />
           </td>
           <td className={`px-3 py-2 text-center text-sm ${rowCls}`} onClick={onClickRow}>{p.quantity ?? 1}</td>
           <td className={`px-3 py-2 text-center text-sm ${rowCls}`} onClick={onClickRow}>
-            <span className={`px-2 py-0.5 text-sm rounded ${p.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-              {p.is_required != null ? (p.is_required ? '必选' : '可选') : '-'}
-            </span>
+            <Badge tone={p.is_required ? 'blue' : 'gray'} label={p.is_required ? '必选' : '可选'} />
           </td>
         </tr>
         {childRows && childRows.map((c: any, j: number) => renderPartRow(c, level + 1, `${idx}-${j}`))}
@@ -249,21 +244,15 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
           <td className={`px-3 py-2 text-sm font-mono text-gray-600 ${rowCls}`} onClick={onClickRow}>{code}</td>
           <td className={`px-3 py-2 text-sm ${rowCls}`} onClick={onClickRow}>{name}</td>
           <td className={`px-3 py-2 text-sm whitespace-nowrap ${rowCls}`} onClick={onClickRow}>
-            <span className={`px-1.5 py-0.5 rounded text-xs ${isAssembly ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
-              {isAssembly ? '部件' : '零件'}
-            </span>
+            <Badge tone={isAssembly ? 'blue' : 'gray'} label={isAssembly ? '部件' : '零件'} />
           </td>
           <td className={`px-3 py-2 text-sm text-gray-500 ${rowCls}`} onClick={onClickRow}>{version}</td>
           <td className={`px-3 py-2 text-sm whitespace-nowrap ${rowCls}`} onClick={onClickRow}>
-            <span className={`px-1.5 py-0.5 rounded text-sm ${status === 'draft' ? 'bg-blue-100 text-blue-800' : status === 'frozen' ? 'bg-orange-100 text-orange-800' : status === 'released' ? 'bg-green-100 text-green-800' : status === 'obsolete' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>
-              {status === 'draft' ? '草稿' : status === 'released' ? '发布' : status === 'frozen' ? '冻结' : status === 'obsolete' ? '作废' : '-'}
-            </span>
+            <Badge status={status} />
           </td>
           <td className={`px-3 py-2 text-center text-sm ${rowCls}`} onClick={onClickRow}>{p.quantity ?? 1}</td>
           <td className={`px-3 py-2 text-center text-sm ${rowCls}`} onClick={onClickRow}>
-            <span className={`px-2 py-0.5 text-sm rounded ${p.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-              {p.is_required != null ? (p.is_required ? '必选' : '可选') : '-'}
-            </span>
+            <Badge tone={p.is_required ? 'blue' : 'gray'} label={p.is_required ? '必选' : '可选'} />
           </td>
         </tr>
         {childRows && childRows.map((c: any, j: number) => renderUnifiedPartRow(c, level + 1, `${idx}-${j}`))}
@@ -297,15 +286,13 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
           <td className={`px-3 py-2 text-sm font-medium text-gray-700 ${rowCls}`} onClick={onClickRow}>{c.child_detail?.code || c.child_code || c.child_id}</td>
           <td className={`px-3 py-2 text-sm text-gray-600 ${rowCls}`} onClick={onClickRow}>{c.child_detail?.name || c.child_name || '-'}</td>
           <td className={`px-3 py-2 text-xs whitespace-nowrap ${rowCls}`} onClick={onClickRow}>
-            <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">构型项</span>
+            <Badge tone="purple" label="构型项" />
           </td>
           <td className="px-3 py-2 text-xs text-gray-400">-</td>
           <td className="px-3 py-2 text-xs text-gray-400">-</td>
           <td className={`px-3 py-2 text-center text-sm ${rowCls}`} onClick={onClickRow}>{c.quantity ?? 1}</td>
           <td className={`px-3 py-2 text-center text-sm ${rowCls}`} onClick={onClickRow}>
-            <span className={`px-2 py-0.5 text-sm rounded ${c.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-              {c.is_required != null ? (c.is_required ? '必选' : '可选') : '-'}
-            </span>
+            <Badge tone={c.is_required ? 'blue' : 'gray'} label={c.is_required ? '必选' : '可选'} />
           </td>
         </tr>
         {expanded && expanded.parts.map((p: any, j: number) => renderUnifiedPartRow(p, level + 1, `${idx}-p${j}`))}
