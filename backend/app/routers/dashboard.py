@@ -17,6 +17,14 @@ router = APIRouter(prefix="/dashboard", tags=["用户看板"])
 COMPONENT_ENTITY_TYPES = ("component", "part", "assembly")
 
 
+def _checkout_name(db: Session, check_out_user_id) -> str | None:
+    """检出人姓名（join User，real_name 兜底）"""
+    if not check_out_user_id:
+        return None
+    user = db.query(User).filter(User.id == check_out_user_id).first()
+    return user.real_name if user else None
+
+
 def _build_component_item(item, rev: PartRevision, db: Session) -> dict:
     """构建零部件看板项：直接使用关联时指定的 revision"""
     master = db.query(PartMaster).filter(PartMaster.id == rev.master_id).first()
@@ -29,6 +37,7 @@ def _build_component_item(item, rev: PartRevision, db: Session) -> dict:
         "name": master.name if master else "",
         "version": rev.version,
         "status": rev.status,
+        "check_out_user_name": _checkout_name(db, rev.check_out_user_id),
     }
 
 
@@ -77,6 +86,7 @@ def _folder_to_dict(folder, db: Session, include_items=False, include_children=F
                         "name": master.name if master else "",
                         "version": rev.version,
                         "status": rev.status,
+                        "check_out_user_name": _checkout_name(db, rev.check_out_user_id),
                     })
             elif item.entity_type == "configuration":
                 rev = db.query(ConfigurationItemRevision).filter(
@@ -96,6 +106,7 @@ def _folder_to_dict(folder, db: Session, include_items=False, include_children=F
                         "name": master.name if master else "",
                         "version": rev.version,
                         "status": rev.status,
+                        "check_out_user_name": _checkout_name(db, rev.check_out_user_id),
                     })
         # 按名称排序
         item_list.sort(key=lambda x: x["name"])

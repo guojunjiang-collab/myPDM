@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { boardApi } from '../../services/api';
 import StatusBadge from '../components/StatusBadge';
@@ -17,6 +17,7 @@ interface DashboardItem {
   name: string;
   version: string;
   status: string;
+  check_out_user_name?: string;
 }
 
 interface FolderNode {
@@ -52,19 +53,66 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: 'configuration', label: '构型项' },
 ];
 
+// 会话级持久化 key：看板展开/筛选状态与滚动位置
+const BOARD_STATE_KEY = 'mobile.board.state';
+const BOARD_SCROLL_KEY = 'mobile.board.scroll';
+
 export default function BoardPage() {
   const navigate = useNavigate();
   const [myFolders, setMyFolders] = useState<FolderNode[]>([]);
   const [sharedFolders, setSharedFolders] = useState<FolderNode[]>([]);
-  const [filterTab, setFilterTab] = useState<FilterTab>('all');
-  // 树形展开状态：expanded[id] === true 表示已展开，默认全部折叠
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  // 会话级持久化：进入详情返回后保留看板状态（展开/筛选/滚动）
+  const [filterTab, setFilterTab] = useState<FilterTab>(() => {
+    try {
+      const raw = sessionStorage.getItem(BOARD_STATE_KEY);
+      if (raw) return (JSON.parse(raw).filterTab as FilterTab) ?? 'all';
+    } catch {
+      /* ignore */
+    }
+    return 'all';
+  });
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
+    try {
+      const raw = sessionStorage.getItem(BOARD_STATE_KEY);
+      if (raw) return (JSON.parse(raw).expanded as Record<string, boolean>) ?? {};
+    } catch {
+      /* ignore */
+    }
+    return {};
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const toggleFolder = (id: string) => {
     setExpanded((prev) => ({ ...prev, [id]: !(prev[id] === true) }));
   };
+
+  // 展开/筛选变化时保存
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(BOARD_STATE_KEY, JSON.stringify({ expanded, filterTab }));
+    } catch {
+      /* ignore */
+    }
+  }, [expanded, filterTab]);
+
+  // 滚动位置：挂载恢复、卸载保存（点击条目跳详情卸载时记录）
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    try {
+      const st = sessionStorage.getItem(BOARD_SCROLL_KEY);
+      if (st && scrollRef.current) scrollRef.current.scrollTop = Number(st);
+    } catch {
+      /* ignore */
+    }
+    return () => {
+      try {
+        if (scrollRef.current) sessionStorage.setItem(BOARD_SCROLL_KEY, String(scrollRef.current.scrollTop));
+      } catch {
+        /* ignore */
+      }
+    };
+  }, []);
 
   // 加载看板数据（桌面 loadDashboard 照搬：boardApi.getDashboard）
   useEffect(() => {
@@ -132,7 +180,7 @@ export default function BoardPage() {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-4">
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-4">
         <section>
           <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide px-1 mb-1">📁 我的文件夹</h2>
           <div className="bg-white rounded-lg shadow-sm overflow-hidden">
@@ -302,6 +350,9 @@ function ItemRow({ item, depth, onClick }: { item: DashboardItem; depth: number;
           <span className="flex-1 min-w-0 truncate text-xs text-gray-500">
             {ENTITY_LABEL[item.entity_type]} {item.name}
           </span>
+          {item.check_out_user_name && (
+            <span className="shrink-0 text-xs text-gray-500">{item.check_out_user_name}</span>
+          )}
         </span>
       </span>
     </button>
