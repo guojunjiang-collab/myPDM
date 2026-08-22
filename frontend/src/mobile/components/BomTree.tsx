@@ -90,16 +90,23 @@ export default function BomTree({ rootItems }: { rootItems: BomChild[] }) {
           <button
             type="button"
             onClick={() => navigate(`/parts/${b.child_master_id}`)}
-            className="flex-1 min-w-0 flex flex-col items-start justify-center py-2 text-left"
+            className="flex-1 min-w-0 flex flex-col justify-center py-1.5 text-left"
           >
-            <span className="w-full text-sm font-medium text-gray-900 truncate">
-              {b.child_code} {b.child_name}
-            </span>
-            <span className="flex items-center gap-1.5 mt-0.5">
-              <span className="text-xs text-gray-500">
-                数量 ×{b.quantity} · 版本 {b.child_version}
+            {/* 行1：件号(左) + 检出人 + 状态(右) */}
+            <span className="flex items-center gap-2 min-w-0">
+              <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
+                {b.child_code}
               </span>
+              {b.child_check_out_user_name && (
+                <span className="shrink-0 text-xs text-gray-500">{b.child_check_out_user_name}</span>
+              )}
               <StatusBadge status={b.child_status} map={STATUS_MAP} />
+            </span>
+            {/* 行2：名称(左) + 用量 + 版本(右) */}
+            <span className="flex items-center gap-2 min-w-0 mt-0.5">
+              <span className="flex-1 min-w-0 truncate text-xs text-gray-500">{b.child_name}</span>
+              <span className="shrink-0 text-xs text-gray-500">用量 ×{b.quantity}</span>
+              <span className="shrink-0 text-xs text-gray-500">版本 {b.child_version}</span>
             </span>
           </button>
         </div>
