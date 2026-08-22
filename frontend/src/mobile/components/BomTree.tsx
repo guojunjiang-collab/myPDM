@@ -94,21 +94,29 @@ export default function BomTree({ rootItems }: { rootItems: BomChild[] }) {
             onClick={() => navigate(`/parts/${b.child_master_id}`)}
             className="flex-1 min-w-0 flex flex-col justify-center py-1.5 pr-4 text-left"
           >
-            {/* 行1：件号(左) + 用量(右) + 版本(右) */}
-            <span className="flex items-center gap-2 min-w-0">
+            {/* 行1：件号(左) + 用量(右, 定宽列) + 版本(右, 定宽列) */}
+            <span className="flex items-center min-w-0">
               <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
                 {b.child_code}
               </span>
-              <span className="shrink-0 text-xs text-gray-500">x{b.quantity}</span>
-              <span className="shrink-0 text-xs text-gray-500">{b.child_version}</span>
+              <span className="shrink-0 w-10 truncate text-right text-xs text-gray-500">x{b.quantity}</span>
+              <span className="shrink-0 w-12 truncate text-right text-xs text-gray-500">
+                {b.child_version}
+              </span>
             </span>
-            {/* 行2：名称(左) + 检出人(右) + 状态(右) */}
-            <span className="flex items-center gap-2 min-w-0 mt-0.5">
+            {/* 行2：名称(左) + 检出人(右, 用量列对齐) + 状态(右, 版本列对齐) */}
+            <span className="flex items-center min-w-0 mt-0.5">
               <span className="flex-1 min-w-0 truncate text-xs text-gray-500">{b.child_name}</span>
-              {b.child_check_out_user_name && (
-                <span className="shrink-0 text-xs text-gray-500">{b.child_check_out_user_name}</span>
+              {b.child_check_out_user_name ? (
+                <span className="shrink-0 w-10 truncate text-right text-xs text-gray-500">
+                  {b.child_check_out_user_name}
+                </span>
+              ) : (
+                <span className="shrink-0 w-10" />
               )}
-              <StatusBadge status={b.child_status} map={STATUS_MAP} />
+              <span className="shrink-0 w-12 flex justify-end">
+                <StatusBadge status={b.child_status} map={STATUS_MAP} />
+              </span>
             </span>
           </button>
         </div>
