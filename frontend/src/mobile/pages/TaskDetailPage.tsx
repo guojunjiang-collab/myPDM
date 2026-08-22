@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { projectApi } from '../../services/projectApi';
 import { logsApi, ecrApi, ecoApi } from '../../services/api';
+import { useDetailOverlayPush } from '../hooks/useDetailOverlay';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
 import { formatMeta } from '../components/formatMeta';
@@ -83,12 +84,44 @@ interface Props {
   onBack?: () => void;
   /** 覆盖层跳转回调（详情栈内导航）；缺省走路由 navigate */
   onNavigate?: (to: string) => void;
+  /** 独立路由模式：系统返回弹掉覆盖层哨兵后关闭本地任务覆盖层（详情栈模式不需要） */
+  onCloseOverlay?: () => void;
 }
 
-export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNavigate }: Props) {
-  // 子任务内部导航栈（不涉及 history；点击子任务行压栈，返回逐级弹出）
+export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNavigate, onCloseOverlay }: Props) {
+  // 详情栈模式：子任务下钻复用详情栈（Context push → 全面屏手势逐级返回）
+  const overlayPush = useDetailOverlayPush();
+  // 独立路由模式：子任务内部导航栈 + history 哨兵（弹出时逐级返回）
   const [subStack, setSubStack] = useState<ProjectTask[]>([]);
+  const subRef = useRef(0);
+  useEffect(() => {
+    subRef.current = subStack.length;
+  }, [subStack]);
   const cur = subStack.length > 0 ? subStack[subStack.length - 1] : rootTask;
+
+  // 全面屏返回手势：子任务栈非空 → 弹掉一层子任务；否则（独立模式）关闭本地覆盖层；
+  // 详情栈模式子任务栈恒空（子任务已入详情栈），本处理不动作，交详情栈逐级弹出
+  useEffect(() => {
+    const onPop = () => {
+      if (subRef.current > 0) {
+        setSubStack((prev) => prev.slice(0, -1));
+        return;
+      }
+      if (onCloseOverlay) onCloseOverlay();
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [onCloseOverlay]);
+
+  /** 点击子任务行：详情栈模式 → 入详情栈（压哨兵）；独立模式 → 内部栈 + 哨兵 */
+  const openChild = (c: ProjectTask) => {
+    if (overlayPush) {
+      overlayPush.push({ kind: 'task', projectId, task: c });
+      return;
+    }
+    setSubStack((prev) => [...prev, c]);
+    window.history.pushState({ mobileTaskSub: true }, '');
+  };
 
   const [tab, setTab] = useState<'overview' | 'children' | 'links' | 'logs'>('overview');
   const [links, setLinks] = useState<TaskLink[]>([]);
@@ -139,8 +172,9 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
   }, [tab, cur.id]);
 
   const backClick = () => {
+    // 子任务栈非空：回退一层（弹哨兵 → popstate 逐级处理，全面屏手势一致）
     if (subStack.length > 0) {
-      setSubStack((prev) => prev.slice(0, -1));
+      window.history.back();
     } else if (onBack) {
       onBack();
     } else if (typeof window !== 'undefined') {
@@ -251,7 +285,7 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
               cur.children.map((c) => (
                 <button
                   key={c.id}
-                  onClick={() => setSubStack((prev) => [...prev, c])}
+                  onClick={() => openChild(c)}
                   className="w-full text-left bg-white rounded-lg px-4 py-2.5 min-h-12 shadow-sm"
                 >
                   <div className="flex items-center gap-2 min-w-0">

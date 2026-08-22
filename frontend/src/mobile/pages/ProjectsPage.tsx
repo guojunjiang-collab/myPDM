@@ -279,18 +279,8 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
   /* ---- 任务详情：详情栈内（Context push）或独立路由本地覆盖层 ---- */
   const overlayPush = useDetailOverlayPush();
   const [taskOverlay, setTaskOverlay] = useState<ProjectTask | null>(null);
-  const taskOverlayRef = useRef(false);
-  useEffect(() => {
-    taskOverlayRef.current = taskOverlay != null;
-  }, [taskOverlay]);
-  // 独立路由模式本地任务覆盖层：压哨兵，系统返回/‹ 关闭
-  useEffect(() => {
-    const onPop = () => {
-      if (taskOverlayRef.current) setTaskOverlay(null);
-    };
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-  }, []);
+  // 本地任务覆盖层哨兵的 popstate 由 TaskDetailPage 统一处理（子任务逐级 → 关闭覆盖层），
+  // 避免多个 popstate 消费者互相冲突
   const openTask = (task: ProjectTask) => {
     if (overlayPush && id) {
       // 详情栈模式（如从零部件反查进入）：推入详情栈，全面屏手势逐级返回
@@ -421,6 +411,7 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
               projectId={id}
               task={taskOverlay}
               onBack={closeTaskOverlay}
+              onCloseOverlay={() => setTaskOverlay(null)}
               onNavigate={(to) => navigate(to)}
             />
           </div>
