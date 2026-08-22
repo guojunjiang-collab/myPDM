@@ -92,7 +92,7 @@ export default function BomTree({ rootItems }: { rootItems: BomChild[] }) {
           <button
             type="button"
             onClick={() => navigate(`/parts/${b.child_master_id}`)}
-            className="flex-1 min-w-0 flex flex-col justify-center py-1.5 text-left"
+            className="flex-1 min-w-0 flex flex-col justify-center py-1.5 pr-4 text-left"
           >
             {/* 行1：件号(左) + 用量(右) + 版本(右) */}
             <span className="flex items-center gap-2 min-w-0">
