@@ -44,7 +44,7 @@ type Phase = 'checking' | 'converting' | 'loading' | 'ready' | 'error';
 /** 工具抽屉：直接复用 useViewerStore 的 actions（与桌面 Toolbar 同一语义，不新增 state） */
 function ToolsPanel() {
   const vs = useViewerStore();
-  const { clipPlanes, measureMode, explodeDistance, wireframe, cameraMode } = vs;
+  const { clipPlanes, measureMode, explodeDistance, wireframe, cameraMode, autoColor, compare } = vs;
 
   const planeOf = (axis: 'x' | 'y' | 'z') => clipPlanes.find((p) => p.axis === axis);
 
@@ -53,9 +53,64 @@ function ToolsPanel() {
     'active:opacity-80';
   const btnOn = 'bg-primary-600 text-white border-primary-600';
   const btnOff = 'bg-white text-gray-600 border-gray-200';
+  const btnDisabled = 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed';
+
+  const DISPLAY_MODES = [
+    { value: 'both' as const, label: '叠加' },
+    { value: 'left' as const, label: '只看左' },
+    { value: 'right' as const, label: '只看右' },
+  ];
 
   return (
     <div className="flex flex-col gap-3">
+      {/* 对比显示（仅对比模式） */}
+      {compare && (
+        <div className="flex flex-col gap-1.5">
+          <div className="text-xs text-gray-400 font-medium">对比显示</div>
+          <div className="flex rounded-lg overflow-hidden border border-gray-200">
+            {DISPLAY_MODES.map((m, i) => (
+              <button
+                key={m.value}
+                type="button"
+                onClick={() => vs.setDisplayMode(m.value)}
+                className={`flex-1 min-h-10 text-xs font-medium ${
+                  compare.displayMode === m.value
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-white text-gray-500'
+                } ${i > 0 ? 'border-l border-gray-200' : ''}`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+          <label className="flex items-center gap-2 min-h-10 text-sm text-gray-600 select-none">
+            <input
+              type="checkbox"
+              checked={compare.onlyDiff}
+              onChange={(e) => vs.setOnlyDiff(e.target.checked)}
+              className="h-4 w-4 accent-primary-600"
+            />
+            仅显示差异
+          </label>
+          <div className="flex items-center gap-2">
+            <span className="shrink-0 text-xs text-gray-500">幽灵</span>
+            <input
+              type="range"
+              min={0.02}
+              max={0.5}
+              step={0.01}
+              value={compare.ghostOpacity}
+              onChange={(e) => vs.setGhostOpacity(Number(e.target.value))}
+              className="flex-1 h-8 accent-primary-600"
+              aria-label="幽灵透明度"
+            />
+            <span className="shrink-0 w-8 text-right text-xs tabular-nums text-gray-400">
+              {compare.ghostOpacity.toFixed(2)}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* 测量 */}
       <div className="flex flex-col gap-1.5">
         <div className="text-xs text-gray-400 font-medium">测量</div>
@@ -125,9 +180,17 @@ function ToolsPanel() {
         />
       </div>
 
-      {/* 线框 / 相机 */}
+      {/* 线框 / 上色 / 相机 */}
       <button type="button" onClick={vs.toggleWireframe} className={`${btnBase} ${wireframe ? btnOn : btnOff}`}>
         线框{wireframe ? '（开）' : ''}
+      </button>
+      <button
+        type="button"
+        onClick={vs.toggleAutoColor}
+        disabled={!!compare}
+        className={`${btnBase} ${compare ? btnDisabled : autoColor ? btnOn : btnOff}`}
+      >
+        上色{compare ? '（对比模式不可用）' : autoColor ? '（开）' : ''}
       </button>
       <button type="button" onClick={vs.toggleCameraMode} className={`${btnBase} ${btnOff}`}>
         {cameraMode === 'orthographic' ? '平行视图' : '透视视图'}
