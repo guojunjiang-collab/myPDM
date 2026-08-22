@@ -91,7 +91,7 @@ export default function PartsListPage() {
             <button
               key={f.key}
               onClick={() => setTypeFilter(f.key)}
-              className={`min-h-10 px-3 rounded-full text-xs ${typeFilter === f.key ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+              className={`min-h-10 px-3 rounded-lg text-xs ${typeFilter === f.key ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
             >
               {f.label}
             </button>
@@ -99,13 +99,13 @@ export default function PartsListPage() {
           <div className="flex-1" />
           <button
             onClick={() => setTopLevel((v) => !v)}
-            className={`min-h-10 px-3 rounded-full text-xs ${topLevel ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+            className={`min-h-10 px-3 rounded-lg text-xs ${topLevel ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
           >
             顶层
           </button>
           <button
             onClick={() => setShowAllVersions((v) => !v)}
-            className={`min-h-10 px-3 rounded-full text-xs ${showAllVersions ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+            className={`min-h-10 px-3 rounded-lg text-xs ${showAllVersions ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
           >
             全部版本
           </button>
