@@ -138,8 +138,7 @@ export default function BomTree({ rootItems }: { rootItems: BomChild[] }) {
   };
 
   return (
-    // pl-4：展开按钮左边距对齐零部件主列表卡片内容左缘（12px 容器 + 16px 卡片内距）
-    <div className="bg-white rounded-lg shadow-sm overflow-hidden pl-4">
+    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
       {rootItems.map((b) => renderNode(b, 0))}
     </div>
   );
