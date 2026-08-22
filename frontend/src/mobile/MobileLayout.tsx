@@ -2,14 +2,16 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { usePageHeader } from '../stores/pageHeader';
 import { can, useAuthStore } from '../stores/auth';
 import NotificationBell from '../components/NotificationBell';
-import { MOBILE_TABS, filterVisible } from './nav';
+import { MOBILE_TABS, MORE_ITEMS, filterVisible } from './nav';
 
 export default function MobileLayout() {
   const user = useAuthStore((s) => s.user); // 订阅登录态：登录/角色变化时触发重渲染
   const tabs = filterVisible(MOBILE_TABS, can); // 组件体内重算，随 user 变化
+  const moreTabs = filterVisible(MORE_ITEMS, can);
   const headerContent = usePageHeader((s) => s.content);
   const location = useLocation();
-  const current = tabs.find((t) => location.pathname.startsWith(t.path));
+  // 标题匹配：底部 Tab + "更多"子页面（/dashboard /ec /inventory /configuration /notifications /settings）
+  const current = [...tabs, ...moreTabs].find((t) => location.pathname.startsWith(t.path));
   const title = headerContent ?? current?.label ?? 'myPDM';
   return (
     <div className="h-full flex flex-col bg-gray-50">
