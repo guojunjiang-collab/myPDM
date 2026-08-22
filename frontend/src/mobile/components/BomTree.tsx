@@ -99,8 +99,8 @@ export default function BomTree({ rootItems }: { rootItems: BomChild[] }) {
               <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
                 {b.child_code}
               </span>
-              <span className="shrink-0 w-10 truncate text-right text-xs text-gray-500">x{b.quantity}</span>
-              <span className="shrink-0 w-12 truncate text-right text-xs text-gray-500">
+              <span className="shrink-0 w-8 truncate text-center text-xs text-gray-500">x{b.quantity}</span>
+              <span className="shrink-0 w-7 truncate text-center text-xs text-gray-500">
                 {b.child_version}
               </span>
               <span className="shrink-0 w-12 flex justify-end">
