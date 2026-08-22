@@ -319,6 +319,34 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
   /* ---- 任务/关联对象详情：全局详情栈（从零部件反查进入）或本地详情栈（独立路由模式） ---- */
   const overlayPush = useDetailOverlayPush();
   const myUserId = useAuthStore((s) => s.user?.id);
+  // 「我的」筛选：只显示当前用户任务及其父项（参考桌面只看我的任务）
+  const [onlyMine, setOnlyMine] = useState(false);
+
+  // 过滤树：保留我的任务 + 祖先链（子任务命中时父项保留，树结构完整）
+  const visibleTasks = useMemo(() => {
+    if (!onlyMine || !myUserId) return tasks;
+    const ids = new Set<string>();
+    const collect = (t: ProjectTask): boolean => {
+      let childMatch = false;
+      for (const c of t.children ?? []) {
+        if (collect(c)) {
+          ids.add(t.id);
+          childMatch = true;
+        }
+      }
+      if (t.assignee_id === myUserId) {
+        ids.add(t.id);
+        return true;
+      }
+      return childMatch;
+    };
+    for (const t of tasks) collect(t);
+    const filterTree = (list: ProjectTask[]): ProjectTask[] =>
+      list
+        .filter((t) => ids.has(t.id))
+        .map((t) => ({ ...t, children: t.children ? filterTree(t.children) : t.children }));
+    return filterTree(tasks);
+  }, [onlyMine, myUserId, tasks]);
   const localOverlay = useDetailOverlay();
   // 详情栈模式：overlayPush 存在 → 任务详情进全局栈（返回链：任务→项目→零部件→列表）；
   // 独立路由模式 → 进本地详情栈（关联对象跳转也入本地栈，返回逐级回任务详情，不离开项目路由）
@@ -394,6 +422,16 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
               <div className="flex items-center justify-between gap-2 px-1">
                 <span className="text-xs text-gray-400">任务列表（{stats.total}）</span>
                 <div className="flex items-center gap-1.5">
+                  {/* 「我的」筛选：只显示我的任务及父项 */}
+                  <button
+                    type="button"
+                    onClick={() => setOnlyMine((v) => !v)}
+                    className={`min-h-8 px-2.5 rounded-lg text-xs ${
+                      onlyMine ? 'bg-primary-600 text-white' : 'bg-white border border-gray-200 text-gray-600'
+                    }`}
+                  >
+                    我的
+                  </button>
                   {maxTreeDepth > 0 && (
                     <div className="relative">
                       <button
@@ -450,11 +488,11 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
                   </button>
                 </div>
               </div>
-              {tasks.length === 0 ? (
-                <EmptyState text="暂无任务" />
+              {visibleTasks.length === 0 ? (
+                <EmptyState text={onlyMine ? '暂无我的任务' : '暂无任务'} />
               ) : (
                 <div className="flex flex-col gap-1.5">
-                  {tasks.map((t) => (
+                  {visibleTasks.map((t) => (
                     <TaskTreeNode
                       key={t.id}
                       task={t}
