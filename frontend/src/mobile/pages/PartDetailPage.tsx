@@ -415,12 +415,22 @@ export default function PartDetailPage({ masterId: propMasterId, revisionId: pro
   const [stpLoading, setStpLoading] = useState(false);
   // 标题栏 3D 按钮是否显示：装配体恒 true；零件需生产附件有 STP
   const [hasStp, setHasStp] = useState<boolean | null>(null);
+  /** 覆盖层模式跳转：新标签打开（避免离开列表路由导致返回时覆盖层丢失） */
+  const overlayOpen = (url: string) => {
+    const w = window.open('', '_blank');
+    if (w) w.location.href = url;
+  };
   const on3DPreview = async () => {
     if (!revisionId || stpLoading) return;
+    // 覆盖层模式：点击同步打开空白标签占位（防弹窗拦截），异步取 token 后写入地址
+    const win = onBack ? window.open('', '_blank') : null;
     if (detail?.type === 'assembly') {
-      navigate(
-        `/stp-viewer?assembly=${revisionId}&code=${encodeURIComponent(detail.code ?? '')}&name=${encodeURIComponent(detail.name ?? '')}`
-      );
+      const url = `/stp-viewer?assembly=${revisionId}&code=${encodeURIComponent(detail.code ?? '')}&name=${encodeURIComponent(detail.name ?? '')}`;
+      if (win) {
+        win.location.href = url;
+        return;
+      }
+      navigate(url);
       return;
     }
     setStpLoading(true);
@@ -432,9 +442,12 @@ export default function PartDetailPage({ masterId: propMasterId, revisionId: pro
         return;
       }
       const t = await mediaApi.token(stp.id, 'gltf');
-      navigate(
-        `/stp-viewer?id=${encodeURIComponent(stp.id)}&token=${encodeURIComponent(t)}&code=${encodeURIComponent(detail?.code ?? '')}&version=${encodeURIComponent(curRev?.version ?? '')}&name=${encodeURIComponent(detail?.name ?? '')}`
-      );
+      const url = `/stp-viewer?id=${encodeURIComponent(stp.id)}&token=${encodeURIComponent(t)}&code=${encodeURIComponent(detail?.code ?? '')}&version=${encodeURIComponent(curRev?.version ?? '')}&name=${encodeURIComponent(detail?.name ?? '')}`;
+      if (win) {
+        win.location.href = url;
+        return;
+      }
+      navigate(url);
     } catch {
       window.alert('3D 模型加载失败，请稍后重试');
     } finally {
@@ -453,9 +466,12 @@ export default function PartDetailPage({ masterId: propMasterId, revisionId: pro
   };
   const startVersionCompare = () => {
     if (cmpSel.length !== 2) return;
-    navigate(
-      `/parts/compare?left=${encodeURIComponent(cmpSel[0])}&right=${encodeURIComponent(cmpSel[1])}`,
-    );
+    const url = `/parts/compare?left=${encodeURIComponent(cmpSel[0])}&right=${encodeURIComponent(cmpSel[1])}`;
+    if (onBack) {
+      overlayOpen(url);
+      return;
+    }
+    navigate(url);
   };
 
   return (
