@@ -219,7 +219,7 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                       </span>
                     )}
                   </span>
-                  {/* 行2：名称（左）+ 类型徽标（参考桌面零件/部件配色）+ 预览（右） */}
+                  {/* 行2：名称（左）+ 类型徽标（固定位置）+ 预览按钮占位（无 3D 时留空，徽标不跳动） */}
                   <span className="mt-1 flex items-center gap-1.5 min-w-0 min-h-7">
                     <span className="flex-1 min-w-0 truncate text-xs text-gray-500">
                       {p.part_detail?.name || ''}
@@ -231,16 +231,19 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                     >
                       {p.part_type === 'assembly' ? '部件' : '零件'}
                     </span>
-                    {p.part_detail?.has_3d === true && (
-                      <button
-                        type="button"
-                        onClick={(e) => onPreviewPart(p, e)}
-                        disabled={previewingId === p.id}
-                        className="shrink-0 px-2.5 min-h-7 rounded bg-primary-50 text-primary-600 text-xs font-medium disabled:opacity-60"
-                      >
-                        {previewingId === p.id ? '加载中...' : '预览'}
-                      </button>
-                    )}
+                    {/* 预览按钮固定占位：无 3D 模型时留空，保证类型徽标位置一致 */}
+                    <span className="shrink-0 w-14 flex justify-end">
+                      {p.part_detail?.has_3d === true && (
+                        <button
+                          type="button"
+                          onClick={(e) => onPreviewPart(p, e)}
+                          disabled={previewingId === p.id}
+                          className="shrink-0 px-2.5 min-h-7 rounded bg-primary-50 text-primary-600 text-xs font-medium disabled:opacity-60"
+                        >
+                          {previewingId === p.id ? '加载中...' : '预览'}
+                        </button>
+                      )}
+                    </span>
                   </span>
                 </button>
               ))
