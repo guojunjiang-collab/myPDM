@@ -7,6 +7,7 @@ import type { BOMCompareResponse } from '../../types';
 import { ViewerCanvas } from '../../components/STPViewer/ViewerCanvas';
 import { ModelTreePanel } from '../../components/STPViewer/ModelTreePanel';
 import { CompareTreePanel } from '../../components/STPViewer/CompareTreePanel';
+import { ViewCube } from '../../components/STPViewer/ViewCube';
 import { buildCompareTree } from '../../components/STPViewer/buildCompareTree';
 import { useViewerStore } from '../../stores/viewerStore';
 import { backInterceptReducer } from '../hooks/backIntercept';
@@ -585,6 +586,11 @@ export function StpViewerCore({
             {errorMessage && <div className="text-gray-400 text-xs">{errorMessage}</div>}
             <div className="text-gray-400 text-xs">请关闭后重试</div>
           </div>
+        )}
+
+        {/* 姿态球（ViewCube）：跟随相机姿态，点击前/后/左/右/上/下切换视角（参考桌面版） */}
+        {!unsupportedMode && phase === 'ready' && (url || asmInstances || compareMode) && (
+          <ViewCube />
         )}
 
         {/* 浮动按钮（抽屉打开时被遮罩盖住不可点） */}

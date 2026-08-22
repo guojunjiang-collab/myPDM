@@ -354,7 +354,7 @@ function ItemRow({ item, depth, onClick }: { item: DashboardItem; depth: number;
       </span>
       {/* 圆点区（与文件夹行的箭头/圆点对齐） */}
       <span className="shrink-0 w-9 flex items-center justify-center text-gray-300 text-sm">•</span>
-      <span className="flex-1 min-w-0 flex flex-col justify-center py-1.5">
+      <span className="flex-1 min-w-0 flex flex-col justify-center py-1.5 pr-3">
         <span className="flex items-center gap-2 min-w-0">
           <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
             {ENTITY_ICON[item.entity_type]} {item.code}
