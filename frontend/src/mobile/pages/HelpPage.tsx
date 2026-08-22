@@ -19,8 +19,11 @@ export default function HelpPage() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* 顶部：返回 + 标题 + 目录按钮 */}
-      <div className="sticky top-0 z-20 bg-gray-50 px-2 pt-2 pb-1">
+      {/* 标题栏：fixed 相对视口（顶部 header 高 48px 之下），滚动内容时始终可见不滑走 */}
+      <div
+        className="fixed left-0 right-0 z-30 bg-gray-50 px-2 pt-2 pb-1 border-b border-gray-100"
+        style={{ top: 48 }}
+      >
         <div className="flex items-center gap-1 min-h-10">
           <button
             aria-label="返回"
@@ -39,8 +42,8 @@ export default function HelpPage() {
           </button>
         </div>
       </div>
-      {/* 桌面端帮助文档内容（h-full + 内部滚动） */}
-      <div className="flex-1 min-h-0">
+      {/* 桌面端帮助文档内容（h-full + 内部滚动）；padding-top 补偿固定标题栏高度 */}
+      <div className="flex-1 min-h-0 pt-[52px]">
         <Help />
       </div>
 
