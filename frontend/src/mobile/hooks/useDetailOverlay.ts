@@ -6,7 +6,8 @@ export type DetailTarget =
   | { kind: 'document'; id: string }
   | { kind: 'project'; id: string }
   | { kind: 'ec'; ecType: 'eco' | 'ecr'; id: string }
-  | { kind: 'task'; projectId: string; task: ProjectTask };
+  | { kind: 'task'; projectId: string; task: ProjectTask }
+  | { kind: 'gantt'; projectId: string };
 
 /**
  * 详情覆盖层栈上下文：详情内容（如项目详情）需要把任务详情等无路由目标推入详情栈时使用，

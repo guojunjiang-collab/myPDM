@@ -323,6 +323,13 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
     }
   };
 
+  /** 甘特图入口：全局详情栈（反查进入）或本地详情栈（独立路由） */
+  const openGantt = () => {
+    if (!id) return;
+    if (overlayPush) overlayPush.push({ kind: 'gantt', projectId: id });
+    else localOverlay.pushTarget({ kind: 'gantt', projectId: id });
+  };
+
   /* ---------------- 详情视图（/projects/:id） ---------------- */
   if (id) {
     const title = project ? `${project.code} ${project.name}` : id;
@@ -374,6 +381,20 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
                 ])}
               </div>
             </div>
+
+            {/* 甘特图入口 */}
+            <button
+              type="button"
+              onClick={openGantt}
+              className="w-full text-left bg-white rounded-lg px-4 py-3 shadow-sm flex items-center gap-2 min-h-12"
+            >
+              <span className="text-base leading-none">📊</span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-sm font-medium text-gray-900">甘特图</span>
+                <span className="block text-xs text-gray-500">任务时间轴（日/周/月）</span>
+              </span>
+              <span className="text-gray-300">›</span>
+            </button>
 
             {/* 任务树：默认展开第 1 层级；下拉控件展开各层级/收起；行点击打开任务详情（多 Tab） */}
             <div className="flex flex-col gap-2">
