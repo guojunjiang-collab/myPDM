@@ -520,16 +520,16 @@ def _link_dict(db, l):
         if row:
             code, name, spec, remark, master_id, version, status = row[0], row[1], row[2], row[3], row[4], row[5], row[6]
     elif table == "configuration_item_masters":
-        # 关联存的是版本(revision)id，需 JOIN 版本表取主数据 code/name（主表仅 code/name，无 spec/remark 列）
+        # 关联存的是版本(revision)id，需 JOIN 版本表取主数据 code/name + 版本/状态（与零部件/图文档排版一致）
         row = db.execute(
-            text("SELECT cim.code, cim.name, cim.id AS master_id "
+            text("SELECT cim.code, cim.name, cim.id AS master_id, cir.version, cir.status "
                  "FROM configuration_item_masters cim "
                  "JOIN configuration_item_revisions cir ON cir.master_id = cim.id "
                  "WHERE cir.id = :id"),
             {"id": str(l.entity_id)}
         ).fetchone()
         if row:
-            code, name, master_id = row[0], row[1], row[2]
+            code, name, master_id, version, status = row[0], row[1], row[2], row[3], row[4]
     elif table:
         row = db.execute(
             text(f"SELECT code, name FROM {table} WHERE id = :id"), {"id": str(l.entity_id)}
