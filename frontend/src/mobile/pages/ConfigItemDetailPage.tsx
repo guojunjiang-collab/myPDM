@@ -224,7 +224,13 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                     >
                       {p.part_type === 'assembly' ? '部件' : '零件'}
                     </span>
-                    <span className="shrink-0 text-xs text-gray-400">{p.is_required ? '必装' : '选装'}</span>
+                    <span
+                      className={`shrink-0 px-2 py-0.5 rounded-full text-xs ${
+                        p.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+                      }`}
+                    >
+                      {p.is_required ? '必装' : '选装'}
+                    </span>
                     {p.part_detail?.has_3d === true && (
                       <button
                         type="button"
