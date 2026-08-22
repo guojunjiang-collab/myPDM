@@ -176,10 +176,10 @@ export default function DocumentDetailPage() {
     };
   }, [id]);
 
-  // 附件仅当切到"附件"段时加载
+  // 附件：进入详情即加载（概览 Tab 常驻显示"预览"入口，附件 Tab 复用同一份数据）
   useEffect(() => {
     let alive = true;
-    if (!id || activeTab !== 'attachments') return;
+    if (!id) return;
     setLoadingAttachments(true);
     setAttachmentsError(null);
     documentsApi
@@ -203,7 +203,7 @@ export default function DocumentDetailPage() {
     return () => {
       alive = false;
     };
-  }, [id, activeTab]);
+  }, [id]);
 
   const title = detail ? `${detail.code} ${detail.name}` : id ?? '图文档详情';
 
@@ -270,6 +270,17 @@ export default function DocumentDetailPage() {
         <div className="p-3">
           {activeTab === 'overview' && (
             <div>
+              {/* 附件常驻区：有附件时一直显示"预览"入口，便于快速点击 */}
+              {!loadingAttachments && !attachmentsError && attachments.length > 0 && (
+                <div className="mb-3">
+                  <div className="text-sm font-bold text-gray-900 mb-2">附件（{attachments.length}）</div>
+                  <div className="flex flex-col gap-2">
+                    {attachments.map((att) => (
+                      <AttachmentPreview key={att.id} attachment={att} />
+                    ))}
+                  </div>
+                </div>
+              )}
               {cfLoading && <p className="text-center text-xs text-gray-400 py-2">自定义字段加载中...</p>}
               {!cfLoading && cfError && (
                 <p className="text-center text-xs text-red-400 py-2">自定义字段加载失败</p>
