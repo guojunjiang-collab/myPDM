@@ -57,13 +57,13 @@ export default function BoardPage() {
   const [myFolders, setMyFolders] = useState<FolderNode[]>([]);
   const [sharedFolders, setSharedFolders] = useState<FolderNode[]>([]);
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
-  // 树形展开状态：expanded[id] === false 表示已折叠，默认全部展开
+  // 树形展开状态：expanded[id] === true 表示已展开，默认全部折叠
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const toggleFolder = (id: string) => {
-    setExpanded((prev) => ({ ...prev, [id]: prev[id] === false }));
+    setExpanded((prev) => ({ ...prev, [id]: !(prev[id] === true) }));
   };
 
   // 加载看板数据（桌面 loadDashboard 照搬：boardApi.getDashboard）
@@ -199,7 +199,7 @@ function FolderTreeNode({
 }) {
   const items = (filterTab === 'all' ? folder.items : folder.items.filter((i) => (filterTab === 'component' ? isComponentType(i.entity_type) : i.entity_type === filterTab))) as DashboardItem[];
   const hasContent = folder.children.length > 0 || folder.items.length > 0;
-  const isOpen = expanded[folder.id] !== false; // 默认展开
+  const isOpen = expanded[folder.id] === true; // 默认折叠
   const count = folder.items?.length ?? 0;
   const childCount = folder.children?.length ?? 0;
   return (
