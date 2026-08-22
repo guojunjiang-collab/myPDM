@@ -4,6 +4,8 @@ import { useDetailOverlayPush } from '../hooks/useDetailOverlay';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
 import ConfigTree from '../components/ConfigTree';
+import { openAttachmentInNewTab } from '../components/AttachmentPreview';
+import type { PreviewAttachment } from '../components/AttachmentPreview';
 import { formatMeta } from '../components/formatMeta';
 import type { ConfigPartItem, ConfigurationItemDetail } from '../../types';
 
@@ -88,6 +90,20 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
   };
   const openDocument = (documentId?: string) => {
     if (documentId && onNavigate) onNavigate(`/documents/${documentId}`);
+  };
+
+  // 图文档卡片"预览"：直接读取该图文档首个附件（参照任务详情-关联对象图文档卡片）
+  const onPreviewDoc = async (link: { id?: string }, doc: { file_id?: string; file_name?: string } | undefined, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!doc?.file_id || previewingId) return;
+    setPreviewingId(link.id ?? 'doc');
+    try {
+      await openAttachmentInNewTab({ id: doc.file_id, file_name: doc.file_name ?? '' } as PreviewAttachment);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : '预览失败，请重试');
+    } finally {
+      setPreviewingId(null);
+    }
   };
 
   // 零部件卡片"预览"按钮：装配体 → 3D 预览入口（stp-viewer?assembly=）；零件 → 附件 STP 单模型入口
@@ -269,22 +285,40 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
               <EmptyState text="暂无关联图文档" />
             ) : (
               detail.documents.map((link) => {
-                const doc = (link as { document?: { id?: string; code?: string; name?: string; version?: string; status?: string; file_name?: string } }).document;
+                const raw = link as { id?: string; document_id?: string; document?: { id?: string; code?: string; name?: string; version?: string; status?: string; file_name?: string; file_id?: string } };
+                const doc = raw.document;
                 return (
                   <button
-                    key={(link as { id?: string }).id ?? (doc?.id ?? 'd')}
-                    onClick={() => openDocument((link as { document_id?: string }).document_id)}
+                    key={raw.id ?? doc?.id ?? 'd'}
+                    onClick={() => openDocument(raw.document_id)}
                     className="w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm"
                   >
-                    <div className="text-sm text-gray-900 break-all">
-                      {doc?.code ? `${doc.code} ${doc.name ?? ''}` : '图文档'}
-                    </div>
-                    <div className="mt-0.5 text-xs text-gray-500">
-                      {formatMeta([
-                        ['版本', doc?.version || undefined],
-                        ['文件', doc?.file_name || undefined],
-                      ])}
-                    </div>
+                    {/* 行1：编号（左）+ 版本 + 状态（右） */}
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
+                        {doc?.code ?? '图文档'}
+                      </span>
+                      {doc?.version && (
+                        <span className="shrink-0 text-xs text-gray-400">{doc.version}</span>
+                      )}
+                      {doc?.status && <StatusBadge status={doc.status} map={STATUS_MAP} />}
+                    </span>
+                    {/* 行2：名称（左）+ 预览按钮（右下角，有附件才显示；样式同任务详情关联对象） */}
+                    <span className="mt-1 flex items-center gap-2 min-w-0 min-h-7">
+                      <span className="flex-1 min-w-0 truncate text-xs text-gray-500">
+                        {doc?.name || doc?.file_name || ''}
+                      </span>
+                      {doc?.file_id && (
+                        <button
+                          type="button"
+                          onClick={(e) => onPreviewDoc(raw, doc, e)}
+                          disabled={previewingId === raw.id}
+                          className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-primary-600 text-white disabled:opacity-60"
+                        >
+                          {previewingId === raw.id ? '加载中...' : '预览'}
+                        </button>
+                      )}
+                    </span>
                   </button>
                 );
               })
