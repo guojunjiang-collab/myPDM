@@ -28,8 +28,9 @@
 |---|---|
 | 落地力度 | **全量组件化重构**（一次性替换全部存量） |
 | 徽标形状 | **胶囊 `rounded-full`**（桌面/移动端一致） |
-| 深色模式 | 不做，但颜色经"语义→类名"映射表间接引用，预留替换点 |
-| 颜色体系 | 复用 Tailwind 内置色板，不新建色板；只建语义映射表 |
+| 多套风格（主题化） | **CSS 变量驱动，本次落地基础架构**：ui 组件颜色全部走 `var(--ui-*)` 变量；默认风格在 `:root` 定义，`html[data-theme]` 可整体覆盖，业务代码与映射表零感知 |
+| 颜色体系 | 语义映射表（状态 → tone）不变；**tone/variant → 颜色**的最终落地改为 CSS 变量（而非静态 Tailwind 类），为多风格切换预留 |
+| 切换 UI | 本次**不实现**风格选择器与第二套风格，仅落地"默认变量集 + 可覆盖结构" |
 | 公共组件位置 | 新增 `src/components/ui/` 目录（Badge / Button / Input / Select / Textarea） |
 | 语义映射位置 | 新增 `src/constants/badges.ts`（单一事实源） |
 | 移动端 | 复用同一套 ui 组件；Button 增加 `touch` 触控尺寸 |
@@ -52,19 +53,21 @@ src/constants/badges.ts  →   src/components/ui/        →   桌面 ~18 文件
 
 ## ① 语义映射表（`src/constants/badges.ts`）
 
-### tone → 类名（组件内部唯一真源）
+### tone → CSS 变量（组件内部唯一真源）
 
-| tone | 类名 | 语义 |
-|---|---|---|
-| `blue` | `bg-blue-100 text-blue-800` | 信息/草稿/审核中 |
-| `orange` | `bg-orange-100 text-orange-800` | 冻结/高优先级 |
-| `green` | `bg-green-100 text-green-800` | 成功/发布/已批准 |
-| `red` | `bg-red-100 text-red-800` | 错误/作废/驳回 |
-| `gray` | `bg-gray-100 text-gray-700` | 中性/未开始/低优先级 |
-| `amber` | `bg-amber-100 text-amber-800` | 警告/执行中/挂起/他人签出 |
-| `teal` | `bg-teal-100 text-teal-800` | 终态成功（已过账/已完成） |
-| `purple` | `bg-purple-100 text-purple-700` | 构型项类型 |
-| `indigo` | `bg-indigo-100 text-indigo-700` | 图文档类型 |
+| tone | 背景变量 | 文字变量 | 语义 |
+|---|---|---|---|
+| `blue` | `var(--ui-blue-bg)` | `var(--ui-blue-text)` | 信息/草稿/审核中 |
+| `orange` | `var(--ui-orange-bg)` | `var(--ui-orange-text)` | 冻结/高优先级 |
+| `green` | `var(--ui-green-bg)` | `var(--ui-green-text)` | 成功/发布/已批准 |
+| `red` | `var(--ui-red-bg)` | `var(--ui-red-text)` | 错误/作废/驳回 |
+| `gray` | `var(--ui-gray-bg)` | `var(--ui-gray-text)` | 中性/未开始/低优先级 |
+| `amber` | `var(--ui-amber-bg)` | `var(--ui-amber-text)` | 警告/执行中/挂起/他人签出 |
+| `teal` | `var(--ui-teal-bg)` | `var(--ui-teal-text)` | 终态成功（已过账/已完成） |
+| `purple` | `var(--ui-purple-bg)` | `var(--ui-purple-text)` | 构型项类型 |
+| `indigo` | `var(--ui-indigo-bg)` | `var(--ui-indigo-text)` | 图文档类型 |
+
+组件渲染类名：`bg-[var(--ui-blue-bg)] text-[var(--ui-blue-text)]`（Tailwind 任意值 + CSS 变量，静态字符串可被 JIT 正常扫描）。默认值在 `index.css` 的 `:root` 中定义为与现状一致的色值（如 `--ui-blue-bg: #dbeafe; --ui-blue-text: #1e40af;`）。
 
 ### 状态域 → 状态值 → { label, tone }（完整清单）
 
@@ -188,13 +191,16 @@ src/constants/badges.ts  →   src/components/ui/        →   桌面 ~18 文件
 | `engineer` | 工程师 | blue |
 | `production` | 生产人员 | green |
 | `guest` | 访客 | gray |
+| `unverified` | 未验证/待审批 | amber（原 yellow → amber 收敛；提示管理员待处理） |
+
+> 角色徽标出现位置：用户管理列表、用户组、顶栏当前用户、知会/审批人选择器等（`Layout`、`Users`、`UsersListPage`、`ECO*`、`ECR*`）。
 
 **N. 用户状态**
 
-| 值 | 标签 | tone |
-|---|---|---|
-| `active` | 正常 | green |
-| `disabled` | 禁用 | red |
+| 值 | 标签 | tone | 说明 |
+|---|---|---|---|
+| `active` | 正常 | green | — |
+| `disabled` | 禁用 | red | 统一桌面红（移动端原灰 → 红，与桌面一致；禁用属需关注状态） |
 
 **O. 项目状态**
 
@@ -248,7 +254,7 @@ interface BadgeProps {
 }
 ```
 
-渲染：`inline-flex items-center whitespace-nowrap rounded-full font-medium` + tone 类 + size 类。  
+渲染：`inline-flex items-center whitespace-nowrap rounded-full font-medium` + tone 变量类（`bg-[var(--ui-<tone>-bg)] text-[var(--ui-<tone>-text)]`）+ size 类。  
 移动端与桌面端**共用同一组件、同一尺寸**（徽标非交互，无需放大触控区）。
 
 ### Button.tsx
@@ -260,15 +266,15 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 ```
 
-| variant | 类名 | 用途 |
+| variant | 类名（CSS 变量驱动） | 用途 |
 |---|---|---|
-| `primary` | `bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800` | 新建/保存/确认 |
-| `secondary` | `border border-gray-300 bg-white text-gray-700 hover:bg-gray-50` | 取消/浏览 |
-| `ghost` | `bg-gray-100 text-gray-700 hover:bg-gray-200` | 次要筛选/折叠 |
-| `danger` | `bg-red-600 text-white hover:bg-red-700 active:bg-red-800` | 删除/作废/强制签入（统一 600） |
-| `success` | `bg-green-600 text-white hover:bg-green-700` | 签入/全部签入（统一 green，废弃 emerald） |
-| `dark` | `bg-gray-500 text-white hover:bg-gray-600` | 撤销签出等中性实底 |
-| `link` | `text-primary-600 hover:text-primary-800 hover:underline` | 行内操作 |
+| `primary` | `bg-[var(--ui-btn-primary-bg)] text-[var(--ui-btn-primary-text)] hover:bg-[var(--ui-btn-primary-hover)] active:bg-[var(--ui-btn-primary-active)]` | 新建/保存/确认 |
+| `secondary` | `border border-[var(--ui-btn-secondary-border)] bg-[var(--ui-btn-secondary-bg)] text-[var(--ui-btn-secondary-text)] hover:bg-[var(--ui-btn-secondary-hover)]` | 取消/浏览 |
+| `ghost` | `bg-[var(--ui-btn-ghost-bg)] text-[var(--ui-btn-ghost-text)] hover:bg-[var(--ui-btn-ghost-hover)]` | 次要筛选/折叠 |
+| `danger` | `bg-[var(--ui-btn-danger-bg)] text-white hover:bg-[var(--ui-btn-danger-hover)] active:bg-[var(--ui-btn-danger-active)]` | 删除/作废/强制签入（统一 600 值） |
+| `success` | `bg-[var(--ui-btn-success-bg)] text-white hover:bg-[var(--ui-btn-success-hover)]` | 签入/全部签入（统一 green 值，废弃 emerald） |
+| `dark` | `bg-[var(--ui-btn-dark-bg)] text-white hover:bg-[var(--ui-btn-dark-hover)]` | 撤销签出等中性实底 |
+| `link` | `text-[var(--ui-btn-link-text)] hover:text-[var(--ui-btn-link-hover)] hover:underline` | 行内操作 |
 
 | size | 类名 | 适用 |
 |---|---|---|
@@ -282,8 +288,70 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 ### Input / Select / Textarea
 
-统一：`w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:bg-gray-100 disabled:text-gray-500`。  
+统一：`w-full rounded-lg border border-[var(--ui-input-border)] bg-[var(--ui-input-bg)] px-3 py-2 text-sm text-[var(--ui-input-text)] placeholder:text-[var(--ui-input-placeholder)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-input-focus-ring)] focus:border-[var(--ui-input-focus-border)] disabled:bg-[var(--ui-input-disabled-bg)] disabled:text-[var(--ui-input-disabled-text)]`。  
 表格内小输入框用 `size="xs"`：`px-2 py-1 text-xs`。消除 `rounded`/`rounded-lg`、`ring-1`/`ring-2`、`ring-primary-500`/`ring-blue-500` 混用。
+
+### CSS 变量清单（`index.css` `:root` 定义，共 3 组 40+ 变量）
+
+```css
+:root {
+  /* ① 徽标 tone（9 × 2） */
+  --ui-blue-bg: #dbeafe;   --ui-blue-text: #1e40af;
+  --ui-orange-bg: #ffedd5; --ui-orange-text: #9a3412;
+  --ui-green-bg: #dcfce7;  --ui-green-text: #166534;
+  --ui-red-bg: #fee2e2;    --ui-red-text: #991b1b;
+  --ui-gray-bg: #f3f4f6;   --ui-gray-text: #374151;
+  --ui-amber-bg: #fef3c7;  --ui-amber-text: #92400e;
+  --ui-teal-bg: #ccfbf1;   --ui-teal-text: #115e59;
+  --ui-purple-bg: #f3e8ff; --ui-purple-text: #6b21a8;
+  --ui-indigo-bg: #e0e7ff; --ui-indigo-text: #3730a3;
+
+  /* ② 按钮 variant */
+  --ui-btn-primary-bg: #0284c7;     --ui-btn-primary-hover: #0369a1;
+  --ui-btn-primary-active: #075985; --ui-btn-primary-text: #ffffff;
+  --ui-btn-secondary-bg: #ffffff;   --ui-btn-secondary-hover: #f9fafb;
+  --ui-btn-secondary-border: #d1d5db; --ui-btn-secondary-text: #374151;
+  --ui-btn-ghost-bg: #f3f4f6;       --ui-btn-ghost-hover: #e5e7eb;
+  --ui-btn-ghost-text: #374151;
+  --ui-btn-danger-bg: #dc2626;      --ui-btn-danger-hover: #b91c1c;
+  --ui-btn-danger-active: #991b1b;
+  --ui-btn-success-bg: #16a34a;     --ui-btn-success-hover: #15803d;
+  --ui-btn-dark-bg: #6b7280;        --ui-btn-dark-hover: #4b5563;
+  --ui-btn-link-text: #0284c7;      --ui-btn-link-hover: #075985;
+
+  /* ③ 表单 */
+  --ui-input-bg: #ffffff;           --ui-input-border: #d1d5db;
+  --ui-input-text: #374151;         --ui-input-placeholder: #9ca3af;
+  --ui-input-focus-ring: #38bdf8;   --ui-input-focus-border: #0ea5e9;
+  --ui-input-disabled-bg: #f3f4f6;  --ui-input-disabled-text: #6b7280;
+}
+```
+
+> 变量值 = 现状各 Tailwind 色阶（blue-100/800、gray-100/700、primary-600 等）的色值，**默认风格与现状视觉完全一致**，切换风格只是换一套变量值。
+
+---
+
+## ④ 多套风格（主题化）扩展路径
+
+本方案落地的 CSS 变量结构使"多套风格、用户自选"成为**后续的低成本增量**：
+
+### 机制
+
+1. **默认风格**：`index.css` `:root` 中的变量集（即本次落地值）
+2. **新风格**：追加一段 `html[data-theme='<风格名>'] { --ui-blue-bg: ...; ... }` 覆盖全部变量
+3. **用户选择**：前端读 `localStorage['pdm-theme']` → 设置 `document.documentElement.dataset.theme` → 整套颜色即时切换，零重渲染、业务代码零改动
+4. **防闪烁**：`main.tsx` 入口早期（或 `index.html` 内联脚本）读取并设置 `data-theme`，先于 React 渲染
+
+### 新增一套风格的步骤（后续任务，工作量约 0.5 天）
+
+1. 定义新变量集（复制 `:root` 块改色值）
+2. 设置页加"风格选择"（写 `localStorage` + 更新 `data-theme`）
+3. 可选：logo/布局色等**非 ui 组件**的全局色 token 化（第二步任务：全局色 token 化——将页面背景、卡片、正文色等静态类也改为变量，本次**不包含**）
+
+### 本次范围边界
+
+- **包含**：ui 组件（徽标/按钮/表单）全部颜色走 CSS 变量；`:root` 默认变量集落地；`html[data-theme]` 覆盖机制经测试可用
+- **不包含**：第二套风格、风格选择 UI、布局/页面级颜色的 token 化（后续独立任务）
 
 ---
 
