@@ -2,18 +2,11 @@ import { useEffect, useState } from 'react';
 import { useInventoryStore } from '../../stores/inventory';
 import { useAuthStore } from '../../stores/auth';
 import { inventoryApi } from '../../services/inventoryApi';
+import { BADGE_DOMAINS } from '../../constants/badges';
 import { Modal } from '../Modal';
-import type { InvDocument, InvDocStatus, InvDocType } from '../../types';
+import Badge from '../ui/Badge';
+import type { InvDocument, InvDocType } from '../../types';
 
-const STATUS_LABEL: Record<InvDocStatus, string> = {
-  draft: '草稿', reviewing: '审批中', approved: '已审批', posted: '已过账',
-  rejected: '已拒绝', cancelled: '已取消',
-};
-const STATUS_COLOR: Record<InvDocStatus, string> = {
-  draft: 'bg-gray-100 text-gray-600', reviewing: 'bg-amber-100 text-amber-700',
-  approved: 'bg-primary-100 text-primary-700', posted: 'bg-green-100 text-green-700',
-  rejected: 'bg-red-100 text-red-700', cancelled: 'bg-gray-100 text-gray-400',
-};
 const DOC_TYPE_LABEL: Record<InvDocType, string> = {
   inbound: '入库单', outbound: '出库单', transfer: '调拨单', stocktake: '盘点单', adjustment: '库存调整单',
 };
@@ -80,9 +73,7 @@ export default function DocumentDetail({ docId, onClose, onChanged }:
 
   return (
     <Modal open={!!doc} title={doc ? doc.doc_number : ''} onClose={onClose} width="3xl"
-      headerAction={doc && (
-        <span className={`px-2 py-0.5 rounded-full text-xs ${STATUS_COLOR[doc.status]}`}>{STATUS_LABEL[doc.status]}</span>
-      )}>
+      headerAction={doc && <Badge status={doc.status} domain="inventoryDoc" />}>
       {doc && (
         <div className="space-y-6 max-h-[72vh] overflow-y-auto pr-1">
           {/* 基本信息卡片 */}
@@ -153,9 +144,7 @@ export default function DocumentDetail({ docId, onClose, onChanged }:
                 {(doc.review_records || []).map((r: any) => (
                   <div key={r.id} className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 text-sm">
                     <span className="font-medium text-gray-900">{r.reviewer_name}</span>
-                    <span className={`px-2 py-0.5 rounded text-xs ${r.decision === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                      {r.decision === 'approved' ? '通过' : r.decision === 'rejected' ? '拒绝' : r.decision}
-                    </span>
+                    <Badge status={r.decision} domain="decision" />
                     {r.comment && <span className="text-gray-500">{r.comment}</span>}
                     <span className="ml-auto text-xs text-gray-400">{fmt(r.created_at)}</span>
                   </div>
@@ -179,7 +168,7 @@ export default function DocumentDetail({ docId, onClose, onChanged }:
                       <div className="text-sm text-gray-900">
                         <span className="font-medium">{log.operator_name || '-'}</span>
                         <span className="text-gray-400 mx-1">·</span>
-                        <span className={txtColor(log.to_status)}>{STATUS_LABEL[log.to_status as InvDocStatus] || log.to_status}</span>
+                        <span className={txtColor(log.to_status)}>{BADGE_DOMAINS.inventoryDoc[log.to_status]?.label || log.to_status}</span>
                       </div>
                       {log.comment && <div className="text-sm text-gray-500 mt-0.5">{log.comment}</div>}
                       <div className="text-xs text-gray-400 mt-0.5">{fmt(log.created_at)}</div>

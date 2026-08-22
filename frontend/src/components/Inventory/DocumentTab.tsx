@@ -4,24 +4,17 @@ import { useInventoryStore } from '../../stores/inventory';
 import { useAuthStore } from '../../stores/auth';
 import { inventoryApi } from '../../services/inventoryApi';
 import { canDownload } from '../../stores/auth';
+import { BADGE_DOMAINS } from '../../constants/badges';
+import Badge from '../ui/Badge';
 import DocumentEditModal from './DocumentEditModal';
 import DocumentDetail from './DocumentDetail';
-import type { InvDocType, InvDocStatus } from '../../types';
+import type { InvDocType } from '../../types';
 
 const DOC_TYPES: { key: InvDocType; label: string }[] = [
   { key: 'inbound', label: '入库单' }, { key: 'outbound', label: '出库单' },
   { key: 'transfer', label: '调拨单' }, { key: 'stocktake', label: '盘点单' },
   { key: 'adjustment', label: '库存调整单' },
 ];
-const STATUS_LABEL: Record<InvDocStatus, string> = {
-  draft: '草稿', reviewing: '审批中', approved: '已审批', posted: '已过账',
-  rejected: '已拒绝', cancelled: '已取消',
-};
-const STATUS_COLOR: Record<InvDocStatus, string> = {
-  draft: 'bg-gray-100 text-gray-600', reviewing: 'bg-amber-100 text-amber-700',
-  approved: 'bg-primary-100 text-primary-700', posted: 'bg-green-100 text-green-700',
-  rejected: 'bg-red-100 text-red-700', cancelled: 'bg-gray-100 text-gray-400',
-};
 
 const ACT_BTN = 'text-sm';
 
@@ -134,7 +127,7 @@ export default function DocumentTab() {
         </select>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={selectCls}>
           <option value="">全部状态</option>
-          {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          {Object.entries(BADGE_DOMAINS.inventoryDoc).map(([k, def]) => <option key={k} value={k}>{def.label}</option>)}
         </select>
         <div className="flex-1" />
         {canDownload() && (
@@ -179,8 +172,7 @@ export default function DocumentTab() {
                 <td className="px-4 py-3 text-sm font-medium text-primary-600">{d.doc_number}</td>
                 <td className="px-4 py-3 text-sm font-medium">{DOC_TYPES.find((t) => t.key === d.doc_type)?.label}</td>
                 <td className="px-4 py-3 text-sm font-medium">
-                  <span className={`px-2 py-0.5 rounded-full text-xs ${STATUS_COLOR[d.status as InvDocStatus]}`}>
-                    {STATUS_LABEL[d.status as InvDocStatus]}</span>
+                  <Badge status={d.status} domain="inventoryDoc" />
                 </td>
                 <td className="px-4 py-3 text-sm font-medium">{d.keeper_name || '-'}</td>
                 <td className="px-4 py-3 text-sm font-medium">{d.creator_name}</td>

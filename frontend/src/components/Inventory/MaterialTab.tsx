@@ -5,6 +5,7 @@ import { inventoryApi } from '../../services/inventoryApi';
 import { partsApi } from '../../services/api';
 import { canEdit, isAdmin } from '../../stores/auth';
 import { Modal, ConfirmModal } from '../Modal';
+import Badge from '../ui/Badge';
 import MaterialDetail from './MaterialDetail';
 import PartDetailModal from '../PartDetailModal';
 import type { InvMaterial } from '../../types';
@@ -13,17 +14,6 @@ import type { InvMaterial } from '../../types';
 const cardCls = 'bg-gray-50 rounded-lg px-3 py-2 border border-gray-100';
 const cardLabelCls = 'block text-xs text-gray-500 mb-0.5';
 const cardInputCls = 'w-full text-sm px-2 py-1 border border-gray-200 rounded bg-white focus:outline-none focus:ring-2 focus:ring-primary-500';
-
-// PDM 零件/部件状态徽标（与零件管理一致）
-const statusTag = (s: string) => {
-  const map: Record<string, { label: string; cls: string }> = {
-    draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
-    frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
-    released: { label: '发布', cls: 'bg-green-100 text-green-800' },
-    obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
-  };
-  return map[s] || { label: s, cls: 'bg-gray-100 text-gray-800' };
-};
 
 export default function MaterialTab() {
   const { materials, loadMaterials } = useInventoryStore();
@@ -236,11 +226,7 @@ export default function MaterialTab() {
                           <td className="px-3 py-2 text-sm text-gray-500">{editingPdm?.spec || editing.spec || '-'}</td>
                           <td className="px-3 py-2 text-sm text-gray-500">{editingPdm?.version || '-'}</td>
                           <td className="px-3 py-2">
-                            {editingPdm ? (
-                              <span className={`px-2 py-1 text-xs rounded-full ${statusTag(editingPdm.status).cls}`}>
-                                {statusTag(editingPdm.status).label}
-                              </span>
-                            ) : '-'}
+                            {editingPdm ? <Badge status={editingPdm.status} /> : '-'}
                           </td>
                         </tr>
                       </tbody>
@@ -327,9 +313,7 @@ export default function MaterialTab() {
                       <td className="px-3 py-2 text-sm text-gray-500 w-24 whitespace-nowrap">{r.version || '-'}</td>
                       <td className="px-3 py-2 text-sm text-gray-500">{r.spec || '-'}</td>
                       <td className="px-3 py-2 w-24 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs rounded-full ${statusTag(r.status as string).cls}`}>
-                          {statusTag(r.status as string).label}
-                        </span>
+                        <Badge status={r.status} />
                       </td>
                       <td className="px-3 py-2 text-right w-24 whitespace-nowrap">
                         <button onClick={() => enablePdm(r)} className="text-green-600 hover:text-green-800">启用</button>
