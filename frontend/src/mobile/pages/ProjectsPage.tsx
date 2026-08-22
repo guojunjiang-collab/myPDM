@@ -260,6 +260,29 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
     setExpanded(init);
   }, [tasks]);
 
+  // 任务树最大深度（下拉层级选项自动生成，参考桌面版 maxTreeDepth）
+  const maxTreeDepth = useMemo(() => {
+    let max = 0;
+    const walk = (ts: ProjectTask[], d: number) => {
+      for (const t of ts) {
+        if (d > max) max = d;
+        if (t.children?.length) walk(t.children, d + 1);
+      }
+    };
+    walk(tasks, 0);
+    return max;
+  }, [tasks]);
+
+  // 展开层级下拉受控值：'collapsed' | 'all' | 数字字符串 | 'custom'（参考桌面版）
+  const [expandSel, setExpandSel] = useState<string>('1');
+  const handleExpandChange = (v: string) => {
+    setExpandSel(v);
+    if (v === 'collapsed') expandToLevel(0);
+    else if (v === 'all') expandToLevel(null);
+    else if (/^\d+$/.test(v)) expandToLevel(Number(v));
+    // 'custom'：保持当前展开状态
+  };
+
   /** 展开到指定层级（0=收起全部，null=全部展开） */
   const expandToLevel = (level: number | null) => {
     const next: Record<string, boolean> = {};
@@ -275,6 +298,8 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
 
   const toggleTask = (tid: string) => {
     setExpanded((prev) => ({ ...prev, [tid]: !(prev[tid] === true) }));
+    // 行内手动展开后下拉显示"自定义"
+    setExpandSel('custom');
   };
 
   /* ---- 任务/关联对象详情：全局详情栈（从零部件反查进入）或本地详情栈（独立路由模式） ---- */
@@ -346,38 +371,20 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between gap-2 px-1">
                 <span className="text-xs text-gray-400">任务列表（{stats.total}）</span>
-                <div className="flex gap-1">
-                  {(
-                    [
-                      { lv: 1, label: '1层' },
-                      { lv: 2, label: '2层' },
-                      { lv: 3, label: '3层' },
-                    ] as const
-                  ).map((b) => (
-                    <button
-                      key={b.lv}
-                      type="button"
-                      onClick={() => expandToLevel(b.lv)}
-                      className="min-h-8 px-2.5 rounded-lg bg-white border border-gray-200 text-xs text-gray-600"
-                    >
-                      {b.label}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => expandToLevel(null)}
-                    className="min-h-8 px-2.5 rounded-lg bg-primary-600 text-white text-xs"
+                {maxTreeDepth > 0 && (
+                  <select
+                    value={expandSel}
+                    onChange={(e) => handleExpandChange(e.target.value)}
+                    className="min-h-8 px-2 rounded-lg bg-white border border-gray-200 text-xs text-gray-600"
                   >
-                    全部
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => expandToLevel(0)}
-                    className="min-h-8 px-2.5 rounded-lg bg-white border border-gray-200 text-xs text-gray-600"
-                  >
-                    收起
-                  </button>
-                </div>
+                    <option value="collapsed">全部折叠</option>
+                    {Array.from({ length: maxTreeDepth }, (_, i) => i + 1).map((k) => (
+                      <option key={k} value={String(k)}>L{k}</option>
+                    ))}
+                    <option value="all">全部展开</option>
+                    {expandSel === 'custom' && <option value="custom">自定义</option>}
+                  </select>
+                )}
               </div>
               {tasks.length === 0 ? (
                 <EmptyState text="暂无任务" />
