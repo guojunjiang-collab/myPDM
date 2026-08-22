@@ -115,21 +115,23 @@ export default function PartsListPage() {
         renderMain={(p) => (
           <div className="flex items-center gap-2 min-w-0">
             <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">{p.code}</span>
-            {p.check_out_user_name && (
-              <span className="shrink-0 text-xs text-gray-500">{p.check_out_user_name}</span>
-            )}
-            <StatusBadge status={p.status} map={STATUS_MAP} />
-          </div>
-        )}
-        renderMeta={(p) => (
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="flex-1 min-w-0 truncate text-xs text-gray-500">{p.name}</span>
             {!showAllVersions && p.version_count && p.version_count > 1 && (
               <span className="shrink-0 px-1.5 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600">
                 {p.version_count} 个版本
               </span>
             )}
-            <span className="shrink-0 text-xs text-gray-500">版本 {p.version}</span>
+            <span className="shrink-0 text-xs text-gray-500">{p.version}</span>
+            <span className="shrink-0 w-12 flex justify-end">
+              <StatusBadge status={p.status} map={STATUS_MAP} />
+            </span>
+          </div>
+        )}
+        renderMeta={(p) => (
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="flex-1 min-w-0 truncate text-xs text-gray-500">{p.name}</span>
+            {p.check_out_user_name && (
+              <span className="shrink-0 text-xs text-gray-500">{p.check_out_user_name}</span>
+            )}
           </div>
         )}
         onClick={(p) =>
