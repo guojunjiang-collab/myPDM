@@ -96,7 +96,7 @@ function LevelTag({ level }: { level: '版本级' | '迭代级' }) {
   return <span className={`px-2 py-0.5 rounded-full text-xs whitespace-nowrap ${cls}`}>{level}</span>;
 }
 
-const sections: Section[] = [
+export const sections: Section[] = [
   {
     id: 'intro',
     icon: '🏗️',
