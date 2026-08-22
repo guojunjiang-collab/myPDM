@@ -45,6 +45,10 @@ function fmtDate(v?: string | null): string {
 export default function ConfigurationItemsPage() {
   const [search, setSearch] = useState('');
   const debounced = useDebounced(search, 400);
+  // 全部版本：显示每个构型项的所有版本行（对齐桌面 show_all_versions 开关）
+  const [showAllVersions, setShowAllVersions] = useState(false);
+  // 仅顶层：只显示没有父构型项的最顶层（对齐桌面 top_level 参数）
+  const [topLevel, setTopLevel] = useState(false);
   const [items, setItems] = useState<ConfigItemRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +81,13 @@ export default function ConfigurationItemsPage() {
     let alive = true;
     setLoading(true);
     configurationApi
-      .listItems({ page: 1, page_size: 100, include_custom_fields: true })
+      .listItems({
+        page: 1,
+        page_size: 100,
+        include_custom_fields: true,
+        show_all_versions: showAllVersions || undefined,
+        top_level: topLevel || undefined,
+      })
       .then((r) => {
         if (!alive) return;
         const data = (r.data ?? {}) as { items?: any[] };
@@ -109,7 +119,7 @@ export default function ConfigurationItemsPage() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [showAllVersions, topLevel]);
 
   // 客户端即时过滤（搜索构型号/名称）
   const kw = debounced.trim().toLowerCase();
@@ -124,6 +134,22 @@ export default function ConfigurationItemsPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        {/* 工具栏：顶层 / 全部版本 */}
+        <div className="flex items-center gap-2 mt-2">
+          <div className="flex-1" />
+          <button
+            onClick={() => setTopLevel((v) => !v)}
+            className={`min-h-10 px-3 rounded-lg text-xs ${topLevel ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+          >
+            顶层
+          </button>
+          <button
+            onClick={() => setShowAllVersions((v) => !v)}
+            className={`min-h-10 px-3 rounded-lg text-xs ${showAllVersions ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+          >
+            全部版本
+          </button>
+        </div>
       </div>
       {loading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
       {!loading && error && <p className="text-center text-xs text-red-400 py-3">{error}</p>}
@@ -134,6 +160,11 @@ export default function ConfigurationItemsPage() {
         renderMain={(i) => (
           <div className="flex items-center gap-2 min-w-0">
             <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">{i.code}</span>
+            {!showAllVersions && i.version_count && i.version_count > 1 && (
+              <span className="shrink-0 px-1.5 py-0.5 rounded-lg text-xs bg-gray-100 text-gray-600">
+                {i.version_count} 个版本
+              </span>
+            )}
             <span className="shrink-0 text-xs text-gray-500">{i.version}</span>
             <span className="shrink-0 w-12 flex justify-end">
               <StatusBadge status={i.status} map={ITEM_STATUS_MAP} />
