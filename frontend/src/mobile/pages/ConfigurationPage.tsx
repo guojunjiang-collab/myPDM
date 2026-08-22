@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { configurationApi, configurationProfileApi } from '../../services/api';
 import { useDebounced } from '../../hooks/useDebounced';
 import MobileCardList from '../components/MobileCardList';
@@ -67,7 +68,11 @@ function fmtDateTime(v?: string | null): string {
 }
 
 export default function ConfigurationPage() {
-  const [section, setSection] = useState<Section>('items');
+  const location = useLocation();
+  // 拆分入口：/configuration/items 默认构型项、/configuration/profiles 默认配置概要
+  const [section, setSection] = useState<Section>(() =>
+    location.pathname.includes('/profiles') ? 'profiles' : 'items',
+  );
 
   /* ---- 构型项段 ---- */
   const [items, setItems] = useState<ConfigItemRow[]>([]);

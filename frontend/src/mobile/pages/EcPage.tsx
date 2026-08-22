@@ -171,7 +171,10 @@ export default function EcPage({ detail, onBack }: Props = {}) {
     }
   }, [id]);
 
-  const [tab, setTab] = useState<Tab>('ecr');
+  const [tab, setTab] = useState<Tab>(() =>
+    // 拆分入口：/ec/ecr 默认 ECR、/ec/eco 默认 ECO（详情路由同理）
+    location.pathname.includes('/eco') ? 'eco' : 'ecr',
+  );
 
   /* ---- ECR 列表 ---- */
   const [ecrs, setEcrs] = useState<ECRRequest[]>([]);

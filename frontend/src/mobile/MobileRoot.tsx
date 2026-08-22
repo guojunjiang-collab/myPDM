@@ -33,10 +33,14 @@ export default function MobileRoot() {
         <Route path="documents" element={<DocumentsListPage />} />
         <Route path="documents/:id" element={<DocumentDetailPage />} />
         <Route path="ec" element={<EcPage />} />
+        <Route path="ec/ecr" element={<EcPage />} />
+        <Route path="ec/eco" element={<EcPage />} />
         <Route path="ec/ecr/:id" element={<EcPage />} />
         <Route path="ec/eco/:id" element={<EcPage />} />
         <Route path="inventory" element={<InventoryPage />} />
         <Route path="configuration" element={<ConfigurationPage />} />
+        <Route path="configuration/items" element={<ConfigurationPage />} />
+        <Route path="configuration/profiles" element={<ConfigurationPage />} />
         {/* 项目进度：/projects 列表 → /projects/:id 详情（两级视图共用 ProjectsPage） */}
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="projects/:id" element={<ProjectsPage />} />

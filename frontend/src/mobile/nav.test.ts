@@ -16,9 +16,9 @@ describe('filterVisible', () => {
     const r = filterVisible(MOBILE_TABS, can as never);
     expect(r.map((t) => t.path)).toEqual(['/parts']);
   });
-  it('更多页包含 6 个入口（系统设置已移除，新增用户管理）', () => {
+  it('更多页包含 8 个入口（ECR/ECO、构型项管理/构型配置 拆分）', () => {
     expect(MORE_ITEMS.map((t) => t.path)).toEqual([
-      '/dashboard', '/ec', '/inventory', '/configuration', '/notifications', '/users',
+      '/dashboard', '/ec/ecr', '/ec/eco', '/inventory', '/configuration/items', '/configuration/profiles', '/notifications', '/users',
     ]);
   });
 });
