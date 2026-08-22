@@ -177,10 +177,8 @@ function buildDesc(n: BOMCompareNode): string {
   if ((l?.detail.version ?? '') !== (r?.detail.version ?? '')) {
     segs.push(`版本 ${l?.detail.version ?? '-'}→${r?.detail.version ?? '-'}`);
   }
-  if ((l?.quantity ?? null) !== (r?.quantity ?? null)) {
-    segs.push(`数量 ${l?.quantity ?? '-'}→${r?.quantity ?? '-'}`);
-  }
   if (n.change_type === 'internal') segs.push('子项变化');
+  // 数量变化已在行1 用量标签展示（×L→×R），此处不再重复
   return segs.join('；') || (n.change_type === 'modify' ? '修改' : '');
 }
 
@@ -469,6 +467,20 @@ export default function BomComparePage() {
                       const depth = n.level + 1;
                       const desc = buildDesc(n);
                       const cm = CHANGE_MAP[n.change_type] ?? CHANGE_MAP.none;
+                      // 用量：两侧都存在 → ×L（相同）/ ×L→×R（不同）；单侧 → ×N
+                      const lq = l?.quantity;
+                      const rq = r?.quantity;
+                      const qtyChanged = lq != null && rq != null && lq !== rq;
+                      const qtyLabel =
+                        lq != null && rq != null
+                          ? lq === rq
+                            ? `×${lq}`
+                            : `×${lq}→×${rq}`
+                          : lq != null
+                            ? `×${lq}`
+                            : rq != null
+                              ? `×${rq}`
+                              : '';
                       return (
                         <div
                           key={n.key}
@@ -509,6 +521,13 @@ export default function BomComparePage() {
                               <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
                                 {code}
                               </span>
+                              {qtyLabel && (
+                                <span
+                                  className={`shrink-0 text-xs ${qtyChanged ? 'text-orange-600 font-medium' : 'text-gray-500'}`}
+                                >
+                                  {qtyLabel}
+                                </span>
+                              )}
                               <span className={`shrink-0 px-1.5 py-0.5 rounded-full text-xs ${cm.cls}`}>
                                 {cm.label}
                               </span>
