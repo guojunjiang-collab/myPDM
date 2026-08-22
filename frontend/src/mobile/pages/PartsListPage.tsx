@@ -70,13 +70,23 @@ export default function PartsListPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="sticky top-0 bg-gray-50 px-3 pt-2 pb-1 z-10">
-        <input
-          className="w-full h-11 px-4 rounded-lg bg-white border border-gray-200 text-base"
-          placeholder="搜索件号/名称..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <div className="flex gap-2 mt-2">
+        {/* 行1：搜索框 + 对比按钮 */}
+        <div className="flex items-center gap-2">
+          <input
+            className="flex-1 min-w-0 h-11 px-4 rounded-lg bg-white border border-gray-200 text-base"
+            placeholder="搜索件号/名称..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <button
+            onClick={() => navigate('/parts/compare')}
+            className="shrink-0 min-h-11 px-3 rounded-lg bg-white text-primary-600 border border-primary-600 text-sm font-medium"
+          >
+            ⇄ 对比
+          </button>
+        </div>
+        {/* 行2：类型筛选（左）+ 顶层/全部版本开关（右） */}
+        <div className="flex items-center gap-2 mt-2">
           {TYPE_FILTERS.map((f) => (
             <button
               key={f.key}
@@ -86,6 +96,7 @@ export default function PartsListPage() {
               {f.label}
             </button>
           ))}
+          <div className="flex-1" />
           <button
             onClick={() => setTopLevel((v) => !v)}
             className={`min-h-10 px-3 rounded-full text-xs ${topLevel ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
@@ -97,12 +108,6 @@ export default function PartsListPage() {
             className={`min-h-10 px-3 rounded-full text-xs ${showAllVersions ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
           >
             全部版本
-          </button>
-          <button
-            onClick={() => navigate('/parts/compare')}
-            className="min-h-10 px-3 rounded-full text-xs bg-white text-primary-600 border border-primary-600"
-          >
-            ⇄ 对比
           </button>
         </div>
       </div>
