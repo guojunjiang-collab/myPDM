@@ -4,7 +4,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { customFieldsApi, documentsApi } from '../../services/api';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
-import AttachmentPreview from '../components/AttachmentPreview';
+import AttachmentPreview, { openAttachmentInNewTab } from '../components/AttachmentPreview';
 import DocWhereUsedTab from './DocWhereUsedTab';
 import type { DocumentRevision, DocumentAttachment } from '../../types';
 
@@ -240,6 +240,21 @@ export default function DocumentDetailPage() {
             ‹
           </button>
           <div className="min-w-0 flex-1 text-base font-medium text-gray-900 truncate">{title}</div>
+          {/* 标题栏最右侧：附件"预览"按钮（图文档只有一个附件，一直显示便于快速点击） */}
+          {!attachmentsError && attachments.length > 0 && (
+            <button
+              onClick={async () => {
+                try {
+                  await openAttachmentInNewTab(attachments[0]);
+                } catch {
+                  /* 静默：失败不阻塞页面 */
+                }
+              }}
+              className="shrink-0 min-h-10 px-3 rounded-lg bg-primary-600 text-white text-xs"
+            >
+              预览
+            </button>
+          )}
         </div>
         <div className="flex mt-1 bg-white rounded-lg border border-gray-200 overflow-hidden">
           {TABS.map((t) => (
@@ -270,17 +285,6 @@ export default function DocumentDetailPage() {
         <div className="p-3">
           {activeTab === 'overview' && (
             <div>
-              {/* 附件常驻区：有附件时一直显示"预览"入口，便于快速点击 */}
-              {!loadingAttachments && !attachmentsError && attachments.length > 0 && (
-                <div className="mb-3">
-                  <div className="text-sm font-bold text-gray-900 mb-2">附件（{attachments.length}）</div>
-                  <div className="flex flex-col gap-2">
-                    {attachments.map((att) => (
-                      <AttachmentPreview key={att.id} attachment={att} />
-                    ))}
-                  </div>
-                </div>
-              )}
               {cfLoading && <p className="text-center text-xs text-gray-400 py-2">自定义字段加载中...</p>}
               {!cfLoading && cfError && (
                 <p className="text-center text-xs text-red-400 py-2">自定义字段加载失败</p>
