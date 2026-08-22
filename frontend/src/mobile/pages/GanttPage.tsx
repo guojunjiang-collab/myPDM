@@ -88,17 +88,20 @@ export default function GanttPage({ projectId, onBack }: Props) {
   const totalPx = range ? (daysBetween(range.start, range.end) + 1) * DAY_PX[scale] : 0;
   const todayX = range ? daysBetween(range.start, new Date()) * DAY_PX[scale] : -1;
 
-  // 左列宽度自适应内容（按最长编号/负责人估算，中文 12px/字、编号 7px/字符），
-  // 右侧 border-r 竖线分割符随左列宽度自动贴合；z-20 高于右区全部元素（含今日线 z-10），滚动时分割线永不被遮盖
+  // 左列宽度自适应内容：canvas 精确测量文本（text-xs 12px），逐行取「层级缩进(depth*10) + 文本宽」之和的最大值
+  // （最长文本可能不在最深层级，不能分开取最大值），再加行内 padding(px-2=16)——分割线紧贴最靠右的编号
   const leftW = useMemo(() => {
-    if (!data) return 160;
+    if (!data) return 140;
+    const ctx =
+      typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
+    if (ctx) ctx.font = '500 12px system-ui, -apple-system, sans-serif';
     let max = 0;
     for (const t of data.tasks) {
-      const codeW = Array.from(t.code).reduce((s, ch) => s + (/[\u4e00-\u9fa5]/.test(ch) ? 12 : 7), 0) + 20;
-      const nameW = (t.assignee_name ? Array.from(t.assignee_name).reduce((s, ch) => s + (/[\u4e00-\u9fa5]/.test(ch) ? 7 : 6), 0) : 16) + 20;
-      max = Math.max(max, codeW, nameW);
+      const codeW = ctx ? ctx.measureText(t.code).width : t.code.length * 7;
+      const nameW = t.assignee_name ? (ctx ? ctx.measureText(t.assignee_name).width : t.assignee_name.length * 6) : 0;
+      max = Math.max(max, t.depth * 10 + codeW, t.depth * 10 + nameW);
     }
-    return Math.min(220, Math.max(160, max));
+    return Math.min(260, Math.max(120, Math.ceil(max) + 16));
   }, [data]);
 
   return (
