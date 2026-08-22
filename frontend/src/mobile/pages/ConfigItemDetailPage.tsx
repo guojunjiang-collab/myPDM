@@ -195,10 +195,17 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                   onClick={() => openPart(p.part_detail?.id, p.part_detail?.revision_id)}
                   className="w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm"
                 >
-                  {/* 行1：编号（左）+ 用量 + 版本 + 状态（右，参照零部件 BOM Tab） */}
+                  {/* 行1：编号（左）+ 必装/选装徽标（紧随编号）+ 用量 + 版本 + 状态（右） */}
                   <span className="flex items-center gap-2 min-w-0">
                     <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
                       {p.part_detail?.code ?? p.part_id}
+                    </span>
+                    <span
+                      className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
+                        p.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+                      }`}
+                    >
+                      {p.is_required ? '必装' : '选装'}
                     </span>
                     {p.quantity != null && (
                       <span className="shrink-0 truncate text-center text-xs text-gray-500">x{p.quantity}</span>
@@ -212,7 +219,7 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                       </span>
                     )}
                   </span>
-                  {/* 行2：名称（左）+ 类型徽标（参考桌面零件/部件配色）+ 必装 + 预览（右） */}
+                  {/* 行2：名称（左）+ 类型徽标（参考桌面零件/部件配色）+ 预览（右） */}
                   <span className="mt-1 flex items-center gap-1.5 min-w-0 min-h-7">
                     <span className="flex-1 min-w-0 truncate text-xs text-gray-500">
                       {p.part_detail?.name || ''}
@@ -223,13 +230,6 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                       }`}
                     >
                       {p.part_type === 'assembly' ? '部件' : '零件'}
-                    </span>
-                    <span
-                      className={`shrink-0 px-2 py-0.5 rounded-full text-xs ${
-                        p.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
-                      }`}
-                    >
-                      {p.is_required ? '必装' : '选装'}
                     </span>
                     {p.part_detail?.has_3d === true && (
                       <button
