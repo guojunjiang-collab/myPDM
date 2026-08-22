@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Modal } from './Modal';
+import Badge from './ui/Badge';
 import type { ImportPreview, ImportRow } from '../services/importExport';
 
 interface ImportPreviewModalProps {
@@ -67,24 +68,12 @@ export default function ImportPreviewModal({
 
   const renderStatusBadge = (row: ImportRow) => {
     if (row.status === '新增') {
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-800">
-          🆕 新增
-        </span>
-      );
+      return <Badge tone="green" label="🆕 新增" />;
     }
     if (row.status === '更新') {
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-          ✏️ 更新
-        </span>
-      );
+      return <Badge tone="blue" label="✏️ 更新" />;
     }
-    return (
-      <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-800">
-        ❌ 错误
-      </span>
-    );
+    return <Badge tone="red" label="❌ 错误" />;
   };
 
   return (

@@ -7,6 +7,7 @@ import { useNotificationStore } from '../stores/notification';
 import { syncService } from '../services/syncService';
 import { APP_VERSION } from '../constants';
 import { ConfirmModal } from './Modal';
+import Badge from './ui/Badge';
 import FloatingAssistant from './assistant/FloatingAssistant';
 import NotificationBell from './NotificationBell';
 import type { Permission } from '../constants/permissions.generated';
@@ -185,9 +186,7 @@ export default function Layout() {
             </div>
             <NotificationBell />
             <span className="text-sm text-gray-700">{user?.real_name}</span>
-            <span className={`px-2 py-0.5 text-xs rounded-full ${user?.role === 'admin' ? 'bg-red-100 text-red-700' : user?.role === 'engineer' ? 'bg-blue-100 text-blue-700' : user?.role === 'production' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
-              {{ admin: '管理员', engineer: '工程师', production: '生产人员', guest: '访客', unverified: '未验证' }[user?.role || 'guest'] || user?.role}
-            </span>
+            <Badge status={user?.role ?? 'guest'} domain="role" />
             <span className="text-gray-300">|</span>
             {/* 自动同步已启用，手动检出改为小图标 */}
             <button

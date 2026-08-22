@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { APP_VERSION } from '../constants';
+import Badge from '../components/ui/Badge';
 
 /* ================================================================
    帮助文档页
@@ -92,8 +93,7 @@ function MiniTable({ head, rows }: { head: string[]; rows: React.ReactNode[][] }
 
 /** 版本级 / 迭代级 标签 */
 function LevelTag({ level }: { level: '版本级' | '迭代级' }) {
-  const cls = level === '版本级' ? 'bg-primary-50 text-primary-700' : 'bg-amber-50 text-amber-700';
-  return <span className={`px-2 py-0.5 rounded-full text-xs whitespace-nowrap ${cls}`}>{level}</span>;
+  return <Badge tone={level === '版本级' ? 'blue' : 'amber'} label={level} />;
 }
 
 export const sections: Section[] = [
@@ -319,19 +319,19 @@ export const sections: Section[] = [
         <UL
           items={[
             <>
-              <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs">草稿</span>{' '}
+              <Badge status="draft" />{' '}
               可自由编辑，尚未定型。
             </>,
             <>
-              <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 text-xs">冻结</span>{' '}
+              <Badge status="frozen" />{' '}
               暂停修改、待评审。
             </>,
             <>
-              <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-xs">发布</span>{' '}
+              <Badge status="released" />{' '}
               正式生效，一般不可直接改动，需通过变更流程。
             </>,
             <>
-              <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-800 text-xs">作废</span>{' '}
+              <Badge status="obsolete" />{' '}
               停止使用。
             </>,
           ]}
