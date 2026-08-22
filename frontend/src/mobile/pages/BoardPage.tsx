@@ -293,7 +293,7 @@ function FolderTreeNode({
         <button
           type="button"
           onClick={() => hasContent && onToggle(folder.id)}
-          className="flex-1 min-w-0 flex items-center gap-2 text-left"
+          className="flex-1 min-w-0 flex items-center gap-2 text-left pr-3"
         >
           <span className="text-sm shrink-0">{shared ? '📂' : '📁'}</span>
           <span className="flex-1 min-w-0 truncate text-sm text-gray-800">{folder.name}</span>
