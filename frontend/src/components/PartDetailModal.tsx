@@ -14,6 +14,7 @@ import ConfigItemDetailModal from './Configuration/ConfigItemDetailModal';
 import TaskEditModal from '../pages/Project/TaskEditModal';
 import ProfileEditModal from './Configuration/ProfileEditModal';
 import { useTableSort } from '../hooks/useTableSort';
+import Badge from './ui/Badge';
 
 /** BOM 结构树的展开箭头，与 STPViewer 模型树(ModelTreePanel)保持同一风格 */
 function BomChevron({ expanded }: { expanded: boolean }) {
@@ -27,16 +28,6 @@ function BomChevron({ expanded }: { expanded: boolean }) {
     </svg>
   );
 }
-
-const statusTag = (s: string) => {
-  const map: Record<string, { label: string; cls: string }> = {
-    draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
-    frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
-    released: { label: '发布', cls: 'bg-green-100 text-green-800' },
-    obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
-  };
-  return map[s] || { label: s, cls: 'bg-gray-100 text-gray-800' };
-};
 
 interface PartDetailModalProps {
   masterId: string;
@@ -386,9 +377,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
           <td className="px-3 py-2">{item.child_name}</td>
           <td className="px-3 py-2 text-gray-500">{item.child_version}</td>
           <td className="px-3 py-2">
-            <span className={`px-1.5 py-0.5 text-xs rounded ${statusTag(item.child_status || 'draft').cls}`}>
-              {statusTag(item.child_status || 'draft').label}
-            </span>
+            <Badge status={item.child_status || 'draft'} />
           </td>
           <td className="px-3 py-2 text-xs">
             {checkoutName ? (
@@ -605,9 +594,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-3">
                   <span className="font-semibold text-sm">版本：{revision?.version}</span>
-                  <span className={`px-2 py-1 text-xs rounded-full ${statusTag(revision?.status || 'draft').cls}`}>
-                    {statusTag(revision?.status || 'draft').label}
-                  </span>
+                  <Badge status={revision?.status || 'draft'} />
                   {isCheckedOut && (
                     <span className="text-xs text-orange-600">已签出：{revision?.check_out_user_name}</span>
                   )}
@@ -894,9 +881,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                             </td>
                             <td className="px-4 py-3">{v.version}</td>
                             <td className="px-4 py-3">
-                              <span className={`px-2 py-1 text-xs rounded-full ${statusTag(v.status as PartStatus).cls}`}>
-                                {statusTag(v.status as PartStatus).label}
-                              </span>
+                              <Badge status={v.status} />
                             </td>
                             <td className="px-4 py-3 text-gray-500">{v.created_at ? new Date(v.created_at).toLocaleDateString('zh-CN') : ''}</td>
                             <td className="px-4 py-3">
@@ -1056,9 +1041,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                       }}>
                       <td className="px-3 py-2 font-medium">{v.version}</td>
                       <td className="px-3 py-2">
-                        <span className={`px-1.5 py-0.5 text-xs rounded ${statusTag(v.status || 'draft').cls}`}>
-                          {statusTag(v.status || 'draft').label}
-                        </span>
+                        <Badge status={v.status || 'draft'} />
                       </td>
                       <td className="px-3 py-2 text-gray-500">{v.created_at ? new Date(v.created_at).toLocaleDateString('zh-CN') : ''}</td>
                     </tr>

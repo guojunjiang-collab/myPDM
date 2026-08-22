@@ -10,16 +10,7 @@ import { useDebounced } from '../hooks/useDebounced';
 import PartDetailModal from '../components/PartDetailModal';
 import { CADWorkspaceModal } from '../components/CADWorkspace/CADWorkspaceModal';
 import PartCompareModal from '../components/PartCompareModal';
-
-const statusTag = (s: string) => {
-  const map: Record<string, { label: string; cls: string }> = {
-    draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
-    frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
-    released: { label: '发布', cls: 'bg-green-100 text-green-800' },
-    obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
-  };
-  return map[s] || { label: s, cls: 'bg-gray-100 text-gray-800' };
-};
+import Badge from '../components/ui/Badge';
 
 type SortField = 'code' | 'name' | 'created_at' | 'version' | 'status' | 'check_out_user_name' | 'type';
 type SortOrder = 'asc' | 'desc';
@@ -278,14 +269,10 @@ export default function PartsPage() {
                   <td className="px-2 py-3 text-sm text-gray-500 text-center whitespace-nowrap">{formatDate(item.created_at, 'YYYY-MM-DD HH:mm')}</td>
                   <td className="px-4 py-3 text-sm text-gray-500 text-center">{item.version}</td>
                   <td className="px-4 py-3 text-center">
-                    <span className={`px-2 py-1 text-xs rounded-full ${item.type === 'assembly' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'}`}>
-                      {item.type === 'assembly' ? '部件' : '零件'}
-                    </span>
+                    <Badge tone={item.type === 'assembly' ? 'blue' : 'gray'} label={item.type === 'assembly' ? '部件' : '零件'} />
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <span className={`px-2 py-1 text-xs rounded-full ${statusTag(item.status).cls}`}>
-                      {statusTag(item.status).label}
-                    </span>
+                    <Badge status={item.status} />
                   </td>
                   <td className="px-4 py-3 text-sm text-center">
                     {item.check_out_user_name ? (

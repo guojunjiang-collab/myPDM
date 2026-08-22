@@ -8,6 +8,7 @@ import AssemblyPartPicker from './AssemblyPartPicker';
 import VersionSelectModal from './VersionSelectModal';
 import type { CustomFieldDefinition, AssemblyPartItem } from '../types';
 import CustomFieldInput from './CustomFieldInput';
+import Badge from './ui/Badge';
 
 interface EntityEditModalProps {
   open: boolean;
@@ -264,23 +265,14 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
             )}
           </td>
           <td className="px-3 py-2">
-            <span className={`px-1.5 py-0.5 text-xs rounded ${isAssembly ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
-              {isAssembly ? '部件' : '零件'}
-            </span>
+            <Badge tone={isAssembly ? 'blue' : 'gray'} label={isAssembly ? '部件' : '零件'} />
           </td>
           <td className="px-3 py-2 font-medium">{part.child_detail?.code || '-'}</td>
           <td className="px-3 py-2">{part.child_detail?.name || '-'}</td>
           <td className="px-3 py-2 text-gray-500">{part.child_detail?.spec || '-'}</td>
           <td className="px-3 py-2 text-gray-500">{part.child_detail?.version || '-'}</td>
           <td className="px-3 py-2">
-            <span className={`px-1.5 py-0.5 text-xs rounded ${
-              part.child_detail?.status === 'released' ? 'bg-green-100 text-green-800' :
-              part.child_detail?.status === 'draft' ? 'bg-blue-100 text-blue-800' :
-              part.child_detail?.status === 'frozen' ? 'bg-orange-100 text-orange-800' :
-              'bg-red-100 text-red-800'
-            }`}>
-              {part.child_detail?.status === 'released' ? '发布' : part.child_detail?.status === 'draft' ? '草稿' : part.child_detail?.status === 'frozen' ? '冻结' : '作废'}
-            </span>
+            <Badge status={part.child_detail?.status} />
           </td>
           <td className="px-3 py-2">
             {level === 0 ? (

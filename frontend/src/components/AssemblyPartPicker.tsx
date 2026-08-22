@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { bomApi, partsApi } from '../services/api';
 import { Modal } from './Modal';
 import { toast } from './Toast';
+import Badge from './ui/Badge';
 
 /* ----------------------------------------------------------------
    Types
@@ -34,25 +35,6 @@ interface AssemblyPartPickerProps {
   currentAssemblyId?: string;
   existingChildIds?: Set<string>;
 }
-
-/* ----------------------------------------------------------------
-   Helpers
-   ---------------------------------------------------------------- */
-
-const statusTag = (s: string) => {
-  const map: Record<string, string> = {
-    draft: 'bg-blue-100 text-blue-800',
-    frozen: 'bg-orange-100 text-orange-800',
-    released: 'bg-green-100 text-green-800',
-    obsolete: 'bg-red-100 text-red-800',
-  };
-  return map[s] || 'bg-gray-100 text-gray-800';
-};
-
-const statusLabel = (s: string) => {
-  const map: Record<string, string> = { draft: '草稿', frozen: '冻结', released: '发布', obsolete: '作废' };
-  return map[s] || s;
-};
 
 /* ----------------------------------------------------------------
    Component
@@ -296,9 +278,7 @@ export default function AssemblyPartPicker({
                       <td className="px-3 py-2">{item.name}</td>
                       <td className="px-3 py-2 text-gray-500">{item.version}</td>
                       <td className="px-3 py-2">
-                        <span className={`px-1.5 py-0.5 text-xs rounded-full ${statusTag(item.status)}`}>
-                          {statusLabel(item.status)}
-                        </span>
+                        <Badge status={item.status} />
                       </td>
                       <td className="px-3 py-2">
                         <input
@@ -417,9 +397,7 @@ export default function AssemblyPartPicker({
                         <td className="px-3 py-2">{item.name}</td>
                         <td className="px-3 py-2 text-gray-500">{item.version}</td>
                         <td className="px-3 py-2">
-                          <span className={`px-1.5 py-0.5 text-xs rounded-full ${statusTag(item.status)}`}>
-                            {statusLabel(item.status)}
-                          </span>
+                          <Badge status={item.status} />
                         </td>
                         <td className="px-3 py-2 text-center">
                           {isAdded ? (

@@ -1,22 +1,13 @@
 import type { Part, CustomFieldDefinition } from '../types';
 import { formatDateTime } from '../utils/date';
 import EntityDocumentSection from './EntityDocumentSection';
+import Badge from './ui/Badge';
 
 interface PartDetailContentProps {
   part: Part;
   customFieldDefs: CustomFieldDefinition[];
   customFieldValues: Record<string, any>;
 }
-
-const statusTag = (s: string) => {
-  const tags: Record<string, { label: string; class: string }> = {
-    draft: { label: '草稿', class: 'bg-blue-100 text-blue-800' },
-    frozen: { label: '冻结', class: 'bg-orange-100 text-orange-800' },
-    released: { label: '发布', class: 'bg-green-100 text-green-800' },
-    obsolete: { label: '作废', class: 'bg-red-100 text-red-800' },
-  };
-  return tags[s] || { label: s, class: 'bg-gray-100 text-gray-800' };
-};
 
 export default function PartDetailContent({ part, customFieldDefs, customFieldValues }: PartDetailContentProps) {
   return (
@@ -69,11 +60,10 @@ function InfoItem({ label, value }: { label: string; value: string }) {
 }
 
 function StatusItem({ label, status }: { label: string; status: string }) {
-  const tag = statusTag(status);
   return (
     <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
       <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-      <span className={`inline-block px-2 py-0.5 text-xs rounded-full ${tag.class}`}>{tag.label}</span>
+      <Badge status={status} />
     </div>
   );
 }

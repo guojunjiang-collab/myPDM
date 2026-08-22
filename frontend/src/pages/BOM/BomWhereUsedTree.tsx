@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { bomApi } from '../../services/api';
 import type { BOMTraceItem } from '../../types';
-import { buildTraceTree, flattenTraceTree, getStatusLabel } from './helpers';
+import { buildTraceTree, flattenTraceTree } from './helpers';
 import type { TraceTreeNode } from './types';
+import Badge from '../../components/ui/Badge';
 
 interface Props {
   revisionId: string;
@@ -10,16 +11,6 @@ interface Props {
   onViewEntity: (masterId: string, revisionId?: string) => void;
   onStateChange?: (state: { loading: boolean; error: boolean; empty: boolean }) => void;
 }
-
-const statusCls = (s: string) => {
-  const map: Record<string, string> = {
-    draft: 'bg-blue-100 text-blue-800',
-    frozen: 'bg-orange-100 text-orange-800',
-    released: 'bg-green-100 text-green-800',
-    obsolete: 'bg-red-100 text-red-800',
-  };
-  return map[s] || 'bg-gray-100 text-gray-800';
-};
 
 export default function BomWhereUsedTree({ revisionId, root, onViewEntity, onStateChange }: Props) {
   const [traceResult, setTraceResult] = useState<BOMTraceItem[]>([]);
@@ -126,17 +117,13 @@ export default function BomWhereUsedTree({ revisionId, root, onViewEntity, onSta
                   <span className="text-xs text-gray-400">0</span>
                 </td>
                 <td className="px-3 py-2">
-                  <span className="px-1.5 py-0.5 text-xs rounded bg-purple-50 text-purple-700">零部件</span>
+                  <Badge tone="gray" label="零部件" />
                 </td>
                 <td className="px-3 py-2 font-medium">{root.code}</td>
                 <td className="px-3 py-2">{root.name}</td>
                 <td className="px-3 py-2">{root.version || '-'}</td>
                 <td className="px-3 py-2">
-                  {root.status ? (
-                    <span className={`px-1.5 py-0.5 text-xs rounded ${statusCls(root.status)}`}>
-                      {getStatusLabel(root.status)}
-                    </span>
-                  ) : '-'}
+                  {root.status ? <Badge status={root.status} /> : '-'}
                 </td>
                 <td className="px-3 py-2">-</td>
               </tr>
@@ -170,15 +157,13 @@ export default function BomWhereUsedTree({ revisionId, root, onViewEntity, onSta
                     </span>
                   </td>
                   <td className="px-3 py-2">
-                    <span className="px-1.5 py-0.5 text-xs rounded bg-purple-50 text-purple-700">零部件</span>
+                    <Badge tone="gray" label="零部件" />
                   </td>
                   <td className="px-3 py-2 font-medium">{parent?.code || '-'}</td>
                   <td className="px-3 py-2">{parent?.name || '-'}</td>
                   <td className="px-3 py-2 text-gray-500">{parent?.version || '-'}</td>
                   <td className="px-3 py-2">
-                    <span className={`px-1.5 py-0.5 text-xs rounded ${statusCls(parent?.status || '')}`}>
-                      {getStatusLabel(parent?.status || '-')}
-                    </span>
+                    <Badge status={parent?.status} />
                   </td>
                   <td className="px-3 py-2">{item.quantity}</td>
                 </tr>

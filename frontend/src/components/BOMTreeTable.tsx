@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { AssemblyPartItem } from '../types';
 import { partsApi } from '../services/api';
+import Badge from './ui/Badge';
 
 interface BOMTreeTableProps {
   /** 根版本 revision_id */
@@ -20,16 +21,6 @@ interface TreeNode {
   hasChildren: boolean;
   expanded: boolean;
 }
-
-const statusTag = (s: string) => {
-  const map: Record<string, { label: string; cls: string }> = {
-    draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
-    frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
-    released: { label: '发布', cls: 'bg-green-100 text-green-800' },
-    obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
-  };
-  return map[s] || { label: s, cls: 'bg-gray-100 text-gray-800' };
-};
 
 /** 把 partsApi.getBOM 返回的扁平子项映射为 AssemblyPartItem */
 const toAssemblyPartItem = (c: any): AssemblyPartItem => ({
@@ -160,9 +151,7 @@ export default function BOMTreeTable({ revisionId, assemblyCode, assemblyName, r
         <td className={`px-3 py-2 text-gray-500 ${dataCellCls}`} onClick={rowClick}>{item.child_detail?.spec || '-'}</td>
         <td className={`px-3 py-2 text-gray-500 ${dataCellCls}`} onClick={rowClick}>{item.child_detail?.version || '-'}</td>
         <td className={`px-3 py-2 ${dataCellCls}`} onClick={rowClick}>
-          <span className={`px-1.5 py-0.5 text-xs rounded ${statusTag(item.child_detail?.status || 'draft').cls}`}>
-            {statusTag(item.child_detail?.status || 'draft').label}
-          </span>
+          <Badge status={item.child_detail?.status || 'draft'} />
         </td>
         <td className={`px-3 py-2 ${dataCellCls}`} onClick={rowClick}>{item.quantity}</td>
       </tr>

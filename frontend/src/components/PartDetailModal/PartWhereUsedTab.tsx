@@ -3,6 +3,7 @@ import { partsApi } from '../../services/api';
 import BomWhereUsedTree from '../../pages/BOM/BomWhereUsedTree';
 import { getStatusLabel } from '../../pages/BOM/helpers';
 import { formatDateTime } from '../../utils/date';
+import Badge from '../ui/Badge';
 
 interface Props {
   revisionId: string;
@@ -35,7 +36,7 @@ const Section = ({ title, count, children }: any) => (
   <div className="mb-4">
     <div className="flex items-center gap-2 mb-2">
       <span className="text-sm font-semibold text-gray-700">{title}</span>
-      <span className="px-1.5 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">{count}</span>
+      <Badge tone="gray" label={count} size="xs" />
     </div>
     {children}
   </div>
@@ -84,7 +85,7 @@ export default function PartWhereUsedTab(props: Props) {
                   <td className="px-3 py-2 text-gray-500">{r.version || '-'}</td>
                   <td className="px-3 py-2 text-gray-500">{getStatusLabel(r.status)}</td>
                   <td className="px-3 py-2 text-center">
-                    <span className={`text-xs px-2 py-0.5 rounded ${r.is_required ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>{r.is_required ? '必选' : '可选'}</span>
+                    <Badge tone={r.is_required ? 'blue' : 'gray'} label={r.is_required ? '必选' : '可选'} />
                   </td>
                   <td className="px-3 py-2">{r.quantity}</td>
                 </tr>

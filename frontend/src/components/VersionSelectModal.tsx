@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { partsApi, documentsApi } from '../services/api';
 import { formatDateTime } from '../utils/date';
 import { Modal } from './Modal';
+import Badge from './ui/Badge';
 
 interface VersionItem {
   id: string;
@@ -21,16 +22,6 @@ interface VersionSelectModalProps {
   onSelect: (versionId: string) => void;
   onClose: () => void;
 }
-
-const statusTag = (s: string) => {
-  const map: Record<string, { label: string; cls: string }> = {
-    draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
-    frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
-    released: { label: '发布', cls: 'bg-green-100 text-green-800' },
-    obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
-  };
-  return map[s] || { label: s, cls: 'bg-gray-100 text-gray-800' };
-};
 
 export default function VersionSelectModal({
   open,
@@ -96,9 +87,7 @@ export default function VersionSelectModal({
                       </span>
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
-                      <span className={`inline-block px-2 py-0.5 text-xs rounded-full ${statusTag(v.status).cls}`}>
-                        {statusTag(v.status).label}
-                      </span>
+                      <Badge status={v.status} />
                     </td>
                     <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{formatDateTime(v.created_at)}</td>
                     <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{creator || '-'}</td>

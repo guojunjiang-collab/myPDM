@@ -5,6 +5,7 @@ import { formatDateTime } from '../utils/date';
 import { partsApi } from '../services/api';
 import EntityDocumentSection from './EntityDocumentSection';
 import ComponentAttachmentBucket from './ComponentAttachmentBucket';
+import Badge from './ui/Badge';
 
 interface AssemblyDetailContentProps {
   assembly: Assembly;
@@ -12,16 +13,6 @@ interface AssemblyDetailContentProps {
   customFieldValues: Record<string, unknown>;
   onSubItemClick?: (item: AssemblyPartItem) => void;
 }
-
-const statusTag = (s: string) => {
-  const map: Record<string, { label: string; cls: string }> = {
-    draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
-    frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
-    released: { label: '发布', cls: 'bg-green-100 text-green-800' },
-    obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
-  };
-  return map[s] || { label: s, cls: 'bg-gray-100 text-gray-800' };
-};
 
 export default function AssemblyDetailContent({ assembly, customFieldDefs, customFieldValues, onSubItemClick }: AssemblyDetailContentProps) {
   const [hasSubItems, setHasSubItems] = useState<boolean | null>(null);
@@ -105,11 +96,10 @@ function InfoItem({ label, value }: { label: string; value: string }) {
 }
 
 function StatusItem({ label, status }: { label: string; status: string }) {
-  const tag = statusTag(status);
   return (
     <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
       <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-      <span className={`inline-block px-2 py-0.5 text-xs rounded-full ${tag.cls}`}>{tag.label}</span>
+      <Badge status={status} />
     </div>
   );
 }
