@@ -36,7 +36,7 @@ export default function DocumentsListPage() {
   const [error, setError] = useState<string | null>(null);
 
   // 详情覆盖层栈：点卡片打开第一层，详情内跳转（反查等）逐级入栈，返回逐级弹出
-  const { stack, openDetail, closeDetail, handleDetailNavigate, popTo } = useDetailOverlay();
+  const { stack, openDetail, handleDetailNavigate } = useDetailOverlay();
 
   useEffect(() => {
     let alive = true;
@@ -146,13 +146,13 @@ export default function DocumentsListPage() {
           {d.kind === 'part' ? (
             <PartDetailPage
               masterId={d.id}
-              onBack={() => (idx === 0 ? closeDetail() : popTo(idx))}
+              onBack={() => window.history.back()}
               onNavigate={handleDetailNavigate}
             />
           ) : (
             <DocumentDetailPage
               id={d.id}
-              onBack={() => (idx === 0 ? closeDetail() : popTo(idx))}
+              onBack={() => window.history.back()}
               onNavigate={handleDetailNavigate}
             />
           )}

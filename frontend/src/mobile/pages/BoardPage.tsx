@@ -156,7 +156,11 @@ export default function BoardPage() {
   };
 
   // 条目详情覆盖层栈：看板保持原状，详情叠在上方，详情内跳转逐级入栈返回
-  const { stack: itemStack, openDetail: openItemDetail, closeDetail: closeItemDetail, handleDetailNavigate, popTo: popItemTo } = useDetailOverlay();
+  const {
+    stack: itemStack,
+    openDetail: openItemDetail,
+    handleDetailNavigate,
+  } = useDetailOverlay();
 
   /* ---------------- 渲染：文件夹按树形结构展开 ---------------- */
 
@@ -233,13 +237,13 @@ export default function BoardPage() {
           {d.kind === 'part' ? (
             <PartDetailPage
               masterId={d.id}
-              onBack={() => (idx === 0 ? closeItemDetail() : popItemTo(idx))}
+              onBack={() => window.history.back()}
               onNavigate={handleDetailNavigate}
             />
           ) : (
             <DocumentDetailPage
               id={d.id}
-              onBack={() => (idx === 0 ? closeItemDetail() : popItemTo(idx))}
+              onBack={() => window.history.back()}
               onNavigate={handleDetailNavigate}
             />
           )}
