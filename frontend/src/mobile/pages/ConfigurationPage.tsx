@@ -69,10 +69,8 @@ function fmtDateTime(v?: string | null): string {
 
 export default function ConfigurationPage() {
   const location = useLocation();
-  // 拆分入口：/configuration/items 默认构型项、/configuration/profiles 默认配置概要
-  const [section, setSection] = useState<Section>(() =>
-    location.pathname.includes('/profiles') ? 'profiles' : 'items',
-  );
+  // 独立界面：/configuration/items = 构型项管理；/configuration/profiles = 构型配置（无 Tab 切换）
+  const section: Section = location.pathname.includes('/profiles') ? 'profiles' : 'items';
 
   /* ---- 构型项段 ---- */
   const [items, setItems] = useState<ConfigItemRow[]>([]);
@@ -185,7 +183,7 @@ export default function ConfigurationPage() {
     return <ItemDetailView revisionId={itemDetailRevId} onBack={() => setItemDetailRevId(null)} />;
   }
 
-  /* ---------------- 列表视图（两段：构型项 / 配置概要） ---------------- */
+  /* ---------------- 列表视图（独立界面：按路由只显示构型项或构型配置） ---------------- */
   return (
     <div className="flex flex-col h-full">
       <div className="sticky top-0 bg-gray-50 px-3 pt-2 pb-1 z-10">
@@ -195,22 +193,6 @@ export default function ConfigurationPage() {
           value={section === 'items' ? itemsSearch : profilesSearch}
           onChange={(e) => (section === 'items' ? setItemsSearch(e.target.value) : setProfilesSearch(e.target.value))}
         />
-        <div className="flex gap-1 mt-2">
-          {([
-            { key: 'items', label: '构型项' },
-            { key: 'profiles', label: '配置概要' },
-          ] as { key: Section; label: string }[]).map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setSection(t.key)}
-              className={`flex-1 h-11 rounded-lg text-sm font-medium transition-colors ${
-                section === t.key ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
       </div>
 
       {section === 'items' && (
