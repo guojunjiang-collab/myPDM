@@ -5,6 +5,7 @@ import { useDebounced } from '../../hooks/useDebounced';
 import MobileCardList from '../components/MobileCardList';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
+import FilterDropdown from '../components/FilterDropdown';
 import DetailOverlayStack from '../components/DetailOverlayStack';
 import { useDetailOverlay } from '../hooks/useDetailOverlay';
 import type { PartListItem } from '../../types';
@@ -31,56 +32,6 @@ const STATUS_FILTERS = [
   { key: 'released', label: '发布' },
   { key: 'obsolete', label: '作废' },
 ];
-
-/** 自定义下拉（参考项目详情-层级下拉样式） */
-function FilterDropdown({
-  value,
-  options,
-  onChange,
-  className,
-}: {
-  value: string;
-  options: Array<{ key: string; label: string }>;
-  onChange: (key: string) => void;
-  className?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const current = options.find((o) => o.key === value) ?? options[0];
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={`min-h-10 px-3 rounded-lg bg-white border border-gray-200 text-xs text-gray-600 ${className ?? ''}`}
-      >
-        {current?.label ?? ''}
-      </button>
-      {open && (
-        <>
-          {/* 点击外部关闭 */}
-          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full mt-1 z-40 min-w-28 bg-white rounded-lg shadow-lg border border-gray-200 py-1">
-            {options.map((opt) => (
-              <button
-                key={opt.key}
-                type="button"
-                onClick={() => {
-                  onChange(opt.key);
-                  setOpen(false);
-                }}
-                className={`w-full text-left px-3 py-2 text-sm ${
-                  value === opt.key ? 'text-primary-600 font-medium bg-primary-50' : 'text-gray-700'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
 
 export default function PartsListPage() {
   const navigate = useNavigate();

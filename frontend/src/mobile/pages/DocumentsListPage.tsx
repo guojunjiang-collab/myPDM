@@ -4,6 +4,7 @@ import { useDebounced } from '../../hooks/useDebounced';
 import MobileCardList from '../components/MobileCardList';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
+import FilterDropdown from '../components/FilterDropdown';
 import DetailOverlayStack from '../components/DetailOverlayStack';
 import { useDetailOverlay } from '../hooks/useDetailOverlay';
 import type { DocumentRevision } from '../../types';
@@ -17,7 +18,7 @@ const STATUS_MAP: Record<string, { label: string; cls: string }> = {
 
 // 后端 GET /api/documents/ 支持 status 参数，空串 '' 表示全部
 const STATUS_FILTERS = [
-  { key: '', label: '全部' },
+  { key: '', label: '全部状态' },
   { key: 'draft', label: '草稿' },
   { key: 'frozen', label: '冻结' },
   { key: 'released', label: '发布' },
@@ -93,17 +94,9 @@ export default function DocumentsListPage() {
             全部版本
           </button>
         </div>
-        {/* 行2：状态筛选 */}
+        {/* 行2：状态下拉筛选 */}
         <div className="flex items-center gap-2 mt-2">
-          {STATUS_FILTERS.map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setStatusFilter(f.key)}
-              className={`min-h-10 px-3 rounded-lg text-xs ${statusFilter === f.key ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
-            >
-              {f.label}
-            </button>
-          ))}
+          <FilterDropdown value={statusFilter} options={STATUS_FILTERS} onChange={setStatusFilter} />
         </div>
       </div>
       {loading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
