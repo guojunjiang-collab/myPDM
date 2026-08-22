@@ -51,7 +51,8 @@ function PartPicker({
     timerRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await partsApi.list({ search: query.trim(), page_size: 20 });
+        // show_all_versions：返回所有版本行，可对比同一零部件的不同版本（与桌面选择器一致）
+        const res = await partsApi.list({ search: query.trim(), page_size: 20, show_all_versions: true });
         setResults(res.items ?? []);
       } catch {
         setResults([]);
