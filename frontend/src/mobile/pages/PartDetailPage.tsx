@@ -4,8 +4,13 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { partsApi } from '../../services/api';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
+import MobileCardList from '../components/MobileCardList';
+import AttachmentPreview from '../components/AttachmentPreview';
 import DesktopOnlyCard from '../components/DesktopOnlyCard';
-import type { PartMaster, PartRevisionBrief } from '../../types';
+import { formatMeta } from '../components/formatMeta';
+import { bomPath } from './bomPath';
+import type { BomChild } from './PartBomPage';
+import type { PartMaster, PartRevisionBrief, PartRevision, PartAttachment } from '../../types';
 
 /**
  * GET /api/parts/{master_id} 实际返回后端 PartMasterResponse：
@@ -39,6 +44,17 @@ function fmtDateTime(v?: string | null): string {
   return Number.isNaN(d.getTime()) ? v : d.toLocaleString('zh-CN', { hour12: false });
 }
 
+function isPermissionError(e: unknown): boolean {
+  if (e && typeof e === 'object' && 'response' in e) {
+    return (e as any).response?.status === 403;
+  }
+  return false;
+}
+
+function sortedByOrder(list: BomChild[]): BomChild[] {
+  return [...list].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+}
+
 function OverviewRow({ label, children }: { label: string; children?: ReactNode }) {
   return (
     <div className="py-2.5">
@@ -55,6 +71,21 @@ export default function PartDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
+
+  // BOM 段（激活时按最新版本加载首层）
+  const [bomItems, setBomItems] = useState<BomChild[]>([]);
+  const [bomLoading, setBomLoading] = useState(false);
+  const [bomError, setBomError] = useState<string | null>(null);
+
+  // 附件段（激活时按最新版本加载）
+  const [attachments, setAttachments] = useState<PartAttachment[]>([]);
+  const [attLoading, setAttLoading] = useState(false);
+  const [attError, setAttError] = useState<string | null>(null);
+
+  // 版本段（激活时加载全部版本历史）
+  const [versions, setVersions] = useState<PartRevision[]>([]);
+  const [verLoading, setVerLoading] = useState(false);
+  const [verError, setVerError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -84,6 +115,83 @@ export default function PartDetailPage() {
       alive = false;
     };
   }, [id]);
+
+  const revisionId = detail?.latest_revision?.id;
+
+  // BOM：切到 BOM 段且详情就绪时加载首层（latest_revision 的 BOM）
+  useEffect(() => {
+    let alive = true;
+    if (!id || activeTab !== 'bom' || !revisionId) return;
+    setBomLoading(true);
+    setBomError(null);
+    partsApi
+      .getBOM(revisionId)
+      .then((list) => {
+        if (alive) setBomItems(sortedByOrder((list ?? []) as BomChild[]));
+      })
+      .catch((e) => {
+        if (alive) {
+          setBomItems([]);
+          setBomError(isPermissionError(e) ? '无权限查看 BOM 结构' : 'BOM 加载失败，请稍后重试');
+        }
+      })
+      .finally(() => {
+        if (alive) setBomLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [id, activeTab, revisionId]);
+
+  // 附件：切到附件段且详情就绪时加载
+  useEffect(() => {
+    let alive = true;
+    if (!id || activeTab !== 'attachments' || !revisionId) return;
+    setAttLoading(true);
+    setAttError(null);
+    partsApi
+      .listAttachments(revisionId)
+      .then((list) => {
+        if (alive) setAttachments((list ?? []) as PartAttachment[]);
+      })
+      .catch((e) => {
+        if (alive) {
+          setAttachments([]);
+          setAttError(isPermissionError(e) ? '无权限访问该附件' : '附件加载失败，请稍后重试');
+        }
+      })
+      .finally(() => {
+        if (alive) setAttLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [id, activeTab, revisionId]);
+
+  // 版本：切到版本段时加载全部版本历史
+  useEffect(() => {
+    let alive = true;
+    if (!id || activeTab !== 'versions') return;
+    setVerLoading(true);
+    setVerError(null);
+    partsApi
+      .revisions(id)
+      .then((list) => {
+        if (alive) setVersions((list ?? []) as PartRevision[]);
+      })
+      .catch((e) => {
+        if (alive) {
+          setVersions([]);
+          setVerError(isPermissionError(e) ? '无权限查看版本历史' : '版本加载失败，请稍后重试');
+        }
+      })
+      .finally(() => {
+        if (alive) setVerLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [id, activeTab]);
 
   const title = detail ? `${detail.code} ${detail.name}` : id ?? '零部件详情';
   const activeLabel = TABS.find((t) => t.key === activeTab)?.label ?? '';
@@ -161,18 +269,88 @@ export default function PartDetailPage() {
               )}
             </div>
           )}
-          {activeTab === 'bom' && (
-            <button
-              onClick={() => navigate(`/parts/${id}/bom`)}
-              className="w-full bg-white rounded-lg px-4 py-3 min-h-14 flex items-center justify-between shadow-sm"
-            >
-              <span className="text-sm text-gray-900">查看 BOM 结构</span>
-              <span className="text-gray-400">›</span>
-            </button>
+
+          {activeTab === 'bom' &&
+            (!revisionId ? (
+              <EmptyState text="该零部件暂无版本，无 BOM 结构" />
+            ) : (
+              <div className="flex flex-col gap-2">
+                {bomLoading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+                {!bomLoading && bomError && (
+                  <p className="text-center text-xs text-red-400 py-3">{bomError}</p>
+                )}
+                {!bomLoading && !bomError && bomItems.length === 0 && (
+                  <EmptyState text="该零部件暂无 BOM 子项" />
+                )}
+                {!bomLoading && !bomError && bomItems.length > 0 && (
+                  <MobileCardList
+                    items={bomItems}
+                    keyOf={(b) => b.id}
+                    renderMain={(b) => `${b.child_code} ${b.child_name}`}
+                    renderMeta={(b) => (
+                      <span className="flex flex-wrap items-center gap-2">
+                        <StatusBadge status={b.child_status} map={STATUS_MAP} />
+                        <span className="text-gray-500">数量 ×{b.quantity}</span>
+                        <span className="text-gray-500">{formatMeta([['版本', b.child_version]])}</span>
+                        {b.has_children && <span className="text-primary-600">可下钻 ›</span>}
+                      </span>
+                    )}
+                    onClick={(b) => {
+                      // 仅装配（has_children）可继续下钻；零件无子 BOM，点击无操作
+                      if (!b.has_children) return;
+                      navigate(bomPath(`/parts/${id}`, b.child_revision_id));
+                    }}
+                  />
+                )}
+              </div>
+            ))}
+
+          {activeTab === 'attachments' &&
+            (!revisionId ? (
+              <EmptyState text="该零部件暂无版本，无附件" />
+            ) : (
+              <div className="flex flex-col gap-2">
+                {attLoading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+                {!attLoading && attError && (
+                  <p className="text-center text-xs text-red-400 py-3">{attError}</p>
+                )}
+                {!attLoading && !attError && attachments.length === 0 && (
+                  <EmptyState text="暂无附件" />
+                )}
+                {!attLoading &&
+                  !attError &&
+                  attachments.map((att) => <AttachmentPreview key={att.id} attachment={att} />)}
+              </div>
+            ))}
+
+          {activeTab === 'versions' && (
+            <div className="flex flex-col gap-2">
+              {verLoading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+              {!verLoading && verError && (
+                <p className="text-center text-xs text-red-400 py-3">{verError}</p>
+              )}
+              {!verLoading && !verError && versions.length === 0 && (
+                <EmptyState text="暂无版本记录" />
+              )}
+              {!verLoading &&
+                !verError &&
+                versions.map((v) => (
+                  <div key={v.id} className="bg-white rounded-lg px-4 py-3 shadow-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-base font-medium text-gray-900">版本 {v.version}</span>
+                      <StatusBadge status={v.status} map={STATUS_MAP} />
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1.5 space-y-0.5">
+                      <div>最新迭代：{v.latest_iteration}</div>
+                      {v.check_out_user_name && <div>检出人：{v.check_out_user_name}</div>}
+                      <div>创建时间：{fmtDateTime(v.created_at)}</div>
+                    </div>
+                  </div>
+                ))}
+            </div>
           )}
-          {activeTab !== 'overview' && activeTab !== 'bom' && (
-            <DesktopOnlyCard feature={activeLabel} />
-          )}
+
+          {activeTab === 'whereused' && <DesktopOnlyCard feature={activeLabel} />}
         </div>
       )}
     </div>

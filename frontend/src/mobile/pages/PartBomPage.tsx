@@ -22,7 +22,7 @@ interface PartDetail extends PartMaster {
  * 非整棵树）：每项含 child_revision_id 与 has_children。
  * 因此下钻 = 以子件版本 id 再次调用 partsApi.getBOM(childId) 取该层子项。
  */
-interface BomChild {
+export interface BomChild {
   id: string;
   child_revision_id: string;
   child_master_id: string;
@@ -48,6 +48,13 @@ const STATUS_MAP: Record<string, { label: string; cls: string }> = {
 
 function sortedByOrder(list: BomChild[]): BomChild[] {
   return [...list].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+}
+
+function isPermissionError(e: unknown): boolean {
+  if (e && typeof e === 'object' && 'response' in e) {
+    return (e as any).response?.status === 403;
+  }
+  return false;
 }
 
 export default function PartBomPage() {
@@ -113,10 +120,10 @@ export default function PartBomPage() {
             setItems(sortedByOrder(list));
           }
         }
-      } catch {
+      } catch (e) {
         if (alive) {
           setItems([]);
-          setError('加载失败，请稍后重试');
+          setError(isPermissionError(e) ? '无权限查看 BOM 结构' : '加载失败，请稍后重试');
         }
       } finally {
         if (alive) setLoading(false);
