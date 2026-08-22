@@ -102,7 +102,7 @@ export default function PartsListPage() {
             onClick={() => navigate('/parts/compare')}
             className="min-h-10 px-3 rounded-full text-xs bg-white text-primary-600 border border-primary-600"
           >
-            ⇄ BOM对比
+            ⇄ 对比
           </button>
         </div>
       </div>
