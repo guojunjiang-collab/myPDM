@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { projectApi } from '../../services/projectApi';
 import { useDebounced } from '../../hooks/useDebounced';
 import { useDetailOverlayPush, useDetailOverlay } from '../hooks/useDetailOverlay';
+import { useAuthStore } from '../../stores/auth';
 import DetailOverlayStack from '../components/DetailOverlayStack';
 import MobileCardList from '../components/MobileCardList';
 import StatusBadge from '../components/StatusBadge';
@@ -74,26 +75,30 @@ function fmtDate(v?: string | null): string {
   return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString('zh-CN');
 }
 
-/* 任务树节点：层级缩进 + 展开箭头 + 行内容；点击行打开任务详情 */
+/* 任务树节点：层级缩进 + 展开箭头 + 行内容；点击行打开任务详情。
+   当前登录人负责的任务：整行浅主色底 + 名称前主色圆点（高亮标识） */
 function TaskTreeNode({
   task,
   depth,
   expanded,
   onToggle,
   onOpen,
+  myUserId,
 }: {
   task: ProjectTask;
   depth: number;
   expanded: Record<string, boolean>;
   onToggle: (tid: string) => void;
   onOpen: (task: ProjectTask) => void;
+  myUserId?: string | null;
 }) {
   const hasChildren = (task.children?.length ?? 0) > 0;
   const isOpen = expanded[task.id] === true;
+  const isMine = !!myUserId && task.assignee_id === myUserId;
   return (
     <>
       <div
-        className="bg-white rounded-lg shadow-sm flex items-center gap-1 py-2 pr-3"
+        className={`rounded-lg shadow-sm flex items-center gap-1 py-2 pr-3 ${isMine ? 'bg-primary-50/60' : 'bg-white'}`}
         style={{ paddingLeft: 10 + depth * 14 }}
       >
         <button
@@ -112,6 +117,7 @@ function TaskTreeNode({
           className="flex-1 min-w-0 flex flex-col justify-center text-left"
         >
           <span className="flex items-center gap-2 min-w-0">
+            {isMine && <span className="w-1.5 h-1.5 rounded-full bg-primary-500 shrink-0" />}
             <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
               {task.code} {task.name}
             </span>
@@ -137,6 +143,7 @@ function TaskTreeNode({
             expanded={expanded}
             onToggle={onToggle}
             onOpen={onOpen}
+            myUserId={myUserId}
           />
         ))}
     </>
@@ -312,6 +319,7 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
 
   /* ---- 任务/关联对象详情：全局详情栈（从零部件反查进入）或本地详情栈（独立路由模式） ---- */
   const overlayPush = useDetailOverlayPush();
+  const myUserId = useAuthStore((s) => s.user?.id);
   const localOverlay = useDetailOverlay();
   // 详情栈模式：overlayPush 存在 → 任务详情进全局栈（返回链：任务→项目→零部件→列表）；
   // 独立路由模式 → 进本地详情栈（关联对象跳转也入本地栈，返回逐级回任务详情，不离开项目路由）
@@ -455,6 +463,7 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
                       expanded={expanded}
                       onToggle={toggleTask}
                       onOpen={openTask}
+                      myUserId={myUserId}
                     />
                   ))}
                 </div>
