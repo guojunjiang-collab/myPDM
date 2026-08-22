@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { bomApi, partsApi } from '../../services/api';
-import StatusBadge from '../components/StatusBadge';
+import Badge from '../../components/ui/Badge';
 import EmptyState from '../components/EmptyState';
 import { formatMeta } from '../components/formatMeta';
 import type { BOMTraceItem } from '../../types';
@@ -15,13 +15,6 @@ import type { BOMTraceItem } from '../../types';
  * - 被构型配置引用（partsApi.whereUsedProfiles）
  * 点击父项/任务跳转对应移动路由；构型项/配置暂无可跳深链，仅只读展示。
  */
-
-const STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
-  frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
-  released: { label: '发布', cls: 'bg-green-100 text-green-800' },
-  obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
-};
 
 interface ConfigRef {
   config_item_revision_id: string;
@@ -66,7 +59,7 @@ function Section({ title, count, children }: { title: string; count: number; chi
     <div className="mb-4">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-sm font-medium text-gray-700">{title}</span>
-        <span className="px-1.5 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">{count}</span>
+        <Badge tone="gray" label={count} size="xs" />
       </div>
       {children}
     </div>
@@ -207,7 +200,7 @@ export default function PartWhereUsedTab({ revisionId, onNavigate }: Props) {
                 </span>
                 <span className="shrink-0 w-7 truncate text-center text-xs text-gray-500">{p.version}</span>
                 <span className="shrink-0 w-12 flex justify-end">
-                  {p.status && <StatusBadge status={p.status} map={STATUS_MAP} />}
+                  {p.status && <Badge status={p.status} />}
                 </span>
               </span>
               {/* 行2：名称（反查链无检出人字段，仅显示名称） */}
@@ -238,19 +231,16 @@ export default function PartWhereUsedTab({ revisionId, onNavigate }: Props) {
                 <span className="shrink-0 w-8 truncate text-center text-xs text-gray-500">x{r.quantity ?? 1}</span>
                 <span className="shrink-0 w-7 truncate text-center text-xs text-gray-500">{r.version}</span>
                 <span className="shrink-0 w-12 flex justify-end">
-                  {r.status && <StatusBadge status={r.status} map={STATUS_MAP} />}
+                  {r.status && <Badge status={r.status} />}
                 </span>
               </span>
               {/* 行2：名称 + 必选/可选 */}
               <span className="flex items-center min-w-0 mt-0.5">
                 <span className="flex-1 min-w-0 truncate text-xs text-gray-500">{r.name}</span>
-                <span
-                  className={`shrink-0 px-1.5 py-0.5 rounded text-xs ${
-                    r.is_required ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
-                  }`}
-                >
-                  {r.is_required ? '必选' : '可选'}
-                </span>
+                <Badge
+                  tone={r.is_required ? 'blue' : 'gray'}
+                  label={r.is_required ? '必选' : '可选'}
+                />
               </span>
             </button>
           ))
@@ -273,7 +263,7 @@ export default function PartWhereUsedTab({ revisionId, onNavigate }: Props) {
                 <span className="flex flex-wrap items-center gap-2">
                   <span className="text-gray-600">{r.project_name}</span>
                   {r.task.assignee_name && <span className="text-gray-500">负责人：{r.task.assignee_name}</span>}
-                  {r.task.status && <StatusBadge status={r.task.status} map={STATUS_MAP} />}
+                  {r.task.status && <Badge status={r.task.status} domain="task" />}
                   <span className="text-gray-500">
                     {formatMeta([
                       ['开始', fmtDate(r.task.planned_start)],
@@ -306,7 +296,7 @@ export default function PartWhereUsedTab({ revisionId, onNavigate }: Props) {
               main={`${r.code} ${r.name}`}
               meta={
                 <span className="flex flex-wrap items-center gap-2">
-                  {r.status && <StatusBadge status={r.status} map={STATUS_MAP} />}
+                  {r.status && <Badge status={r.status} domain="profile" />}
                   <span className="text-gray-500">用量 ×{r.quantity ?? 1}</span>
                 </span>
               }

@@ -6,6 +6,8 @@ import { inventoryApi } from '../../services/inventoryApi';
 import { projectApi } from '../../services/projectApi';
 import { notificationApi } from '../../services/notificationApi';
 import { useAuthStore } from '../../stores/auth';
+import Badge from '../../components/ui/Badge';
+import type { BadgeTone } from '../../constants/badges';
 import EmptyState from '../components/EmptyState';
 import type { MyTodoItem, MyTaskItem, Notification } from '../../types';
 
@@ -20,18 +22,11 @@ import type { MyTodoItem, MyTaskItem, Notification } from '../../types';
    - 图表/复杂 tile 桌面组件不可复用 → 以纯文本/数字摘要呈现（brief 允许）。
    ================================================================ */
 
-const TYPE_TAG: Record<string, { label: string; cls: string }> = {
-  ecr: { label: 'ECR', cls: 'bg-blue-50 text-blue-800' },
-  eco: { label: 'ECO', cls: 'bg-amber-50 text-amber-800' },
+const TYPE_TAG: Record<string, { label: string; tone: BadgeTone }> = {
+  ecr: { label: 'ECR', tone: 'blue' },
+  eco: { label: 'ECO', tone: 'amber' },
 };
 const PRIO_DOT: Record<string, string> = { urgent: '#E24B4A', high: '#EF9F27', normal: '#378ADD', low: '#888780' };
-// 任务状态徽章（与桌面 MyTasksTile / 项目详情表一致）
-const TASK_STATUS_CLS: Record<string, string> = {
-  未开始: 'bg-gray-100 text-gray-600',
-  进行中: 'bg-blue-50 text-blue-700',
-  挂起: 'bg-amber-50 text-amber-700',
-  已完成: 'bg-green-50 text-green-700',
-};
 
 function fmtDate(d: string | null): string {
   if (!d) return '';
@@ -67,7 +62,7 @@ function Section({ title, badge, children }: { title: string; badge?: number; ch
       <div className="flex items-center gap-2 mb-2">
         <h2 className="text-sm font-semibold text-gray-800">{title}</h2>
         {badge !== undefined && badge > 0 && (
-          <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-600">{badge}</span>
+          <Badge tone="red" label={badge} size="xs" />
         )}
       </div>
       {children}
@@ -272,9 +267,7 @@ export default function DashboardPage() {
                       <span className={`flex-1 min-w-0 truncate text-sm ${od ? 'text-red-700' : 'text-gray-800'}`}>
                         {t.name}
                       </span>
-                      <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded ${TASK_STATUS_CLS[t.status] || 'bg-gray-100 text-gray-600'}`}>
-                        {t.status}
-                      </span>
+                      <Badge status={t.status} domain="task" />
                       <span className="shrink-0 text-xs text-gray-400">
                         {fmtDate(t.planned_start)}~{fmtDate(t.planned_end)}
                       </span>
@@ -302,9 +295,11 @@ export default function DashboardPage() {
                 key={`${it.type}:${it.id}`}
                 className="flex items-center gap-2 py-2.5 border-b border-gray-50 last:border-b-0"
               >
-                <span className={`text-xs px-1.5 py-0.5 rounded shrink-0 ${TYPE_TAG[it.type]?.cls || 'bg-gray-100 text-gray-700'}`}>
-                  {TYPE_TAG[it.type]?.label || it.type}
-                </span>
+                <Badge
+                  tone={TYPE_TAG[it.type]?.tone ?? 'gray'}
+                  label={TYPE_TAG[it.type]?.label ?? it.type}
+                  size="xs"
+                />
                 <span className={`flex-1 text-sm min-w-0 truncate ${it.kind === 'rejected' ? 'text-red-600' : 'text-gray-700'}`}>
                   {it.title}
                   {it.kind === 'rejected' ? ' · 被驳回' : ''}

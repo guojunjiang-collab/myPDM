@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { documentsApi } from '../../services/api';
-import StatusBadge from '../components/StatusBadge';
+import Badge from '../../components/ui/Badge';
+import type { BadgeDomain } from '../../constants/badges';
 import EmptyState from '../components/EmptyState';
 import { formatMeta } from '../components/formatMeta';
 
@@ -15,13 +16,6 @@ import { formatMeta } from '../components/formatMeta';
  * - 被 ECR 引用（documentsApi.whereUsedEcrs）
  * 零部件/任务/ECO/ECR 可跳转对应移动路由；构型项暂无可跳深链，仅只读展示。
  */
-
-const STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
-  frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
-  released: { label: '发布', cls: 'bg-green-100 text-green-800' },
-  obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
-};
 
 function fmtDate(v?: string): string {
   if (!v) return '';
@@ -59,7 +53,7 @@ function Section({ title, count, children }: { title: string; count: number; chi
     <div className="mb-4">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-sm font-bold text-gray-900">{title}</span>
-        <span className="px-1.5 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">{count}</span>
+        <Badge tone="gray" label={count} size="xs" />
       </div>
       {children}
     </div>
@@ -89,6 +83,7 @@ function RowCard({
   name,
   version,
   status,
+  domain = 'part',
   badge,
   onClick,
 }: {
@@ -96,6 +91,7 @@ function RowCard({
   name?: string;
   version?: string;
   status?: string;
+  domain?: BadgeDomain;
   badge?: ReactNode;
   onClick?: () => void;
 }) {
@@ -110,7 +106,7 @@ function RowCard({
         <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">{code}</span>
         <span className="shrink-0 w-7 truncate text-center text-xs text-gray-500">{version}</span>
         <span className="shrink-0 w-12 flex justify-end">
-          {status && <StatusBadge status={status} map={STATUS_MAP} />}
+          {status && <Badge status={status} domain={domain} />}
         </span>
       </span>
       <span className="flex items-center min-w-0 mt-0.5">
@@ -183,6 +179,7 @@ export default function DocWhereUsedTab({ revisionId, onNavigate }: Props) {
                 ['完成', fmtDate(r.task.planned_end)],
               ])}
               status={r.task.status}
+              domain="task"
               onClick={() =>
                 onNavigate
                   ? onNavigate(`/projects/${r.project_id}`)
@@ -201,6 +198,7 @@ export default function DocWhereUsedTab({ revisionId, onNavigate }: Props) {
               code={r.eco_number}
               name={r.title}
               status={r.status}
+              domain="eco"
               onClick={() =>
                 onNavigate ? onNavigate(`/ec/eco/${r.eco_id}`) : navigate(`/ec/eco/${r.eco_id}`)
               }
@@ -217,6 +215,7 @@ export default function DocWhereUsedTab({ revisionId, onNavigate }: Props) {
               code={r.ecr_number}
               name={r.title}
               status={r.status}
+              domain="ecr"
               onClick={() =>
                 onNavigate ? onNavigate(`/ec/ecr/${r.ecr_id}`) : navigate(`/ec/ecr/${r.ecr_id}`)
               }

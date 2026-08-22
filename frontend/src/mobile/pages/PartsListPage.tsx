@@ -3,19 +3,13 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { partsApi } from '../../services/api';
 import { useDebounced } from '../../hooks/useDebounced';
 import MobileCardList from '../components/MobileCardList';
-import StatusBadge from '../components/StatusBadge';
+import Badge from '../../components/ui/Badge';
 import EmptyState from '../components/EmptyState';
 import FilterDropdown from '../components/FilterDropdown';
 import DetailOverlayStack from '../components/DetailOverlayStack';
 import { useDetailOverlay } from '../hooks/useDetailOverlay';
 import type { PartListItem } from '../../types';
 
-const STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
-  frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
-  released: { label: '发布', cls: 'bg-green-100 text-green-800' },
-  obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
-};
 // 后端 GET /api/parts/ 原生支持 type 参数（Literal['part','assembly']），
 // 空串 '' 表示全部，undefined 时不传该参数
 const TYPE_FILTERS = [
@@ -172,7 +166,7 @@ export default function PartsListPage() {
             )}
             <span className="shrink-0 text-xs text-gray-500">{p.version}</span>
             <span className="shrink-0 w-12 flex justify-end">
-              <StatusBadge status={p.status} map={STATUS_MAP} />
+              <Badge status={p.status} />
             </span>
           </div>
         )}

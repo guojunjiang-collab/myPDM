@@ -2,7 +2,7 @@ import { Fragment, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mediaApi, partsApi } from '../../services/api';
-import StatusBadge from '../components/StatusBadge';
+import Badge from '../../components/ui/Badge';
 import type { BomChild } from '../pages/PartBomPage';
 
 /**
@@ -12,13 +12,6 @@ import type { BomChild } from '../pages/PartBomPage';
  * - 点击行（非箭头区域）→ 打开子项详情页 /parts/{child_master_id}。
  * - 触控目标 ≥40px：展开箭头 w-10，行内容 min-h-10。
  */
-
-const STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
-  frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
-  released: { label: '发布', cls: 'bg-green-100 text-green-800' },
-  obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
-};
 
 function sortedByOrder(list: BomChild[]): BomChild[] {
   return [...list].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
@@ -143,7 +136,7 @@ export default function BomTree({ rootItems, onNavigate }: Props) {
                 {b.child_version}
               </span>
               <span className="shrink-0 w-12 flex justify-end">
-                <StatusBadge status={b.child_status} map={STATUS_MAP} />
+                <Badge status={b.child_status} />
               </span>
             </span>
             {/* 行2：名称(左) + 检出状态 + 预览按钮（靠右） */}

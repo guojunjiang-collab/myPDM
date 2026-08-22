@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { boardApi, partsApi, documentsApi, mediaApi } from '../../services/api';
-import StatusBadge from '../components/StatusBadge';
+import Badge from '../../components/ui/Badge';
+import type { BadgeTone } from '../../constants/badges';
 import EmptyState from '../components/EmptyState';
 import DetailOverlayStack from '../components/DetailOverlayStack';
 import { useDetailOverlay } from '../hooks/useDetailOverlay';
@@ -37,21 +38,22 @@ interface FolderNode {
 // 零件/部件已统一为「零部件」，旧数据 entity_type 可能仍为 part/assembly
 const isComponentType = (t: string) => t === 'component' || t === 'part' || t === 'assembly';
 
-// 类型徽标（行1 件号与版本之间）：零件灰 / 部件紫 / 图文档天蓝 / 构型项青绿（与状态徽标色系区分）
-const ENTITY_BADGE: Record<string, { label: string; cls: string }> = {
-  part: { label: '零件', cls: 'bg-gray-100 text-gray-800' },
-  component: { label: '零件', cls: 'bg-gray-100 text-gray-800' },
-  assembly: { label: '部件', cls: 'bg-purple-100 text-purple-800' },
-  document: { label: '图文档', cls: 'bg-sky-100 text-sky-700' },
-  configuration: { label: '构型项', cls: 'bg-teal-100 text-teal-700' },
+// 类型徽标（行1 件号与版本之间）：零件灰 / 部件紫 / 图文档靛 / 构型项青（与状态徽标色系区分）
+const ENTITY_BADGE: Record<string, { label: string; tone: BadgeTone }> = {
+  part: { label: '零件', tone: 'gray' },
+  component: { label: '零件', tone: 'gray' },
+  assembly: { label: '部件', tone: 'purple' },
+  document: { label: '图文档', tone: 'indigo' },
+  configuration: { label: '构型项', tone: 'teal' },
 };
 
-const STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
-  active: { label: '有效', cls: 'bg-green-100 text-green-800' },
-  frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
-  released: { label: '发布', cls: 'bg-green-100 text-green-800' },
-  obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
+// 状态徽标（draft/active/frozen/released/obsolete；active 无 domain 映射，tone+label）
+const STATUS_TAG: Record<string, { label: string; tone: BadgeTone }> = {
+  draft: { label: '草稿', tone: 'blue' },
+  active: { label: '有效', tone: 'green' },
+  frozen: { label: '冻结', tone: 'orange' },
+  released: { label: '发布', tone: 'green' },
+  obsolete: { label: '作废', tone: 'red' },
 };
 
 type FilterTab = 'all' | 'component' | 'document' | 'configuration';
@@ -426,15 +428,16 @@ function ItemRow({ item, depth, onClick }: { item: DashboardItem; depth: number;
         <span className="flex items-center gap-2 min-w-0">
           <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">{item.code}</span>
           {/* 类型徽标：件号与版本之间（零件/部件/图文档/构型项） */}
-          <span
-            className={`shrink-0 text-xs px-1.5 py-0.5 rounded ${
-              ENTITY_BADGE[item.entity_type]?.cls ?? 'bg-gray-100 text-gray-600'
-            }`}
-          >
-            {ENTITY_BADGE[item.entity_type]?.label ?? '对象'}
-          </span>
+          <Badge
+            tone={ENTITY_BADGE[item.entity_type]?.tone ?? 'gray'}
+            label={ENTITY_BADGE[item.entity_type]?.label ?? '对象'}
+            size="xs"
+          />
           <span className="shrink-0 text-xs text-gray-500">{item.version}</span>
-          <StatusBadge status={item.status} map={STATUS_MAP} />
+          <Badge
+            tone={STATUS_TAG[item.status]?.tone ?? 'gray'}
+            label={STATUS_TAG[item.status]?.label ?? item.status}
+          />
         </span>
         <span className="flex items-center gap-2 min-w-0 mt-0.5">
           <span className="flex-1 min-w-0 truncate text-xs text-gray-500">{item.name}</span>

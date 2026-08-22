@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { bomApi, partsApi } from '../../services/api';
 import type { BOMCompareNode, BOMCompareResponse } from '../../types';
 import type { PartListItem } from '../../types';
+import Badge from '../../components/ui/Badge';
+import type { BadgeTone } from '../../constants/badges';
 import { StpViewerCore } from './StpViewerPage';
 
 /**
@@ -12,12 +14,12 @@ import { StpViewerCore } from './StpViewerPage';
  * - 汇总条：新增/删除/修改/内部变更；可"仅显示差异"
  */
 
-const CHANGE_MAP: Record<string, { label: string; cls: string }> = {
-  add: { label: '新增', cls: 'bg-green-100 text-green-700' },
-  delete: { label: '删除', cls: 'bg-red-100 text-red-700' },
-  modify: { label: '修改', cls: 'bg-yellow-100 text-yellow-700' },
-  internal: { label: '内部', cls: 'bg-orange-100 text-orange-700' },
-  none: { label: '无变化', cls: 'bg-gray-100 text-gray-600' },
+const CHANGE_MAP: Record<string, { label: string; tone: BadgeTone }> = {
+  add: { label: '新增', tone: 'green' },
+  delete: { label: '删除', tone: 'red' },
+  modify: { label: '修改', tone: 'amber' },
+  internal: { label: '内部', tone: 'orange' },
+  none: { label: '无变化', tone: 'gray' },
 };
 
 const ROW_BG: Record<string, string> = {
@@ -528,9 +530,7 @@ export default function BomComparePage() {
                                   {qtyLabel}
                                 </span>
                               )}
-                              <span className={`shrink-0 px-1.5 py-0.5 rounded-full text-xs ${cm.cls}`}>
-                                {cm.label}
-                              </span>
+                              <Badge tone={cm.tone} label={cm.label} size="xs" />
                             </span>
                             <span className="text-xs text-gray-500 mt-0.5 truncate">
                               {name}

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { inventoryApi } from '../../services/inventoryApi';
 import { useDebounced } from '../../hooks/useDebounced';
 import MobileCardList from '../components/MobileCardList';
-import StatusBadge from '../components/StatusBadge';
+import Badge from '../../components/ui/Badge';
+import { resolveBadge } from '../../constants/badges';
 import EmptyState from '../components/EmptyState';
 import { formatMeta } from '../components/formatMeta';
 import type { StockRow, InvDocument, Warehouse, InvMaterial } from '../../types';
@@ -32,19 +33,6 @@ const DOC_TYPE_LABEL: Record<string, string> = {
   transfer: '调拨单',
   stocktake: '盘点单',
   adjustment: '库存调整单',
-};
-
-const DOC_STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  draft: { label: '草稿', cls: 'bg-gray-100 text-gray-600' },
-  reviewing: { label: '审批中', cls: 'bg-amber-100 text-amber-700' },
-  approved: { label: '已审批', cls: 'bg-primary-100 text-primary-700' },
-  posted: { label: '已过账', cls: 'bg-green-100 text-green-700' },
-  rejected: { label: '已拒绝', cls: 'bg-red-100 text-red-700' },
-  cancelled: { label: '已取消', cls: 'bg-gray-100 text-gray-400' },
-};
-
-const LOW_MAP: Record<string, { label: string; cls: string }> = {
-  low: { label: '低库存', cls: 'bg-red-100 text-red-700' },
 };
 
 interface LedgerRow {
@@ -267,7 +255,7 @@ export default function InventoryPage() {
             renderMain={(r) => `${r.material_code} ${r.material_name}`}
             renderMeta={(r) => (
               <span className="flex flex-wrap items-center gap-2">
-                {r.is_low && <StatusBadge status="low" map={LOW_MAP} />}
+                {r.is_low && <Badge tone="red" label="低库存" />}
                 <span>
                   {formatMeta([
                     ['仓库', whName(r.warehouse_id)],
@@ -294,7 +282,7 @@ export default function InventoryPage() {
             renderMain={(d) => d.doc_number}
             renderMeta={(d) => (
               <span className="flex flex-wrap items-center gap-2">
-                <StatusBadge status={d.status} map={DOC_STATUS_MAP} />
+                <Badge status={d.status} domain="inventoryDoc" />
                 <span>
                   {formatMeta([
                     ['类型', DOC_TYPE_LABEL[d.doc_type]],
@@ -376,7 +364,7 @@ function StockDetailView({ materialId, rows, whName, onBack, onViewDoc }: {
         {first && (
           <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
             <div className="flex items-center gap-2">
-              {anyLow && <StatusBadge status="low" map={LOW_MAP} />}
+              {anyLow && <Badge tone="red" label="低库存" />}
             </div>
             <div className="mt-1 text-sm text-gray-900 break-all">{first.material_code} {first.material_name}</div>
             <div className="mt-1 text-xs text-gray-500">
@@ -520,7 +508,7 @@ function DocDetailView({ docId, whName, matName, onBack }: {
           {/* 基础信息 */}
           <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
             <div className="flex items-center gap-2">
-              <StatusBadge status={doc.status} map={DOC_STATUS_MAP} />
+              <Badge status={doc.status} domain="inventoryDoc" />
               <span className="text-xs text-gray-500">{DOC_TYPE_LABEL[doc.doc_type]}</span>
             </div>
             <div className="mt-2 text-xs text-gray-500">
@@ -572,9 +560,10 @@ function DocDetailView({ docId, whName, matName, onBack }: {
                   <div key={r.id ?? i} className="rounded-lg px-3 py-2 bg-gray-50 border border-gray-100">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-gray-900">{r.reviewer_name || '-'}</span>
-                      <span className={`px-2 py-0.5 rounded text-xs ${r.decision === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {r.decision === 'approved' ? '通过' : r.decision === 'rejected' ? '拒绝' : r.decision === 'returned' ? '退回' : r.decision || '-'}
-                      </span>
+                      <Badge
+                        tone={r.decision === 'approved' ? 'green' : 'red'}
+                        label={r.decision === 'approved' ? '通过' : r.decision === 'rejected' ? '拒绝' : r.decision === 'returned' ? '退回' : r.decision || '-'}
+                      />
                     </div>
                     {r.comment && <div className="text-xs text-gray-500 mt-1">{r.comment}</div>}
                     {r.created_at && <div className="text-xs text-gray-400 mt-1">{fmtDateTime(r.created_at)}</div>}
@@ -596,7 +585,7 @@ function DocDetailView({ docId, whName, matName, onBack }: {
                       <div className="text-sm text-gray-900 break-all">
                         <span className="font-medium">{log.operator_name || '-'}</span>
                         <span className="text-gray-400 mx-1">·</span>
-                        <span>{DOC_STATUS_MAP[log.to_status || '']?.label || log.to_status || '-'}</span>
+                        <span>{resolveBadge(log.to_status, 'inventoryDoc').label || log.to_status || '-'}</span>
                       </div>
                       {log.comment && <div className="text-xs text-gray-500 mt-0.5">{log.comment}</div>}
                       {log.created_at && <div className="text-xs text-gray-400 mt-0.5">{fmtDateTime(log.created_at)}</div>}

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { configurationApi } from '../../services/api';
 import { useDebounced } from '../../hooks/useDebounced';
 import MobileCardList from '../components/MobileCardList';
-import StatusBadge from '../components/StatusBadge';
+import Badge from '../../components/ui/Badge';
 import EmptyState from '../components/EmptyState';
 import DetailOverlayStack from '../components/DetailOverlayStack';
 import { useDetailOverlay } from '../hooks/useDetailOverlay';
@@ -13,13 +13,6 @@ import { formatMeta } from '../components/formatMeta';
    - 搜索 + 卡片列表；点击 → 覆盖层详情栈（ConfigItemDetailPage 多 Tab）
    - 详情内跳转（零部件/图文档/子构型项）全部栈内，滚动位置保留、全面屏手势逐级返回
    ================================================================ */
-
-const ITEM_STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
-  frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
-  released: { label: '发布', cls: 'bg-green-100 text-green-800' },
-  obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
-};
 
 /** 桌面 ConfigurationList 的列表行（listItems 响应映射） */
 interface ConfigItemRow {
@@ -166,7 +159,7 @@ export default function ConfigurationItemsPage() {
             )}
             <span className="shrink-0 text-xs text-gray-500">{i.version}</span>
             <span className="shrink-0 w-12 flex justify-end">
-              <StatusBadge status={i.status} map={ITEM_STATUS_MAP} />
+              <Badge status={i.status} />
             </span>
           </div>
         )}

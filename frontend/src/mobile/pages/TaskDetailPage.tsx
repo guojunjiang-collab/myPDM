@@ -3,7 +3,7 @@ import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 import { projectApi } from '../../services/projectApi';
 import { logsApi, ecrApi, ecoApi, partsApi, documentsApi, mediaApi } from '../../services/api';
 import { useDetailOverlayPush } from '../hooks/useDetailOverlay';
-import StatusBadge from '../components/StatusBadge';
+import Badge from '../../components/ui/Badge';
 import EmptyState from '../components/EmptyState';
 import AttachmentPreview, { openAttachmentInNewTab, isAttachmentPreviewable } from '../components/AttachmentPreview';
 import type { PreviewAttachment } from '../components/AttachmentPreview';
@@ -19,25 +19,11 @@ import type { ProjectTask, TaskLink, TaskStatus, TaskPriority, TaskComment } fro
 
 const TASK_TYPE_LABEL: Record<string, string> = { 任务: '任务', 里程碑: '里程碑', 评审: '评审' };
 
-const STATUS_MAP: Record<TaskStatus, { label: string; cls: string }> = {
-  未开始: { label: '未开始', cls: 'bg-gray-100 text-gray-600' },
-  进行中: { label: '进行中', cls: 'bg-blue-50 text-blue-700' },
-  已完成: { label: '已完成', cls: 'bg-green-50 text-green-700' },
-  挂起: { label: '挂起', cls: 'bg-amber-50 text-amber-700' },
-};
-
-const PRIORITY_MAP: Record<TaskPriority, { label: string; cls: string }> = {
-  高: { label: '高', cls: 'bg-red-50 text-red-700' },
-  中: { label: '中', cls: 'bg-gray-100 text-gray-600' },
-  低: { label: '低', cls: 'bg-blue-50 text-blue-700' },
-};
-
-/** 通用状态徽标（draft/frozen/released/obsolete，与移动端其它页一致） */
-const ENTITY_STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
-  frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
-  released: { label: '发布', cls: 'bg-green-100 text-green-800' },
-  obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
+/** 任务优先级徽标（高/中/低，中文值无 domain 映射，本地 tone+label） */
+const PRIORITY_TAG: Record<TaskPriority, { label: string; tone: 'red' | 'gray' | 'blue' }> = {
+  高: { label: '高', tone: 'red' },
+  中: { label: '中', tone: 'gray' },
+  低: { label: '低', tone: 'blue' },
 };
 
 /** 关联对象分区顺序与聚合键 */
@@ -374,10 +360,10 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
                 <span>{TASK_TYPE_LABEL[cur.task_type] ?? cur.task_type}</span>
               </FieldCard>
               <FieldCard label="状态">
-                <StatusBadge status={cur.status} map={STATUS_MAP} />
+                <Badge status={cur.status} domain="task" />
               </FieldCard>
               <FieldCard label="优先级">
-                <StatusBadge status={cur.priority} map={PRIORITY_MAP} />
+                <Badge tone={PRIORITY_TAG[cur.priority].tone} label={PRIORITY_TAG[cur.priority].label} />
               </FieldCard>
               <FieldCard label="负责人">
                 <span>{cur.assignee_name || '—'}</span>
@@ -421,7 +407,7 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
                     <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
                       {c.code} {c.name}
                     </span>
-                    <StatusBadge status={c.status} map={STATUS_MAP} />
+                    <Badge status={c.status} domain="task" />
                   </div>
                   <div className="mt-1 text-xs text-gray-500 flex flex-wrap items-center gap-2">
                     <span>{TASK_TYPE_LABEL[c.task_type] ?? c.task_type}</span>
@@ -449,9 +435,7 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
                   <section key={sec.key}>
                     <div className="flex items-center gap-1.5 px-1 mb-1.5">
                       <span className="text-sm font-bold text-gray-900">{sec.title}</span>
-                      <span className="min-w-5 h-5 px-1.5 rounded-full bg-gray-100 text-gray-500 text-xs flex items-center justify-center">
-                        {secLinks.length}
-                      </span>
+                      <Badge tone="gray" label={secLinks.length} size="xs" />
                     </div>
                     <div className="flex flex-col gap-1.5">
                       {secLinks.map((l) => (
@@ -469,18 +453,13 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
                               <span className="shrink-0 text-xs text-gray-400">{l.entity_version}</span>
                             )}
                             {(l.entity_type === 'part' || l.entity_type === 'assembly') && (
-                              <span
-                                className={`shrink-0 px-2 py-0.5 rounded-full text-xs ${
-                                  isAssembly(l)
-                                    ? 'bg-purple-100 text-purple-800'
-                                    : 'bg-gray-100 text-gray-800'
-                                }`}
-                              >
-                                {isAssembly(l) ? '部件' : '零件'}
-                              </span>
+                              <Badge
+                                tone={isAssembly(l) ? 'blue' : 'gray'}
+                                label={isAssembly(l) ? '部件' : '零件'}
+                              />
                             )}
                             {l.entity_status && (
-                              <StatusBadge status={l.entity_status} map={ENTITY_STATUS_MAP} />
+                              <Badge status={l.entity_status} />
                             )}
                           </span>
                           {/* 行2：名称/描述（左）+ 预览按钮（右下角，预查确认可预览才显示） */}

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { customFieldsApi, entityDocumentsApi, mediaApi, partsApi } from '../../services/api';
-import StatusBadge from '../components/StatusBadge';
+import Badge from '../../components/ui/Badge';
 import EmptyState from '../components/EmptyState';
 import AttachmentPreview, { openAttachmentInNewTab } from '../components/AttachmentPreview';
 import type { PreviewAttachment } from '../components/AttachmentPreview';
@@ -19,13 +19,6 @@ import type { PartMaster, PartRevisionBrief, PartRevision, PartAttachment } from
 interface PartDetail extends PartMaster {
   latest_revision?: PartRevisionBrief | null;
 }
-
-const STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
-  frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
-  released: { label: '发布', cls: 'bg-green-100 text-green-800' },
-  obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
-};
 
 const TYPE_LABEL: Record<string, string> = { part: '零件', assembly: '部件' };
 
@@ -95,7 +88,7 @@ function AttachmentSection({ title, items }: { title: string; items: PartAttachm
     <div>
       <div className="flex items-center gap-2 mb-2">
         <span className="text-sm font-medium text-gray-700">{title}</span>
-        <span className="px-1.5 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">{items.length}</span>
+        <Badge tone="gray" label={items.length} size="xs" />
       </div>
       {items.length === 0 ? (
         <EmptyState text={`暂无${title}`} />
@@ -417,7 +410,7 @@ export default function PartDetailPage({
     { label: '类型', value: detail?.type ? TYPE_LABEL[detail.type] ?? detail.type : undefined },
     {
       label: '状态',
-      value: curRev?.status ? <StatusBadge status={curRev.status} map={STATUS_MAP} /> : undefined,
+      value: curRev?.status ? <Badge status={curRev.status} /> : undefined,
     },
     { label: '最新版本', value: curRev?.version },
     {
@@ -673,7 +666,7 @@ export default function PartDetailPage({
                             {l.document?.code ?? '未知文档'}
                           </span>
                           <span className="shrink-0 text-xs text-gray-500">{l.document?.version}</span>
-                          <StatusBadge status={l.document?.status ?? 'draft'} map={STATUS_MAP} />
+                          <Badge status={l.document?.status ?? 'draft'} />
                         </span>
                         {/* 行2：名称（左）+ 预览按钮（右对齐，有附件才显示） */}
                         <span className="mt-1 flex items-center gap-2 min-w-0 min-h-7">
@@ -726,7 +719,7 @@ export default function PartDetailPage({
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-base font-medium text-gray-900">版本 {v.version}</span>
                           <span className="flex items-center gap-2">
-                            <StatusBadge status={v.status} map={STATUS_MAP} />
+                            <Badge status={v.status} />
                             <span
                               className={`w-5 h-5 rounded-full border flex items-center justify-center text-xs ${
                                 selected

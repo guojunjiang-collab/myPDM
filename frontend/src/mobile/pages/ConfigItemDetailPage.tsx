@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { configurationApi, customFieldsApi, mediaApi, partsApi } from '../../services/api';
 import { useDetailOverlayPush } from '../hooks/useDetailOverlay';
-import StatusBadge from '../components/StatusBadge';
+import Badge from '../../components/ui/Badge';
 import EmptyState from '../components/EmptyState';
 import ConfigTree from '../components/ConfigTree';
 import { openAttachmentInNewTab } from '../components/AttachmentPreview';
@@ -28,13 +28,6 @@ function fmtDateTime(v?: string | null): string {
    - 零部件/图文档 → onNavigate 栈内跳转；子构型项 → 详情栈 push（逐级下钻）
    - 覆盖层模式 Props（onBack/onNavigate）与独立路由模式共用
    ================================================================ */
-
-const STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
-  frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
-  released: { label: '发布', cls: 'bg-green-100 text-green-800' },
-  obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
-};
 
 interface Props {
   /** 构型项版本 revision id */
@@ -258,7 +251,7 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                   { label: '名称', value: name },
                   {
                     label: '状态',
-                    value: detail.revision.status ? <StatusBadge status={detail.revision.status} map={STATUS_MAP} /> : undefined,
+                    value: detail.revision.status ? <Badge status={detail.revision.status} /> : undefined,
                   },
                   { label: '版本', value: detail.revision.version },
                   {
@@ -330,15 +323,12 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                     )}
                     {/* 必装/选装徽标与状态徽标成组靠右，间距紧凑；状态徽标位置不动 */}
                     <span className="shrink-0 flex items-center gap-1.5">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          p.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
-                        }`}
-                      >
-                        {p.is_required ? '必装' : '选装'}
-                      </span>
+                      <Badge
+                        tone={p.is_required ? 'blue' : 'gray'}
+                        label={p.is_required ? '必装' : '选装'}
+                      />
                       {p.part_detail?.status && (
-                        <StatusBadge status={p.part_detail.status} map={STATUS_MAP} />
+                        <Badge status={p.part_detail.status} />
                       )}
                     </span>
                   </span>
@@ -347,13 +337,10 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                     <span className="flex-1 min-w-0 truncate text-xs text-gray-500">
                       {p.part_detail?.name || ''}
                     </span>
-                    <span
-                      className={`shrink-0 px-2 py-0.5 rounded-full text-xs ${
-                        p.part_type === 'assembly' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      {p.part_type === 'assembly' ? '部件' : '零件'}
-                    </span>
+                    <Badge
+                      tone={p.part_type === 'assembly' ? 'blue' : 'gray'}
+                      label={p.part_type === 'assembly' ? '部件' : '零件'}
+                    />
                     {/* 预览按钮固定占位（w-10 = 状态徽标内容宽度）：无 3D 时留空，类型徽标与必装徽标对齐 */}
                     <span className="shrink-0 w-10 flex justify-end">
                       {p.part_detail?.has_3d === true && (
@@ -407,7 +394,7 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                       {doc?.version && (
                         <span className="shrink-0 text-xs text-gray-400">{doc.version}</span>
                       )}
-                      {doc?.status && <StatusBadge status={doc.status} map={STATUS_MAP} />}
+                      {doc?.status && <Badge status={doc.status} />}
                     </span>
                     {/* 行2：名称（左）+ 预览按钮（右下角，有附件才显示；样式同任务详情关联对象） */}
                     <span className="mt-1 flex items-center gap-2 min-w-0 min-h-7">
@@ -447,7 +434,7 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-base font-medium text-gray-900">版本 {v.version}</span>
-                    <StatusBadge status={v.status} map={STATUS_MAP} />
+                    <Badge status={v.status} />
                   </div>
                   <div className="text-xs text-gray-500 mt-1.5 space-y-0.5">
                     <div>最新迭代：{v.latest_iteration}</div>

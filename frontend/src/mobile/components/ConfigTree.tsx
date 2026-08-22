@@ -1,7 +1,7 @@
 import { Fragment, useState } from 'react';
 import type { ReactNode } from 'react';
 import { configurationApi } from '../../services/api';
-import StatusBadge from '../components/StatusBadge';
+import Badge from '../../components/ui/Badge';
 import type { ConfigChildItem } from '../../types';
 
 /**
@@ -11,13 +11,6 @@ import type { ConfigChildItem } from '../../types';
  * - 点击行（非箭头区域）→ 回调打开子构型项详情（覆盖层详情栈逐级下钻）。
  * - 触控目标 ≥40px：展开箭头 w-9，行内容 min-h-10。
  */
-
-const STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
-  frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
-  released: { label: '发布', cls: 'bg-green-100 text-green-800' },
-  obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
-};
 
 function sortedByOrder(list: ConfigChildItem[]): ConfigChildItem[] {
   return [...list].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
@@ -114,7 +107,7 @@ export default function ConfigTree({ rootItems, onOpenChild }: Props) {
                 <span className="shrink-0 w-7 truncate text-center text-xs text-gray-500">{detail.version}</span>
               )}
               <span className="shrink-0 w-12 flex justify-end">
-                {detail?.status && <StatusBadge status={detail.status} map={STATUS_MAP} />}
+                {detail?.status && <Badge status={detail.status} />}
               </span>
             </span>
             {/* 行2：名称(左) + 要求/检出(右) */}

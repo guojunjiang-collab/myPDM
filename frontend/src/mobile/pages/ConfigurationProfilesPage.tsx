@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { configurationProfileApi } from '../../services/api';
 import { useDebounced } from '../../hooks/useDebounced';
 import MobileCardList from '../components/MobileCardList';
-import StatusBadge from '../components/StatusBadge';
+import Badge from '../../components/ui/Badge';
+import { resolveBadge } from '../../constants/badges';
 import EmptyState from '../components/EmptyState';
 import { formatMeta } from '../components/formatMeta';
 import type { ConfigurationProfileDetail } from '../../types';
@@ -11,14 +12,6 @@ import type { ConfigurationProfileDetail } from '../../types';
    构型配置移动页（只读，独立界面）
    - 列表 + 同页内二级详情（配置清单/审批记录/状态流转）
    ================================================================ */
-
-const PROFILE_STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  draft: { label: '草稿', cls: 'bg-gray-100 text-gray-600' },
-  reviewing: { label: '评审中', cls: 'bg-amber-100 text-amber-700' },
-  active: { label: '生效中', cls: 'bg-green-100 text-green-700' },
-  rejected: { label: '已驳回', cls: 'bg-red-100 text-red-700' },
-  archived: { label: '已归档', cls: 'bg-gray-100 text-gray-500' },
-};
 
 function fmtDate(v?: string | null): string {
   if (!v) return '';
@@ -100,7 +93,7 @@ export default function ConfigurationProfilesPage() {
         renderMain={(p) => `${p.code} ${p.name}`}
         renderMeta={(p) => (
           <span className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={p.status} map={PROFILE_STATUS_MAP} />
+            <Badge status={p.status} domain="profile" />
             <span>
               {formatMeta([
                 ['架次', p.effectivity_start || p.effectivity_end ? `${p.effectivity_start || '—'} ~ ${p.effectivity_end || '—'}` : undefined],
@@ -173,7 +166,7 @@ function ProfileDetailView({ profileId, onBack }: { profileId: string; onBack: (
           {/* 基础信息 */}
           <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
             <div className="flex items-center gap-2">
-              <StatusBadge status={profile.status} map={PROFILE_STATUS_MAP} />
+              <Badge status={profile.status} domain="profile" />
               {profile.configuration_item && (
                 <span className="text-xs text-gray-500">
                   构型项 {profile.configuration_item.code} {profile.configuration_item.name}
@@ -229,9 +222,10 @@ function ProfileDetailView({ profileId, onBack }: { profileId: string; onBack: (
                   <div key={r.id} className="rounded-lg px-3 py-2 bg-gray-50 border border-gray-100">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-gray-900">{r.reviewer_name || r.reviewer_id || '-'}</span>
-                      <span className={`px-2 py-0.5 rounded text-xs ${r.decision === 'approved' ? 'bg-green-100 text-green-700' : r.decision === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>
-                        {r.decision === 'approved' ? '通过' : r.decision === 'rejected' ? '拒绝' : r.decision === 'returned' ? '退回' : r.decision || '-'}
-                      </span>
+                      <Badge
+                        tone={r.decision === 'approved' ? 'green' : r.decision === 'rejected' ? 'red' : 'orange'}
+                        label={r.decision === 'approved' ? '通过' : r.decision === 'rejected' ? '拒绝' : r.decision === 'returned' ? '退回' : r.decision || '-'}
+                      />
                     </div>
                     {r.comment && <div className="text-xs text-gray-500 mt-1">{r.comment}</div>}
                     {r.created_at && <div className="text-xs text-gray-400 mt-1">{fmtDateTime(r.created_at)}</div>}
@@ -253,7 +247,7 @@ function ProfileDetailView({ profileId, onBack }: { profileId: string; onBack: (
                       <div className="text-sm text-gray-900 break-all">
                         <span className="font-medium">{log.operator_name || '-'}</span>
                         <span className="text-gray-400 mx-1">·</span>
-                        <span>{PROFILE_STATUS_MAP[log.to_status || '']?.label || log.to_status || '-'}</span>
+                        <span>{resolveBadge(log.to_status, 'profile').label || log.to_status || '-'}</span>
                       </div>
                       {log.comment && <div className="text-xs text-gray-500 mt-0.5">{log.comment}</div>}
                       {log.created_at && <div className="text-xs text-gray-400 mt-0.5">{fmtDateTime(log.created_at)}</div>}

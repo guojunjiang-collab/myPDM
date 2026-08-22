@@ -2,18 +2,11 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { customFieldsApi, documentsApi } from '../../services/api';
-import StatusBadge from '../components/StatusBadge';
+import Badge from '../../components/ui/Badge';
 import EmptyState from '../components/EmptyState';
 import AttachmentPreview, { openAttachmentInNewTab } from '../components/AttachmentPreview';
 import DocWhereUsedTab from './DocWhereUsedTab';
 import type { DocumentRevision, DocumentAttachment } from '../../types';
-
-const STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  draft: { label: '草稿', cls: 'bg-blue-100 text-blue-800' },
-  frozen: { label: '冻结', cls: 'bg-orange-100 text-orange-800' },
-  released: { label: '发布', cls: 'bg-green-100 text-green-800' },
-  obsolete: { label: '作废', cls: 'bg-red-100 text-red-800' },
-};
 
 const TABS = [
   { key: 'overview', label: '概览' },
@@ -224,7 +217,7 @@ export default function DocumentDetailPage({ id: propId, onBack, onNavigate }: P
     { label: '编号', value: detail?.code },
     { label: '名称', value: detail?.name },
     { label: '版本', value: detail?.version },
-    { label: '状态', value: detail?.status ? <StatusBadge status={detail.status} map={STATUS_MAP} /> : undefined },
+    { label: '状态', value: detail?.status ? <Badge status={detail.status} /> : undefined },
     { label: '备注', value: detail?.remark },
     { label: '创建人', value: detail?.creator_name },
     { label: '检出人', value: detail?.check_out_user_name },
@@ -383,7 +376,7 @@ export default function DocumentDetailPage({ id: propId, onBack, onNavigate }: P
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-base font-medium text-gray-900">版本 {v.version}</span>
-                      <StatusBadge status={v.status} map={STATUS_MAP} />
+                      <Badge status={v.status} />
                     </div>
                     <div className="text-xs text-gray-500 mt-1.5 space-y-0.5">
                       <div>最新迭代：{v.latest_iteration}</div>

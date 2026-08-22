@@ -6,7 +6,7 @@ import { useDetailOverlayPush, useDetailOverlay } from '../hooks/useDetailOverla
 import { useAuthStore } from '../../stores/auth';
 import DetailOverlayStack from '../components/DetailOverlayStack';
 import MobileCardList from '../components/MobileCardList';
-import StatusBadge from '../components/StatusBadge';
+import Badge from '../../components/ui/Badge';
 import EmptyState from '../components/EmptyState';
 import { formatMeta } from '../components/formatMeta';
 import TaskDetailPage from './TaskDetailPage';
@@ -25,21 +25,6 @@ import type { Project, ProjectTask } from '../../types/project';
    - 视图方案：独立子路由 projects/:id（浏览器返回/深链可用），两级视图共用本文件
      （受「只允许新建一个文件」约束），见 report §4。
    ================================================================ */
-
-const PROJECT_STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  待启动: { label: '待启动', cls: 'bg-gray-100 text-gray-500' },
-  进行中: { label: '进行中', cls: 'bg-blue-100 text-blue-800' },
-  已完成: { label: '已完成', cls: 'bg-green-100 text-green-800' },
-  已暂停: { label: '已暂停', cls: 'bg-amber-100 text-amber-800' },
-  已归档: { label: '已归档', cls: 'bg-gray-100 text-gray-600' },
-};
-
-const TASK_STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  未开始: { label: '未开始', cls: 'bg-gray-100 text-gray-600' },
-  进行中: { label: '进行中', cls: 'bg-blue-50 text-blue-700' },
-  已完成: { label: '已完成', cls: 'bg-green-50 text-green-700' },
-  挂起: { label: '挂起', cls: 'bg-amber-50 text-amber-700' },
-};
 
 /** GET /api/projects/{id}/tasks 返回嵌套任务树（backend crud_project.get_task_tree），
  *  移动端以可展开/折叠树呈现（默认展开第 1 层级，工具按钮展开各层级）。 */
@@ -134,7 +119,7 @@ function TaskTreeNode({
             <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
               {task.code} {task.name}
             </span>
-            <StatusBadge status={task.status} map={TASK_STATUS_MAP} />
+            <Badge status={task.status} domain="task" />
           </span>
           <span className="mt-0.5 text-xs text-gray-500 flex flex-wrap items-center gap-2">
             <span>
@@ -406,7 +391,7 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
             {/* 项目头：状态 + 负责人 + 计划起止 + 创建时间 */}
             <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
               <div className="flex items-center gap-2">
-                <StatusBadge status={project.status} map={PROJECT_STATUS_MAP} />
+                <Badge status={project.status} domain="project" />
                 <span className="text-xs text-gray-500">负责人 {project.owner_name}</span>
               </div>
               <div className="mt-2 text-xs text-gray-500">
@@ -556,7 +541,7 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
         renderMain={(p) => `${p.code} ${p.name}`}
         renderMeta={(p) => (
           <span className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={p.status} map={PROJECT_STATUS_MAP} />
+            <Badge status={p.status} domain="project" />
             <span>
               {formatMeta([
                 ['计划', `${p.planned_start || '—'} ~ ${p.planned_end || '—'}`],
