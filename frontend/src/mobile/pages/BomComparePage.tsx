@@ -27,6 +27,67 @@ const ROW_BG: Record<string, string> = {
   none: 'bg-white',
 };
 
+const STATUS_LABEL: Record<string, string> = {
+  draft: '草稿',
+  frozen: '冻结',
+  released: '发布',
+  obsolete: '作废',
+};
+
+/** 属性对比表：左右装配的系统字段 + 自定义字段并排对比（对齐桌面 PropertyCompareTable） */
+function PropertyTable({ left, right, onlyDiff }: { left: any; right: any; onlyDiff: boolean }) {
+  const statusLabel = (s?: string) => (s ? STATUS_LABEL[s] ?? s : '');
+  const systemFields = [
+    { label: '件号', lv: left?.code, rv: right?.code },
+    { label: '名称', lv: left?.name, rv: right?.name },
+    { label: '版本', lv: left?.version, rv: right?.version },
+    {
+      label: '状态',
+      lv: left?.status ? statusLabel(left.status) : '',
+      rv: right?.status ? statusLabel(right.status) : '',
+    },
+  ];
+  const lcf: Record<string, { label: string; value: unknown }> = left?.custom_fields ?? {};
+  const rcf: Record<string, { label: string; value: unknown }> = right?.custom_fields ?? {};
+  const cfKeys = [...new Set([...Object.keys(lcf), ...Object.keys(rcf)])].sort();
+  const customRows = cfKeys.map((k) => ({
+    label: lcf[k]?.label ?? rcf[k]?.label ?? k,
+    lv: lcf[k]?.value ?? '',
+    rv: rcf[k]?.value ?? '',
+  }));
+  let rows = [...systemFields, ...customRows];
+  if (onlyDiff) rows = rows.filter((r) => String(r.lv) !== String(r.rv));
+
+  return (
+    <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-3">
+      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+        <div className="flex bg-gray-50 text-xs font-medium text-gray-600 border-b border-gray-200">
+          <span className="w-20 shrink-0 px-3 py-2">字段</span>
+          <span className="flex-1 min-w-0 px-3 py-2">左值</span>
+          <span className="flex-1 min-w-0 px-3 py-2">右值</span>
+        </div>
+        {rows.map((r, i) => {
+          const lvs = String(r.lv ?? '');
+          const rvs = String(r.rv ?? '');
+          const changed = lvs !== rvs;
+          return (
+            <div
+              key={i}
+              className={`flex border-b border-gray-50 last:border-b-0 ${changed ? 'bg-yellow-50' : ''}`}
+            >
+              <span className="w-20 shrink-0 px-3 py-2 text-xs text-gray-500 whitespace-nowrap">{r.label}</span>
+              <span className="flex-1 min-w-0 px-3 py-2 text-sm break-all">{lvs || '-'}</span>
+              <span className={`flex-1 min-w-0 px-3 py-2 text-sm break-all ${changed ? 'font-semibold text-red-600' : ''}`}>
+                {rvs || '-'}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /** 可搜索零部件选择器（服务端搜索，点选版本） */
 function PartPicker({
   label,
@@ -131,6 +192,7 @@ export default function BomComparePage() {
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [onlyDiff, setOnlyDiff] = useState(false);
+  const [activeTab, setActiveTab] = useState<'tree' | 'property'>('tree');
 
   const handleCompare = async () => {
     if (!leftId || !rightId) return;
@@ -278,23 +340,21 @@ export default function BomComparePage() {
 
       {result && (
         <div className="flex-1 min-h-0 flex flex-col">
-          {/* 汇总条 */}
-          <div className="px-3 pt-2 pb-1 flex items-center gap-3 text-xs">
-            <span>
-              新增 <span className="text-green-600 font-medium">{s?.added ?? 0}</span>
-            </span>
-            <span>
-              删除 <span className="text-red-600 font-medium">{s?.deleted ?? 0}</span>
-            </span>
-            <span>
-              修改 <span className="text-yellow-600 font-medium">{s?.modified ?? 0}</span>
-            </span>
-            {(s?.internal_changes ?? 0) > 0 && (
-              <span>
-                内部变更 <span className="text-orange-600 font-medium">{s?.internal_changes}</span>
-              </span>
-            )}
-            <label className="ml-auto flex items-center gap-1 text-gray-600 select-none">
+          {/* Tab：BOM树对比 | 属性对比（仅差异两 Tab 共享） */}
+          <div className="flex items-center gap-2 px-3 pt-2">
+            <button
+              onClick={() => setActiveTab('tree')}
+              className={`min-h-9 px-3 rounded-full text-xs ${activeTab === 'tree' ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+            >
+              BOM树对比
+            </button>
+            <button
+              onClick={() => setActiveTab('property')}
+              className={`min-h-9 px-3 rounded-full text-xs ${activeTab === 'property' ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+            >
+              属性对比
+            </button>
+            <label className="ml-auto flex items-center gap-1 text-xs text-gray-600 select-none">
               <input
                 type="checkbox"
                 checked={onlyDiff}
@@ -305,85 +365,111 @@ export default function BomComparePage() {
             </label>
           </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-3">
-            {identical ? (
-              <div className="text-sm text-green-600 bg-green-50 rounded-lg px-3 py-3 text-center">
-                两侧 BOM 一致
+          {activeTab === 'property' ? (
+            <div className="flex-1 min-h-0 flex flex-col pt-2">
+              <PropertyTable left={result.left_assembly} right={result.right_assembly} onlyDiff={onlyDiff} />
+            </div>
+          ) : (
+            <>
+              {/* 汇总条 */}
+              <div className="px-3 pt-2 pb-1 flex items-center gap-3 text-xs">
+                <span>
+                  新增 <span className="text-green-600 font-medium">{s?.added ?? 0}</span>
+                </span>
+                <span>
+                  删除 <span className="text-red-600 font-medium">{s?.deleted ?? 0}</span>
+                </span>
+                <span>
+                  修改 <span className="text-yellow-600 font-medium">{s?.modified ?? 0}</span>
+                </span>
+                {(s?.internal_changes ?? 0) > 0 && (
+                  <span>
+                    内部变更 <span className="text-orange-600 font-medium">{s?.internal_changes}</span>
+                  </span>
+                )}
               </div>
-            ) : visibleNodes.length === 0 ? (
-              <div className="text-sm text-gray-500 text-center py-6">无差异节点</div>
-            ) : (
-              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-                {visibleNodes.map((n) => {
-                  const l = n.left;
-                  const r = n.right;
-                  const side = l ?? r;
-                  const code = side?.detail.code ?? '';
-                  const name = side?.detail.name ?? '';
-                  const hasChildren = result.comparison.some(
-                    (c) =>
-                      c.path.startsWith(n.path + '/') &&
-                      c.path.split('/').length === n.path.split('/').length + 1
-                  );
-                  const isOpen = expanded.has(n.key);
-                  const depth = n.level + 1;
-                  const desc = buildDesc(n);
-                  const cm = CHANGE_MAP[n.change_type] ?? CHANGE_MAP.none;
-                  return (
-                    <div
-                      key={n.key}
-                      className={`flex items-stretch min-h-10 border-b border-gray-100 last:border-b-0 ${ROW_BG[n.change_type] ?? ''}`}
-                    >
-                      {/* 缩进 + 竖线 */}
-                      <span className="relative shrink-0" style={{ width: depth * 16 + 4 }}>
-                        {depth > 0 && (
-                          <span
-                            className="absolute top-0 bottom-0 border-l border-gray-200"
-                            style={{ left: depth * 16 + 2 }}
-                          />
-                        )}
-                      </span>
-                      {hasChildren ? (
-                        <button
-                          type="button"
-                          aria-label={isOpen ? '折叠' : '展开'}
-                          onClick={() => toggle(n.key)}
-                          className="shrink-0 w-9 flex items-center justify-center text-gray-500 text-sm"
+
+              <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-3">
+                {identical ? (
+                  <div className="text-sm text-green-600 bg-green-50 rounded-lg px-3 py-3 text-center">
+                    两侧 BOM 一致
+                  </div>
+                ) : visibleNodes.length === 0 ? (
+                  <div className="text-sm text-gray-500 text-center py-6">无差异节点</div>
+                ) : (
+                  <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                    {visibleNodes.map((n) => {
+                      const l = n.left;
+                      const r = n.right;
+                      const side = l ?? r;
+                      const code = side?.detail.code ?? '';
+                      const name = side?.detail.name ?? '';
+                      const hasChildren = result.comparison.some(
+                        (c) =>
+                          c.path.startsWith(n.path + '/') &&
+                          c.path.split('/').length === n.path.split('/').length + 1
+                      );
+                      const isOpen = expanded.has(n.key);
+                      const depth = n.level + 1;
+                      const desc = buildDesc(n);
+                      const cm = CHANGE_MAP[n.change_type] ?? CHANGE_MAP.none;
+                      return (
+                        <div
+                          key={n.key}
+                          className={`flex items-stretch min-h-10 border-b border-gray-100 last:border-b-0 ${ROW_BG[n.change_type] ?? ''}`}
                         >
-                          {isOpen ? '▾' : '▸'}
-                        </button>
-                      ) : (
-                        <span className="shrink-0 w-9 flex items-center justify-center text-gray-300 text-xs">
-                          •
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const m = side?.child_master_id;
-                          if (m) navigate(`/parts/${m}`);
-                        }}
-                        className="flex-1 min-w-0 flex flex-col justify-center py-1.5 pl-1 text-left"
-                      >
-                        <span className="flex items-center gap-2 min-w-0">
-                          <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
-                            {code}
+                          {/* 缩进 + 竖线 */}
+                          <span className="relative shrink-0" style={{ width: depth * 16 + 4 }}>
+                            {depth > 0 && (
+                              <span
+                                className="absolute top-0 bottom-0 border-l border-gray-200"
+                                style={{ left: depth * 16 + 2 }}
+                              />
+                            )}
                           </span>
-                          <span className={`shrink-0 px-1.5 py-0.5 rounded-full text-xs ${cm.cls}`}>
-                            {cm.label}
-                          </span>
-                        </span>
-                        <span className="text-xs text-gray-500 mt-0.5 truncate">
-                          {name}
-                          {desc ? ` · ${desc}` : ''}
-                        </span>
-                      </button>
-                    </div>
-                  );
-                })}
+                          {hasChildren ? (
+                            <button
+                              type="button"
+                              aria-label={isOpen ? '折叠' : '展开'}
+                              onClick={() => toggle(n.key)}
+                              className="shrink-0 w-9 flex items-center justify-center text-gray-500 text-sm"
+                            >
+                              {isOpen ? '▾' : '▸'}
+                            </button>
+                          ) : (
+                            <span className="shrink-0 w-9 flex items-center justify-center text-gray-300 text-xs">
+                              •
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const m = side?.child_master_id;
+                              if (m) navigate(`/parts/${m}`);
+                            }}
+                            className="flex-1 min-w-0 flex flex-col justify-center py-1.5 pl-1 text-left"
+                          >
+                            <span className="flex items-center gap-2 min-w-0">
+                              <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
+                                {code}
+                              </span>
+                              <span className={`shrink-0 px-1.5 py-0.5 rounded-full text-xs ${cm.cls}`}>
+                                {cm.label}
+                              </span>
+                            </span>
+                            <span className="text-xs text-gray-500 mt-0.5 truncate">
+                              {name}
+                              {desc ? ` · ${desc}` : ''}
+                            </span>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
       )}
     </div>
