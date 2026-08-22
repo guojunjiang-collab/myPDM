@@ -13,8 +13,9 @@ export default function MobileLayout() {
   const title = headerContent ?? current?.label ?? 'myPDM';
   return (
     <div className="h-full flex flex-col bg-gray-50">
-      <header className="h-12 shrink-0 flex items-center justify-between px-3 bg-white border-b border-gray-200">
-        <span className="text-base font-medium truncate">{title}</span>
+      <header className="h-12 shrink-0 flex items-center px-3 bg-white border-b border-gray-200">
+        {/* 主界面标题居中（铃铛左侧区域），各主界面共用 */}
+        <span className="flex-1 min-w-0 text-center text-base font-medium truncate">{title}</span>
         <NotificationBell />
       </header>
       <main className="flex-1 overflow-y-auto pb-16">
