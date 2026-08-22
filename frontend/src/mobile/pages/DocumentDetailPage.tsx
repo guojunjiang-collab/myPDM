@@ -19,7 +19,7 @@ const TABS = [
   { key: 'overview', label: '概览' },
   { key: 'attachments', label: '附件' },
   { key: 'versions', label: '版本' },
-  { key: 'whereused', label: 'Where-Used' },
+  { key: 'whereused', label: '反查' },
 ];
 
 function fmtDateTime(v?: string | null): string {
@@ -64,6 +64,10 @@ export default function DocumentDetailPage() {
   const [loadingAttachments, setLoadingAttachments] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attachmentsError, setAttachmentsError] = useState<string | null>(null);
+  // 版本段（激活时加载全部版本历史）
+  const [versions, setVersions] = useState<DocumentRevision[]>([]);
+  const [verLoading, setVerLoading] = useState(false);
+  const [verError, setVerError] = useState(false);
   // Tab 状态记录在 URL（?tab=），进入新详情默认概览；退回时浏览器还原上一级 URL → 恢复对应 Tab
   const [activeTab, setActiveTab] = useState(() => {
     const t = new URLSearchParams(location.search).get('tab');
@@ -75,6 +79,31 @@ export default function DocumentDetailPage() {
     const t = new URLSearchParams(location.search).get('tab');
     setActiveTab(t && TABS.some((x) => x.key === t) ? t : 'overview');
   }, [location.search, id]);
+
+  // 版本：切到版本段时加载全部版本历史
+  useEffect(() => {
+    let alive = true;
+    if (!id || activeTab !== 'versions') return;
+    setVerLoading(true);
+    setVerError(false);
+    documentsApi
+      .versions(id)
+      .then((res: { data?: DocumentRevision[] }) => {
+        if (alive) setVersions(res.data ?? []);
+      })
+      .catch(() => {
+        if (alive) {
+          setVersions([]);
+          setVerError(true);
+        }
+      })
+      .finally(() => {
+        if (alive) setVerLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [id, activeTab]);
 
   // 自定义字段：详情就绪后加载 document 定义与值
   const [cfDefs, setCfDefs] = useState<CfDef[]>([]);
@@ -295,7 +324,37 @@ export default function DocumentDetailPage() {
                 ))}
             </div>
           )}
-          {activeTab === 'versions' && <EmptyState text="版本历史请在桌面端查看" />}
+          {activeTab === 'versions' && (
+            <div className="flex flex-col gap-2">
+              {verLoading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+              {!verLoading && verError && (
+                <p className="text-center text-xs text-red-400 py-3">版本加载失败，请稍后重试</p>
+              )}
+              {!verLoading && !verError && versions.length === 0 && (
+                <EmptyState text="暂无版本记录" />
+              )}
+              {!verLoading &&
+                !verError &&
+                versions.map((v) => (
+                  <div
+                    key={v.id}
+                    className={`rounded-lg px-4 py-3 shadow-sm ${
+                      v.id === id ? 'bg-primary-50 border border-primary-300' : 'bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-base font-medium text-gray-900">版本 {v.version}</span>
+                      <StatusBadge status={v.status} map={STATUS_MAP} />
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1.5 space-y-0.5">
+                      <div>最新迭代：{v.latest_iteration}</div>
+                      {v.check_out_user_name && <div>检出人：{v.check_out_user_name}</div>}
+                      <div>创建时间：{fmtDateTime(v.created_at)}</div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          )}
           {activeTab === 'whereused' && id && <DocWhereUsedTab revisionId={id} />}
         </div>
       )}
