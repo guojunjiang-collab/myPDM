@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { assemblyViewerApi } from '../../services/api';
+import type { AssemblyInstance, AssemblyTreeNode } from '../../services/api';
 import { ViewerCanvas } from '../../components/STPViewer/ViewerCanvas';
 import { ModelTreePanel } from '../../components/STPViewer/ModelTreePanel';
 import { useViewerStore } from '../../stores/viewerStore';
@@ -8,14 +10,16 @@ import { backInterceptReducer } from '../hooks/backIntercept';
 import type { BackAction, BackLayer } from '../hooks/backIntercept';
 
 /**
- * 移动端 STP 3D 查看器（Task 12）。
+ * 移动端 STP 3D 查看器（Task 12 + 装配模式扩展）。
  *
- * 参数约定与桌面版 pages/STPViewer.tsx 完全一致（单件预览模式）：
- *   /stp-viewer?id=<附件id>&token=<媒体令牌>[&code=&version=&name=]
- *   → gltf 地址 /api/v2/attachments/{id}/gltf?token=...，code/version/name 透传给 ViewerCanvas。
- *
- * 装配（assembly）/配置清单（config-profile）/BOM 对比（compare-left+compare-right）模式
- * 为桌面工程流程，移动端暂不支持，给出明确的桌面端提示（详见 task-12-report.md）。
+ * 参数约定与桌面版 pages/STPViewer.tsx 完全一致：
+ *   单件预览：/stp-viewer?id=<附件id>&token=<媒体令牌>[&code=&version=&name=]
+ *     → gltf 地址 /api/v2/attachments/{id}/gltf?token=...，code/version/name 透传给 ViewerCanvas。
+ *   装配预览：/stp-viewer?assembly=<版本id>[&code=&version=&name=]
+ *     → assemblyViewerApi.instances/tree 加载全部叶项实例（含变换矩阵），
+ *       ViewerCanvas kind='assembly' 按矩阵摆放渲染。
+ * 配置清单（config-profile）/BOM 对比（compare-left+compare-right）模式
+ * 为桌面工程流程，移动端暂不支持，给出明确的桌面端提示。
  *
  * 交互：
  * - 画布容器 touch-action: none，防止页面手势（滚动/双指缩放浏览器级手势）抢走
@@ -140,24 +144,26 @@ export default function StpViewerPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // —— 参数解析（与桌面 pages/STPViewer.tsx 第 17-40 行单件模式约定一致）——
+  // —— 参数解析（与桌面 pages/STPViewer.tsx 约定一致）——
   const params = new URLSearchParams(location.search);
   const id = params.get('id');
   const token = params.get('token');
+  const assemblyRevId = params.get('assembly');
   const partCode = params.get('code') || undefined;
   const partVersion = params.get('version') || undefined;
   const partName = params.get('name') || undefined;
   const unsupportedMode = !!(
-    params.get('assembly') ||
     params.get('config-profile') ||
     params.get('compare-left') ||
     params.get('compare-right')
   );
 
-  // —— 模型加载（复刻桌面 checkAndLoad / downloadFile / poll 逻辑）——
+  // —— 模型加载（单件复刻桌面 checkAndLoad / downloadFile / poll 逻辑；装配走 instances/tree）——
   const [phase, setPhase] = useState<Phase>('checking');
   const [url, setUrl] = useState<string | null>(null);
   const [downloadPct, setDownloadPct] = useState(0);
+  const [asmInstances, setAsmInstances] = useState<AssemblyInstance[] | null>(null);
+  const [asmTree, setAsmTree] = useState<AssemblyTreeNode[]>([]);
   const blobUrlRef = useRef<string | null>(null);
   const resetStore = useViewerStore((s) => s.reset);
   const loadingState = useViewerStore((s) => s.loadingState);
@@ -168,6 +174,30 @@ export default function StpViewerPage() {
     blobUrlRef.current = null;
     setUrl(null);
     if (unsupportedMode) return;
+    if (assemblyRevId) {
+      // 装配模式：加载全部叶项实例（含变换矩阵）与模型树，按矩阵摆放渲染
+      let cancelled = false;
+      setPhase('loading');
+      setAsmInstances(null);
+      setAsmTree([]);
+      Promise.all([
+        assemblyViewerApi.instances(assemblyRevId).catch(() => [] as AssemblyInstance[]),
+        assemblyViewerApi.tree(assemblyRevId).catch(() => [] as AssemblyTreeNode[]),
+      ])
+        .then(([ins, tr]) => {
+          if (cancelled) return;
+          setAsmInstances(ins);
+          setAsmTree(tr);
+          setPhase('ready');
+        })
+        .catch(() => {
+          if (!cancelled) setPhase('error');
+        });
+      return () => {
+        cancelled = true;
+        resetStore();
+      };
+    }
     if (!id || !token) {
       setPhase('error');
       return;
@@ -251,7 +281,7 @@ export default function StpViewerPage() {
       if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
       resetStore();
     };
-  }, [id, token, unsupportedMode, resetStore]);
+  }, [id, token, unsupportedMode, assemblyRevId, resetStore]);
 
   // —— 返回拦截：左右抽屉 + history 哨兵（backInterceptReducer）——
   const [backLayer, dispatch] = useReducer<React.Reducer<BackLayer, BackAction>>(
@@ -308,7 +338,7 @@ export default function StpViewerPage() {
 
   const drawer = backLayer.kind === 'drawer' ? (backLayer.drawerId as DrawerId) : null;
   const displayTitle =
-    [partCode, partVersion, partName].filter(Boolean).join('_') || '3D 模型';
+    [partCode, partVersion, partName].filter(Boolean).join('_') || (assemblyRevId ? '装配 3D 模型' : '3D 模型');
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-gray-100 flex flex-col">
@@ -330,8 +360,11 @@ export default function StpViewerPage() {
         {phase === 'ready' && url && (
           <ViewerCanvas source={{ kind: 'single', url, code: partCode, version: partVersion, name: partName }} />
         )}
+        {phase === 'ready' && assemblyRevId && asmInstances && (
+          <ViewerCanvas source={{ kind: 'assembly', instances: asmInstances, tree: asmTree }} />
+        )}
 
-        {/* 桌面工程模式（装配/配置清单/BOM 对比）暂不支持移动端 */}
+        {/* 桌面工程模式（配置清单/BOM 对比）暂不支持移动端 */}
         {unsupportedMode && (
           <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-gray-100">
             <div className="text-sm text-gray-500">该模式暂不支持移动端查看，请使用电脑浏览器</div>
@@ -358,13 +391,29 @@ export default function StpViewerPage() {
         )}
         {!unsupportedMode && phase === 'loading' && (
           <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-white/90">
-            <div className="text-sm text-gray-600">正在下载模型... {downloadPct}%</div>
-            <div className="w-64 h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-primary-500 rounded-full transition-all duration-300"
-                style={{ width: `${downloadPct}%` }}
-              />
+            <div className="text-sm text-gray-600">
+              {assemblyRevId ? '正在加载装配模型...' : `正在下载模型... ${downloadPct}%`}
             </div>
+            {!assemblyRevId && (
+              <div className="w-64 h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary-500 rounded-full transition-all duration-300"
+                  style={{ width: `${downloadPct}%` }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+        {!unsupportedMode && phase === 'ready' && assemblyRevId && asmInstances && asmInstances.length === 0 && (
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-gray-50">
+            <div className="text-sm text-gray-500">该装配暂无已摆位的零件（先导入装配 STEP）</div>
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="min-h-11 px-4 rounded-lg bg-primary-600 text-white text-sm"
+            >
+              返回
+            </button>
           </div>
         )}
         {!unsupportedMode && phase === 'error' && (
@@ -396,7 +445,7 @@ export default function StpViewerPage() {
         )}
 
         {/* 浮动按钮（抽屉打开时被遮罩盖住不可点） */}
-        {!unsupportedMode && phase === 'ready' && url && (
+        {!unsupportedMode && phase === 'ready' && (url || asmInstances) && (
           <>
             <button
               type="button"

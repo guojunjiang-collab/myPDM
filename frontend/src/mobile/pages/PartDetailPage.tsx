@@ -316,6 +316,20 @@ export default function PartDetailPage() {
         <div className="p-3">
           {activeTab === 'overview' && (
             <div>
+              {/* 装配体 3D 预览入口（加载全部叶项并摆放，/stp-viewer 装配模式） */}
+              {detail?.type === 'assembly' && revisionId && (
+                <button
+                  onClick={() =>
+                    navigate(
+                      `/stp-viewer?assembly=${revisionId}&code=${encodeURIComponent(detail.code ?? '')}&name=${encodeURIComponent(detail.name ?? '')}`
+                    )
+                  }
+                  className="w-full mb-2 bg-primary-600 text-white rounded-lg px-4 py-3 min-h-11 text-sm font-medium flex items-center justify-between shadow-sm"
+                >
+                  <span>3D 预览（装配体）</span>
+                  <span>›</span>
+                </button>
+              )}
               {cfLoading && <p className="text-center text-xs text-gray-400 py-2">自定义字段加载中...</p>}
               {!cfLoading && cfError && (
                 <p className="text-center text-xs text-red-400 py-2">自定义字段加载失败</p>

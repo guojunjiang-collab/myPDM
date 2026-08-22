@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { mediaApi } from '../../services/api';
 import DesktopOnlyCard from './DesktopOnlyCard';
 
@@ -9,11 +10,13 @@ import DesktopOnlyCard from './DesktopOnlyCard';
  * - 图片          → mediaApi.token(id,'preview') + <img> 直链内嵌显示
  * - Office       → mediaApi.token(id,'office-pdf') + 新标签打开 /office-pdf
  *                  （后端 office-pdf 端点同步 LibreOffice 转 PDF，命中缓存直接返回）
+ * - STP/STEP     → mediaApi.token(id,'gltf') + SPA 跳转 /stp-viewer 三维预览
  * - 其余          → DesktopOnlyCard（暂不支持手机，请使用电脑浏览器）
  */
 
 const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
 const OFFICE_EXTS = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'];
+const STP_EXTS = ['stp', 'step'];
 
 export interface PreviewAttachment {
   id: string;
@@ -40,11 +43,13 @@ function isPermissionError(e: unknown): boolean {
 }
 
 export default function AttachmentPreview({ attachment }: { attachment: PreviewAttachment }) {
+  const navigate = useNavigate();
   const fileName = attachment.file_name || '附件';
   const ext = extOf(fileName);
   const isImage = IMAGE_EXTS.includes(ext);
   const isPdf = ext === 'pdf';
   const isOffice = OFFICE_EXTS.includes(ext);
+  const isStp = STP_EXTS.includes(ext);
 
   const [imgToken, setImgToken] = useState<string | null>(null);
   const [imgFailed, setImgFailed] = useState(false);
@@ -97,7 +102,21 @@ export default function AttachmentPreview({ attachment }: { attachment: PreviewA
     }
   };
 
-  if (!isImage && !isPdf && !isOffice) {
+  // STP/STEP：取 gltf 媒体令牌 → SPA 跳转移动端三维查看器（/stp-viewer）
+  const openStp = async () => {
+    setConverting(true);
+    setError(null);
+    try {
+      const t = await mediaApi.token(attachment.id, 'gltf');
+      navigate(`/stp-viewer?id=${encodeURIComponent(attachment.id)}&token=${encodeURIComponent(t)}&name=${encodeURIComponent(fileName)}`);
+    } catch (e) {
+      setError(isPermissionError(e) ? '无权限访问该附件' : '3D 预览失败，请重试');
+    } finally {
+      setConverting(false);
+    }
+  };
+
+  if (!isImage && !isPdf && !isOffice && !isStp) {
     return <DesktopOnlyCard feature={fileName} />;
   }
 
@@ -127,6 +146,15 @@ export default function AttachmentPreview({ attachment }: { attachment: PreviewA
             {converting ? '转换中...' : '预览'}
           </button>
         )}
+        {isStp && (
+          <button
+            onClick={openStp}
+            disabled={converting}
+            className="shrink-0 min-h-10 px-3 rounded-lg bg-primary-600 text-white text-xs disabled:opacity-60"
+          >
+            {converting ? '加载中...' : '3D 预览'}
+          </button>
+        )}
       </div>
 
       {isImage && (
@@ -149,6 +177,7 @@ export default function AttachmentPreview({ attachment }: { attachment: PreviewA
 
       {isPdf && error && <p className="text-xs text-red-500 mt-2">{error}</p>}
       {isOffice && !converting && error && <p className="text-xs text-red-500 mt-2">{error}</p>}
+      {isStp && !converting && error && <p className="text-xs text-red-500 mt-2">{error}</p>}
     </div>
   );
 }
