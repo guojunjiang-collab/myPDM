@@ -3,6 +3,7 @@ import { Modal } from '../Modal';
 import { documentsApi } from '../../services/api';
 import type { ECRDocumentLink, Document } from '../../types';
 import Button from '../ui/Button';
+import Input from '../ui/Input';
 
 interface ECRDocumentPickerProps {
   open: boolean;
@@ -75,12 +76,11 @@ export function ECRDocumentPicker({ open, onClose, onSelect, alreadyLinked }: EC
     <Modal open={open} title="关联图文档" onClose={onClose} width="lg">
       <div className="space-y-4">
         {/* Search */}
-        <input
+        <Input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="搜索文档编号/名称/版本..."
-          className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
 
         {/* Document table */}

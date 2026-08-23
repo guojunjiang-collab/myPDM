@@ -8,6 +8,9 @@ import ProfileStatusBadge from './ProfileStatusBadge';
 import ProfileReviewPanel from './ProfileReviewPanel';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
+import Textarea from '../ui/Textarea';
 import { configurationApi, configurationProfileApi, usersApi, partsApi, customFieldsApi } from '../../services/api';
 import { exportProfilePdf, exportProfileExcel } from '../../services/configProfilePdfExport';
 import { useAuthStore, isAdmin } from '../../stores/auth';
@@ -835,53 +838,53 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                 <label className="block text-xs text-gray-500 mb-0.5">编号 {isCreate && '*'}</label>
-                <input
+                <Input size="xs"
                   value={form.code}
                   onChange={(e) => setForm({ ...form, code: e.target.value })}
                   disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
-                  className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-400 placeholder:text-gray-300"
+                  className="disabled:text-gray-400 placeholder:text-gray-300"
                   placeholder="如 CFG-PROFILE-001"
                 />
               </div>
               <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                 <label className="block text-xs text-gray-500 mb-0.5">名称 {isCreate && '*'}</label>
-                <input
+                <Input size="xs"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
-                  className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-400 placeholder:text-gray-300"
+                  className="disabled:text-gray-400 placeholder:text-gray-300"
                   placeholder="如 A型机翼配置"
                 />
               </div>
               <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                 <label className="block text-xs text-gray-500 mb-0.5">架次起始</label>
-                <input
+                <Input size="xs"
                   value={form.effectivity_start}
                   onChange={(e) => setForm({ ...form, effectivity_start: e.target.value })}
                   disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
-                  className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-400 placeholder:text-gray-300"
+                  className="disabled:text-gray-400 placeholder:text-gray-300"
                   placeholder="如 001"
                 />
               </div>
               <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                 <label className="block text-xs text-gray-500 mb-0.5">架次结束</label>
-                <input
+                <Input size="xs"
                   value={form.effectivity_end}
                   onChange={(e) => setForm({ ...form, effectivity_end: e.target.value })}
                   disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
-                  className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-400 placeholder:text-gray-300"
+                  className="disabled:text-gray-400 placeholder:text-gray-300"
                   placeholder="如 999"
                 />
               </div>
               <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                 <label className="block text-xs text-gray-500 mb-0.5">备注</label>
-                <textarea
+                <Textarea size="xs"
                   ref={remarkRef}
                   value={form.remark}
                   onChange={(e) => setForm({ ...form, remark: e.target.value })}
                   rows={1}
                   disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
-                  className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none disabled:bg-gray-100 disabled:text-gray-400"
+                  className="resize-none disabled:text-gray-400"
                 />
               </div>
               {!isCreate && profile && (
@@ -949,15 +952,15 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                     {reviewers.map((rv, i) => (
                       <div key={i} className="flex items-center gap-2">
                         <span className="text-xs text-gray-400 w-5">{rv.seq || i + 1}</span>
-                        <select value={rv.user_id}
+                        <Select size="xs" value={rv.user_id}
                           onChange={(e) => updateReviewer(i, e.target.value)}
                           disabled={usersLoading}
-                          className="flex-1 border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500">
+                          className="flex-1">
                           <option value="">{usersLoading ? '加载中...' : '请选择审批人'}</option>
                           {users.filter((u) => u.id !== currentUserId && (u.role === 'admin' || u.role === 'engineer')).map((u) => (
                             <option key={u.id} value={u.id}>{u.real_name} ({u.username})</option>
                           ))}
-                        </select>
+                        </Select>
                         <Button variant="danger" size="xs" type="button" onClick={() => removeReviewer(i)}>✕</Button>
                       </div>
                     ))}

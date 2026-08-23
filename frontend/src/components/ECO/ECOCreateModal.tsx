@@ -10,6 +10,9 @@ import PartDetailModal from '../PartDetailModal';
 import EntityEditModal from '../EntityEditModal';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
+import Textarea from '../ui/Textarea';
 import { ECOEditView } from './ECOEditView';
 import { ECRDocumentPicker } from '../ECR/ECRDocumentPicker';
 import AssemblyPartPicker from '../AssemblyPartPicker';
@@ -393,14 +396,14 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
             <label className="block text-xs text-gray-500 mb-0.5">ECO 编号</label>
-            <input type="text" value={localEco?.eco_number || ''} disabled
-              className="w-full text-sm px-2 py-1 border border-gray-200 rounded bg-gray-100 text-gray-400" placeholder="新建时自动生成" />
+            <Input size="xs" type="text" value={localEco?.eco_number || ''} disabled
+              placeholder="新建时自动生成" />
           </div>
           <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
             <label className="block text-xs text-gray-500 mb-0.5">标题 <span className="text-red-500">*</span></label>
-            <input type="text" value={title}
+            <Input size="xs" type="text" value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className={`w-full text-sm px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-primary-500 ${errors.title ? 'border-red-500' : 'border-gray-200'}`}
+              className={errors.title ? '!border-red-500' : ''}
               placeholder="请输入 ECO 标题" />
             {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
           </div>
@@ -409,18 +412,17 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
             <label className="block text-xs text-gray-500 mb-0.5">变更原因 <span className="text-red-500">*</span></label>
-            <select value={reason} onChange={(e) => setReason(e.target.value)}
-              className={`w-full text-sm px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-primary-500 ${errors.reason ? 'border-red-400' : 'border-gray-200'}`}>
+            <Select size="xs" value={reason} onChange={(e) => setReason(e.target.value)}
+              className={errors.reason ? '!border-red-400' : ''}>
               {REASON_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+            </Select>
             {errors.reason && <p className="text-red-500 text-xs mt-1">{errors.reason}</p>}
           </div>
           <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
             <label className="block text-xs text-gray-500 mb-0.5">变更类别</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)}
-              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500">
+            <Select size="xs" value={category} onChange={(e) => setCategory(e.target.value)}>
               {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+            </Select>
           </div>
           <div className="col-span-2 md:col-span-1 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
             <label className="block text-xs text-gray-500 mb-0.5">优先级</label>
@@ -436,20 +438,19 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
           </div>
           <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
             <label className="block text-xs text-gray-500 mb-0.5">审批模式</label>
-            <select value={reviewMode} onChange={(e) => setReviewMode(e.target.value)}
-              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500">
+            <Select size="xs" value={reviewMode} onChange={(e) => setReviewMode(e.target.value)}>
               <option value="all">会签（全部通过）</option>
               <option value="any">或签（任一通过）</option>
-            </select>
+            </Select>
           </div>
         </div>
 
         <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
           <label className="block text-xs text-gray-500 mb-0.5">变更描述</label>
-          <textarea ref={descRef} value={description} onChange={(e) => setDescription(e.target.value)}
+          <Textarea size="xs" ref={descRef} value={description} onChange={(e) => setDescription(e.target.value)}
             onInput={(e) => { e.currentTarget.style.height = 'auto'; e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px'; }}
             rows={1} style={{ minHeight: '38px', resize: 'none' }}
-            className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 overflow-hidden"
+            className="overflow-hidden"
             placeholder="变更详细描述（选填）" />
         </div>
 
@@ -471,18 +472,18 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
             {reviewers.map((reviewer, index) => (
               <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
                 <span className="text-xs text-gray-400 w-6">{reviewer.seq}</span>
-                <select value={reviewer.user_id}
+                <Select value={reviewer.user_id}
                   onChange={(e) => updateReviewer(index, 'user_id', e.target.value)}
-                  className="flex-1 border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="flex-1"
                   disabled={usersLoading}>
                   <option value="">{usersLoading ? '加载中...' : '请选择审批人'}</option>
                   {users.filter((u) => u.id !== currentUserId && (u.role === 'admin' || u.role === 'engineer')).map((u) => (
                     <option key={u.id} value={u.id}>{u.real_name} ({u.username}) - {u.role}</option>
                   ))}
-                </select>
-                <input type="number" value={reviewer.seq}
+                </Select>
+                <Input size="xs" type="number" value={reviewer.seq}
                   onChange={(e) => updateReviewer(index, 'seq', parseInt(e.target.value) || 1)}
-                  className="w-16 border border-gray-300 rounded px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="!w-16 text-center"
                   min={1} />
                 <Button variant="danger" size="xs" type="button" onClick={() => removeReviewer(index)} title="移除">✕</Button>
               </div>
@@ -763,9 +764,9 @@ function EcrPicker({ onSelect }: { onSelect: (id: string, number: string) => voi
   return (
     <div>
       <div className="flex gap-2 mb-3">
-        <input value={search} onChange={e => setSearch(e.target.value)}
+        <Input value={search} onChange={e => setSearch(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSearch()}
-          placeholder="搜索 ECR 编号或标题..." className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm" />
+          placeholder="搜索 ECR 编号或标题..." className="flex-1" />
         <Button size="sm" onClick={handleSearch} disabled={searching}>搜索</Button>
       </div>
       {searching ? <p className="text-xs text-gray-400 text-center py-4">加载中...</p> : (

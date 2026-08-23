@@ -13,6 +13,9 @@ import { useDebounced } from '../hooks/useDebounced';
 import ArchiveTreeModal from '../components/ArchiveTreeModal';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
+import Select from '../components/ui/Select';
+import Textarea from '../components/ui/Textarea';
 
 type SortField = 'code' | 'name' | 'created_at' | 'version' | 'status' | 'check_out_user_name';
 type SortOrder = 'asc' | 'desc';
@@ -181,10 +184,9 @@ export default function Documents() {
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center gap-2 mb-4 shrink-0">
-        <select
+        <Select
           value={searchField}
           onChange={(e) => setSearchField(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
         >
           <option value="all">全部字段</option>
           <option value="code">编号</option>
@@ -193,25 +195,24 @@ export default function Documents() {
           {documentCustomDefs.map(def => (
             <option key={def.id} value={`cf_${def.id}`}>{def.name}</option>
           ))}
-        </select>
-        <input
+        </Select>
+        <Input
           type="text"
           placeholder={searchField === 'all' ? '搜索...' : searchField.startsWith('cf_') ? `搜索${documentCustomDefs.find(d => d.id === searchField.replace('cf_', ''))?.name || '自定义字段'}...` : `搜索${searchField === 'code' ? '编号' : searchField === 'name' ? '名称' : '备注'}...`}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="!w-44"
         />
-        <select
+        <Select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
         >
           <option value="">全部状态</option>
           <option value="draft">草稿</option>
           <option value="frozen">冻结</option>
           <option value="released">发布</option>
           <option value="obsolete">作废</option>
-        </select>
+        </Select>
         <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm whitespace-nowrap">
           <input
             type="checkbox"
@@ -308,31 +309,29 @@ export default function Documents() {
         <form onSubmit={handleCreateSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">编号 <span className="text-red-500">*</span></label>
-            <input
+            <Input
               type="text"
               value={createCode}
               onChange={(e) => setCreateCode(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               required
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">名称 <span className="text-red-500">*</span></label>
-            <input
+            <Input
               type="text"
               value={createName}
               onChange={(e) => setCreateName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               required
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">备注</label>
-            <textarea
+            <Textarea
               value={createRemark}
               onChange={(e) => setCreateRemark(e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+              className="resize-none"
             />
           </div>
           <div>

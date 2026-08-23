@@ -4,6 +4,8 @@ import { Modal } from './Modal';
 import { toast } from './Toast';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
+import Input from './ui/Input';
+import Select from './ui/Select';
 
 /* ----------------------------------------------------------------
    Types
@@ -282,13 +284,13 @@ export default function AssemblyPartPicker({
                         <Badge status={item.status} />
                       </td>
                       <td className="px-3 py-2">
-                        <input
+                        <Input size="xs"
                           type="number"
                           min={1}
                           step={1}
                           value={item.quantity}
                           onChange={(e) => updateQuantity(item.id, parseInt(e.target.value, 10) || 1)}
-                          className="w-20 px-2 py-1 border border-gray-300 rounded text-right text-sm"
+                          className="!w-20 text-right"
                         />
                       </td>
                       <td className="px-3 py-2 text-right">
@@ -311,24 +313,23 @@ export default function AssemblyPartPicker({
 
         {/* ---- 2. 搜索 & 筛选 ---- */}
         <div className="flex gap-2 items-center">
-          <input
+          <Input
             type="text"
             placeholder="搜索件号、名称..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+            className="flex-1"
           />
-          <select
+          <Select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
           >
             <option value="">全部状态</option>
             <option value="draft">草稿</option>
             <option value="frozen">冻结</option>
             <option value="released">发布</option>
             <option value="obsolete">作废</option>
-          </select>
+          </Select>
         </div>
 
         {/* ---- 快速新建 ---- */}
@@ -340,11 +341,11 @@ export default function AssemblyPartPicker({
           {quickOpen && (
             <div className="px-4 py-3 border-t space-y-2 bg-gray-50">
               <div className="flex gap-2">
-                <input value={quickForm.code} onChange={e => setQuickForm({ ...quickForm, code: e.target.value })} placeholder="件号 *" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
-                <input value={quickForm.name} onChange={e => setQuickForm({ ...quickForm, name: e.target.value })} placeholder="名称 *" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                <Input size="xs" value={quickForm.code} onChange={e => setQuickForm({ ...quickForm, code: e.target.value })} placeholder="件号 *" className="flex-1" />
+                <Input size="xs" value={quickForm.name} onChange={e => setQuickForm({ ...quickForm, name: e.target.value })} placeholder="名称 *" className="flex-1" />
               </div>
               <div className="flex gap-2">
-                <input value={quickForm.spec} onChange={e => setQuickForm({ ...quickForm, spec: e.target.value })} placeholder="规格型号" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                <Input size="xs" value={quickForm.spec} onChange={e => setQuickForm({ ...quickForm, spec: e.target.value })} placeholder="规格型号" className="flex-1" />
                 <Button size="sm" onClick={async () => {
                   if (!quickForm.code.trim() || !quickForm.name.trim()) return;
                   setQuickCreating(true);

@@ -7,6 +7,9 @@ import { can, useAuthStore } from '../../stores/auth';
 import { Modal, ConfirmModal } from '../../components/Modal';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
+import Input from '../../components/ui/Input';
+import Select from '../../components/ui/Select';
+import Textarea from '../../components/ui/Textarea';
 import { toast } from '../../components/Toast';
 import { useHeaderTabs } from '../../hooks/useHeaderTabs';
 import { usePersistedTabState } from '../../hooks/usePersistedTabState';
@@ -570,21 +573,20 @@ export default function Projects() {
         {tab === 'summary' && (
           <div className="h-full flex flex-col">
             <div className="flex items-center gap-2 mb-4 shrink-0">
-              <input
+              <Input
                 type="text"
                 placeholder="搜索编号/名称..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="!w-44"
               />
-              <select
+              <Select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
               >
                 <option value="">全部状态</option>
                 {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
+              </Select>
               <div className="flex-1" />
               {can('project:create') && (
                 <Button onClick={handleOpenCreate}>
@@ -664,27 +666,26 @@ export default function Projects() {
                 </div>
 
                 <div className="flex items-center gap-2 mb-3 shrink-0">
-                  <input
+                  <Input
                     type="text"
                     placeholder="搜索任务..."
                     value={taskSearch}
                     onChange={(e) => setTaskSearch(e.target.value)}
-                    className="w-44 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="!w-44"
                   />
-                  <select value={taskStatusFilter} onChange={(e) => setTaskStatusFilter(e.target.value)} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm">
+                  <Select value={taskStatusFilter} onChange={(e) => setTaskStatusFilter(e.target.value)}>
                     <option value="">全部状态</option>
                     {(['未开始', '进行中', '已完成', '挂起'] as TaskStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
+                  </Select>
                   <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none whitespace-nowrap">
                     <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)}
                       className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
                     只看我的任务
                   </label>
                   {maxTreeDepth > 0 && (
-                    <select
+                    <Select size="xs"
                       value={expandSel}
                       onChange={(e) => handleExpandChange(e.target.value)}
-                      className="px-2 py-1.5 text-sm rounded bg-white border border-gray-300 text-gray-600"
                     >
                       <option value="collapsed">全部折叠</option>
                       {Array.from({ length: maxTreeDepth }, (_, i) => i + 1).map((k) => (
@@ -692,7 +693,7 @@ export default function Projects() {
                       ))}
                       <option value="all">全部展开</option>
                       {expandSel === 'custom' && <option value="custom">自定义</option>}
-                    </select>
+                    </Select>
                   )}
                   {viewMode === 'table' ? (
                     <Button variant="secondary" size="sm" onClick={() => setViewMode('gantt')}>甘特图</Button>
@@ -863,61 +864,56 @@ export default function Projects() {
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">项目名称 <span className="text-red-500">*</span></label>
-              <input
+              <Input size="xs"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
                 required
               />
             </div>
             {editingProject && (
               <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                 <label className="block text-xs text-gray-500 mb-0.5">状态</label>
-                <select
+                <Select size="xs"
                   value={form.status}
                   onChange={(e) => setForm({ ...form, status: e.target.value as ProjectStatus })}
-                  className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
                   {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
+                </Select>
               </div>
             )}
             {editingProject && (
               <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                 <label className="block text-xs text-gray-500 mb-0.5">负责人</label>
-                <select
+                <Select size="xs"
                   value={form.owner_id}
                   onChange={(e) => setForm({ ...form, owner_id: e.target.value })}
-                  className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
                   {allUsers.map((u) => <option key={u.id} value={u.id}>{u.real_name} ({u.username})</option>)}
-                </select>
+                </Select>
               </div>
             )}
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">计划开始</label>
-              <input
+              <Input size="xs"
                 type="date"
                 value={form.planned_start}
                 onChange={(e) => setForm({ ...form, planned_start: e.target.value })}
-                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">计划完成</label>
-              <input
+              <Input size="xs"
                 type="date"
                 value={form.planned_end}
                 onChange={(e) => setForm({ ...form, planned_end: e.target.value })}
-                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
             <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">描述</label>
-              <textarea
+              <Textarea size="xs"
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
-                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+                className="resize-none"
                 rows={3}
                 placeholder="可选"
               />

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ECRReviewer, ECRReviewRecord } from '../../types';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
+import Textarea from '../ui/Textarea';
 
 interface ECRReviewPanelProps {
   reviewers: ECRReviewer[];
@@ -148,11 +149,11 @@ export function ECRReviewPanel({
                     <label className="block text-xs text-gray-500 mb-1">
                       审批意见
                     </label>
-                    <textarea
+                    <Textarea
                       value={comment}
                       onChange={(e) => setComment(e.target.value)}
                       rows={2}
-                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                      className="resize-none"
                       placeholder="输入审批意见（可选）"
                     />
                   </div>

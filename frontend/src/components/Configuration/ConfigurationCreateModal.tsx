@@ -10,6 +10,7 @@ import { useDataStore } from '../../stores/data';
 import CustomFieldInput from '../CustomFieldInput';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
+import Input from '../ui/Input';
 
 interface Props {
   open: boolean;
@@ -345,13 +346,13 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
           <td className="px-3 py-2 text-sm text-gray-500 cursor-pointer hover:text-primary-600" onClick={() => setNestedEditItem({ id: c.child_id, code: c.child_code, name: c.child_name } as ConfigurationItem)}>{c.child_remark || '-'}</td>
           <td className="px-3 py-2 text-center text-sm">
             {isRoot ? (
-              <input type="number" min={1} value={c.quantity ?? 1}
+              <Input size="xs" type="number" min={1} value={c.quantity ?? 1}
                 onChange={(e) => updateChildQuantity(arrIndex, parseInt(e.target.value) || 1)}
-                className="w-14 text-center text-sm border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                className="!w-14 text-center" />
             ) : (
-              <input type="number" min={1} value={c.quantity ?? 1}
+              <Input size="xs" type="number" min={1} value={c.quantity ?? 1}
                 onChange={(e) => updateNestedField(c, 'quantity', parseInt(e.target.value) || 1)}
-                className="w-14 text-center text-sm border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                className="!w-14 text-center" />
             )}
           </td>
           <td className="px-3 py-2 text-center text-sm">
@@ -419,13 +420,13 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
             <label className="block text-xs text-gray-500 mb-0.5">构型号 *</label>
-            <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })}
-              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300" placeholder="如 CFG-001" />
+            <Input size="xs" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })}
+              className="placeholder:text-gray-300" placeholder="如 CFG-001" />
           </div>
           <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
             <label className="block text-xs text-gray-500 mb-0.5">中文名称 *</label>
-            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300" placeholder="如 A型机翼构型" />
+            <Input size="xs" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
+              className="placeholder:text-gray-300" placeholder="如 A型机翼构型" />
           </div>
           {item && (
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
@@ -501,9 +502,9 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                          <Badge status={p.part_status} />
                        </td>
                        <td className="px-3 py-1.5 text-center" onClick={e => e.stopPropagation()}>
-                         <input type="number" min={1} value={p.quantity ?? 1}
+                         <Input size="xs" type="number" min={1} value={p.quantity ?? 1}
                            onChange={(e) => updatePartQuantity(i, parseInt(e.target.value) || 1)}
-                           className="w-14 text-center text-xs border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                           className="!w-14 text-center" />
                        </td>
                        <td className="px-3 py-1.5 text-center" onClick={e => e.stopPropagation()}>
                          <button onClick={() => togglePartRequired(i)}
@@ -577,8 +578,8 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                 {/* 搜索 + 快速新建 + 候选列表 */}
                 <div className="px-4 flex-1 flex flex-col min-h-0">
                   <div className="flex gap-2 pt-4 pb-3 items-center flex-shrink-0">
-                    <input value={cfgSearch} onChange={e => setCfgSearch(e.target.value)} autoFocus
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm" placeholder="搜索构型号/名称（实时）..." />
+                    <Input value={cfgSearch} onChange={e => setCfgSearch(e.target.value)} autoFocus
+                      className="flex-1" placeholder="搜索构型号/名称（实时）..." />
                     {cfgSearching && <span className="text-xs text-gray-400 whitespace-nowrap">搜索中...</span>}
                   </div>
 
@@ -591,10 +592,10 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                     {quickCreateOpen && (
                       <div className="px-4 py-3 border-t space-y-2 bg-gray-50">
                         <div className="flex gap-2">
-                          <input value={quickForm.code} onChange={e => setQuickForm({ ...quickForm, code: e.target.value })}
-                            placeholder="构型号 *" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
-                          <input value={quickForm.name} onChange={e => setQuickForm({ ...quickForm, name: e.target.value })}
-                            placeholder="名称 *" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                          <Input size="xs" value={quickForm.code} onChange={e => setQuickForm({ ...quickForm, code: e.target.value })}
+                            placeholder="构型号 *" className="flex-1" />
+                          <Input size="xs" value={quickForm.name} onChange={e => setQuickForm({ ...quickForm, name: e.target.value })}
+                            placeholder="名称 *" className="flex-1" />
                           <Button size="sm" className="whitespace-nowrap" onClick={async () => {
                             if (!quickForm.code.trim() || !quickForm.name.trim()) return;
                             setQuickCreating(true);

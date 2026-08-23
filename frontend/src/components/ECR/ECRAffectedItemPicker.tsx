@@ -5,6 +5,7 @@ import { partsApi } from '../../services/api';
 import { useTableSort } from '../../hooks/useTableSort';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
+import Input from '../ui/Input';
 import type { Part, Assembly } from '../../types';
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -194,12 +195,11 @@ export function ECRAffectedItemPicker({
 
         {/* Search input */}
         <div>
-          <input
+          <Input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="搜索编码或名称..."
-            className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
           />
         </div>
 

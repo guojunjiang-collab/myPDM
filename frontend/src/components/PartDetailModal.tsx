@@ -16,6 +16,9 @@ import ProfileEditModal from './Configuration/ProfileEditModal';
 import { useTableSort } from '../hooks/useTableSort';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
+import Input from './ui/Input';
+import Select from './ui/Select';
+import Textarea from './ui/Textarea';
 
 /** BOM 结构树的展开箭头，与 STPViewer 模型树(ModelTreePanel)保持同一风格 */
 function BomChevron({ expanded }: { expanded: boolean }) {
@@ -387,14 +390,14 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
           </td>
           <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
             {canEdit && !viewingIterationId ? (
-              <input type="number" min={1} defaultValue={item.quantity}
+              <Input size="xs" type="number" min={1} defaultValue={item.quantity}
                 onBlur={async (e) => {
                   const v = parseInt(e.target.value);
                     if (v > 0 && v !== item.quantity && revisionId) {
                         try { await partsApi.updateBOMItem(revisionId, item.id, { quantity: v }); refreshChildren(parentRevId || revisionId); } catch {}
                       }
                 }}
-                className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                className="!w-16 text-right" />
             ) : item.quantity}
           </td>
           <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
@@ -552,15 +555,14 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                 <>
                   <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                     <div className="text-xs text-gray-500 mb-0.5">件号</div>
-                    <input type="text" value={editMaster.code}
+                    <Input size="xs" type="text" value={editMaster.code}
                       onChange={(e) => { setEditMaster(p => ({...p, code: e.target.value})); autoSaveMaster({code: e.target.value}); }}
-                      className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono" />
+                      className="font-mono" />
                   </div>
                   <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                     <div className="text-xs text-gray-500 mb-0.5">名称</div>
-                    <input type="text" value={editMaster.name}
-                      onChange={(e) => { setEditMaster(p => ({...p, name: e.target.value})); autoSaveMaster({name: e.target.value}); }}
-                      className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                    <Input size="xs" type="text" value={editMaster.name}
+                      onChange={(e) => { setEditMaster(p => ({...p, name: e.target.value})); autoSaveMaster({name: e.target.value}); }} />
                   </div>
                   <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                     <div className="text-xs text-gray-500 mb-0.5">类型</div>
@@ -693,8 +695,8 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                                   <div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                                     <div className="text-xs text-gray-500 mb-0.5">{def.name}</div>
                                     {def.field_type === 'select' ? (
-                                      <select
-                                        className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 mt-0.5 bg-white"
+                                      <Select size="xs"
+                                        className="mt-0.5"
                                         value={val}
                                         onChange={(e) => handleChange(e.target.value)}
                                       >
@@ -704,18 +706,18 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                                           const value = typeof opt === 'string' ? opt : (opt.value || opt.label || opt);
                                           return <option key={value} value={value}>{label}</option>;
                                         })}
-                                      </select>
+                                      </Select>
                                     ) : def.field_type === 'number' ? (
-                                      <input
+                                      <Input size="xs"
                                         type="number"
-                                        className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 mt-0.5"
+                                        className="mt-0.5"
                                         value={val}
                                         onChange={(e) => handleChange(e.target.value)}
                                       />
                                     ) : (
-                                      <input
+                                      <Input size="xs"
                                         type="text"
-                                        className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 mt-0.5"
+                                        className="mt-0.5"
                                         value={val}
                                         onChange={(e) => handleChange(e.target.value)}
                                       />
@@ -952,7 +954,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
       {showCheckinModal && (
         <Modal open={showCheckinModal} onClose={() => setShowCheckinModal(false)} title="签入说明" width="md">
           <div className="p-4">
-            <textarea className="w-full border rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" rows={3} placeholder="请输入签入说明（选填）..."
+            <Textarea rows={3} placeholder="请输入签入说明（选填）..."
               value={checkinNote} onChange={(e) => setCheckinNote(e.target.value)} />
             <div className="flex justify-end gap-2 mt-4">
               <Button variant="secondary" onClick={() => setShowCheckinModal(false)}>取消</Button>

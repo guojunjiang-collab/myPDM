@@ -12,6 +12,8 @@ import { CADWorkspaceModal } from '../components/CADWorkspace/CADWorkspaceModal'
 import PartCompareModal from '../components/PartCompareModal';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
+import Select from '../components/ui/Select';
 
 type SortField = 'code' | 'name' | 'created_at' | 'version' | 'status' | 'check_out_user_name' | 'type';
 type SortOrder = 'asc' | 'desc';
@@ -132,10 +134,9 @@ export default function PartsPage() {
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center gap-2 mb-4 shrink-0">
-        <select
+        <Select
           value={searchField}
           onChange={(e) => setSearchField(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
         >
           <option value="all">全部字段</option>
           <option value="code">件号</option>
@@ -144,8 +145,8 @@ export default function PartsPage() {
           {componentCustomDefs.map(def => (
             <option key={def.id} value={`cf_${def.id}`}>{def.name}</option>
           ))}
-        </select>
-        <input
+        </Select>
+        <Input
           type="text"
           placeholder={
             searchField.startsWith('cf_') ? '搜索...' :
@@ -155,19 +156,18 @@ export default function PartsPage() {
           }
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="!w-44"
         />
-        <select
+        <Select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
         >
           <option value="">全部状态</option>
           <option value="draft">草稿</option>
           <option value="frozen">冻结</option>
           <option value="released">发布</option>
           <option value="obsolete">作废</option>
-        </select>
+        </Select>
         <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm whitespace-nowrap">
           <input
             type="checkbox"
@@ -300,21 +300,18 @@ export default function PartsPage() {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">件号 <span className="text-red-500">*</span></label>
-            <input type="text" value={newPart.code}
-              onChange={(e) => setNewPart(p => ({...p, code: e.target.value}))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+            <Input type="text" value={newPart.code}
+              onChange={(e) => setNewPart(p => ({...p, code: e.target.value}))} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">名称 <span className="text-red-500">*</span></label>
-            <input type="text" value={newPart.name}
-              onChange={(e) => setNewPart(p => ({...p, name: e.target.value}))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+            <Input type="text" value={newPart.name}
+              onChange={(e) => setNewPart(p => ({...p, name: e.target.value}))} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">规格型号</label>
-            <input type="text" value={newPart.spec}
-              onChange={(e) => setNewPart(p => ({...p, spec: e.target.value}))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+            <Input type="text" value={newPart.spec}
+              onChange={(e) => setNewPart(p => ({...p, spec: e.target.value}))} />
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="secondary" onClick={() => setShowCreateModal(false)}>取消</Button>

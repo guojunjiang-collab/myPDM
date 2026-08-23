@@ -6,6 +6,8 @@ import { BADGE_DOMAINS } from '../../constants/badges';
 import { Modal } from '../Modal';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
 import type { InvDocument, InvDocType } from '../../types';
 
 const DOC_TYPE_LABEL: Record<InvDocType, string> = {
@@ -114,9 +116,9 @@ export default function DocumentDetail({ docId, onClose, onChanged }:
                       {doc.doc_type === 'stocktake' && (
                         <td className="px-3 py-2 text-right">
                           {doc.status === 'approved' && isKeeper ? (
-                            <input type="number" value={counts[l.id!] ?? ''}
+                            <Input size="xs" type="number" value={counts[l.id!] ?? ''}
                               onChange={(e) => setCounts({ ...counts, [l.id!]: Number(e.target.value) })}
-                              className="w-20 px-2 py-1 border border-gray-300 rounded text-sm text-right focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                              className="!w-20 text-right" />
                           ) : <span className="text-sm">{l.counted_quantity ?? '-'}</span>}
                         </td>
                       )}
@@ -191,13 +193,12 @@ export default function DocumentDetail({ docId, onClose, onChanged }:
           {/* 操作（其余动作在列表「操作」列；此处保留需详情上下文的改派/过账） */}
           {doc.status === 'approved' && (
             <div className="flex flex-wrap gap-2 justify-end border-t border-gray-200 pt-4">
-              <select value={reassign} onChange={(e) => setReassign(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm bg-white">
+              <Select value={reassign} onChange={(e) => setReassign(e.target.value)}>
                 <option value="">改派库管员…</option>
                 {users.filter((u) => u.role !== 'guest').map((u) => (
                   <option key={u.id} value={u.id}>{u.real_name}</option>
                 ))}
-              </select>
+              </Select>
               {reassign && (
                 <Button variant="secondary" onClick={() => act(() => inventoryApi.assignKeeper(doc.id, reassign)).then(() => setReassign(''))}>确认改派</Button>
               )}

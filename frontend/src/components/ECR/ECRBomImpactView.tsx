@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState, useMemo } from 'react';
 import type { BomImpactNode } from '../../types';
 import Badge from '../ui/Badge';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
 import { BADGE_DOMAINS } from '../../constants/badges';
 
 // ─── Action config ───────────────────────────────────────────────
@@ -196,10 +198,9 @@ export function ECRBomImpactView({
     onChangeAction: (val: BomImpactNode['action']) => void,
     options: typeof UPWARD_ACTIONS | typeof DOWNWARD_ACTIONS,
   ) => (
-    <select
+    <Select size="xs"
       value={value}
       onChange={(e) => onChangeAction(e.target.value as BomImpactNode['action'])}
-      className="w-full text-xs border border-gray-300 rounded px-1.5 py-1 bg-white focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
     >
       {options.map((opt) => {
         const cfg = BADGE_DOMAINS.action[opt];
@@ -209,7 +210,7 @@ export function ECRBomImpactView({
           </option>
         );
       })}
-    </select>
+    </Select>
   );
 
   const thClass = 'px-2 py-2 text-left text-xs font-semibold text-gray-500 border-b border-gray-200 whitespace-nowrap';
@@ -280,13 +281,13 @@ export function ECRBomImpactView({
                       </td>
                       <td className={tdClass}>
                         {editable && isQuantityEditable(node.action) ? (
-                          <input
+                          <Input size="xs"
                             type="number"
                             min="1"
                             step="1"
                             value={getQuantityValue(node)}
                             onChange={(e) => handleUpwardQty(idx, e.target.value)}
-                            className="w-20 text-xs border rounded px-1.5 py-0.5 focus:ring-1 focus:ring-blue-500"
+                            className="!w-20"
                           />
                         ) : (
                           <span className="text-xs">{getQuantityValue(node)}</span>
@@ -294,12 +295,11 @@ export function ECRBomImpactView({
                       </td>
                       <td className={tdClass}>
                         {editable ? (
-                          <input
+                          <Input size="xs"
                             type="text"
                             value={node.change_description || ''}
                             onChange={(e) => handleUpwardDescription(idx, e.target.value)}
                             disabled={node.action === 'no_change'}
-                            className="w-full text-xs border border-gray-300 rounded px-1.5 py-1 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                             placeholder="变更说明"
                           />
                         ) : (
@@ -362,13 +362,13 @@ export function ECRBomImpactView({
                     </td>
                     <td className={tdClass}>
                       {editable && isQuantityEditable(node.action) ? (
-                        <input
+                        <Input size="xs"
                           type="number"
                           min="1"
                           step="1"
                           value={getQuantityValue(node)}
                           onChange={(e) => handleDownwardQty(idx, e.target.value)}
-                          className="w-20 text-xs border rounded px-1.5 py-0.5 focus:ring-1 focus:ring-blue-500"
+                          className="!w-20"
                         />
                       ) : (
                         <span className="text-xs">{getQuantityValue(node)}</span>
@@ -376,12 +376,11 @@ export function ECRBomImpactView({
                     </td>
                     <td className={tdClass}>
                       {editable ? (
-                        <input
+                        <Input size="xs"
                           type="text"
                           value={node.change_description || ''}
                           onChange={(e) => handleDownwardDescription(idx, e.target.value)}
                           disabled={node.action === 'no_change'}
-                          className="w-full text-xs border border-gray-300 rounded px-1.5 py-1 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                           placeholder="变更说明"
                         />
                       ) : (

@@ -10,6 +10,9 @@ import type { CustomFieldDefinition, AssemblyPartItem } from '../types';
 import CustomFieldInput from './CustomFieldInput';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
+import Input from './ui/Input';
+import Select from './ui/Select';
+import Textarea from './ui/Textarea';
 
 interface EntityEditModalProps {
   open: boolean;
@@ -277,9 +280,9 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
           </td>
           <td className="px-3 py-2">
             {level === 0 ? (
-              <input type="number" min={1} defaultValue={part.quantity} disabled={locked} onBlur={e => { const v = parseInt(e.target.value); if (v > 0 && v !== part.quantity) handleUpdateQuantity(part.id, v); }} className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-500" />
+              <Input size="xs" type="number" min={1} defaultValue={part.quantity} disabled={locked} onBlur={e => { const v = parseInt(e.target.value); if (v > 0 && v !== part.quantity) handleUpdateQuantity(part.id, v); }} className="!w-16 text-right" />
             ) : (
-              <input type="number" min={1} defaultValue={part.quantity} disabled={locked} onBlur={e => { const v = parseInt(e.target.value); if (v > 0 && v !== part.quantity) handleNestedQuantity(part.parent_id || part.id, part.id, v); }} className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-500" />
+              <Input size="xs" type="number" min={1} defaultValue={part.quantity} disabled={locked} onBlur={e => { const v = parseInt(e.target.value); if (v > 0 && v !== part.quantity) handleNestedQuantity(part.parent_id || part.id, part.id, v); }} className="!w-16 text-right" />
             )}
           </td>
           <td className="px-3 py-2 text-right whitespace-nowrap">
@@ -324,25 +327,25 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">件号</label>
-              <input type="text" value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value })} disabled={!(isAdmin() && formData.version === 'A')} title={isAdmin() ? (formData.version === 'A' ? '管理员可修改件号' : '仅 A 版允许修改件号，升版后的版本不可改') : undefined} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-500" />
+              <Input size="xs" type="text" value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value })} disabled={!(isAdmin() && formData.version === 'A')} title={isAdmin() ? (formData.version === 'A' ? '管理员可修改件号' : '仅 A 版允许修改件号，升版后的版本不可改') : undefined} />
             </div>
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">中文名称 <span className="text-red-500">*</span></label>
-              <input type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} disabled={locked} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-500" required />
+              <Input size="xs" type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} disabled={locked} required />
             </div>
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">版本</label>
-              <input type="text" value={formData.version} disabled className="w-full text-sm px-2 py-1 border border-gray-200 rounded bg-gray-100 text-gray-500" />
+              <Input size="xs" type="text" value={formData.version} disabled />
             </div>
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">状态</label>
-              <select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })} disabled={locked} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-500">
+              <Select size="xs" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })} disabled={locked}>
                 {STATUS_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-              </select>
+              </Select>
             </div>
             <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">规格型号</label>
-              <textarea ref={specRef} value={formData.spec} onChange={e => setFormData({ ...formData, spec: e.target.value })} disabled={locked} onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none disabled:bg-gray-100 disabled:text-gray-500" rows={1} />
+              <Textarea size="xs" ref={specRef} value={formData.spec} onChange={e => setFormData({ ...formData, spec: e.target.value })} disabled={locked} onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }} className="resize-none" rows={1} />
             </div>
           </div>
 

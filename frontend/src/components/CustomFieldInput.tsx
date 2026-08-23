@@ -1,4 +1,5 @@
 import type { CustomFieldDefinition } from '../types';
+import { INPUT_BASE_CLASS } from './ui/Input';
 
 interface Props {
   def: CustomFieldDefinition;
@@ -9,7 +10,7 @@ interface Props {
 }
 
 export default function CustomFieldInput({ def, value, onChange, disabled, readOnly }: Props) {
-  const baseClass = "w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-500";
+  const baseClass = INPUT_BASE_CLASS;
 
   if (readOnly) {
     if (def.field_type === 'multiselect') {

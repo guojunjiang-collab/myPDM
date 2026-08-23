@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
+import Select from '../../components/ui/Select';
 import { projectApi } from '../../services/projectApi';
 import { usersApi } from '../../services/api';
 import type { ProjectMember } from '../../types/project';
@@ -93,17 +94,15 @@ export default function MemberManageModal({ open, projectId, ownerId, onClose, o
   return (
     <Modal open={open} title="项目成员管理" onClose={onClose} width="lg">
       <div className="flex gap-2 mb-4">
-        <select value={pickUser} onChange={(e) => setPickUser(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg">
+        <Select value={pickUser} onChange={(e) => setPickUser(e.target.value)} className="flex-1">
           <option value="">选择用户加入…</option>
           {users.filter((u) => !draftIds.has(u.id)).map((u) => (
             <option key={u.id} value={u.id}>{u.real_name}（{u.username}）</option>
           ))}
-        </select>
-        <select value={pickRole} onChange={(e) => setPickRole(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg">
+        </Select>
+        <Select value={pickRole} onChange={(e) => setPickRole(e.target.value)}>
           {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-        </select>
+        </Select>
         <Button onClick={stageAdd}>添加</Button>
       </div>
 
@@ -117,10 +116,9 @@ export default function MemberManageModal({ open, projectId, ownerId, onClose, o
               {isOwner ? (
                 <Badge size="xs" tone="blue" label="负责人" />
               ) : (
-                <select value={m.role_in_project} onChange={(e) => stageRole(m.user_id, e.target.value)}
-                        className="text-xs border border-gray-300 rounded px-1.5 py-0.5 text-gray-600">
+                <Select size="xs" value={m.role_in_project} onChange={(e) => stageRole(m.user_id, e.target.value)}>
                   {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-                </select>
+                </Select>
               )}
               <div className="flex-1" />
               {!isOwner && (

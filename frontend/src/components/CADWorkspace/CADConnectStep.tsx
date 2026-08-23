@@ -3,6 +3,7 @@ import type { useCADBridge, CADType } from '../../hooks/useCADBridge';
 import type { BOMRow } from './CADBOMMatchTable';
 import { flattenTree } from './flattenTree';
 import Button from '../ui/Button';
+import Select from '../ui/Select';
 
 interface Props {
   bridge: ReturnType<typeof useCADBridge>;
@@ -83,14 +84,13 @@ export function CADConnectStep({ bridge, cadType, onCadTypeChange, onAssemblyLoa
       </div>
 
       <div className="flex gap-3">
-        <select
+        <Select size="xs"
           value={cadType}
           onChange={(e) => onCadTypeChange(e.target.value as CADType)}
-          className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-500"
         >
           <option value="catia">CATIA V5</option>
           <option value="solidworks">SolidWorks</option>
-        </select>
+        </Select>
         <Button
           onClick={handleDetect}
           disabled={detecting}

@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import type { InputHTMLAttributes } from 'react';
 
 export const INPUT_BASE_CLASS =
@@ -8,6 +9,8 @@ interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'>
   size?: 'md' | 'xs';
 }
 
-export default function Input({ size = 'md', className = '', ...rest }: InputProps) {
-  return <input className={`${INPUT_BASE_CLASS} ${INPUT_SIZE_CLASS[size]} ${className}`.trim()} {...rest} />;
-}
+const Input = forwardRef<HTMLInputElement, InputProps>(function Input({ size = 'md', className = '', ...rest }, ref) {
+  return <input ref={ref} className={`${INPUT_BASE_CLASS} ${INPUT_SIZE_CLASS[size]} ${className}`.trim()} {...rest} />;
+});
+
+export default Input;

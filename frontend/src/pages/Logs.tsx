@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { logsApi } from '../services/api';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
+import Select from '../components/ui/Select';
 import type { BadgeTone } from '../constants/badges';
 import type { OperationLog } from '../types';
 import { formatDateTime } from '../utils/date';
@@ -99,54 +101,49 @@ export default function Logs() {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div>
             <label className="block text-xs text-gray-500 mb-1">用户ID</label>
-            <input
+            <Input
               type="text"
               value={filterUser}
               onChange={(e) => setFilterUser(e.target.value)}
-              className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
               placeholder="用户ID"
             />
           </div>
           <div>
             <label className="block text-xs text-gray-500 mb-1">对象类型</label>
-            <select
+            <Select
               value={filterTargetType}
               onChange={(e) => setFilterTargetType(e.target.value)}
-              className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
             >
               {TARGET_TYPE_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
-            </select>
+            </Select>
           </div>
           <div>
             <label className="block text-xs text-gray-500 mb-1">操作类型</label>
-            <select
+            <Select
               value={filterAction}
               onChange={(e) => setFilterAction(e.target.value)}
-              className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
             >
               {ACTION_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
-            </select>
+            </Select>
           </div>
           <div>
             <label className="block text-xs text-gray-500 mb-1">开始日期</label>
-            <input
+            <Input
               type="date"
               value={filterDateFrom}
               onChange={(e) => setFilterDateFrom(e.target.value)}
-              className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
             />
           </div>
           <div>
             <label className="block text-xs text-gray-500 mb-1">结束日期</label>
-            <input
+            <Input
               type="date"
               value={filterDateTo}
               onChange={(e) => setFilterDateTo(e.target.value)}
-              className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
             />
           </div>
         </div>

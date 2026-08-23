@@ -4,6 +4,8 @@ import type { BomImpactNode } from '../../types';
 import { ECOActionBadge } from './ECOStatusBadge';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
 import AssemblyPartPicker from '../AssemblyPartPicker';
 import { toast } from '../Toast';
 
@@ -110,10 +112,9 @@ const DOWNWARD_ACTIONS = ['no_change', 'upgrade', 'qty_change', 'delete', 'add_e
 function ActionSelect({ value, onChange, variant = 'downward' }: { value: string; onChange: (v: string) => void; variant?: 'upward' | 'downward' }) {
   const actions = variant === 'upward' ? UPWARD_ACTIONS : DOWNWARD_ACTIONS;
   return (
-    <select value={value} onChange={e => onChange(e.target.value)}
-      className="w-full text-xs border border-gray-300 rounded px-1 py-1 bg-white focus:ring-1 focus:ring-primary-500">
+    <Select size="xs" value={value} onChange={e => onChange(e.target.value)}>
       {actions.map(a => <option key={a} value={a}>{a==='no_change'?'不变':a==='upgrade'?'升版':a==='qty_change'?'数量':a==='delete'?'删除':a==='add_existing'?'新增':a}</option>)}
-    </select>
+    </Select>
   );
 }
 
@@ -197,12 +198,12 @@ function EditableUpward({ rows, onUpdate, displayOnly = false, meta, onToggle }:
             </td>
             <td className={`${td} text-center`}>
               {n.action === 'delete' ? <span className="text-red-500 text-xs">—</span>
-              : n.action === 'qty_change' && !displayOnly ? <input type="number" value={n._targetQty ?? (n.quantity_change?.to ?? n.quantity)} min={1} onChange={e => onUpdate(i, { _targetQty: parseInt(e.target.value)||1 })} className="w-16 border border-gray-300 rounded px-1 py-0.5 text-xs text-center" />
+              : n.action === 'qty_change' && !displayOnly ? <Input size="xs" type="number" value={n._targetQty ?? (n.quantity_change?.to ?? n.quantity)} min={1} onChange={e => onUpdate(i, { _targetQty: parseInt(e.target.value)||1 })} className="!w-16 text-center" />
               : <span className="text-xs">{n._targetQty ?? (n.quantity_change?.to ?? n.quantity)}</span>}
             </td>
             <td className={td}>
               {displayOnly ? <span className="text-gray-600">{(n._desc ?? n.change_description) || '-'}</span>
-              : <input type="text" value={(n._desc ?? n.change_description) || ''} placeholder="说明" onChange={e => onUpdate(i, { _desc: e.target.value })} className="w-full border border-gray-300 rounded px-1 py-0.5 text-xs" />}
+              : <Input size="xs" type="text" value={(n._desc ?? n.change_description) || ''} placeholder="说明" onChange={e => onUpdate(i, { _desc: e.target.value })} />}
             </td>
           </tr>
         ))}</tbody>
@@ -235,11 +236,11 @@ function EditableDownward({ rows, onUpdate, displayOnly = false, onRemove }: { r
               {n.action === 'delete' ? <span className="text-red-500 text-xs">—</span>
               : (n.action !== 'qty_change' && n.action !== 'add_existing' && n.action !== 'add_new') ? <span className="text-xs">{n._targetQty ?? n.quantity}</span>
               : displayOnly ? <span className="text-xs">{n._targetQty ?? n.quantity}</span>
-              : <input type="number" value={n._targetQty ?? n.quantity} min={1} onChange={e => onUpdate(i, { _targetQty: parseInt(e.target.value)||1 })} className="w-16 border border-gray-300 rounded px-1 py-0.5 text-xs text-center" />}
+              : <Input size="xs" type="number" value={n._targetQty ?? n.quantity} min={1} onChange={e => onUpdate(i, { _targetQty: parseInt(e.target.value)||1 })} className="!w-16 text-center" />}
             </td>
             <td className={td}>
               {displayOnly ? <span className="text-gray-600">{(n._desc ?? n.change_description) || '-'}</span>
-              : <input type="text" value={(n._desc ?? n.change_description) || ''} placeholder="说明" onChange={e => onUpdate(i, { _desc: e.target.value })} className="w-full border border-gray-300 rounded px-1 py-0.5 text-xs" />}
+              : <Input size="xs" type="text" value={(n._desc ?? n.change_description) || ''} placeholder="说明" onChange={e => onUpdate(i, { _desc: e.target.value })} />}
             </td>
             {onRemove && (n.action === 'add_new' || n.action === 'add_existing') && (
               <td className={td}><Button variant="danger" size="xs" onClick={() => onRemove(i)} title="移除">✕</Button></td>

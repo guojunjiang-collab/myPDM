@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
+import Input from '../ui/Input';
 
 export interface ComboOption {
   value: string;
@@ -42,9 +43,9 @@ export default function ComboBox({ value, options, placeholder = '选择...', on
       </button>
       {open && (
         <div className="absolute z-30 mt-1 w-full min-w-[18rem] bg-white border border-gray-200 rounded-lg shadow-lg">
-          <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)}
+          <Input autoFocus value={query} onChange={(e) => setQuery(e.target.value)}
             placeholder="输入编号/名称搜索..."
-            className="w-full px-2 py-1.5 border-b border-gray-200 text-sm focus:outline-none" />
+            className="!rounded-none !border-x-0 !border-t-0 !px-2 !py-1.5" />
           <div className="max-h-56 overflow-auto">
             {filtered.length === 0 ? (
               <div className="px-3 py-2 text-sm text-gray-400">无匹配</div>

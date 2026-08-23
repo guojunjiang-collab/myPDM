@@ -11,6 +11,9 @@ import { ECRDocumentPicker } from './ECRDocumentPicker';
 import VersionSelectModal from '../VersionSelectModal';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
+import Textarea from '../ui/Textarea';
 
 const REASON_OPTIONS = [
   { value: 'quality_defect', label: '质量缺陷' },
@@ -439,31 +442,29 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
             <label className="block text-xs text-gray-500 mb-0.5">ECR 编号</label>
-            <input type="text" value={editingEcr?.ecr_number || ''} disabled
-              className="w-full text-sm px-2 py-1 border border-gray-200 rounded bg-gray-100 text-gray-400" placeholder="新建时自动生成" />
+            <Input size="xs" type="text" value={editingEcr?.ecr_number || ''} disabled
+              placeholder="新建时自动生成" />
           </div>
           <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
             <label className="block text-xs text-gray-500 mb-0.5">ECR 标题 <span className="text-red-500">*</span></label>
-            <input type="text" value={title} onChange={(e) => { setTitle(e.target.value); if (errors.title) setErrors({ ...errors, title: '' }); }}
+            <Input size="xs" type="text" value={title} onChange={(e) => { setTitle(e.target.value); if (errors.title) setErrors({ ...errors, title: '' }); }}
               placeholder="请输入 ECR 标题"
-              className={`w-full text-sm px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-primary-500 ${errors.title ? 'border-red-400' : 'border-gray-200'}`} />
+              className={errors.title ? '!border-red-400' : ''} />
             {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
           </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
             <label className="block text-xs text-gray-500 mb-0.5">变更原因</label>
-            <select value={reason} onChange={(e) => setReason(e.target.value)}
-              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500">
+            <Select size="xs" value={reason} onChange={(e) => setReason(e.target.value)}>
               {REASON_OPTIONS.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
-            </select>
+            </Select>
           </div>
           <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
             <label className="block text-xs text-gray-500 mb-0.5">变更类别</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)}
-              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500">
+            <Select size="xs" value={category} onChange={(e) => setCategory(e.target.value)}>
               {CATEGORY_OPTIONS.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
-            </select>
+            </Select>
           </div>
           <div className="col-span-2 md:col-span-1 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
             <label className="block text-xs text-gray-500 mb-0.5">优先级</label>
@@ -479,19 +480,18 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
           </div>
           <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
             <label className="block text-xs text-gray-500 mb-0.5">审批模式</label>
-            <select value={reviewMode} onChange={(e) => setReviewMode(e.target.value)}
-              className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500">
+            <Select size="xs" value={reviewMode} onChange={(e) => setReviewMode(e.target.value)}>
               <option value="all">会签</option>
               <option value="any">或签</option>
-            </select>
+            </Select>
           </div>
         </div>
         <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
           <label className="block text-xs text-gray-500 mb-0.5">变更描述</label>
-          <textarea ref={descRef} value={description} onChange={(e) => setDescription(e.target.value)}
+          <Textarea size="xs" ref={descRef} value={description} onChange={(e) => setDescription(e.target.value)}
             onInput={(e) => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }}
             rows={1} placeholder="请描述变更内容和原因"
-            className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" />
+            className="resize-none" />
         </div>
 
         {/* Reviewers */}
@@ -521,7 +521,7 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
                 className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200"
               >
                 <span className="text-xs text-gray-400 w-6">{reviewer.seq}</span>
-                <select
+                <Select
                   value={reviewer.user_id}
                   onChange={(e) => {
                     updateReviewer(index, 'user_id', e.target.value);
@@ -531,9 +531,7 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
                       setErrors(newErrors);
                     }
                   }}
-                  className={`flex-1 border rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors[`reviewer_${index}`] ? 'border-red-400' : 'border-gray-300'
-                  }`}
+                  className={`flex-1 ${errors[`reviewer_${index}`] ? '!border-red-400' : ''}`}
                   disabled={usersLoading}
                 >
                   <option value="">
@@ -544,14 +542,14 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
                       {u.real_name} ({u.username}) - {u.role}
                     </option>
                   ))}
-                </select>
-                <input
+                </Select>
+                <Input size="xs"
                   type="number"
                   value={reviewer.seq}
                   onChange={(e) =>
                     updateReviewer(index, 'seq', parseInt(e.target.value) || 1)
                   }
-                  className="w-16 border border-gray-300 rounded px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="!w-16 text-center"
                   min={1}
                 />
                 <Button variant="danger" size="xs"

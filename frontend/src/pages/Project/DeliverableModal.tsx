@@ -18,6 +18,8 @@ import ConfigItemDetailModal from '../../components/Configuration/ConfigItemDeta
 import { ECRDetailModal } from '../../components/ECR/ECRDetailModal';
 import { ECODetailModal } from '../../components/ECO/ECODetailModal';
 import Button from '../../components/ui/Button';
+import Input from '../../components/ui/Input';
+import Select from '../../components/ui/Select';
 
 interface Props {
   open: boolean;
@@ -149,21 +151,20 @@ export default function DeliverableModal({
 
       {/* 工具栏 */}
       <div className="flex items-center gap-2 mb-3 shrink-0">
-        <input
+        <Input
           type="text"
           placeholder="搜索编号/名称..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-44 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="!w-44"
         />
-        <select
+        <Select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white"
         >
           <option value="">全部状态</option>
           {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+        </Select>
         <div className="flex-1" />
         <span className="text-sm text-gray-400">共 {items.length} 条</span>
       </div>

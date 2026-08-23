@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
+import Input from '../../components/ui/Input';
+import Select from '../../components/ui/Select';
+import Textarea from '../../components/ui/Textarea';
 import type { BadgeTone } from '../../constants/badges';
 import { projectApi } from '../../services/projectApi';
 import { partsApi, documentsApi, ecrApi, ecoApi, logsApi, customFieldsApi } from '../../services/api';
@@ -302,15 +305,13 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
             </div>
             <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">名称 <span className="text-red-500">*</span></label>
-              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-                     className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              <Input size="xs" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </div>
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">类型</label>
-              <select value={form.task_type} onChange={(e) => setForm({ ...form, task_type: e.target.value as TaskType })}
-                      className="w-full text-sm px-2 py-1 border border-gray-200 rounded bg-white focus:outline-none focus:ring-2 focus:ring-primary-500">
+              <Select size="xs" value={form.task_type} onChange={(e) => setForm({ ...form, task_type: e.target.value as TaskType })}>
                 {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
+              </Select>
             </div>
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">状态</label>
@@ -318,10 +319,9 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
             </div>
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">优先级</label>
-              <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as TaskPriority })}
-                      className="w-full text-sm px-2 py-1 border border-gray-200 rounded bg-white focus:outline-none focus:ring-2 focus:ring-primary-500">
+              <Select size="xs" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as TaskPriority })}>
                 {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
-              </select>
+              </Select>
             </div>
           </div>
         </div>
@@ -349,11 +349,10 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                   <div>
                     <h4 className="text-sm font-semibold text-gray-700 mb-2">负责人</h4>
                     <div className="w-64">
-                      <select value={form.assignee_id} onChange={(e) => setForm({ ...form, assignee_id: e.target.value })}
-                              className="w-full text-sm px-2 py-1.5 border border-gray-200 rounded bg-white focus:outline-none focus:ring-2 focus:ring-primary-500">
+                      <Select size="xs" value={form.assignee_id} onChange={(e) => setForm({ ...form, assignee_id: e.target.value })}>
                         <option value="">未指派</option>
                         {users.map((u) => <option key={u.id} value={u.id}>{u.real_name}</option>)}
-                      </select>
+                      </Select>
                     </div>
                   </div>
 
@@ -365,21 +364,21 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                         <div className="text-xs text-gray-500 mb-0.5">
                           计划开始{hasChildren && <span className="text-primary-600 ml-1">（子任务汇总）</span>}
                         </div>
-                        <input type="date" value={form.planned_start}
+                        <Input size="xs" type="date" value={form.planned_start}
                                onChange={(e) => setForm({ ...form, planned_start: e.target.value })}
                                disabled={hasChildren}
                                title={hasChildren ? '有子任务，计划周期由子任务统计而来，不可手动修改' : undefined}
-                               className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
+                               className="disabled:cursor-not-allowed disabled:text-gray-400" />
                       </div>
                       <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                         <div className="text-xs text-gray-500 mb-0.5">
                           计划完成{hasChildren && <span className="text-primary-600 ml-1">（子任务汇总）</span>}
                         </div>
-                        <input type="date" value={form.planned_end}
+                        <Input size="xs" type="date" value={form.planned_end}
                                onChange={(e) => setForm({ ...form, planned_end: e.target.value })}
                                disabled={hasChildren}
                                title={hasChildren ? '有子任务，计划周期由子任务统计而来，不可手动修改' : undefined}
-                               className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
+                               className="disabled:cursor-not-allowed disabled:text-gray-400" />
                       </div>
                       <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                         <div className="text-xs text-gray-500 mb-0.5">实际开始</div>
@@ -395,8 +394,8 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                   {/* 描述 */}
                   <div>
                     <h4 className="text-sm font-semibold text-gray-700 mb-2">描述</h4>
-                    <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
-                              className="w-full text-sm px-3 py-2 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+                    <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
+                              className="resize-none"
                               rows={3} placeholder="可选" />
                   </div>
 
@@ -407,15 +406,16 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                         <h4 className="text-sm font-semibold text-gray-700">任务依赖</h4>
                         {canEditDeps && (
                           <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
-                            <select className="border rounded px-2 py-1 text-sm" value={depForm.role}
+                            <Select size="xs" value={depForm.role}
                               onChange={(e) => setDepForm({ ...depForm, role: e.target.value as 'pred' | 'succ' })}>
                               <option value="pred">本任务为前置 →</option>
                               <option value="succ">本任务为后置 ←</option>
-                            </select>
+                            </Select>
                             <div className="relative" ref={taskDropRef}>
-                              <input
+                              <Input
+                                size="xs"
                                 type="text"
-                                className="border rounded px-2 py-1 text-sm w-48"
+                                className="!w-48"
                                 placeholder="搜索任务…"
                                 value={depForm.other
                                   ? (allTasks.find(t => t.id === depForm.other)
@@ -458,11 +458,11 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                                 </div>
                               )}
                             </div>
-                            <select className="border rounded px-2 py-1 text-sm" value={depForm.type}
+                            <Select size="xs" value={depForm.type}
                               onChange={(e) => setDepForm({ ...depForm, type: e.target.value as DepType })}>
                               {(['FS', 'SS', 'FF', 'SF'] as DepType[]).map((t) => <option key={t} value={t}>{t}</option>)}
-                            </select>
-                            <input type="number" className="border rounded px-2 py-1 text-sm w-20" placeholder="lag" value={depForm.lag}
+                            </Select>
+                            <Input size="xs" type="number" className="!w-20" placeholder="lag" value={depForm.lag}
                               onChange={(e) => setDepForm({ ...depForm, lag: Number(e.target.value) })} />
                             <Button size="sm"
                               disabled={!depForm.other}
@@ -583,10 +583,10 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                     {comments.length === 0 && <div className="text-xs text-gray-400 py-4">暂无评论</div>}
                   </div>
                   <div className="flex gap-2">
-                    <input value={newComment} onChange={(e) => setNewComment(e.target.value)}
+                    <Input value={newComment} onChange={(e) => setNewComment(e.target.value)}
                            onKeyDown={(e) => { if (e.key === 'Enter') submitComment(); }}
                            placeholder="写评论…(项目成员均可评论)"
-                           className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                           className="flex-1" />
                     <Button onClick={submitComment}>发送</Button>
                   </div>
                 </div>
@@ -632,11 +632,10 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
             <div>
               <h4 className="text-sm font-semibold text-gray-700 mb-2">负责人</h4>
               <div className="w-64">
-                <select value={form.assignee_id} onChange={(e) => setForm({ ...form, assignee_id: e.target.value })}
-                        className="w-full text-sm px-2 py-1.5 border border-gray-200 rounded bg-white focus:outline-none focus:ring-2 focus:ring-primary-500">
+                <Select size="xs" value={form.assignee_id} onChange={(e) => setForm({ ...form, assignee_id: e.target.value })}>
                   <option value="">未指派</option>
                   {users.map((u) => <option key={u.id} value={u.id}>{u.real_name}</option>)}
-                </select>
+                </Select>
               </div>
             </div>
 
@@ -648,19 +647,19 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                   <div className="text-xs text-gray-500 mb-0.5">
                     计划开始{hasChildren && <span className="text-primary-600 ml-1">（子任务汇总）</span>}
                   </div>
-                  <input type="date" value={form.planned_start} onChange={(e) => setForm({ ...form, planned_start: e.target.value })}
+                  <Input size="xs" type="date" value={form.planned_start} onChange={(e) => setForm({ ...form, planned_start: e.target.value })}
                          disabled={hasChildren}
                          title={hasChildren ? '有子任务，计划周期由子任务统计而来，不可手动修改' : undefined}
-                         className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
+                         className="disabled:cursor-not-allowed disabled:text-gray-400" />
                 </div>
                 <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                   <div className="text-xs text-gray-500 mb-0.5">
                     计划完成{hasChildren && <span className="text-primary-600 ml-1">（子任务汇总）</span>}
                   </div>
-                  <input type="date" value={form.planned_end} onChange={(e) => setForm({ ...form, planned_end: e.target.value })}
+                  <Input size="xs" type="date" value={form.planned_end} onChange={(e) => setForm({ ...form, planned_end: e.target.value })}
                          disabled={hasChildren}
                          title={hasChildren ? '有子任务，计划周期由子任务统计而来，不可手动修改' : undefined}
-                         className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
+                         className="disabled:cursor-not-allowed disabled:text-gray-400" />
                 </div>
                 <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                   <div className="text-xs text-gray-500 mb-0.5">实际开始</div>
@@ -676,8 +675,8 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
             {/* 描述 */}
             <div>
               <h4 className="text-sm font-semibold text-gray-700 mb-2">描述</h4>
-              <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
-                        className="w-full text-sm px-3 py-2 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+              <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
+                        className="resize-none"
                         rows={3} placeholder="可选" />
             </div>
           </div>

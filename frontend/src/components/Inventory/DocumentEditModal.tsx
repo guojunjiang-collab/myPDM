@@ -5,6 +5,9 @@ import { inventoryApi } from '../../services/inventoryApi';
 import { Modal } from '../Modal';
 import ComboBox from './ComboBox';
 import Button from '../ui/Button';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
+import Textarea from '../ui/Textarea';
 import type { InvDocType, InvDocLine, StockRow } from '../../types';
 
 interface ReviewerFormItem { user_id: string; seq: number; }
@@ -17,7 +20,6 @@ const DOC_LABELS: Record<InvDocType, string> = {
 // ECR 式卡片字段样式
 const cardCls = 'bg-gray-50 rounded-lg px-3 py-2 border border-gray-100';
 const cardLabelCls = 'block text-xs text-gray-500 mb-0.5';
-const cardInputCls = 'w-full text-sm px-2 py-1 border border-gray-200 rounded bg-white focus:outline-none focus:ring-2 focus:ring-primary-500';
 
 export default function DocumentEditModal({ docType, onClose, onSaved }:
   { docType: InvDocType; onClose: () => void; onSaved: () => void }) {
@@ -103,42 +105,42 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className={cardCls}>
             <label className={cardLabelCls}>{isTransfer ? '源仓' : '仓库'}</label>
-            <select value={warehouseId} onChange={(e) => onWarehouseChange(e.target.value)} className={cardInputCls}>
+            <Select size="xs" value={warehouseId} onChange={(e) => onWarehouseChange(e.target.value)}>
               <option value="">请选择</option>
               {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-            </select>
+            </Select>
           </div>
           {isTransfer && (
             <div className={cardCls}>
               <label className={cardLabelCls}>目标仓</label>
-              <select value={toWarehouseId} onChange={(e) => setToWarehouseId(e.target.value)} className={cardInputCls}>
+              <Select size="xs" value={toWarehouseId} onChange={(e) => setToWarehouseId(e.target.value)}>
                 <option value="">请选择</option>
                 {warehouses.filter((w) => w.id !== warehouseId).map((w) => (
                   <option key={w.id} value={w.id}>{w.name}</option>
                 ))}
-              </select>
+              </Select>
             </div>
           )}
           <div className={cardCls}>
             <label className={cardLabelCls}>业务子类</label>
-            <input value={bizType} onChange={(e) => setBizType(e.target.value)}
-              placeholder="如 采购入库/生产领料" className={cardInputCls} />
+            <Input size="xs" value={bizType} onChange={(e) => setBizType(e.target.value)}
+              placeholder="如 采购入库/生产领料" />
           </div>
           <div className={cardCls}>
             <label className={cardLabelCls}>指定库管员</label>
-            <select value={keeperId} onChange={(e) => setKeeperId(e.target.value)} className={cardInputCls}>
+            <Select size="xs" value={keeperId} onChange={(e) => setKeeperId(e.target.value)}>
               <option value="">（默认仓库库管员）</option>
               {users.filter((u) => u.role !== 'guest').map((u) => (
                 <option key={u.id} value={u.id}>{u.real_name}</option>
               ))}
-            </select>
+            </Select>
           </div>
           <div className={cardCls}>
             <label className={cardLabelCls}>审批模式</label>
-            <select value={reviewMode} onChange={(e) => setReviewMode(e.target.value as 'all' | 'any')} className={cardInputCls}>
+            <Select size="xs" value={reviewMode} onChange={(e) => setReviewMode(e.target.value as 'all' | 'any')}>
               <option value="all">会签（全部通过）</option>
               <option value="any">或签（任一通过）</option>
-            </select>
+            </Select>
           </div>
         </div>
 
@@ -161,17 +163,17 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
             {reviewers.map((reviewer, index) => (
               <div key={index} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg border border-gray-200">
                 <span className="text-xs text-gray-400 w-6 text-center">{reviewer.seq}</span>
-                <select value={reviewer.user_id}
+                <Select value={reviewer.user_id}
                   onChange={(e) => updateReviewer(index, 'user_id', e.target.value)}
-                  className="flex-1 border border-gray-300 rounded px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-primary-500">
+                  className="flex-1">
                   <option value="">请选择审批人</option>
                   {users.filter((u) => u.role !== 'guest' && u.id !== currentUserId).map((u) => (
                     <option key={u.id} value={u.id}>{u.real_name}（{u.role}）</option>
                   ))}
-                </select>
-                <input type="number" min={1} value={reviewer.seq}
+                </Select>
+                <Input size="xs" type="number" min={1} value={reviewer.seq}
                   onChange={(e) => updateReviewer(index, 'seq', parseInt(e.target.value) || 1)}
-                  className="w-16 border border-gray-300 rounded px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                  className="!w-16 text-center" />
                 <Button variant="danger" size="xs" type="button" onClick={() => removeReviewer(index)} title="移除">✕</Button>
               </div>
             ))}
@@ -221,9 +223,9 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
                         {isTransfer && <td className="px-3 py-2 text-sm text-right text-gray-500">{toWarehouseId ? tgtBal : '-'}</td>}
                         {!isStocktake && (
                           <td className="px-3 py-2">
-                            <input type="number" value={l.quantity}
+                            <Input size="xs" type="number" value={l.quantity}
                               onChange={(e) => updateLine(i, { quantity: Number(e.target.value) })}
-                              className={`w-24 px-2 py-1 border rounded text-sm focus:outline-none focus:ring-1 ${over ? 'border-red-400 text-red-600 focus:ring-red-400' : 'border-gray-300 focus:ring-primary-500'}`} />
+                              className={`!w-24 ${over ? '!border-red-400 !text-red-600' : ''}`} />
                           </td>
                         )}
                         <td className="px-3 py-2 text-center">
@@ -261,20 +263,19 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
                         />
                       </td>
                       <td className="px-3 py-2">
-                        <input value={l.batch_no} onChange={(e) => updateLine(i, { batch_no: e.target.value })}
-                          className="w-24 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                        <Input size="xs" value={l.batch_no} onChange={(e) => updateLine(i, { batch_no: e.target.value })}
+                          className="!w-24" />
                       </td>
                       {isAdjustment && (
                         <td className="px-3 py-2">
-                          <select value={l.direction || 'in'} onChange={(e) => updateLine(i, { direction: e.target.value as any })}
-                            className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500">
+                          <Select size="xs" value={l.direction || 'in'} onChange={(e) => updateLine(i, { direction: e.target.value as any })}>
                             <option value="in">盘盈+</option><option value="out">报损-</option>
-                          </select>
+                          </Select>
                         </td>
                       )}
                       <td className="px-3 py-2">
-                        <input type="number" value={l.quantity} onChange={(e) => updateLine(i, { quantity: Number(e.target.value) })}
-                          className="w-24 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                        <Input size="xs" type="number" value={l.quantity} onChange={(e) => updateLine(i, { quantity: Number(e.target.value) })}
+                          className="!w-24" />
                       </td>
                       <td className="px-3 py-2 text-center">
                         <Button variant="danger" size="xs" onClick={() => removeLine(i)}>✕</Button>
@@ -296,7 +297,7 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
 
         <div className={cardCls}>
           <label className={cardLabelCls}>备注</label>
-          <textarea value={remark} onChange={(e) => setRemark(e.target.value)} className={`${cardInputCls} resize-none`} rows={2} />
+          <Textarea size="xs" value={remark} onChange={(e) => setRemark(e.target.value)} className="resize-none" rows={2} />
         </div>
 
         <div className="flex justify-end gap-2 pt-1">

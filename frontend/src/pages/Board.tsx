@@ -8,6 +8,8 @@ import ArchiveTreeModal from '../components/ArchiveTreeModal';
 import ConfigItemDetailModal from '../components/Configuration/ConfigItemDetailModal';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
+import Select from '../components/ui/Select';
 import type { BadgeTone } from '../constants/badges';
 import { useAuthStore } from '../stores/auth';
 
@@ -496,7 +498,7 @@ export default function Board() {
       {/* ---- Rename ---- */}
       <Modal open={!!renameModal} title="重命名文件夹" onClose={() => setRenameModal(null)} width="sm">
         <div className="space-y-4">
-          <input type="text" value={renameName} onChange={(e) => setRenameName(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" autoFocus />
+          <Input type="text" value={renameName} onChange={(e) => setRenameName(e.target.value)} autoFocus />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => setRenameModal(null)}>取消</Button>
             <Button type="button" onClick={handleRename}>确认</Button>
@@ -507,7 +509,7 @@ export default function Board() {
       {/* ---- Create Folder ---- */}
       <Modal open={createModal !== null && createModal !== undefined} title="新建文件夹" onClose={() => setCreateModal(null)} width="sm">
         <div className="space-y-4">
-          <input type="text" value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder="请输入文件夹名称" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleCreate()} />
+          <Input type="text" value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder="请输入文件夹名称" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleCreate()} />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => setCreateModal(null)}>取消</Button>
             <Button type="button" onClick={handleCreate}>创建</Button>
@@ -519,11 +521,11 @@ export default function Board() {
       <Modal open={!!shareModal} title={`共享文件夹${isShareDirty ? ' (未保存)' : ''}`} onClose={handleCancelShares} width="md">
         <div className="space-y-4">
           <div className="flex gap-2">
-            <input type="text" placeholder="搜索用户名/姓名..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm" />
-            <select value={sharePermission} onChange={(e) => setSharePermission(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            <Input type="text" placeholder="搜索用户名/姓名..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} className="flex-1" />
+            <Select value={sharePermission} onChange={(e) => setSharePermission(e.target.value)}>
               <option value="view">只读查看</option>
               <option value="edit">可编辑</option>
-            </select>
+            </Select>
           </div>
           <div className="max-h-36 overflow-y-auto border border-gray-200 rounded-lg">
             {usersList.filter((u) => !userSearch.trim() || u.username.includes(userSearch) || u.real_name.includes(userSearch)).filter((u) => !workingShares.some((s) => s.shared_with_user_id === u.id)).map((u) => (
@@ -554,14 +556,13 @@ export default function Board() {
                   <div key={s.id} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded">
                     <span className="text-sm">{s.shared_with_user?.real_name || '-'}</span>
                     <div className="flex items-center gap-2">
-                      <select
+                      <Select size="xs"
                         value={s.permission}
                         onChange={(e) => handleUpdateSharePermissionLocal(s.id, e.target.value)}
-                        className="text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-primary-500"
                       >
                         <option value="view">只读</option>
                         <option value="edit">可编辑</option>
-                      </select>
+                      </Select>
                       <Button type="button" variant="danger" size="xs" onClick={() => handleRemoveShareLocal(s.id)}>取消</Button>
                     </div>
                   </div>
@@ -789,7 +790,7 @@ function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) 
         </div>
         {/* Search + filter */}
         <div className="flex gap-2">
-          <input type="text" placeholder="搜索编号/名称..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm" />
+          <Input type="text" placeholder="搜索编号/名称..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1" />
           <div className="flex gap-1">{(['all', 'component', 'document', 'configuration'] as FilterTab[]).map((t) => (
             <button type="button" key={t} onClick={() => setTab(t)} className={`px-3 py-2 text-sm rounded-lg ${tab === t ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{t === 'all' ? '全部' : ENTITY_LABEL[t]}</button>
           ))}</div>
