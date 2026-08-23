@@ -5,9 +5,9 @@ import uuid
 from ..database import get_db
 from ..models import (
     User, DocumentMaster, DocumentRevision, UserDashboard, DashboardFolder,
-    DashboardItem, DashboardFolderShare
+    DashboardItem, DashboardFolderShare, DocumentAttachment
 )
-from ..models_parts import PartMaster, PartRevision
+from ..models_parts import PartMaster, PartRevision, PartIteration, PartAttachment
 from ..models_configuration import ConfigurationItemMaster, ConfigurationItemRevision
 from ..permissions import require_permission, check_object_policy
 
@@ -29,6 +29,10 @@ def _build_component_item(item, rev: PartRevision, db: Session) -> dict:
     """构建零部件看板项：直接使用关联时指定的 revision；entity_type 按主档类型区分零件(part)/部件(assembly)"""
     master = db.query(PartMaster).filter(PartMaster.id == rev.master_id).first()
     mtype = master.type if master and master.type in ("part", "assembly") else "part"
+    # 附件数：该 revision 下所有迭代的附件总数
+    attachment_count = db.query(PartAttachment).join(
+        PartIteration, PartIteration.id == PartAttachment.iteration_id
+    ).filter(PartIteration.part_revision_id == rev.id).count()
     return {
         "id": item.id,
         "entity_type": mtype,
@@ -39,6 +43,7 @@ def _build_component_item(item, rev: PartRevision, db: Session) -> dict:
         "version": rev.version,
         "status": rev.status,
         "check_out_user_name": _checkout_name(db, rev.check_out_user_id),
+        "attachment_count": attachment_count,
     }
 
 
@@ -88,6 +93,9 @@ def _folder_to_dict(folder, db: Session, include_items=False, include_children=F
                         "version": rev.version,
                         "status": rev.status,
                         "check_out_user_name": _checkout_name(db, rev.check_out_user_id),
+                        "attachment_count": db.query(DocumentAttachment).filter(
+                            DocumentAttachment.revision_id == rev.id
+                        ).count(),
                     })
             elif item.entity_type == "configuration":
                 rev = db.query(ConfigurationItemRevision).filter(

@@ -38,9 +38,11 @@ interface PartDetailModalProps {
   revisionId?: string;
   open: boolean;
   onClose: (savedPatch?: Record<string, string>) => void;
+  /** 打开时默认定位的 Tab（如预览直达附件） */
+  initialTab?: 'info' | 'bom' | 'whereused' | 'docs' | 'attachments' | 'versions' | 'iterations';
 }
 
-export default function PartDetailModal({ masterId, revisionId: propRevisionId, open, onClose }: PartDetailModalProps) {
+export default function PartDetailModal({ masterId, revisionId: propRevisionId, open, onClose, initialTab }: PartDetailModalProps) {
   const { user } = useAuthStore();
 
   const [master, setMaster] = useState<PartMaster | null>(null);
@@ -108,7 +110,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
       setRevision(null);
       setIteration(null);
       setInternalRevisionId(propRevisionId || null);
-      setActiveTab('info');
+      setActiveTab(initialTab ?? 'info');
       setViewingIterationId(null);
       setViewingIteration(null);
       customFieldsApi.listDefinitions().then((res: any) => {

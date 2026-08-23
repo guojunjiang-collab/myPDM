@@ -27,6 +27,7 @@ interface DashboardItem {
   name: string;
   version: string;
   status: string;
+  attachment_count?: number;
 }
 
 interface FolderNode {
@@ -141,6 +142,8 @@ export default function Board() {
   const [detailItem, setDetailItem] = useState<DashboardItem | null>(null);
   const [detailComponentId, setDetailComponentId] = useState<string | null>(null);
   const [detailDocId, setDetailDocId] = useState<string | null>(null);
+  /** 预览模式：打开详情弹窗时直达附件 Tab */
+  const [previewMode, setPreviewMode] = useState(false);
   const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
 
   /* ---- 侧边栏「共享给我的」区域高度（可拖动分隔条调整） ---- */
@@ -325,6 +328,7 @@ export default function Board() {
   const canEditFolder = selectedFolder ? !selectedFolder.shared_from || selectedFolder.shared_from?.permission === 'edit' : false;
 
   const handleViewDetail = (item: DashboardItem) => {
+    setPreviewMode(false);
     // 图文档 → DocumentDetailModal；零部件 → 复用零部件管理的 PartDetailModal；构型项 → 复用构型项管理的 ConfigItemDetailModal
     if (item.entity_type === 'document') {
       setDetailDocId(item.entity_id);
@@ -336,6 +340,19 @@ export default function Board() {
     } else {
       setDetailItem(item);
       setDetailComponentId(null);
+    }
+  };
+
+  /** 预览：打开详情弹窗并直达附件 Tab */
+  const handlePreview = (item: DashboardItem) => {
+    setPreviewMode(true);
+    if (item.entity_type === 'document') {
+      setDetailDocId(item.entity_id);
+      setDetailComponentId(null);
+      setDetailItem(null);
+    } else if (isComponentType(item.entity_type)) {
+      setDetailComponentId(item.master_id || item.entity_id);
+      setDetailItem(null);
     }
   };
 
@@ -450,7 +467,7 @@ export default function Board() {
                       <th className="px-5 py-2.5 text-left text-[var(--ui-text-secondary)] font-medium">名称</th>
                       <th className="px-5 py-2.5 text-left text-[var(--ui-text-secondary)] font-medium w-20">版本</th>
                       <th className="px-5 py-2.5 text-left text-[var(--ui-text-secondary)] font-medium w-20">状态</th>
-                      {canEditFolder && <th className="px-5 py-2.5 text-right text-[var(--ui-text-secondary)] font-medium w-20">操作</th>}
+                      <th className="px-5 py-2.5 text-right text-[var(--ui-text-secondary)] font-medium w-44">操作</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -461,11 +478,22 @@ export default function Board() {
                         <td className="px-5 py-2.5 text-[var(--ui-text-secondary)]">{item.name}</td>
                         <td className="px-5 py-2.5 text-[var(--ui-text-secondary)]">{item.version || '-'}</td>
                         <td className="px-5 py-2.5"><StatusTag status={item.status} /></td>
-                        {canEditFolder && (
-                          <td className="px-5 py-2.5 text-right">
+                        <td className="px-5 py-2.5 text-right whitespace-nowrap">
+                          {(isComponentType(item.entity_type) || item.entity_type === 'document') && (
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="xs"
+                              className="mr-2"
+                              disabled={!(item.attachment_count ?? 0) > 0}
+                              title={!(item.attachment_count ?? 0) > 0 ? '预览附件' : '暂无附件'}
+                              onClick={(e) => { e.stopPropagation(); handlePreview(item); }}
+                            >预览</Button>
+                          )}
+                          {canEditFolder && (
                             <Button type="button" variant="danger" size="xs" onClick={(e) => { e.stopPropagation(); handleRemoveItem(item.id); }}>移除</Button>
-                          </td>
-                        )}
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -598,6 +626,7 @@ export default function Board() {
         masterId={detailComponentId || ''}
         open={!!detailComponentId}
         onClose={() => setDetailComponentId(null)}
+        initialTab={previewMode ? 'attachments' : undefined}
       />
 
       {detailDocId && (
