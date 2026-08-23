@@ -103,6 +103,66 @@ html[data-theme='warm'] {
   --ui-text-tertiary: #a3948a;
 }
 
+/* ===== 深色主题（黑夜模式） ===== */
+html[data-theme='dark'] {
+  /* 背景组 */
+  --ui-bg-page: #0f172a;  --ui-bg-surface: #1e293b;
+  --ui-bg-subtle: #334155; --ui-bg-hover: #475569;
+  --ui-border: #334155;
+  --ui-text-primary: #f8fafc; --ui-text-secondary: #cbd5e1; --ui-text-tertiary: #94a3b8;
+  /* 徽标 9 组深色版（bg 半透明、text 亮色，色相保持） */
+  --ui-blue-bg: rgba(59,130,246,.15);   --ui-blue-text: #93c5fd;
+  --ui-orange-bg: rgba(249,115,22,.15); --ui-orange-text: #fdba74;
+  --ui-green-bg: rgba(34,197,94,.15);   --ui-green-text: #86efac;
+  --ui-red-bg: rgba(239,68,68,.15);     --ui-red-text: #fca5a5;
+  --ui-gray-bg: rgba(148,163,184,.18);  --ui-gray-text: #cbd5e1;
+  --ui-amber-bg: rgba(245,158,11,.15);  --ui-amber-text: #fcd34d;
+  --ui-teal-bg: rgba(20,184,166,.15);   --ui-teal-text: #5eead4;
+  --ui-purple-bg: rgba(168,85,247,.15); --ui-purple-text: #d8b4fe;
+  --ui-indigo-bg: rgba(99,102,241,.15); --ui-indigo-text: #c7d2fe;
+  /* 按钮 */
+  --ui-btn-primary-bg: #0284c7; --ui-btn-primary-hover: #0369a1;
+  --ui-btn-primary-active: #075985; --ui-btn-primary-text: #ffffff;
+  --ui-btn-secondary-bg: #1e293b; --ui-btn-secondary-hover: #334155;
+  --ui-btn-secondary-border: #475569; --ui-btn-secondary-text: #e2e8f0;
+  --ui-btn-ghost-bg: #334155; --ui-btn-ghost-hover: #475569;
+  --ui-btn-ghost-text: #e2e8f0;
+  --ui-btn-danger-bg: #dc2626; --ui-btn-danger-hover: #ef4444;
+  --ui-btn-danger-active: #b91c1c; --ui-btn-danger-text: #ffffff;
+  --ui-btn-success-bg: #16a34a; --ui-btn-success-hover: #22c55e;
+  --ui-btn-success-text: #ffffff;
+  --ui-btn-dark-bg: #475569; --ui-btn-dark-hover: #64748b;
+  --ui-btn-dark-text: #ffffff;
+  --ui-btn-link-text: #38bdf8; --ui-btn-link-hover: #7dd3fc;
+  /* 表单 */
+  --ui-input-bg: #0f172a; --ui-input-border: #475569;
+  --ui-input-text: #e2e8f0; --ui-input-placeholder: #64748b;
+  --ui-input-focus-ring: #38bdf8; --ui-input-focus-border: #38bdf8;
+  --ui-input-disabled-bg: #1e293b; --ui-input-disabled-text: #64748b;
+  /* 树缩进/字体组不覆盖（与主题无关） */
+}
+
+/* 深色灰阶补偿块（specificity (0,2,0) > Tailwind 类 (0,1,0)，仅深色生效） */
+html[data-theme='dark'] .text-gray-800,
+html[data-theme='dark'] .text-gray-700 { color: #cbd5e1; }
+html[data-theme='dark'] .text-gray-600,
+html[data-theme='dark'] .text-gray-500 { color: #94a3b8; }
+html[data-theme='dark'] .text-gray-400 { color: #94a3b8; }
+html[data-theme='dark'] .text-gray-300 { color: #64748b; }
+html[data-theme='dark'] .bg-gray-50 { background-color: #334155; }
+html[data-theme='dark'] .bg-gray-100 { background-color: #334155; }
+html[data-theme='dark'] .bg-gray-200 { background-color: #475569; }
+html[data-theme='dark'] .border-gray-100,
+html[data-theme='dark'] .border-gray-200,
+html[data-theme='dark'] .border-gray-300 { border-color: #334155; }
+html[data-theme='dark'] .hover\:bg-gray-50:hover { background-color: #334155; }
+html[data-theme='dark'] .hover\:bg-gray-100:hover { background-color: #334155; }
+html[data-theme='dark'] .hover\:bg-gray-200:hover { background-color: #475569; }
+
+/* 深色 divide 分隔线补偿（Tailwind divide-* 生成于子元素 > :not([hidden]) ~ :not([hidden])，深色下补成深灰） */
+html[data-theme='dark'] .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+html[data-theme='dark'] .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: #334155; }
+
 * {
   box-sizing: border-box;
   margin: 0;
