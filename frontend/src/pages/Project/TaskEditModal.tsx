@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal } from '../../components/Modal';
+import { toast } from '../../components/Toast';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
@@ -169,7 +170,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
       }
       else { await projectApi.createTask(projectId, payload); onSaved(); }
     } catch (err: any) {
-      alert(err?.response?.data?.detail || '保存失败');
+      toast.error(err?.response?.data?.detail || '保存失败');
     }
   };
 
@@ -192,14 +193,14 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
       // 刷新父级（甘特/计划表）但不关闭弹窗，便于连续操作
       onRefresh?.({ ...payload, taskId: task.id });
     } catch (err: any) {
-      alert(err?.response?.data?.detail || '操作失败');
+      toast.error(err?.response?.data?.detail || '操作失败');
     } finally {
       setStatusSaving(false);
     }
   };
 
   const ensureTaskId = (): string | null => {
-    if (!task) { alert('请先保存任务,再添加关联对象/评论'); return null; }
+    if (!task) { toast.error('请先保存任务,再添加关联对象/评论'); return null; }
     return task.id;
   };
 
@@ -231,7 +232,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
           return;
         }
       } catch { /* 提示 */ }
-      alert('该零件生产附件无 STP 文件');
+      toast.info('该零件生产附件无 STP 文件');
       return;
     }
     if (l.entity_type === 'document') {
@@ -241,12 +242,12 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
         const att = atts[0];
         if (att) {
           await previewAttachment(att.id, att.file_name || '', {
-            onArchive: () => alert('压缩包附件请在图文档详情中查看'),
+            onArchive: () => toast.info('压缩包附件请在图文档详情中查看'),
           });
           return;
         }
       } catch { /* 提示 */ }
-      alert('该图文档暂无附件可预览');
+      toast.info('该图文档暂无附件可预览');
     }
   };
 
@@ -290,7 +291,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
           await ecoApi.detail(entityId);
           setEcView({ id: entityId, kind: 'eco' });
         } catch {
-          alert('无法打开该变更单(ECR/ECO 不存在或无权限)');
+          toast.error('无法打开该变更单(ECR/ECO 不存在或无权限)');
         }
       }
       return;
@@ -525,7 +526,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                                   setDepTaskSearch('');
                                   loadDeps();
                                 } catch (err: any) {
-                                  alert(err?.response?.data?.detail || '添加依赖失败');
+                                  toast.error(err?.response?.data?.detail || '添加依赖失败');
                                 }
                               }}>添加依赖</Button>
                           </div>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { projectApi } from '../../../services/projectApi';
+import { toast } from '../../../components/Toast';
 import type { GanttData, GanttTask } from '../../../types/project';
 import type { Scale } from './ganttUtils';
 import {
@@ -95,7 +96,7 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
       syncProjectDates(res.data.tasks);
       onTaskUpdated?.();
     } catch {
-      alert('自动排期失败(需项目经理/管理员权限)');
+      toast.error('自动排期失败(需项目经理/管理员权限)');
       await load();
     } finally {
       setScheduling(false);

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../../components/Modal';
+import { toast } from '../../components/Toast';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import Select from '../../components/ui/Select';
@@ -81,7 +82,7 @@ export default function MemberManageModal({ open, projectId, ownerId, onClose, o
       onSaved?.();
       onClose();
     } catch (err: any) {
-      alert(err?.response?.data?.detail || '保存失败,请重试');
+      toast.error(err?.response?.data?.detail || '保存失败,请重试');
       // 失败时重新拉取,避免本地与服务端不一致
       const r = await projectApi.listMembers(projectId);
       const items = (r.data.items as ProjectMember[]).map(toDraft);
