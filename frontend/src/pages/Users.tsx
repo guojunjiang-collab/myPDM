@@ -256,6 +256,12 @@ export default function Users() {
           className={`px-4 h-[var(--ui-control-h)] inline-flex items-center -mb-px border-b-2 text-sm ${activeTab === 'all' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-[var(--ui-text-secondary)]'}`}
           onClick={() => setActiveTab('all')}
         >全部用户</button>
+        {can('user_groups:read' as any) && (
+          <button
+            className={`px-4 h-[var(--ui-control-h)] inline-flex items-center -mb-px border-b-2 text-sm ${activeTab === 'groups' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-[var(--ui-text-secondary)]'}`}
+            onClick={() => setActiveTab('groups')}
+          >用户组</button>
+        )}
         {isAdmin() && (
           <button
             className={`px-4 h-[var(--ui-control-h)] inline-flex items-center -mb-px border-b-2 text-sm ${activeTab === 'pending' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-[var(--ui-text-secondary)]'}`}
@@ -266,12 +272,6 @@ export default function Users() {
               <span className="ml-1.5"><Badge size="xs" tone="amber" label={unverifiedUsers.length} /></span>
             )}
           </button>
-        )}
-        {can('user_groups:read' as any) && (
-          <button
-            className={`px-4 h-[var(--ui-control-h)] inline-flex items-center -mb-px border-b-2 text-sm ${activeTab === 'groups' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-[var(--ui-text-secondary)]'}`}
-            onClick={() => setActiveTab('groups')}
-          >用户组</button>
         )}
       </div>
 
