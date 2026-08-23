@@ -18,7 +18,7 @@ import TreeToggle from '../ui/TreeToggle';
 import { useTableSort } from '../../hooks/useTableSort';
 import { compareVersions } from '../../constants';
 import { ECOEditView } from './ECOEditView';
-import { ECRDocumentPicker } from '../ECR/ECRDocumentPicker';
+import DocumentPicker from '../DocumentPicker';
 import AssemblyPartPicker from '../AssemblyPartPicker';
 
 const REASON_OPTIONS = [
@@ -651,19 +651,20 @@ onExecuteFreeze={(itemId, newEntityId) => handleExecuteAction('freeze', itemId, 
         </Button>
       </div>
 
-      {/* 图文档选择器 — 独立弹窗 */}
-      <ECRDocumentPicker
+      {/* 图文档选择器 — 独立弹窗（共享 DocumentPicker） */}
+      <DocumentPicker
         open={showDocPicker}
         onClose={() => setShowDocPicker(false)}
-        onSelect={(docs: ECRDocumentLink[]) => {
+        onConfirm={(items) => {
           setDocumentLinks(prev => {
             const existing = new Set(prev.map(d => d.document_id));
-            const newDocs = docs.filter(d => !existing.has(d.document_id));
+            const newDocs = items
+              .filter(v => !existing.has(v.document_id))
+              .map(v => ({ document_id: v.document_id, document_code: '', document_name: '', document_version: '' }));
             return [...prev, ...newDocs];
           });
-          setShowDocPicker(false);
         }}
-        alreadyLinked={documentLinks.map(d => d.document_id)}
+        existingDocIds={new Set(documentLinks.map(d => d.document_id))}
       />
 
       {/* ECR 选择弹窗（共享 Modal，zIndex 走 MODAL_Z.picker；height 限定防 ECR 长列表超高） */}

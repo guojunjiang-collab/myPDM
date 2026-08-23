@@ -9,7 +9,7 @@ import { exportEcoPdf } from '../../services/ecPdfExport';
 import { useDataStore } from '../../stores/data';
 import { ECOEditView } from './ECOEditView';
 import { ECRReviewPanel } from '../ECR/ECRReviewPanel';
-import { ECRDocumentPicker } from '../ECR/ECRDocumentPicker';
+import DocumentPicker from '../DocumentPicker';
 import AssemblyPartPicker from '../AssemblyPartPicker';
 import VersionSelectModal from '../VersionSelectModal';
 import PartDetailModal from '../PartDetailModal';
@@ -439,10 +439,16 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
       />
     )}
 
-    {/* 图文档选择器 */}
-    <ECRDocumentPicker open={showDocPicker} onClose={() => setShowDocPicker(false)}
-      onSelect={(docs: ECRDocumentLink[]) => { const existing = new Set(documentLinks.map(d => d.document_id)); const newDocs = docs.filter(d => !existing.has(d.document_id)); saveDocumentLinks([...documentLinks, ...newDocs]); setShowDocPicker(false); }}
-      alreadyLinked={documentLinks.map(d => d.document_id)} />
+    {/* 图文档选择器（共享 DocumentPicker） */}
+    <DocumentPicker open={showDocPicker} onClose={() => setShowDocPicker(false)}
+      onConfirm={(items) => {
+        const existing = new Set(documentLinks.map(d => d.document_id));
+        const newDocs = items
+          .filter(v => !existing.has(v.document_id))
+          .map(v => ({ document_id: v.document_id, document_code: '', document_name: '', document_version: '' }));
+        saveDocumentLinks([...documentLinks, ...newDocs]);
+      }}
+      existingDocIds={new Set(documentLinks.map(d => d.document_id))} />
 
     {/* 零部件选择器 */}
     <AssemblyPartPicker open={showReleasePicker} onClose={() => setShowReleasePicker(false)}

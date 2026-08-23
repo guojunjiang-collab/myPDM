@@ -7,7 +7,8 @@ import { useDataStore } from '../../stores/data';
 import type { ECRRequest, ECRCreateData, ECRReviewer, ECRDocumentLink, BomImpactNode } from '../../types';
 import { ECRAffectedItemPicker } from './ECRAffectedItemPicker';
 import { ECRBomImpactView } from './ECRBomImpactView';
-import { ECRDocumentPicker } from './ECRDocumentPicker';
+import DocumentPicker from '../DocumentPicker';
+import Tabs from '../ui/Tabs';
 import VersionSelectModal from '../VersionSelectModal';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
@@ -117,6 +118,8 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
   const [documentLinks, setDocumentLinks] = useState<ECRDocumentLink[]>([]);
   const [showAffectedPicker, setShowAffectedPicker] = useState(false);
   const [showDocPicker, setShowDocPicker] = useState(false);
+  // Tab 分页（参考零部件详情：基本信息/审批人/关联图文档/BOM影响）
+  const [activeTab, setActiveTab] = useState<'info' | 'reviewers' | 'docs' | 'items'>('info');
   const [docData, setDocData] = useState<Record<string, any>>({});
   const [docAttachments, setDocAttachments] = useState<Record<string, any[]>>({});
   const [docCustomValues, setDocCustomValues] = useState<Record<string, Record<string, any>>>({});
@@ -174,7 +177,7 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
       if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
     }, 0);
     return () => clearTimeout(timer);
-  }, [open, description]);
+  }, [open, description, activeTab]);
 
   // Initialize form on open or when editingEcr changes
   useEffect(() => {
@@ -201,6 +204,7 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
         resetForm();
       }
       setErrors({});
+      setActiveTab('info');
     }
   }, [open, editingEcr]);
 
@@ -453,9 +457,19 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
 
   return (
     <>
-    <Modal open={open} title={isEditing ? '编辑 ECR' : '新建 ECR'} onClose={handleClose} width="full">
-      <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-        <div className="grid grid-cols-2 gap-4">
+    <Modal open={open} title={isEditing ? '编辑 ECR' : '新建 ECR'} onClose={handleClose} width="full" height="75vh"
+      footer={
+        <>
+          <Button variant="secondary" onClick={handleClose}>取消</Button>
+          <Button onClick={handleSubmit} disabled={loading}>
+            {loading ? '提交中...' : isEditing ? '保存修改' : '创建 ECR'}
+          </Button>
+        </>
+      }
+    >
+      <div className="h-full flex flex-col min-h-0">
+        {/* 常驻摘要条：编号 + 标题（必填） */}
+        <div className="grid grid-cols-2 gap-4 shrink-0 mb-3">
           <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
             <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">ECR 编号</label>
             <Input size="xs" type="text" value={editingEcr?.ecr_number || ''} disabled
@@ -469,6 +483,25 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
             {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
           </div>
         </div>
+
+        {/* Tab 栏（必填缺失红点提示） */}
+        <div className="shrink-0 mb-3">
+          <Tabs
+            items={[
+              { key: 'info', label: <span>基本信息{!title.trim() && <span className="ml-1 text-red-500">●</span>}</span> },
+              { key: 'items', label: '受影响物料' },
+              { key: 'docs', label: '关联图文档' },
+              { key: 'reviewers', label: <span>审批{reviewers.some(r => !r.user_id) && <span className="ml-1 text-red-500">●</span>}</span> },
+            ]}
+            activeKey={activeTab}
+            onChange={(k) => setActiveTab(k as any)}
+          />
+        </div>
+
+        {/* Tab 内容区 */}
+        <div className="flex-1 min-h-0 overflow-auto pr-1 space-y-4">
+          {activeTab === 'info' && (
+            <>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
             <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">变更原因</label>
@@ -509,7 +542,10 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
             rows={1} placeholder="请描述变更内容和原因"
             className="resize-none" />
         </div>
-
+            </>
+          )}
+          {activeTab === 'reviewers' && (
+            <>
         {/* Reviewers */}
         <div>
           <div className="flex items-center justify-between mb-2">
@@ -583,7 +619,10 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
             <p className="text-red-500 text-xs mt-1">请为所有审批人选择用户</p>
           )}
         </div>
-
+            </>
+          )}
+          {activeTab === 'docs' && (
+            <>
         {/* 关联图文档 */}
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
@@ -624,7 +663,10 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
             )}
           </div>
         </div>
-
+            </>
+          )}
+          {activeTab === 'items' && (
+            <>
         {/* BOM 影响分析 */}
         <div>
           <div className="flex items-center justify-between mb-2">
@@ -697,19 +739,9 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
             ))}
           </div>
         </div>
-      </div>
-
-      {/* Footer */}
-      <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[var(--ui-border)]">
-        <Button variant="secondary" onClick={handleClose}>
-          取消
-        </Button>
-        <Button
-          onClick={handleSubmit}
-          disabled={loading}
-        >
-          {loading ? '提交中...' : isEditing ? '保存修改' : '创建 ECR'}
-        </Button>
+            </>
+          )}
+        </div>
       </div>
     </Modal>
 
@@ -720,11 +752,18 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
         alreadySelected={affectedItems.map((a) => a.entity_id)}
       />
 
-      <ECRDocumentPicker
+      <DocumentPicker
         open={showDocPicker}
         onClose={() => setShowDocPicker(false)}
-        onSelect={(docs) => addDocumentLinks(docs)}
-        alreadyLinked={documentLinks.map((d) => d.document_id)}
+        onConfirm={(items) =>
+          addDocumentLinks(items.map((v) => ({
+            document_id: v.document_id,
+            document_code: '',
+            document_name: '',
+            document_version: '',
+          })))
+        }
+        existingDocIds={new Set(documentLinks.map((d) => d.document_id))}
       />
       <VersionSelectModal
         open={!!versionSelectState}

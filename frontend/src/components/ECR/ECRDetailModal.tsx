@@ -6,6 +6,7 @@ import { useAuthStore, canEdit, isAdmin, canDownload } from '../../stores/auth';
 import { exportEcrPdf } from '../../services/ecPdfExport';
 import { useDataStore } from '../../stores/data';
 import { ECRStatusBadge, ECRPriorityBadge } from './ECRStatusBadge';
+import Tabs from '../ui/Tabs';
 import { ECRReviewPanel } from './ECRReviewPanel';
 import { ECRBomImpactView } from './ECRBomImpactView';
 import DocumentDetailModal from '../DocumentDetailModal';
@@ -101,6 +102,9 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
   const [showCloseForm, setShowCloseForm] = useState(false);
   const [closeComment, setCloseComment] = useState('');
 
+  // Tab 分页（参考零部件详情：基本信息/审批/关联图文档/受影响物料）
+  const [activeTab, setActiveTab] = useState<'info' | 'review' | 'docs' | 'items'>('info');
+
   const loadDetail = useCallback(async () => {
     if (!ecrId) return;
     setLoading(true);
@@ -191,6 +195,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
       loadStatusLogs();
       setShowCloseForm(false);
       setCloseComment('');
+      setActiveTab('info');
     }
   }, [open, ecrId, loadDetail, loadStatusLogs]);
 
@@ -295,7 +300,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
               </Button>
             )}
             {isCurrentReviewer() && hasPendingReview() && (
-              <span className="text-sm text-blue-600 self-center">👆 请在上方审批区域进行操作</span>
+              <span className="text-sm text-blue-600 self-center">请到「审批」Tab 进行审批操作</span>
             )}
           </div>
         );
@@ -340,20 +345,38 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
       ) : !detail ? (
         <div className="text-center text-[var(--ui-text-secondary)] py-12">暂无数据</div>
       ) : (
-        <div className="print-area space-y-6 pr-1">
-          {/* Header */}
-          <div className="flex items-center justify-between pb-4 border-b border-[var(--ui-border)]">
-            <div>
-              <div className="text-lg font-bold text-[var(--ui-text-primary)]">
-                {detail.ecr_number}
-              </div>
-              <div className="text-sm text-[var(--ui-text-secondary)] mt-0.5">{detail.title}</div>
+        <div className="h-full flex flex-col min-h-0">
+          {/* 常驻摘要条：编号 + 标题 + 状态/优先级 + 操作按钮 */}
+          <div className="flex items-center justify-between gap-3 pb-3 mb-3 border-b border-[var(--ui-border)] shrink-0">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="text-lg font-bold text-[var(--ui-text-primary)] shrink-0">{detail.ecr_number}</span>
+              <span className="text-sm text-[var(--ui-text-secondary)] truncate">{detail.title}</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <ECRStatusBadge status={detail.status} />
               <ECRPriorityBadge priority={detail.priority} />
+              {renderActions()}
             </div>
           </div>
+
+          {/* Tab 栏 */}
+          <div className="shrink-0 mb-3">
+            <Tabs
+              items={[
+                { key: 'info', label: '基本信息' },
+                { key: 'items', label: '受影响物料' },
+                { key: 'docs', label: '关联图文档' },
+                { key: 'review', label: '审批' },
+              ]}
+              activeKey={activeTab}
+              onChange={(k) => setActiveTab(k as any)}
+            />
+          </div>
+
+          {/* Tab 内容区 */}
+          <div className="flex-1 min-h-0 overflow-auto pr-1 space-y-6">
+            {activeTab === 'info' && (
+              <>
 
           {/* Basic Info */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -388,6 +411,10 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
             </div>
           )}
 
+            </>
+          )}
+          {activeTab === 'review' && (
+            <>
           {/* Review Progress */}
           <div>
             <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-3">
@@ -407,6 +434,92 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
             />
           </div>
 
+          {/* Status Log（审批 Tab） */}
+          {statusLogs.length > 0 && (
+            <div>
+              <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-3">📋 状态记录</h4>
+              <div className="space-y-0">
+                {statusLogs.map((log) => (
+                  <div key={log.id} className="flex gap-3 pb-4">
+                    {/* Timeline dot and line */}
+                    <div className="flex flex-col items-center">
+                      <div
+                        className={`w-3 h-3 rounded-full border-2 ${
+                          log.to_status === 'approved'
+                            ? 'bg-green-500 border-green-500'
+                            : log.to_status === 'rejected'
+                              ? 'bg-red-500 border-red-500'
+                              : log.to_status === 'returned'
+                                ? 'bg-orange-500 border-orange-500'
+                                : 'bg-blue-500 border-blue-500'
+                        }`}
+                      />
+                      <div className="w-0.5 flex-1 bg-gray-200 min-h-[16px]" />
+                    </div>
+                    <div className="flex-1 pb-1">
+                      <div className="text-sm text-[var(--ui-text-primary)]">
+                        <span className="font-medium">{log.operator_name}</span>
+                        <span className="text-[var(--ui-text-secondary)] mx-1">·</span>
+                        <span
+                          className={`${
+                            log.to_status === 'approved'
+                              ? 'text-green-600'
+                              : log.to_status === 'rejected'
+                                ? 'text-red-600'
+                                : log.to_status === 'returned'
+                                  ? 'text-orange-600'
+                                  : 'text-blue-600'
+                          }`}
+                        >
+                          {STATUS_LABELS[log.to_status] || log.to_status}
+                        </span>
+                      </div>
+                      {log.comment && (
+                        <div className="text-sm text-[var(--ui-text-secondary)] mt-0.5">{log.comment}</div>
+                      )}
+                      <div className="text-xs text-[var(--ui-text-tertiary)] mt-0.5">
+                        {new Date(log.created_at).toLocaleString('zh-CN')}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Close form（审批 Tab） */}
+          {showCloseForm && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <h4 className="text-sm font-semibold text-red-700 mb-2">关闭 ECR</h4>
+              <Textarea
+                value={closeComment}
+                onChange={(e) => setCloseComment(e.target.value)}
+                rows={2}
+                className="!border-red-300 resize-none"
+                placeholder="关闭原因（可选）"
+              />
+              <div className="flex gap-2 mt-2">
+                <Button variant="danger" size="sm"
+                  onClick={handleClose}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? '处理中...' : '确认关闭'}
+                </Button>
+                <Button variant="secondary" size="sm"
+                  onClick={() => {
+                    setShowCloseForm(false);
+                    setCloseComment('');
+                  }}
+                >
+                  取消
+                </Button>
+              </div>
+            </div>
+          )}
+            </>
+          )}
+          {activeTab === 'docs' && (
+            <>
           {/* Document Links */}
           {detail.document_links && detail.document_links.length > 0 ? (
             <div className="border-t pt-4">
@@ -477,7 +590,10 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
               </div>
             </div>
           ) : null}
-
+            </>
+          )}
+          {activeTab === 'items' && (
+            <>
           {/* Affected Items */}
           {detail.affected_items && detail.affected_items.length > 0 && (
             <div>
@@ -525,95 +641,10 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
               </div>
             </div>
           )}
-
-          {/* Status Log */}
-          {statusLogs.length > 0 && (
-            <div>
-              <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-3">📋 状态记录</h4>
-              <div className="space-y-0">
-                {statusLogs.map((log) => (
-                  <div key={log.id} className="flex gap-3 pb-4">
-                    {/* Timeline dot and line */}
-                    <div className="flex flex-col items-center">
-                      <div
-                        className={`w-3 h-3 rounded-full border-2 ${
-                          log.to_status === 'approved'
-                            ? 'bg-green-500 border-green-500'
-                            : log.to_status === 'rejected'
-                              ? 'bg-red-500 border-red-500'
-                              : log.to_status === 'returned'
-                                ? 'bg-orange-500 border-orange-500'
-                                : 'bg-blue-500 border-blue-500'
-                        }`}
-                      />
-                      <div className="w-0.5 flex-1 bg-gray-200 min-h-[16px]" />
-                    </div>
-                    <div className="flex-1 pb-1">
-                      <div className="text-sm text-[var(--ui-text-primary)]">
-                        <span className="font-medium">{log.operator_name}</span>
-                        <span className="text-[var(--ui-text-secondary)] mx-1">·</span>
-                        <span
-                          className={`${
-                            log.to_status === 'approved'
-                              ? 'text-green-600'
-                              : log.to_status === 'rejected'
-                                ? 'text-red-600'
-                                : log.to_status === 'returned'
-                                  ? 'text-orange-600'
-                                  : 'text-blue-600'
-                          }`}
-                        >
-                          {STATUS_LABELS[log.to_status] || log.to_status}
-                        </span>
-                      </div>
-                      {log.comment && (
-                        <div className="text-sm text-[var(--ui-text-secondary)] mt-0.5">{log.comment}</div>
-                      )}
-                      <div className="text-xs text-[var(--ui-text-tertiary)] mt-0.5">
-                        {new Date(log.created_at).toLocaleString('zh-CN')}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            </>
           )}
-
-          {/* Close form */}
-          {showCloseForm && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <h4 className="text-sm font-semibold text-red-700 mb-2">关闭 ECR</h4>
-              <Textarea
-                value={closeComment}
-                onChange={(e) => setCloseComment(e.target.value)}
-                rows={2}
-                className="!border-red-300 resize-none"
-                placeholder="关闭原因（可选）"
-              />
-              <div className="flex gap-2 mt-2">
-                <Button variant="danger" size="sm"
-                  onClick={handleClose}
-                  disabled={actionLoading}
-                >
-                  {actionLoading ? '处理中...' : '确认关闭'}
-                </Button>
-                <Button variant="secondary" size="sm"
-                  onClick={() => {
-                    setShowCloseForm(false);
-                    setCloseComment('');
-                  }}
-                >
-                  取消
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Action buttons */}
-          <div className="pt-4 border-t border-[var(--ui-border)] flex items-center justify-between">
-            {renderActions()}
-          </div>
         </div>
+      </div>
       )}
     </Modal>
 
