@@ -489,9 +489,9 @@ export default function PartCompareModal({
                       );
                       const isExpanded = expanded.has(n.key);
                       // depth = n.level + 1，ROOT 为 0，直接子项为 1，以此类推
-                      // 对齐 CompareTreePanel：paddingLeft = 8 + depth*12，按钮中心 = 16 + depth*12
+                      // 对齐 CompareTreePanel：paddingLeft = 8 + depth*var(--ui-tree-indent)，按钮中心 = 16 + depth*var(--ui-tree-indent)
                       const depth = n.level + 1;
-                      const indent = 8 + depth * 12;
+                      const indent = `calc(8px + ${depth} * var(--ui-tree-indent))`;
                       return (
                         <tr key={n.key} className={`${rowBg[n.change_type]} border-b border-gray-100 cursor-pointer hover:brightness-95`}
                           onClick={() => {
@@ -509,7 +509,7 @@ export default function PartCompareModal({
                               <span
                                 key={k}
                                 className="absolute -top-px bottom-0 w-px bg-gray-200 pointer-events-none"
-                                style={{ left: 16 + k * 12 }}
+                                style={{ left: `calc(16px + ${k} * var(--ui-tree-indent))` }}
                               />
                             ))}
                             <span className="inline-flex items-center gap-1">
@@ -538,7 +538,7 @@ export default function PartCompareModal({
                               <span
                                 key={k}
                                 className="absolute -top-px bottom-0 w-px bg-gray-200 pointer-events-none"
-                                style={{ left: 16 + k * 12 }}
+                                style={{ left: `calc(16px + ${k} * var(--ui-tree-indent))` }}
                               />
                             ))}
                             <span className="inline-flex items-center gap-1">

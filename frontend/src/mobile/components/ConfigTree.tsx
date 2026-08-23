@@ -2,6 +2,7 @@ import { Fragment, useState } from 'react';
 import type { ReactNode } from 'react';
 import { configurationApi } from '../../services/api';
 import Badge from '../../components/ui/Badge';
+import TreeToggle from '../../components/ui/TreeToggle';
 import type { ConfigChildItem } from '../../types';
 
 /**
@@ -16,9 +17,9 @@ function sortedByOrder(list: ConfigChildItem[]): ConfigChildItem[] {
   return [...list].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 }
 
-// 每级缩进 24px；展开按钮 36px（根行代码距左框 36px）。
+// 每级缩进 var(--ui-tree-indent)（14px）；展开按钮 36px（根行代码距左框 36px）。
 // 竖线位置 = i*INDENT + BTN/2 = 父项展开按钮中心，保证竖线与父项展开按钮对齐。
-const INDENT = 24;
+const INDENT = 'var(--ui-tree-indent)';
 const BTN = 36;
 
 interface Props {
@@ -65,27 +66,30 @@ export default function ConfigTree({ rootItems, onOpenChild }: Props) {
       <Fragment key={c.id}>
         <div className="flex items-stretch min-h-10 border-b border-gray-50 bg-white">
           {/* 缩进 + 层级竖线（每级一条，位置 = 父项展开按钮中心） */}
-          <span className="relative shrink-0" style={{ width: depth * INDENT }}>
+          <span className="relative shrink-0" style={{ width: `calc(${depth} * ${INDENT})` }}>
             {depth > 0 &&
               Array.from({ length: depth }).map((_, i) => (
                 <span
                   key={i}
                   className="absolute top-0 bottom-0 border-l border-gray-200"
-                  style={{ left: i * INDENT + BTN / 2 }}
+                  style={{ left: `calc(${i} * ${INDENT} + ${BTN / 2}px)` }}
                 />
               ))}
           </span>
           {c.has_children ? (
-            <button
-              type="button"
-              aria-label={isOpen ? '折叠' : '展开'}
-              onClick={() => toggle(revId)}
-              className="shrink-0 w-9 flex items-center justify-center text-gray-500 text-lg"
-            >
-              {isLoading ? '⋯' : isOpen ? '▾' : '▸'}
-            </button>
+            <span className="shrink-0 w-9 flex items-center justify-center">
+              <TreeToggle
+                expanded={isOpen}
+                onClick={() => toggle(revId)}
+                loading={isLoading}
+                size="sm"
+                title={isOpen ? '折叠' : '展开'}
+              />
+            </span>
           ) : (
-            <span className="shrink-0 w-9 flex items-center justify-center text-gray-300 text-sm">•</span>
+            <span className="shrink-0 w-9 flex items-center justify-center">
+              <TreeToggle leaf size="sm" />
+            </span>
           )}
           {/* 点击行 → 打开子构型项详情（详情栈逐级下钻） */}
           <button
@@ -127,17 +131,17 @@ export default function ConfigTree({ rootItems, onOpenChild }: Props) {
         {isOpen && (
           <div className="bg-white">
             {isLoading && (
-              <div className="py-2 text-xs text-gray-400" style={{ paddingLeft: (depth + 1) * INDENT + BTN }}>
+              <div className="py-2 text-xs text-gray-400" style={{ paddingLeft: `calc((${depth} + 1) * ${INDENT} + ${BTN}px)` }}>
                 加载中...
               </div>
             )}
             {!isLoading && hasError && (
-              <div className="py-2 text-xs text-red-400" style={{ paddingLeft: (depth + 1) * INDENT + BTN }}>
+              <div className="py-2 text-xs text-red-400" style={{ paddingLeft: `calc((${depth} + 1) * ${INDENT} + ${BTN}px)` }}>
                 加载失败，请重试
               </div>
             )}
             {!isLoading && !hasError && kids && kids.length === 0 && (
-              <div className="py-2 text-xs text-gray-400" style={{ paddingLeft: (depth + 1) * INDENT + BTN }}>
+              <div className="py-2 text-xs text-gray-400" style={{ paddingLeft: `calc((${depth} + 1) * ${INDENT} + ${BTN}px)` }}>
                 该构型项无下级子构型项
               </div>
             )}

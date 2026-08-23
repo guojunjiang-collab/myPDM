@@ -3,6 +3,7 @@ import type { MouseEvent as ReactMouseEvent } from 'react';
 import { boardApi, partsApi, documentsApi, mediaApi } from '../../services/api';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
+import TreeToggle from '../../components/ui/TreeToggle';
 import type { BadgeTone } from '../../constants/badges';
 import EmptyState from '../components/EmptyState';
 import DetailOverlayStack from '../components/DetailOverlayStack';
@@ -250,7 +251,7 @@ export default function BoardPage() {
    文件夹树节点（递归）：缩进 + 竖线 + 展开箭头 + 文件夹行 + 子文件夹/条目
    ================================================================ */
 
-const INDENT = 24;
+const INDENT = 'var(--ui-tree-indent)';
 
 function FolderTreeNode({
   folder,
@@ -276,28 +277,25 @@ function FolderTreeNode({
     <>
       <div className="flex items-stretch min-h-11 border-b border-gray-50 last:border-b-0">
         {/* 缩进 + 层级竖线（每级一条，对齐对应祖先箭头区中心，同 BOM 树 i*INDENT + 18） */}
-        <span className="relative shrink-0" style={{ width: depth * INDENT }}>
+        <span className="relative shrink-0" style={{ width: `calc(${depth} * ${INDENT})` }}>
           {depth > 0 &&
             Array.from({ length: depth }).map((_, i) => (
               <span
                 key={i}
                 className="absolute top-0 bottom-0 border-l border-gray-200"
-                style={{ left: i * INDENT + 18 }}
+                style={{ left: `calc(${i} * ${INDENT} + 18px)` }}
               />
             ))}
         </span>
         {/* 展开箭头（有子文件夹或条目才可展开） */}
         {hasContent ? (
-          <button
-            type="button"
-            aria-label={isOpen ? '折叠' : '展开'}
-            onClick={() => onToggle(folder.id)}
-            className="shrink-0 w-9 flex items-center justify-center text-gray-500 text-lg"
-          >
-            {isOpen ? '▾' : '▸'}
-          </button>
+          <span className="shrink-0 w-9 flex items-center justify-center">
+            <TreeToggle expanded={isOpen} onClick={() => onToggle(folder.id)} size="sm" title={isOpen ? '折叠' : '展开'} />
+          </span>
         ) : (
-          <span className="shrink-0 w-9 flex items-center justify-center text-gray-300 text-sm">•</span>
+          <span className="shrink-0 w-9 flex items-center justify-center">
+            <TreeToggle leaf size="sm" />
+          </span>
         )}
         {/* 文件夹行（点击切换展开） */}
         <button
@@ -413,18 +411,20 @@ function ItemRow({ item, depth, onClick }: { item: DashboardItem; depth: number;
       className="w-full flex items-stretch min-h-11 text-left border-b border-gray-50 last:border-b-0"
     >
       {/* 缩进 + 层级竖线（与文件夹行同构，竖线对齐箭头区中心） */}
-      <span className="relative shrink-0" style={{ width: depth * INDENT }}>
+      <span className="relative shrink-0" style={{ width: `calc(${depth} * ${INDENT})` }}>
         {depth > 0 &&
           Array.from({ length: depth }).map((_, i) => (
             <span
               key={i}
               className="absolute top-0 bottom-0 border-l border-gray-200"
-              style={{ left: i * INDENT + 18 }}
+              style={{ left: `calc(${i} * ${INDENT} + 18px)` }}
             />
           ))}
       </span>
       {/* 圆点区（与文件夹行的箭头/圆点对齐） */}
-      <span className="shrink-0 w-9 flex items-center justify-center text-gray-300 text-sm">•</span>
+      <span className="shrink-0 w-9 flex items-center justify-center">
+        <TreeToggle leaf size="sm" />
+      </span>
       <span className="flex-1 min-w-0 flex flex-col justify-center py-1.5 pr-3">
         <span className="flex items-center gap-2 min-w-0">
           <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">{item.code}</span>

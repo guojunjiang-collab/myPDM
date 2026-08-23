@@ -3,6 +3,7 @@ import { userGroupsApi, usersApi } from '../../services/api';
 import { can } from '../../stores/auth';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
+import TreeToggle from '../../components/ui/TreeToggle';
 import EmptyState from '../components/EmptyState';
 import { useDebounced } from '../../hooks/useDebounced';
 
@@ -298,19 +299,26 @@ export default function UsersListPage() {
             <div className="p-3 flex flex-col gap-2">
               {groups.map((g) => (
                 <div key={g.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
-                  <button
-                    onClick={() => toggleGroup(g.id)}
-                    className="w-full text-left px-4 py-3 min-h-12 flex items-center gap-2"
-                  >
-                    <span className="text-base">{expandedGroup === g.id ? '▾' : '▸'}</span>
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-sm text-gray-800 truncate">{g.name}</span>
-                      {g.description && (
-                        <span className="block text-xs text-gray-500 truncate mt-0.5">{g.description}</span>
-                      )}
-                    </span>
-                    <Badge tone="gray" label={`${g.member_count ?? 0} 人`} size="xs" />
-                  </button>
+                  <div className="w-full flex items-center gap-2 px-4 py-3 min-h-12">
+                    <TreeToggle
+                      expanded={expandedGroup === g.id}
+                      onClick={() => toggleGroup(g.id)}
+                      size="sm"
+                      title={expandedGroup === g.id ? '折叠' : '展开'}
+                    />
+                    <button
+                      onClick={() => toggleGroup(g.id)}
+                      className="flex-1 min-w-0 text-left flex items-center gap-2"
+                    >
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-sm text-gray-800 truncate">{g.name}</span>
+                        {g.description && (
+                          <span className="block text-xs text-gray-500 truncate mt-0.5">{g.description}</span>
+                        )}
+                      </span>
+                      <Badge tone="gray" label={`${g.member_count ?? 0} 人`} size="xs" />
+                    </button>
+                  </div>
                   {expandedGroup === g.id && (
                     <div className="border-t border-gray-100 px-4 py-2 flex flex-col">
                       {!membersByGroup[g.id] ? (

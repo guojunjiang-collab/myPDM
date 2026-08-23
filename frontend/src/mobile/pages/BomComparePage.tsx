@@ -5,6 +5,7 @@ import type { BOMCompareNode, BOMCompareResponse } from '../../types';
 import type { PartListItem } from '../../types';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
+import TreeToggle from '../../components/ui/TreeToggle';
 import type { BadgeTone } from '../../constants/badges';
 import { StpViewerCore } from './StpViewerPage';
 
@@ -492,26 +493,21 @@ export default function BomComparePage() {
                           className={`flex items-stretch min-h-10 border-b border-gray-100 last:border-b-0 ${ROW_BG[n.change_type] ?? ''}`}
                         >
                           {/* 缩进 + 竖线 */}
-                          <span className="relative shrink-0" style={{ width: depth * 16 + 4 }}>
+                          <span className="relative shrink-0" style={{ width: `calc(4px + ${depth} * var(--ui-tree-indent))` }}>
                             {depth > 0 && (
                               <span
                                 className="absolute top-0 bottom-0 border-l border-gray-200"
-                                style={{ left: depth * 16 + 2 }}
+                                style={{ left: `calc(2px + ${depth} * var(--ui-tree-indent))` }}
                               />
                             )}
                           </span>
                           {hasChildren ? (
-                            <button
-                              type="button"
-                              aria-label={isOpen ? '折叠' : '展开'}
-                              onClick={() => toggle(n.key)}
-                              className="shrink-0 w-9 flex items-center justify-center text-gray-500 text-sm"
-                            >
-                              {isOpen ? '▾' : '▸'}
-                            </button>
+                            <span className="shrink-0 w-9 flex items-center justify-center">
+                              <TreeToggle expanded={isOpen} onClick={() => toggle(n.key)} size="sm" title={isOpen ? '折叠' : '展开'} />
+                            </span>
                           ) : (
-                            <span className="shrink-0 w-9 flex items-center justify-center text-gray-300 text-xs">
-                              •
+                            <span className="shrink-0 w-9 flex items-center justify-center">
+                              <TreeToggle leaf size="sm" />
                             </span>
                           )}
                           <button

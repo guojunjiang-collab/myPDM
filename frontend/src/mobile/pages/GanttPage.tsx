@@ -8,6 +8,14 @@ import {
 import type { Scale } from '../../pages/Project/gantt/ganttUtils';
 import type { GanttData, GanttTask, ProjectTask } from '../../types/project';
 
+/** 缩进步长像素值（读取 --ui-tree-indent；canvas 测量与渲染 calc() 保持一致） */
+function treeIndentPx(): number {
+  if (typeof document === 'undefined') return 14;
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--ui-tree-indent').trim();
+  const n = parseFloat(raw);
+  return Number.isFinite(n) && n > 0 ? n : 14;
+}
+
 /* ================================================================
    移动端甘特图（只读，覆盖层）：
    - 数据/几何计算复用桌面版 ganttUtils（DAY_PX/barBox/ticks/computeRange/STATUS_FILL）
@@ -88,18 +96,19 @@ export default function GanttPage({ projectId, onBack }: Props) {
   const totalPx = range ? (daysBetween(range.start, range.end) + 1) * DAY_PX[scale] : 0;
   const todayX = range ? daysBetween(range.start, new Date()) * DAY_PX[scale] : -1;
 
-  // 左列宽度自适应内容：canvas 精确测量文本（text-xs 12px），逐行取「层级缩进(depth*10) + 文本宽」之和的最大值
+  // 左列宽度自适应内容：canvas 精确测量文本（text-xs 12px），逐行取「层级缩进(depth*var(--ui-tree-indent)) + 文本宽」之和的最大值
   // （最长文本可能不在最深层级，不能分开取最大值），再加行内 padding(px-2=16)——分割线紧贴最靠右的编号
   const leftW = useMemo(() => {
     if (!data) return 140;
     const ctx =
       typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
     if (ctx) ctx.font = '500 12px system-ui, -apple-system, sans-serif';
+    const indentPx = treeIndentPx();
     let max = 0;
     for (const t of data.tasks) {
       const codeW = ctx ? ctx.measureText(t.code).width : t.code.length * 7;
       const nameW = t.assignee_name ? (ctx ? ctx.measureText(t.assignee_name).width : t.assignee_name.length * 6) : 0;
-      max = Math.max(max, t.depth * 10 + codeW, t.depth * 10 + nameW);
+      max = Math.max(max, t.depth * indentPx + codeW, t.depth * indentPx + nameW);
     }
     return Math.min(300, Math.max(96, Math.ceil(max) + 12));
   }, [data]);
@@ -159,14 +168,14 @@ export default function GanttPage({ projectId, onBack }: Props) {
                   {/* 编号：全部显示不省略（左列宽度按测量值自适应，已含保险余量） */}
                   <span
                     className="text-xs font-medium text-gray-900 whitespace-nowrap leading-tight"
-                    style={{ paddingLeft: t.depth * 10 }}
+                    style={{ paddingLeft: `calc(${t.depth} * var(--ui-tree-indent))` }}
                   >
                     {t.code}
                   </span>
                   {/* 行2：负责人（更小字体）；无负责人/无日期时给出提醒 */}
                   <span
                     className="text-[10px] whitespace-nowrap leading-tight"
-                    style={{ paddingLeft: t.depth * 10 }}
+                    style={{ paddingLeft: `calc(${t.depth} * var(--ui-tree-indent))` }}
                   >
                     {t.assignee_name ? (
                       <span className="text-gray-500">{t.assignee_name}</span>

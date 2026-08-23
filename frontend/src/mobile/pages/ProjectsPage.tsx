@@ -8,6 +8,7 @@ import DetailOverlayStack from '../components/DetailOverlayStack';
 import MobileCardList from '../components/MobileCardList';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
+import TreeToggle from '../../components/ui/TreeToggle';
 import EmptyState from '../components/EmptyState';
 import { formatMeta } from '../components/formatMeta';
 import TaskDetailPage from './TaskDetailPage';
@@ -62,9 +63,9 @@ function fmtDate(v?: string | null): string {
 }
 
 /* 任务树节点：层级缩进 + 展开箭头 + 行内容；点击行打开任务详情。
-   展开箭头/缩进/竖线参照用户看板文件夹层级（箭头区 w-9、缩进 24、竖线对齐箭头中心）。
+   展开箭头/缩进/竖线参照用户看板文件夹层级（箭头区 w-9、缩进 var(--ui-tree-indent)、竖线对齐箭头中心）。
    当前登录人负责的任务：整行浅主色底（bg-primary-100）高亮标识 */
-const INDENT = 24;
+const INDENT = 'var(--ui-tree-indent)';
 const BTN = 36;
 
 function TaskTreeNode({
@@ -91,26 +92,28 @@ function TaskTreeNode({
         className={`rounded-lg shadow-sm flex items-stretch ${isMine ? 'bg-primary-100' : 'bg-white'}`}
       >
         {/* 缩进 + 层级竖线（每级一条，位置 = 该级箭头中心，同看板文件夹树） */}
-        <span className="relative shrink-0" style={{ width: depth * INDENT }}>
+        <span className="relative shrink-0" style={{ width: `calc(${depth} * ${INDENT})` }}>
           {depth > 0 &&
             Array.from({ length: depth }).map((_, i) => (
               <span
                 key={i}
                 className="absolute top-0 bottom-0 border-l border-gray-200"
-                style={{ left: i * INDENT + BTN / 2 }}
+                style={{ left: `calc(${i} * ${INDENT} + ${BTN / 2}px)` }}
               />
             ))}
         </span>
-        <button
-          type="button"
-          aria-label={hasChildren ? (isOpen ? '折叠' : '展开') : '无子任务'}
-          onClick={() => hasChildren && onToggle(task.id)}
-          className={`shrink-0 w-9 flex items-center justify-center text-lg leading-none ${
-            hasChildren ? 'text-gray-500' : 'text-gray-300'
-          }`}
-        >
-          {hasChildren ? (isOpen ? '▾' : '▸') : '•'}
-        </button>
+        <span className="shrink-0 w-9 flex items-center justify-center">
+          {hasChildren ? (
+            <TreeToggle
+              expanded={isOpen}
+              onClick={() => onToggle(task.id)}
+              size="sm"
+              title={isOpen ? '折叠' : '展开'}
+            />
+          ) : (
+            <TreeToggle leaf size="sm" title="无子任务" />
+          )}
+        </span>
         <button
           type="button"
           onClick={() => onOpen(task)}
