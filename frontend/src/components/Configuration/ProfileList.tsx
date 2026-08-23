@@ -118,6 +118,7 @@ export default function ProfileList() {
       {/* 搜索 + 新建 */}
       <div className="flex items-center gap-2 mb-4 shrink-0">
         <Select
+          className="!w-auto"
           value={searchField}
           onChange={(e) => setSearchField(e.target.value)}
         >
@@ -131,9 +132,10 @@ export default function ProfileList() {
           placeholder={searchField === 'all' ? '搜索...' : `搜索${searchField === 'code' ? '编号' : searchField === 'name' ? '名称' : '备注'}...`}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="!w-44"
+          className="flex-1 min-w-0"
         />
         <Select
+          className="!w-auto"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
         >

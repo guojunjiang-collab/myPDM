@@ -152,12 +152,12 @@ export function ECOList() {
       <div className="flex items-center gap-2 mb-4 shrink-0">
         <Input type="text" placeholder="搜索..." value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          className="!w-44" />
-        <Select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
+          className="flex-1 min-w-0" />
+        <Select className="!w-auto" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
           <option value="">全部状态</option>
           {Object.entries(statusLabels).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </Select>
-        <Select value={priorityFilter} onChange={(e) => { setPriorityFilter(e.target.value); setPage(1); }}>
+        <Select className="!w-auto" value={priorityFilter} onChange={(e) => { setPriorityFilter(e.target.value); setPage(1); }}>
           <option value="">全部优先级</option>
           {Object.entries(priorityLabels).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </Select>

@@ -322,6 +322,7 @@ export default function AssemblyPartPicker({
             className="flex-1"
           />
           <Select
+            className="!w-auto"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >

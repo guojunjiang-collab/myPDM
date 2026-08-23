@@ -578,9 +578,10 @@ export default function Projects() {
                 placeholder="搜索编号/名称..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="!w-44"
+                className="flex-1 min-w-0"
               />
               <Select
+                className="!w-auto"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
@@ -671,9 +672,9 @@ export default function Projects() {
                     placeholder="搜索任务..."
                     value={taskSearch}
                     onChange={(e) => setTaskSearch(e.target.value)}
-                    className="!w-44"
+                    className="flex-1 min-w-0"
                   />
-                  <Select value={taskStatusFilter} onChange={(e) => setTaskStatusFilter(e.target.value)}>
+                  <Select className="!w-auto" value={taskStatusFilter} onChange={(e) => setTaskStatusFilter(e.target.value)}>
                     <option value="">全部状态</option>
                     {(['未开始', '进行中', '已完成', '挂起'] as TaskStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
                   </Select>
@@ -683,7 +684,7 @@ export default function Projects() {
                     只看我的任务
                   </label>
                   {maxTreeDepth > 0 && (
-                    <Select size="xs"
+                    <Select size="xs" className="!w-auto"
                       value={expandSel}
                       onChange={(e) => handleExpandChange(e.target.value)}
                     >

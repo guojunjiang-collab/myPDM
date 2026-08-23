@@ -156,9 +156,10 @@ export default function DeliverableModal({
           placeholder="搜索编号/名称..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="!w-44"
+          className="flex-1 min-w-0"
         />
         <Select
+          className="!w-auto"
           value={status}
           onChange={(e) => setStatus(e.target.value)}
         >

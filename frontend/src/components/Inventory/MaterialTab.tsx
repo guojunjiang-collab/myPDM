@@ -142,7 +142,7 @@ export default function MaterialTab() {
       <div className="flex items-center gap-2 mb-4 shrink-0">
         <Input type="text" placeholder="搜索编码/名称/规格..." value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="!w-64" />
+          className="flex-1 min-w-0" />
         <div className="flex-1" />
         {canEdit() && (
           <>

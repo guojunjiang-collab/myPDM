@@ -146,7 +146,7 @@ export default function ConfigItemPicker({ open, onClose, onConfirm, excludeId }
         <div className="flex gap-2 items-center">
           <Input type="text" placeholder="搜索构型号、名称..." value={search} onChange={(e) => setSearch(e.target.value)}
             className="flex-1" />
-          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <Select className="!w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="">全部状态</option>
             <option value="draft">草稿</option>
             <option value="frozen">冻结</option>

@@ -120,12 +120,12 @@ export default function DocumentTab() {
       <div className="flex gap-2 mb-4 items-center shrink-0">
         <Input type="text" placeholder="搜索单据号/业务/创建人/物料..." value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="!w-80" />
-        <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+          className="flex-1 min-w-0" />
+        <Select className="!w-auto" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
           <option value="">全部类型</option>
           {DOC_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
         </Select>
-        <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+        <Select className="!w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           <option value="">全部状态</option>
           {Object.entries(BADGE_DOMAINS.inventoryDoc).map(([k, def]) => <option key={k} value={k}>{def.label}</option>)}
         </Select>

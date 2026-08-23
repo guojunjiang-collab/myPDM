@@ -135,6 +135,7 @@ export default function PartsPage() {
     <div className="h-full flex flex-col">
       <div className="flex items-center gap-2 mb-4 shrink-0">
         <Select
+          className="!w-auto"
           value={searchField}
           onChange={(e) => setSearchField(e.target.value)}
         >
@@ -156,9 +157,10 @@ export default function PartsPage() {
           }
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="!w-44"
+          className="flex-1 min-w-0"
         />
         <Select
+          className="!w-auto"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
         >

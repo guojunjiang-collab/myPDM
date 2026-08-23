@@ -141,6 +141,7 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
     <div className="flex-1 min-h-0 flex flex-col">
       <div className="flex gap-2 mb-4 shrink-0">
         <Select
+          className="!w-auto"
           value={searchField}
           onChange={(e) => setSearchField(e.target.value)}
         >
@@ -155,7 +156,7 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
           type="text"
           value={search} onChange={(e) => setSearch(e.target.value)}
           placeholder={searchField === 'all' ? '搜索全部字段...' : searchField === 'code' ? '搜索构型号...' : searchField === 'name' ? '搜索名称...' : searchField.startsWith('cf_') ? `搜索${configCustomDefs.find(d => d.id === searchField.replace('cf_', ''))?.name || '自定义字段'}...` : '搜索...'}
-          className="!w-44"
+          className="flex-1 min-w-0"
         />
         <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-[var(--ui-bg-hover)] text-sm whitespace-nowrap" title="只显示没有父项的最顶层构型项">
           <input

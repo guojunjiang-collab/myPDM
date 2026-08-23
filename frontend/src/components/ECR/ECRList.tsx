@@ -297,9 +297,10 @@ export function ECRList() {
           placeholder="搜索..."
           value={search}
           onChange={(e) => handleSearchChange(e.target.value)}
-          className="!w-44"
+          className="flex-1 min-w-0"
         />
         <Select
+          className="!w-auto"
           value={statusFilter}
           onChange={(e) => handleStatusChange(e.target.value)}
         >
@@ -309,6 +310,7 @@ export function ECRList() {
           ))}
         </Select>
         <Select
+          className="!w-auto"
           value={priorityFilter}
           onChange={(e) => handlePriorityChange(e.target.value)}
         >
