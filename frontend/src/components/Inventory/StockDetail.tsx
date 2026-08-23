@@ -34,7 +34,7 @@ export default function StockDetail({ materialId, rows, whName, onClose, onViewD
 
   return (
     <Modal open title="物料库存详情" onClose={onClose} width="3xl">
-      <div className="h-[30vh] flex flex-col">
+      <div className="h-[55vh] flex flex-col">
       {/* TAB 切换 */}
       <div className="flex border-b border-[var(--ui-border)] mb-4 shrink-0">
         <button
