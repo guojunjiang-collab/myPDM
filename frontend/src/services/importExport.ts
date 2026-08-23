@@ -685,15 +685,11 @@ export async function pickDirectoryForImport(): Promise<FileSystemDirectoryHandl
 // ================================================================
 
 /**
- * 导出自定义字段定义到指定目录
+ * 导出自定义字段定义（直接下载 Excel）
  */
-export async function exportCustomFieldDefs(dirHandle?: FileSystemDirectoryHandle): Promise<void> {
+export async function exportCustomFieldDefs(): Promise<void> {
   const defs = useDataStore.getState().customFieldDefs;
   if (defs.length === 0) return;
-
-  const handle = dirHandle || (supportsFileSystemAccess()
-    ? await window.showDirectoryPicker({ mode: 'readwrite', startIn: 'downloads' })
-    : null);
 
   // 字段定义
   const defRows = defs.map((d) => ({
@@ -721,11 +717,7 @@ export async function exportCustomFieldDefs(dirHandle?: FileSystemDirectoryHandl
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
 
-  if (handle) {
-    await writeBlobToDirectory(handle, '自定义字段定义.xlsx', blob);
-  } else {
-    downloadBlob(blob, `自定义字段定义_${todayStr()}.xlsx`);
-  }
+  downloadBlob(blob, `自定义字段定义_${todayStr()}.xlsx`);
 }
 
 /**
