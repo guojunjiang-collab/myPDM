@@ -138,7 +138,7 @@ export default function DeliverableModal({
             className={`px-4 py-2 text-sm border-b-2 -mb-px ${
               tab === t.key
                 ? 'border-primary-600 text-primary-600 font-medium'
-                : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'
+                : 'border-transparent text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)]'
             }`}
           >
             {t.label}

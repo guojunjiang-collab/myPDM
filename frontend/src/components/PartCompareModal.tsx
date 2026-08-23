@@ -420,8 +420,8 @@ export default function PartCompareModal({
           {result && (
             <div className="border rounded-lg overflow-hidden flex flex-col flex-1 min-h-0">
               <div className="flex items-center gap-1 border-b bg-[var(--ui-bg-subtle)] px-1">
-                <button onClick={() => setActiveTab('property')} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'property' ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'}`}>属性对比</button>
-                <button onClick={() => setActiveTab('bom')} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'bom' ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'}`}>BOM树对比</button>
+                <button onClick={() => setActiveTab('property')} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'property' ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)]'}`}>属性对比</button>
+                <button onClick={() => setActiveTab('bom')} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'bom' ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)]'}`}>BOM树对比</button>
               </div>
 
               {activeTab === 'property' ? (

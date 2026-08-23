@@ -416,7 +416,7 @@ export default function Board() {
                   className={`px-4 py-2.5 text-sm border-b-2 transition-colors ${
                     filterTab === tab
                       ? 'border-primary-500 text-primary-700 font-medium'
-                      : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'
+                      : 'border-transparent text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)]'
                   }`}
                 >
                   {tab === 'all' ? `全部 (${tabCounts.all})` : `${ENTITY_LABEL[tab]} (${tabCounts[tab]})`}

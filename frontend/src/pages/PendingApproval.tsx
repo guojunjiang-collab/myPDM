@@ -54,7 +54,7 @@ export default function PendingApproval() {
           </button>
           <button
             onClick={handleLogout}
-            className="w-full py-2.5 rounded-lg font-medium text-[var(--ui-text-secondary)] hover:text-gray-700 hover:bg-[var(--ui-bg-hover)] transition-colors"
+            className="w-full py-2.5 rounded-lg font-medium text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)] hover:bg-[var(--ui-bg-hover)] transition-colors"
           >
             退出登录
           </button>

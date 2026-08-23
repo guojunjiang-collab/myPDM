@@ -197,25 +197,25 @@ export default function PartsPage() {
         <table className="w-full">
           <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
             <tr>
-              <th onClick={() => onSort('code')} className="w-56 px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+              <th onClick={() => onSort('code')} className="w-56 px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-[var(--ui-text-primary)] select-none whitespace-nowrap">
                 件号{sortIcon('code')}
               </th>
-              <th onClick={() => onSort('name')} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+              <th onClick={() => onSort('name')} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-[var(--ui-text-primary)] select-none whitespace-nowrap">
                 中文名称{sortIcon('name')}
               </th>
-              <th onClick={() => onSort('created_at')} className="w-44 px-2 py-3 text-center text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+              <th onClick={() => onSort('created_at')} className="w-44 px-2 py-3 text-center text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-[var(--ui-text-primary)] select-none whitespace-nowrap">
                 创建时间{sortIcon('created_at')}
               </th>
-              <th onClick={() => onSort('version')} className="w-16 px-4 py-3 text-center text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+              <th onClick={() => onSort('version')} className="w-16 px-4 py-3 text-center text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-[var(--ui-text-primary)] select-none whitespace-nowrap">
                 版本{sortIcon('version')}
               </th>
-              <th onClick={() => onSort('type')} className="w-20 px-4 py-3 text-center text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+              <th onClick={() => onSort('type')} className="w-20 px-4 py-3 text-center text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-[var(--ui-text-primary)] select-none whitespace-nowrap">
                 类型{sortIcon('type')}
               </th>
-              <th onClick={() => onSort('status')} className="w-20 px-4 py-3 text-center text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+              <th onClick={() => onSort('status')} className="w-20 px-4 py-3 text-center text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-[var(--ui-text-primary)] select-none whitespace-nowrap">
                 状态{sortIcon('status')}
               </th>
-              <th onClick={() => onSort('check_out_user_name')} className="w-20 px-4 py-3 text-center text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+              <th onClick={() => onSort('check_out_user_name')} className="w-20 px-4 py-3 text-center text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-[var(--ui-text-primary)] select-none whitespace-nowrap">
                 签出状态{sortIcon('check_out_user_name')}
               </th>
               <th className="w-16 px-4 py-3 text-center text-sm font-medium text-[var(--ui-text-secondary)] select-none whitespace-nowrap">

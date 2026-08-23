@@ -113,7 +113,7 @@ export function Toolbar() {
         className={`text-sm px-3 py-1.5 rounded-md font-medium transition-colors
           ${measureMode === 'distance'
             ? 'bg-blue-50 text-blue-600 border border-blue-200'
-            : 'text-[var(--ui-text-secondary)] hover:text-gray-700 hover:bg-[var(--ui-bg-hover)] border border-transparent'}`}
+            : 'text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)] hover:bg-[var(--ui-bg-hover)] border border-transparent'}`}
       >
         测量
       </button>
@@ -136,7 +136,7 @@ export function Toolbar() {
 
       {/* Reset */}
       <button onClick={resetAction}
-        className="text-sm px-3 py-1.5 rounded-md font-medium text-[var(--ui-text-secondary)] hover:text-gray-700 hover:bg-[var(--ui-bg-hover)] border border-transparent transition-colors"
+        className="text-sm px-3 py-1.5 rounded-md font-medium text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)] hover:bg-[var(--ui-bg-hover)] border border-transparent transition-colors"
       >
         重置
       </button>
@@ -147,7 +147,7 @@ export function Toolbar() {
         className={`text-sm px-3 py-1.5 rounded-md font-medium transition-colors
           ${cameraMode === 'orthographic'
             ? 'bg-blue-50 text-blue-600 border border-blue-200'
-            : 'text-[var(--ui-text-secondary)] hover:text-gray-700 hover:bg-[var(--ui-bg-hover)] border border-transparent'}`}
+            : 'text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)] hover:bg-[var(--ui-bg-hover)] border border-transparent'}`}
       >
         {cameraMode === 'orthographic' ? '平行' : '透视'}
       </button>
@@ -158,7 +158,7 @@ export function Toolbar() {
         className={`text-sm px-3 py-1.5 rounded-md font-medium transition-colors
           ${wireframe
             ? 'bg-blue-50 text-blue-600 border border-blue-200'
-            : 'text-[var(--ui-text-secondary)] hover:text-gray-700 hover:bg-[var(--ui-bg-hover)] border border-transparent'}`}
+            : 'text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)] hover:bg-[var(--ui-bg-hover)] border border-transparent'}`}
       >
         线框
       </button>
@@ -173,7 +173,7 @@ export function Toolbar() {
             ? 'text-gray-300 cursor-not-allowed border border-transparent'
             : autoColor
               ? 'bg-blue-50 text-blue-600 border border-blue-200'
-              : 'text-[var(--ui-text-secondary)] hover:text-gray-700 hover:bg-[var(--ui-bg-hover)] border border-transparent'}`}
+              : 'text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)] hover:bg-[var(--ui-bg-hover)] border border-transparent'}`}
       >
         上色
       </button>

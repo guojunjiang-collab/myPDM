@@ -372,7 +372,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
           <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-hidden flex-1 min-h-0 flex flex-col">
             <div className="flex border-b border-[var(--ui-border)] shrink-0">
               {tabs.map((t) => (
-                <button key={t.key} onClick={() => setActiveTab(t.key)} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === t.key ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'}`}>{t.label}</button>
+                <button key={t.key} onClick={() => setActiveTab(t.key)} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === t.key ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)]'}`}>{t.label}</button>
               ))}
             </div>
             <div className="p-4 overflow-y-auto flex-1 min-h-0">

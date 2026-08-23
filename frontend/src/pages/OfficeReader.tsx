@@ -82,7 +82,7 @@ export default function OfficeReader() {
                   className={`px-3 py-1.5 text-sm whitespace-nowrap border-b-2 ${
                     i === activeSheet
                       ? 'border-primary-600 text-primary-600 font-medium'
-                      : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'
+                      : 'border-transparent text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)]'
                   }`}
                 >
                   {s.name}

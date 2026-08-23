@@ -63,7 +63,7 @@ export default function ForcePasswordChange() {
         <button
           type="button"
           onClick={handleLogout}
-          className="text-sm text-[var(--ui-text-secondary)] hover:text-gray-700"
+          className="text-sm text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)]"
         >
           退出登录
         </button>

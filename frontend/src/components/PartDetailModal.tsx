@@ -662,7 +662,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                     className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                       activeTab === t.key
                         ? 'border-primary-600 text-primary-600'
-                        : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'
+                        : 'border-transparent text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)]'
                     }`}>
                     {t.label}
                   </button>
@@ -779,11 +779,11 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                         <table className="w-full text-sm">
                         <thead>
                           <tr className="bg-[var(--ui-bg-subtle)] border-b sticky top-0 z-10">
-                            <th onClick={() => handleSort('child_code')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium cursor-pointer select-none whitespace-nowrap hover:text-gray-700" style={{ paddingLeft: 28 }}>件号 {getSortIcon('child_code')}</th>
-                            <th onClick={() => handleSort('child_name')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium cursor-pointer select-none whitespace-nowrap hover:text-gray-700">中文名称 {getSortIcon('child_name')}</th>
-                            <th onClick={() => handleSort('child_version')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16 cursor-pointer select-none whitespace-nowrap hover:text-gray-700">版本 {getSortIcon('child_version')}</th>
-                            <th onClick={() => handleSort('child_status')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20 cursor-pointer select-none whitespace-nowrap hover:text-gray-700">状态 {getSortIcon('child_status')}</th>
-                            <th onClick={() => handleSort('child_check_out_user_name')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20 cursor-pointer select-none whitespace-nowrap hover:text-gray-700">签出状态 {getSortIcon('child_check_out_user_name')}</th>
+                            <th onClick={() => handleSort('child_code')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium cursor-pointer select-none whitespace-nowrap hover:text-[var(--ui-text-primary)]" style={{ paddingLeft: 28 }}>件号 {getSortIcon('child_code')}</th>
+                            <th onClick={() => handleSort('child_name')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium cursor-pointer select-none whitespace-nowrap hover:text-[var(--ui-text-primary)]">中文名称 {getSortIcon('child_name')}</th>
+                            <th onClick={() => handleSort('child_version')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16 cursor-pointer select-none whitespace-nowrap hover:text-[var(--ui-text-primary)]">版本 {getSortIcon('child_version')}</th>
+                            <th onClick={() => handleSort('child_status')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20 cursor-pointer select-none whitespace-nowrap hover:text-[var(--ui-text-primary)]">状态 {getSortIcon('child_status')}</th>
+                            <th onClick={() => handleSort('child_check_out_user_name')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20 cursor-pointer select-none whitespace-nowrap hover:text-[var(--ui-text-primary)]">签出状态 {getSortIcon('child_check_out_user_name')}</th>
                              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">用量</th>
                              <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-12 whitespace-nowrap">矩阵</th>
                              <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-20">预览</th>
@@ -1067,7 +1067,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
             onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 py-3 border-b sticky top-0 bg-[var(--ui-bg-surface)]">
               <span className="font-semibold text-sm">{matrixPopup.child_code} 变换矩阵</span>
-              <button onClick={() => setMatrixPopup(null)} className="text-[var(--ui-text-secondary)] hover:text-gray-700 text-lg">&times;</button>
+              <button onClick={() => setMatrixPopup(null)} className="text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)] text-lg">&times;</button>
             </div>
             <div className="p-4 space-y-3">
               {(matrixPopup.cad_instances || []).map((inst: any, idx: number) => (

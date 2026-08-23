@@ -389,7 +389,7 @@ export default function Settings() {
               className={`px-4 h-[var(--ui-control-h)] inline-flex items-center text-sm font-medium border-b-2 -mb-px transition-colors ${
                 activeTab === tab.key
                   ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'
+                  : 'border-transparent text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)]'
               } ${!tab.enabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
             >
               {tab.label}

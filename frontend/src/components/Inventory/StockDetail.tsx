@@ -38,13 +38,13 @@ export default function StockDetail({ materialId, rows, whName, onClose, onViewD
       {/* TAB 切换 */}
       <div className="flex border-b border-[var(--ui-border)] mb-4 shrink-0">
         <button
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'info' ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'}`}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'info' ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)]'}`}
           onClick={() => setTab('info')}
         >
           基础信息
         </button>
         <button
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'ledger' ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'}`}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'ledger' ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)]'}`}
           onClick={() => setTab('ledger')}
         >
           库存流水

@@ -184,11 +184,11 @@ export default function BOMTreeTable({ revisionId, assemblyCode, assemblyName, r
               <thead className="bg-[var(--ui-bg-subtle)] border-b sticky top-0 z-10">
                 <tr>
                   <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20">层级</th>
-                  <th onClick={() => handleViewSort('code')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">件号 {getViewSortIcon('code')}</th>
+                  <th onClick={() => handleViewSort('code')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium cursor-pointer hover:text-[var(--ui-text-primary)] select-none whitespace-nowrap">件号 {getViewSortIcon('code')}</th>
                   <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">中文名称</th>
                   <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">规格型号</th>
-                  <th onClick={() => handleViewSort('version')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-24 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">版本 {getViewSortIcon('version')}</th>
-                  <th onClick={() => handleViewSort('status')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-24 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">状态 {getViewSortIcon('status')}</th>
+                  <th onClick={() => handleViewSort('version')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-24 cursor-pointer hover:text-[var(--ui-text-primary)] select-none whitespace-nowrap">版本 {getViewSortIcon('version')}</th>
+                  <th onClick={() => handleViewSort('status')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-24 cursor-pointer hover:text-[var(--ui-text-primary)] select-none whitespace-nowrap">状态 {getViewSortIcon('status')}</th>
                   <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20">用量</th>
                 </tr>
               </thead>
