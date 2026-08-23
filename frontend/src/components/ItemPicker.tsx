@@ -98,15 +98,15 @@ export default function ItemPicker({ open, onClose, onConfirm, existingIds }: It
     const kw = search.trim().toLowerCase();
     const all: any[] = [];
     const seen = new Set<string>();
-    // 零部件：按 零件(part)/部件(assembly) 细分，显示所有版本（已关联版本标记，不隐藏）
+    // 零部件：按 零件(part)/部件(assembly) 细分（id 取 revision_id；同时检查 master_id 兼容旧数据），已关联的版本不显示
     if (tab === 'all' || tab === 'part' || tab === 'assembly') srcComponents.forEach((p: any) => {
       const sub = p.type === 'assembly' ? 'assembly' : 'part';
       if (tab !== 'all' && tab !== sub) return;
       const id = p.revision_id || p.id; const mid = p.master_id || p.id;
-      if (!seen.has(id)) { seen.add(id); all.push({ t: 'component', sub, id, mid, code: p.code, name: p.name, version: p.version || '', status: p.status || '' }); }
+      if (!existingIds.has(id) && !existingIds.has(mid) && !seen.has(id)) { seen.add(id); all.push({ t: 'component', sub, id, mid, code: p.code, name: p.name, version: p.version || '', status: p.status || '' }); }
     });
-    if (tab === 'all' || tab === 'document') srcDocuments.forEach((d: any) => { const id = d.id || d.revision_id; if (!seen.has(id)) { seen.add(id); all.push({ t: 'document', id, mid: d.master_id || d.id, code: d.code, name: d.name, version: d.version || '', status: d.status || '' }); } });
-    if (tab === 'all' || tab === 'configuration') srcConfigItems.forEach((c: any) => { const id = c.id || c.revision_id; if (!seen.has(id)) { seen.add(id); all.push({ t: 'configuration', id, mid: c.master_id || c.id, code: c.code, name: c.name, version: c.version || '', status: c.status || '' }); } });
+    if (tab === 'all' || tab === 'document') srcDocuments.forEach((d: any) => { const id = d.id || d.revision_id; if (!existingIds.has(id) && !seen.has(id)) { seen.add(id); all.push({ t: 'document', id, mid: d.master_id || d.id, code: d.code, name: d.name, version: d.version || '', status: d.status || '' }); } });
+    if (tab === 'all' || tab === 'configuration') srcConfigItems.forEach((c: any) => { const id = c.id || c.revision_id; if (!existingIds.has(id) && !seen.has(id)) { seen.add(id); all.push({ t: 'configuration', id, mid: c.master_id || c.id, code: c.code, name: c.name, version: c.version || '', status: c.status || '' }); } });
     return kw ? all.filter((i) => i.code.toLowerCase().includes(kw) || i.name.toLowerCase().includes(kw)) : all;
   }, [tab, search, srcComponents, srcDocuments, srcConfigItems, existingIds]);
 
@@ -167,11 +167,7 @@ export default function ItemPicker({ open, onClose, onConfirm, existingIds }: It
                   <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{item.version || '-'}</td>
                   <td className="px-3 py-2">{item.name}</td>
                   <td className="px-3 py-2"><StatusTag status={item.status} /></td>
-                  <td className="px-3 py-2 text-center whitespace-nowrap">
-                    {existingIds.has(item.id) || existingIds.has(item.mid)
-                      ? <span className="text-xs text-[var(--ui-text-tertiary)]">已关联</span>
-                      : (selected.has(item.id) ? <span className="text-xs text-green-600">已选</span> : <Button type="button" size="xs" onClick={() => setSelected(new Map(selected).set(item.id, item))}>添加</Button>)}
-                  </td>
+                  <td className="px-3 py-2 text-center whitespace-nowrap">{selected.has(item.id) ? <span className="text-xs text-green-600">已选</span> : <Button type="button" size="xs" onClick={() => setSelected(new Map(selected).set(item.id, item))}>添加</Button>}</td>
                 </tr>
               ))}
             </tbody></table>
