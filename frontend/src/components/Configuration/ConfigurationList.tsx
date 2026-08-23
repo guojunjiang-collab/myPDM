@@ -140,6 +140,12 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       <div className="flex gap-2 mb-4 shrink-0">
+        <Input
+          type="text"
+          value={search} onChange={(e) => setSearch(e.target.value)}
+          placeholder={searchField === 'all' ? '搜索全部字段...' : searchField === 'code' ? '搜索构型号...' : searchField === 'name' ? '搜索名称...' : searchField.startsWith('cf_') ? `搜索${configCustomDefs.find(d => d.id === searchField.replace('cf_', ''))?.name || '自定义字段'}...` : '搜索...'}
+          className="flex-1 min-w-0"
+        />
         <Select
           className="!w-auto"
           value={searchField}
@@ -152,13 +158,7 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
             <option key={def.id} value={`cf_${def.id}`}>{def.name}</option>
           ))}
         </Select>
-        <Input
-          type="text"
-          value={search} onChange={(e) => setSearch(e.target.value)}
-          placeholder={searchField === 'all' ? '搜索全部字段...' : searchField === 'code' ? '搜索构型号...' : searchField === 'name' ? '搜索名称...' : searchField.startsWith('cf_') ? `搜索${configCustomDefs.find(d => d.id === searchField.replace('cf_', ''))?.name || '自定义字段'}...` : '搜索...'}
-          className="flex-1 min-w-0"
-        />
-        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-[var(--ui-bg-hover)] text-sm whitespace-nowrap" title="只显示没有父项的最顶层构型项">
+        <label className="flex items-center gap-1.5 px-3 py-2 border border-[var(--ui-border)] rounded-lg cursor-pointer hover:bg-[var(--ui-bg-hover)] text-sm whitespace-nowrap" title="只显示没有父项的最顶层构型项">
           <input
             type="checkbox"
             checked={topLevelOnly}
@@ -167,7 +167,7 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
           />
           仅顶层构型项
         </label>
-        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-[var(--ui-bg-hover)] text-sm whitespace-nowrap">
+        <label className="flex items-center gap-1.5 px-3 py-2 border border-[var(--ui-border)] rounded-lg cursor-pointer hover:bg-[var(--ui-bg-hover)] text-sm whitespace-nowrap">
           <input
             type="checkbox"
             checked={showAllVersions}

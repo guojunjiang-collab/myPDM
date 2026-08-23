@@ -134,19 +134,6 @@ export default function PartsPage() {
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center gap-2 mb-4 shrink-0">
-        <Select
-          className="!w-auto"
-          value={searchField}
-          onChange={(e) => setSearchField(e.target.value)}
-        >
-          <option value="all">全部字段</option>
-          <option value="code">件号</option>
-          <option value="name">中文名称</option>
-          <option value="spec">规格型号</option>
-          {componentCustomDefs.map(def => (
-            <option key={def.id} value={`cf_${def.id}`}>{def.name}</option>
-          ))}
-        </Select>
         <Input
           type="text"
           placeholder={
@@ -161,6 +148,19 @@ export default function PartsPage() {
         />
         <Select
           className="!w-auto"
+          value={searchField}
+          onChange={(e) => setSearchField(e.target.value)}
+        >
+          <option value="all">全部字段</option>
+          <option value="code">件号</option>
+          <option value="name">中文名称</option>
+          <option value="spec">规格型号</option>
+          {componentCustomDefs.map(def => (
+            <option key={def.id} value={`cf_${def.id}`}>{def.name}</option>
+          ))}
+        </Select>
+        <Select
+          className="!w-auto"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
         >
@@ -170,7 +170,7 @@ export default function PartsPage() {
           <option value="released">发布</option>
           <option value="obsolete">作废</option>
         </Select>
-        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-[var(--ui-bg-hover)] text-sm whitespace-nowrap">
+        <label className="flex items-center gap-1.5 px-3 py-2 border border-[var(--ui-border)] rounded-lg cursor-pointer hover:bg-[var(--ui-bg-hover)] text-sm whitespace-nowrap">
           <input
             type="checkbox"
             checked={showAllVersions}
@@ -179,7 +179,7 @@ export default function PartsPage() {
           />
           全部版本
         </label>
-        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-[var(--ui-bg-hover)] text-sm whitespace-nowrap" title="只显示没有父项的最顶层零部件">
+        <label className="flex items-center gap-1.5 px-3 py-2 border border-[var(--ui-border)] rounded-lg cursor-pointer hover:bg-[var(--ui-bg-hover)] text-sm whitespace-nowrap" title="只显示没有父项的最顶层零部件">
           <input
             type="checkbox"
             checked={topLevelOnly}

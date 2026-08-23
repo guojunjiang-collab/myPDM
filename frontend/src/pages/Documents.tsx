@@ -184,6 +184,13 @@ export default function Documents() {
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center gap-2 mb-4 shrink-0">
+        <Input
+          type="text"
+          placeholder={searchField === 'all' ? '搜索...' : searchField.startsWith('cf_') ? `搜索${documentCustomDefs.find(d => d.id === searchField.replace('cf_', ''))?.name || '自定义字段'}...` : `搜索${searchField === 'code' ? '编号' : searchField === 'name' ? '名称' : '备注'}...`}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="flex-1 min-w-0"
+        />
         <Select
           className="!w-auto"
           value={searchField}
@@ -197,13 +204,6 @@ export default function Documents() {
             <option key={def.id} value={`cf_${def.id}`}>{def.name}</option>
           ))}
         </Select>
-        <Input
-          type="text"
-          placeholder={searchField === 'all' ? '搜索...' : searchField.startsWith('cf_') ? `搜索${documentCustomDefs.find(d => d.id === searchField.replace('cf_', ''))?.name || '自定义字段'}...` : `搜索${searchField === 'code' ? '编号' : searchField === 'name' ? '名称' : '备注'}...`}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 min-w-0"
-        />
         <Select
           className="!w-auto"
           value={statusFilter}
@@ -215,7 +215,7 @@ export default function Documents() {
           <option value="released">发布</option>
           <option value="obsolete">作废</option>
         </Select>
-        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-[var(--ui-bg-hover)] text-sm whitespace-nowrap">
+        <label className="flex items-center gap-1.5 px-3 py-2 border border-[var(--ui-border)] rounded-lg cursor-pointer hover:bg-[var(--ui-bg-hover)] text-sm whitespace-nowrap">
           <input
             type="checkbox"
             checked={showAllVersions}
@@ -224,7 +224,7 @@ export default function Documents() {
           />
           全部版本
         </label>
-        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-[var(--ui-bg-hover)] text-sm whitespace-nowrap">
+        <label className="flex items-center gap-1.5 px-3 py-2 border border-[var(--ui-border)] rounded-lg cursor-pointer hover:bg-[var(--ui-bg-hover)] text-sm whitespace-nowrap">
           <input
             type="checkbox"
             checked={showAccessibleOnly}

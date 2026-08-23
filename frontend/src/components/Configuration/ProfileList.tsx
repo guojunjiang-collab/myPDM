@@ -117,6 +117,13 @@ export default function ProfileList() {
     <div className="flex-1 min-h-0 flex flex-col">
       {/* 搜索 + 新建 */}
       <div className="flex items-center gap-2 mb-4 shrink-0">
+        <Input
+          type="text"
+          placeholder={searchField === 'all' ? '搜索...' : `搜索${searchField === 'code' ? '编号' : searchField === 'name' ? '名称' : '备注'}...`}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="flex-1 min-w-0"
+        />
         <Select
           className="!w-auto"
           value={searchField}
@@ -127,13 +134,6 @@ export default function ProfileList() {
           <option value="name">名称</option>
           <option value="remark">备注</option>
         </Select>
-        <Input
-          type="text"
-          placeholder={searchField === 'all' ? '搜索...' : `搜索${searchField === 'code' ? '编号' : searchField === 'name' ? '名称' : '备注'}...`}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 min-w-0"
-        />
         <Select
           className="!w-auto"
           value={statusFilter}
