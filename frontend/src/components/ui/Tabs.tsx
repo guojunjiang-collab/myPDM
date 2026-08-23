@@ -24,7 +24,7 @@ export default function Tabs({ items, activeKey, onChange, size = 'md' }: TabsPr
             key={item.key}
             type="button"
             onClick={() => onChange(item.key)}
-            className={`${
+            className={`shrink-0 ${
               size === 'sm' ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm'
             } font-medium border-b-2 transition-colors ${
               active

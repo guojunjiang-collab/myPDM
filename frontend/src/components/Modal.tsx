@@ -27,6 +27,8 @@ interface ModalProps {
 // 模块级滚动锁计数器：多弹窗叠加时，最后一个关闭才恢复 body 滚动
 let scrollLockCount = 0;
 let previousBodyOverflow = '';
+// 模块级弹窗打开栈：仅栈顶弹窗响应 Esc，避免一次 Esc 连关所有叠层弹窗
+let modalStack: symbol[] = [];
 
 export function Modal({
   open,
@@ -44,6 +46,7 @@ export function Modal({
   const overlayRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const lastFocusedRef = useRef<Element | null>(null);
+  const escTokenRef = useRef<symbol>(Symbol('modal'));
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -54,14 +57,20 @@ export function Modal({
     }
   }, [open]);
 
-  // Esc 关闭
+  // Esc 关闭：仅栈顶弹窗响应（叠层时按 Esc 只关最上层）
   useEffect(() => {
     if (!open || !closeOnEsc) return;
+    modalStack.push(escTokenRef.current);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && modalStack[modalStack.length - 1] === escTokenRef.current) {
+        onClose();
+      }
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return () => {
+      modalStack = modalStack.filter((t) => t !== escTokenRef.current);
+      window.removeEventListener('keydown', onKey);
+    };
   }, [open, closeOnEsc, onClose]);
 
   // body 滚动锁（计数器：open++ / cleanup--，归零恢复）
@@ -81,12 +90,18 @@ export function Modal({
     };
   }, [open, scrollLock]);
 
-  // 焦点管理：打开后聚焦面板，关闭后还原触发元素焦点
+  // 焦点管理：打开后聚焦面板，关闭或卸载时还原触发元素焦点
   useEffect(() => {
     if (open) {
       lastFocusedRef.current = document.activeElement;
       const raf = requestAnimationFrame(() => panelRef.current?.focus());
-      return () => cancelAnimationFrame(raf);
+      return () => {
+        cancelAnimationFrame(raf);
+        const el = lastFocusedRef.current;
+        if (el instanceof HTMLElement && document.contains(el)) {
+          el.focus();
+        }
+      };
     }
     const el = lastFocusedRef.current;
     if (el instanceof HTMLElement && document.contains(el)) {
