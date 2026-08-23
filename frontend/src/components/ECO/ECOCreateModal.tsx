@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Modal } from '../Modal';
+import { Modal, MODAL_Z } from '../Modal';
 import { toast } from '../Toast';
 import { ecoApi, usersApi, documentsApi, ecrApi, partsApi, customFieldsApi } from '../../services/api';
 import { useAuthStore } from '../../stores/auth';
@@ -650,22 +650,17 @@ onExecuteFreeze={(itemId, newEntityId) => handleExecuteAction('freeze', itemId, 
         alreadyLinked={documentLinks.map(d => d.document_id)}
       />
 
-      {/* ECR 选择弹窗 */}
-      {showEcrPicker && (
-      <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center" onClick={() => setShowEcrPicker(false)}>
-        <div className="bg-[var(--ui-bg-surface)] rounded-lg shadow-xl w-full max-w-lg max-h-[70vh] overflow-auto p-4" onClick={e => e.stopPropagation()}>
-          <h4 className="text-sm font-semibold mb-3">选择 ECR</h4>
-          <EcrPicker onSelect={async (id, number) => {
-            try {
-              await ecoApi.update(localEco!.id, { ecr_id: id } as any);
-              setLocalEco(prev => prev ? { ...prev, ecr_id: id, ecr_number: number } : prev);
-              toast.success('ECR 关联成功');
-            } catch { toast.error('关联失败'); }
-            setShowEcrPicker(false);
-          }} />
-        </div>
-      </div>
-      )}
+      {/* ECR 选择弹窗（共享 Modal，消灭 z-[100] 自绘遮罩） */}
+      <Modal open={showEcrPicker} title="选择 ECR" onClose={() => setShowEcrPicker(false)} width="lg" zIndex={MODAL_Z.picker}>
+        <EcrPicker onSelect={async (id, number) => {
+          try {
+            await ecoApi.update(localEco!.id, { ecr_id: id } as any);
+            setLocalEco(prev => prev ? { ...prev, ecr_id: id, ecr_number: number } : prev);
+            toast.success('ECR 关联成功');
+          } catch { toast.error('关联失败'); }
+          setShowEcrPicker(false);
+        }} />
+      </Modal>
 
       {/* 版本选择器 */}
       <VersionSelectModal

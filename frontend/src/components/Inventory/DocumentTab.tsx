@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { formatDate } from '../../lib/date';
 import { useInventoryStore } from '../../stores/inventory';
 import { useAuthStore } from '../../stores/auth';
@@ -9,6 +9,7 @@ import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
+import Dropdown from '../ui/Dropdown';
 import DocumentEditModal from './DocumentEditModal';
 import DocumentDetail from './DocumentDetail';
 import type { InvDocType } from '../../types';
@@ -33,7 +34,6 @@ export default function DocumentTab() {
   const [creating, setCreating] = useState<InvDocType | null>(null);
   const [showMenu, setShowMenu] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
 
   const load = async () => {
     setLoading(true);
@@ -59,14 +59,7 @@ export default function DocumentTab() {
     });
   }, [docs, search]);
 
-  // 点击外部关闭新建菜单
-  useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false);
-    };
-    document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
-  }, []);
+  // 点击外部关闭新建菜单 → Dropdown 内置处理
 
   const act = async (fn: () => Promise<any>) => {
     try { await fn(); await load(); }
@@ -131,17 +124,17 @@ export default function DocumentTab() {
         </Select>
         <div className="flex-1" />
         {canDownload() && (
-          <div className="relative" ref={menuRef}>
-            <Button onClick={() => setShowMenu(!showMenu)}>+ 新建单据 ▾</Button>
-            {showMenu && (
-              <div className="absolute right-0 mt-1 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-lg z-20 overflow-hidden">
-                {DOC_TYPES.map((t) => (
-                  <Button key={t.key} variant="ghost" size="sm" className="w-full !justify-start rounded-none"
-                    onClick={() => { setCreating(t.key); setShowMenu(false); }}>{t.label}</Button>
-                ))}
-              </div>
-            )}
-          </div>
+          <Dropdown
+            open={showMenu}
+            onOpenChange={setShowMenu}
+            align="right"
+            trigger={<Button onClick={() => setShowMenu(!showMenu)}>+ 新建单据 ▾</Button>}
+          >
+            {DOC_TYPES.map((t) => (
+              <Button key={t.key} variant="ghost" size="sm" className="w-full !justify-start rounded-none"
+                onClick={() => { setCreating(t.key); setShowMenu(false); }}>{t.label}</Button>
+            ))}
+          </Dropdown>
         )}
       </div>
 

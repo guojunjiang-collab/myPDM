@@ -4,7 +4,7 @@ import { useAuthStore } from '../stores/auth';
 import type { PartMaster, PartRevision, PartIteration, PartStatus, CascadeResult, PartListItem } from '../types';
 import { Loading } from './Loading';
 import { toast } from './Toast';
-import { Modal } from './Modal';
+import { Modal, MODAL_Z } from './Modal';
 import EntityDocumentSection from './EntityDocumentSection';
 import PartAttachmentBucket from './PartAttachmentBucket';
 import AssemblyPartPicker from './AssemblyPartPicker';
@@ -1061,42 +1061,38 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
           onClose={() => { setNestedMasterId(null); setNestedRevisionId(null); }}
         />
       )}
-      {/* ===== 变换矩阵详情弹窗 ===== */}
-      {matrixPopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setMatrixPopup(null)}>
-          <div className="absolute inset-0 bg-black/30" />
-          <div className="relative bg-[var(--ui-bg-surface)] rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[70vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-4 py-3 border-b sticky top-0 bg-[var(--ui-bg-surface)]">
-              <span className="font-semibold text-sm">{matrixPopup.child_code} 变换矩阵</span>
-              <button onClick={() => setMatrixPopup(null)} className="text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)] text-lg">&times;</button>
+      {/* ===== 变换矩阵详情弹窗（共享 Modal，消灭"容器+absolute 遮罩"写法） ===== */}
+      <Modal
+        open={!!matrixPopup}
+        onClose={() => setMatrixPopup(null)}
+        title={matrixPopup ? `${matrixPopup.child_code} 变换矩阵` : ''}
+        width="lg"
+        zIndex={MODAL_Z.picker}
+      >
+        <div className="space-y-3">
+          {(matrixPopup?.cad_instances || []).map((inst: any, idx: number) => (
+            <div key={idx} className="border rounded-lg p-3 bg-[var(--ui-bg-subtle)]">
+              <div className="flex items-center gap-3 mb-2">
+                <Badge tone="gray" label={inst.source === 'step' ? 'STEP' : inst.source || '—'} />
+                <span className="text-xs text-[var(--ui-text-secondary)]">实例 {idx + 1}</span>
+                {inst.label && <span className="text-xs text-[var(--ui-text-secondary)]">"{inst.label}"</span>}
+              </div>
+              <div className="grid grid-cols-4 gap-x-3 gap-y-1 font-mono text-xs">
+                {(inst.matrix || []).map((v: number, i: number) => (
+                  <div key={i} className="text-right">
+                    <span className={i % 4 === 3 ? 'text-indigo-600' : 'text-[var(--ui-text-secondary)]'}>
+                      {Number(v).toFixed(3).replace(/\.?0+$/, '')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-1 text-xs text-[var(--ui-text-tertiary)]">
+                平移 (x,y,z): {[3,7,11].map(i => Number((inst.matrix || [])[i] || 0).toFixed(3).replace(/\.?0+$/, '')).join(', ')}m
+              </div>
             </div>
-            <div className="p-4 space-y-3">
-              {(matrixPopup.cad_instances || []).map((inst: any, idx: number) => (
-                <div key={idx} className="border rounded-lg p-3 bg-[var(--ui-bg-subtle)]">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Badge tone="gray" label={inst.source === 'step' ? 'STEP' : inst.source || '—'} />
-                    <span className="text-xs text-[var(--ui-text-secondary)]">实例 {idx + 1}</span>
-                    {inst.label && <span className="text-xs text-[var(--ui-text-secondary)]">"{inst.label}"</span>}
-                  </div>
-                  <div className="grid grid-cols-4 gap-x-3 gap-y-1 font-mono text-xs">
-                    {(inst.matrix || []).map((v: number, i: number) => (
-                      <div key={i} className="text-right">
-                        <span className={i % 4 === 3 ? 'text-indigo-600' : 'text-[var(--ui-text-secondary)]'}>
-                          {Number(v).toFixed(3).replace(/\.?0+$/, '')}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-1 text-xs text-[var(--ui-text-tertiary)]">
-                    平移 (x,y,z): {[3,7,11].map(i => Number((inst.matrix || [])[i] || 0).toFixed(3).replace(/\.?0+$/, '')).join(', ')}m
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          ))}
         </div>
-      )}
+      </Modal>
       {wuConfigRevId && (
         <ConfigItemDetailModal open={!!wuConfigRevId} revisionId={wuConfigRevId}
           onClose={() => setWuConfigRevId(null)} />

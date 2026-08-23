@@ -5,7 +5,7 @@ import api from '../services/api';
 import { useAuthStore } from '../stores/auth';
 import { isAdmin } from '../stores/auth';
 import type { CustomFieldDefinition } from '../types';
-import { Modal } from '../components/Modal';
+import { Modal, ConfirmModal } from '../components/Modal';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
@@ -599,26 +599,27 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* ---- Reset Confirm Modal ---- */}
-        <Modal open={showResetConfirm} title="确认重置" onClose={() => setShowResetConfirm(false)} width="sm">
-          <div className="space-y-4">
-              <p className="text-sm text-[var(--ui-text-secondary)]">此操作将清空所有业务数据（零件、部件、图文档、附件、自定义字段、看板、构型管理、变更管理、glTF缓存），删除所有非管理员用户，并将 admin 密码重置为 admin123。此操作不可逆，请输入管理员密码确认：</p>
-            <Input
-              type="password"
-              value={resetPassword}
-              onChange={(e) => setResetPassword(e.target.value)}
-              placeholder="请输入管理员密码"
-              autoFocus
-              onKeyDown={(e) => e.key === 'Enter' && handleResetData()}
-            />
-            <div className="flex justify-end gap-2">
-              <Button variant="secondary" type="button" onClick={() => setShowResetConfirm(false)}>取消</Button>
-              <Button variant="danger" type="button" onClick={handleResetData} disabled={resetting}>
-                {resetting ? '重置中...' : '确认重置'}
-              </Button>
-            </div>
-          </div>
-        </Modal>
+        {/* ---- Reset Confirm Modal（ConfirmModal + children 密码输入） ---- */}
+        <ConfirmModal
+          open={showResetConfirm}
+          title="确认重置"
+          type="danger"
+          content="此操作将清空所有业务数据（零件、部件、图文档、附件、自定义字段、看板、构型管理、变更管理、glTF缓存），删除所有非管理员用户，并将 admin 密码重置为 admin123。此操作不可逆，请输入管理员密码确认："
+          confirmText={resetting ? '重置中...' : '确认重置'}
+          confirmLoading={resetting}
+          onConfirm={handleResetData}
+          onCancel={() => setShowResetConfirm(false)}
+        >
+          <Input
+            type="password"
+            value={resetPassword}
+            onChange={(e) => setResetPassword(e.target.value)}
+            placeholder="请输入管理员密码"
+            autoFocus
+            onKeyDown={(e) => e.key === 'Enter' && handleResetData()}
+            className="mb-4"
+          />
+        </ConfirmModal>
         </>
       )}
 

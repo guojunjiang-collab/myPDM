@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal } from '../Modal';
 import { configurationApi, partsApi, customFieldsApi } from '../../services/api';
 import AssemblyPartPicker from '../AssemblyPartPicker';
@@ -12,6 +12,7 @@ import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import TreeToggle from '../ui/TreeToggle';
+import EntityPickerModal from '../ui/EntityPickerModal';
 
 interface Props {
   open: boolean;
@@ -63,10 +64,6 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
   // 子构型项
   const [children, setChildren] = useState<ChildEntry[]>([]);
   const [cfgPickerOpen, setCfgPickerOpen] = useState(false);
-  const [cfgSearch, setCfgSearch] = useState('');
-  const [cfgResults, setCfgResults] = useState<any[]>([]);
-  const [cfgSearching, setCfgSearching] = useState(false);
-  const cfgReqId = useRef(0);
   const [pickerSelected, setPickerSelected] = useState<any[]>([]);
   const [pickerParentId, setPickerParentId] = useState<string | null>(null); // null=根级, string=指定父级子项
   const [pickerParentIdx, setPickerParentIdx] = useState<string | null>(null); // 父行的 idx，用于标记 has_children
@@ -365,9 +362,8 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
           <td className="px-3 py-2 text-center text-sm">
             <div className="flex items-center justify-center gap-1 whitespace-nowrap">
               <Button variant="link" size="xs" onClick={() => {
-                setPickerParentId(c.child_id); setPickerParentIdx(idx); setCfgSearch(''); setPickerSelected([]);
+                setPickerParentId(c.child_id); setPickerParentIdx(idx); setPickerSelected([]);
                 setQuickCreateOpen(false); setQuickForm({ code: '', name: '' });
-                setCfgResults([]);
                 setCfgPickerOpen(true);
               }}>＋子项</Button>
               <Button variant="danger" size="xs" onClick={() => {
@@ -383,29 +379,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
     );
   };
 
-  // 加载/搜索可选子构型项（exclude 规则与打开弹窗时一致；带请求竞态守卫）
-  const loadCfgItems = (search: string) => {
-    const reqId = ++cfgReqId.current;
-    setCfgSearching(true);
-    const params: any = { page: 1, page_size: 100 };
-    const excludeId = pickerParentId ?? item?.id;
-    if (item?.id && excludeId) params.exclude_ancestors_of = excludeId;
-    const kw = search.trim();
-    if (kw) params.search = kw;
-    configurationApi.list(params)
-      .then(r => { if (reqId === cfgReqId.current) setCfgResults(r.items || []); })
-      .catch(() => { if (reqId === cfgReqId.current) setCfgResults([]); })
-      .finally(() => { if (reqId === cfgReqId.current) setCfgSearching(false); });
-  };
-
-  // 选择子构型项弹窗：随输入实时刷新列表（防抖 250ms）；打开弹窗时也会触发首次加载
-  useEffect(() => {
-    if (!cfgPickerOpen) return;
-    setCfgSearching(true);
-    const t = setTimeout(() => loadCfgItems(cfgSearch), 250);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cfgPickerOpen, cfgSearch, pickerParentId]);
+  // 选择子构型项弹窗：数据拉取已内聚进 EntityPickerModal（fetchData），本组件不再维护 cfgResults/cfgSearch
 
   return (
     <>
@@ -529,147 +503,94 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-sm font-bold text-gray-700">子构型项 ({children.length})</h4>
             <Button size="sm" type="button" onClick={() => {
-              setPickerParentId(null); setCfgSearch(''); setPickerSelected([]);
+              setPickerParentId(null); setPickerSelected([]);
               setQuickCreateOpen(false); setQuickForm({ code: '', name: '' });
-              setCfgResults([]); setCfgPickerOpen(true);
+              setCfgPickerOpen(true);
             }}>添加子构型项</Button>
           </div>
 
-          {/* 构型项选择器弹窗 */}
-          {cfgPickerOpen && (
-                <div className="fixed inset-0 bg-black/40 z-[70] flex items-center justify-center" onClick={() => { setCfgPickerOpen(false); setPickerParentId(null); }}>
-              <div className="bg-[var(--ui-bg-surface)] rounded-lg shadow-xl w-full max-w-2xl max-h-[75vh] flex flex-col" onClick={e => e.stopPropagation()}>
-                <div className="px-4 py-3 border-b flex items-center justify-between">
-                  <h4 className="text-sm font-semibold">{pickerParentId ? '选择子构型项（添加至下级）' : '选择子构型项'}</h4>
-                  <button onClick={() => setCfgPickerOpen(false)} className="text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)]">✕</button>
+          {/* 构型项选择器弹窗（共享 EntityPickerModal，消灭 z-[70] 自绘遮罩） */}
+          <EntityPickerModal<any>
+            open={cfgPickerOpen}
+            title={pickerParentId ? '选择子构型项（添加至下级）' : '选择子构型项'}
+            onClose={() => { setCfgPickerOpen(false); setPickerParentId(null); }}
+            width="xl"
+            fetchData={async ({ search }) => {
+              const params: any = { page: 1, page_size: 100 };
+              const excludeId = pickerParentId ?? item?.id;
+              if (item?.id && excludeId) params.exclude_ancestors_of = excludeId;
+              const kw = search.trim();
+              if (kw) params.search = kw;
+              try {
+                const r = await configurationApi.list(params);
+                return (r.items || []).filter((x: any) =>
+                  !children.some(c => c.child_id === x.id) && x.id !== pickerParentId
+                );
+              } catch { return []; }
+            }}
+            getKey={(r) => r.id}
+            columns={[
+              { key: 'code', title: '构型号', width: '120px', render: (r) => <span className="font-medium text-xs">{r.code}</span> },
+              { key: 'name', title: '名称', render: (r) => <span className="text-xs">{r.name}</span> },
+              { key: 'spec', title: '规格型号', render: (r) => <span className="text-xs text-[var(--ui-text-tertiary)]">{r.spec || '-'}</span> },
+            ]}
+            selected={pickerSelected}
+            onSelectedChange={setPickerSelected}
+            onConfirm={async (items) => {
+              if (pickerParentId) {
+                // 向指定父级添加子项 → 即时 API
+                if (items.length > 0) {
+                  await configurationApi.addChildren(pickerParentId, items.map((s: any) => ({
+                    child_revision_id: s.id, is_required: true, quantity: 1,
+                  })));
+                  if (pickerParentIdx) markHasChildren(pickerParentIdx);
+                  refreshParentChildren(pickerParentId);
+                }
+              } else {
+                setChildren(prev => sortByCode([...prev, ...items.map((s: any) => ({
+                  child_id: s.id, child_code: s.code, child_name: s.name, child_remark: s.remark || '', quantity: 1, is_required: true,
+                  has_children: false,
+                }))]));
+              }
+              setCfgPickerOpen(false);
+              setPickerParentId(null); setPickerParentIdx(null);
+            }}
+            searchPlaceholder="搜索构型号/名称..."
+            confirmText="确认添加"
+            quickCreate={(
+              <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden mb-3">
+                <div className="flex items-center">
+                  <TreeToggle expanded={quickCreateOpen} onClick={() => { setQuickCreateOpen(!quickCreateOpen); if (!quickCreateOpen) setQuickForm({ code: '', name: '' }); }} size="sm" />
+                  <Button variant="ghost" size="sm" className="flex-1 !justify-start" onClick={() => { setQuickCreateOpen(!quickCreateOpen); if (!quickCreateOpen) setQuickForm({ code: '', name: '' }); }}>
+                    快速新建构型项
+                  </Button>
                 </div>
-
-                {/* 已选子项 */}
-                <div className="border-b">
-                  <div className="bg-[var(--ui-bg-subtle)] px-4 py-2 text-sm font-medium text-gray-700">已选子项 ({pickerSelected.length})</div>
-                  {pickerSelected.length === 0 ? (
-                    <div className="px-4 py-4 text-center text-sm text-[var(--ui-text-tertiary)]">请在下方列表中选择</div>
-                  ) : (
-                    <div className="max-h-48 overflow-y-auto">
-                      <table className="w-full text-sm">
-                        <thead className="sticky top-0 bg-[var(--ui-bg-subtle)] border-b"><tr>
-                          <th className="px-3 py-2 text-left text-xs text-[var(--ui-text-secondary)]">构型号</th>
-                          <th className="px-3 py-2 text-left text-xs text-[var(--ui-text-secondary)]">名称</th>
-                          <th className="px-3 py-2 text-right text-xs text-[var(--ui-text-secondary)] w-12"></th>
-                        </tr></thead>
-                        <tbody className="divide-y">
-                          {pickerSelected.map((s: any) => (
-                            <tr key={s.id} className="hover:bg-[var(--ui-bg-hover)]">
-                              <td className="px-3 py-2 font-medium text-xs">{s.code}</td>
-                              <td className="px-3 py-2 text-xs">{s.name}</td>
-                              <td className="px-3 py-2 text-right">
-                                <Button variant="danger" size="xs" onClick={() => setPickerSelected(prev => prev.filter(x => x.id !== s.id))}>移除</Button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-
-                {/* 搜索 + 快速新建 + 候选列表 */}
-                <div className="px-4 flex-1 flex flex-col min-h-0">
-                  <div className="flex gap-2 pt-4 pb-3 items-center flex-shrink-0">
-                    <Input value={cfgSearch} onChange={e => setCfgSearch(e.target.value)} autoFocus
-                      className="flex-1" placeholder="搜索构型号/名称（实时）..." />
-                    {cfgSearching && <span className="text-xs text-[var(--ui-text-tertiary)] whitespace-nowrap">搜索中...</span>}
-                  </div>
-
-                  {/* 快速新建构型项 */}
-                  <div className="border rounded-lg overflow-hidden mb-3 flex-shrink-0">
-                    <div className="flex items-center">
-                      <TreeToggle expanded={quickCreateOpen} onClick={() => { setQuickCreateOpen(!quickCreateOpen); if (!quickCreateOpen) setQuickForm({ code: '', name: '' }); }} size="sm" />
-                      <Button variant="ghost" size="sm" className="flex-1 !justify-start" onClick={() => { setQuickCreateOpen(!quickCreateOpen); if (!quickCreateOpen) setQuickForm({ code: '', name: '' }); }}>
-                        快速新建构型项
+                {quickCreateOpen && (
+                  <div className="px-4 py-3 border-t space-y-2 bg-[var(--ui-bg-subtle)]">
+                    <div className="flex gap-2">
+                      <Input size="xs" value={quickForm.code} onChange={e => setQuickForm({ ...quickForm, code: e.target.value })}
+                        placeholder="构型号 *" className="flex-1" />
+                      <Input size="xs" value={quickForm.name} onChange={e => setQuickForm({ ...quickForm, name: e.target.value })}
+                        placeholder="名称 *" className="flex-1" />
+                      <Button size="sm" className="whitespace-nowrap" onClick={async () => {
+                        if (!quickForm.code.trim() || !quickForm.name.trim()) return;
+                        setQuickCreating(true);
+                        try {
+                          const r = await configurationApi.create({ code: quickForm.code.trim(), name: quickForm.name.trim() });
+                          const newItem = { id: r.id, code: quickForm.code.trim(), name: quickForm.name.trim() };
+                          setPickerSelected(prev => [...prev, newItem]);
+                          setQuickForm({ code: '', name: '' });
+                        } catch (e: any) {}
+                        finally { setQuickCreating(false); }
+                      }} disabled={quickCreating}>
+                        {quickCreating ? '创建中...' : '新建并添加'}
                       </Button>
                     </div>
-                    {quickCreateOpen && (
-                      <div className="px-4 py-3 border-t space-y-2 bg-[var(--ui-bg-subtle)]">
-                        <div className="flex gap-2">
-                          <Input size="xs" value={quickForm.code} onChange={e => setQuickForm({ ...quickForm, code: e.target.value })}
-                            placeholder="构型号 *" className="flex-1" />
-                          <Input size="xs" value={quickForm.name} onChange={e => setQuickForm({ ...quickForm, name: e.target.value })}
-                            placeholder="名称 *" className="flex-1" />
-                          <Button size="sm" className="whitespace-nowrap" onClick={async () => {
-                            if (!quickForm.code.trim() || !quickForm.name.trim()) return;
-                            setQuickCreating(true);
-                            try {
-                              const r = await configurationApi.create({ code: quickForm.code.trim(), name: quickForm.name.trim() });
-                              const newItem = { id: r.id, code: quickForm.code.trim(), name: quickForm.name.trim() };
-                              setPickerSelected(prev => [...prev, newItem]);
-                              setQuickForm({ code: '', name: '' });
-                            } catch (e: any) {}
-                            finally { setQuickCreating(false); }
-                          }} disabled={quickCreating}>
-                            {quickCreating ? '创建中...' : '新建并添加'}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
                   </div>
-
-                  <div className="flex-1 overflow-y-auto border border-[var(--ui-border)] rounded">
-                    {cfgResults.length === 0 ? (
-                      <div className="text-center py-8 text-sm text-[var(--ui-text-tertiary)]">{cfgSearching ? '加载中...' : '无可用构型项'}</div>
-                    ) : (
-                      <table className="w-full text-sm">
-                        <thead className="sticky top-0 bg-[var(--ui-bg-subtle)] border-b">
-                          <tr>
-                            <th className="px-3 py-2 text-left text-xs text-[var(--ui-text-secondary)]">构型号</th>
-                            <th className="px-3 py-2 text-left text-xs text-[var(--ui-text-secondary)]">名称</th>
-                            <th className="px-3 py-2 text-left text-xs text-[var(--ui-text-secondary)]">规格型号</th>
-                            <th className="px-3 py-2 text-center text-xs text-[var(--ui-text-secondary)] w-20">操作</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {cfgResults.filter((r: any) => !children.some(c => c.child_id === r.id) && !pickerSelected.some(s => s.id === r.id) && r.id !== pickerParentId).map((r: any) => (
-                            <tr key={r.id} className="hover:bg-[var(--ui-bg-hover)]">
-                              <td className="px-3 py-2 font-medium text-xs">{r.code}</td>
-                              <td className="px-3 py-2 text-xs">{r.name}</td>
-                              <td className="px-3 py-2 text-xs text-[var(--ui-text-tertiary)]">{r.spec || '-'}</td>
-                              <td className="px-3 py-2 text-center">
-                                <Button size="xs" onClick={() => setPickerSelected(prev => [...prev, r])}>添加</Button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                </div>
-
-                {/* 底部按钮 */}
-                <div className="px-4 py-3 border-t flex justify-end gap-2">
-                  <Button variant="secondary" onClick={() => { setCfgPickerOpen(false); setPickerParentId(null); }}>取消</Button>
-                  <Button onClick={async () => {
-                    if (pickerParentId) {
-                      // 向指定父级添加子项 → 即时 API
-                      if (pickerSelected.length > 0) {
-                        await configurationApi.addChildren(pickerParentId, pickerSelected.map((s: any) => ({
-                          child_revision_id: s.id, is_required: true, quantity: 1,
-                        })));
-                        if (pickerParentIdx) markHasChildren(pickerParentIdx);
-                        refreshParentChildren(pickerParentId);
-                      }
-                    } else {
-                      setChildren(prev => sortByCode([...prev, ...pickerSelected.map((s: any) => ({
-                        child_id: s.id, child_code: s.code, child_name: s.name, child_remark: s.remark || '', quantity: 1, is_required: true,
-                        has_children: false,
-                      }))]));
-                    }
-                    setCfgPickerOpen(false);
-                    setPickerParentId(null); setPickerParentIdx(null);
-                  }}>确认添加 ({pickerSelected.length})</Button>
-                </div>
+                )}
               </div>
-            </div>
-          )}
+            )}
+          />
 
           {children.length === 0 ? (
             <p className="text-sm text-[var(--ui-text-tertiary)] py-2">暂无子构型项，点击"添加子构型项"选择</p>

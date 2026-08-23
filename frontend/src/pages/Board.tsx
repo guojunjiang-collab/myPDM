@@ -12,6 +12,7 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import TreeToggle from '../components/ui/TreeToggle';
+import Dropdown from '../components/ui/Dropdown';
 import type { BadgeTone } from '../constants/badges';
 import ItemPicker, { typeBadge, StatusTag, type FilterTab } from '../components/ItemPicker';
 import { useAuthStore } from '../stores/auth';
@@ -109,7 +110,6 @@ export default function Board() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [removeShareId, setRemoveShareId] = useState<string | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<{ id: string; el: HTMLElement } | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
 
   /* ---- Data ---- */
   const [usersList, setUsersList] = useState<{ id: string; username: string; real_name: string }[]>([]);
@@ -176,15 +176,6 @@ export default function Board() {
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
-
-  /* Close menu on outside click */
-  useEffect(() => {
-    const h = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuAnchor(null);
-    };
-    if (menuAnchor) document.addEventListener('mousedown', h);
-    return () => document.removeEventListener('mousedown', h);
-  }, [menuAnchor]);
 
   /* Selected folder */
   const allFolders = useMemo(() => [...myFolders, ...sharedFolders], [myFolders, sharedFolders]);
@@ -534,24 +525,30 @@ export default function Board() {
       </div>
 
 
-      {/* ---- Context Menu ---- */}
+      {/* ---- Context Menu（共享 Dropdown；⋮ 在 BoardTreeNode 组件树深处，用 0 尺寸锚点 span 承接定位） ---- */}
       {menuAnchor && (() => {
         const menuFolder = findFolderById(allFolders, menuAnchor.id);
         const menuIsShared = !!menuFolder?.shared_from;
+        const rect = menuAnchor.el.getBoundingClientRect();
 
         return (
-          <div ref={menuRef} className="fixed z-50 bg-[var(--ui-bg-surface)] rounded-lg shadow-lg border border-[var(--ui-border)] py-1 min-w-[120px]" style={{ left: menuAnchor.el.getBoundingClientRect().left, top: menuAnchor.el.getBoundingClientRect().bottom + 4 }}>
+          <Dropdown
+            open
+            onOpenChange={(v) => { if (!v) setMenuAnchor(null); }}
+            align="left"
+            trigger={<span className="fixed w-0 h-0" style={{ left: rect.left, top: rect.bottom }} />}
+          >
             {menuIsShared ? (
               <Button type="button" variant="ghost" size="sm" className="w-full !justify-start rounded-none !text-red-600 hover:!bg-red-50" onClick={() => { setRemoveShareId(menuAnchor.id); setMenuAnchor(null); }}>🚫 移除共享</Button>
             ) : (
               <>
                 <Button type="button" variant="ghost" size="sm" className="w-full !justify-start rounded-none" onClick={() => { const f = findFolderById(allFolders, menuAnchor.id); setRenameModal({ id: menuAnchor.id, name: f?.name || '' }); setRenameName(f?.name || ''); setMenuAnchor(null); }}>✏️ 重命名</Button>
                 <Button type="button" variant="ghost" size="sm" className="w-full !justify-start rounded-none" onClick={() => { setShareModal(menuAnchor.id); setUserSearch(''); setShareUserId(''); setSharePermission('view'); setMenuAnchor(null); }}>🔗 共享</Button>
-                <div className="border-t border-gray-100 my-1" />
+                <div className="border-t border-[var(--ui-border)] my-1" />
                 <Button type="button" variant="ghost" size="sm" className="w-full !justify-start rounded-none !text-red-600 hover:!bg-red-50" onClick={() => { setDeleteId(menuAnchor.id); setMenuAnchor(null); }}>🗑️ 删除</Button>
               </>
             )}
-          </div>
+          </Dropdown>
         );
       })()}
 
