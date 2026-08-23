@@ -44,6 +44,26 @@
   --ui-input-text: #374151;          --ui-input-placeholder: #9ca3af;
   --ui-input-focus-ring: #38bdf8;    --ui-input-focus-border: #0ea5e9;
   --ui-input-disabled-bg: #f3f4f6;   --ui-input-disabled-text: #6b7280;
+
+  /* ===== 外观配置 ui 变量 ===== */
+  /* 字体组 */
+  --ui-font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --ui-font-scale: 1;
+  --ui-font-size-sm: 12px;
+  --ui-font-size-base: 14px;
+  --ui-font-size-lg: 16px;
+  --ui-line-height: 1.5;
+  /* 背景组 */
+  --ui-bg-page: #f5f5f5;
+  --ui-bg-surface: #ffffff;
+  --ui-bg-subtle: #f9fafb;
+  --ui-bg-hover: #f3f4f6;
+  --ui-border: #e5e7eb;
+  --ui-text-primary: #111827;
+  --ui-text-secondary: #6b7280;
+  --ui-text-tertiary: #9ca3af;
+  /* 树组 */
+  --ui-tree-indent: 14px;
 }
 
 /* ===== 多主题（浅色变体集；徽标语义色跨主题稳定，仅品牌主色切换）===== */
