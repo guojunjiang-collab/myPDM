@@ -94,22 +94,6 @@ function ToolsPanel() {
             />
             仅显示差异
           </label>
-          <div className="flex items-center gap-2">
-            <span className="shrink-0 text-xs text-[var(--ui-text-secondary)]">幽灵</span>
-            <input
-              type="range"
-              min={0.02}
-              max={0.5}
-              step={0.01}
-              value={compare.ghostOpacity}
-              onChange={(e) => vs.setGhostOpacity(Number(e.target.value))}
-              className="flex-1 h-8 accent-primary-600"
-              aria-label="幽灵透明度"
-            />
-            <span className="shrink-0 w-8 text-right text-xs tabular-nums text-[var(--ui-text-tertiary)]">
-              {compare.ghostOpacity.toFixed(2)}
-            </span>
-          </div>
         </div>
       )}
 
@@ -179,6 +163,21 @@ function ToolsPanel() {
           onChange={(e) => vs.setExplodeDistance(Number(e.target.value))}
           className="w-full h-8 accent-primary-600"
           aria-label="爆炸距离"
+        />
+      </div>
+
+      {/* 幽灵（对比淡出非匹配 / 装配预览全局淡出） */}
+      <div className="flex flex-col gap-1.5">
+        <div className="text-xs text-[var(--ui-text-tertiary)] font-medium">幽灵</div>
+        <input
+          type="range"
+          min={0.02}
+          max={0.3}
+          step={0.01}
+          value={vs.ghostOpacity}
+          onChange={(e) => vs.setGhostOpacity(Number(e.target.value))}
+          className="w-full h-8 accent-primary-600"
+          aria-label="幽灵透明度"
         />
       </div>
 

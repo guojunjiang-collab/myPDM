@@ -20,6 +20,7 @@ export function useCompareVisualState(
   ghostCandidates: MutableRefObject<Set<string>>,
 ) {
   const compare = useViewerStore((s) => s.compare);
+  const ghostOpacity = useViewerStore((s) => s.ghostOpacity);
   const hiddenParts = useViewerStore((s) => s.hiddenParts);
   const wireframe = useViewerStore((s) => s.wireframe);
   const isolateMode = useViewerStore((s) => s.isolateMode);
@@ -28,7 +29,7 @@ export function useCompareVisualState(
     const group = groupRef.current;
     if (!group || !compare) return;
 
-    const { displayMode, onlyDiff, ghostOpacity, selectedKey, nodeMap } = compare;
+    const { displayMode, onlyDiff, selectedKey, nodeMap } = compare;
 
     // 选中行涉及的 mesh（左右两侧一起）。
     // BOM 行 key 在 nodeMap 里，直接取两侧 meshUuids；
@@ -100,5 +101,5 @@ export function useCompareVisualState(
       }
       std.needsUpdate = true;
     });
-  }, [groupRef, ghostCandidates, compare, hiddenParts, wireframe, isolateMode]);
+  }, [groupRef, ghostCandidates, compare, ghostOpacity, hiddenParts, wireframe, isolateMode]);
 }

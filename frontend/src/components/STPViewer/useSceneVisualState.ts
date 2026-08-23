@@ -23,6 +23,7 @@ export function useSceneVisualState(
 ) {
   const selectedNodeId = useViewerStore((s) => s.selectedNodeId);
   const isolateMode = useViewerStore((s) => s.isolateMode);
+  const ghostOpacity = useViewerStore((s) => s.ghostOpacity);
   const nodeMap = useViewerStore((s) => s.nodeMap);
   const hiddenParts = useViewerStore((s) => s.hiddenParts);
   const wireframe = useViewerStore((s) => s.wireframe);
@@ -54,7 +55,10 @@ export function useSceneVisualState(
 
       if (!sel) {
         if (std.emissive) { std.emissive.setHex(0x000000); std.emissiveIntensity = 0; }
-        std.transparent = false; std.opacity = 1; std.depthWrite = true;
+        // 无选中节点：幽灵透明度全局淡出（装配预览看内部结构；1 = 不透明）
+        std.transparent = ghostOpacity < 1;
+        std.opacity = ghostOpacity;
+        std.depthWrite = ghostOpacity >= 1;
       } else if (sel.has(mesh.uuid)) {
         if (std.emissive) { std.emissive.setHex(0x224488); std.emissiveIntensity = 0.5; }
         std.transparent = false; std.opacity = 1; std.depthWrite = true;
@@ -68,7 +72,7 @@ export function useSceneVisualState(
       }
       std.needsUpdate = true;
     });
-  }, [groupRef, selectedNodeId, isolateMode, nodeMap, hiddenParts, wireframe]);
+  }, [groupRef, selectedNodeId, isolateMode, ghostOpacity, nodeMap, hiddenParts, wireframe]);
 
   // 自动上色：按零件名称着色；关闭时还原原始色。只改 color，不触碰 emissive/opacity。
   useEffect(() => {

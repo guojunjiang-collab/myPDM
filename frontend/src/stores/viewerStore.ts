@@ -28,11 +28,13 @@ export interface ViewerState {
     meshOwner: Map<string, { key: string; side: Side }>;
     displayMode: DisplayMode;
     onlyDiff: boolean;
-    ghostOpacity: number;
     selectedKey: string | null;
     leftMissing: boolean;
     rightMissing: boolean;
   } | null;
+
+  /** 幽灵透明度（对比模式淡出非匹配 / 装配预览全局淡出，1 = 不透明） */
+  ghostOpacity: number;
 
   // 视图
   modelScale: number;
@@ -97,6 +99,7 @@ const initialState = {
   treeData: null as TreeNode | null,
   streamProgress: null as { loaded: number; total: number } | null,
   compare: null as ViewerState['compare'],
+  ghostOpacity: 0.12,
   nodeMap: new Map<string, TreeNode>(),
   meshOwner: new Map<string, TreeNode>(),
   selectedNodeId: null as string | null,
@@ -159,7 +162,6 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
         meshOwner: new Map(),
         displayMode: 'both',
         onlyDiff: false,
-        ghostOpacity: 0.12,
         selectedKey: null,
         leftMissing: opts.leftMissing,
         rightMissing: opts.rightMissing,
@@ -229,11 +231,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
     set({ compare: { ...c, onlyDiff: v } });
   },
 
-  setGhostOpacity: (v) => {
-    const c = get().compare;
-    if (!c) return;
-    set({ compare: { ...c, ghostOpacity: v } });
-  },
+  setGhostOpacity: (v) => set({ ghostOpacity: v }),
 
   // 切换某配对行某一侧的显隐（作用于该侧 meshUuids，与既有 hiddenParts 同一套机制）
   toggleCompareSideVisibility: (key, side) => {

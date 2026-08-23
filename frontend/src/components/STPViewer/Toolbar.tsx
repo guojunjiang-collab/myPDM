@@ -52,21 +52,6 @@ export function Toolbar() {
             仅显示差异
           </Button>
 
-          <div className="flex items-center gap-2 text-sm text-[var(--ui-text-secondary)] shrink-0">
-            <span className="font-medium">幽灵</span>
-            <input
-              type="range"
-              min={0.02}
-              max={0.5}
-              step={0.01}
-              value={compare.ghostOpacity}
-              onChange={(e) => setGhostOpacity(Number(e.target.value))}
-              className="w-16 h-1 accent-primary-500"
-              title="淡出零件的不透明度"
-            />
-            <span className="tabular-nums text-[var(--ui-text-tertiary)] w-8">{compare.ghostOpacity.toFixed(2)}</span>
-          </div>
-
           <div className="w-px h-5 bg-[var(--ui-border)] shrink-0 hidden sm:block" />
         </>
       )}
@@ -111,6 +96,22 @@ export function Toolbar() {
           onChange={(e) => setExplode(Number(e.target.value))}
           className="w-14 h-1 accent-primary-500"
         />
+      </div>
+
+      {/* Ghost opacity（对比淡出非匹配 / 装配预览全局淡出） */}
+      <div className="flex items-center gap-2 text-sm text-[var(--ui-text-secondary)] shrink-0">
+        <span className="font-medium">幽灵</span>
+        <input
+          type="range"
+          min={0.02}
+          max={0.3}
+          step={0.01}
+          value={vs.ghostOpacity}
+          onChange={(e) => setGhostOpacity(Number(e.target.value))}
+          className="w-16 h-1 accent-primary-500"
+          title="淡出零件的不透明度"
+        />
+        <span className="tabular-nums text-[var(--ui-text-tertiary)] w-8">{vs.ghostOpacity.toFixed(2)}</span>
       </div>
 
       <div className="w-px h-5 bg-[var(--ui-border)] shrink-0 hidden sm:block" />
