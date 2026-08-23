@@ -344,55 +344,59 @@ export default function Board() {
   if (loading) return <div className="text-[var(--ui-text-secondary)] py-8 text-center">加载中...</div>;
 
   return (
-    <div className="flex h-full">
-      {/* Left: Folder Tree */}
-      <div ref={sidebarRef} className="w-72 shrink-0 border-r border-[var(--ui-border)] bg-[var(--ui-bg-subtle)] flex flex-col">
-        <div className="px-2 pt-2 pb-1">
+    <div className="flex h-full gap-4 p-4 bg-[var(--ui-bg-page)]">
+      {/* Left: 文件夹树卡片 */}
+      <div ref={sidebarRef} className="w-72 shrink-0 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-[10px] shadow-sm flex flex-col overflow-hidden">
+        <div className="px-3 pt-3">
           <Button type="button" size="md" className="w-full" onClick={() => { setCreateModal(''); setCreateName(''); }}>
             + 新建文件夹
           </Button>
         </div>
-        <div className="px-3 py-2 text-xs font-medium text-[var(--ui-text-tertiary)] uppercase tracking-wide">我的文件夹</div>
-        <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-2">
-          {myFolders.length === 0 ? (
-            <p className="text-sm text-[var(--ui-text-tertiary)] text-center py-6">暂无文件夹</p>
-          ) : (
+        <div className="flex-1 min-h-0 flex flex-col gap-2.5 p-3">
+          {/* 子卡① 我的文件夹 */}
+          <div className="flex-1 min-h-0 flex flex-col bg-[var(--ui-bg-subtle)] border border-[var(--ui-border)] rounded-lg overflow-y-auto">
+            <div className="px-3 py-2 text-xs font-medium text-[var(--ui-text-tertiary)] uppercase tracking-wide shrink-0">我的文件夹</div>
             <div className="space-y-0.5">
-              {myFolders.map((f) => (
-                <BoardTreeNode key={f.id} node={f} depth={0} isShared={false} selectedId={selectedId} expandedIds={expandedIds} onSelect={setSelectedId} onToggle={toggleExpand} onMenu={(id, el) => setMenuAnchor({ id, el })} />
-              ))}
+              {myFolders.length === 0 ? (
+                <p className="text-sm text-[var(--ui-text-tertiary)] text-center py-6">暂无文件夹</p>
+              ) : (
+                myFolders.map((f) => (
+                  <BoardTreeNode key={f.id} node={f} depth={0} isShared={false} selectedId={selectedId} expandedIds={expandedIds} onSelect={setSelectedId} onToggle={toggleExpand} onMenu={(id, el) => setMenuAnchor({ id, el })} />
+                ))
+              )}
             </div>
+          </div>
+          {sharedFolders.length > 0 && (
+            <>
+              {/* 可拖动分隔条：调整「我的文件夹 / 共享给我的」高度比例 */}
+              <div
+                onPointerDown={handleSharedResize}
+                title="拖动调整两个区域高度"
+                className="group shrink-0 h-3 cursor-row-resize flex items-center justify-center -my-0.5"
+              >
+                <div className="w-9 h-1 rounded-full bg-[var(--ui-border)] group-hover:bg-primary-500 transition-colors" />
+              </div>
+              {/* 子卡② 共享给我的 */}
+              <div className="shrink-0 bg-[var(--ui-bg-subtle)] border border-[var(--ui-border)] rounded-lg overflow-y-auto" style={{ height: sharedPaneH }}>
+                <div className="px-3 py-2 text-xs font-medium text-[var(--ui-text-tertiary)] uppercase tracking-wide shrink-0">📂 共享给我的</div>
+                <div className="space-y-0.5">
+                  {sharedFolders.map((f) => (
+                    <BoardTreeNode key={`s-${f.id}`} node={f} depth={0} isShared={true} selectedId={selectedId} expandedIds={expandedIds} onSelect={setSelectedId} onToggle={toggleExpand} onMenu={(id, el) => setMenuAnchor({ id, el })} />
+                  ))}
+                </div>
+              </div>
+            </>
           )}
         </div>
-        {sharedFolders.length > 0 && (
-          <>
-            {/* 可拖动分隔条：调整「共享给我的」区域高度 */}
-            <div
-              onPointerDown={handleSharedResize}
-              title="拖动调整高度"
-              className="group shrink-0 h-px cursor-row-resize bg-gray-200 hover:bg-primary-400 active:bg-primary-500 transition-colors relative"
-            >
-              {/* 视觉 1px，热区上下各扩 3px 便于拖动 */}
-              <div className="absolute inset-x-0 -top-[3px] -bottom-[3px]" />
-            </div>
-            <div className="px-3 py-2 text-xs font-medium text-[var(--ui-text-tertiary)] uppercase tracking-wide shrink-0">📂 共享给我的</div>
-            <div className="shrink-0 overflow-y-auto px-2 pb-2" style={{ height: sharedPaneH }}>
-              <div className="space-y-0.5">
-                {sharedFolders.map((f) => (
-                  <BoardTreeNode key={`s-${f.id}`} node={f} depth={0} isShared={true} selectedId={selectedId} expandedIds={expandedIds} onSelect={setSelectedId} onToggle={toggleExpand} onMenu={(id, el) => setMenuAnchor({ id, el })} />
-                ))}
-              </div>
-            </div>
-          </>
-        )}
       </div>
 
-      {/* Right: Content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Right: 内容区卡片 */}
+      <div className="flex-1 flex flex-col min-w-0 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-[10px] shadow-sm overflow-hidden">
+        <div className="flex-1 min-h-0 flex flex-col gap-2.5 p-3">
         {selectedFolder ? (
           <>
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-[var(--ui-border)]">
+            {/* 子卡① 头部：路径 + 操作按钮 */}
+            <div className="shrink-0 bg-[var(--ui-bg-subtle)] border border-[var(--ui-border)] rounded-lg px-5 py-4">
               <h2 className="text-sm font-medium text-[var(--ui-text-secondary)] mb-2">{getFolderPath(allFolders, selectedFolder.id)}</h2>
               {canEditFolder && (
                 <div className="flex gap-2">
@@ -406,14 +410,14 @@ export default function Board() {
               )}
             </div>
 
-            {/* Tabs */}
-            <div className="px-6 flex gap-0 border-b border-[var(--ui-border)]">
+            {/* 子卡② Tab 行 */}
+            <div className="shrink-0 bg-[var(--ui-bg-subtle)] border border-[var(--ui-border)] rounded-lg px-4 flex gap-0">
               {(['all', 'component', 'document', 'configuration'] as FilterTab[]).map((tab) => (
                 <button
                   type="button"
                   key={tab}
                   onClick={() => setFilterTab(tab)}
-                  className={`px-4 py-2.5 text-sm border-b-2 transition-colors ${
+                  className={`px-3 py-2.5 text-sm border-b-2 transition-colors ${
                     filterTab === tab
                       ? 'border-primary-500 text-primary-700 font-medium'
                       : 'border-transparent text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)]'
@@ -424,13 +428,13 @@ export default function Board() {
               ))}
             </div>
 
-            {/* Table */}
-            <div className="flex-1 overflow-auto">
+            {/* 子卡③ 内容表格 */}
+            <div className="flex-1 min-h-0 bg-[var(--ui-bg-subtle)] border border-[var(--ui-border)] rounded-lg overflow-auto">
               {filteredItems.length === 0 ? (
                 <p className="text-sm text-[var(--ui-text-tertiary)] text-center py-16">暂无关联项目</p>
               ) : (
                 <table className="w-full text-sm">
-                  <thead className="bg-[var(--ui-bg-subtle)] border-b">
+                  <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
                     <tr>
                       <th className="px-5 py-2.5 text-left text-[var(--ui-text-secondary)] font-medium w-28">类型</th>
                       <th className="px-5 py-2.5 text-left text-[var(--ui-text-secondary)] font-medium">编号</th>
@@ -464,7 +468,7 @@ export default function Board() {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex-1 flex items-center justify-center bg-[var(--ui-bg-subtle)] border border-[var(--ui-border)] rounded-lg">
             <div className="text-center text-[var(--ui-text-tertiary)]">
               <div className="text-4xl mb-2">📂</div>
               <p className="text-sm">选择左侧文件夹查看内容</p>
@@ -472,6 +476,7 @@ export default function Board() {
           </div>
         )}
 
+        </div>
       </div>
 
 
