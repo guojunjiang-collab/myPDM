@@ -37,7 +37,7 @@ export function Toolbar() {
 
   return (
     <div className="relative border-b border-[var(--ui-border)] bg-[var(--ui-bg-subtle)] shadow-sm">
-      <div className="flex items-center gap-3 px-4 py-2">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2">
       {compare && (
         <>
           <div className="flex items-center gap-2 shrink-0">
@@ -67,7 +67,7 @@ export function Toolbar() {
             <span className="tabular-nums text-[var(--ui-text-tertiary)] w-8">{compare.ghostOpacity.toFixed(2)}</span>
           </div>
 
-          <div className="w-px h-5 bg-[var(--ui-border)] shrink-0" />
+          <div className="w-px h-5 bg-[var(--ui-border)] shrink-0 hidden sm:block" />
         </>
       )}
 
@@ -88,7 +88,7 @@ export function Toolbar() {
         })}
       </div>
 
-      <div className="w-px h-5 bg-[var(--ui-border)] shrink-0" />
+      <div className="w-px h-5 bg-[var(--ui-border)] shrink-0 hidden sm:block" />
 
       {/* Measure mode */}
       <Button
@@ -113,7 +113,7 @@ export function Toolbar() {
         />
       </div>
 
-      <div className="w-px h-5 bg-[var(--ui-border)] shrink-0" />
+      <div className="w-px h-5 bg-[var(--ui-border)] shrink-0 hidden sm:block" />
 
       {/* Reset */}
       <Button size="md" variant="secondary" onClick={resetAction}>
