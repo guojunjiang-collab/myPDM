@@ -494,7 +494,6 @@ export default function Board() {
                           {(isComponentType(item.entity_type) || item.entity_type === 'document') && (
                             <Button
                               type="button"
-                              variant="secondary"
                               size="xs"
                               className="mr-2"
                               disabled={!((item.attachment_count ?? 0) > 0)}
