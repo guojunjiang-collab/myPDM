@@ -8,6 +8,7 @@ import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
 import Textarea from '../ui/Textarea';
+import Alert from '../ui/Alert';
 import type { InvDocType, InvDocLine, StockRow } from '../../types';
 
 interface ReviewerFormItem { user_id: string; seq: number; }
@@ -32,6 +33,8 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
   const [reviewers, setReviewers] = useState<ReviewerFormItem[]>([]);
   const [reviewMode, setReviewMode] = useState<'all' | 'any'>('all');
   const [keeperId, setKeeperId] = useState('');
+  // 表单校验错误（阻塞性校验 → Alert）
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // 审批人管理（仿 ECR）：可添加多个
   const addReviewer = () => {
@@ -81,8 +84,9 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
   const removeLine = (i: number) => setLines(lines.filter((_, idx) => idx !== i));
 
   const save = async () => {
-    if (!warehouseId) { alert('请选择仓库'); return; }
-    if (isTransfer && !toWarehouseId) { alert('请选择目标仓'); return; }
+    if (!warehouseId) { setSaveError('请选择仓库'); return; }
+    if (isTransfer && !toWarehouseId) { setSaveError('请选择目标仓'); return; }
+    setSaveError(null);
     const payload = {
       doc_type: docType, biz_type: bizType || undefined,
       warehouse_id: warehouseId, to_warehouse_id: isTransfer ? toWarehouseId : undefined,
@@ -101,6 +105,7 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
   return (
     <Modal open title={`新建${DOC_LABELS[docType]}`} onClose={onClose} width="3xl">
       <div className="space-y-4 max-h-[78vh] overflow-y-auto pr-1">
+        {saveError && <Alert tone="danger">{saveError}</Alert>}
         {/* 基本信息（卡片字段） */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className={cardCls}>

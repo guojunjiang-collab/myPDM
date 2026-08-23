@@ -10,6 +10,8 @@ import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
 import Dropdown from '../ui/Dropdown';
+import { ConfirmModal } from '../Modal';
+import { toast } from '../Toast';
 import DocumentEditModal from './DocumentEditModal';
 import DocumentDetail from './DocumentDetail';
 import type { InvDocType } from '../../types';
@@ -34,6 +36,8 @@ export default function DocumentTab() {
   const [creating, setCreating] = useState<InvDocType | null>(null);
   const [showMenu, setShowMenu] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
+  // 行级破坏性操作确认（状态驱动 ConfirmModal）
+  const [confirmDoc, setConfirmDoc] = useState<{ id: string; action: 'delete' | 'post' | 'cancel' } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -63,7 +67,7 @@ export default function DocumentTab() {
 
   const act = async (fn: () => Promise<any>) => {
     try { await fn(); await load(); }
-    catch (e: any) { alert(e?.response?.data?.detail || '操作失败'); }
+    catch (e: any) { toast.error(e?.response?.data?.detail || '操作失败'); }
   };
 
   // 行内操作列：按状态/角色显示动作；过账(盘点)与改派需在详情里填实盘/选人，故打开详情
@@ -75,7 +79,7 @@ export default function DocumentTab() {
       return (
         <div className="flex gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
           <Button variant="link" size="xs" className="mr-2" onClick={() => act(() => inventoryApi.submit(d.id))}>提交审批</Button>
-          <Button variant="danger" size="xs" onClick={() => confirm('确认删除该单据？') && act(() => inventoryApi.deleteDocument(d.id))}>删除</Button>
+          <Button variant="danger" size="xs" onClick={() => setConfirmDoc({ id: d.id, action: 'delete' })}>删除</Button>
         </div>
       );
     }
@@ -97,10 +101,10 @@ export default function DocumentTab() {
       return (
         <div className="flex gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
           {isKeeper && (
-            <Button variant="link" size="xs" className="mr-2" onClick={() => d.doc_type === 'stocktake' ? setDetailId(d.id) : (confirm('确认过账？') && act(() => inventoryApi.post(d.id, {})))}>过账</Button>
+            <Button variant="link" size="xs" className="mr-2" onClick={() => d.doc_type === 'stocktake' ? setDetailId(d.id) : setConfirmDoc({ id: d.id, action: 'post' })}>过账</Button>
           )}
           <Button variant="link" size="xs" className="mr-2" onClick={() => setDetailId(d.id)}>改派</Button>
-          <Button variant="link" size="xs" onClick={() => confirm('确认取消该单据？') && act(() => inventoryApi.cancel(d.id))}>取消</Button>
+          <Button variant="link" size="xs" onClick={() => setConfirmDoc({ id: d.id, action: 'cancel' })}>取消</Button>
         </div>
       );
     }
@@ -183,6 +187,26 @@ export default function DocumentTab() {
       {detailId && (
         <DocumentDetail docId={detailId} onClose={() => setDetailId(null)} onChanged={load} />
       )}
+
+      {/* 行级操作确认 */}
+      <ConfirmModal
+        open={!!confirmDoc}
+        title="确认操作"
+        content={
+          confirmDoc?.action === 'delete' ? '确认删除该单据？'
+          : confirmDoc?.action === 'post' ? '确认过账？'
+          : '确认取消该单据？'
+        }
+        onConfirm={() => {
+          if (!confirmDoc) return;
+          const { id, action } = confirmDoc;
+          if (action === 'delete') act(() => inventoryApi.deleteDocument(id));
+          else if (action === 'post') act(() => inventoryApi.post(id, {}));
+          else act(() => inventoryApi.cancel(id));
+          setConfirmDoc(null);
+        }}
+        onCancel={() => setConfirmDoc(null)}
+      />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { inventoryApi } from '../../services/inventoryApi';
 import { partsApi } from '../../services/api';
 import { canEdit, isAdmin } from '../../stores/auth';
 import { Modal, ConfirmModal } from '../Modal';
+import { toast } from '../Toast';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
@@ -122,7 +123,7 @@ export default function MaterialTab() {
       setPdmMode(false); setPdmKeyword('');
       await reload();
     } catch (err: any) {
-      alert(err?.response?.data?.detail || '启用失败，请重试');
+      toast.error(err?.response?.data?.detail || '启用失败，请重试');
     }
   };
 
