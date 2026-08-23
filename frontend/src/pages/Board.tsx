@@ -371,6 +371,7 @@ export default function Board() {
       setDetailItem(null);
     } else if (item.entity_type === 'document') {
       // 图文档：直接复用附件预览（PDF/图片/Office/3D 等按格式分发）
+      let handled = false;
       try {
         const res: any = await documentsApi.listAttachments(item.entity_id);
         const atts: any[] = Array.isArray(res) ? res : (res?.items || []);
@@ -380,13 +381,13 @@ export default function Board() {
             // 压缩包：降级打开详情弹窗（附件区含压缩包浏览）
             onArchive: () => { setDetailDocId(item.entity_id); setDetailComponentId(null); setDetailItem(null); },
           });
+          handled = true;
           return;
         }
-      } catch { /* 忽略，走 fallback */ }
-      // 无附件：打开详情弹窗（默认附件页）
-      setDetailDocId(item.entity_id);
-      setDetailComponentId(null);
-      setDetailItem(null);
+      } catch { /* 下方统一提示 */ }
+      if (!handled) {
+        alert(item.attachment_count ? '附件预览失败，请重试' : '该图文档暂无附件可预览');
+      }
     }
   };
 
