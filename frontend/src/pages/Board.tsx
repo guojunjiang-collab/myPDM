@@ -416,10 +416,10 @@ export default function Board() {
               </div>
               {canEditFolder && (
                 <div className="ml-auto flex gap-2">
-                  <Button type="button" variant="secondary" size="md" onClick={() => { setCreateModal(selectedFolder.id); setCreateName(''); }}>
+                  <Button type="button" size="md" onClick={() => { setCreateModal(selectedFolder.id); setCreateName(''); }}>
                     + 子文件夹
                   </Button>
-                  <Button type="button" variant="secondary" size="md" onClick={() => setPickerOpen(true)}>
+                  <Button type="button" size="md" onClick={() => setPickerOpen(true)}>
                     + 关联项目
                   </Button>
                 </div>
