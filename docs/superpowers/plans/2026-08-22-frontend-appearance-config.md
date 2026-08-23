@@ -715,3 +715,5 @@ git commit -m "docs: 外观配置与树形统一验收通过，补充验收记�
 
 - 构建/测试双 PASS（162 用例）；grep 表面类残留仅限豁免清单；树符号字面 0 处非豁免；四主题代码级抽查通过；深色变量块 + 灰阶补偿 + 表面 token 应用齐备。
 - 除 §7 3 处树形收敛清单偏差（1 处为真实遗留）外，计划目标全部达成。**验收结论：通过（DONE_WITH_CONCERNS，BOMTreeTable 树符号遗留报控制器）**。
+
+> **跟进注记（2026-08-22 收尾）**：§7 遗留违规已全部跟进闭环——① BOMTreeTable.tsx 树行箭头与根行全部展开箭头收敛为共享 TreeToggle（`908b372`）；② 同源转义树符号 EntityEditModal / ProfileEditModal×2 / ConfigurationCreateModal 收敛为 TreeToggle 并全库复查 `\u25` 系列转义（`38ccbbf`），复查后转义树符号与字面树符号非豁免残留均 = 0；③ BOMTreeTable 与 BomWhereUsedTree 缩进经复核为连字符徽标层级列（无像素缩进布局），正式登记豁免（`var(--ui-tree-indent)` 不适用）。两项修复均 build PASS 且评审通过。**最终验收结论：通过（全 12 任务 T1-T11+10b/11b/11c 评审通过）**。

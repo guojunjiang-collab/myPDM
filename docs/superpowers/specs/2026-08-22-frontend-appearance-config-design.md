@@ -215,3 +215,5 @@ Tailwind 3 的 `text-xs/sm/base` 为编译期固定值。在 `index.css` 用 `@l
 - grep：表面类残留仅限豁免清单（10 处全归类，非豁免 0）；树符号字面 0 处非豁免——但发现 `BOMTreeTable.tsx:145,212` 以 `\u25BC/\u25B6` 转义渲染 ▼/▶ 的真实遗留（字面 grep 漏检），详见计划文档验收记录 §7。
 - 四主题代码级抽查通过：THEMES 4 条目、Settings/MorePage 浅色+深色分组、dark 变量块（背景/徽标9组/按钮/表单）+ 灰阶补偿块、`bg-[var(--ui-bg-surface)]` 214 处（桌面+移动）。
 - 实际视觉渲染未在浏览器验证（代码级验收）；深色逐页视觉确认由控制器/PM 在浏览器完成。
+
+> **跟进注记（2026-08-22 收尾）**：验收发现的 BOMTreeTable 转义树符号（`\u25BC/\u25B6`）及同源 4 处（EntityEditModal / ProfileEditModal×2 / ConfigurationCreateModal）已全部收敛为共享 TreeToggle（`908b372` + `38ccbbf`，均 build PASS 且评审通过）；全库 `\u25` 系列转义与字面树符号非豁免残留 = 0。BOMTreeTable / BomWhereUsedTree 缩进经复核为连字符徽标层级列（无像素缩进），登记豁免。**最终验收结论：通过**。
