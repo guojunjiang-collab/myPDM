@@ -53,7 +53,7 @@ function NodeRow({ node, depth }: { node: TreeNode; depth: number }) {
     }
   }, [selected]);
 
-  const indent = 16 + depth * 16;
+  const indent = `calc(16px + ${depth} * var(--ui-tree-indent))`;
 
   return (
     <li className="relative">
@@ -61,7 +61,7 @@ function NodeRow({ node, depth }: { node: TreeNode; depth: number }) {
           绘制顺序在其后会把竖线盖住；抬到行之上即可。线落在行的 paddingLeft
           留白区（行 padding 为 indent，线在 indent-9），压不到展开按钮和文字。 */}
       {depth > 0 && (
-        <div className="absolute top-0 bottom-0 z-10 pointer-events-none" style={{ left: indent - 9 }}>
+        <div className="absolute top-0 bottom-0 z-10 pointer-events-none" style={{ left: `calc(${indent} - 9px)` }}>
           <div className="h-full w-px bg-gray-200" />
         </div>
       )}

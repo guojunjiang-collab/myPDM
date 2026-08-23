@@ -355,14 +355,14 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
         <tr className="hover:bg-gray-50 cursor-pointer" onClick={rowClick}>
           <td
             className="relative px-3 py-2 font-medium whitespace-nowrap"
-            style={{ paddingLeft: 8 + level * 12 }}
+            style={{ paddingLeft: `calc(8px + ${level} * var(--ui-tree-indent))` }}
             onClick={(e) => e.stopPropagation()}
           >
             {level > 0 && Array.from({ length: level }, (_, k) => (
               <span
                 key={k}
                 className="absolute -top-px bottom-0 w-px bg-gray-200 pointer-events-none"
-                style={{ left: 16 + k * 12 }}
+                style={{ left: `calc(16px + ${k} * var(--ui-tree-indent))` }}
               />
             ))}
             <span className="inline-flex items-center gap-1">

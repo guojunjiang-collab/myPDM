@@ -9,6 +9,7 @@ import PartDetailModal from '../PartDetailModal';
 import { useDataStore } from '../../stores/data';
 import CustomFieldInput from '../CustomFieldInput';
 import Badge from '../ui/Badge';
+import TreeToggle from '../ui/TreeToggle';
 
 interface Props {
   itemId: string | null;
@@ -188,10 +189,7 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
           <td className="px-3 py-2 text-sm text-gray-400 whitespace-nowrap">
             <span>{'-'.repeat(level)}{level}</span>
             {isAssembly && entityId && (
-              <button onClick={(e) => { e.stopPropagation(); togglePart(idx, entityId, p.part_detail?.revision_id || ''); }}
-                className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
-                {childRows ? '▼' : '▶'}
-              </button>
+              <span className="ml-1 inline-flex"><TreeToggle expanded={!!childRows} onClick={() => togglePart(idx, entityId, p.part_detail?.revision_id || '')} size="md" /></span>
             )}
           </td>
           <td className={`px-3 py-2 text-sm ${rowCls}`} onClick={onClickRow}>
@@ -235,10 +233,7 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
           <td className="px-3 py-2 text-sm text-gray-400 whitespace-nowrap">
             <span>{'-'.repeat(level)}</span>
             {isAssembly && entityId && (
-              <button onClick={(e) => { e.stopPropagation(); togglePart(idx, entityId, p.part_detail?.revision_id || ''); }}
-                className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
-                {childRows ? '▼' : '▶'}
-              </button>
+              <span className="ml-1 inline-flex"><TreeToggle expanded={!!childRows} onClick={() => togglePart(idx, entityId, p.part_detail?.revision_id || '')} size="md" /></span>
             )}
           </td>
           <td className={`px-3 py-2 text-sm font-mono text-gray-600 ${rowCls}`} onClick={onClickRow}>{code}</td>
@@ -277,10 +272,7 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
           <td className="px-3 py-2 text-sm text-gray-400 whitespace-nowrap">
             <span>{'-'.repeat(level)}{level}</span>
             {expandable && (
-              <button onClick={(e) => { e.stopPropagation(); toggleChild(idx, childId); }}
-                className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
-                {expanded ? '▼' : '▶'}
-              </button>
+              <span className="ml-1 inline-flex"><TreeToggle expanded={!!expanded} onClick={() => toggleChild(idx, childId)} size="md" /></span>
             )}
           </td>
           <td className={`px-3 py-2 text-sm font-medium text-gray-700 ${rowCls}`} onClick={onClickRow}>{c.child_detail?.code || c.child_code || c.child_id}</td>

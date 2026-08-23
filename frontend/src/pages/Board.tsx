@@ -10,6 +10,7 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
+import TreeToggle from '../components/ui/TreeToggle';
 import type { BadgeTone } from '../constants/badges';
 import { useAuthStore } from '../stores/auth';
 
@@ -650,15 +651,13 @@ function BoardTreeNode({
             ? 'bg-primary-50 text-primary-700'
             : 'hover:bg-gray-100 text-gray-700'
         }`}
-        style={{ paddingLeft: depth * 16 + 8 }}
+        style={{ paddingLeft: `calc(8px + ${depth} * var(--ui-tree-indent))` }}
         onClick={() => onSelect(node.id)}
       >
         {hasChildren ? (
-          <button type="button" onClick={(e) => { e.stopPropagation(); onToggle(node.id); }} className="w-3.5 flex items-center justify-center text-gray-400 hover:text-gray-600 text-xs">
-            {isExpanded ? '▼' : '▶'}
-          </button>
+          <TreeToggle expanded={isExpanded} onClick={() => onToggle(node.id)} size="sm" />
         ) : (
-          <span className="w-3.5" />
+          <TreeToggle leaf size="sm" />
         )}
         <span className="text-gray-400">{isShared ? '📂' : '📁'}</span>
         <span className="flex-1 truncate">{node.name}</span>

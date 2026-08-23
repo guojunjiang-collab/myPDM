@@ -50,7 +50,7 @@ function SideCell({ side, node, which, indent, leading }: {
 
   if (!side) {
     return (
-      <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-0.5" style={{ paddingLeft: 8 + indent }}>
+      <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-0.5" style={{ paddingLeft: `calc(8px + ${indent} * var(--ui-tree-indent))` }}>
         {leading}
         <span className="text-gray-300 italic text-xs">—</span>
       </div>
@@ -67,7 +67,7 @@ function SideCell({ side, node, which, indent, leading }: {
     : side.quantity;
 
   return (
-    <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-0.5" style={{ paddingLeft: 8 + indent }}>
+    <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-0.5" style={{ paddingLeft: `calc(8px + ${indent} * var(--ui-tree-indent))` }}>
       {leading}
       {side.meshUuids.length > 0 ? (
         <button
@@ -114,7 +114,7 @@ function InstanceCell({ present, label, meshUuids, indent }: {
   const visible = meshUuids.length === 0 || meshUuids.some((u) => !hiddenParts.has(u));
 
   return (
-    <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-0.5" style={{ paddingLeft: 8 + indent }}>
+    <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-0.5" style={{ paddingLeft: `calc(8px + ${indent} * var(--ui-tree-indent))` }}>
       {/* 与 BOM 行的展开按钮等宽占位，保证实例行文字与上级行对齐 */}
       <span className="w-4 shrink-0" />
       {present && meshUuids.length > 0 ? (
@@ -143,8 +143,8 @@ function InstanceCell({ present, label, meshUuids, indent }: {
  * 行背景会把长线截断成一段一段。改成每行画自己那一段、上下首尾相接，
  * 无论行有没有底色，ladder 都是连续的。
  *
- * 每条线对齐**该层展开按钮的中心**：格内 paddingLeft = 8 + level*12，
- * 按钮宽 16px，故第 k 层按钮中心距格左边 16 + k*12。两格严格等宽
+ * 每条线对齐**该层展开按钮的中心**：格内 paddingLeft = 8 + level*var(--ui-tree-indent)，
+ * 按钮宽 16px，故第 k 层按钮中心距格左边 16 + k*var(--ui-tree-indent)。两格严格等宽
  * （行内只有 两个 flex-1 + 1px 分隔线），右格左边即 50% + 0.5px。
  */
 function GuideLines({ level }: { level: number }) {
@@ -152,7 +152,7 @@ function GuideLines({ level }: { level: number }) {
   return (
     <>
       {Array.from({ length: level }, (_, k) => {
-        const x = 16 + k * 12;
+        const x = `calc(16px + ${k} * var(--ui-tree-indent))`;
         return (
           <Fragment key={k}>
             <span
@@ -161,7 +161,7 @@ function GuideLines({ level }: { level: number }) {
             />
             <span
               className="absolute top-0 -bottom-px w-px bg-gray-200 pointer-events-none"
-              style={{ left: `calc(50% + ${x + 0.5}px)` }}
+              style={{ left: `calc(50% + ${x} + 0.5px)` }}
             />
           </Fragment>
         );
@@ -177,7 +177,7 @@ function InstanceRow({ inst, depth, node }: { inst: CompareInstanceNode; depth: 
   const isSelected = selectedKey === inst.key;
   const inLeft = inst.side === 'left' || inst.side === 'both';
   const inRight = inst.side === 'right' || inst.side === 'both';
-  const indent = (depth + 1) * 12;
+  const indent = depth + 1;
 
   // 左右两侧件号/版本可能不同，各取自己那侧的 CompareSide
   const labelOf = (s: CompareSide | null) =>
@@ -239,7 +239,7 @@ function Row({ node, depth }: { node: CompareNode; depth: number }) {
           side={node.left}
           node={node}
           which="left"
-          indent={depth * 12}
+          indent={depth}
           leading={hasChildren || hasInstances ? (
             <button
               onClick={(e) => { e.stopPropagation(); toggleExpanded(node.key); }}
@@ -257,7 +257,7 @@ function Row({ node, depth }: { node: CompareNode; depth: number }) {
           side={node.right}
           node={node}
           which="right"
-          indent={depth * 12}
+          indent={depth}
           leading={<span className="w-4 shrink-0" />}
         />
       </div>

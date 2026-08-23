@@ -1,7 +1,7 @@
 import { forwardRef } from 'react';
 
 interface TreeToggleProps {
-  expanded: boolean;
+  expanded?: boolean; // leaf 占位模式下无需传值
   onClick?: () => void;
   loading?: boolean;
   leaf?: boolean;
@@ -11,7 +11,7 @@ interface TreeToggleProps {
 }
 
 const TreeToggle = forwardRef<HTMLButtonElement, TreeToggleProps>(
-  ({ expanded, onClick, loading, leaf, size = 'md', title, disabled }, ref) => {
+  ({ expanded = false, onClick, loading, leaf, size = 'md', title, disabled }, ref) => {
     const iconSize = size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4';
     const hitSize = size === 'sm' ? 'w-4 h-4' : 'w-5 h-5';
     if (leaf) {

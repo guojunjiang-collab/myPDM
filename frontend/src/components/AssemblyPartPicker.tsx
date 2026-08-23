@@ -6,6 +6,7 @@ import Badge from './ui/Badge';
 import Button from './ui/Button';
 import Input from './ui/Input';
 import Select from './ui/Select';
+import TreeToggle from './ui/TreeToggle';
 
 /* ----------------------------------------------------------------
    Types
@@ -335,7 +336,7 @@ export default function AssemblyPartPicker({
         {/* ---- 快速新建 ---- */}
         <div className="border rounded-lg overflow-hidden">
           <Button variant="ghost" size="sm" className="w-full !justify-start" onClick={() => setQuickOpen(!quickOpen)}>
-            <span className="text-xs">{quickOpen ? '▼' : '▶'}</span>
+            <TreeToggle expanded={quickOpen} onClick={() => setQuickOpen(!quickOpen)} size="sm" />
             快速新建零部件
           </Button>
           {quickOpen && (

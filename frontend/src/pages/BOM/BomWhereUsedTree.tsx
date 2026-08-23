@@ -4,6 +4,7 @@ import type { BOMTraceItem } from '../../types';
 import { buildTraceTree, flattenTraceTree } from './helpers';
 import type { TraceTreeNode } from './types';
 import Badge from '../../components/ui/Badge';
+import TreeToggle from '../../components/ui/TreeToggle';
 
 interface Props {
   revisionId: string;
@@ -145,14 +146,9 @@ export default function BomWhereUsedTree({ revisionId, root, onViewEntity, onSta
                     <span className="inline-flex items-center gap-0.5">
                       <span className="text-xs text-gray-400">{'-'.repeat(item.level)}{item.level}</span>
                       {hasChildren ? (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); toggleTraceNode(item.bom_item_id); }}
-                          className="w-4 h-4 inline-flex items-center justify-center text-gray-500 hover:bg-gray-200 rounded"
-                        >
-                          {node.expanded ? '▼' : '▶'}
-                        </button>
+                        <TreeToggle expanded={node.expanded} onClick={() => toggleTraceNode(item.bom_item_id)} size="sm" />
                       ) : (
-                        <span className="w-4 inline-block" />
+                        <TreeToggle leaf size="sm" />
                       )}
                     </span>
                   </td>

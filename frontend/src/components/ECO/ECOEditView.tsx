@@ -6,6 +6,7 @@ import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
+import TreeToggle from '../ui/TreeToggle';
 import AssemblyPartPicker from '../AssemblyPartPicker';
 import { toast } from '../Toast';
 
@@ -97,9 +98,8 @@ function LevelCell({ n, meta, onToggle }: { n: MutableNode; meta?: Map<MutableNo
     <td className={td}>
       <span className="text-gray-400 inline-flex items-center gap-0.5">
         {m?.hasChildren ? (
-          <button type="button" onClick={(e) => { e.stopPropagation(); onToggle?.(m.key); }}
-            className="text-gray-500 hover:text-gray-700 w-3 leading-none">{m.expanded ? '▼' : '▶'}</button>
-        ) : <span className="inline-block w-3" />}
+          <TreeToggle expanded={m.expanded} onClick={() => onToggle?.(m.key)} size="sm" />
+        ) : <TreeToggle leaf size="sm" />}
         {n.level != null ? '-'.repeat(n.level) + n.level : '-'}
       </span>
     </td>

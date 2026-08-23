@@ -13,6 +13,7 @@ import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
 import Textarea from '../ui/Textarea';
+import TreeToggle from '../ui/TreeToggle';
 import { ECOEditView } from './ECOEditView';
 import { ECRDocumentPicker } from '../ECR/ECRDocumentPicker';
 import AssemblyPartPicker from '../AssemblyPartPicker';
@@ -820,7 +821,7 @@ function ReleaseItemsTable({ items, onViewItem, onRemove, onVersionSelect }: { i
         <tr key={idx} className="hover:bg-gray-50 cursor-pointer" onClick={() => onViewItem(isAssembly ? 'assembly' : 'part', ri.entity_id, 'view')}>
           <td className="px-3 py-1.5 text-xs text-gray-400 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
             <span>{'-'.repeat(level)}{level}</span>
-            {isAssembly && <button onClick={(e) => { e.stopPropagation(); toggleExpand(idx, ri.entity_id, ri.entity_type); }} className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">{childRows ? '▼' : '▶'}</button>}
+            {isAssembly && <span className="ml-1 inline-flex"><TreeToggle expanded={!!childRows} onClick={() => toggleExpand(idx, ri.entity_id, ri.entity_type)} size="sm" /></span>}
           </td>
           <td className="px-3 py-1.5 text-xs"><Badge tone={isAssembly ? 'blue' : 'gray'} label={isAssembly ? '部件' : '零件'} /></td>
           <td className="px-3 py-1.5 text-xs font-mono">{ri.entity_code}</td>

@@ -249,14 +249,14 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
       <tr key={c.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => { if (revId) setNestedConfigRevId(revId); }}>
         <td
           className="relative px-3 py-2 font-medium whitespace-nowrap"
-          style={{ paddingLeft: 8 + (level - 1) * 12 }}
+          style={{ paddingLeft: `calc(8px + (${level} - 1) * var(--ui-tree-indent))` }}
           onClick={(e) => e.stopPropagation()}
         >
           {level > 1 && Array.from({ length: level - 1 }, (_, k) => (
             <span
               key={k}
               className="absolute -top-px bottom-0 w-px bg-gray-200 pointer-events-none"
-              style={{ left: 16 + k * 12 }}
+              style={{ left: `calc(16px + ${k} * var(--ui-tree-indent))` }}
             />
           ))}
           <span className="inline-flex items-center gap-1">

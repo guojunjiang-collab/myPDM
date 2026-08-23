@@ -11,6 +11,7 @@ import CustomFieldInput from '../CustomFieldInput';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
+import TreeToggle from '../ui/TreeToggle';
 
 interface Props {
   open: boolean;
@@ -586,7 +587,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                   {/* 快速新建构型项 */}
                   <div className="border rounded-lg overflow-hidden mb-3 flex-shrink-0">
                      <Button variant="ghost" size="sm" className="w-full !justify-start" onClick={() => { setQuickCreateOpen(!quickCreateOpen); if (!quickCreateOpen) setQuickForm({ code: '', name: '' }); }}>
-                      <span className="text-xs">{quickCreateOpen ? '▼' : '▶'}</span>
+                      <TreeToggle expanded={quickCreateOpen} onClick={() => { setQuickCreateOpen(!quickCreateOpen); if (!quickCreateOpen) setQuickForm({ code: '', name: '' }); }} size="sm" />
                       快速新建构型项
                     </Button>
                     {quickCreateOpen && (

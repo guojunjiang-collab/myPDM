@@ -879,13 +879,13 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                     className={`border-b border-gray-200 transition-colors ${hoveredIndex === ri ? hoverClass(row) : ''}`}>
                     <td
                       className="relative p-2 font-medium whitespace-nowrap"
-                      style={{ width: 180, paddingLeft: 8 + row.level * 12 }}
+                      style={{ width: 180, paddingLeft: `calc(8px + ${row.level} * var(--ui-tree-indent))` }}
                     >
                       {row.level > 0 && Array.from({ length: row.level }, (_, k) => (
                         <span
                           key={k}
                           className="absolute -top-px bottom-0 w-px bg-gray-300 pointer-events-none z-10"
-                          style={{ left: 16 + k * 12 }}
+                          style={{ left: `calc(16px + ${k} * var(--ui-tree-indent))` }}
                         />
                       ))}
                       <span className="inline-flex items-center gap-1">

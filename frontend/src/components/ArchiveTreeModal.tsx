@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Modal } from './Modal';
 import { attachmentApi, mediaApi } from '../services/api';
 import type { ArchiveTreeNode, ArchiveTreeResponse } from '../types';
+import TreeToggle from './ui/TreeToggle';
 
 interface ArchiveTreeModalProps {
   open: boolean;
@@ -39,10 +40,13 @@ function TreeNodeItem({ node, depth, attId, token }: { node: ArchiveTreeNode; de
     <React.Fragment>
       <tr className={`hover:bg-gray-50 ${isDir ? 'cursor-pointer' : ''}`}
         onClick={() => { if (isDir) setExpanded(!expanded); }}>
-        <td className="px-3 py-1.5 text-xs whitespace-nowrap" style={{ paddingLeft: `${16 + depth * 20}px` }}>
+        <td className="px-3 py-1.5 text-xs whitespace-nowrap" style={{ paddingLeft: `calc(16px + ${depth} * var(--ui-tree-indent))` }}>
           <span className="inline-flex items-center gap-1">
-            {hasChildren && (<span className="text-gray-400 w-3 inline-block text-center">{expanded ? '▼' : '▶'}</span>)}
-            {!hasChildren && isDir && <span className="w-3 inline-block" />}
+            {hasChildren ? (
+              <TreeToggle expanded={expanded} onClick={() => { if (isDir) setExpanded(!expanded); }} size="sm" />
+            ) : isDir ? (
+              <TreeToggle leaf size="sm" />
+            ) : null}
             <span className={isDir ? 'font-medium' : ''}>{isDir ? '📁 ' : '📄 '}{node.name}</span>
           </span>
         </td>

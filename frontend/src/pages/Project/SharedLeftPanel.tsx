@@ -82,7 +82,7 @@ export default function SharedLeftPanel({ tasks, expanded, childMap, onToggle, o
               onClick={(e) => { if (hasDrag) e.stopPropagation(); onRowClick?.(t.id); }}>
               <TaskCodeCell code={t.code} depth={t.depth} hasChildren={hasChildren}
                 isExpanded={expanded.has(t.id)}
-                onToggle={(e) => { e.stopPropagation(); onToggle(t.id); }}
+                onToggle={() => onToggle(t.id)}
                 onClick={() => onRowClick?.(t.id)} variant="gantt" />
               <TaskNameCell name={t.name} taskType={t.task_type}
                 isCritical={t.is_critical} variant="gantt"

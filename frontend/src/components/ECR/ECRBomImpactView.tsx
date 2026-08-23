@@ -3,6 +3,7 @@ import type { BomImpactNode } from '../../types';
 import Badge from '../ui/Badge';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
+import TreeToggle from '../ui/TreeToggle';
 import { BADGE_DOMAINS } from '../../constants/badges';
 
 // ─── Action config ───────────────────────────────────────────────
@@ -257,14 +258,9 @@ export function ECRBomImpactView({
                         <span className="inline-flex items-center gap-0.5">
                           <span className="text-xs text-gray-400">{'-'.repeat(node.level ?? 0)}{node.level ?? 0}</span>
                           {hasChildren ? (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); toggleUpwardNode(treeNode); }}
-                              className="w-4 h-4 inline-flex items-center justify-center text-gray-500 hover:bg-gray-200 rounded"
-                            >
-                              {expandedKeys.has(`${treeNode.node.entity_id}:${treeNode.node.level}`) ? '▼' : '▶'}
-                            </button>
+                            <TreeToggle expanded={expandedKeys.has(`${treeNode.node.entity_id}:${treeNode.node.level}`)} onClick={() => toggleUpwardNode(treeNode)} size="sm" />
                           ) : (
-                            <span className="w-4 inline-block" />
+                            <TreeToggle leaf size="sm" />
                           )}
                         </span>
                       </td>

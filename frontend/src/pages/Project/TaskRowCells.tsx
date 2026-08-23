@@ -1,4 +1,5 @@
-import { CODE_W, ASSIGNEE_W, INDENT } from './gantt/ganttUtils';
+import { CODE_W, ASSIGNEE_W } from './gantt/ganttUtils';
+import TreeToggle from '../../components/ui/TreeToggle';
 
 export const TYPE_ICON: Record<string, string> = { 任务: '📋', 里程碑: '🏁', 评审: '🔎' };
 
@@ -7,7 +8,7 @@ interface CodeCellProps {
   depth: number;
   hasChildren: boolean;
   isExpanded: boolean;
-  onToggle?: (e: React.MouseEvent) => void;
+  onToggle?: () => void;
   onClick?: () => void;
   variant: 'table' | 'gantt';
 }
@@ -29,22 +30,13 @@ interface AssigneeCellProps {
 
 export function TaskCodeCell({ code, depth, hasChildren, isExpanded, onToggle, onClick, variant }: CodeCellProps) {
   const indent = variant === 'gantt'
-    ? { paddingLeft: 8 + depth * INDENT, width: CODE_W }
-    : { paddingLeft: depth * INDENT };
+    ? { paddingLeft: `calc(8px + ${depth} * var(--ui-tree-indent))`, width: CODE_W }
+    : { paddingLeft: `calc(${depth} * var(--ui-tree-indent))` };
 
   const toggleEl = hasChildren ? (
-    variant === 'gantt' ? (
-      <span className="inline-block w-4 cursor-pointer select-none text-gray-400 hover:text-gray-700"
-        onClick={onToggle}>
-        {isExpanded ? '▾' : '▸'}
-      </span>
-    ) : (
-      <button onClick={onToggle} className="text-gray-400 w-4 shrink-0">
-        {isExpanded ? '▾' : '▸'}
-      </button>
-    )
+    <TreeToggle expanded={isExpanded} onClick={onToggle} size="sm" />
   ) : (
-    <span className="inline-block w-4 shrink-0" />
+    <TreeToggle leaf size="sm" />
   );
 
   return (

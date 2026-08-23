@@ -9,6 +9,7 @@ import type { ProfileCompareNode, ProfileComparePart, ProfileCompareResult } fro
 import type { ConfigurationProfile } from '../../types';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
+import TreeToggle from '../ui/TreeToggle';
 
 interface Props {
   open: boolean;
@@ -167,8 +168,7 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
         <td className="px-2 py-2 text-xs text-gray-500 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
           {'-'.repeat(level)} {level}
           {hasChildren && level > 0 && (
-            <button type="button" onClick={(e) => { e.stopPropagation(); toggle(n.key); }}
-              className="ml-1 text-gray-400 hover:text-gray-600">{isExpanded ? '▼' : '▶'}</button>
+            <span className="ml-1 inline-flex"><TreeToggle expanded={isExpanded} onClick={() => toggle(n.key)} size="sm" /></span>
           )}
         </td>
         <td className="px-2 py-2 text-xs font-medium">{l?.code || '-'}</td>
