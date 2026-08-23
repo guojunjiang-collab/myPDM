@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, MODAL_Z } from '../Modal';
 import Button from './Button';
 import Input from './Input';
@@ -15,7 +15,7 @@ interface EntityPickerModalProps<T> {
   title: string;
   onClose: () => void;
   width?: 'lg' | 'xl' | 'full';
-  /** 候选数据拉取（open / 搜索 / 类型切换时触发） */
+  /** 候选数据拉取（open / 搜索 / 类型切换时触发；引用无需稳定，内部以 ref 持有） */
   fetchData: (params: { search: string; type?: string }) => Promise<T[]>;
   /** 条目唯一键（已选去重与「已添加」判定依据） */
   getKey: (item: T) => string;
@@ -74,7 +74,11 @@ export default function EntityPickerModal<T>({
   const [search, setSearch] = useState('');
   const [items, setItems] = useState<T[]>([]);
   const [fetchLoading, setFetchLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [internalSelected, setInternalSelected] = useState<T[]>([]);
+  // ref 持有 fetchData，调用方传内联箭头也不会导致 effect 反复重建
+  const fetchDataRef = useRef(fetchData);
+  fetchDataRef.current = fetchData;
 
   // 非受控模式：每次打开重置内部已选
   useEffect(() => {
@@ -91,12 +95,17 @@ export default function EntityPickerModal<T>({
     if (!open) return;
     let cancelled = false;
     setFetchLoading(true);
-    fetchData({ search, type: activeType })
+    setFetchError(null);
+    fetchDataRef
+      .current({ search, type: activeType })
       .then((data) => {
         if (!cancelled) setItems(data);
       })
       .catch(() => {
-        if (!cancelled) setItems([]);
+        if (!cancelled) {
+          setItems([]);
+          setFetchError('数据加载失败，请稍后重试');
+        }
       })
       .finally(() => {
         if (!cancelled) setFetchLoading(false);
@@ -104,7 +113,7 @@ export default function EntityPickerModal<T>({
     return () => {
       cancelled = true;
     };
-  }, [open, search, activeType, fetchData]);
+  }, [open, search, activeType]);
 
   const add = (item: T) => {
     const key = getKey(item);
@@ -238,6 +247,11 @@ export default function EntityPickerModal<T>({
 
       {/* 候选表格 */}
       <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden">
+        {fetchError && (
+          <div className="bg-[var(--ui-amber-bg)] text-[var(--ui-amber-text)] px-3 py-2 text-xs border-b border-[var(--ui-border)]">
+            {fetchError}
+          </div>
+        )}
         <div className="max-h-[260px] overflow-y-auto">
           <table className="w-full text-[13px]">
             <thead className="sticky top-0 z-10">
