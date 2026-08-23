@@ -146,7 +146,7 @@ export default function ProfileList() {
           <option value="rejected">已驳回</option>
           <option value="archived">已归档</option>
         </Select>
-        <Button variant="secondary" onClick={() => setCompareOpen(true)}>
+        <Button onClick={() => setCompareOpen(true)}>
           ⇄ 配置对比
         </Button>
         <div className="flex-1" />

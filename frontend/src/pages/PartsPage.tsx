@@ -196,7 +196,7 @@ export default function PartsPage() {
           </svg>
           CAD工作台
         </Button>
-        <Button variant="secondary" onClick={() => setShowCompareModal(true)}>
+        <Button onClick={() => setShowCompareModal(true)}>
           ⇄ BOM对比
         </Button>
         <div className="flex-1" />
