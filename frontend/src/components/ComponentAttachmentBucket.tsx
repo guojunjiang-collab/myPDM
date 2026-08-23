@@ -98,7 +98,7 @@ export default function ComponentAttachmentBucket({ componentId, category, label
   return (
     <div className="border-t pt-4">
       <div className="flex items-center justify-between mb-2">
-        <h4 className="text-sm font-bold text-gray-700">{label}</h4>
+        <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">{label}</h4>
         {editable && !uploading && (
           <>
             <Button size="sm" type="button" onClick={() => fileInputRef.current?.click()}>+ 上传附件</Button>

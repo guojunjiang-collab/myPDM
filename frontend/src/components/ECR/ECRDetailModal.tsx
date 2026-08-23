@@ -394,7 +394,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
           {/* Document Links */}
           {detail.document_links && detail.document_links.length > 0 ? (
             <div className="border-t pt-4">
-              <h4 className="text-sm font-bold text-gray-700 mb-2">关联图文档</h4>
+              <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">关联图文档</h4>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-[var(--ui-bg-subtle)] border-b">

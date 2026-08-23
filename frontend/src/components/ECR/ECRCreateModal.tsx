@@ -571,7 +571,7 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
         {/* 关联图文档 */}
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-bold text-gray-700">关联图文档</h4>
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">关联图文档</h4>
             <Button size="sm" type="button" onClick={() => setShowDocPicker(true)}>+ 关联图文档</Button>
           </div>
           <div className="border rounded-lg overflow-hidden">

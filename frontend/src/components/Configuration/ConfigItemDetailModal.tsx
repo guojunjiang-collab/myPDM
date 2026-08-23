@@ -397,7 +397,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
               {activeTab === 'parts' && (
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-sm font-bold text-gray-700">关联零部件 ({parts.length})</h4>
+                    <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">关联零部件 ({parts.length})</h4>
                     {canEdit && (
                       <Button size="sm" onClick={() => setPartPickerOpen(true)}>关联零部件</Button>
                     )}
@@ -471,7 +471,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
               )}
               {activeTab === 'children' && (
                 <div className="flex flex-col h-full min-h-0">
-                  <div className="flex items-center justify-between mb-3 shrink-0"><h4 className="text-sm font-bold text-gray-700">子构型项</h4>{canEdit && (<Button size="sm" onClick={() => { setPickerParentId(internalRevId); setCfgPickerOpen(true); }}>+ 添加子项</Button>)}</div>
+                  <div className="flex items-center justify-between mb-3 shrink-0"><h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">子构型项</h4>{canEdit && (<Button size="sm" onClick={() => { setPickerParentId(internalRevId); setCfgPickerOpen(true); }}>+ 添加子项</Button>)}</div>
                   {children.length === 0 ? (<div className="text-[var(--ui-text-tertiary)] text-sm py-4 text-center">暂无子构型项</div>) : (
                      <div className="border rounded-lg overflow-hidden flex-1 min-h-0"><div className="overflow-y-auto h-full" ref={childrenScrollRef}><table className="w-full text-sm"><thead><tr className="bg-[var(--ui-bg-subtle)] border-b sticky top-0 z-10"><th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium" style={{ paddingLeft: 28 }}>构型号</th><th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">名称</th><th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-16">版本</th><th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-20">状态</th><th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-20">签出状态</th><th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-20 whitespace-nowrap">必选/可选</th><th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-16 whitespace-nowrap">数量</th>{canEdit && <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-28 whitespace-nowrap">操作</th>}</tr></thead><tbody className="divide-y divide-gray-200">{rows}</tbody></table></div></div>
                   )}

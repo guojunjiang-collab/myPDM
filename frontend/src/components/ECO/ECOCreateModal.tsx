@@ -510,7 +510,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         {/* 关联图文档 */}
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-bold text-gray-700">关联图文档</h4>
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">关联图文档</h4>
             <Button size="sm" type="button" onClick={() => setShowDocPicker(true)}>+ 关联图文档</Button>
           </div>
           <div className="border rounded-lg overflow-hidden">
@@ -571,7 +571,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         {!!localEco && (
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-bold text-gray-700">ECR 变更分析{localEco.ecr_number ? `（${localEco.ecr_number}）` : ''}</h4>
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">ECR 变更分析{localEco.ecr_number ? `（${localEco.ecr_number}）` : ''}</h4>
             <div className="flex items-center gap-2">
               <Button size="sm" type="button" onClick={() => setShowEcrPicker(true)}>
                 {localEco.ecr_id ? '更换' : '+ 关联 ECR'}
@@ -613,7 +613,7 @@ onExecuteFreeze={(itemId, newEntityId) => handleExecuteAction('freeze', itemId, 
         {editingEco && (
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-bold text-gray-700">工程变更结果</h4>
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">工程变更结果</h4>
             <Button size="sm" type="button" onClick={() => setShowReleasePicker(true)}>+ 关联零部件</Button>
           </div>
           {releaseItems.length === 0 ? (
@@ -650,7 +650,7 @@ onExecuteFreeze={(itemId, newEntityId) => handleExecuteAction('freeze', itemId, 
         alreadyLinked={documentLinks.map(d => d.document_id)}
       />
 
-      {/* ECR 选择弹窗（共享 Modal，消灭 z-[100] 自绘遮罩；height 限定防 ECR 长列表超高） */}
+      {/* ECR 选择弹窗（共享 Modal，zIndex 走 MODAL_Z.picker；height 限定防 ECR 长列表超高） */}
       <Modal open={showEcrPicker} title="选择 ECR" onClose={() => setShowEcrPicker(false)} width="lg" height="70vh" zIndex={MODAL_Z.picker}>
         <EcrPicker onSelect={async (id, number) => {
           try {

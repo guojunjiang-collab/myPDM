@@ -90,7 +90,7 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
       {/* 自定义字段 - 卡片式 */}
       {customFieldDefs.length > 0 && (
         <div className="border-t pt-4">
-          <h4 className="text-sm font-bold text-gray-700 mb-2">自定义字段</h4>
+          <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">自定义字段</h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {customFieldDefs.map(def => (
               <InfoItem
@@ -109,7 +109,7 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
 
       {/* 附件区域 - 只显示、预览、下载，无上传/删除 */}
       <div className="border-t pt-4">
-        <h4 className="text-sm font-bold text-gray-700 mb-2">附件</h4>
+        <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">附件</h4>
 
         {loadingAttachments ? (
           <div className="text-sm text-[var(--ui-text-secondary)]">加载中...</div>

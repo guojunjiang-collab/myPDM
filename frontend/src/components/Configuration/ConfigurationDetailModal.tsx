@@ -327,7 +327,7 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
 
           {/* 关联零部件 */}
           <div>
-            <h4 className="text-sm font-bold text-gray-700 mb-2">关联零部件 ({data.parts?.length || 0})</h4>
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">关联零部件 ({data.parts?.length || 0})</h4>
             {data.parts?.length > 0 ? (
               <table className="w-full text-sm border border-[var(--ui-border)] rounded">
                 <thead className="bg-[var(--ui-bg-subtle)] border-b"><tr>
@@ -349,7 +349,7 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
 
           {/* 子构型项 */}
           <div>
-            <h4 className="text-sm font-bold text-gray-700 mb-2">子构型项 ({data.children?.length || 0})</h4>
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">子构型项 ({data.children?.length || 0})</h4>
             {data.children?.length > 0 ? (
               <table className="w-full text-sm border border-[var(--ui-border)] rounded">
                 <thead className="bg-[var(--ui-bg-subtle)] border-b"><tr>

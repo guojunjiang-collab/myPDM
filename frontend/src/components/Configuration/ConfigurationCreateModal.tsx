@@ -391,12 +391,12 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
         {/* 基本信息 */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
-            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">构型号 *</label>
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">构型号 <span className="text-red-500">*</span></label>
             <Input size="xs" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })}
               className="placeholder:text-gray-300" placeholder="如 CFG-001" />
           </div>
           <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
-            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">中文名称 *</label>
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">中文名称 <span className="text-red-500">*</span></label>
             <Input size="xs" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
               className="placeholder:text-gray-300" placeholder="如 A型机翼构型" />
           </div>
@@ -417,7 +417,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
         {/* 自定义字段 */}
         {cfDefs.length > 0 && (
           <div className="border-t pt-4">
-            <h4 className="text-sm font-bold text-gray-700 mb-2">自定义字段</h4>
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">自定义字段</h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {cfDefs.map(def => (
                 <div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
@@ -439,7 +439,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
         {/* 关联零部件 */}
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-bold text-gray-700">关联零部件 ({parts.length})</h4>
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">关联零部件 ({parts.length})</h4>
             <Button size="sm" type="button" onClick={() => setPickerOpen(true)}>关联零部件</Button>
           </div>
           {parts.length === 0 ? (
@@ -501,7 +501,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
         {/* 子构型项 */}
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-bold text-gray-700">子构型项 ({children.length})</h4>
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">子构型项 ({children.length})</h4>
             <Button size="sm" type="button" onClick={() => {
               setPickerParentId(null); setPickerSelected([]);
               setQuickCreateOpen(false); setQuickForm({ code: '', name: '' });
@@ -509,7 +509,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
             }}>添加子构型项</Button>
           </div>
 
-          {/* 构型项选择器弹窗（共享 EntityPickerModal，消灭 z-[70] 自绘遮罩） */}
+          {/* 构型项选择器弹窗（共享 EntityPickerModal，zIndex 走 MODAL_Z.picker） */}
           <EntityPickerModal<any>
             open={cfgPickerOpen}
             title={pickerParentId ? '选择子构型项（添加至下级）' : '选择子构型项'}

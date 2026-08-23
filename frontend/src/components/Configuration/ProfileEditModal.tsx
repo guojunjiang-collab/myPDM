@@ -836,7 +836,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
             ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
-                <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">编号 {isCreate && '*'}</label>
+                <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">编号 {isCreate && <span className="text-red-500">*</span>}</label>
                 <Input size="xs"
                   value={form.code}
                   onChange={(e) => setForm({ ...form, code: e.target.value })}
@@ -846,7 +846,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                 />
               </div>
               <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
-                <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">名称 {isCreate && '*'}</label>
+                <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">名称 {isCreate && <span className="text-red-500">*</span>}</label>
                 <Input size="xs"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -988,7 +988,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
             {profile && canEdit && (
               <div className="border-t pt-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-gray-700">配置清单</h4>
+                  <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">配置清单</h4>
                   <div className="flex items-center gap-2">
                     {form.configuration_item_revision_id && (
                       <>
@@ -1049,7 +1049,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
             {/* ── 正式配置清单 ── */}
             {profile && configTree && (
               <div className="border-t pt-3">
-                <h4 className="text-sm font-bold text-gray-700 mb-2">正式配置清单</h4>
+                <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">正式配置清单</h4>
                 <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden max-h-[600px] overflow-y-auto bg-[var(--ui-bg-surface)]">
                   <table className="w-full text-sm">
                     <thead className="bg-gray-100 sticky top-0 z-10">
@@ -1074,7 +1074,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
             {/* ── 状态日志 ── */}
             {profile && profile.status !== 'draft' && !isCreate && (profile.status_logs || []).length > 0 && (
               <div className="border-t pt-3">
-                <h4 className="text-sm font-bold text-gray-700 mb-2">状态日志</h4>
+                <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">状态日志</h4>
                 <ul className="text-xs text-[var(--ui-text-secondary)] space-y-1 max-h-32 overflow-y-auto">
                   {(profile.status_logs || []).map((l) => (
                     <li key={l.id} className="flex gap-2">

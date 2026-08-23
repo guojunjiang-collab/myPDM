@@ -241,7 +241,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
           {/* Document links */}
           <div className="border-t pt-4">
             <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-bold text-gray-700">关联图文档</h4>
+              <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">关联图文档</h4>
             </div>
             <div className="border rounded-lg overflow-hidden">
               {documentLinks.length === 0 ? (
@@ -296,7 +296,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
           {/* BOM impact */}
           {eco.ecr_id && (
             <div className="border-t pt-4">
-              <h4 className="text-sm font-bold text-gray-700 mb-2">ECR 变更分析（{eco.ecr_number || 'ECR'}）</h4>
+              <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">ECR 变更分析（{eco.ecr_number || 'ECR'}）</h4>
               <ECOEditView ecrId={eco.ecr_id} onEcrLinked={() => {}} readOnly executionItems={eco.execution_items}
                 ecoId={ecoId} ecoStatus={eco.status} canExecute={executionMode && (eco.status === 'approved' || eco.status === 'executing')}
                 onExecuteUpgrade={async (itemId, entityInfo) => {
@@ -349,7 +349,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
           {/* 工程变更结果 */}
           <div className="border-t pt-4">
             <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-bold text-gray-700">工程变更结果</h4>
+              <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">工程变更结果</h4>
               {executionMode && eco.status === 'executing' && releaseItems.length > 0 && (
                 <Button variant={canPublishAll ? 'success' : 'secondary'} size="sm" onClick={() => setShowPublishAll(true)} disabled={actionLoading || !canPublishAll}
                   title={canPublishAll ? '存在草稿/冻结状态的零部件，可一键发布' : '工程变更结果已全部发布'}>

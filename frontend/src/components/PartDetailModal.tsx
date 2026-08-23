@@ -757,7 +757,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                 {activeTab === 'bom' && (
                   <div className="flex flex-col min-h-0 h-full">
                     <div className="flex items-center justify-between mb-3 shrink-0">
-                      <h4 className="text-sm font-bold text-gray-700">子项清单</h4>
+                      <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">子项清单</h4>
                       <div className="flex gap-2">
                         {canEdit && !viewingIterationId && (
                           <Button variant="success" size="sm" onClick={() => setBomPickerOpen(true)}>

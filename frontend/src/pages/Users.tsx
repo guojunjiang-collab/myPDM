@@ -618,7 +618,7 @@ export default function Users() {
       )}
 
       {/* 组编辑弹窗 */}
-      <Modal open={groupModalOpen} title={editingGroup ? '编辑用户组' : '新建用户组'} onClose={() => setGroupModalOpen(false)} width="lg">
+      <Modal open={groupModalOpen} title={editingGroup ? '编辑用户组' : '新建用户组'} onClose={() => { setGroupModalOpen(false); setGroupError(null); }} width="lg">
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField label="名称" required card>
@@ -678,7 +678,7 @@ export default function Users() {
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button type="button" onClick={() => setGroupModalOpen(false)} variant="secondary" disabled={groupSaving}>取消</Button>
+            <Button type="button" onClick={() => { setGroupModalOpen(false); setGroupError(null); }} variant="secondary" disabled={groupSaving}>取消</Button>
             <Button type="button" onClick={saveGroup} disabled={groupSaving}>{groupSaving ? '保存中...' : '保存'}</Button>
           </div>
         </div>

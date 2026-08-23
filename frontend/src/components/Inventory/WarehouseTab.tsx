@@ -111,7 +111,7 @@ export default function WarehouseTab() {
       <FormModal
         open={!!editing}
         title={editing?.id ? '编辑仓库' : '新建仓库'}
-        onClose={() => setEditing(null)}
+        onClose={() => { setEditing(null); setSaveError(null); }}
         width="md"
         onSubmit={save}
         saving={saving}

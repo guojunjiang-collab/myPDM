@@ -210,7 +210,7 @@ export default function MaterialTab() {
       </div>
 
       {/* 新建/编辑非 PDM 物料 */}
-      <Modal open={!!editing} title={editing?.id ? '编辑物料' : '新建物料'} onClose={() => setEditing(null)} width="3xl">
+      <Modal open={!!editing} title={editing?.id ? '编辑物料' : '新建物料'} onClose={() => { setEditing(null); setSaveError(null); }} width="3xl">
         {editing && (
           <div className="space-y-4">
             {saveError && <Alert tone="danger">{saveError}</Alert>}

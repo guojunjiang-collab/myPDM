@@ -351,7 +351,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
           {/* 自定义字段 */}
           {customFieldDefs.length > 0 && (
             <div className="border-t pt-4">
-              <h4 className="text-sm font-bold text-gray-700 mb-2">自定义字段</h4>
+              <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">自定义字段</h4>
               {loadingCustomFields ? (
                 <div className="text-sm text-[var(--ui-text-secondary)]">加载中...</div>
               ) : (
@@ -382,7 +382,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
           {(entityType === 'assembly' || entityType === 'component') && (
             <div className="border-t pt-4">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-bold text-gray-700">子项清单</h4>
+                <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">子项清单</h4>
                 {!locked && <Button size="sm" type="button" onClick={() => { setPickerTargetId(null); setExpandedParts({}); setPickerOpen(true); }}>+ 添加子项</Button>}
               </div>
               <div className="border rounded-lg overflow-hidden">

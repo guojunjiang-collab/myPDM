@@ -27,7 +27,7 @@ export default function PartDetailContent({ part, customFieldDefs, customFieldVa
       {/* 自定义字段 - 卡片式 */}
       {customFieldDefs.length > 0 && (
         <div className="border-t pt-4">
-          <h4 className="text-sm font-bold text-gray-700 mb-2">自定义字段</h4>
+          <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">自定义字段</h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {customFieldDefs.map(def => (
               <InfoItem

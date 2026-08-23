@@ -172,7 +172,7 @@ export default function PartAttachmentBucket({ revisionId, iterationId, category
   return (
     <div className="border-t pt-4">
       <div className="flex items-center justify-between mb-2">
-        <h4 className="text-sm font-bold text-gray-700">{label}</h4>
+        <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">{label}</h4>
         <div className="flex items-center gap-2">
           {showDownloadAll && (
             <Button size="sm" type="button" onClick={handleDownloadAll} disabled={downloadingAll}

@@ -298,7 +298,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
   return (
     <div className="border-t pt-4">
       <div className="flex items-center justify-between mb-2">
-        <h4 className="text-sm font-bold text-gray-700">关联图文档</h4>
+        <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">关联图文档</h4>
         {hasEditableAction && (
           <Button size="sm" type="button" onClick={() => setPickerOpen(true)}>
             + 关联图文档
@@ -469,7 +469,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
 
             {editCustomDefs.length > 0 && (
               <div className="border-t pt-4">
-                <h4 className="text-sm font-bold text-gray-700 mb-2">自定义字段</h4>
+                <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">自定义字段</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {editCustomDefs.map(def => (
                     <div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
