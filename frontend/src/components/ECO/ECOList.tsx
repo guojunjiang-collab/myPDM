@@ -3,6 +3,7 @@ import { ecoApi } from '../../services/api';
 import type { ECORequest } from '../../types';
 import { canEdit, isAdmin, useAuthStore } from '../../stores/auth';
 import { toast } from '../Toast';
+import { ConfirmModal } from '../Modal';
 import { ECOStatusBadge, ECOPriorityBadge } from './ECOStatusBadge';
 import { ECOCreateModal } from './ECOCreateModal';
 import { ECODetailModal } from './ECODetailModal';
@@ -80,12 +81,9 @@ export function ECOList() {
     try { await ecoApi.startExecution(id); toast.success('已开始执行'); load(); } catch { toast.error('执行失败'); }
     finally { setActionLoading(null); }
   };
-  const handleDelete = async (id: string) => {
-    if (!confirm('确定删除该 ECO？')) return;
-    setActionLoading(id);
-    try { await ecoApi.delete(id); toast.success('已删除'); load(); } catch { toast.error('删除失败'); }
-    finally { setActionLoading(null); }
-  };
+  // 删除确认（状态驱动 ConfirmModal）
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const handleDelete = (id: string) => setConfirmDeleteId(id);
   const handleEdit = async (eco: ECORequest) => {
     const reqId = ++editReqId.current;
     try {
@@ -223,6 +221,24 @@ export function ECOList() {
         />
       )}
       {ccEcoId && <ECOCcPicker open={!!ccEcoId} ecoId={ccEcoId} onClose={() => setCcEcoId(null)} />}
+
+      {/* 删除 ECO 确认 */}
+      <ConfirmModal
+        open={!!confirmDeleteId}
+        title="确认删除"
+        content="确定删除该 ECO？"
+        confirmText="删除"
+        cancelText="取消"
+        type="danger"
+        onConfirm={async () => {
+          if (!confirmDeleteId) return;
+          setActionLoading(confirmDeleteId);
+          try { await ecoApi.delete(confirmDeleteId); toast.success('已删除'); load(); }
+          catch { toast.error('删除失败'); }
+          finally { setActionLoading(null); setConfirmDeleteId(null); }
+        }}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

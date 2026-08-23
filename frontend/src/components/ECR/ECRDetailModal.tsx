@@ -139,7 +139,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
       a.click();
       document.body.removeChild(a);
     } catch {
-      alert('下载失败，请重试');
+      toast.error('下载失败，请重试');
     }
   };
 
@@ -149,24 +149,24 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
       try {
         const mt = await mediaApi.token(attId, 'preview');
         window.open(`/api/v2/attachments/${attId}/preview?token=${encodeURIComponent(mt)}`, '_blank');
-      } catch { alert('预览失败，请重试'); }
+      } catch { toast.error('预览失败，请重试'); }
       return;
     }
     if (['zip', 'tar', 'gz', 'tgz', 'rar', '7z'].includes(ext)) {
       try {
         const mt = await mediaApi.token(attId, 'preview');
         window.open(`/api/v2/attachments/${attId}/preview?token=${encodeURIComponent(mt)}`, '_blank');
-      } catch { alert('预览失败，请重试'); }
+      } catch { toast.error('预览失败，请重试'); }
       return;
     }
     if (ext === 'stp' || ext === 'step') {
       try {
         const mt = await mediaApi.token(attId, 'gltf');
         window.open(`/stp-viewer?id=${attId}&token=${encodeURIComponent(mt)}`, '_blank');
-      } catch { alert('预览失败，请重试'); }
+      } catch { toast.error('预览失败，请重试'); }
       return;
     }
-    alert('该格式暂不支持预览');
+    toast.info('该格式暂不支持预览');
   };
 
   useEffect(() => {
