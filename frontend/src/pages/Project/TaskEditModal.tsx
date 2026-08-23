@@ -596,7 +596,11 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                                 <td className="px-3 py-2 font-mono text-gray-700 whitespace-nowrap">{l.entity_code || '—'}</td>
                                 <td className="px-3 py-2 text-gray-700">{l.entity_name || '—'}</td>
                                 <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{l.entity_version || '—'}</td>
-                                <td className="px-3 py-2 whitespace-nowrap"><StatusTag status={l.entity_status || ''} /></td>
+                                <td className="px-3 py-2 whitespace-nowrap">
+                                  {l.entity_type === 'ec' || !l.entity_status
+                                    ? <span className="text-[var(--ui-text-tertiary)]">-</span>
+                                    : <StatusTag status={l.entity_status} />}
+                                </td>
                                 <td className="px-3 py-2 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                                   {(l.entity_type === 'part' || l.entity_type === 'assembly') && (
                                     <Button
