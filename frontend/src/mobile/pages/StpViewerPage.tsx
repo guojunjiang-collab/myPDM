@@ -465,7 +465,7 @@ export function StpViewerCore({
       (assemblyRevId ? '装配 3D 模型' : '3D 模型');
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-gray-100 flex flex-col">
+    <div className="relative h-dvh w-screen overflow-hidden bg-gray-100 flex flex-col">
       {/* 顶部返回条：返回按钮 + 模型名 */}
       <div className="flex items-center gap-1 bg-[var(--ui-bg-surface)] border-b border-[var(--ui-border)] px-2 shrink-0">
         <button
@@ -597,7 +597,7 @@ export function StpViewerCore({
               onClick={() => openDrawer('tree')}
               variant="secondary"
               size="xs"
-              className="absolute left-3 bottom-5 z-20 min-w-11 min-h-11 px-3 rounded-full shadow-md"
+              className="absolute left-3 bottom-[calc(env(safe-area-inset-bottom)+1.25rem)] z-20 min-w-11 min-h-11 px-3 rounded-full shadow-md"
             >
               模型树
             </Button>
@@ -605,7 +605,7 @@ export function StpViewerCore({
               onClick={() => openDrawer('tools')}
               variant="secondary"
               size="xs"
-              className="absolute right-3 bottom-5 z-20 min-w-11 min-h-11 px-3 rounded-full shadow-md"
+              className="absolute right-3 bottom-[calc(env(safe-area-inset-bottom)+1.25rem)] z-20 min-w-11 min-h-11 px-3 rounded-full shadow-md"
             >
               工具
             </Button>
