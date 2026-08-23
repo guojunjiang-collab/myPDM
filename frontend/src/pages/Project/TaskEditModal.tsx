@@ -564,7 +564,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
 
               {tab === 'links' && (
                 <div className="h-full flex flex-col gap-4 min-h-0">
-                  <div>
+                  <div className="shrink-0">
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                       <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">关联对象</h4>
                       <div className="ml-auto flex items-center gap-2">
@@ -572,8 +572,10 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                         <Button size="sm" onClick={() => setShowECPicker(true)}>关联变更</Button>
                       </div>
                     </div>
-                    {links.length > 0 ? (
-                      <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden flex-1 min-h-0 overflow-y-auto">
+                  </div>
+                  {links.length > 0 ? (
+                    <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden flex-1 min-h-0">
+                      <div className="overflow-y-auto h-full">
                         <table className="w-full text-sm">
                           <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
                             <tr>
@@ -636,10 +638,10 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                           </tbody>
                         </table>
                       </div>
+                      </div>
                     ) : (
                       <div className="text-xs text-[var(--ui-text-tertiary)] py-4">暂无关联</div>
                     )}
-                  </div>
                 </div>
               )}
 
