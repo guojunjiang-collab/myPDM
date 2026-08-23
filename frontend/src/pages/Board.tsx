@@ -458,9 +458,6 @@ export default function Board() {
               </div>
               {canEditFolder && (
                 <div className="ml-auto flex gap-2">
-                  <Button type="button" size="md" onClick={() => { setCreateModal(selectedFolder.id); setCreateName(''); }}>
-                    + 子文件夹
-                  </Button>
                   <Button type="button" size="md" onClick={() => setPickerOpen(true)}>
                     + 关联对象
                   </Button>
@@ -554,6 +551,7 @@ export default function Board() {
               <Button type="button" variant="ghost" size="sm" className="w-full !justify-start rounded-none !text-red-600 hover:!bg-red-50" onClick={() => { setRemoveShareId(menuAnchor.id); setMenuAnchor(null); }}>🚫 移除共享</Button>
             ) : (
               <>
+                <Button type="button" variant="ghost" size="sm" className="w-full !justify-start rounded-none" onClick={() => { setCreateModal(menuAnchor.id); setCreateName(''); setMenuAnchor(null); }}>📁 新建子文件夹</Button>
                 <Button type="button" variant="ghost" size="sm" className="w-full !justify-start rounded-none" onClick={() => { const f = findFolderById(allFolders, menuAnchor.id); setRenameModal({ id: menuAnchor.id, name: f?.name || '' }); setRenameName(f?.name || ''); setMenuAnchor(null); }}>✏️ 重命名</Button>
                 <Button type="button" variant="ghost" size="sm" className="w-full !justify-start rounded-none" onClick={() => { setShareModal(menuAnchor.id); setUserSearch(''); setShareUserId(''); setSharePermission('view'); setMenuAnchor(null); }}>🔗 共享</Button>
                 <div className="border-t border-[var(--ui-border)] my-1" />
