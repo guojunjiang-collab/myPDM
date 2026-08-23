@@ -570,11 +570,11 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                         <table className="w-full text-sm">
                           <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
                             <tr>
-                              <th onClick={() => toggleLinkSort('entity_type')} className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-20 whitespace-nowrap cursor-pointer select-none">类型<LinkSortArrow k="entity_type" /></th>
+                              <th onClick={() => toggleLinkSort('entity_type')} className="text-center px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-20 whitespace-nowrap cursor-pointer select-none">类型<LinkSortArrow k="entity_type" /></th>
                               <th onClick={() => toggleLinkSort('entity_code')} className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-36 whitespace-nowrap cursor-pointer select-none">件号<LinkSortArrow k="entity_code" /></th>
                               <th onClick={() => toggleLinkSort('entity_name')} className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] cursor-pointer select-none">名称<LinkSortArrow k="entity_name" /></th>
-                              <th onClick={() => toggleLinkSort('entity_version')} className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-16 whitespace-nowrap cursor-pointer select-none">版本<LinkSortArrow k="entity_version" /></th>
-                              <th onClick={() => toggleLinkSort('entity_status')} className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-20 whitespace-nowrap cursor-pointer select-none">状态<LinkSortArrow k="entity_status" /></th>
+                              <th onClick={() => toggleLinkSort('entity_version')} className="text-center px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-16 whitespace-nowrap cursor-pointer select-none">版本<LinkSortArrow k="entity_version" /></th>
+                              <th onClick={() => toggleLinkSort('entity_status')} className="text-center px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-20 whitespace-nowrap cursor-pointer select-none">状态<LinkSortArrow k="entity_status" /></th>
                               <th className="text-right px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-40">操作</th>
                             </tr>
                           </thead>
@@ -590,13 +590,13 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                                       handleViewEntity(l.entity_type, l.entity_id);
                                     }
                                   }}>
-                                <td className="px-3 py-2 whitespace-nowrap">
+                                <td className="px-3 py-2 text-center whitespace-nowrap">
                                   <Badge size="xs" tone={LINK_BADGE[l.entity_type]?.tone ?? 'gray'} label={LINK_BADGE[l.entity_type]?.label ?? l.entity_type} />
                                 </td>
                                 <td className="px-3 py-2 font-mono text-gray-700 whitespace-nowrap">{l.entity_code || '—'}</td>
                                 <td className="px-3 py-2 text-gray-700">{l.entity_name || '—'}</td>
-                                <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{l.entity_version || '—'}</td>
-                                <td className="px-3 py-2 whitespace-nowrap">
+                                <td className="px-3 py-2 text-gray-700 text-center whitespace-nowrap">{l.entity_version || '-'}</td>
+                                <td className="px-3 py-2 text-center whitespace-nowrap">
                                   {l.entity_type === 'ec' || !l.entity_status
                                     ? <span className="text-[var(--ui-text-tertiary)]">-</span>
                                     : <StatusTag status={l.entity_status} />}
