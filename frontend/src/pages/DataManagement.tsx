@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { isAdmin } from '../stores/auth';
 import { ConfirmModal } from '../components/Modal';
+import Button from '../components/ui/Button';
 
 interface TableStats {
   count: number;
@@ -239,13 +240,13 @@ export default function DataManagement() {
               </div>
             )}
 
-            <button
+            <Button
+              variant="danger"
               onClick={() => setPurgeConfirmOpen(true)}
               disabled={selectedTables.size === 0 || purging}
-              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-40 text-sm"
             >
               执行清理
-            </button>
+            </Button>
           </div>
 
           <ConfirmModal

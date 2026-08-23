@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotificationStore } from '../stores/notification';
 import Badge from './ui/Badge';
+import Button from './ui/Button';
 import { notificationIcon, NOTIFICATION_TARGET_ROUTE } from '../lib/notification';
 import { fromNow } from '../lib/date';
 import type { Notification } from '../types';
@@ -42,7 +43,7 @@ export default function NotificationBell() {
         <div className="absolute right-0 mt-2 w-[360px] bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden z-50">
           <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-100">
             <b className="text-sm">通知 {unread > 0 && <span className="text-red-500">{unread}</span>}</b>
-            <button onClick={() => markAllRead()} className="text-xs text-blue-600 hover:text-blue-800">全部已读</button>
+            <Button variant="link" size="xs" onClick={() => markAllRead()}>全部已读</Button>
           </div>
           <div className="max-h-[400px] overflow-y-auto">
             {recent.length === 0 ? (

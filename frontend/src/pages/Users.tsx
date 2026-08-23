@@ -5,6 +5,7 @@ import type { User } from '../types';
 import { isAdmin, can } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
 import Badge from '../components/ui/Badge';
+import Button from '../components/ui/Button';
 import { useTableSort } from '../hooks/useTableSort';
 import { formatDateTime } from '../utils/date';
 import { previewUsersImport, executeUsersImport } from '../services/importExport';
@@ -363,20 +364,12 @@ export default function Users() {
         {/* 导入导出（仅管理员） */}
         {isAdmin() && (
           <div className="flex gap-2">
-            <button
-              onClick={handleExport}
-              disabled={exporting}
-              className="px-4 py-2 border border-green-600 text-green-600 rounded-lg hover:bg-green-50 disabled:opacity-50"
-            >
+            <Button variant="secondary" onClick={handleExport} disabled={exporting}>
               {exporting ? '导出中...' : '导出用户'}
-            </button>
-            <button
-              onClick={handleImportClick}
-              disabled={importing}
-              className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 disabled:opacity-50"
-            >
+            </Button>
+            <Button variant="secondary" onClick={handleImportClick} disabled={importing}>
               {importing ? (importStatus || '导入中...') : '导入用户'}
-            </button>
+            </Button>
             <input
               ref={fileInputRef}
               type="file"
@@ -387,9 +380,9 @@ export default function Users() {
           </div>
         )}
         {isAdmin() && (
-          <button onClick={handleAdd} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+          <Button onClick={handleAdd}>
             + 新增用户
-          </button>
+          </Button>
         )}
       </div>
 
@@ -439,9 +432,9 @@ export default function Users() {
                 <td className="px-4 py-3 text-right">
                     {isAdmin() && (
                       <>
-                        <button onClick={() => handleEdit(user)} className="text-primary-600 hover:text-primary-800 mr-2">编辑</button>
-                        <button type="button" onClick={() => setResetId(user.id)} className="text-orange-600 hover:text-orange-800 mr-2">重置密码</button>
-                        <button type="button" onClick={() => setDeleteId(user.id)} className="text-red-600 hover:text-red-800">删除</button>
+                        <Button variant="link" size="xs" className="mr-2" onClick={() => handleEdit(user)}>编辑</Button>
+                        <Button variant="link" size="xs" className="mr-2" type="button" onClick={() => setResetId(user.id)}>重置密码</Button>
+                        <Button variant="danger" size="xs" type="button" onClick={() => setDeleteId(user.id)}>删除</Button>
                       </>
                     )}
                   </td>
@@ -590,10 +583,10 @@ export default function Users() {
           )}
 
           <div className="flex justify-end gap-2 pt-4 border-t">
-            <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-            <button type="submit" disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+            <Button type="button" onClick={() => setModalOpen(false)} variant="secondary">取消</Button>
+            <Button type="submit" disabled={saving}>
               {saving ? '保存中...' : '保存'}
-            </button>
+            </Button>
           </div>
         </form>
       </Modal>
@@ -683,10 +676,9 @@ export default function Users() {
         <div>
           <div className="flex justify-end mb-3">
             {isAdmin() && (
-              <button
-                className="px-3 py-1.5 bg-primary-600 text-white rounded hover:bg-primary-700"
+              <Button size="sm"
                 onClick={() => { setEditingGroup(null); setGroupForm({ name: '', description: '' }); setMemberSelectedIds([]); setMemberSearch(''); setGroupModalOpen(true); }}
-              >新建用户组</button>
+              >新建用户组</Button>
             )}
           </div>
           <table className="min-w-full divide-y divide-gray-200 bg-white rounded-lg border border-gray-200">
@@ -704,8 +696,8 @@ export default function Users() {
                   <td className="px-4 py-2 text-sm">{g.member_count}</td>
                   {isAdmin() && (
                     <td className="px-4 py-2 text-sm space-x-2" onClick={(e) => e.stopPropagation()}>
-                      <button className="text-primary-600 hover:underline" onClick={async () => { setEditingGroup(g); setGroupForm({ name: g.name, description: g.description || '' }); setMemberSearch(''); const res = await userGroupsApi.getMembers(g.id); setMemberSelectedIds((res.data?.user_ids || []).map(String)); setGroupModalOpen(true); }}>编辑</button>
-                      <button className="text-red-600 hover:underline" onClick={() => removeGroup(g.id)}>删除</button>
+                      <Button variant="link" size="xs" onClick={async () => { setEditingGroup(g); setGroupForm({ name: g.name, description: g.description || '' }); setMemberSearch(''); const res = await userGroupsApi.getMembers(g.id); setMemberSelectedIds((res.data?.user_ids || []).map(String)); setGroupModalOpen(true); }}>编辑</Button>
+                      <Button variant="danger" size="xs" onClick={() => removeGroup(g.id)}>删除</Button>
                     </td>
                   )}
                 </tr>
@@ -780,8 +772,8 @@ export default function Users() {
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-4 border-t">
-            <button type="button" onClick={() => setGroupModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-            <button type="button" onClick={saveGroup} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">保存</button>
+            <Button type="button" onClick={() => setGroupModalOpen(false)} variant="secondary">取消</Button>
+            <Button type="button" onClick={saveGroup}>保存</Button>
           </div>
         </div>
       </Modal>
@@ -834,7 +826,7 @@ export default function Users() {
               </div>
             </div>
             <div className="flex justify-end pt-4 border-t mt-4">
-              <button type="button" onClick={() => setViewingGroupId(null)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">关闭</button>
+              <Button type="button" onClick={() => setViewingGroupId(null)} variant="secondary">关闭</Button>
             </div>
           </Modal>
         );

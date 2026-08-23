@@ -4,6 +4,7 @@ import { useAuthStore } from '../../stores/auth';
 import { inventoryApi } from '../../services/inventoryApi';
 import { Modal } from '../Modal';
 import ComboBox from './ComboBox';
+import Button from '../ui/Button';
 import type { InvDocType, InvDocLine, StockRow } from '../../types';
 
 interface ReviewerFormItem { user_id: string; seq: number; }
@@ -145,10 +146,9 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-gray-700">👤 审批人</label>
-            <button type="button" onClick={addReviewer}
-              className="text-xs px-3 py-1 rounded bg-primary-50 text-primary-600 hover:bg-primary-100 transition-colors">
+            <Button variant="ghost" size="xs" type="button" onClick={addReviewer}>
               + 添加审批人
-            </button>
+            </Button>
           </div>
 
           {reviewers.length === 0 && (
@@ -172,8 +172,7 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
                 <input type="number" min={1} value={reviewer.seq}
                   onChange={(e) => updateReviewer(index, 'seq', parseInt(e.target.value) || 1)}
                   className="w-16 border border-gray-300 rounded px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-1 focus:ring-primary-500" />
-                <button type="button" onClick={() => removeReviewer(index)}
-                  className="text-red-400 hover:text-red-600 text-sm px-2" title="移除">✕</button>
+                <Button variant="danger" size="xs" type="button" onClick={() => removeReviewer(index)} title="移除">✕</Button>
               </div>
             ))}
           </div>
@@ -183,7 +182,7 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
         <div>
           <div className="flex justify-between items-center mb-2">
             <label className="text-sm font-semibold text-gray-700">📋 明细</label>
-            <button onClick={addLine} className="text-primary-600 hover:text-primary-800 text-sm">+ 加一行</button>
+            <Button variant="link" size="xs" onClick={addLine}>+ 加一行</Button>
           </div>
           <div className="rounded-lg border border-gray-200">
             {usesStockPicker ? (
@@ -228,7 +227,7 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
                           </td>
                         )}
                         <td className="px-3 py-2 text-center">
-                          <button onClick={() => removeLine(i)} className="text-red-500 hover:text-red-700">✕</button>
+                          <Button variant="danger" size="xs" onClick={() => removeLine(i)}>✕</Button>
                         </td>
                       </tr>
                     );
@@ -278,7 +277,7 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
                           className="w-24 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500" />
                       </td>
                       <td className="px-3 py-2 text-center">
-                        <button onClick={() => removeLine(i)} className="text-red-500 hover:text-red-700">✕</button>
+                        <Button variant="danger" size="xs" onClick={() => removeLine(i)}>✕</Button>
                       </td>
                     </tr>
                   ))}
@@ -301,8 +300,8 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
         </div>
 
         <div className="flex justify-end gap-2 pt-1">
-          <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">取消</button>
-          <button onClick={save} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">保存草稿</button>
+          <Button variant="secondary" onClick={onClose}>取消</Button>
+          <Button onClick={save}>保存草稿</Button>
         </div>
       </div>
     </Modal>

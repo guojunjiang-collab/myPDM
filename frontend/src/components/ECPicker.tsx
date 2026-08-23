@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Modal } from './Modal';
+import Button from './ui/Button';
 import { useAuthStore } from '../stores/auth';
 
 interface ECPickerProps {
@@ -76,10 +77,10 @@ export default function ECPicker({ open, onClose, onConfirm }: ECPickerProps) {
         {filtered.length === 0 && <div className="py-8 text-center text-gray-400">无数据</div>}
       </div>
       <div className="flex justify-end gap-2 mt-4">
-        <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-        <button onClick={handleConfirm} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+        <Button variant="secondary" onClick={onClose}>取消</Button>
+        <Button onClick={handleConfirm}>
           确认({selected.size})
-        </button>
+        </Button>
       </div>
     </Modal>
   );

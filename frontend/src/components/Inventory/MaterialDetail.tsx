@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Modal } from '../Modal';
+import Button from '../ui/Button';
 import { useDataStore } from '../../stores/data';
 import type { InvMaterial } from '../../types';
 
@@ -104,7 +105,7 @@ export default function MaterialDetail({ material, onClose, onViewEntity }: Prop
         )}
 
         <div className="flex justify-end border-t border-gray-200 pt-4">
-          <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">关闭</button>
+          <Button variant="secondary" onClick={onClose}>关闭</Button>
         </div>
       </div>
     </Modal>

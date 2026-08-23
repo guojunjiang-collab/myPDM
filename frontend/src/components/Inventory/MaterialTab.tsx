@@ -6,6 +6,7 @@ import { partsApi } from '../../services/api';
 import { canEdit, isAdmin } from '../../stores/auth';
 import { Modal, ConfirmModal } from '../Modal';
 import Badge from '../ui/Badge';
+import Button from '../ui/Button';
 import MaterialDetail from './MaterialDetail';
 import PartDetailModal from '../PartDetailModal';
 import type { InvMaterial } from '../../types';
@@ -144,10 +145,8 @@ export default function MaterialTab() {
         <div className="flex-1" />
         {canEdit() && (
           <>
-            <button onClick={() => setPdmMode(true)}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">从 PDM 启用</button>
-            <button onClick={() => setEditing({ code: '', name: '', track_mode: 'quantity', unit: '个' } as any)}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建物料</button>
+            <Button variant="success" onClick={() => setPdmMode(true)}>从 PDM 启用</Button>
+            <Button onClick={() => setEditing({ code: '', name: '', track_mode: 'quantity', unit: '个' } as any)}>+ 新建物料</Button>
           </>
         )}
       </div>
@@ -185,10 +184,10 @@ export default function MaterialTab() {
                 <td className="px-4 py-3 text-sm font-medium">{m.safety_stock ?? '-'}</td>
                 <td className="px-4 py-3 text-right text-sm space-x-3">
                   {canEdit() && (
-                    <button onClick={(e) => { e.stopPropagation(); setEditing(m); }} className="text-primary-600 hover:text-primary-800">编辑</button>
+                    <Button variant="link" size="xs" onClick={(e) => { e.stopPropagation(); setEditing(m); }}>编辑</Button>
                   )}
                   {isAdmin() && (
-                    <button onClick={(e) => { e.stopPropagation(); setDeleteId(m.id); }} className="text-red-600 hover:text-red-800">删除</button>
+                    <Button variant="danger" size="xs" onClick={(e) => { e.stopPropagation(); setDeleteId(m.id); }}>删除</Button>
                   )}
                 </td>
               </tr>
@@ -275,8 +274,8 @@ export default function MaterialTab() {
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-1 border-t border-gray-200">
-              <button onClick={() => setEditing(null)} className="mt-3 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">取消</button>
-              <button onClick={saveStandalone} className="mt-3 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">保存</button>
+              <Button variant="secondary" className="mt-3" onClick={() => setEditing(null)}>取消</Button>
+              <Button className="mt-3" onClick={saveStandalone}>保存</Button>
             </div>
           </div>
         )}
@@ -316,7 +315,7 @@ export default function MaterialTab() {
                         <Badge status={r.status} />
                       </td>
                       <td className="px-3 py-2 text-right w-24 whitespace-nowrap">
-                        <button onClick={() => enablePdm(r)} className="text-green-600 hover:text-green-800">启用</button>
+                        <Button variant="link" size="xs" onClick={() => enablePdm(r)}>启用</Button>
                       </td>
                     </tr>
                   ))}

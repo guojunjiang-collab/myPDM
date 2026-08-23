@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import Badge from '../../components/ui/Badge';
+import Button from '../../components/ui/Button';
 import type { BadgeTone } from '../../constants/badges';
 import { projectApi } from '../../services/projectApi';
 import { partsApi, documentsApi, ecrApi, ecoApi, logsApi, customFieldsApi } from '../../services/api';
@@ -463,7 +464,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                             </select>
                             <input type="number" className="border rounded px-2 py-1 text-sm w-20" placeholder="lag" value={depForm.lag}
                               onChange={(e) => setDepForm({ ...depForm, lag: Number(e.target.value) })} />
-                            <button className="px-2 py-1 text-sm bg-primary-600 text-white rounded"
+                            <Button size="sm"
                               disabled={!depForm.other}
                               onClick={async () => {
                                 const pred = depForm.role === 'pred' ? task.id : depForm.other;
@@ -476,7 +477,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                                 } catch (err: any) {
                                   alert(err?.response?.data?.detail || '添加依赖失败');
                                 }
-                              }}>添加依赖</button>
+                              }}>添加依赖</Button>
                           </div>
                         )}
                       </div>
@@ -492,7 +493,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                               <span className="truncate">{other ? `${other.code} ${other.name}` : otherId}</span>
                               {d.lag_days ? <span className="text-gray-400">lag {d.lag_days}d</span> : null}
                               {canEditDeps && (
-                                <button className="ml-auto text-xs text-red-500" onClick={async () => { await projectApi.removeDep(projectId, d.id); loadDeps(); }}>删除</button>
+                                <Button variant="danger" size="xs" className="ml-auto" onClick={async () => { await projectApi.removeDep(projectId, d.id); loadDeps(); }}>删除</Button>
                               )}
                             </li>
                           );
@@ -510,10 +511,10 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                       <h4 className="text-sm font-semibold text-gray-700">关联对象</h4>
                       <div className="ml-auto flex items-center gap-2">
-                        <button onClick={() => setShowPartPicker(true)} className="text-xs px-2 py-1 rounded bg-primary-50 text-primary-700 hover:bg-primary-100">零部件 +</button>
-                        <button onClick={() => setShowConfigPicker(true)} className="text-xs px-2 py-1 rounded bg-teal-50 text-teal-700 hover:bg-teal-100">构型项 +</button>
-                        <button onClick={() => setShowECPicker(true)} className="text-xs px-2 py-1 rounded bg-amber-50 text-amber-700 hover:bg-amber-100">EC +</button>
-                        <button onClick={() => setShowDocPicker(true)} className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100">图文档 +</button>
+                        <Button variant="ghost" size="xs" onClick={() => setShowPartPicker(true)}>零部件 +</Button>
+                        <Button variant="ghost" size="xs" onClick={() => setShowConfigPicker(true)}>构型项 +</Button>
+                        <Button variant="ghost" size="xs" onClick={() => setShowECPicker(true)}>EC +</Button>
+                        <Button variant="ghost" size="xs" onClick={() => setShowDocPicker(true)}>图文档 +</Button>
                       </div>
                     </div>
                     {links.length > 0 ? (
@@ -545,7 +546,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                                 <td className="px-3 py-2 font-mono text-gray-700 whitespace-nowrap">{l.entity_code || '—'}</td>
                                 <td className="px-3 py-2 text-gray-700">{l.entity_name || '—'}</td>
                                 <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-                                  <button onClick={() => removeLink(l.id)} className="text-gray-400 hover:text-red-600 text-sm">×</button>
+                                  <Button variant="danger" size="xs" onClick={() => removeLink(l.id)}>×</Button>
                                 </td>
                               </tr>
                             ))}
@@ -573,7 +574,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                             <span className="font-medium">{c.user_name}</span>
                             <span className="text-xs text-gray-400">{formatDateTime(c.created_at)}</span>
                             <div className="flex-1" />
-                            <button onClick={() => removeComment(c.id)} className="text-xs text-gray-400 hover:text-red-600">删除</button>
+                            <Button variant="danger" size="xs" onClick={() => removeComment(c.id)}>删除</Button>
                           </div>
                           <div className="text-gray-700 whitespace-pre-wrap">{c.content}</div>
                         </div>
@@ -586,7 +587,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                            onKeyDown={(e) => { if (e.key === 'Enter') submitComment(); }}
                            placeholder="写评论…(项目成员均可评论)"
                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-                    <button onClick={submitComment} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">发送</button>
+                    <Button onClick={submitComment}>发送</Button>
                   </div>
                 </div>
               )}
@@ -686,39 +687,34 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
         <div className="flex justify-between gap-2 border-t pt-3 mt-3 shrink-0">
           <div className="flex gap-2">
             {task && form.status === '未开始' && (
-              <button onClick={() => handleStatusAction('进行中')} disabled={statusSaving}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm">
+              <Button onClick={() => handleStatusAction('进行中')} disabled={statusSaving}>
                 {statusSaving ? '...' : '▶ 开始任务'}
-              </button>
+              </Button>
             )}
             {task && form.status === '进行中' && (
               <>
-                <button onClick={() => handleStatusAction('挂起')} disabled={statusSaving}
-                        className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 text-sm">
+                <Button variant="dark" onClick={() => handleStatusAction('挂起')} disabled={statusSaving}>
                   {statusSaving ? '...' : '⏸ 暂停任务'}
-                </button>
-                <button onClick={() => handleStatusAction('已完成')} disabled={statusSaving}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm">
+                </Button>
+                <Button variant="success" onClick={() => handleStatusAction('已完成')} disabled={statusSaving}>
                   {statusSaving ? '...' : '✓ 完成任务'}
-                </button>
+                </Button>
               </>
             )}
             {task && form.status === '挂起' && (
-              <button onClick={() => handleStatusAction('进行中')} disabled={statusSaving}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm">
+              <Button onClick={() => handleStatusAction('进行中')} disabled={statusSaving}>
                 {statusSaving ? '...' : '▶ 恢复任务'}
-              </button>
+              </Button>
             )}
             {task && form.status === '已完成' && (
-              <button onClick={() => handleStatusAction('进行中')} disabled={statusSaving}
-                      className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 text-sm">
+              <Button variant="dark" onClick={() => handleStatusAction('进行中')} disabled={statusSaving}>
                 {statusSaving ? '...' : '↩ 退回'}
-              </button>
+              </Button>
             )}
           </div>
           <div className="flex gap-2">
-            <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-            <button onClick={handleSave} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">保存</button>
+            <Button variant="secondary" onClick={onClose}>取消</Button>
+            <Button onClick={handleSave}>保存</Button>
           </div>
         </div>
       </div>

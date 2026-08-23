@@ -3,6 +3,7 @@ import { useInventoryStore } from '../../stores/inventory';
 import { inventoryApi } from '../../services/inventoryApi';
 import { canEdit, isAdmin } from '../../stores/auth';
 import { Modal, ConfirmModal } from '../Modal';
+import Button from '../ui/Button';
 import type { Warehouse } from '../../types';
 
 const WH_TYPES = [
@@ -53,8 +54,7 @@ export default function WarehouseTab() {
       <div className="flex gap-2 mb-4 shrink-0">
         <div className="flex-1" />
         {canEdit() && (
-          <button onClick={() => setEditing({ code: '', name: '', type: 'general' })}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建仓库</button>
+          <Button onClick={() => setEditing({ code: '', name: '', type: 'general' })}>+ 新建仓库</Button>
         )}
       </div>
 
@@ -83,10 +83,10 @@ export default function WarehouseTab() {
                 <td className="px-4 py-3 text-sm font-medium">{users.find((u) => u.id === w.default_keeper_id)?.real_name || '-'}</td>
                 <td className="px-4 py-3 text-right text-sm space-x-1">
                   {canEdit() && (
-                    <button onClick={() => setEditing(w)} className="text-primary-600 hover:text-primary-800 mr-3">编辑</button>
+                    <Button variant="link" size="xs" className="mr-3" onClick={() => setEditing(w)}>编辑</Button>
                   )}
                   {isAdmin() && (
-                    <button onClick={() => setDeleteId(w.id)} className="text-red-600 hover:text-red-800">删除</button>
+                    <Button variant="danger" size="xs" onClick={() => setDeleteId(w.id)}>删除</Button>
                   )}
                 </td>
               </tr>
@@ -127,8 +127,8 @@ export default function WarehouseTab() {
               </select>
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setEditing(null)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">取消</button>
-              <button onClick={save} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">保存</button>
+              <Button variant="secondary" onClick={() => setEditing(null)}>取消</Button>
+              <Button onClick={save}>保存</Button>
             </div>
           </div>
         )}

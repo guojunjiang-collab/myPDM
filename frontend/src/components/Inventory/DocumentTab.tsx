@@ -6,6 +6,7 @@ import { inventoryApi } from '../../services/inventoryApi';
 import { canDownload } from '../../stores/auth';
 import { BADGE_DOMAINS } from '../../constants/badges';
 import Badge from '../ui/Badge';
+import Button from '../ui/Button';
 import DocumentEditModal from './DocumentEditModal';
 import DocumentDetail from './DocumentDetail';
 import type { InvDocType } from '../../types';
@@ -80,8 +81,8 @@ export default function DocumentTab() {
     if (d.status === 'draft' && isCreator) {
       return (
         <div className="flex gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
-          <button onClick={() => act(() => inventoryApi.submit(d.id))} className="text-blue-600 hover:text-blue-800 text-sm mr-2">提交审批</button>
-          <button onClick={() => confirm('确认删除该单据？') && act(() => inventoryApi.deleteDocument(d.id))} className="text-red-600 hover:text-red-800 text-sm">删除</button>
+          <Button variant="link" size="xs" className="mr-2" onClick={() => act(() => inventoryApi.submit(d.id))}>提交审批</Button>
+          <Button variant="danger" size="xs" onClick={() => confirm('确认删除该单据？') && act(() => inventoryApi.deleteDocument(d.id))}>删除</Button>
         </div>
       );
     }
@@ -90,12 +91,12 @@ export default function DocumentTab() {
         <div className="flex gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
           {(isReviewer || isAdmin) && (
             <>
-              <button onClick={() => act(() => inventoryApi.review(d.id, { decision: 'approved' }))} className="text-green-600 hover:text-green-800 text-sm mr-2">通过</button>
-              <button onClick={() => act(() => inventoryApi.review(d.id, { decision: 'returned' }))} className="text-orange-600 hover:text-orange-800 text-sm mr-2">退回</button>
-              <button onClick={() => act(() => inventoryApi.review(d.id, { decision: 'rejected' }))} className="text-red-600 hover:text-red-800 text-sm mr-2">拒绝</button>
+              <Button variant="link" size="xs" className="mr-2" onClick={() => act(() => inventoryApi.review(d.id, { decision: 'approved' }))}>通过</Button>
+              <Button variant="link" size="xs" className="mr-2" onClick={() => act(() => inventoryApi.review(d.id, { decision: 'returned' }))}>退回</Button>
+              <Button variant="link" size="xs" className="mr-2" onClick={() => act(() => inventoryApi.review(d.id, { decision: 'rejected' }))}>拒绝</Button>
             </>
           )}
-          {isCreator && <button onClick={() => act(() => inventoryApi.withdraw(d.id))} className="text-gray-600 hover:text-gray-800 text-sm">撤回</button>}
+          {isCreator && <Button variant="link" size="xs" onClick={() => act(() => inventoryApi.withdraw(d.id))}>撤回</Button>}
         </div>
       );
     }
@@ -103,11 +104,10 @@ export default function DocumentTab() {
       return (
         <div className="flex gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
           {isKeeper && (
-            <button onClick={() => d.doc_type === 'stocktake' ? setDetailId(d.id) : (confirm('确认过账？') && act(() => inventoryApi.post(d.id, {})))}
-              className="text-green-600 hover:text-green-800 text-sm mr-2">过账</button>
+            <Button variant="link" size="xs" className="mr-2" onClick={() => d.doc_type === 'stocktake' ? setDetailId(d.id) : (confirm('确认过账？') && act(() => inventoryApi.post(d.id, {})))}>过账</Button>
           )}
-          <button onClick={() => setDetailId(d.id)} className="text-primary-600 hover:text-primary-800 text-sm mr-2">改派</button>
-          <button onClick={() => confirm('确认取消该单据？') && act(() => inventoryApi.cancel(d.id))} className="text-red-600 hover:text-red-800 text-sm">取消</button>
+          <Button variant="link" size="xs" className="mr-2" onClick={() => setDetailId(d.id)}>改派</Button>
+          <Button variant="link" size="xs" onClick={() => confirm('确认取消该单据？') && act(() => inventoryApi.cancel(d.id))}>取消</Button>
         </div>
       );
     }
@@ -132,13 +132,12 @@ export default function DocumentTab() {
         <div className="flex-1" />
         {canDownload() && (
           <div className="relative" ref={menuRef}>
-            <button onClick={() => setShowMenu(!showMenu)}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">+ 新建单据 ▾</button>
+            <Button onClick={() => setShowMenu(!showMenu)}>+ 新建单据 ▾</Button>
             {showMenu && (
               <div className="absolute right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
                 {DOC_TYPES.map((t) => (
-                  <button key={t.key} onClick={() => { setCreating(t.key); setShowMenu(false); }}
-                    className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50 whitespace-nowrap">{t.label}</button>
+                  <Button key={t.key} variant="ghost" size="sm" className="w-full !justify-start rounded-none"
+                    onClick={() => { setCreating(t.key); setShowMenu(false); }}>{t.label}</Button>
                 ))}
               </div>
             )}

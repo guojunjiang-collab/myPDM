@@ -5,6 +5,7 @@ import { inventoryApi } from '../../services/inventoryApi';
 import { BADGE_DOMAINS } from '../../constants/badges';
 import { Modal } from '../Modal';
 import Badge from '../ui/Badge';
+import Button from '../ui/Button';
 import type { InvDocument, InvDocType } from '../../types';
 
 const DOC_TYPE_LABEL: Record<InvDocType, string> = {
@@ -198,12 +199,10 @@ export default function DocumentDetail({ docId, onClose, onChanged }:
                 ))}
               </select>
               {reassign && (
-                <button onClick={() => act(() => inventoryApi.assignKeeper(doc.id, reassign)).then(() => setReassign(''))}
-                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">确认改派</button>
+                <Button variant="secondary" onClick={() => act(() => inventoryApi.assignKeeper(doc.id, reassign)).then(() => setReassign(''))}>确认改派</Button>
               )}
               {isKeeper && (
-                <button onClick={doPost}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">过账</button>
+                <Button variant="success" onClick={doPost}>过账</Button>
               )}
             </div>
           )}

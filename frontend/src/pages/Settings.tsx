@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { customFieldsApi, authApi } from '../services/api';
 import api from '../services/api';
@@ -6,6 +6,7 @@ import { useAuthStore } from '../stores/auth';
 import { isAdmin } from '../stores/auth';
 import type { CustomFieldDefinition } from '../types';
 import { Modal } from '../components/Modal';
+import Button from '../components/ui/Button';
 import { useDataStore } from '../stores/data';
 import { exportAllData, exportCustomFieldDefs, importCustomFieldDefs, importAllData, exportDashboardFile, previewDashboardImportFromFile, executeDashboardImport } from '../services/importExport';
 
@@ -88,6 +89,8 @@ export default function Settings() {
   const [batchStatus, setBatchStatus] = useState('');
   const [dashExporting, setDashExporting] = useState(false);
   const [dashImporting, setDashImporting] = useState(false);
+  const fieldImportRef = useRef<HTMLInputElement>(null);
+  const dashImportRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (activeTab === 'customFields') {
@@ -428,22 +431,16 @@ export default function Settings() {
             <p className="text-sm text-gray-500">自定义字段用于扩展零部件、图文档的结构</p>
             {isAdmin() && (
               <div className="flex gap-2">
-                <button
-                  onClick={handleExportFields}
-                  className="px-4 py-2 border border-green-600 text-green-600 rounded-lg hover:bg-green-50"
-                >
+                <Button variant="secondary" onClick={handleExportFields}>
                   导出字段
-                </button>
-                <label className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 cursor-pointer">
+                </Button>
+                <Button variant="secondary" onClick={() => fieldImportRef.current?.click()}>
                   导入
-                  <input type="file" accept=".xlsx" onChange={handleImportFields} className="hidden" />
-                </label>
-                <button
-                  onClick={openCreateModal}
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-                >
+                </Button>
+                <input ref={fieldImportRef} type="file" accept=".xlsx" onChange={handleImportFields} className="hidden" />
+                <Button onClick={openCreateModal}>
                   新增字段
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -496,18 +493,16 @@ export default function Settings() {
                       <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                         {isAdmin() && (
                           <>
-                            <button
-                              className="text-primary-600 hover:text-primary-800 mr-2"
+                            <Button variant="link" size="xs" className="mr-2"
                               onClick={() => openEditModal(field)}
                             >
                               编辑
-                            </button>
-                            <button
-                              className="text-red-600 hover:text-red-800"
+                            </Button>
+                            <Button variant="danger" size="xs"
                               onClick={() => handleDelete(field.id)}
                             >
                               删除
-                            </button>
+                            </Button>
                           </>
                         )}
                       </td>
@@ -560,7 +555,7 @@ export default function Settings() {
                 </div>
               </div>
               <div className="flex justify-end pt-4 border-t mt-4">
-                <button type="button" onClick={() => setViewingField(null)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">关闭</button>
+                <Button variant="secondary" type="button" onClick={() => setViewingField(null)}>关闭</Button>
               </div>
             </Modal>
           )}
@@ -591,13 +586,9 @@ export default function Settings() {
             <p className="text-sm text-gray-500 mb-4">
               将系统中的所有零件、部件、图文档、构型项、构型配置、用户看板数据导出为文件备份。请选择目标文件夹。
             </p>
-            <button
-              onClick={handleExportAll}
-              disabled={exporting}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-            >
+            <Button variant="success" onClick={handleExportAll} disabled={exporting}>
               {exporting ? '导出中...' : '导出全部数据'}
-            </button>
+            </Button>
             {exportProgress && (
               <p className={`mt-3 text-sm ${exporting ? 'text-blue-600' : 'text-green-600'}`}>
                 {exporting ? '⏳' : '✅'} {exportProgress}
@@ -611,13 +602,9 @@ export default function Settings() {
             <p className="text-sm text-gray-500 mb-4">
               从导出的文件夹中选择"自定义字段定义.xlsx + 图文档清单.xlsx + 零件清单.xlsx + 部件清单.xlsx + 构型项.xlsx + 构型配置.xlsx + 用户看板.xlsx"等文件所在的文件夹，批量导入全部数据。
             </p>
-            <button
-              onClick={handleImportAll}
-              disabled={importing}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-            >
+            <Button onClick={handleImportAll} disabled={importing}>
               {importing ? '导入中...' : '导入全部数据'}
-            </button>
+            </Button>
             {importProgress && (
               <p className={`mt-3 text-sm ${importing ? 'text-blue-600' : 'text-green-600'}`}>
                 {importing ? '⏳' : '✅'} {importProgress}
@@ -631,13 +618,9 @@ export default function Settings() {
             <p className="text-sm text-gray-500 mb-4">
               仅导出所有用户的看板数据（文件夹、关联项目、共享设置），保存为 Excel 文件。
             </p>
-            <button
-              onClick={handleDashExport}
-              disabled={dashExporting}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-            >
+            <Button variant="success" onClick={handleDashExport} disabled={dashExporting}>
               {dashExporting ? '导出中...' : '导出用户看板'}
-            </button>
+            </Button>
             {dashExporting && (
               <p className="mt-3 text-sm text-blue-600">⏳ 导出中...</p>
             )}
@@ -649,12 +632,10 @@ export default function Settings() {
             <p className="text-sm text-gray-500 mb-4">
               选择已导出的"用户看板.xlsx"文件，导入用户看板数据。
             </p>
-            <label
-              className={`inline-block px-4 py-2 rounded-lg cursor-pointer text-white ${dashImporting ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'}`}
-            >
+            <Button onClick={() => dashImportRef.current?.click()} disabled={dashImporting}>
               {dashImporting ? '导入中...' : '导入用户看板'}
-              <input type="file" accept=".xlsx" onChange={handleDashImport} className="hidden" disabled={dashImporting} />
-            </label>
+            </Button>
+            <input ref={dashImportRef} type="file" accept=".xlsx" onChange={handleDashImport} className="hidden" disabled={dashImporting} />
             {dashImporting && (
               <p className="mt-3 text-sm text-blue-600">⏳ 导入中...</p>
             )}
@@ -668,13 +649,9 @@ export default function Settings() {
               建议在空闲时段执行，转换过程使用最多 2 个并发进程。
             </p>
             <div className="flex items-center gap-3">
-              <button
-                onClick={handleBatchConvert}
-                disabled={batchConverting}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-              >
+              <Button onClick={handleBatchConvert} disabled={batchConverting}>
                 {batchConverting ? '转换中...' : '批量转换 STP'}
-              </button>
+              </Button>
               {batchStatus && (
                 <span className="text-sm text-gray-500">{batchStatus}</span>
               )}
@@ -687,13 +664,9 @@ export default function Settings() {
             <p className="text-sm text-gray-500 mb-4">
               清空所有零件、部件、图文档、自定义字段、附件文件、看板、构型管理（构型项/构型配置）及变更管理（ECR/ECO）数据。需验证管理员密码。此操作不可逆，请谨慎操作。
             </p>
-            <button
-              onClick={() => { setShowResetConfirm(true); setResetPassword(''); }}
-              disabled={resetting}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-            >
+            <Button variant="danger" onClick={() => { setShowResetConfirm(true); setResetPassword(''); }} disabled={resetting}>
               {resetting ? '重置中...' : '重置系统数据'}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -711,10 +684,10 @@ export default function Settings() {
               onKeyDown={(e) => e.key === 'Enter' && handleResetData()}
             />
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setShowResetConfirm(false)} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-              <button type="button" onClick={handleResetData} disabled={resetting} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50">
+              <Button variant="secondary" type="button" onClick={() => setShowResetConfirm(false)}>取消</Button>
+              <Button variant="danger" type="button" onClick={handleResetData} disabled={resetting}>
                 {resetting ? '重置中...' : '确认重置'}
-              </button>
+              </Button>
             </div>
           </div>
         </Modal>
@@ -774,13 +747,9 @@ export default function Settings() {
                   </div>
                 )}
 
-                <button
-                  type="submit"
-                  disabled={changingPassword}
-                  className="w-full py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
-                >
+                <Button type="submit" disabled={changingPassword} className="w-full">
                   {changingPassword ? '提交中...' : '确认修改'}
-                </button>
+                </Button>
               </form>
             )}
           </div>
@@ -904,20 +873,19 @@ export default function Settings() {
           )}
 
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-            <button
+            <Button
               type="button"
               onClick={() => setShowModal(false)}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              variant="secondary"
             >
               取消
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
             >
               {saving ? '保存中...' : '保存'}
-            </button>
+            </Button>
           </div>
         </form>
       </Modal>

@@ -17,6 +17,7 @@ import DocumentDetailModal from '../../components/DocumentDetailModal';
 import ConfigItemDetailModal from '../../components/Configuration/ConfigItemDetailModal';
 import { ECRDetailModal } from '../../components/ECR/ECRDetailModal';
 import { ECODetailModal } from '../../components/ECO/ECODetailModal';
+import Button from '../../components/ui/Button';
 
 interface Props {
   open: boolean;
@@ -45,30 +46,25 @@ function TaskCell({ tasks, onOpenTask }: {
 
   return (
     <span className="relative inline-flex items-center gap-1" title={taskTooltip(tasks)}>
-      <button
+      <Button variant="link" size="xs"
         onClick={(e) => { e.stopPropagation(); onOpenTask(tasks[0].id); }}
-        className="text-primary-600 hover:text-primary-800 truncate max-w-[160px]"
-      >
+        className="truncate max-w-[160px]">
         {tasks[0].code} {tasks[0].name}
-      </button>
+      </Button>
       {tasks.length > 1 && (
         <>
-          <button
-            onClick={(e) => { e.stopPropagation(); setListOpen((v) => !v); }}
-            className="px-1 rounded bg-gray-100 text-gray-500 text-xs hover:bg-gray-200"
-          >
+          <Button variant="ghost" size="xs"
+            onClick={(e) => { e.stopPropagation(); setListOpen((v) => !v); }}>
             +{tasks.length - 1}
-          </button>
+          </Button>
           {listOpen && (
             <div className="absolute right-0 top-full mt-1 z-10 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[180px]">
               {tasks.slice(1).map((t) => (
-                <button
-                  key={t.id}
+                <Button variant="ghost" size="sm" key={t.id}
                   onClick={(e) => { e.stopPropagation(); setListOpen(false); onOpenTask(t.id); }}
-                  className="block w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 truncate"
-                >
+                  className="w-full !justify-start rounded-none truncate">
                   {t.code} {t.name}
-                </button>
+                </Button>
               ))}
             </div>
           )}
@@ -125,11 +121,10 @@ export default function DeliverableModal({
     <>
       <Modal open={open} title="交付物汇总" onClose={onClose} width="3xl" height="75vh"
         headerAction={
-          <button onClick={handleExport} disabled={!summary}
-            title="导出全部四类，不受当前 TAB 与筛选影响"
-            className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed">
+          <Button variant="primary" size="sm" onClick={handleExport} disabled={!summary}
+            title="导出全部四类，不受当前 TAB 与筛选影响">
             导出 Excel
-          </button>
+          </Button>
         }>
       <div className="flex flex-col h-full">
       {/* TAB 条 */}

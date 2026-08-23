@@ -6,6 +6,7 @@ import { usersApi } from '../../services/api';
 import { can, useAuthStore } from '../../stores/auth';
 import { Modal, ConfirmModal } from '../../components/Modal';
 import Badge from '../../components/ui/Badge';
+import Button from '../../components/ui/Button';
 import { toast } from '../../components/Toast';
 import { useHeaderTabs } from '../../hooks/useHeaderTabs';
 import { usePersistedTabState } from '../../hooks/usePersistedTabState';
@@ -586,10 +587,9 @@ export default function Projects() {
               </select>
               <div className="flex-1" />
               {can('project:create') && (
-                <button onClick={handleOpenCreate}
-                        className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm">
+                <Button onClick={handleOpenCreate}>
                   + 新建项目
-                </button>
+                </Button>
               )}
             </div>
 
@@ -629,10 +629,10 @@ export default function Projects() {
                         <td className="px-4 py-2 text-sm text-gray-500">{p.member_count ?? 0}</td>
                         <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                           {can('project:update') && (
-                            <button onClick={(e) => handleOpenEdit(p, e)} className="text-primary-600 hover:text-primary-800 text-sm mr-3">编辑</button>
+                            <Button variant="link" size="xs" className="mr-3" onClick={(e) => handleOpenEdit(p, e)}>编辑</Button>
                           )}
                           {can('project:delete') && (
-                            <button onClick={(e) => handleDeleteClick(p, e)} className="text-red-600 hover:text-red-800 text-sm">删除</button>
+                            <Button variant="danger" size="xs" onClick={(e) => handleDeleteClick(p, e)}>删除</Button>
                           )}
                         </td>
                       </tr>
@@ -657,10 +657,9 @@ export default function Projects() {
                   <Badge status={currentProject.status} domain="project" />
                   <span className="text-sm text-gray-500">负责人 {currentProject.owner_name}</span>
                   <div className="flex-1" />
-                  <button onClick={() => setDeliverableOpen(true)}
-                          className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-white">交付物汇总</button>
+                  <Button variant="secondary" size="sm" onClick={() => setDeliverableOpen(true)}>交付物汇总</Button>
                   {isManager && (
-                    <button onClick={() => setMemberOpen(true)} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-white">成员管理</button>
+                    <Button variant="secondary" size="sm" onClick={() => setMemberOpen(true)}>成员管理</Button>
                   )}
                 </div>
 
@@ -696,9 +695,9 @@ export default function Projects() {
                     </select>
                   )}
                   {viewMode === 'table' ? (
-                    <button onClick={() => setViewMode('gantt')} className="px-2 py-1.5 text-sm rounded bg-white border border-gray-300 text-gray-600 hover:bg-gray-50">甘特图</button>
+                    <Button variant="secondary" size="sm" onClick={() => setViewMode('gantt')}>甘特图</Button>
                   ) : (
-                    <button onClick={() => setViewMode('table')} className="px-2 py-1.5 text-sm rounded bg-white border border-gray-300 text-gray-600 hover:bg-gray-50">计划表</button>
+                    <Button variant="secondary" size="sm" onClick={() => setViewMode('table')}>计划表</Button>
                   )}
                   {viewMode === 'gantt' && (
                     <>
@@ -710,13 +709,13 @@ export default function Projects() {
                         </button>
                       ))}
                       {can('project.task:depend') && (
-                        <button onClick={() => setAutoScheduleKey((k) => k + 1)} className="px-2 py-1.5 text-sm rounded bg-primary-600 text-white hover:bg-primary-700">刷新排期</button>
+                        <Button size="sm" onClick={() => setAutoScheduleKey((k) => k + 1)}>刷新排期</Button>
                       )}
                     </>
                   )}
                   <div className="flex-1" />
                   {isManager && (
-                    <button onClick={() => openCreate(null)} className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700">+ 新建顶层任务</button>
+                    <Button size="sm" onClick={() => openCreate(null)}>+ 新建顶层任务</Button>
                   )}
                 </div>
 
@@ -760,10 +759,10 @@ export default function Projects() {
                                 <span className="px-2 flex-1 min-w-0 truncate text-gray-500" title={currentProject.description || undefined}>{currentProject.description || '—'}</span>
                                 <div className="shrink-0 flex items-center justify-end px-4 text-gray-400">
                                   {isManager && (
-                                    <button onClick={() => setMemberOpen(true)} className="text-primary-600 text-sm mr-2">成员</button>
+                                    <Button variant="link" size="xs" className="mr-2" onClick={() => setMemberOpen(true)}>成员</Button>
                                   )}
                                   {can('project:update') && (
-                                    <button onClick={(e) => handleOpenEdit(currentProject, e)} className="text-primary-600 text-sm">编辑</button>
+                                    <Button variant="link" size="xs" onClick={(e) => handleOpenEdit(currentProject, e)}>编辑</Button>
                                   )}
                                 </div>
                               </div>
@@ -793,8 +792,8 @@ export default function Projects() {
                                       <span className="px-2 flex-1 min-w-0 truncate text-gray-500" title={t.description || undefined}>{t.description || '—'}</span>
                                       <div className="shrink-0 flex items-center justify-end px-4 text-gray-400" onClick={(e) => e.stopPropagation()}>
                                         {(t.link_count ?? 0) > 0 && <span className="mr-2">🔗 {t.link_count}</span>}
-                                        {isManager && <button onClick={() => openCreate(t.id)} className="text-primary-600 text-sm mr-2">+子</button>}
-                                        {can('project.task:delete') && <button onClick={() => setDelTask(t)} className="text-red-600 text-sm">删除</button>}
+                                        {isManager && <Button variant="link" size="xs" className="mr-2" onClick={() => openCreate(t.id)}>+子</Button>}
+                                        {can('project.task:delete') && <Button variant="danger" size="xs" onClick={() => setDelTask(t)}>删除</Button>}
                                       </div>
                                     </div>
                                   );
@@ -926,10 +925,10 @@ export default function Projects() {
           </div>
         </div>
         <div className="flex justify-end gap-2 pt-4 border-t mt-4">
-          <button onClick={() => { setCreateOpen(false); setEditingProject(null); }} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-          <button onClick={handleSave} disabled={saving} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+          <Button variant="secondary" onClick={() => { setCreateOpen(false); setEditingProject(null); }}>取消</Button>
+          <Button onClick={handleSave} disabled={saving}>
             {saving ? '保存中...' : (editingProject ? '保存' : '创建')}
-          </button>
+          </Button>
         </div>
       </Modal>
 

@@ -1,3 +1,5 @@
+import Button from '../ui/Button';
+
 interface Props {
   count: number;
   onClose: () => void;
@@ -11,12 +13,11 @@ export function CADCompleteStep({ count, onClose }: Props) {
       <p className="text-sm text-gray-500 mb-6">
         本次共处理 {count} 个零部件，可在零部件列表中查看结果
       </p>
-      <button
+      <Button
         onClick={onClose}
-        className="px-8 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm"
       >
         关闭
-      </button>
+      </Button>
     </div>
   );
 }

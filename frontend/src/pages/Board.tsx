@@ -7,6 +7,7 @@ import DocumentDetailModal from '../components/DocumentDetailModal';
 import ArchiveTreeModal from '../components/ArchiveTreeModal';
 import ConfigItemDetailModal from '../components/Configuration/ConfigItemDetailModal';
 import Badge from '../components/ui/Badge';
+import Button from '../components/ui/Button';
 import type { BadgeTone } from '../constants/badges';
 import { useAuthStore } from '../stores/auth';
 
@@ -344,9 +345,9 @@ export default function Board() {
       {/* Left: Folder Tree */}
       <div ref={sidebarRef} className="w-72 shrink-0 border-r border-gray-200 bg-gray-50 flex flex-col">
         <div className="px-2 pt-2 pb-1">
-          <button type="button" onClick={() => { setCreateModal(''); setCreateName(''); }} className="w-full px-3 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">
+          <Button type="button" size="sm" className="w-full" onClick={() => { setCreateModal(''); setCreateName(''); }}>
             + 新建文件夹
-          </button>
+          </Button>
         </div>
         <div className="px-3 py-2 text-xs font-medium text-gray-400 uppercase tracking-wide">我的文件夹</div>
         <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-2">
@@ -392,12 +393,12 @@ export default function Board() {
               <h2 className="text-sm font-medium text-gray-500 mb-2">{getFolderPath(allFolders, selectedFolder.id)}</h2>
               {canEditFolder && (
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => { setCreateModal(selectedFolder.id); setCreateName(''); }} className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 text-gray-700">
+                  <Button type="button" variant="secondary" size="sm" onClick={() => { setCreateModal(selectedFolder.id); setCreateName(''); }}>
                     + 子文件夹
-                  </button>
-                  <button type="button" onClick={() => setPickerOpen(true)} className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 text-gray-700">
+                  </Button>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => setPickerOpen(true)}>
                     + 关联项目
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -449,7 +450,7 @@ export default function Board() {
                         <td className="px-5 py-2.5"><StatusTag status={item.status} /></td>
                         {canEditFolder && (
                           <td className="px-5 py-2.5 text-right">
-                            <button type="button" onClick={(e) => { e.stopPropagation(); handleRemoveItem(item.id); }} className="text-red-500 hover:text-red-700 text-xs">移除</button>
+                            <Button type="button" variant="danger" size="xs" onClick={(e) => { e.stopPropagation(); handleRemoveItem(item.id); }}>移除</Button>
                           </td>
                         )}
                       </tr>
@@ -479,13 +480,13 @@ export default function Board() {
         return (
           <div ref={menuRef} className="fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[120px]" style={{ left: menuAnchor.el.getBoundingClientRect().left, top: menuAnchor.el.getBoundingClientRect().bottom + 4 }}>
             {menuIsShared ? (
-              <button type="button" className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50" onClick={() => { setRemoveShareId(menuAnchor.id); setMenuAnchor(null); }}>🚫 移除共享</button>
+              <Button type="button" variant="ghost" size="sm" className="w-full !justify-start rounded-none !text-red-600 hover:!bg-red-50" onClick={() => { setRemoveShareId(menuAnchor.id); setMenuAnchor(null); }}>🚫 移除共享</Button>
             ) : (
               <>
-                <button type="button" className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50" onClick={() => { const f = findFolderById(allFolders, menuAnchor.id); setRenameModal({ id: menuAnchor.id, name: f?.name || '' }); setRenameName(f?.name || ''); setMenuAnchor(null); }}>✏️ 重命名</button>
-                <button type="button" className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50" onClick={() => { setShareModal(menuAnchor.id); setUserSearch(''); setShareUserId(''); setSharePermission('view'); setMenuAnchor(null); }}>🔗 共享</button>
+                <Button type="button" variant="ghost" size="sm" className="w-full !justify-start rounded-none" onClick={() => { const f = findFolderById(allFolders, menuAnchor.id); setRenameModal({ id: menuAnchor.id, name: f?.name || '' }); setRenameName(f?.name || ''); setMenuAnchor(null); }}>✏️ 重命名</Button>
+                <Button type="button" variant="ghost" size="sm" className="w-full !justify-start rounded-none" onClick={() => { setShareModal(menuAnchor.id); setUserSearch(''); setShareUserId(''); setSharePermission('view'); setMenuAnchor(null); }}>🔗 共享</Button>
                 <div className="border-t border-gray-100 my-1" />
-                <button type="button" className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50" onClick={() => { setDeleteId(menuAnchor.id); setMenuAnchor(null); }}>🗑️ 删除</button>
+                <Button type="button" variant="ghost" size="sm" className="w-full !justify-start rounded-none !text-red-600 hover:!bg-red-50" onClick={() => { setDeleteId(menuAnchor.id); setMenuAnchor(null); }}>🗑️ 删除</Button>
               </>
             )}
           </div>
@@ -497,8 +498,8 @@ export default function Board() {
         <div className="space-y-4">
           <input type="text" value={renameName} onChange={(e) => setRenameName(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" autoFocus />
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setRenameModal(null)} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-            <button type="button" onClick={handleRename} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">确认</button>
+            <Button type="button" variant="secondary" onClick={() => setRenameModal(null)}>取消</Button>
+            <Button type="button" onClick={handleRename}>确认</Button>
           </div>
         </div>
       </Modal>
@@ -508,8 +509,8 @@ export default function Board() {
         <div className="space-y-4">
           <input type="text" value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder="请输入文件夹名称" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleCreate()} />
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setCreateModal(null)} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-            <button type="button" onClick={handleCreate} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">创建</button>
+            <Button type="button" variant="secondary" onClick={() => setCreateModal(null)}>取消</Button>
+            <Button type="button" onClick={handleCreate}>创建</Button>
           </div>
         </div>
       </Modal>
@@ -544,7 +545,7 @@ export default function Board() {
               <p className="text-center text-sm text-gray-400 py-4">无匹配用户</p>
             )}
           </div>
-          {shareUserId && <div className="flex justify-end"><button type="button" onClick={handleAddShare} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">添加到列表</button></div>}
+          {shareUserId && <div className="flex justify-end"><Button type="button" size="sm" onClick={handleAddShare}>添加到列表</Button></div>}
           {workingShares.length > 0 && (
             <div>
               <h4 className="text-sm font-medium text-gray-700 mb-2">已共享 ({workingShares.length})</h4>
@@ -561,7 +562,7 @@ export default function Board() {
                         <option value="view">只读</option>
                         <option value="edit">可编辑</option>
                       </select>
-                      <button type="button" onClick={() => handleRemoveShareLocal(s.id)} className="text-xs text-red-500 hover:text-red-700">取消</button>
+                      <Button type="button" variant="danger" size="xs" onClick={() => handleRemoveShareLocal(s.id)}>取消</Button>
                     </div>
                   </div>
                 ))}
@@ -570,8 +571,8 @@ export default function Board() {
           )}
           {/* Save / Cancel */}
           <div className="flex justify-end gap-2 pt-2 border-t border-gray-200">
-            <button type="button" onClick={handleCancelShares} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-            <button type="button" onClick={handleSaveShares} disabled={!isShareDirty} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">保存</button>
+            <Button type="button" variant="secondary" onClick={handleCancelShares}>取消</Button>
+            <Button type="button" onClick={handleSaveShares} disabled={!isShareDirty}>保存</Button>
           </div>
         </div>
       </Modal>
@@ -780,7 +781,7 @@ function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) 
             <div className="max-h-32 overflow-y-auto">
               <table className="w-full text-sm"><tbody className="divide-y divide-gray-100">
                 {selectedList.map((item) => (
-                  <tr key={item.id}><td className="px-3 py-1.5"><span className="mr-1">{ENTITY_ICON[item.t]}</span>{item.code}</td><td className="px-3 py-1.5 text-gray-500">{item.version || '-'}</td><td className="px-3 py-1.5 text-gray-500">{item.name}</td><td className="px-3 py-1.5 text-right"><button type="button" onClick={() => { const n = new Map(selected); n.delete(item.id); setSelected(n); }} className="text-red-500 text-xs">✕</button></td></tr>
+                  <tr key={item.id}><td className="px-3 py-1.5"><span className="mr-1">{ENTITY_ICON[item.t]}</span>{item.code}</td><td className="px-3 py-1.5 text-gray-500">{item.version || '-'}</td><td className="px-3 py-1.5 text-gray-500">{item.name}</td><td className="px-3 py-1.5 text-right"><Button type="button" variant="danger" size="xs" onClick={() => { const n = new Map(selected); n.delete(item.id); setSelected(n); }}>✕</Button></td></tr>
                 ))}
               </tbody></table>
             </div>
@@ -816,7 +817,7 @@ function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) 
                   <td className="px-3 py-2 text-gray-500">{item.version || '-'}</td>
                   <td className="px-3 py-2">{item.name}</td>
                   <td className="px-3 py-2"><StatusTag status={item.status} /></td>
-                  <td className="px-3 py-2 text-center whitespace-nowrap">{selected.has(item.id) ? <span className="text-xs text-green-600">已选</span> : <button type="button" onClick={() => setSelected(new Map(selected).set(item.id, item))} className="px-2.5 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700 whitespace-nowrap">添加</button>}</td>
+                  <td className="px-3 py-2 text-center whitespace-nowrap">{selected.has(item.id) ? <span className="text-xs text-green-600">已选</span> : <Button type="button" size="xs" onClick={() => setSelected(new Map(selected).set(item.id, item))}>添加</Button>}</td>
                 </tr>
               ))}
             </tbody></table>
@@ -824,8 +825,8 @@ function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) 
         </div></div>
         {/* Bottom */}
         <div className="flex justify-end gap-2 pt-2 border-t">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
-          <button type="button" onClick={handleConfirm} disabled={selectedList.length === 0} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">确认关联 ({selectedList.length})</button>
+          <Button type="button" variant="secondary" onClick={onClose}>取消</Button>
+          <Button type="button" onClick={handleConfirm} disabled={selectedList.length === 0}>确认关联 ({selectedList.length})</Button>
         </div>
       </div>
     </Modal>

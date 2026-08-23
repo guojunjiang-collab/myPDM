@@ -1,7 +1,8 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import type { useCADBridge, CADType } from '../../hooks/useCADBridge';
 import type { BOMRow } from './CADBOMMatchTable';
 import { flattenTree } from './flattenTree';
+import Button from '../ui/Button';
 
 interface Props {
   bridge: ReturnType<typeof useCADBridge>;
@@ -90,22 +91,20 @@ export function CADConnectStep({ bridge, cadType, onCadTypeChange, onAssemblyLoa
           <option value="catia">CATIA V5</option>
           <option value="solidworks">SolidWorks</option>
         </select>
-        <button
+        <Button
           onClick={handleDetect}
           disabled={detecting}
-          className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-gray-300 text-sm"
         >
           {detecting ? '检测中...' : `检测 ${cadLabel}`}
-        </button>
+        </Button>
 
         {cadDetected && (
-          <button
+          <Button
             onClick={handleLoadAssembly}
             disabled={loadingTree}
-            className="px-6 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 disabled:bg-gray-300 text-sm"
           >
             {loadingTree ? '读取中...' : '读取装配结构'}
-          </button>
+          </Button>
         )}
       </div>
 

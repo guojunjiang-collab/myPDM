@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { logsApi } from '../services/api';
 import Badge from '../components/ui/Badge';
+import Button from '../components/ui/Button';
 import type { BadgeTone } from '../constants/badges';
 import type { OperationLog } from '../types';
 import { formatDateTime } from '../utils/date';
@@ -150,19 +151,20 @@ export default function Logs() {
           </div>
         </div>
         <div className="flex justify-end gap-2 mt-4">
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={handleReset}
-            className="px-4 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
           >
             重置
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
-            className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+            size="sm"
           >
             搜索
-          </button>
+          </Button>
         </div>
       </form>
 
@@ -222,34 +224,18 @@ export default function Logs() {
               共 {total} 条记录，第 {page + 1} / {totalPages} 页
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={() => setPage(0)}
-                disabled={page === 0}
-                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+              <Button variant="secondary" size="sm" onClick={() => setPage(0)} disabled={page === 0}>
                 首页
-              </button>
-              <button
-                onClick={() => setPage(page - 1)}
-                disabled={page === 0}
-                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => setPage(page - 1)} disabled={page === 0}>
                 上一页
-              </button>
-              <button
-                onClick={() => setPage(page + 1)}
-                disabled={page >= totalPages - 1}
-                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => setPage(page + 1)} disabled={page >= totalPages - 1}>
                 下一页
-              </button>
-              <button
-                onClick={() => setPage(totalPages - 1)}
-                disabled={page >= totalPages - 1}
-                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => setPage(totalPages - 1)} disabled={page >= totalPages - 1}>
                 末页
-              </button>
+              </Button>
             </div>
           </div>
         )}
