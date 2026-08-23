@@ -364,7 +364,7 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
                 <Badge status={cur.status} domain="task" />
               </FieldCard>
               <FieldCard label="优先级">
-                <Badge tone={PRIORITY_TAG[cur.priority].tone} label={PRIORITY_TAG[cur.priority].label} />
+                <Badge tone={PRIORITY_TAG[cur.priority]?.tone ?? 'gray'} label={PRIORITY_TAG[cur.priority]?.label ?? cur.priority} />
               </FieldCard>
               <FieldCard label="负责人">
                 <span>{cur.assignee_name || '—'}</span>

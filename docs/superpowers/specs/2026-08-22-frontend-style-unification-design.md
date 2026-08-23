@@ -47,7 +47,7 @@ src/constants/badges.ts  →   src/components/ui/        →   桌面 ~18 文件
 (全部状态域 → 颜色 tone)       Badge / Button / Input       + 85+ 处按钮
 ```
 
-所有颜色只允许出现在 `badges.ts` 与 `ui/*.tsx` 中；业务代码只写语义（`<Badge status="released" />`、`<Button variant="danger">`），不写颜色类。
+所有颜色只允许出现在 `badges.ts` 与 `ui/*.tsx` 中；业务代码只写语义（`<Badge status="released" />`、`<Button variant="danger">`），不写颜色类。**例外（已批准）**：非按钮语义的分段控件选中态与必选/可选切换 chip 等交互控件，允许直接引用 `var(--ui-*)`（移动端筛选胶囊 tab 选中态、构型必选/可选切换，见 Task 16/19b）。
 
 ---
 
@@ -271,9 +271,9 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 | `primary` | `bg-[var(--ui-btn-primary-bg)] text-[var(--ui-btn-primary-text)] hover:bg-[var(--ui-btn-primary-hover)] active:bg-[var(--ui-btn-primary-active)]` | 新建/保存/确认 |
 | `secondary` | `border border-[var(--ui-btn-secondary-border)] bg-[var(--ui-btn-secondary-bg)] text-[var(--ui-btn-secondary-text)] hover:bg-[var(--ui-btn-secondary-hover)]` | 取消/浏览 |
 | `ghost` | `bg-[var(--ui-btn-ghost-bg)] text-[var(--ui-btn-ghost-text)] hover:bg-[var(--ui-btn-ghost-hover)]` | 次要筛选/折叠 |
-| `danger` | `bg-[var(--ui-btn-danger-bg)] text-white hover:bg-[var(--ui-btn-danger-hover)] active:bg-[var(--ui-btn-danger-active)]` | 删除/作废/强制签入（统一 600 值） |
-| `success` | `bg-[var(--ui-btn-success-bg)] text-white hover:bg-[var(--ui-btn-success-hover)]` | 签入/全部签入（统一 green 值，废弃 emerald） |
-| `dark` | `bg-[var(--ui-btn-dark-bg)] text-white hover:bg-[var(--ui-btn-dark-hover)]` | 撤销签出等中性实底 |
+| `danger` | `bg-[var(--ui-btn-danger-bg)] text-[var(--ui-btn-danger-text)] hover:bg-[var(--ui-btn-danger-hover)] active:bg-[var(--ui-btn-danger-active)]` | 删除/作废/强制签入（统一 600 值） |
+| `success` | `bg-[var(--ui-btn-success-bg)] text-[var(--ui-btn-success-text)] hover:bg-[var(--ui-btn-success-hover)]` | 签入/全部签入（统一 green 值，废弃 emerald） |
+| `dark` | `bg-[var(--ui-btn-dark-bg)] text-[var(--ui-btn-dark-text)] hover:bg-[var(--ui-btn-dark-hover)]` | 撤销签出等中性实底 |
 | `link` | `text-[var(--ui-btn-link-text)] hover:text-[var(--ui-btn-link-hover)] hover:underline` | 行内操作 |
 
 | size | 类名 | 适用 |

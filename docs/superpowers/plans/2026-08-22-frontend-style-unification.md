@@ -1125,6 +1125,8 @@ git commit -m "docs: 风格统一验收通过，补充验收记录"
 
 > V1-V6 为**按钮上下文内联色**（全局约束明确禁止，但均处于任务文件清单之外=范围缺口）；V7 为**徽标上下文**遗漏。按约束约定：**本次不修复**，仅记录上报，建议由控制器安排后续专项（或纳入下轮收敛任务）。
 
+> **19b 关闭说明（后续收尾提交 0aeca50 已全部修复，本表为验收时快照）**：V1-V7 全部转为共享组件——Login/ForcePasswordChange → `Button primary w-full`；FeishuCallback/WechatCallback → `Button`（`<Link>`→`<Button>`+`navigate`，SPA 等价）；Modal ConfirmModal 取消=secondary、确认=success|danger；ImportPreviewModal 取消=secondary、确认导入=primary；PartDetailModal STEP 来源标签 → `<Badge tone="gray" />`。另：备注① 必选/可选 chip 配色已统一为 必选=`--ui-blue-bg`/可选=`--ui-gray-bg`（4 处，与 `required` 域及 `PartWhereUsedTab.tsx:88` 一致）。收尾后全量 grep 由 31 处降至 19 处（均为已登记豁免/装饰上下文）。
+
 ### Step 3/4: 逐页抽查（代码级）
 
 > 抽查口径：状态/类型/必选徽标 → `<Badge>`；按钮 → `<Button>`；表单 → `<Input>/<Select>/<Textarea>`；移动端主操作按钮为 touch 尺寸（≥44px）。
