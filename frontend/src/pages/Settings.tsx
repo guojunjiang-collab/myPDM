@@ -425,7 +425,7 @@ export default function Settings() {
             {isAdmin() && (
               <div className="flex gap-2">
                 <Button variant="secondary" onClick={handleExportFields}>
-                  导出字段
+                  导出
                 </Button>
                 <Button variant="secondary" onClick={() => fieldImportRef.current?.click()}>
                   导入
