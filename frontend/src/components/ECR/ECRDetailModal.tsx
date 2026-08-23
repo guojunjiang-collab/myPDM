@@ -35,13 +35,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   other: '其他',
 };
 
-const PRIORITY_LABELS: Record<string, string> = {
-  urgent: '紧急',
-  high: '高',
-  normal: '普通',
-  low: '低',
-};
-
 const STATUS_LABELS: Record<string, string> = {
   created: '创建',
   submitted: '提交评审',
@@ -382,7 +375,10 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <InfoItem label="变更原因" value={REASON_LABELS[detail.reason] || detail.reason} />
             <InfoItem label="变更类别" value={CATEGORY_LABELS[detail.category || ''] || detail.category || '-'} />
-            <InfoItem label="优先级" value={PRIORITY_LABELS[detail.priority] || detail.priority} />
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
+              <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">优先级</div>
+              <div className="pt-0.5"><ECRPriorityBadge priority={detail.priority} /></div>
+            </div>
             <InfoItem label="审批模式" value={detail.review_mode === 'all' ? '会签' : '或签'} />
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -401,15 +397,13 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
             />
           </div>
 
-          {/* Description */}
-          {detail.description && (
-            <div>
-              <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">📝 变更描述</h4>
-              <div className="bg-[var(--ui-bg-subtle)] rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap border border-[var(--ui-border)]">
-                {detail.description}
-              </div>
+          {/* Description（常驻展示，空描述显示占位） */}
+          <div>
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">📝 变更描述</h4>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap border border-[var(--ui-border)]">
+              {detail.description || '-'}
             </div>
-          )}
+          </div>
 
             </>
           )}
