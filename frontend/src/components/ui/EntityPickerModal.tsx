@@ -15,8 +15,10 @@ interface EntityPickerModalProps<T> {
   title: string;
   onClose: () => void;
   width?: 'lg' | 'xl' | 'full';
-  /** 候选数据拉取（open / 搜索 / 类型切换时触发；引用无需稳定，内部以 ref 持有） */
-  fetchData: (params: { search: string; type?: string }) => Promise<T[]>;
+  /** 候选数据拉取（open / 搜索 / 类型切换 / filterParams 变化时触发；引用无需稳定，内部以 ref 持有） */
+  fetchData: (params: { search: string; type?: string; [k: string]: unknown }) => Promise<T[]>;
+  /** 额外筛选参数（如状态筛选），变化时重新拉取候选 */
+  filterParams?: Record<string, unknown>;
   /** 条目唯一键（已选去重与「已添加」判定依据） */
   getKey: (item: T) => string;
   /** 候选表格列（多类型模式可自行在 columns 中渲染类型徽标，或提供 renderTypeBadge） */
@@ -25,6 +27,10 @@ interface EntityPickerModalProps<T> {
   selected: T[];
   /** 已选变更回调；缺省则内部维护（打开时重置为空），onConfirm 时一次性返回 */
   onSelectedChange?: (items: T[]) => void;
+  /** 已选面板额外列标题（如「用量」）；缺省不渲染额外列 */
+  selectedExtraTitle?: string;
+  /** 已选面板额外列单元格渲染（渲染在「移除」按钮列之前） */
+  selectedExtra?: (item: T) => ReactNode;
   onConfirm: (items: T[]) => void;
   searchPlaceholder?: string;
   /** 搜索行右侧筛选插槽（如状态 Select） */
@@ -55,10 +61,13 @@ export default function EntityPickerModal<T>({
   onClose,
   width = 'full',
   fetchData,
+  filterParams,
   getKey,
   columns,
   selected,
   onSelectedChange,
+  selectedExtraTitle,
+  selectedExtra,
   onConfirm,
   searchPlaceholder = '搜索...',
   filters,
@@ -97,7 +106,7 @@ export default function EntityPickerModal<T>({
     setFetchLoading(true);
     setFetchError(null);
     fetchDataRef
-      .current({ search, type: activeType })
+      .current({ search, type: activeType, ...filterParams })
       .then((data) => {
         if (!cancelled) setItems(data);
       })
@@ -113,7 +122,7 @@ export default function EntityPickerModal<T>({
     return () => {
       cancelled = true;
     };
-  }, [open, search, activeType]);
+  }, [open, search, activeType, filterParams]);
 
   const add = (item: T) => {
     const key = getKey(item);
@@ -182,6 +191,9 @@ export default function EntityPickerModal<T>({
                       {c.title}
                     </th>
                   ))}
+                  {selectedExtraTitle && (
+                    <th className="text-left font-medium px-3 py-1.5 whitespace-nowrap">{selectedExtraTitle}</th>
+                  )}
                   <th className="w-10" />
                 </tr>
               </thead>
@@ -191,6 +203,9 @@ export default function EntityPickerModal<T>({
                     {columns.map((c) => (
                       <td key={c.key} className="px-3 py-1.5">{c.render(item)}</td>
                     ))}
+                    {selectedExtraTitle && selectedExtra && (
+                      <td className="px-2 py-1.5">{selectedExtra(item)}</td>
+                    )}
                     <td className="px-2 py-1.5 text-right">
                       <button
                         type="button"

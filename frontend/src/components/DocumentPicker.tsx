@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useDataStore } from '../stores/data';
 import { documentsApi, customFieldsApi } from '../services/api';
-import { Modal, MODAL_Z } from './Modal';
+import EntityPickerModal from './ui/EntityPickerModal';
 import { toast } from './Toast';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
@@ -25,7 +25,7 @@ interface SelectedItem {
 
 interface CandidateItem extends SelectedItem {
   revision_id?: string;
-  customFieldValues: Record<string, unknown>;
+  customFieldValues?: Record<string, unknown>;
 }
 
 interface DocumentPickerProps {
@@ -51,7 +51,7 @@ const renderFieldValue = (v: unknown) => {
 };
 
 /* ----------------------------------------------------------------
-   Component
+   Component（EntityPickerModal 薄封装，吸收原自绘骨架）
    ---------------------------------------------------------------- */
 
 export default function DocumentPicker({
@@ -65,34 +65,29 @@ export default function DocumentPicker({
   entityCode,
   entityName,
 }: DocumentPickerProps) {
-  /* ---- 筛选 ---- */
-  const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [selected, setSelected] = useState<SelectedItem[]>([]);
+  const [refreshToken, setRefreshToken] = useState(0);
 
-  /* ---- 已选 ---- */
-  const [selected, setSelected] = useState<Map<string, SelectedItem>>(new Map());
-
-  /* ---- 数据源 ---- */
+  /* ---- 数据源（store 优先，fallback API；打开时加载一次） ---- */
   const storeDocuments = useDataStore((s) => s.documents);
   const [fetchedDocs, setFetchedDocs] = useState<Document[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [localFieldDefs, setLocalFieldDefs] = useState<CustomFieldDefinition[]>([]);
+  const [localFieldValues, setLocalFieldValues] = useState<Record<string, Record<string, unknown>>>({});
 
   /* ---- 快速新建 ---- */
   const [quickOpen, setQuickOpen] = useState(false);
   const [quickForm, setQuickForm] = useState({ code: '', name: '', remark: '' });
   const [quickCreating, setQuickCreating] = useState(false);
 
-  /* ---- 内部自定义字段（props 未传入时自行加载） ---- */
-  const [localFieldDefs, setLocalFieldDefs] = useState<CustomFieldDefinition[]>([]);
-  const [localFieldValues, setLocalFieldValues] = useState<Record<string, Record<string, unknown>>>({});
-
-  /* 加载数据 */
   useEffect(() => {
     if (!open) return;
+    setSelected([]);
+    setStatusFilter('');
     setQuickForm({ code: '', name: '', remark: '' });
     setQuickOpen(false);
     setQuickCreating(false);
-    setLoading(true);
+    setRefreshToken(0);
 
     const docPromise: Promise<Document[]> = storeDocuments.length > 0
       ? Promise.resolve(storeDocuments)
@@ -101,20 +96,14 @@ export default function DocumentPicker({
           return Array.isArray(data) ? data : (data?.items || []) as Document[];
         });
 
-    // 如果外部传入了字段定义和值，就不需要自行加载
+    // 外部传入字段定义/值则不需要自行加载
     const needLoadFields = !propFieldDefs || !propFieldValues;
-    let fieldDefsPromise: Promise<CustomFieldDefinition[]> = Promise.resolve([]);
-
-    if (needLoadFields) {
-      fieldDefsPromise = customFieldsApi.listDefinitions().then((r) =>
-        (r.data || []).filter((d: CustomFieldDefinition) => d.applies_to?.includes('document')),
-      );
-    }
 
     docPromise.then((docs) => {
       setFetchedDocs(docs);
       if (needLoadFields) {
-        fieldDefsPromise.then((defs) => {
+        customFieldsApi.listDefinitions().then((r) => {
+          const defs = (r.data || []).filter((d: CustomFieldDefinition) => d.applies_to?.includes('document'));
           setLocalFieldDefs(defs);
           if (defs.length > 0 && docs.length > 0) {
             Promise.all(
@@ -122,9 +111,7 @@ export default function DocumentPicker({
                 try {
                   const res = await customFieldsApi.getValues('document', doc.id);
                   const vals: Record<string, unknown> = {};
-                  (res.data || []).forEach((v: CustomFieldValue) => {
-                    vals[v.field_id] = v.value;
-                  });
+                  (res.data || []).forEach((v: CustomFieldValue) => { vals[v.field_id] = v.value; });
                   return { id: doc.id, vals };
                 } catch {
                   return { id: doc.id, vals: {} };
@@ -132,30 +119,28 @@ export default function DocumentPicker({
               }),
             ).then((results) => {
               const all: Record<string, Record<string, unknown>> = {};
-              for (const r of results) all[r.id] = r.vals;
+              for (const r2 of results) all[r2.id] = r2.vals;
               setLocalFieldValues(all);
             });
           }
         });
       }
-    }).catch(() => {}).finally(() => setLoading(false));
-  }, [open, storeDocuments, propFieldDefs, propFieldValues]);
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
-  // 优先使用 props，fallback 到内部加载的
   const fieldDefs = propFieldDefs && propFieldDefs.length > 0 ? propFieldDefs : localFieldDefs;
   const fieldValues = propFieldValues || localFieldValues;
-
   const documentsList = storeDocuments.length > 0 ? storeDocuments : fetchedDocs;
 
-  /* 搜索 + 筛选 */
-  const filtered = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
+  const fetchData = useCallback(async (params: { search: string; status?: string }) => {
+    const kw = params.search.trim().toLowerCase();
     return documentsList
       .filter((doc) => {
         if (existingDocIds.has(doc.id || doc.revision_id || '')) return false;
-        if (statusFilter && doc.status !== statusFilter) return false;
-        if (!keyword) return true;
-        return doc.code.toLowerCase().includes(keyword) || doc.name.toLowerCase().includes(keyword);
+        if (params.status && doc.status !== params.status) return false;
+        if (!kw) return true;
+        return doc.code.toLowerCase().includes(kw) || doc.name.toLowerCase().includes(kw);
       })
       .map((doc) => ({
         id: doc.id || doc.revision_id || '',
@@ -165,22 +150,20 @@ export default function DocumentPicker({
         version: doc.version || 'A',
         status: doc.status,
         customFieldValues: fieldValues[doc.id || doc.revision_id || ''] || {},
-      }));
-  }, [documentsList, search, statusFilter, existingDocIds, fieldValues]);
+      }) as CandidateItem);
+  }, [documentsList, existingDocIds, fieldValues]);
 
-  /* ---- 操作 ---- */
-
-  const addToSelected = (item: CandidateItem) => {
-    const docId = item.id || item.revision_id || '';
-    if (selected.has(docId)) return;
-    setSelected(new Map(selected).set(docId, { id: docId, code: item.code, name: item.name, version: item.version, status: item.status }));
-  };
-
-  const removeFromSelected = (id: string) => {
-    const next = new Map(selected);
-    next.delete(id);
-    setSelected(next);
-  };
+  const columns = useMemo(() => ([
+    { key: 'code', title: '图文档编号', width: '160px', render: (d: CandidateItem) => <span className="font-medium">{d.code}</span> },
+    { key: 'name', title: '图文档名称', render: (d: CandidateItem) => d.name },
+    { key: 'version', title: '版本', width: '70px', render: (d: CandidateItem) => <span className="text-[var(--ui-text-secondary)]">{d.version}</span> },
+    { key: 'status', title: '状态', width: '80px', render: (d: CandidateItem) => <Badge status={d.status} /> },
+    ...fieldDefs.map((def) => ({
+      key: def.id,
+      title: def.name,
+      render: (d: CandidateItem) => <span className="text-[var(--ui-text-secondary)] whitespace-nowrap">{renderFieldValue((d.customFieldValues || {})[def.id])}</span>,
+    })),
+  ]), [fieldDefs]);
 
   const handleQuickCreate = async () => {
     if (!quickForm.code.trim() || !quickForm.name.trim()) return;
@@ -192,18 +175,17 @@ export default function DocumentPicker({
         remark: quickForm.remark.trim() || undefined,
       });
       const doc = r.data as Document;
-      // 加入已选
-      setSelected((prev) => new Map(prev).set(doc.id, {
+      setSelected((prev) => [...prev, {
         id: doc.id,
         code: doc.code,
         name: doc.name,
         version: doc.version || 'A',
         status: doc.status,
-      }));
-      // 同步进候选数据源，无需重新搜索
+      }]);
       setFetchedDocs((prev) => [...prev, doc]);
       useDataStore.getState().setDocuments([...useDataStore.getState().documents, doc]);
       setQuickForm({ code: '', name: '', remark: '' });
+      setRefreshToken((t) => t + 1);
     } catch {
       toast.error('新建图文档失败，请检查编号是否重复');
     } finally {
@@ -211,104 +193,37 @@ export default function DocumentPicker({
     }
   };
 
-  const handleConfirm = () => {
-    const result = Array.from(selected.values()).map((v) => ({
-      document_id: v.id,
-    }));
-    onConfirm(result);
-    setSelected(new Map());
-    setSearch('');
-    setStatusFilter('');
-  };
-
-  const handleCancel = () => {
-    setSelected(new Map());
-    setSearch('');
-    setStatusFilter('');
-    onClose();
-  };
-
   const entityTypeLabel = entityType === 'part' ? '零件' : entityType === 'assembly' ? '部件' : entityType === 'component' ? '零部件' : entityType === 'configuration' ? '构型项' : '';
   const entityLabel = entityCode && entityTypeLabel ? ` - ${entityTypeLabel} ${entityCode}${entityName ? ` ${entityName}` : ''}` : '';
   const title = `关联图文档${entityLabel}`;
 
-  const selectedList = useMemo(() => Array.from(selected.values()), [selected]);
-
   return (
-    <Modal open={open} title={title} onClose={handleCancel} width="full" zIndex={MODAL_Z.picker}>
-      <div className="space-y-4 max-h-[75vh] flex flex-col">
-        {/* ---- 1. 已选 ---- */}
-        <div className="border rounded-lg overflow-hidden">
-          <div className="bg-[var(--ui-bg-subtle)] border-b px-4 py-2 flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">
-              已选图文档{selectedList.length > 0 ? ` (${selectedList.length})` : ''}
-            </span>
-          </div>
-          {selectedList.length === 0 ? (
-            <div className="px-4 py-6 text-center text-sm text-[var(--ui-text-tertiary)]">请在下方列表中选择要关联的图文档</div>
-          ) : (
-            <div className="overflow-x-auto max-h-48 overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-[var(--ui-bg-subtle)] border-b sticky top-0">
-                  <tr>
-                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">图文档编号</th>
-                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">图文档名称</th>
-                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">版本</th>
-                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">状态</th>
-                    {fieldDefs.map((def) => (
-                      <th key={def.id} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium whitespace-nowrap">{def.name}</th>
-                    ))}
-                    <th className="px-3 py-2 text-right text-[var(--ui-text-secondary)] font-medium w-12"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {selectedList.map((item) => (
-                    <tr key={item.id} className="hover:bg-[var(--ui-bg-hover)]">
-                      <td className="px-3 py-2 font-medium">{item.code}</td>
-                      <td className="px-3 py-2">{item.name}</td>
-                      <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{item.version}</td>
-                      <td className="px-3 py-2">
-                        <Badge status={item.status} />
-                      </td>
-                      {fieldDefs.map((def) => (
-                        <td key={def.id} className="px-3 py-2 text-[var(--ui-text-secondary)] whitespace-nowrap">
-                          {renderFieldValue((fieldValues[item.id] || {})[def.id])}
-                        </td>
-                      ))}
-                      <td className="px-3 py-2 text-right">
-                        <Button variant="danger" size="xs" type="button" onClick={() => removeFromSelected(item.id)} title="移除">✕</Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* ---- 2. 搜索 & 筛选 ---- */}
-        <div className="flex gap-2 items-center">
-          <Input
-            type="text"
-            placeholder="搜索编号、名称..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 min-w-0"
-          />
-          <Select
-            className="!w-auto"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="">全部状态</option>
-            <option value="draft">草稿</option>
-            <option value="frozen">冻结</option>
-            <option value="released">发布</option>
-            <option value="obsolete">作废</option>
-          </Select>
-        </div>
-
-        {/* ---- 快速新建 ---- */}
+    <EntityPickerModal<CandidateItem>
+      open={open}
+      title={title}
+      onClose={onClose}
+      width="full"
+      fetchData={fetchData}
+      filterParams={{ status: statusFilter, r: refreshToken }}
+      getKey={(d) => d.id}
+      columns={columns}
+      selected={selected}
+      onSelectedChange={setSelected}
+      onConfirm={(items) => {
+        onConfirm(items.map((v) => ({ document_id: v.id })));
+        onClose();
+      }}
+      searchPlaceholder="搜索编号、名称..."
+      filters={
+        <Select className="!w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <option value="">全部状态</option>
+          <option value="draft">草稿</option>
+          <option value="frozen">冻结</option>
+          <option value="released">发布</option>
+          <option value="obsolete">作废</option>
+        </Select>
+      }
+      quickCreate={
         <div className="border rounded-lg overflow-hidden">
           <div className="flex items-center">
             <TreeToggle expanded={quickOpen} onClick={() => setQuickOpen(!quickOpen)} size="sm" />
@@ -331,74 +246,7 @@ export default function DocumentPicker({
             </div>
           )}
         </div>
-
-        {/* ---- 3. 可选列表 ---- */}
-        <div className="border rounded-lg overflow-hidden flex-1 min-h-0">
-          <div className="overflow-y-auto max-h-64">
-            {loading ? (
-              <div className="px-4 py-8 text-center text-sm text-[var(--ui-text-tertiary)]">加载中...</div>
-            ) : filtered.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm text-[var(--ui-text-tertiary)]">无匹配结果</div>
-            ) : (
-              <table className="w-full text-sm">
-                <thead className="bg-[var(--ui-bg-subtle)] border-b sticky top-0">
-                  <tr>
-                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">图文档编号</th>
-                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">图文档名称</th>
-                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">版本</th>
-                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">状态</th>
-                    {fieldDefs.map((def) => (
-                      <th key={def.id} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium whitespace-nowrap">{def.name}</th>
-                    ))}
-                    <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-20">操作</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filtered.map((item) => {
-                    const docId = item.id || item.revision_id || '';
-                    const isAdded = selected.has(docId);
-                    return (
-                      <tr key={item.id} className="hover:bg-[var(--ui-bg-hover)]">
-                        <td className="px-3 py-2 font-medium">{item.code}</td>
-                        <td className="px-3 py-2">{item.name}</td>
-                        <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{item.version}</td>
-                        <td className="px-3 py-2">
-                          <Badge status={item.status} />
-                        </td>
-                        {fieldDefs.map((def) => (
-                          <td key={def.id} className="px-3 py-2 text-[var(--ui-text-secondary)] whitespace-nowrap">
-                            {renderFieldValue(item.customFieldValues[def.id])}
-                          </td>
-                        ))}
-                        <td className="px-3 py-2 text-center">
-                          {isAdded ? (
-                            <span className="text-xs text-green-600">已关联</span>
-                          ) : (
-                            <Button size="xs" type="button" onClick={() => addToSelected(item)}>
-                              关联
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-
-        {/* ---- 底部 ---- */}
-        <div className="flex justify-between items-center pt-2 border-t">
-          <span className="text-sm text-[var(--ui-text-secondary)]">已选 <span className="font-medium text-gray-700">{selectedList.length}</span> 项</span>
-          <div className="flex gap-2">
-            <Button variant="secondary" type="button" onClick={handleCancel}>取消</Button>
-            <Button type="button" onClick={handleConfirm} disabled={selectedList.length === 0}>
-              确认关联
-            </Button>
-          </div>
-        </div>
-      </div>
-    </Modal>
+      }
+    />
   );
 }

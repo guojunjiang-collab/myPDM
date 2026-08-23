@@ -15,7 +15,7 @@ import VersionSelectModal from '../VersionSelectModal';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
-import Textarea from '../ui/Textarea';
+import CheckinNoteModal from '../CheckinNoteModal';
 
 function BomChevron({ expanded }: { expanded: boolean }) {
   return (
@@ -497,16 +497,20 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
         </>)}
       </div>
 
-      {showCheckinModal && (
-        <Modal open={showCheckinModal} onClose={() => setShowCheckinModal(false)} title="签入说明" width="md">
-          <div className="p-4"><Textarea rows={3} placeholder="请输入签入说明（选填）..." value={checkinNote} onChange={(e) => setCheckinNote(e.target.value)} />
-            <div className="flex justify-end gap-2 mt-4">
-              <Button variant="secondary" onClick={() => setShowCheckinModal(false)}>取消</Button>
-              <Button onClick={async () => { setSaving(true); await doAction(() => configurationApi.checkin(internalRevId, checkinNote || ''), '签入成功'); setSaving(false); setShowCheckinModal(false); setCheckinNote(''); }} disabled={saving}>{saving ? '保存中...' : '确认签入'}</Button>
-            </div>
-          </div>
-        </Modal>
-      )}
+      <CheckinNoteModal
+        open={showCheckinModal}
+        note={checkinNote}
+        onChange={setCheckinNote}
+        saving={saving}
+        onCancel={() => setShowCheckinModal(false)}
+        onConfirm={async () => {
+          setSaving(true);
+          await doAction(() => configurationApi.checkin(internalRevId, checkinNote || ''), '签入成功');
+          setSaving(false);
+          setShowCheckinModal(false);
+          setCheckinNote('');
+        }}
+      />
       {cfgPickerOpen && (
         <ConfigItemPicker open={cfgPickerOpen} onClose={() => { setCfgPickerOpen(false); setPickerParentId(null); }} excludeId={internalRevId}
           onConfirm={async (items) => { if (!pickerParentId) return; try { await configurationApi.addChildren(pickerParentId, items); toast.success(`已添加 ${items.length} 个子构型项`); if (pickerParentId !== internalRevId) { setSubChildren(prev => { const s = { ...prev }; delete s[pickerParentId]; return s; }); } setCfgPickerOpen(false); setPickerParentId(null); refreshChildren(pickerParentId); } catch {} }} />

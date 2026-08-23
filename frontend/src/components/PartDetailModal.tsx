@@ -18,7 +18,7 @@ import Badge from './ui/Badge';
 import Button from './ui/Button';
 import Input from './ui/Input';
 import Select from './ui/Select';
-import Textarea from './ui/Textarea';
+import CheckinNoteModal from './CheckinNoteModal';
 
 /** BOM 结构树的展开箭头，与 STPViewer 模型树(ModelTreePanel)保持同一风格 */
 function BomChevron({ expanded }: { expanded: boolean }) {
@@ -945,26 +945,20 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
         )}
       </div>
 
-      {showCheckinModal && (
-        <Modal open={showCheckinModal} onClose={() => setShowCheckinModal(false)} title="签入说明" width="md">
-          <div className="p-4">
-            <Textarea rows={3} placeholder="请输入签入说明（选填）..."
-              value={checkinNote} onChange={(e) => setCheckinNote(e.target.value)} />
-            <div className="flex justify-end gap-2 mt-4">
-              <Button variant="secondary" onClick={() => setShowCheckinModal(false)}>取消</Button>
-              <Button onClick={async () => {
-                setSaving(true);
-                await doAction(() => partsApi.checkin(revisionId!, checkinNote || undefined), '签入成功');
-                setSaving(false);
-                setShowCheckinModal(false);
-                setCheckinNote('');
-              }} disabled={saving}>
-                {saving ? '保存中...' : '确认签入'}
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
+      <CheckinNoteModal
+        open={showCheckinModal}
+        note={checkinNote}
+        onChange={setCheckinNote}
+        saving={saving}
+        onCancel={() => setShowCheckinModal(false)}
+        onConfirm={async () => {
+          setSaving(true);
+          await doAction(() => partsApi.checkin(revisionId!, checkinNote || undefined), '签入成功');
+          setSaving(false);
+          setShowCheckinModal(false);
+          setCheckinNote('');
+        }}
+      />
       <AssemblyPartPicker
         open={bomPickerOpen}
         onClose={() => setBomPickerOpen(false)}

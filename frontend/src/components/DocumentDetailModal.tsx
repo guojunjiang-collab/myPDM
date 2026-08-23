@@ -18,7 +18,7 @@ import { ECRDetailModal } from './ECR/ECRDetailModal';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
 import Input from './ui/Input';
-import Textarea from './ui/Textarea';
+import CheckinNoteModal from './CheckinNoteModal';
 import type { DocumentRevision, DocumentIteration, CustomFieldDefinition } from '../types';
 
 interface Props {
@@ -708,26 +708,19 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
         )}
       </div>
 
-      {/* 签入说明弹窗 */}
-      {showCheckinModal && (
-        <Modal open={showCheckinModal} title="签入说明" onClose={() => setShowCheckinModal(false)} width="md">
-          <Textarea
-            value={checkinNote}
-            onChange={(e) => setCheckinNote(e.target.value)}
-            placeholder="请输入签入说明（选填）..."
-            rows={4}
-          />
-          <div className="flex justify-end gap-2 mt-3">
-            <Button variant="secondary" size="sm" onClick={() => setShowCheckinModal(false)}>取消</Button>
-            <Button variant="success" size="sm" onClick={async () => {
-              if (!doc) return;
-              await doAction(() => documentsApi.checkin(doc.id, checkinNote || undefined), '签入成功');
-              setShowCheckinModal(false);
-              setCheckinNote('');
-            }}>确认签入</Button>
-          </div>
-        </Modal>
-      )}
+      {/* 签入说明弹窗（共享 CheckinNoteModal） */}
+      <CheckinNoteModal
+        open={showCheckinModal}
+        note={checkinNote}
+        onChange={setCheckinNote}
+        onCancel={() => setShowCheckinModal(false)}
+        onConfirm={async () => {
+          if (!doc) return;
+          await doAction(() => documentsApi.checkin(doc.id, checkinNote || undefined), '签入成功');
+          setShowCheckinModal(false);
+          setCheckinNote('');
+        }}
+      />
 
       {archivePreview && (
         <ArchiveTreeModal
