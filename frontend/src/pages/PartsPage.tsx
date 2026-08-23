@@ -170,24 +170,19 @@ export default function PartsPage() {
           <option value="released">发布</option>
           <option value="obsolete">作废</option>
         </Select>
-        <label className="flex items-center gap-1.5 px-3 py-2 rounded-lg cursor-pointer text-sm whitespace-nowrap transition-colors select-none bg-[var(--ui-btn-primary-bg)] text-[var(--ui-btn-primary-text)] hover:bg-[var(--ui-btn-primary-hover)]">
-          <input
-            type="checkbox"
-            checked={showAllVersions}
-            onChange={(e) => setShowAllVersions(e.target.checked)}
-            className="w-3.5 h-3.5"
-          />
+        <button
+          onClick={() => setShowAllVersions((v) => !v)}
+          className={`px-3 py-2 rounded-lg text-sm whitespace-nowrap transition-colors select-none ${showAllVersions ? 'bg-[var(--ui-btn-primary-bg)] text-[var(--ui-btn-primary-text)]' : 'bg-[var(--ui-bg-surface)] text-[var(--ui-text-secondary)] border border-[var(--ui-border)] hover:bg-[var(--ui-bg-hover)]'}`}
+        >
           全部版本
-        </label>
-        <label className="flex items-center gap-1.5 px-3 py-2 rounded-lg cursor-pointer text-sm whitespace-nowrap transition-colors select-none bg-[var(--ui-btn-primary-bg)] text-[var(--ui-btn-primary-text)] hover:bg-[var(--ui-btn-primary-hover)]" title="只显示没有父项的最顶层零部件">
-          <input
-            type="checkbox"
-            checked={topLevelOnly}
-            onChange={(e) => setTopLevelOnly(e.target.checked)}
-            className="w-3.5 h-3.5"
-          />
+        </button>
+        <button
+          onClick={() => setTopLevelOnly((v) => !v)}
+          className={`px-3 py-2 rounded-lg text-sm whitespace-nowrap transition-colors select-none ${topLevelOnly ? 'bg-[var(--ui-btn-primary-bg)] text-[var(--ui-btn-primary-text)]' : 'bg-[var(--ui-bg-surface)] text-[var(--ui-text-secondary)] border border-[var(--ui-border)] hover:bg-[var(--ui-bg-hover)]'}`}
+          title="只显示没有父项的最顶层零部件"
+        >
           仅顶层零部件
-        </label>
+        </button>
 
         <Button onClick={() => setShowCADWorkspace(true)}>
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

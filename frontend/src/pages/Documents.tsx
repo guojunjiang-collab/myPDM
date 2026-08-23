@@ -215,24 +215,18 @@ export default function Documents() {
           <option value="released">发布</option>
           <option value="obsolete">作废</option>
         </Select>
-        <label className="flex items-center gap-1.5 px-3 py-2 rounded-lg cursor-pointer text-sm whitespace-nowrap transition-colors select-none bg-[var(--ui-btn-primary-bg)] text-[var(--ui-btn-primary-text)] hover:bg-[var(--ui-btn-primary-hover)]">
-          <input
-            type="checkbox"
-            checked={showAllVersions}
-            onChange={(e) => setShowAllVersions(e.target.checked)}
-            className="w-3.5 h-3.5"
-          />
+        <button
+          onClick={() => setShowAllVersions((v) => !v)}
+          className={`px-3 py-2 rounded-lg text-sm whitespace-nowrap transition-colors select-none ${showAllVersions ? 'bg-[var(--ui-btn-primary-bg)] text-[var(--ui-btn-primary-text)]' : 'bg-[var(--ui-bg-surface)] text-[var(--ui-text-secondary)] border border-[var(--ui-border)] hover:bg-[var(--ui-bg-hover)]'}`}
+        >
           全部版本
-        </label>
-        <label className="flex items-center gap-1.5 px-3 py-2 rounded-lg cursor-pointer text-sm whitespace-nowrap transition-colors select-none bg-[var(--ui-btn-primary-bg)] text-[var(--ui-btn-primary-text)] hover:bg-[var(--ui-btn-primary-hover)]">
-          <input
-            type="checkbox"
-            checked={showAccessibleOnly}
-            onChange={(e) => setShowAccessibleOnly(e.target.checked)}
-            className="w-3.5 h-3.5"
-          />
+        </button>
+        <button
+          onClick={() => setShowAccessibleOnly((v) => !v)}
+          className={`px-3 py-2 rounded-lg text-sm whitespace-nowrap transition-colors select-none ${showAccessibleOnly ? 'bg-[var(--ui-btn-primary-bg)] text-[var(--ui-btn-primary-text)]' : 'bg-[var(--ui-bg-surface)] text-[var(--ui-text-secondary)] border border-[var(--ui-border)] hover:bg-[var(--ui-bg-hover)]'}`}
+        >
           可查看
-        </label>
+        </button>
 
         <div className="flex-1" />
         {canEdit() && (
