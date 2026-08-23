@@ -10,7 +10,7 @@ import { projectApi } from '../../services/projectApi';
 import { partsApi, documentsApi, ecrApi, ecoApi, logsApi, customFieldsApi, mediaApi } from '../../services/api';
 import { useDataStore } from '../../stores/data';
 import type { CustomFieldDefinition, CustomFieldValue } from '../../types';
-import ItemPicker from '../../components/ItemPicker';
+import ItemPicker, { StatusTag } from '../../components/ItemPicker';
 import { previewAttachment } from '../../utils/attachmentPreview';
 import ECPicker from '../../components/ECPicker';
 import PartDetailModal from '../../components/PartDetailModal';
@@ -556,6 +556,8 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                               <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-20 whitespace-nowrap">类型</th>
                               <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-36 whitespace-nowrap">件号</th>
                               <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">名称</th>
+                              <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-16 whitespace-nowrap">版本</th>
+                              <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-20 whitespace-nowrap">状态</th>
                               <th className="text-right px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-40">操作</th>
                             </tr>
                           </thead>
@@ -576,6 +578,8 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                                 </td>
                                 <td className="px-3 py-2 font-mono text-gray-700 whitespace-nowrap">{l.entity_code || '—'}</td>
                                 <td className="px-3 py-2 text-gray-700">{l.entity_name || '—'}</td>
+                                <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{l.entity_version ? `v${l.entity_version}` : '—'}</td>
+                                <td className="px-3 py-2 whitespace-nowrap"><StatusTag status={l.entity_status || ''} /></td>
                                 <td className="px-3 py-2 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                                   {(l.entity_type === 'part' || l.entity_type === 'assembly') && (
                                     <Button
