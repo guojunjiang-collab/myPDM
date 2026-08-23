@@ -49,6 +49,19 @@ interface ShareRecord {
 
 type FilterTab = 'all' | 'component' | 'document' | 'configuration';
 
+/** 关联项目弹窗筛选：零部件拆分为 零件/部件 */
+type PickerTab = 'all' | 'part' | 'assembly' | 'document' | 'configuration';
+
+/** 类型徽标（胶囊式，符合约定配色） */
+const TYPE_BADGE: Record<string, { label: string; tone: BadgeTone }> = {
+  part: { label: '零件', tone: 'blue' },
+  assembly: { label: '部件', tone: 'purple' },
+  document: { label: '图文档', tone: 'gray' },
+  configuration: { label: '构型项', tone: 'green' },
+  component: { label: '零部件', tone: 'blue' },
+};
+const typeBadge = (t: string): { label: string; tone: BadgeTone } => TYPE_BADGE[t] ?? { label: t, tone: 'gray' };
+
 const ENTITY_LABEL: Record<string, string> = { part: '零部件', assembly: '零部件', component: '零部件', document: '图文档', configuration: '构型项' };
 const ENTITY_ICON: Record<string, string> = { part: '📦', assembly: '📦', component: '📦', document: '📄', configuration: '⚙️' };
 
@@ -705,7 +718,7 @@ interface ItemPickerProps {
 }
 
 function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) {
-  const [tab, setTab] = useState<FilterTab>('all');
+  const [tab, setTab] = useState<PickerTab>('all');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Map<string, any>>(new Map());
 
@@ -758,8 +771,13 @@ function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) 
     const kw = search.trim().toLowerCase();
     const all: any[] = [];
     const seen = new Set<string>();
-    // 零部件：id 取 revision_id（看板存储 revision_id，显示时按关联版本展示）；同时检查 master_id 兼容旧数据
-    if (tab === 'all' || tab === 'component') srcComponents.forEach((p: any) => { const id = p.revision_id || p.id; const mid = p.master_id || p.id; if (!existingIds.has(id) && !existingIds.has(mid) && !seen.has(id)) { seen.add(id); all.push({ t: 'component', id, code: p.code, name: p.name, version: p.version || '', status: p.status || '' }); } });
+    // 零部件：按 零件(part)/部件(assembly) 细分（id 取 revision_id，看板存储 revision_id，显示时按关联版本展示；同时检查 master_id 兼容旧数据）
+    if (tab === 'all' || tab === 'part' || tab === 'assembly') srcComponents.forEach((p: any) => {
+      const sub = p.type === 'assembly' ? 'assembly' : 'part';
+      if (tab !== 'all' && tab !== sub) return;
+      const id = p.revision_id || p.id; const mid = p.master_id || p.id;
+      if (!existingIds.has(id) && !existingIds.has(mid) && !seen.has(id)) { seen.add(id); all.push({ t: 'component', sub, id, code: p.code, name: p.name, version: p.version || '', status: p.status || '' }); }
+    });
     if (tab === 'all' || tab === 'document') srcDocuments.forEach((d: any) => { const id = d.id || d.revision_id; if (!existingIds.has(id) && !seen.has(id)) { seen.add(id); all.push({ t: 'document', id, code: d.code, name: d.name, version: d.version || '', status: d.status || '' }); } });
     if (tab === 'all' || tab === 'configuration') srcConfigItems.forEach((c: any) => { const id = c.id || c.revision_id; if (!existingIds.has(id) && !seen.has(id)) { seen.add(id); all.push({ t: 'configuration', id, code: c.code, name: c.name, version: c.version || '', status: c.status || '' }); } });
     return kw ? all.filter((i) => i.code.toLowerCase().includes(kw) || i.name.toLowerCase().includes(kw)) : all;
@@ -784,7 +802,7 @@ function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) 
             <div className="max-h-32 overflow-y-auto">
               <table className="w-full text-sm"><tbody className="divide-y divide-gray-100">
                 {selectedList.map((item) => (
-                  <tr key={item.id}><td className="px-3 py-1.5"><span className="mr-1">{ENTITY_ICON[item.t]}</span>{item.code}</td><td className="px-3 py-1.5 text-[var(--ui-text-secondary)]">{item.version || '-'}</td><td className="px-3 py-1.5 text-[var(--ui-text-secondary)]">{item.name}</td><td className="px-3 py-1.5 text-right"><Button type="button" variant="danger" size="xs" onClick={() => { const n = new Map(selected); n.delete(item.id); setSelected(n); }}>✕</Button></td></tr>
+                  <tr key={item.id}><td className="px-3 py-1.5"><Badge size="xs" tone={typeBadge(item.sub || item.t).tone} label={typeBadge(item.sub || item.t).label} /></td><td className="px-3 py-1.5">{item.code}</td><td className="px-3 py-1.5 text-[var(--ui-text-secondary)]">{item.version || '-'}</td><td className="px-3 py-1.5 text-[var(--ui-text-secondary)]">{item.name}</td><td className="px-3 py-1.5 text-right"><Button type="button" variant="danger" size="xs" onClick={() => { const n = new Map(selected); n.delete(item.id); setSelected(n); }}>✕</Button></td></tr>
                 ))}
               </tbody></table>
             </div>
@@ -793,8 +811,10 @@ function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) 
         {/* Search + filter */}
         <div className="flex gap-2">
           <Input type="text" placeholder="搜索编号/名称..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1" />
-          <div className="flex gap-1">{(['all', 'component', 'document', 'configuration'] as FilterTab[]).map((t) => (
-            <button type="button" key={t} onClick={() => setTab(t)} className={`px-3 py-2 text-sm rounded-lg ${tab === t ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{t === 'all' ? '全部' : ENTITY_LABEL[t]}</button>
+          <div className="flex gap-2">{(['all', 'part', 'assembly', 'document', 'configuration'] as PickerTab[]).map((t) => (
+            <Button key={t} size="sm" active={tab === t} onClick={() => setTab(t)}>
+              {t === 'all' ? '全部' : t === 'part' ? '零件' : t === 'assembly' ? '部件' : ENTITY_LABEL[t]}
+            </Button>
           ))}</div>
         </div>
         {/* Candidates */}
@@ -815,7 +835,7 @@ function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) 
             </tr></thead><tbody className="divide-y divide-gray-100">
               {candidates.map((item) => (
                 <tr key={item.id} className="hover:bg-[var(--ui-bg-hover)]">
-                  <td className="px-3 py-2"><span className="mr-1">{ENTITY_ICON[item.t]}</span><span className="text-xs text-[var(--ui-text-secondary)]">{ENTITY_LABEL[item.t]}</span></td>
+                  <td className="px-3 py-2"><Badge size="xs" tone={typeBadge(item.sub || item.t).tone} label={typeBadge(item.sub || item.t).label} /></td>
                   <td className="px-3 py-2 font-medium">{item.code}</td>
                   <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{item.version || '-'}</td>
                   <td className="px-3 py-2">{item.name}</td>
