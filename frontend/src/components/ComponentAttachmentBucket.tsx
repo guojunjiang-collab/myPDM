@@ -4,6 +4,8 @@ import type { ComponentAttachment } from '../services/api';
 import { previewAttachment } from '../utils/attachmentPreview';
 import ArchiveTreeModal from './ArchiveTreeModal';
 import Button from './ui/Button';
+import { ConfirmModal } from './Modal';
+import { toast } from './Toast';
 
 interface Props {
   componentId: string;
@@ -56,7 +58,7 @@ export default function ComponentAttachmentBucket({ componentId, category, label
     const file = e.target.files?.[0];
     if (!file) return;
     const MAX_ALLOWED = 1073741824;
-    if (file.size > MAX_ALLOWED) { alert('文件大小超过系统限制 1GB'); if (fileInputRef.current) fileInputRef.current.value = ''; return; }
+    if (file.size > MAX_ALLOWED) { toast.error('文件大小超过系统限制 1GB'); if (fileInputRef.current) fileInputRef.current.value = ''; return; }
     setUploading(true); setUploadName(file.name); setProgress(0);
     try {
       if (file.size > CHUNK_THRESHOLD) {
@@ -66,20 +68,16 @@ export default function ComponentAttachmentBucket({ componentId, category, label
       }
       await load();
     } catch {
-      alert('上传失败，请重试');
+      toast.error('上传失败，请重试');
     } finally {
       setUploading(false); setUploadName(''); setProgress(0);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  const handleDelete = async (attId: string) => {
-    if (!confirm('确定要删除该附件吗？')) return;
-    setDeletingId(attId);
-    try { await componentAttachmentsApi.remove(componentId, attId); await load(); }
-    catch { alert('删除失败，请重试'); }
-    finally { setDeletingId(null); }
-  };
+  // 删除附件确认（状态驱动 ConfirmModal）
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const handleDelete = (attId: string) => setConfirmDeleteId(attId);
 
   const handlePreview = (attId: string, fileName: string) => {
     previewAttachment(attId, fileName, { onArchive: (id, name) => setArchivePreview({ attId: id, fileName: name }) });
@@ -92,7 +90,7 @@ export default function ComponentAttachmentBucket({ componentId, category, label
       a.href = `/api/v2/attachments/${attId}/direct-download?token=${encodeURIComponent(mt)}`;
       a.download = fileName || 'download';
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    } catch { alert('下载失败，请重试'); }
+    } catch { toast.error('下载失败，请重试'); }
   };
 
   if (hideWhenEmpty && !loading && !uploading && items.length === 0) return null;
@@ -161,6 +159,24 @@ export default function ComponentAttachmentBucket({ componentId, category, label
       {archivePreview && (
         <ArchiveTreeModal open={!!archivePreview} onClose={() => setArchivePreview(null)} attachmentId={archivePreview.attId} fileName={archivePreview.fileName} />
       )}
+
+      {/* 删除附件确认 */}
+      <ConfirmModal
+        open={!!confirmDeleteId}
+        title="确认删除"
+        content="确定要删除该附件吗？"
+        confirmText="删除"
+        cancelText="取消"
+        type="danger"
+        onConfirm={async () => {
+          if (!confirmDeleteId) return;
+          setDeletingId(confirmDeleteId);
+          try { await componentAttachmentsApi.remove(componentId, confirmDeleteId); await load(); }
+          catch { toast.error('删除失败，请重试'); }
+          finally { setDeletingId(null); setConfirmDeleteId(null); }
+        }}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

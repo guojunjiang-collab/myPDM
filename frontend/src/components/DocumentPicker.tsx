@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useDataStore } from '../stores/data';
 import { documentsApi, customFieldsApi } from '../services/api';
 import { Modal } from './Modal';
+import { toast } from './Toast';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
 import Input from './ui/Input';
@@ -204,7 +205,7 @@ export default function DocumentPicker({
       useDataStore.getState().setDocuments([...useDataStore.getState().documents, doc]);
       setQuickForm({ code: '', name: '', remark: '' });
     } catch {
-      alert('新建图文档失败，请检查编号是否重复');
+      toast.error('新建图文档失败，请检查编号是否重复');
     } finally {
       setQuickCreating(false);
     }

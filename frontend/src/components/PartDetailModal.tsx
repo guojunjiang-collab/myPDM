@@ -4,7 +4,7 @@ import { useAuthStore } from '../stores/auth';
 import type { PartMaster, PartRevision, PartIteration, PartStatus, CascadeResult, PartListItem } from '../types';
 import { Loading } from './Loading';
 import { toast } from './Toast';
-import { Modal, MODAL_Z } from './Modal';
+import { Modal, ConfirmModal, MODAL_Z } from './Modal';
 import EntityDocumentSection from './EntityDocumentSection';
 import PartAttachmentBucket from './PartAttachmentBucket';
 import AssemblyPartPicker from './AssemblyPartPicker';
@@ -72,6 +72,10 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   const [versionSelectRevisions, setVersionSelectRevisions] = useState<any[]>([]);
   const [versionSelectLoading, setVersionSelectLoading] = useState(false);
   const [matrixPopup, setMatrixPopup] = useState<any>(null);
+  // 移除子项确认（状态驱动 ConfirmModal）
+  const [removeItemState, setRemoveItemState] = useState<{ itemId: string; targetRevId: string } | null>(null);
+  // 删除迭代确认
+  const [deleteIterState, setDeleteIterState] = useState<{ revisionId: string; iterId: string; iteration: number } | null>(null);
   const [nestedMasterId, setNestedMasterId] = useState<string | null>(null);
   const [nestedRevisionId, setNestedRevisionId] = useState<string | null>(null);
   const [wuConfigRevId, setWuConfigRevId] = useState<string | null>(null);
@@ -336,9 +340,9 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
         const mt = await mediaApi.token(stp.id, 'gltf');
         window.open(`/stp-viewer?id=${stp.id}&token=${encodeURIComponent(mt)}&code=${encodeURIComponent(item.child_code || '')}&version=${item.child_version || ''}&name=${encodeURIComponent(item.child_name || '')}`, '_blank');
       } else {
-        alert('该零件没有 STP/STEP 附件');
+        toast.info('该零件没有 STP/STEP 附件');
       }
-    } catch { alert('打开预览失败'); }
+    } catch { toast.error('打开预览失败'); }
   }, []);
 
   const renderBomRow = useCallback((item: any, level: number, parentRevId?: string): React.ReactNode => {
@@ -426,16 +430,10 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                 {hasChildren && (
                   <Button variant="link" size="xs" type="button" onClick={(e) => { e.stopPropagation(); setNestedPickerRevId(item.child_revision_id); }}>+子项</Button>
                 )}
-                <Button variant="danger" size="xs" type="button" onClick={async (e) => {
+                <Button variant="danger" size="xs" type="button" onClick={(e) => {
                   e.stopPropagation();
                   if (!revisionId) return;
-                  if (!confirm('确定移除此子项？')) return;
-                  const targetRevId = parentRevId || revisionId;
-                  try {
-                    await partsApi.deleteBOMItem(targetRevId, item.id);
-                    toast.success('已删除');
-                    refreshChildren(targetRevId);
-                  } catch (e2: any) { toast.error(e2?.response?.data?.detail || '删除失败'); }
+                  setRemoveItemState({ itemId: item.id, targetRevId: parentRevId || revisionId });
                 }}>移除</Button>
               </span>
             </td>
@@ -617,9 +615,9 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
             const mt = await mediaApi.token(stp.id, 'gltf');
             window.open(`/stp-viewer?id=${stp.id}&token=${encodeURIComponent(mt)}&code=${encodeURIComponent(editMaster.code)}&version=${revision?.version || ''}&name=${encodeURIComponent(editMaster.name)}`, '_blank');
           } else {
-            alert('该零件没有 STP/STEP 附件，请先上传');
+            toast.info('该零件没有 STP/STEP 附件，请先上传');
           }
-        } catch { alert('预览失败'); }
+        } catch { toast.error('预览失败'); }
       }}>3D预览</Button>
                   )}
                   {(canCheckout || canCheckin || canUndo || canFreeze || canUnfreeze || canRelease || canUpgrade || canObsolete || canForceCheckin) && (
@@ -926,15 +924,9 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                                 <Button
                                   variant="danger"
                                   size="xs"
-                                  onClick={async () => {
-                                    if (!revisionId || !confirm(`确定删除迭代 #${it.iteration}？该迭代的附件也将被删除。`)) return;
-                                    try {
-                                      await partsApi.deleteIteration(revisionId, it.id);
-                                      toast.success('迭代已删除');
-                                      setIterationsList(await partsApi.iterations(revisionId));
-                                    } catch (e: any) {
-                                      toast.error(e?.response?.data?.detail || '删除失败');
-                                    }
+                                  onClick={() => {
+                                    if (!revisionId) return;
+                                    setDeleteIterState({ revisionId, iterId: it.id, iteration: it.iteration });
                                   }}
                                 >
                                   删除
@@ -1115,6 +1107,48 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
           initialRightItem={toPartListItem(cmpSel[1])}
         />
       )}
+
+      {/* 移除子项确认 */}
+      <ConfirmModal
+        open={!!removeItemState}
+        title="确认移除"
+        content="确定移除此子项？"
+        confirmText="移除"
+        cancelText="取消"
+        type="danger"
+        onConfirm={async () => {
+          if (!removeItemState) return;
+          try {
+            await partsApi.deleteBOMItem(removeItemState.targetRevId, removeItemState.itemId);
+            toast.success('已删除');
+            refreshChildren(removeItemState.targetRevId);
+          } catch (e2: any) { toast.error(e2?.response?.data?.detail || '删除失败'); }
+          setRemoveItemState(null);
+        }}
+        onCancel={() => setRemoveItemState(null)}
+      />
+
+      {/* 删除迭代确认 */}
+      <ConfirmModal
+        open={!!deleteIterState}
+        title="确认删除"
+        content={deleteIterState ? `确定删除迭代 #${deleteIterState.iteration}？该迭代的附件也将被删除。` : ''}
+        confirmText="删除"
+        cancelText="取消"
+        type="danger"
+        onConfirm={async () => {
+          if (!deleteIterState) return;
+          try {
+            await partsApi.deleteIteration(deleteIterState.revisionId, deleteIterState.iterId);
+            toast.success('迭代已删除');
+            setIterationsList(await partsApi.iterations(deleteIterState.revisionId));
+          } catch (e: any) {
+            toast.error(e?.response?.data?.detail || '删除失败');
+          }
+          setDeleteIterState(null);
+        }}
+        onCancel={() => setDeleteIterState(null)}
+      />
     </Modal>
   );
 }

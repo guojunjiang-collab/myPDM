@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { Document, CustomFieldDefinition, DocumentAttachment } from '../types';
 import { documentsApi, mediaApi } from '../services/api';
 import { previewAttachment } from '../utils/attachmentPreview';
+import { toast } from './Toast';
 import { formatDateTime } from '../utils/date';
 import Badge from './ui/Badge';
 
@@ -55,9 +56,9 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
       document.body.removeChild(a);
     } catch (e: any) {
       if (e?.response?.status === 403) {
-        alert('无权限访问该附件');
+        toast.error('无权限访问该附件');
       } else {
-        alert('下载失败，请重试');
+        toast.error('下载失败，请重试');
       }
     }
   };

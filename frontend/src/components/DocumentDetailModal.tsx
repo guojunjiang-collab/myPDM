@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Modal } from './Modal';
+import { Modal, ConfirmModal } from './Modal';
 import { Loading } from './Loading';
 import { toast } from './Toast';
 import { useAuthStore, isAdmin as checkIsAdmin } from '../stores/auth';
@@ -67,6 +67,8 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
   const [wuTask, setWuTask] = useState<{ projectId: string; task: any } | null>(null);
   const [wuEco, setWuEco] = useState<string | null>(null);
   const [wuEcr, setWuEcr] = useState<string | null>(null);
+  // 删除迭代确认
+  const [confirmDeleteIter, setConfirmDeleteIter] = useState<{ docId: string; iterId: string; iteration: number } | null>(null);
 
   const effectiveRevisionId = viewingVersionId || revisionId;
   const isViewingOtherVersion = !!viewingVersionId && viewingVersionId !== revisionId;
@@ -316,17 +318,9 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
     }
   };
 
-  const handleDeleteAtt = async (attId: string) => {
-    if (!revisionId || !confirm('确定删除该附件？')) return;
-    try {
-      await documentsApi.deleteAttachment(revisionId, attId);
-      await loadAttachments();
-      toast.success('已删除');
-    } catch (e: any) {
-      const detail = e?.response?.data?.detail;
-      toast.error(typeof detail === 'string' ? detail : '删除失败');
-    }
-  };
+  // 删除附件确认（状态驱动 ConfirmModal）
+  const [confirmDeleteAttId, setConfirmDeleteAttId] = useState<string | null>(null);
+  const handleDeleteAtt = (attId: string) => setConfirmDeleteAttId(attId);
 
   const handleDownload = async (attId: string, fileName: string) => {
     try {
@@ -681,17 +675,9 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                                     </Button>
                                   )}
                                   {it.iteration > 1 && checkIsAdmin() && (
-                                    <Button variant="danger" size="xs" onClick={async () => {
-                                      if (!doc || !confirm(`确定删除迭代 #${it.iteration}？该迭代的附件也将被删除。`)) return;
-                                      try {
-                                        await documentsApi.deleteIteration(doc.id, it.id);
-                                        toast.success('迭代已删除');
-                                        await loadIterations();
-                                        await loadAttachments();
-                                        onSaved();
-                                      } catch (e: any) {
-                                        toast.error(e?.response?.data?.detail || '删除失败');
-                                      }
+                                    <Button variant="danger" size="xs" onClick={() => {
+                                      if (!doc) return;
+                                      setConfirmDeleteIter({ docId: doc.id, iterId: it.id, iteration: it.iteration });
                                     }}>删除</Button>
                                   )}
                                 </div>
@@ -768,6 +754,53 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
       {wuEcr && (
         <ECRDetailModal open={!!wuEcr} ecrId={wuEcr} onClose={() => setWuEcr(null)} onSuccess={() => {}} />
       )}
+
+      {/* 删除附件确认 */}
+      <ConfirmModal
+        open={!!confirmDeleteAttId}
+        title="确认删除"
+        content="确定删除该附件？"
+        confirmText="删除"
+        cancelText="取消"
+        type="danger"
+        onConfirm={async () => {
+          if (!confirmDeleteAttId || !revisionId) return;
+          try {
+            await documentsApi.deleteAttachment(revisionId, confirmDeleteAttId);
+            await loadAttachments();
+            toast.success('已删除');
+          } catch (e: any) {
+            const detail = e?.response?.data?.detail;
+            toast.error(typeof detail === 'string' ? detail : '删除失败');
+          }
+          setConfirmDeleteAttId(null);
+        }}
+        onCancel={() => setConfirmDeleteAttId(null)}
+      />
+
+      {/* 删除迭代确认 */}
+      <ConfirmModal
+        open={!!confirmDeleteIter}
+        title="确认删除"
+        content={confirmDeleteIter ? `确定删除迭代 #${confirmDeleteIter.iteration}？该迭代的附件也将被删除。` : ''}
+        confirmText="删除"
+        cancelText="取消"
+        type="danger"
+        onConfirm={async () => {
+          if (!confirmDeleteIter) return;
+          try {
+            await documentsApi.deleteIteration(confirmDeleteIter.docId, confirmDeleteIter.iterId);
+            toast.success('迭代已删除');
+            await loadIterations();
+            await loadAttachments();
+            onSaved();
+          } catch (e: any) {
+            toast.error(e?.response?.data?.detail || '删除失败');
+          }
+          setConfirmDeleteIter(null);
+        }}
+        onCancel={() => setConfirmDeleteIter(null)}
+      />
     </Modal>
   );
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Modal } from './Modal';
+import { toast } from './Toast';
 import { customFieldsApi, partsApi } from '../services/api';
 import { useDataStore } from '../stores/data';
 import { isAdmin } from '../stores/auth';
@@ -155,7 +156,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
       setPickerOpen(false);
       setPickerTargetId(null);
     } catch {
-      alert('添加子项失败');
+      toast.error('添加子项失败');
     }
   };
 
@@ -164,7 +165,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
       await partsApi.deleteBOMItem(entityId, itemId);
       await loadEditParts(entityId);
     } catch {
-      alert('删除子项失败');
+      toast.error('删除子项失败');
     }
   };
 
@@ -177,7 +178,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
       await partsApi.addBOMItem(entityId, { child_revision_id: selectedVersionId, quantity: item.quantity }, iterationId);
       await loadEditParts(entityId);
     } catch {
-      alert('切换版本失败');
+      toast.error('切换版本失败');
     } finally {
       setVersionSelectState(null);
     }
@@ -187,7 +188,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
     try {
       await partsApi.updateBOMItem(entityId, itemId, { quantity: qty });
     } catch {
-      alert('更新用量失败');
+      toast.error('更新用量失败');
     }
   };
 

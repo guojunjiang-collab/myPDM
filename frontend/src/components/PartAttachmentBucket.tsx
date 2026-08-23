@@ -3,6 +3,8 @@ import api, { partsApi, v2UploadApi, CHUNK_SIZE, CHUNK_THRESHOLD } from '../serv
 import { previewAttachment } from '../utils/attachmentPreview';
 import ArchiveTreeModal from './ArchiveTreeModal';
 import Button from './ui/Button';
+import { ConfirmModal } from './Modal';
+import { toast } from './Toast';
 
 interface PartAttachmentItem {
   id: string;
@@ -68,7 +70,7 @@ export default function PartAttachmentBucket({ revisionId, iterationId, category
     const file = e.target.files?.[0];
     if (!file) return;
     const MAX_ALLOWED = 1073741824;
-    if (file.size > MAX_ALLOWED) { alert('文件大小超过系统限制 1GB'); if (fileInputRef.current) fileInputRef.current.value = ''; return; }
+    if (file.size > MAX_ALLOWED) { toast.error('文件大小超过系统限制 1GB'); if (fileInputRef.current) fileInputRef.current.value = ''; return; }
     setUploading(true); setUploadName(file.name); setProgress(0);
     try {
       if (file.size > CHUNK_THRESHOLD) {
@@ -83,20 +85,16 @@ export default function PartAttachmentBucket({ revisionId, iterationId, category
       }
       await load();
     } catch {
-      alert('上传失败，请重试');
+      toast.error('上传失败，请重试');
     } finally {
       setUploading(false); setUploadName(''); setProgress(0);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  const handleDelete = async (attId: string) => {
-    if (!confirm('确定要删除该附件吗？')) return;
-    setDeletingId(attId);
-    try { await partsApi.deleteAttachment(revisionId, attId); await load(); }
-    catch { alert('删除失败，请重试'); }
-    finally { setDeletingId(null); }
-  };
+  // 删除附件确认（状态驱动 ConfirmModal）
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const handleDelete = (attId: string) => setConfirmDeleteId(attId);
 
   const handlePreview = (att: PartAttachmentItem) => {
     previewAttachment(att.id, att.file_name, { onArchive: (id, name) => setArchivePreview({ attId: id, fileName: name }) });
@@ -111,7 +109,7 @@ export default function PartAttachmentBucket({ revisionId, iterationId, category
       a.download = att.file_name || 'download';
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch { alert('下载失败，请重试'); }
+    } catch { toast.error('下载失败，请重试'); }
   };
 
   const [downloadingAll, setDownloadingAll] = useState(false);
@@ -145,7 +143,7 @@ export default function PartAttachmentBucket({ revisionId, iterationId, category
             ok++;
           } catch { /* 单个失败跳过 */ }
         }
-        alert(`已保存 ${ok} 个${label}到所选文件夹${skip ? `，跳过同名 ${skip} 个` : ''}`);
+        toast.success(`已保存 ${ok} 个${label}到所选文件夹${skip ? `，跳过同名 ${skip} 个` : ''}`);
       } else {
         // 回退：浏览器逐个下载到默认目录（Firefox/Safari 等不支持文件夹选择）
         for (const it of data.items) {
@@ -162,8 +160,8 @@ export default function PartAttachmentBucket({ revisionId, iterationId, category
         }
       }
     } catch (e: any) {
-      if (e?.response?.status === 404) alert(`该部件及子项没有可下载的${label}`);
-      else alert('获取附件清单失败，请重试');
+      if (e?.response?.status === 404) toast.info(`该部件及子项没有可下载的${label}`);
+      else toast.error('获取附件清单失败，请重试');
     } finally {
       setDownloadingAll(false);
     }
@@ -243,6 +241,24 @@ export default function PartAttachmentBucket({ revisionId, iterationId, category
       {archivePreview && (
         <ArchiveTreeModal open={!!archivePreview} onClose={() => setArchivePreview(null)} attachmentId={archivePreview.attId} fileName={archivePreview.fileName} />
       )}
+
+      {/* 删除附件确认 */}
+      <ConfirmModal
+        open={!!confirmDeleteId}
+        title="确认删除"
+        content="确定要删除该附件吗？"
+        confirmText="删除"
+        cancelText="取消"
+        type="danger"
+        onConfirm={async () => {
+          if (!confirmDeleteId) return;
+          setDeletingId(confirmDeleteId);
+          try { await partsApi.deleteAttachment(revisionId, confirmDeleteId); await load(); }
+          catch { toast.error('删除失败，请重试'); }
+          finally { setDeletingId(null); setConfirmDeleteId(null); }
+        }}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

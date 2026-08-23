@@ -4,7 +4,8 @@ import { previewAttachment } from '../utils/attachmentPreview';
 import type { EntityDocument, CustomFieldDefinition, CustomFieldValue, Document, DocumentAttachment } from '../types';
 import { canEdit } from '../stores/auth';
 import { useDataStore } from '../stores/data';
-import { Modal } from './Modal';
+import { Modal, ConfirmModal } from './Modal';
+import { toast } from './Toast';
 import DocumentDetailModal from './DocumentDetailModal';
 import DocumentPicker from './DocumentPicker';
 import VersionSelectModal from './VersionSelectModal';
@@ -123,7 +124,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
       await load();
       setPickerOpen(false);
     } catch {
-      alert('关联图文档失败');
+      toast.error('关联图文档失败');
     }
   };
 
@@ -132,7 +133,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
       await entityDocumentsApi.remove(entityType, entityId, edocId);
       await load();
     } catch {
-      alert('移除关联失败');
+      toast.error('移除关联失败');
     }
   };
 
@@ -146,7 +147,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
       await entityDocumentsApi.add(entityType, entityId, { document_id: selectedVersionId });
       await load();
     } catch {
-      alert('切换版本失败');
+      toast.error('切换版本失败');
     } finally {
       setVersionSelectState(null);
     }
@@ -162,7 +163,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
       a.click();
       document.body.removeChild(a);
     } catch {
-      alert('下载失败，请重试');
+      toast.error('下载失败，请重试');
     }
   };
 
@@ -224,7 +225,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
     const file = e.target.files?.[0];
     if (!file || !editingDoc) return;
     const MAX_ALLOWED = 1073741824;
-    if (file.size > MAX_ALLOWED) { alert(`文件大小超过系统限制 1GB`); if (editFileInputRef.current) editFileInputRef.current.value = ''; return; }
+    if (file.size > MAX_ALLOWED) { toast.error(`文件大小超过系统限制 1GB`); if (editFileInputRef.current) editFileInputRef.current.value = ''; return; }
     setEditUploading(true); setEditUploadFileName(file.name); setEditUploadProgress(0);
     try {
       if (file.size > CHUNK_THRESHOLD) {
@@ -233,7 +234,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
         await v2UploadApi.uploadSmallFile(file, 'documents', editingDoc.id, (p) => setEditUploadProgress(p));
       }
       await loadEditAttachments(editingDoc.id);
-    } catch { alert('上传失败，请重试'); }
+    } catch { toast.error('上传失败，请重试'); }
     finally { setEditUploading(false); setEditUploadFileName(''); setEditUploadProgress(0); if (editFileInputRef.current) editFileInputRef.current.value = ''; }
   };
 
@@ -251,13 +252,9 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
     setEditUploadProgress(100);
   };
 
-  const handleEditDeleteAttachment = async (attId: string) => {
-    if (!editingDoc || !confirm('确定要删除该附件吗？')) return;
-    setEditDeletingAttId(attId);
-    try { await documentsApi.deleteAttachment(editingDoc.id, attId); await loadEditAttachments(editingDoc.id); }
-    catch { alert('删除失败，请重试'); }
-    finally { setEditDeletingAttId(null); }
-  };
+  // 删除编辑弹窗附件确认（状态驱动 ConfirmModal）
+  const [confirmDeleteAttId, setConfirmDeleteAttId] = useState<string | null>(null);
+  const handleEditDeleteAttachment = (attId: string) => setConfirmDeleteAttId(attId);
 
   const handleEditSave = async () => {
     if (!editingDoc) return;
@@ -590,6 +587,24 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
           fileName={archivePreview.fileName}
         />
       )}
+
+      {/* 删除编辑弹窗附件确认 */}
+      <ConfirmModal
+        open={!!confirmDeleteAttId}
+        title="确认删除"
+        content="确定要删除该附件吗？"
+        confirmText="删除"
+        cancelText="取消"
+        type="danger"
+        onConfirm={async () => {
+          if (!confirmDeleteAttId || !editingDoc) return;
+          setEditDeletingAttId(confirmDeleteAttId);
+          try { await documentsApi.deleteAttachment(editingDoc.id, confirmDeleteAttId); await loadEditAttachments(editingDoc.id); }
+          catch { toast.error('删除失败，请重试'); }
+          finally { setEditDeletingAttId(null); setConfirmDeleteAttId(null); }
+        }}
+        onCancel={() => setConfirmDeleteAttId(null)}
+      />
     </div>
   );
 }

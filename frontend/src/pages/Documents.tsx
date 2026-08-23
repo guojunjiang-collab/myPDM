@@ -159,7 +159,7 @@ export default function Documents() {
       setItems(prev => prev.filter(d => d.id !== deleteId));
       setRefreshToken(t => t + 1);
     } catch (error) {
-      alert('删除失败');
+      toast.error('删除失败');
     }
   };
 
@@ -416,7 +416,7 @@ export default function Documents() {
                     const res = await documentsApi.detail(id);
                     handleView(res.data);
                   } catch {
-                    alert('加载版本失败');
+                    toast.error('加载版本失败');
                   }
                 }}
               />
