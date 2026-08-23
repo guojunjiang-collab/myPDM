@@ -672,7 +672,7 @@ export default function Projects() {
                     placeholder="搜索任务..."
                     value={taskSearch}
                     onChange={(e) => setTaskSearch(e.target.value)}
-                    className="flex-1 min-w-0"
+                    className="w-64 shrink-0"
                   />
                   <Select className="!w-auto" value={taskStatusFilter} onChange={(e) => setTaskStatusFilter(e.target.value)}>
                     <option value="">全部状态</option>
