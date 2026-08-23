@@ -573,7 +573,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                               }
                             };
                             return (
-                              <div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                              <div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                                 <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{def.name}</div>
                                 <CustomFieldInput
                                   def={def}
@@ -807,7 +807,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
 
 function InfoCard({ label, readonly, children }: { label: string; readonly: boolean; children: React.ReactNode }) {
   return (
-    <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+    <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
       <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{label}</div>
       {children}
     </div>

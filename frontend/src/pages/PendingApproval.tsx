@@ -32,7 +32,7 @@ export default function PendingApproval() {
 
   return (
     <div className="min-h-screen bg-[var(--ui-bg-subtle)] flex items-center justify-center">
-      <div className="bg-[var(--ui-bg-surface)] rounded-xl shadow-sm p-10 max-w-md w-full text-center border border-gray-100">
+      <div className="bg-[var(--ui-bg-surface)] rounded-xl shadow-sm p-10 max-w-md w-full text-center border border-[var(--ui-border)]">
         <div className="text-5xl mb-4">&#x23F3;</div>
         <h1 className="text-xl font-semibold text-gray-800 mb-2">等待审批</h1>
         <p className="text-[var(--ui-text-secondary)] text-sm leading-relaxed mb-8">

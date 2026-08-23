@@ -395,12 +395,12 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
 
         {/* 基本字段 - 卡片式 */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
             <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">ECO 编号</label>
             <Input size="xs" type="text" value={localEco?.eco_number || ''} disabled
               placeholder="新建时自动生成" />
           </div>
-          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
             <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">标题 <span className="text-red-500">*</span></label>
             <Input size="xs" type="text" value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -411,7 +411,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
             <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">变更原因 <span className="text-red-500">*</span></label>
             <Select size="xs" value={reason} onChange={(e) => setReason(e.target.value)}
               className={errors.reason ? '!border-red-400' : ''}>
@@ -419,13 +419,13 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
             </Select>
             {errors.reason && <p className="text-red-500 text-xs mt-1">{errors.reason}</p>}
           </div>
-          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
             <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">变更类别</label>
             <Select size="xs" value={category} onChange={(e) => setCategory(e.target.value)}>
               {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </Select>
           </div>
-          <div className="col-span-2 md:col-span-1 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+          <div className="col-span-2 md:col-span-1 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
             <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">优先级</label>
             <div className="flex gap-2 pt-0.5 flex-wrap">
               {PRIORITY_OPTIONS.map((o) => (
@@ -437,7 +437,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
               ))}
             </div>
           </div>
-          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
             <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">审批模式</label>
             <Select size="xs" value={reviewMode} onChange={(e) => setReviewMode(e.target.value)}>
               <option value="all">会签（全部通过）</option>
@@ -446,7 +446,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
           </div>
         </div>
 
-        <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+        <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
           <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">变更描述</label>
           <Textarea size="xs" ref={descRef} value={description} onChange={(e) => setDescription(e.target.value)}
             onInput={(e) => { e.currentTarget.style.height = 'auto'; e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px'; }}

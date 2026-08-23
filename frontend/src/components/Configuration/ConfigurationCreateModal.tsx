@@ -390,24 +390,24 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
 
         {/* 基本信息 */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
             <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">构型号 *</label>
             <Input size="xs" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })}
               className="placeholder:text-gray-300" placeholder="如 CFG-001" />
           </div>
-          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
             <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">中文名称 *</label>
             <Input size="xs" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
               className="placeholder:text-gray-300" placeholder="如 A型机翼构型" />
           </div>
           {item && (
-            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
               <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">创建人</label>
               <div className="text-sm text-gray-700 py-1">{creatorName || '-'}</div>
             </div>
           )}
           {isEdit && (
-            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100 col-span-2 md:col-span-4">
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)] col-span-2 md:col-span-4">
               <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">创建者</label>
               <div className="text-sm text-gray-700 py-1">{creatorName || '-'}</div>
             </div>
@@ -420,7 +420,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
             <h4 className="text-sm font-bold text-gray-700 mb-2">自定义字段</h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {cfDefs.map(def => (
-                <div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                <div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                   <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">
                     {def.name}
                     {def.is_required && <span className="text-red-500 ml-0.5">*</span>}

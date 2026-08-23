@@ -783,7 +783,7 @@ export default function Projects() {
                                       onDrop={(e) => handleDrop(t, e)}
                                       onClick={() => openEdit(t)}
                                       onMouseEnter={() => setHoveredId(t.id)}
-                                      className={`flex items-center border-b border-gray-100 text-sm ${hoveredId === t.id ? 'bg-primary-50' : ''} ${overdue ? 'bg-red-50' : ''} cursor-pointer ${isDragInto ? 'bg-blue-50 ring-2 ring-primary-300 ring-inset' : ''} ${isDragging ? 'opacity-40' : ''}`}
+                                      className={`flex items-center border-b border-[var(--ui-border)] text-sm ${hoveredId === t.id ? 'bg-primary-50' : ''} ${overdue ? 'bg-red-50' : ''} cursor-pointer ${isDragInto ? 'bg-blue-50 ring-2 ring-primary-300 ring-inset' : ''} ${isDragging ? 'opacity-40' : ''}`}
                                       style={{ height: 36 }}>
                                       <span className="px-2 shrink-0 truncate" style={{ width: 64 }}>{t.priority}</span>
                                       <span className="px-2 shrink-0 truncate text-[var(--ui-text-secondary)]" style={{ width: 100 }}>{t.planned_start || '—'}</span>
@@ -860,7 +860,7 @@ export default function Projects() {
       <Modal open={createOpen} title={editingProject ? '编辑项目' : '新建项目'} onClose={() => { setCreateOpen(false); setEditingProject(null); }} width="lg">
         <div className="space-y-4 max-h-[75vh] overflow-y-auto px-1">
           <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <div className="col-span-2 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
               <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">项目名称 <span className="text-red-500">*</span></label>
               <Input size="xs"
                 value={form.name}
@@ -869,7 +869,7 @@ export default function Projects() {
               />
             </div>
             {editingProject && (
-              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                 <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">状态</label>
                 <Select size="xs"
                   value={form.status}
@@ -880,7 +880,7 @@ export default function Projects() {
               </div>
             )}
             {editingProject && (
-              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                 <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">负责人</label>
                 <Select size="xs"
                   value={form.owner_id}
@@ -890,7 +890,7 @@ export default function Projects() {
                 </Select>
               </div>
             )}
-            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
               <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">计划开始</label>
               <Input size="xs"
                 type="date"
@@ -898,7 +898,7 @@ export default function Projects() {
                 onChange={(e) => setForm({ ...form, planned_start: e.target.value })}
               />
             </div>
-            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
               <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">计划完成</label>
               <Input size="xs"
                 type="date"
@@ -906,7 +906,7 @@ export default function Projects() {
                 onChange={(e) => setForm({ ...form, planned_end: e.target.value })}
               />
             </div>
-            <div className="col-span-2 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <div className="col-span-2 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
               <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">描述</label>
               <Textarea size="xs"
                 value={form.description}

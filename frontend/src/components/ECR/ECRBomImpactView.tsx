@@ -215,7 +215,7 @@ export function ECRBomImpactView({
   );
 
   const thClass = 'px-2 py-2 text-left text-xs font-semibold text-[var(--ui-text-secondary)] border-b border-[var(--ui-border)] whitespace-nowrap';
-  const tdClass = 'px-2 py-1.5 text-xs text-gray-700 border-b border-gray-100';
+  const tdClass = 'px-2 py-1.5 text-xs text-gray-700 border-b border-[var(--ui-border)]';
 
   // ── Render ─────────────────────────────────────────────────────
   return (
@@ -396,7 +396,7 @@ export function ECRBomImpactView({
       )}
 
       {/* Summary */}
-      <div className="text-xs text-[var(--ui-text-secondary)] pt-2 border-t border-gray-100">
+      <div className="text-xs text-[var(--ui-text-secondary)] pt-2 border-t border-[var(--ui-border)]">
         <span className="font-semibold text-gray-800">结论：</span>
         {(() => {
           const upParents = upwardChain.filter((n) => n.level !== 0 && !n.is_change_target);

@@ -505,27 +505,27 @@ export default function Settings() {
             <Modal open={!!viewingField} title="字段详情" onClose={() => setViewingField(null)} width="md">
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                     <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">名称</div>
                     <div className="text-sm font-medium">{viewingField.name}</div>
                   </div>
-                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                     <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">标识</div>
                     <div className="text-sm font-mono">{viewingField.field_key}</div>
                   </div>
-                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                     <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">类型</div>
                     <div className="text-sm">{FIELD_TYPES.find(t => t.value === viewingField.field_type)?.label || viewingField.field_type}</div>
                   </div>
-                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                     <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">排序</div>
                     <div className="text-sm">{viewingField.sort_order}</div>
                   </div>
-                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                     <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">必填</div>
                     <div className="text-sm">{viewingField.is_required ? '是' : '否'}</div>
                   </div>
-                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                     <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">适用类型</div>
                     <div className="text-sm flex gap-1 flex-wrap">
                       {(Array.isArray(viewingField.applies_to) ? viewingField.applies_to : [viewingField.applies_to]).map((type) => (
@@ -534,7 +534,7 @@ export default function Settings() {
                     </div>
                   </div>
                   {viewingField.options && viewingField.options.length > 0 && (
-                    <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100 col-span-2">
+                    <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)] col-span-2">
                       <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">选项列表</div>
                       <div className="text-sm">{viewingField.options.join('、')}</div>
                     </div>
@@ -719,7 +719,7 @@ export default function Settings() {
       >
         <form onSubmit={handleSubmitField} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
               <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">字段名称</label>
               <Input
                 type="text"
@@ -729,7 +729,7 @@ export default function Settings() {
                 placeholder="例如：采购周期"
               />
             </div>
-            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
               <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">字段标识</label>
               <Input
                 type="text"
@@ -742,7 +742,7 @@ export default function Settings() {
               />
               <p className="mt-1 text-xs text-[var(--ui-text-tertiary)]">创建后不可修改，用于API字段映射</p>
             </div>
-            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
               <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">字段类型</label>
               <Select
                 value={formData.field_type}
@@ -754,7 +754,7 @@ export default function Settings() {
                 ))}
               </Select>
             </div>
-            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
               <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">排序序号</label>
               <Input
                 type="number"
@@ -766,7 +766,7 @@ export default function Settings() {
               <p className="mt-1 text-xs text-[var(--ui-text-tertiary)]">越小越靠前</p>
             </div>
             {(formData.field_type === 'select' || formData.field_type === 'multiselect') && (
-              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100 col-span-2">
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)] col-span-2">
                 <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">选项</label>
                 <Textarea
                   value={formData.options}
@@ -778,7 +778,7 @@ export default function Settings() {
                 />
               </div>
             )}
-            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100 col-span-2">
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)] col-span-2">
               <label className="block text-xs text-[var(--ui-text-secondary)] mb-1">适用类型</label>
               <div className="flex gap-4">
                 {ENTITY_TYPES.map((type) => (

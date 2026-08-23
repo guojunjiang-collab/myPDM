@@ -293,7 +293,7 @@ export function CompareTreePanel() {
 
   return (
     <div className="flex flex-col h-full bg-[var(--ui-bg-surface)] border-r border-[var(--ui-border)]">
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-100">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-[var(--ui-border)]">
         <span className="text-sm font-semibold text-[var(--ui-text-secondary)]">BOM 对比树</span>
         <button
           onClick={() => selectCompareKey(null)}

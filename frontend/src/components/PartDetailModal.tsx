@@ -553,33 +553,33 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 shrink-0 mb-3">
               {canEdit ? (
                 <>
-                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                     <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">件号</div>
                     <Input size="xs" type="text" value={editMaster.code}
                       onChange={(e) => { setEditMaster(p => ({...p, code: e.target.value})); autoSaveMaster({code: e.target.value}); }}
                       className="font-mono" />
                   </div>
-                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                     <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">名称</div>
                     <Input size="xs" type="text" value={editMaster.name}
                       onChange={(e) => { setEditMaster(p => ({...p, name: e.target.value})); autoSaveMaster({name: e.target.value}); }} />
                   </div>
-                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                     <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">类型</div>
                     <div className="text-sm text-[var(--ui-text-primary)] font-medium">{master?.type === 'assembly' ? '部件' : '零件'}</div>
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                     <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">件号</div>
                     <div className="text-sm text-[var(--ui-text-primary)] font-medium font-mono">{master?.code}</div>
                   </div>
-                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                     <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">名称</div>
                     <div className="text-sm text-[var(--ui-text-primary)] font-medium">{master?.name}</div>
                   </div>
-                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                     <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">类型</div>
                     <div className="text-sm text-[var(--ui-text-primary)] font-medium">{master?.type === 'assembly' ? '部件' : '零件'}</div>
                   </div>
@@ -679,7 +679,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                     {!viewingIterationId && canEdit ? (
                       <>
                         <div>
-                          <h4 className="text-sm font-semibold mb-2">自定义字段</h4>
+                          <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">自定义字段</h4>
                           <div className="grid grid-cols-3 gap-3">
                             {cfDefs.length === 0 ? (
                               <div className="text-[var(--ui-text-tertiary)] text-sm col-span-3">无</div>
@@ -692,7 +692,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                                   debouncedCfSave(newVals);
                                 };
                                 return (
-                                  <div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                                  <div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                                     <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{def.name}</div>
                                     {def.field_type === 'select' ? (
                                       <Select size="xs"
@@ -732,7 +732,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                     ) : (
                       <>
                         <div>
-                          <h4 className="text-sm font-semibold mb-2">自定义字段</h4>
+                          <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">自定义字段</h4>
                           <div className="grid grid-cols-3 gap-3">
                             {cfDefs.length === 0 ? (
                               <div className="text-[var(--ui-text-tertiary)] text-sm col-span-3">无</div>
@@ -740,7 +740,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                               cfDefs.map((def: any) => {
                                 const val = cfEditValues[def.id];
                                 return (
-                                  <div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                                  <div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                                     <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{def.name}</div>
                                     <div className="text-sm">{val !== undefined && val !== null ? String(val) : '—'}</div>
                                   </div>
@@ -836,7 +836,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
 
                 {activeTab === 'versions' && (
                   <>
-                    <p className="text-sm text-[var(--ui-text-secondary)] px-4 py-2 border-b border-gray-100">
+                    <p className="text-sm text-[var(--ui-text-secondary)] px-4 py-2 border-b border-[var(--ui-border)]">
                       勾选两个版本进行 BOM 对比（当前版本默认已选）
                     </p>
                     <table className="w-full text-sm">

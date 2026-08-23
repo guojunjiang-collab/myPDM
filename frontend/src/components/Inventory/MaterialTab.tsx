@@ -7,6 +7,7 @@ import { canEdit, isAdmin } from '../../stores/auth';
 import { Modal, ConfirmModal } from '../Modal';
 import { toast } from '../Toast';
 import Badge from '../ui/Badge';
+import Alert from '../ui/Alert';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
@@ -15,7 +16,7 @@ import PartDetailModal from '../PartDetailModal';
 import type { InvMaterial } from '../../types';
 
 // ECR 式卡片字段样式
-const cardCls = 'bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100';
+const cardCls = 'bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]';
 const cardLabelCls = 'block text-xs text-[var(--ui-text-secondary)] mb-0.5';
 
 export default function MaterialTab() {
@@ -75,12 +76,22 @@ export default function MaterialTab() {
     }
   }, [pdmMode, syncAll]);
 
+  // 保存 loading/错误（阶段2c 补缺口）
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const saveStandalone = async () => {
     if (!editing) return;
-    if (editing.id) await inventoryApi.updateMaterial(editing.id, editing);
-    else await inventoryApi.createMaterial(editing);
-    setEditing(null);
-    await reload();
+    setSaving(true); setSaveError(null);
+    try {
+      if (editing.id) await inventoryApi.updateMaterial(editing.id, editing);
+      else await inventoryApi.createMaterial(editing);
+      setEditing(null);
+      await reload();
+    } catch (err: any) {
+      setSaveError(err?.response?.data?.detail || '保存失败，请重试');
+    } finally {
+      setSaving(false);
+    }
   };
 
   // 打开弹窗或关键词变化时，直接向后端查询 PDM 零部件（防抖）
@@ -202,6 +213,7 @@ export default function MaterialTab() {
       <Modal open={!!editing} title={editing?.id ? '编辑物料' : '新建物料'} onClose={() => setEditing(null)} width="3xl">
         {editing && (
           <div className="space-y-4">
+            {saveError && <Alert tone="danger">{saveError}</Alert>}
             <div className="grid grid-cols-2 gap-3">
               {editingIsPdm ? (
                 <div className="col-span-2">
@@ -276,8 +288,8 @@ export default function MaterialTab() {
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-1 border-t border-[var(--ui-border)]">
-              <Button variant="secondary" className="mt-3" onClick={() => setEditing(null)}>取消</Button>
-              <Button className="mt-3" onClick={saveStandalone}>保存</Button>
+              <Button variant="secondary" className="mt-3" onClick={() => setEditing(null)} disabled={saving}>取消</Button>
+              <Button className="mt-3" onClick={saveStandalone} disabled={saving}>{saving ? '保存中...' : '保存'}</Button>
             </div>
           </div>
         )}

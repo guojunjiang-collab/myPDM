@@ -3,6 +3,8 @@ import { useInventoryStore } from '../../stores/inventory';
 import { inventoryApi } from '../../services/inventoryApi';
 import { canEdit, isAdmin } from '../../stores/auth';
 import { Modal, ConfirmModal } from '../Modal';
+import FormModal from '../ui/FormModal';
+import FormField from '../ui/FormField';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
@@ -21,6 +23,9 @@ export default function WarehouseTab() {
   const [editing, setEditing] = useState<Partial<Warehouse> | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // 保存 loading/错误（阶段2c 补缺口）
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const reload = async () => {
     setLoading(true);
@@ -30,10 +35,17 @@ export default function WarehouseTab() {
 
   const save = async () => {
     if (!editing) return;
-    if (editing.id) await inventoryApi.updateWarehouse(editing.id, editing);
-    else await inventoryApi.createWarehouse(editing);
-    setEditing(null);
-    await reload();
+    setSaving(true); setSaveError(null);
+    try {
+      if (editing.id) await inventoryApi.updateWarehouse(editing.id, editing);
+      else await inventoryApi.createWarehouse(editing);
+      setEditing(null);
+      await reload();
+    } catch (err: any) {
+      setSaveError(err?.response?.data?.detail || '保存失败，请重试');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -95,29 +107,33 @@ export default function WarehouseTab() {
         </table>
       </div>
 
-      {/* 新建/编辑弹窗 */}
-      <Modal open={!!editing} title={editing?.id ? '编辑仓库' : '新建仓库'} onClose={() => setEditing(null)} width="md">
+      {/* 新建/编辑弹窗（FormModal + FormField 统一 label/footer/saving/error） */}
+      <FormModal
+        open={!!editing}
+        title={editing?.id ? '编辑仓库' : '新建仓库'}
+        onClose={() => setEditing(null)}
+        width="md"
+        onSubmit={save}
+        saving={saving}
+        error={saveError}
+      >
         {editing && (
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm text-[var(--ui-text-secondary)] mb-1">编码</label>
+          <>
+            <FormField label="编码" required>
               <Input placeholder="仓库编码" value={editing.code || ''} disabled={!!editing.id}
                 onChange={(e) => setEditing({ ...editing, code: e.target.value })} />
-            </div>
-            <div>
-              <label className="block text-sm text-[var(--ui-text-secondary)] mb-1">名称</label>
+            </FormField>
+            <FormField label="名称" required>
               <Input placeholder="仓库名称" value={editing.name || ''}
                 onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
-            </div>
-            <div>
-              <label className="block text-sm text-[var(--ui-text-secondary)] mb-1">类型</label>
+            </FormField>
+            <FormField label="类型">
               <Select value={editing.type || 'general'}
                 onChange={(e) => setEditing({ ...editing, type: e.target.value })}>
                 {WH_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
               </Select>
-            </div>
-            <div>
-              <label className="block text-sm text-[var(--ui-text-secondary)] mb-1">默认库管员</label>
+            </FormField>
+            <FormField label="默认库管员">
               <Select value={editing.default_keeper_id || ''}
                 onChange={(e) => setEditing({ ...editing, default_keeper_id: e.target.value || null })}>
                 <option value="">（无默认库管员）</option>
@@ -125,14 +141,10 @@ export default function WarehouseTab() {
                   <option key={u.id} value={u.id}>{u.real_name}</option>
                 ))}
               </Select>
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="secondary" onClick={() => setEditing(null)}>取消</Button>
-              <Button onClick={save}>保存</Button>
-            </div>
-          </div>
+            </FormField>
+          </>
         )}
-      </Modal>
+      </FormModal>
 
       {/* 删除确认 */}
       <ConfirmModal

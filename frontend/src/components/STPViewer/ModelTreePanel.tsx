@@ -138,7 +138,7 @@ export function ModelTreePanel() {
   return (
     <div className="flex flex-col h-full bg-[var(--ui-bg-surface)] border-r border-[var(--ui-border)]">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-100">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-[var(--ui-border)]">
         <span className="text-sm font-semibold text-[var(--ui-text-secondary)] uppercase tracking-wider">模型树</span>
         <button
           onClick={() => selectNode(null)}
@@ -149,7 +149,7 @@ export function ModelTreePanel() {
       </div>
 
       {/* Isolate mode toggle */}
-      <label className="flex items-center justify-between px-3 py-1.5 border-b border-gray-100 cursor-pointer select-none hover:bg-[var(--ui-bg-hover)] transition-colors">
+      <label className="flex items-center justify-between px-3 py-1.5 border-b border-[var(--ui-border)] cursor-pointer select-none hover:bg-[var(--ui-bg-hover)] transition-colors">
         <span className="text-sm text-[var(--ui-text-secondary)]">隔离模式</span>
         <div className="relative">
           <input

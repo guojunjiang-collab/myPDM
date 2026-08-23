@@ -8,6 +8,8 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
+import FormField from '../components/ui/FormField';
+import Alert from '../components/ui/Alert';
 import { useTableSort } from '../hooks/useTableSort';
 import { formatDateTime } from '../utils/date';
 
@@ -206,19 +208,29 @@ export default function Users() {
     }
   };
 
+  // 保存用户组 loading/错误（阶段2c 补缺口）
+  const [groupSaving, setGroupSaving] = useState(false);
+  const [groupError, setGroupError] = useState<string | null>(null);
   const saveGroup = async () => {
-    let groupId = editingGroup?.id || '';
-    if (editingGroup) {
-      await userGroupsApi.update(editingGroup.id, groupForm);
-    } else {
-      const res = await userGroupsApi.create(groupForm);
-      groupId = (res.data as any)?.id || '';
+    setGroupSaving(true); setGroupError(null);
+    try {
+      let groupId = editingGroup?.id || '';
+      if (editingGroup) {
+        await userGroupsApi.update(editingGroup.id, groupForm);
+      } else {
+        const res = await userGroupsApi.create(groupForm);
+        groupId = (res.data as any)?.id || '';
+      }
+      if (groupId) {
+        await userGroupsApi.setMembers(groupId, memberSelectedIds);
+      }
+      setGroupModalOpen(false);
+      await loadGroups();
+    } catch (err: any) {
+      setGroupError(err?.response?.data?.detail || '保存失败，请重试');
+    } finally {
+      setGroupSaving(false);
     }
-    if (groupId) {
-      await userGroupsApi.setMembers(groupId, memberSelectedIds);
-    }
-    setGroupModalOpen(false);
-    await loadGroups();
   };
 
   // 删除用户组确认（状态驱动 ConfirmModal）
@@ -346,8 +358,7 @@ export default function Users() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* 用户名（仅新增） */}
           {!editingUser && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">用户名 <span className="text-red-500">*</span></label>
+            <FormField label="用户名" required>
               <Input
                 type="text"
                 value={formData.username}
@@ -357,32 +368,26 @@ export default function Users() {
                 maxLength={64}
                 placeholder="3-64个字符"
               />
-              {editingUser && (
-                <p className="text-xs text-[var(--ui-text-tertiary)] mt-1">用户名不可修改</p>
-              )}
-            </div>
+            </FormField>
           )}
 
           {editingUser && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">用户名</label>
+            <FormField label="用户名">
               <Input type="text" value={formData.username} disabled />
-            </div>
+            </FormField>
           )}
 
           {/* 姓名 + 角色 */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">姓名 <span className="text-red-500">*</span></label>
+            <FormField label="姓名" required>
               <Input
                 type="text"
                 value={formData.real_name}
                 onChange={(e) => setFormData({ ...formData, real_name: e.target.value })}
                 required
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">角色 <span className="text-red-500">*</span></label>
+            </FormField>
+            <FormField label="角色" required>
               <Select
                 value={formData.role}
                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
@@ -392,33 +397,30 @@ export default function Users() {
                 <option value="production">生产人员</option>
                 <option value="guest">访客</option>
               </Select>
-            </div>
+            </FormField>
           </div>
 
           {/* 部门 + 电话 */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">部门</label>
+            <FormField label="部门">
               <Input
                 type="text"
                 value={formData.department}
                 onChange={(e) => setFormData({ ...formData, department: e.target.value })}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">电话</label>
+            </FormField>
+            <FormField label="电话">
               <Input
                 type="text"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               />
-            </div>
+            </FormField>
           </div>
 
           {/* 状态（仅编辑） */}
           {editingUser && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">状态</label>
+            <FormField label="状态">
               <Select
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
@@ -426,13 +428,12 @@ export default function Users() {
                 <option value="active">正常</option>
                 <option value="disabled">禁用</option>
               </Select>
-            </div>
+            </FormField>
           )}
 
           {/* 所属组 */}
           {isAdmin() && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">所属组</label>
+            <FormField label="所属组">
               <div className="max-h-32 overflow-auto border border-[var(--ui-border)] rounded p-2">
                 {groups.length === 0 && <span className="text-[var(--ui-text-tertiary)] text-sm">暂无用户组</span>}
                 {groups.map((g) => (
@@ -447,14 +448,11 @@ export default function Users() {
                   </label>
                 ))}
               </div>
-            </div>
+            </FormField>
           )}
 
           {/* 密码 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              密码 {editingUser ? '' : <span className="text-red-500">*</span>}
-            </label>
+          <FormField label="密码" required={!editingUser}>
             <Input
               type="password"
               value={formData.password}
@@ -463,12 +461,10 @@ export default function Users() {
               placeholder={editingUser ? '留空则不修改密码' : '至少6个字符'}
               {...((!editingUser) ? { required: true } : {})}
             />
-          </div>
+          </FormField>
 
           {saveError && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
-              {saveError}
-            </div>
+            <Alert tone="danger">{saveError}</Alert>
           )}
 
           <div className="flex justify-end gap-2 pt-4 border-t">
@@ -625,8 +621,7 @@ export default function Users() {
       <Modal open={groupModalOpen} title={editingGroup ? '编辑用户组' : '新建用户组'} onClose={() => setGroupModalOpen(false)} width="lg">
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">名称 <span className="text-red-500">*</span></label>
+            <FormField label="名称" required card>
               <Input
                 type="text"
                 value={groupForm.name}
@@ -635,9 +630,8 @@ export default function Users() {
                 required
                 maxLength={64}
               />
-            </div>
-            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">描述</label>
+            </FormField>
+            <FormField label="描述" card>
               <Input
                 type="text"
                 value={groupForm.description}
@@ -645,10 +639,11 @@ export default function Users() {
                 size="xs"
                 maxLength={255}
               />
-            </div>
+            </FormField>
           </div>
+          {groupError && <Alert tone="danger">{groupError}</Alert>}
           <div className="border-t pt-3">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">成员</h4>
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">成员</h4>
             <Input
               type="text"
               placeholder="搜索用户..."
@@ -683,8 +678,8 @@ export default function Users() {
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button type="button" onClick={() => setGroupModalOpen(false)} variant="secondary">取消</Button>
-            <Button type="button" onClick={saveGroup}>保存</Button>
+            <Button type="button" onClick={() => setGroupModalOpen(false)} variant="secondary" disabled={groupSaving}>取消</Button>
+            <Button type="button" onClick={saveGroup} disabled={groupSaving}>{groupSaving ? '保存中...' : '保存'}</Button>
           </div>
         </div>
       </Modal>
@@ -697,21 +692,21 @@ export default function Users() {
           <Modal open={!!viewingGroupId} title="用户组详情" onClose={() => setViewingGroupId(null)} width="md">
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                   <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">名称</div>
                   <div className="text-sm font-medium">{g?.name || '-'}</div>
                 </div>
-                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                   <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">成员数</div>
                   <div className="text-sm font-medium">{viewingGroupMembers.length}</div>
                 </div>
-                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100 col-span-2">
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)] col-span-2">
                   <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">描述</div>
                   <div className="text-sm">{g?.description || '-'}</div>
                 </div>
               </div>
               <div className="border-t pt-3">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">成员列表</h4>
+                <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">成员列表</h4>
                 {memberUsers.length === 0 ? (
                   <div className="text-sm text-[var(--ui-text-tertiary)] py-4 text-center border border-dashed border-gray-300 rounded-lg">暂无成员</div>
                 ) : (

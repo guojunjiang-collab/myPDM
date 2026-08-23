@@ -19,7 +19,7 @@ const DOC_LABELS: Record<InvDocType, string> = {
 };
 
 // ECR 式卡片字段样式
-const cardCls = 'bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100';
+const cardCls = 'bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]';
 const cardLabelCls = 'block text-xs text-[var(--ui-text-secondary)] mb-0.5';
 
 export default function DocumentEditModal({ docType, onClose, onSaved }:

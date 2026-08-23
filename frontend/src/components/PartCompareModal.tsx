@@ -173,7 +173,7 @@ function PartPicker({ label, valueId, onPick, onSearch, filterType }: {
                 key={o.revision_id}
                 type="button"
                 onMouseDown={() => { onPick(o.revision_id, o); setSelected(o); setOpen(false); }}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--ui-bg-hover)] border-b border-gray-100 last:border-b-0 flex items-center gap-2"
+                className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--ui-bg-hover)] border-b border-[var(--ui-border)] last:border-b-0 flex items-center gap-2"
               >
                 <span className="font-medium">{o.code}</span>
                 <span className="text-[var(--ui-text-secondary)] truncate">{o.name}</span>
@@ -493,7 +493,7 @@ export default function PartCompareModal({
                       const depth = n.level + 1;
                       const indent = `calc(8px + ${depth} * var(--ui-tree-indent))`;
                       return (
-                        <tr key={n.key} className={`${rowBg[n.change_type]} border-b border-gray-100 cursor-pointer hover:brightness-95`}
+                        <tr key={n.key} className={`${rowBg[n.change_type]} border-b border-[var(--ui-border)] cursor-pointer hover:brightness-95`}
                           onClick={() => {
                             const side = n.right || n.left;
                             if (side?.child_master_id && side?.child_revision_id) {

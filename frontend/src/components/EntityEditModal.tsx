@@ -324,25 +324,25 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
             </div>
           )}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
               <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">件号</label>
               <Input size="xs" type="text" value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value })} disabled={!(isAdmin() && formData.version === 'A')} title={isAdmin() ? (formData.version === 'A' ? '管理员可修改件号' : '仅 A 版允许修改件号，升版后的版本不可改') : undefined} />
             </div>
-            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
               <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">中文名称 <span className="text-red-500">*</span></label>
               <Input size="xs" type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} disabled={locked} required />
             </div>
-            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
               <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">版本</label>
               <Input size="xs" type="text" value={formData.version} disabled />
             </div>
-            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
               <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">状态</label>
               <Select size="xs" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })} disabled={locked}>
                 {STATUS_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
               </Select>
             </div>
-            <div className="col-span-2 md:col-span-2 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <div className="col-span-2 md:col-span-2 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
               <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">规格型号</label>
               <Textarea size="xs" ref={specRef} value={formData.spec} onChange={e => setFormData({ ...formData, spec: e.target.value })} disabled={locked} onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }} className="resize-none" rows={1} />
             </div>
@@ -357,7 +357,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {customFieldDefs.map(def => (
-                    <div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                    <div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                       <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">
                         {def.name}
                         {def.is_required && <span className="text-red-500 ml-1">*</span>}

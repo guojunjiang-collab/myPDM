@@ -835,7 +835,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
               </div>
             ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                 <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">编号 {isCreate && '*'}</label>
                 <Input size="xs"
                   value={form.code}
@@ -845,7 +845,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                   placeholder="如 CFG-PROFILE-001"
                 />
               </div>
-              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                 <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">名称 {isCreate && '*'}</label>
                 <Input size="xs"
                   value={form.name}
@@ -855,7 +855,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                   placeholder="如 A型机翼配置"
                 />
               </div>
-              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                 <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">架次起始</label>
                 <Input size="xs"
                   value={form.effectivity_start}
@@ -865,7 +865,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                   placeholder="如 001"
                 />
               </div>
-              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                 <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">架次结束</label>
                 <Input size="xs"
                   value={form.effectivity_end}
@@ -875,7 +875,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                   placeholder="如 999"
                 />
               </div>
-              <div className="col-span-2 md:col-span-2 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <div className="col-span-2 md:col-span-2 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                 <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">备注</label>
                 <Textarea size="xs"
                   ref={remarkRef}
@@ -887,7 +887,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                 />
               </div>
               {!isCreate && profile && (
-                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                   <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">状态</label>
                   <div className="flex items-center gap-2 pt-0.5">
                     <ProfileStatusBadge status={profile.status} />
@@ -895,7 +895,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                 </div>
               )}
               {!isView && (!isCreate ? (profile && profile.status === 'draft') : true) && (
-                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                   <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">审批模式</label>
                   <div className="flex gap-3 pt-0.5 text-sm">
                     <label className="flex items-center gap-1 cursor-pointer">
@@ -1157,7 +1157,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
 
 function InfoItem({ label, value, className }: { label: string; value: React.ReactNode; className?: string }) {
   return (
-    <div className={`bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100 ${className || ''}`}>
+    <div className={`bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)] ${className || ''}`}>
       <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{label}</div>
       <div className="text-sm text-[var(--ui-text-primary)] font-medium whitespace-pre-wrap">{value}</div>
     </div>

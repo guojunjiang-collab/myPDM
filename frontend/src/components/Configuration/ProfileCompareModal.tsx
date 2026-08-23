@@ -81,7 +81,7 @@ function ProfilePicker({ label, options, valueId, onPick }: {
                 key={o.id}
                 type="button"
                 onMouseDown={() => { onPick(o.id); setOpen(false); }}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--ui-bg-hover)] border-b border-gray-100 last:border-b-0 flex items-center gap-2"
+                className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--ui-bg-hover)] border-b border-[var(--ui-border)] last:border-b-0 flex items-center gap-2"
               >
                 <span className="font-medium">{o.code}</span>
                 <span className="text-[var(--ui-text-secondary)]">{o.name}</span>
@@ -163,7 +163,7 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
     const isExpanded = expanded.has(n.key);
     const l = n.left, r = n.right;
     rows.push(
-      <tr key={n.key} className={`${rowBg[n.change_type]} border-b border-gray-100 cursor-pointer hover:brightness-95`}
+      <tr key={n.key} className={`${rowBg[n.change_type]} border-b border-[var(--ui-border)] cursor-pointer hover:brightness-95`}
         onClick={() => openDetail('config_item', n)}>
         <td className="px-2 py-2 text-xs text-[var(--ui-text-secondary)] whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
           {'-'.repeat(level)} {level}
@@ -190,7 +190,7 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
         const pl = p.left, pr = p.right;
         const chg = new Set(p.changed_fields || []);
         rows.push(
-          <tr key={p.key} className={`${rowBg[p.change_type]} border-b border-gray-100 cursor-pointer hover:brightness-95`}
+          <tr key={p.key} className={`${rowBg[p.change_type]} border-b border-[var(--ui-border)] cursor-pointer hover:brightness-95`}
             onClick={() => openDetail('part', p)}>
             <td className="px-2 py-2 text-xs text-[var(--ui-text-tertiary)] whitespace-nowrap" onClick={(e) => e.stopPropagation()}>{'-'.repeat(level + 1)}</td>
             <td className="px-2 py-2 text-xs font-mono text-[var(--ui-text-secondary)]">{pl?.item_code || '-'}</td>

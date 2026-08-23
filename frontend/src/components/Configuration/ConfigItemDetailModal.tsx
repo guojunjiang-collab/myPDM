@@ -39,7 +39,7 @@ function InfoCard({ label, value, readonly, onChange }: {
   label: string; value: string; readonly: boolean; onChange?: (v: string) => void;
 }) {
   return (
-    <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+    <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
       <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{label}</div>
       {readonly ? (
         <div className="text-sm text-[var(--ui-text-primary)] font-medium">{value || '—'}</div>
@@ -342,11 +342,11 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
             {canEdit ? (<>
               <InfoCard label="构型号" value={editCode} readonly={false} onChange={(v) => { setEditCode(v); autoSaveMaster({ code: v }); }} />
               <InfoCard label="中文名称" value={editName} readonly={false} onChange={(v) => { setEditName(v); autoSaveMaster({ name: v }); }} />
-              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100"><div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">类型</div><div className="text-sm text-[var(--ui-text-primary)] font-medium">构型项</div></div>
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]"><div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">类型</div><div className="text-sm text-[var(--ui-text-primary)] font-medium">构型项</div></div>
             </>) : (<>
-              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100"><div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">构型号</div><div className="text-sm text-[var(--ui-text-primary)] font-medium font-mono">{master?.code}</div></div>
-              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100"><div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">中文名称</div><div className="text-sm text-[var(--ui-text-primary)] font-medium">{master?.name}</div></div>
-              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100"><div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">类型</div><div className="text-sm text-[var(--ui-text-primary)] font-medium">构型项</div></div>
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]"><div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">构型号</div><div className="text-sm text-[var(--ui-text-primary)] font-medium font-mono">{master?.code}</div></div>
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]"><div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">中文名称</div><div className="text-sm text-[var(--ui-text-primary)] font-medium">{master?.name}</div></div>
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]"><div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">类型</div><div className="text-sm text-[var(--ui-text-primary)] font-medium">构型项</div></div>
             </>)}
           </div>
 
@@ -390,7 +390,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
                     )}
                   </div>
                   {cfDefs.length > 0 ? (
-                    <div><h4 className="text-sm font-semibold mb-2">自定义字段</h4><div className="grid grid-cols-3 gap-3">{cfDefs.map((def: any) => (<div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100"><div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{def.name}</div><div><CustomFieldInput def={def} value={cfValues[def.id]} onChange={(val) => { setCfValues(prev => ({ ...prev, [def.id]: val })); autoSaveCf(def.id, val); }} readOnly={!canEdit} /></div></div>))}</div></div>
+                    <div><h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">自定义字段</h4><div className="grid grid-cols-3 gap-3">{cfDefs.map((def: any) => (<div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]"><div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{def.name}</div><div><CustomFieldInput def={def} value={cfValues[def.id]} onChange={(val) => { setCfValues(prev => ({ ...prev, [def.id]: val })); autoSaveCf(def.id, val); }} readOnly={!canEdit} /></div></div>))}</div></div>
                   ) : (<div className="text-[var(--ui-text-tertiary)] text-sm">无</div>)}
                 </div>
               )}

@@ -76,7 +76,7 @@ export default function SharedLeftPanel({ tasks, expanded, childMap, onToggle, o
             {isDragAbove && <div className="h-1"><div className="h-1 bg-primary-500 rounded-full mx-1" /></div>}
             <div
               {...dragProps}
-              className={`flex items-center border-b border-gray-100 text-sm ${hoveredId === t.id ? 'bg-primary-50' : ''} ${isDragInto ? 'bg-blue-50 ring-2 ring-primary-300 ring-inset' : ''} ${isDragging ? 'opacity-40' : ''} ${hasDrag ? 'cursor-grab' : ''}`}
+              className={`flex items-center border-b border-[var(--ui-border)] text-sm ${hoveredId === t.id ? 'bg-primary-50' : ''} ${isDragInto ? 'bg-blue-50 ring-2 ring-primary-300 ring-inset' : ''} ${isDragging ? 'opacity-40' : ''} ${hasDrag ? 'cursor-grab' : ''}`}
               style={{ height: ROW_H }}
               onMouseEnter={() => onHover?.(t.id)}
               onClick={(e) => { if (hasDrag) e.stopPropagation(); onRowClick?.(t.id); }}>

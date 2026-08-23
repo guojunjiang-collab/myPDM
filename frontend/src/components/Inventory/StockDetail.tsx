@@ -5,7 +5,7 @@ import type { StockRow } from '../../types';
 
 function InfoItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+    <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
       <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{label}</div>
       <div className="text-sm text-[var(--ui-text-primary)] font-medium">{value}</div>
     </div>

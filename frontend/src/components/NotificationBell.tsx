@@ -41,7 +41,7 @@ export default function NotificationBell() {
       </button>
       {open && (
         <div className="absolute right-0 mt-2 w-[360px] bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-xl overflow-hidden z-50">
-          <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-100">
+          <div className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--ui-border)]">
             <b className="text-sm">通知 {unread > 0 && <span className="text-red-500">{unread}</span>}</b>
             <Button variant="link" size="xs" onClick={() => markAllRead()}>全部已读</Button>
           </div>
@@ -66,7 +66,7 @@ export default function NotificationBell() {
             })}
           </div>
           <div onClick={() => { setOpen(false); navigate('/notifications'); }}
-            className="text-center py-2.5 text-[13px] text-blue-600 hover:bg-[var(--ui-bg-hover)] cursor-pointer border-t border-gray-100">
+            className="text-center py-2.5 text-[13px] text-blue-600 hover:bg-[var(--ui-bg-hover)] cursor-pointer border-t border-[var(--ui-border)]">
             查看全部通知 →
           </div>
         </div>

@@ -43,7 +43,7 @@ const ROW_BG: Record<string, string> = {
 };
 
 const th = 'px-2 py-2 text-left text-xs font-semibold text-[var(--ui-text-secondary)] border-b border-[var(--ui-border)] whitespace-nowrap';
-const td = 'px-2 py-1.5 text-xs text-gray-700 border-b border-gray-100';
+const td = 'px-2 py-1.5 text-xs text-gray-700 border-b border-[var(--ui-border)]';
 
 // ─── 向上溯源树：保持父→子→孙层级相邻，兄弟按件号排序，支持按层展开 ───
 interface UpwardTreeNode { node: MutableNode; children: UpwardTreeNode[]; }

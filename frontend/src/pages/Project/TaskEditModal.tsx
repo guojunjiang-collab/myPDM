@@ -62,6 +62,8 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
   // 有子任务的任务：计划周期由其子任务统计（rollup）而来，编辑时不可手动修改
   const hasChildren = (task?.children?.length ?? 0) > 0;
   const [statusSaving, setStatusSaving] = useState(false);
+  // 主保存 loading（阶段2c 补缺口）
+  const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState<'info' | 'links' | 'comments' | 'logs'>('info');
   const [taskLogs, setTaskLogs] = useState<OperationLog[]>([]);
   const [taskLogsLoading, setTaskLogsLoading] = useState(false);
@@ -150,6 +152,8 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
   };
 
   const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
     const payload: any = { ...form, parent_id: task ? undefined : parentId };
     // 补负责人显示名（项目详情任务表按 assignee_name 显示；清空负责人时置 null 及时刷新）
     const u = users.find((x) => x.id === payload.assignee_id);
@@ -171,6 +175,8 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
       else { await projectApi.createTask(projectId, payload); onSaved(); }
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || '保存失败');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -350,25 +356,25 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
         {/* === 核心信息区 === */}
         <div className="shrink-0 mb-3">
           <div className="grid grid-cols-6 gap-3">
-            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
               <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">编号</div>
               <div className="text-sm text-[var(--ui-text-primary)] font-medium font-mono py-1">{task?.code || '—'}</div>
             </div>
-            <div className="col-span-2 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <div className="col-span-2 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
               <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">名称 <span className="text-red-500">*</span></label>
               <Input size="xs" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </div>
-            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
               <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">类型</label>
               <Select size="xs" value={form.task_type} onChange={(e) => setForm({ ...form, task_type: e.target.value as TaskType })}>
                 {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
               </Select>
             </div>
-            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
               <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">状态</label>
               <Badge status={form.status} domain="task" />
             </div>
-            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
               <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">优先级</label>
               <Select size="xs" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as TaskPriority })}>
                 {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
@@ -411,7 +417,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                   <div>
                     <h4 className="text-sm font-semibold text-gray-700 mb-2">计划周期</h4>
                     <div className="grid grid-cols-4 gap-3">
-                      <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                      <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                         <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">
                           计划开始{hasChildren && <span className="text-primary-600 ml-1">（子任务汇总）</span>}
                         </div>
@@ -421,7 +427,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                                title={hasChildren ? '有子任务，计划周期由子任务统计而来，不可手动修改' : undefined}
                                className="disabled:cursor-not-allowed disabled:text-[var(--ui-text-tertiary)]" />
                       </div>
-                      <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                      <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                         <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">
                           计划完成{hasChildren && <span className="text-primary-600 ml-1">（子任务汇总）</span>}
                         </div>
@@ -431,11 +437,11 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                                title={hasChildren ? '有子任务，计划周期由子任务统计而来，不可手动修改' : undefined}
                                className="disabled:cursor-not-allowed disabled:text-[var(--ui-text-tertiary)]" />
                       </div>
-                      <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                      <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                         <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">实际开始</div>
                         <div className="text-sm text-[var(--ui-text-tertiary)] py-1">{form.actual_start || '—'}</div>
                       </div>
-                      <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                      <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                         <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">实际完成</div>
                         <div className="text-sm text-[var(--ui-text-tertiary)] py-1">{form.actual_end || '—'}</div>
                       </div>
@@ -720,7 +726,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
             <div>
               <h4 className="text-sm font-semibold text-gray-700 mb-2">计划周期</h4>
               <div className="grid grid-cols-4 gap-3">
-                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                   <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">
                     计划开始{hasChildren && <span className="text-primary-600 ml-1">（子任务汇总）</span>}
                   </div>
@@ -729,7 +735,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                          title={hasChildren ? '有子任务，计划周期由子任务统计而来，不可手动修改' : undefined}
                          className="disabled:cursor-not-allowed disabled:text-[var(--ui-text-tertiary)]" />
                 </div>
-                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                   <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">
                     计划完成{hasChildren && <span className="text-primary-600 ml-1">（子任务汇总）</span>}
                   </div>
@@ -738,11 +744,11 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                          title={hasChildren ? '有子任务，计划周期由子任务统计而来，不可手动修改' : undefined}
                          className="disabled:cursor-not-allowed disabled:text-[var(--ui-text-tertiary)]" />
                 </div>
-                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                   <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">实际开始</div>
                   <div className="text-sm text-[var(--ui-text-tertiary)] py-1">—</div>
                 </div>
-                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                   <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">实际完成</div>
                   <div className="text-sm text-[var(--ui-text-tertiary)] py-1">—</div>
                 </div>
@@ -789,8 +795,8 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
             )}
           </div>
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={onClose}>取消</Button>
-            <Button onClick={handleSave}>保存</Button>
+            <Button variant="secondary" onClick={onClose} disabled={saving}>取消</Button>
+            <Button onClick={handleSave} disabled={saving}>{saving ? '保存中...' : '保存'}</Button>
           </div>
         </div>
       </div>

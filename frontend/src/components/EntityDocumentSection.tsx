@@ -440,19 +440,19 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
         {editingDoc && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                 <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">编号</label>
                 <Input type="text" value={editingDoc.code} disabled size="xs" />
               </div>
-              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                 <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">名称 <span className="text-red-500">*</span></label>
                 <Input type="text" value={editFormData.name} onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })} size="xs" />
               </div>
-              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                 <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">版本</label>
                 <Input type="text" value={editingDoc.version || ''} disabled size="xs" />
               </div>
-              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                 <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">状态</label>
                 <Select value={editFormData.status} onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })} size="xs">
                   <option value="draft">草稿</option>
@@ -461,7 +461,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
                   <option value="obsolete">作废</option>
                 </Select>
               </div>
-              <div className="col-span-2 md:col-span-2 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <div className="col-span-2 md:col-span-2 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                 <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">备注</label>
                 <Textarea value={editFormData.remark} onChange={(e) => setEditFormData({ ...editFormData, remark: e.target.value })} rows={1} size="xs" className="resize-none" />
               </div>
@@ -472,7 +472,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
                 <h4 className="text-sm font-bold text-gray-700 mb-2">自定义字段</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {editCustomDefs.map(def => (
-                    <div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                    <div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                       <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">{def.name}{def.is_required && <span className="text-red-500 ml-1">*</span>}</label>
                       {def.field_type === 'select' && def.options?.length ? (
                         <Select value={editCustomValues[def.id] ?? ''} onChange={(e) => setEditCustomValues({ ...editCustomValues, [def.id]: e.target.value })} size="xs">

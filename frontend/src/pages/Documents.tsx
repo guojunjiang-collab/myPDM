@@ -16,6 +16,8 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import Textarea from '../components/ui/Textarea';
+import FormField from '../components/ui/FormField';
+import Alert from '../components/ui/Alert';
 
 type SortField = 'code' | 'name' | 'created_at' | 'version' | 'status' | 'check_out_user_name';
 type SortOrder = 'asc' | 'desc';
@@ -297,35 +299,31 @@ export default function Documents() {
         width="md"
       >
         <form onSubmit={handleCreateSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">编号 <span className="text-red-500">*</span></label>
+          <FormField label="编号" required>
             <Input
               type="text"
               value={createCode}
               onChange={(e) => setCreateCode(e.target.value)}
               required
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">名称 <span className="text-red-500">*</span></label>
+          </FormField>
+          <FormField label="名称" required>
             <Input
               type="text"
               value={createName}
               onChange={(e) => setCreateName(e.target.value)}
               required
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">备注</label>
+          </FormField>
+          <FormField label="备注">
             <Textarea
               value={createRemark}
               onChange={(e) => setCreateRemark(e.target.value)}
               rows={3}
               className="resize-none"
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">关联用户组（留空=全员可预览/下载）</label>
+          </FormField>
+          <FormField label="关联用户组（留空=全员可预览/下载）">
             <div className="max-h-40 overflow-auto border border-[var(--ui-border)] rounded-lg p-2 grid grid-cols-2 gap-x-2 gap-y-0.5">
               {allGroups.length === 0 && <span className="text-[var(--ui-text-tertiary)] text-sm col-span-2">暂无用户组</span>}
               {allGroups.map((g) => (
@@ -340,11 +338,9 @@ export default function Documents() {
                 </label>
               ))}
             </div>
-          </div>
+          </FormField>
           {createSaveError && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
-              {createSaveError}
-            </div>
+            <Alert tone="danger">{createSaveError}</Alert>
           )}
           <div className="flex justify-end gap-2 pt-4 border-t">
             <Button variant="secondary" type="button" onClick={() => setCreateModalOpen(false)}>取消</Button>

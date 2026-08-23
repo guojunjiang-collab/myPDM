@@ -197,21 +197,30 @@ export default function Board() {
   /* ---- Actions ---- */
   const toggleExpand = (id: string) => setExpandedIds((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
+  // 弹窗提交 saving（阶段2c 补缺口）
+  const [createSaving, setCreateSaving] = useState(false);
+  const [renameSaving, setRenameSaving] = useState(false);
+  const [sharesSaving, setSharesSaving] = useState(false);
+
   const handleCreate = async () => {
-    if (!createName.trim()) return;
+    if (!createName.trim() || createSaving) return;
+    setCreateSaving(true);
     try {
       await boardApi.createFolder({ name: createName.trim(), parent_id: createModal || undefined });
       setCreateModal(null); setCreateName('');
       await loadDashboard();
     } catch (e: any) { toast.error(e?.response?.data?.detail || '创建失败'); }
+    finally { setCreateSaving(false); }
   };
 
   const handleRename = async () => {
-    if (!renameModal || !renameName.trim()) return;
+    if (!renameModal || !renameName.trim() || renameSaving) return;
+    setRenameSaving(true);
     try {
       await boardApi.updateFolder(renameModal.id, { name: renameName.trim() });
       setRenameModal(null); await loadDashboard();
     } catch { toast.error('重命名失败'); }
+    finally { setRenameSaving(false); }
   };
 
   const handleDelete = async () => {
@@ -276,7 +285,8 @@ export default function Board() {
   };
 
   const handleSaveShares = async () => {
-    if (!shareModal) return;
+    if (!shareModal || sharesSaving) return;
+    setSharesSaving(true);
     try {
       await boardApi.saveShares(shareModal, workingShares.map(s => ({
         shared_with_user_id: s.shared_with_user_id,
@@ -287,6 +297,7 @@ export default function Board() {
       setUserSearch('');
       await loadDashboard();
     } catch (e: any) { toast.error(e?.response?.data?.detail || '保存失败'); }
+    finally { setSharesSaving(false); }
   };
 
   const handleCancelShares = () => {
@@ -558,8 +569,8 @@ export default function Board() {
         <div className="space-y-4">
           <Input type="text" value={renameName} onChange={(e) => setRenameName(e.target.value)} autoFocus />
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setRenameModal(null)}>取消</Button>
-            <Button type="button" onClick={handleRename}>确认</Button>
+            <Button type="button" variant="secondary" onClick={() => setRenameModal(null)} disabled={renameSaving}>取消</Button>
+            <Button type="button" onClick={handleRename} disabled={renameSaving}>{renameSaving ? '保存中...' : '确认'}</Button>
           </div>
         </div>
       </Modal>
@@ -569,8 +580,8 @@ export default function Board() {
         <div className="space-y-4">
           <Input type="text" value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder="请输入文件夹名称" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleCreate()} />
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setCreateModal(null)}>取消</Button>
-            <Button type="button" onClick={handleCreate}>创建</Button>
+            <Button type="button" variant="secondary" onClick={() => setCreateModal(null)} disabled={createSaving}>取消</Button>
+            <Button type="button" onClick={handleCreate} disabled={createSaving}>{createSaving ? '创建中...' : '创建'}</Button>
           </div>
         </div>
       </Modal>
@@ -591,7 +602,7 @@ export default function Board() {
                 type="button"
                 key={u.id}
                 onClick={() => setShareUserId(u.id)}
-                className={`w-full text-left px-3 py-2 text-sm border-b border-gray-100 last:border-b-0 transition-colors ${
+                className={`w-full text-left px-3 py-2 text-sm border-b border-[var(--ui-border)] last:border-b-0 transition-colors ${
                   shareUserId === u.id
                     ? 'bg-primary-50 text-primary-700 font-medium'
                     : 'hover:bg-[var(--ui-bg-hover)] text-gray-700'
@@ -630,8 +641,8 @@ export default function Board() {
           )}
           {/* Save / Cancel */}
           <div className="flex justify-end gap-2 pt-2 border-t border-[var(--ui-border)]">
-            <Button type="button" variant="secondary" onClick={handleCancelShares}>取消</Button>
-            <Button type="button" onClick={handleSaveShares} disabled={!isShareDirty}>保存</Button>
+            <Button type="button" variant="secondary" onClick={handleCancelShares} disabled={sharesSaving}>取消</Button>
+            <Button type="button" onClick={handleSaveShares} disabled={!isShareDirty || sharesSaving}>{sharesSaving ? '保存中...' : '保存'}</Button>
           </div>
         </div>
       </Modal>

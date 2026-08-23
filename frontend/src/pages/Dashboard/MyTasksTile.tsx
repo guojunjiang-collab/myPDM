@@ -60,7 +60,7 @@ export function MyTasksTile({ onOverdue }: { onOverdue?: (n: number) => void }) 
       {loaded && items.length === 0 ? <EmptyState text="暂无指派给你的任务" /> : (
         <div className="flex flex-col gap-3 overflow-y-auto max-h-[360px] pr-1">
           {groups.map((g) => (
-            <div key={g.project.id} className="rounded-lg border border-gray-100 bg-[var(--ui-bg-subtle)]">
+            <div key={g.project.id} className="rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg-subtle)]">
               <Link
                 to={`/projects?project_id=${g.project.id}`}
                 className="block px-3 py-1.5 border-b border-[var(--ui-border)] text-sm font-medium text-[var(--ui-text-secondary)] hover:text-blue-600"

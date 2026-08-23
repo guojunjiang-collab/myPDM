@@ -14,6 +14,7 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
+import FormField from '../components/ui/FormField';
 
 type SortField = 'code' | 'name' | 'created_at' | 'version' | 'status' | 'check_out_user_name' | 'type';
 type SortOrder = 'asc' | 'desc';
@@ -288,21 +289,18 @@ export default function PartsPage() {
 
       <Modal open={showCreateModal} onClose={() => setShowCreateModal(false)} title="新建零件" width="md">
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">件号 <span className="text-red-500">*</span></label>
+          <FormField label="件号" required>
             <Input type="text" value={newPart.code}
               onChange={(e) => setNewPart(p => ({...p, code: e.target.value}))} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">名称 <span className="text-red-500">*</span></label>
+          </FormField>
+          <FormField label="名称" required>
             <Input type="text" value={newPart.name}
               onChange={(e) => setNewPart(p => ({...p, name: e.target.value}))} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">规格型号</label>
+          </FormField>
+          <FormField label="规格型号">
             <Input type="text" value={newPart.spec}
               onChange={(e) => setNewPart(p => ({...p, spec: e.target.value}))} />
-          </div>
+          </FormField>
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="secondary" onClick={() => setShowCreateModal(false)}>取消</Button>
             <Button onClick={handleCreate} disabled={createSaving}>

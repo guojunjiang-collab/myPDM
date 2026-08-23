@@ -440,12 +440,12 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
     <Modal open={open} title={isEditing ? '编辑 ECR' : '新建 ECR'} onClose={handleClose} width="full">
       <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
             <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">ECR 编号</label>
             <Input size="xs" type="text" value={editingEcr?.ecr_number || ''} disabled
               placeholder="新建时自动生成" />
           </div>
-          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
             <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">ECR 标题 <span className="text-red-500">*</span></label>
             <Input size="xs" type="text" value={title} onChange={(e) => { setTitle(e.target.value); if (errors.title) setErrors({ ...errors, title: '' }); }}
               placeholder="请输入 ECR 标题"
@@ -454,19 +454,19 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
           </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
             <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">变更原因</label>
             <Select size="xs" value={reason} onChange={(e) => setReason(e.target.value)}>
               {REASON_OPTIONS.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
             </Select>
           </div>
-          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
             <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">变更类别</label>
             <Select size="xs" value={category} onChange={(e) => setCategory(e.target.value)}>
               {CATEGORY_OPTIONS.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
             </Select>
           </div>
-          <div className="col-span-2 md:col-span-1 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+          <div className="col-span-2 md:col-span-1 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
             <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">优先级</label>
             <div className="flex gap-2 pt-0.5 flex-wrap">
               {PRIORITY_OPTIONS.map((opt) => (
@@ -478,7 +478,7 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
               ))}
             </div>
           </div>
-          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
             <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">审批模式</label>
             <Select size="xs" value={reviewMode} onChange={(e) => setReviewMode(e.target.value)}>
               <option value="all">会签</option>
@@ -486,7 +486,7 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
             </Select>
           </div>
         </div>
-        <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+        <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
           <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">变更描述</label>
           <Textarea size="xs" ref={descRef} value={description} onChange={(e) => setDescription(e.target.value)}
             onInput={(e) => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }}
