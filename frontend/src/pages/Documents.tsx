@@ -215,23 +215,23 @@ export default function Documents() {
           <option value="released">发布</option>
           <option value="obsolete">作废</option>
         </Select>
-        <label className={`flex items-center gap-1.5 px-3 py-2 rounded-lg cursor-pointer text-sm whitespace-nowrap transition-colors select-none ${showAllVersions ? 'bg-[var(--ui-btn-primary-bg)] text-[var(--ui-btn-primary-text)]' : 'border border-[var(--ui-border)] text-[var(--ui-text-secondary)] hover:bg-[var(--ui-bg-hover)]'}`}>
+        <label className="flex items-center gap-1.5 px-3 py-2 rounded-lg cursor-pointer text-sm whitespace-nowrap transition-colors select-none bg-[var(--ui-btn-primary-bg)] text-[var(--ui-btn-primary-text)] hover:bg-[var(--ui-btn-primary-hover)]">
           <input
             type="checkbox"
             checked={showAllVersions}
             onChange={(e) => setShowAllVersions(e.target.checked)}
             className="w-3.5 h-3.5"
           />
-          {showAllVersions && '✓ '}全部版本
+          全部版本
         </label>
-        <label className={`flex items-center gap-1.5 px-3 py-2 rounded-lg cursor-pointer text-sm whitespace-nowrap transition-colors select-none ${showAccessibleOnly ? 'bg-[var(--ui-btn-primary-bg)] text-[var(--ui-btn-primary-text)]' : 'border border-[var(--ui-border)] text-[var(--ui-text-secondary)] hover:bg-[var(--ui-bg-hover)]'}`}>
+        <label className="flex items-center gap-1.5 px-3 py-2 rounded-lg cursor-pointer text-sm whitespace-nowrap transition-colors select-none bg-[var(--ui-btn-primary-bg)] text-[var(--ui-btn-primary-text)] hover:bg-[var(--ui-btn-primary-hover)]">
           <input
             type="checkbox"
             checked={showAccessibleOnly}
             onChange={(e) => setShowAccessibleOnly(e.target.checked)}
             className="w-3.5 h-3.5"
           />
-          {showAccessibleOnly && '✓ '}可查看
+          可查看
         </label>
 
         <div className="flex-1" />
