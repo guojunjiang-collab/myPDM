@@ -682,7 +682,7 @@ export default function Projects() {
                     只看我的任务
                   </Button>
                   {maxTreeDepth > 0 && (
-                    <Select size="xs" className="!w-auto"
+                    <Select size="md" className="!w-auto"
                       value={expandSel}
                       onChange={(e) => handleExpandChange(e.target.value)}
                     >
