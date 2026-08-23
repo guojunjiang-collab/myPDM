@@ -165,6 +165,12 @@ export default function DocumentPicker({
     })),
   ]), [fieldDefs]);
 
+  // filterParams 需稳定引用：仅 status/refreshToken 变化时重建（避免每次渲染触发全量重拉）
+  const filterParams = useMemo(
+    () => ({ status: statusFilter, r: refreshToken }),
+    [statusFilter, refreshToken],
+  );
+
   const handleQuickCreate = async () => {
     if (!quickForm.code.trim() || !quickForm.name.trim()) return;
     setQuickCreating(true);
@@ -204,13 +210,14 @@ export default function DocumentPicker({
       onClose={onClose}
       width="full"
       fetchData={fetchData}
-      filterParams={{ status: statusFilter, r: refreshToken }}
+      filterParams={filterParams}
       getKey={(d) => d.id}
       columns={columns}
       selected={selected}
       onSelectedChange={setSelected}
       onConfirm={(items) => {
         onConfirm(items.map((v) => ({ document_id: v.id })));
+        setSelected([]);
         onClose();
       }}
       searchPlaceholder="搜索编号、名称..."

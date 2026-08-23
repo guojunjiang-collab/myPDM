@@ -70,6 +70,12 @@ export default function ConfigItemPicker({ open, onClose, onConfirm, excludeId }
     { key: 'status', title: '状态', width: '80px', render: (i: ConfigItem) => <Badge status={i.status} /> },
   ]), []);
 
+  // filterParams 需稳定引用：仅 status/refreshToken 变化时重建（避免每次渲染触发全量重拉）
+  const filterParams = useMemo(
+    () => ({ status: statusFilter, r: refreshToken }),
+    [statusFilter, refreshToken],
+  );
+
   const handleQuickCreate = async () => {
     if (!quickForm.code.trim() || !quickForm.name.trim()) return;
     setQuickCreating(true);
@@ -91,13 +97,14 @@ export default function ConfigItemPicker({ open, onClose, onConfirm, excludeId }
       onClose={onClose}
       width="xl"
       fetchData={fetchData}
-      filterParams={{ status: statusFilter, r: refreshToken }}
+      filterParams={filterParams}
       getKey={(i) => i.id}
       columns={columns}
       selected={selected}
       onSelectedChange={setSelected}
       onConfirm={(items) => {
         onConfirm(items.map(s => ({ child_revision_id: s.id, is_required: true })));
+        setSelected([]);
         onClose();
       }}
       searchPlaceholder="搜索构型号、名称..."

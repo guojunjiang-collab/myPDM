@@ -81,6 +81,12 @@ export default function EntityPickerModal<T>({
   loading = false,
 }: EntityPickerModalProps<T>) {
   const [search, setSearch] = useState('');
+  // 搜索防抖 300ms：服务端搜索（AssemblyPartPicker）避免击键即请求，客户端筛选避免整表闪烁
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
   const [items, setItems] = useState<T[]>([]);
   const [fetchLoading, setFetchLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -106,7 +112,7 @@ export default function EntityPickerModal<T>({
     setFetchLoading(true);
     setFetchError(null);
     fetchDataRef
-      .current({ search, type: activeType, ...filterParams })
+      .current({ search: debouncedSearch, type: activeType, ...filterParams })
       .then((data) => {
         if (!cancelled) setItems(data);
       })
@@ -122,7 +128,7 @@ export default function EntityPickerModal<T>({
     return () => {
       cancelled = true;
     };
-  }, [open, search, activeType, filterParams]);
+  }, [open, debouncedSearch, activeType, filterParams]);
 
   const add = (item: T) => {
     const key = getKey(item);

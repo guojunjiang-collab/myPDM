@@ -66,6 +66,7 @@ export default function AssemblyPartPicker({
     setQuickOpen(false);
     setQuickCreating(false);
     setRefreshToken(0);
+    setAncestorIds(new Set()); // 先清空，避免首次拉取使用上次的旧排除集
 
     // 计算祖先链：向上查找所有包含当前部件的父部件（避免自引用循环）
     if (currentAssemblyId) {
@@ -137,6 +138,13 @@ export default function AssemblyPartPicker({
     { key: 'status', title: '状态', width: '80px', render: (i: CandidateItem) => <Badge status={i.status} /> },
   ]), []);
 
+  // filterParams 需稳定引用：仅 status/refreshToken/ancestorIds 变化时重建（避免每次渲染触发全量重拉）；
+  // ancestorIds 纳入依赖使祖先链计算完成后自动重新拉取（排除集生效）
+  const filterParams = useMemo(
+    () => ({ status: statusFilter, r: refreshToken, ancestorTick: ancestorIds.size }),
+    [statusFilter, refreshToken, ancestorIds],
+  );
+
   const updateQuantity = (id: string, qty: number) => {
     setSelected(prev => prev.map(s => s.id === id ? { ...s, quantity: Math.max(1, qty || 1) } : s));
   };
@@ -168,7 +176,7 @@ export default function AssemblyPartPicker({
       onClose={() => { setSelected([]); onClose(); }}
       width="full"
       fetchData={fetchData}
-      filterParams={{ status: statusFilter, r: refreshToken }}
+      filterParams={filterParams}
       getKey={(i) => i.id}
       columns={columns}
       selected={selected}
