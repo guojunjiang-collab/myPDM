@@ -491,7 +491,17 @@ export default function Board() {
                         <td className="px-5 py-2.5 text-[var(--ui-text-secondary)]">{item.version || '-'}</td>
                         <td className="px-5 py-2.5"><StatusTag status={item.status} /></td>
                         <td className="px-5 py-2.5 text-right whitespace-nowrap">
-                          {(isComponentType(item.entity_type) || item.entity_type === 'document') && (
+                          {isComponentType(item.entity_type) && (
+                            <Button
+                              type="button"
+                              size="xs"
+                              className="mr-2"
+                              disabled={!((item.attachment_count ?? 0) > 0)}
+                              title={((item.attachment_count ?? 0) > 0) ? '3D 预览' : '暂无附件'}
+                              onClick={(e) => { e.stopPropagation(); handlePreview(item); }}
+                            >3D</Button>
+                          )}
+                          {item.entity_type === 'document' && (
                             <Button
                               type="button"
                               size="xs"
