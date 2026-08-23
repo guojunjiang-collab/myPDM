@@ -15,16 +15,16 @@ import { useDebounced } from '../../hooks/useDebounced';
 const ROLE_LABEL: Record<string, string> = {
   admin: '管理员',
   engineer: '工程师',
-  production: '生产',
+  production: '生产人员',
   guest: '访客',
-  unverified: '待审批',
+  unverified: '未验证',
 };
 
 const ROLE_FILTERS = [
   { key: '', label: '全部' },
   { key: 'admin', label: '管理员' },
   { key: 'engineer', label: '工程师' },
-  { key: 'production', label: '生产' },
+  { key: 'production', label: '生产人员' },
   { key: 'guest', label: '访客' },
 ];
 

@@ -39,13 +39,13 @@ interface FolderNode {
 // 零件/部件已统一为「零部件」，旧数据 entity_type 可能仍为 part/assembly
 const isComponentType = (t: string) => t === 'component' || t === 'part' || t === 'assembly';
 
-// 类型徽标（行1 件号与版本之间）：零件灰 / 部件紫 / 图文档靛 / 构型项青（与状态徽标色系区分）
+// 类型徽标（行1 件号与版本之间）：零件灰 / 部件蓝 / 图文档靛 / 构型项紫（与 entity 域一致）
 const ENTITY_BADGE: Record<string, { label: string; tone: BadgeTone }> = {
   part: { label: '零件', tone: 'gray' },
   component: { label: '零件', tone: 'gray' },
-  assembly: { label: '部件', tone: 'purple' },
+  assembly: { label: '部件', tone: 'blue' },
   document: { label: '图文档', tone: 'indigo' },
-  configuration: { label: '构型项', tone: 'teal' },
+  configuration: { label: '构型项', tone: 'purple' },
 };
 
 // 状态徽标（draft/active/frozen/released/obsolete；active 无 domain 映射，tone+label）
