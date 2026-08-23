@@ -400,22 +400,18 @@ export default function Board() {
               <h2 className="text-sm font-medium text-[var(--ui-text-secondary)]">{getFolderPath(allFolders, selectedFolder.id)}</h2>
             </div>
 
-            {/* 子卡② 工具栏：Tab 行 + 操作按钮 */}
-            <div className="shrink-0 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-sm px-4 flex items-center gap-2">
-              <div className="flex gap-0">
+            {/* 子卡② 工具栏：Tab 筛选（Button 规范）+ 操作按钮 */}
+            <div className="shrink-0 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-sm px-4 py-2.5 flex items-center gap-2">
+              <div className="flex gap-2">
                 {(['all', 'component', 'document', 'configuration'] as FilterTab[]).map((tab) => (
-                  <button
-                    type="button"
+                  <Button
                     key={tab}
+                    size="md"
+                    active={filterTab === tab}
                     onClick={() => setFilterTab(tab)}
-                    className={`px-3 py-2.5 text-sm border-b-2 transition-colors ${
-                      filterTab === tab
-                        ? 'border-primary-500 text-primary-700 font-medium'
-                        : 'border-transparent text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)]'
-                    }`}
                   >
                     {tab === 'all' ? `全部 (${tabCounts.all})` : `${ENTITY_LABEL[tab]} (${tabCounts[tab]})`}
-                  </button>
+                  </Button>
                 ))}
               </div>
               {canEditFolder && (
