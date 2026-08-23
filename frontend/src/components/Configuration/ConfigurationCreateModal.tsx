@@ -336,10 +336,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
           <td className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)] whitespace-nowrap">
             {levelStr}
             {hasChildren && !isEmpty && (
-              <button onClick={(e) => { e.stopPropagation(); toggleChildExpand(idx, childId); }}
-                className="inline-flex items-center w-5 h-5 text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] ml-1">
-                {childRows ? '\u25bc' : '\u25b6'}
-              </button>
+              <span className="ml-1 inline-flex"><TreeToggle expanded={!!childRows} onClick={() => toggleChildExpand(idx, childId)} size="md" title={childRows ? '折叠' : '展开'} /></span>
             )}
           </td>
           <td className="px-3 py-2 text-sm font-medium cursor-pointer hover:text-primary-600" onClick={() => setNestedEditItem({ id: c.child_id, code: c.child_code, name: c.child_name } as ConfigurationItem)}>{c.child_code}</td>

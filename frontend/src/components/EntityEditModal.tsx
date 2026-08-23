@@ -13,6 +13,7 @@ import Button from './ui/Button';
 import Input from './ui/Input';
 import Select from './ui/Select';
 import Textarea from './ui/Textarea';
+import TreeToggle from './ui/TreeToggle';
 
 interface EntityEditModalProps {
   open: boolean;
@@ -262,10 +263,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
           <td className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)] whitespace-nowrap">
             <span>{'-'.repeat(level)}{level}</span>
             {hasChildren && (
-              <button type="button" onClick={(e) => { e.stopPropagation(); toggleExpand(idx, part.child_id); }}
-                className="inline-flex items-center w-5 h-5 text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] ml-1">
-                {childRows ? '\u25bc' : '\u25b6'}
-              </button>
+              <span className="ml-1 inline-flex"><TreeToggle expanded={!!childRows} onClick={() => toggleExpand(idx, part.child_id)} size="md" title={childRows ? '折叠' : '展开'} /></span>
             )}
           </td>
           <td className="px-3 py-2">

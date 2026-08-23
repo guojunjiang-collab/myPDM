@@ -11,6 +11,7 @@ import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
 import Textarea from '../ui/Textarea';
+import TreeToggle from '../ui/TreeToggle';
 import { configurationApi, configurationProfileApi, usersApi, partsApi, customFieldsApi } from '../../services/api';
 import { exportProfilePdf, exportProfileExcel } from '../../services/configProfilePdfExport';
 import { useAuthStore, isAdmin } from '../../stores/auth';
@@ -607,10 +608,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         <td className="px-3 py-2 text-xs text-[var(--ui-text-secondary)] whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
           {levelPrefix}{level}
           {hasChildren ? (
-            <button type="button" onClick={(e) => { e.stopPropagation(); toggleFormalExpand(node.id); }}
-              className="inline-flex items-center text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] cursor-pointer select-none ml-1">
-              {isExpanded ? '\u25bc' : '\u25b6'}
-            </button>
+            <span className="ml-1 inline-flex"><TreeToggle expanded={isExpanded} onClick={() => toggleFormalExpand(node.id)} size="sm" title={isExpanded ? '折叠' : '展开'} /></span>
           ) : null}
         </td>
         <td className="px-3 py-2 text-sm font-medium text-gray-700">{node.code}</td>
@@ -668,13 +666,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         <td className="px-3 py-2 text-xs text-[var(--ui-text-secondary)] whitespace-nowrap">
           {levelPrefix}{level}
           {hasChildren ? (
-            <button
-              type="button"
-              onClick={() => toggleExpand(node.id)}
-              className="inline-flex items-center text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] cursor-pointer select-none ml-1"
-            >
-              {isExpanded ? '\u25bc' : '\u25b6'}
-            </button>
+            <span className="ml-1 inline-flex"><TreeToggle expanded={isExpanded} onClick={() => toggleExpand(node.id)} size="sm" title={isExpanded ? '折叠' : '展开'} /></span>
           ) : null}
         </td>
         <td className="px-3 py-2 text-sm font-medium text-gray-700">{node.code}</td>
