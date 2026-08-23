@@ -197,7 +197,7 @@ export default function PartsPage() {
         <table className="w-full">
           <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
             <tr>
-              <th onClick={() => onSort('code')} className="w-56 px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer select-none whitespace-nowrap">
+              <th onClick={() => onSort('code')} className="w-60 px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer select-none whitespace-nowrap">
                 件号{sortIcon('code')}
               </th>
               <th onClick={() => onSort('name')} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer select-none whitespace-nowrap">
