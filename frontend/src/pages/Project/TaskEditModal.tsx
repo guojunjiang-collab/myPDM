@@ -561,8 +561,8 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                       <h4 className="text-sm font-semibold text-gray-700">关联对象</h4>
                       <div className="ml-auto flex items-center gap-2">
-                        <Button size="sm" onClick={() => setShowItemPicker(true)}>关联项目</Button>
-                        <Button variant="ghost" size="xs" onClick={() => setShowECPicker(true)}>EC +</Button>
+                        <Button size="sm" onClick={() => setShowItemPicker(true)}>关联对象</Button>
+                        <Button size="sm" onClick={() => setShowECPicker(true)}>关联变更</Button>
                       </div>
                     </div>
                     {links.length > 0 ? (

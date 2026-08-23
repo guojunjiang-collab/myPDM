@@ -118,7 +118,7 @@ export default function ItemPicker({ open, onClose, onConfirm, existingIds }: It
   const selectedList = Array.from(selected.values());
 
   return (
-    <Modal open={open} title="关联项目" onClose={onClose} width="full">
+    <Modal open={open} title="关联对象" onClose={onClose} width="full">
       <div className="space-y-4 max-h-[75vh] flex flex-col">
         {/* Already selected */}
         <div className="border rounded-lg overflow-hidden">

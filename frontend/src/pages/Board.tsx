@@ -459,7 +459,7 @@ export default function Board() {
                     + 子文件夹
                   </Button>
                   <Button type="button" size="md" onClick={() => setPickerOpen(true)}>
-                    + 关联项目
+                    + 关联对象
                   </Button>
                 </div>
               )}
