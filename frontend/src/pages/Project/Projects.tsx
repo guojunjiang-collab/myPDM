@@ -678,7 +678,7 @@ export default function Projects() {
                     <option value="">全部状态</option>
                     {(['未开始', '进行中', '已完成', '挂起'] as TaskStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
                   </Select>
-                  <Button active={onlyMine}>
+                  <Button active={onlyMine} onClick={() => setOnlyMine((v) => !v)}>
                     只看我的任务
                   </Button>
                   {maxTreeDepth > 0 && (

@@ -170,10 +170,10 @@ export default function PartsPage() {
           <option value="released">发布</option>
           <option value="obsolete">作废</option>
         </Select>
-        <Button active={showAllVersions}>
+        <Button active={showAllVersions} onClick={() => setShowAllVersions((v) => !v)}>
           全部版本
         </Button>
-        <Button active={topLevelOnly} title="只显示没有父项的最顶层零部件">
+        <Button active={topLevelOnly} onClick={() => setTopLevelOnly((v) => !v)} title="只显示没有父项的最顶层零部件">
           仅顶层零部件
         </Button>
 

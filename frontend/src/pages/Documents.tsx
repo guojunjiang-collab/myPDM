@@ -215,10 +215,10 @@ export default function Documents() {
           <option value="released">发布</option>
           <option value="obsolete">作废</option>
         </Select>
-        <Button active={showAllVersions}>
+        <Button active={showAllVersions} onClick={() => setShowAllVersions((v) => !v)}>
           全部版本
         </Button>
-        <Button active={showAccessibleOnly}>
+        <Button active={showAccessibleOnly} onClick={() => setShowAccessibleOnly((v) => !v)}>
           可查看
         </Button>
 
