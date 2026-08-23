@@ -47,10 +47,7 @@ interface ShareRecord {
   created_at: string;
 }
 
-type FilterTab = 'all' | 'component' | 'document' | 'configuration';
-
-/** 关联项目弹窗筛选：零部件拆分为 零件/部件 */
-type PickerTab = 'all' | 'part' | 'assembly' | 'document' | 'configuration';
+type FilterTab = 'all' | 'part' | 'assembly' | 'document' | 'configuration';
 
 /** 类型徽标（胶囊式，符合约定配色） */
 const TYPE_BADGE: Record<string, { label: string; tone: BadgeTone }> = {
@@ -210,7 +207,7 @@ export default function Board() {
   const allFolders = useMemo(() => [...myFolders, ...sharedFolders], [myFolders, sharedFolders]);
   const selectedFolder = useMemo(() => selectedId ? findFolderById(allFolders, selectedId) : null, [selectedId, allFolders]);
   const selectedItems = useMemo(() => selectedFolder ? flattenItems(selectedFolder) : [], [selectedFolder]);
-  const filteredItems = useMemo(() => filterTab === 'all' ? selectedItems : selectedItems.filter((i) => filterTab === 'component' ? isComponentType(i.entity_type) : i.entity_type === filterTab), [selectedItems, filterTab]);
+  const filteredItems = useMemo(() => filterTab === 'all' ? selectedItems : selectedItems.filter((i) => i.entity_type === filterTab), [selectedItems, filterTab]);
   const existingIds = useMemo(() => {
     const ids = new Set(selectedItems.map((i) => i.entity_id));
     selectedItems.forEach((i) => { if (i.master_id) ids.add(i.master_id); });
@@ -345,7 +342,8 @@ export default function Board() {
   /* Tab counts */
   const tabCounts = useMemo(() => ({
     all: selectedItems.length,
-    component: selectedItems.filter((i) => isComponentType(i.entity_type)).length,
+    part: selectedItems.filter((i) => i.entity_type === 'part').length,
+    assembly: selectedItems.filter((i) => i.entity_type === 'assembly').length,
     document: selectedItems.filter((i) => i.entity_type === 'document').length,
     configuration: selectedItems.filter((i) => i.entity_type === 'configuration').length,
   }), [selectedItems]);
@@ -416,14 +414,14 @@ export default function Board() {
             {/* 子卡② 工具栏：Tab 筛选（Button 规范）+ 操作按钮 */}
             <div className="shrink-0 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-sm px-4 py-2.5 flex items-center gap-2">
               <div className="flex gap-2">
-                {(['all', 'component', 'document', 'configuration'] as FilterTab[]).map((tab) => (
+                {(['all', 'part', 'assembly', 'document', 'configuration'] as FilterTab[]).map((tab) => (
                   <Button
                     key={tab}
                     size="md"
                     active={filterTab === tab}
                     onClick={() => setFilterTab(tab)}
                   >
-                    {tab === 'all' ? `全部 (${tabCounts.all})` : `${ENTITY_LABEL[tab]} (${tabCounts[tab]})`}
+                    {tab === 'all' ? `全部 (${tabCounts.all})` : `${typeBadge(tab).label} (${tabCounts[tab]})`}
                   </Button>
                 ))}
               </div>
@@ -458,10 +456,7 @@ export default function Board() {
                   <tbody className="divide-y divide-gray-200">
                     {filteredItems.map((item) => (
                       <tr key={item.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => handleViewDetail(item)}>
-                        <td className="px-5 py-2.5">
-                          <span className="mr-1">{ENTITY_ICON[item.entity_type]}</span>
-                          <span className="text-xs text-[var(--ui-text-secondary)]">{ENTITY_LABEL[item.entity_type]}</span>
-                        </td>
+                        <td className="px-5 py-2.5"><Badge size="xs" tone={typeBadge(item.entity_type).tone} label={typeBadge(item.entity_type).label} /></td>
                         <td className="px-5 py-2.5 font-medium text-gray-800">{item.code}</td>
                         <td className="px-5 py-2.5 text-[var(--ui-text-secondary)]">{item.name}</td>
                         <td className="px-5 py-2.5 text-[var(--ui-text-secondary)]">{item.version || '-'}</td>
@@ -718,7 +713,7 @@ interface ItemPickerProps {
 }
 
 function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) {
-  const [tab, setTab] = useState<PickerTab>('all');
+  const [tab, setTab] = useState<FilterTab>('all');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Map<string, any>>(new Map());
 
@@ -811,9 +806,9 @@ function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) 
         {/* Search + filter */}
         <div className="flex gap-2">
           <Input type="text" placeholder="搜索编号/名称..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1" />
-          <div className="flex gap-2">{(['all', 'part', 'assembly', 'document', 'configuration'] as PickerTab[]).map((t) => (
+          <div className="flex gap-2">{(['all', 'part', 'assembly', 'document', 'configuration'] as FilterTab[]).map((t) => (
             <Button key={t} size="sm" active={tab === t} onClick={() => setTab(t)}>
-              {t === 'all' ? '全部' : t === 'part' ? '零件' : t === 'assembly' ? '部件' : ENTITY_LABEL[t]}
+              {t === 'all' ? '全部' : typeBadge(t).label}
             </Button>
           ))}</div>
         </div>
