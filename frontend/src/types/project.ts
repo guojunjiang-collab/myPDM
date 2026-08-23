@@ -68,6 +68,10 @@ export interface TaskLink {
   entity_status?: string | null;
   /** 零部件实际类型（'part' | 'assembly'，后端 _link_dict 返回；关联可能统一存 part） */
   entity_kind?: string | null;
+  /** 生产附件是否含 STP/STEP（零件 3D 预览可用性，后端 _link_dict 返回） */
+  has_stp?: boolean;
+  /** 图文档附件数（预览按钮置灰用，后端 _link_dict 返回） */
+  attachment_count?: number;
 }
 
 export interface TaskComment {

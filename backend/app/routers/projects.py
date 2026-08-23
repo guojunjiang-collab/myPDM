@@ -502,8 +502,10 @@ _ENTITY_TABLE = {"part": "part_masters", "assembly": "part_masters", "component"
 
 
 def _link_dict(db, l):
-    from sqlalchemy import text
+    from sqlalchemy import text, or_
     code = name = spec = remark = master_id = version = status = kind = None
+    has_stp = None
+    attachment_count = 0
     table = _ENTITY_TABLE.get(l.entity_type)
     if table == "part_masters":
         row = db.execute(
@@ -512,6 +514,18 @@ def _link_dict(db, l):
         ).fetchone()
         if row:
             code, name, spec, master_id, version, status, kind = row[0], row[1], row[2], row[3], row[4], row[5], row[6]
+        # 生产附件是否含 STP/STEP（零件 3D 预览可用性，与看板一致）
+        from ..models_parts import PartAttachment, PartIteration
+        has_stp = db.query(PartAttachment).join(
+            PartIteration, PartIteration.id == PartAttachment.iteration_id
+        ).filter(
+            PartIteration.revision_id == l.entity_id,
+            PartAttachment.category == "production",
+            or_(
+                PartAttachment.file_name.ilike("%.stp"),
+                PartAttachment.file_name.ilike("%.step"),
+            ),
+        ).first() is not None
     elif table == "document_revisions":
         row = db.execute(
             text("SELECT dm.code, dm.name, NULL AS spec, dr.remark, dm.id as master_id, dr.version, dr.status FROM document_revisions dr JOIN document_masters dm ON dm.id = dr.master_id WHERE dr.id = :id"),
@@ -519,6 +533,10 @@ def _link_dict(db, l):
         ).fetchone()
         if row:
             code, name, spec, remark, master_id, version, status = row[0], row[1], row[2], row[3], row[4], row[5], row[6]
+        from ..models import DocumentAttachment
+        attachment_count = db.query(DocumentAttachment).filter(
+            DocumentAttachment.revision_id == l.entity_id
+        ).count()
     elif table == "configuration_item_masters":
         # 关联存的是版本(revision)id，需 JOIN 版本表取主数据 code/name + 版本/状态（与零部件/图文档排版一致）
         row = db.execute(
@@ -546,7 +564,8 @@ def _link_dict(db, l):
     return {"id": str(l.id), "task_id": str(l.task_id), "entity_type": l.entity_type,
             "entity_id": str(l.entity_id), "entity_code": code, "entity_name": name,
             "entity_spec": spec, "entity_remark": remark, "entity_master_id": str(master_id) if master_id else None,
-            "entity_version": version, "entity_status": status, "entity_kind": kind}
+            "entity_version": version, "entity_status": status, "entity_kind": kind,
+            "has_stp": has_stp, "attachment_count": attachment_count}
 
 
 def _comment_dict(db, c):

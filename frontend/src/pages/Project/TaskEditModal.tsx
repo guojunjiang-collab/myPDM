@@ -7,12 +7,11 @@ import Select from '../../components/ui/Select';
 import Textarea from '../../components/ui/Textarea';
 import type { BadgeTone } from '../../constants/badges';
 import { projectApi } from '../../services/projectApi';
-import { partsApi, documentsApi, ecrApi, ecoApi, logsApi, customFieldsApi } from '../../services/api';
+import { partsApi, documentsApi, ecrApi, ecoApi, logsApi, customFieldsApi, mediaApi } from '../../services/api';
 import { useDataStore } from '../../stores/data';
 import type { CustomFieldDefinition, CustomFieldValue } from '../../types';
-import AssemblyPartPicker from '../../components/AssemblyPartPicker';
-import DocumentPicker from '../../components/DocumentPicker';
-import ConfigItemPicker from '../../components/Configuration/ConfigItemPicker';
+import ItemPicker from '../../components/ItemPicker';
+import { previewAttachment } from '../../utils/attachmentPreview';
 import ECPicker from '../../components/ECPicker';
 import PartDetailModal from '../../components/PartDetailModal';
 import DocumentDetailModal from '../../components/DocumentDetailModal';
@@ -40,12 +39,12 @@ const TYPES: TaskType[] = ['任务', '里程碑', '评审'];
 const STATUSES: TaskStatus[] = ['未开始', '进行中', '已完成', '挂起'];
 const PRIORITIES: TaskPriority[] = ['高', '中', '低'];
 const LINK_BADGE: Record<string, { tone: BadgeTone; label: string }> = {
-  part: { tone: 'blue', label: '零部件' },
-  assembly: { tone: 'blue', label: '零部件' },
+  part: { tone: 'blue', label: '零件' },
+  assembly: { tone: 'purple', label: '部件' },
   component: { tone: 'blue', label: '零部件' },
-  config_item: { tone: 'teal', label: '构型项' },
+  config_item: { tone: 'green', label: '构型项' },
   ec: { tone: 'amber', label: 'EC' },
-  document: { tone: 'blue', label: '图文档' },
+  document: { tone: 'gray', label: '图文档' },
 };
 
 const logActionTone = (action: string): BadgeTone => {
@@ -69,10 +68,8 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
   const [links, setLinks] = useState<TaskLink[]>([]);
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [newComment, setNewComment] = useState('');
-  const [showPartPicker, setShowPartPicker] = useState(false);
-  const [showDocPicker, setShowDocPicker] = useState(false);
+  const [showItemPicker, setShowItemPicker] = useState(false);
   const [showECPicker, setShowECPicker] = useState(false);
-  const [showConfigPicker, setShowConfigPicker] = useState(false);
   const [detailEntityId, setDetailEntityId] = useState<string | null>(null);
   const [detailEntityType, setDetailEntityType] = useState<string | null>(null);
   const [detailData, setDetailData] = useState<any>(null);
@@ -215,6 +212,42 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
     const tid = ensureTaskId(); if (!tid) return;
     await projectApi.removeLink(projectId, tid, linkId);
     loadLinks(tid);
+  };
+
+  /** 与用户看板一致的预览：部件 → 装配体 3D；零件 → STP 附件 3D；图文档 → 附件预览 */
+  const handleLinkPreview = async (l: TaskLink) => {
+    if (l.entity_type === 'assembly') {
+      window.open(`/stp-viewer?assembly=${l.entity_id}`, '_blank');
+      return;
+    }
+    if (l.entity_type === 'part') {
+      try {
+        const res: any = await partsApi.listAttachments(l.entity_id);
+        const atts: any[] = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : (res?.items || []));
+        const stp = atts.find((a) => /\.(stp|step)$/i.test(a.file_name || ''));
+        if (stp) {
+          const mt = await mediaApi.token(stp.id, 'gltf');
+          window.open(`/stp-viewer?id=${stp.id}&token=${encodeURIComponent(mt)}`, '_blank');
+          return;
+        }
+      } catch { /* 提示 */ }
+      alert('该零件生产附件无 STP 文件');
+      return;
+    }
+    if (l.entity_type === 'document') {
+      try {
+        const res: any = await documentsApi.listAttachments(l.entity_id);
+        const atts: any[] = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : (res?.items || []));
+        const att = atts[0];
+        if (att) {
+          await previewAttachment(att.id, att.file_name || '', {
+            onArchive: () => alert('压缩包附件请在图文档详情中查看'),
+          });
+          return;
+        }
+      } catch { /* 提示 */ }
+      alert('该图文档暂无附件可预览');
+    }
   };
 
   const submitComment = async () => {
@@ -511,10 +544,8 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                       <h4 className="text-sm font-semibold text-gray-700">关联对象</h4>
                       <div className="ml-auto flex items-center gap-2">
-                        <Button variant="ghost" size="xs" onClick={() => setShowPartPicker(true)}>零部件 +</Button>
-                        <Button variant="ghost" size="xs" onClick={() => setShowConfigPicker(true)}>构型项 +</Button>
+                        <Button size="sm" onClick={() => setShowItemPicker(true)}>关联项目</Button>
                         <Button variant="ghost" size="xs" onClick={() => setShowECPicker(true)}>EC +</Button>
-                        <Button variant="ghost" size="xs" onClick={() => setShowDocPicker(true)}>图文档 +</Button>
                       </div>
                     </div>
                     {links.length > 0 ? (
@@ -525,7 +556,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                               <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-20 whitespace-nowrap">类型</th>
                               <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-36 whitespace-nowrap">件号</th>
                               <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">名称</th>
-                              <th className="text-right px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-12">操作</th>
+                              <th className="text-right px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-40">操作</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
@@ -545,8 +576,28 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                                 </td>
                                 <td className="px-3 py-2 font-mono text-gray-700 whitespace-nowrap">{l.entity_code || '—'}</td>
                                 <td className="px-3 py-2 text-gray-700">{l.entity_name || '—'}</td>
-                                <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-                                  <Button variant="danger" size="xs" onClick={() => removeLink(l.id)}>×</Button>
+                                <td className="px-3 py-2 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                  {(l.entity_type === 'part' || l.entity_type === 'assembly') && (
+                                    <Button
+                                      type="button"
+                                      size="xs"
+                                      className="mr-1"
+                                      disabled={l.entity_type === 'assembly' ? false : !l.has_stp}
+                                      title={l.entity_type === 'assembly' ? '装配体 3D 预览' : (l.has_stp ? '3D 预览' : '生产附件无 STP 文件')}
+                                      onClick={() => handleLinkPreview(l)}
+                                    >3D</Button>
+                                  )}
+                                  {l.entity_type === 'document' && (
+                                    <Button
+                                      type="button"
+                                      size="xs"
+                                      className="mr-1"
+                                      disabled={!((l.attachment_count ?? 0) > 0)}
+                                      title={((l.attachment_count ?? 0) > 0) ? '预览附件' : '暂无附件'}
+                                      onClick={() => handleLinkPreview(l)}
+                                    >预览</Button>
+                                  )}
+                                  <Button variant="danger" size="xs" onClick={() => removeLink(l.id)}>移除</Button>
                                 </td>
                               </tr>
                             ))}
@@ -760,33 +811,19 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
         />
       )}
 
-      {showPartPicker && (
-        <AssemblyPartPicker
-          open={showPartPicker}
-          onClose={() => setShowPartPicker(false)}
+      {showItemPicker && (
+        <ItemPicker
+          open={showItemPicker}
+          onClose={() => setShowItemPicker(false)}
+          existingIds={new Set(links.map((l) => l.entity_id))}
           onConfirm={(items) => {
-            addLinks(items.map((it) => ({ entity_type: 'part', entity_id: it.child_id })));
-            setShowPartPicker(false);
-          }}
-        />
-      )}
-      {showDocPicker && (
-        <DocumentPicker
-          open={showDocPicker}
-          onClose={() => setShowDocPicker(false)}
-          onConfirm={(items) => {
-            addLinks(items.map((it) => ({ entity_type: 'document', entity_id: it.document_id })));
-            setShowDocPicker(false);
-          }}
-        />
-      )}
-      {showConfigPicker && (
-        <ConfigItemPicker
-          open={showConfigPicker}
-          onClose={() => setShowConfigPicker(false)}
-          onConfirm={(items) => {
-            if (items.length > 0) addLinks([{ entity_type: 'config_item', entity_id: items[0].child_revision_id }]);
-            setShowConfigPicker(false);
+            addLinks(items.map((it) => ({
+              entity_type: it.entity_type === 'component'
+                ? (it.sub === 'assembly' ? 'assembly' : 'part')
+                : it.entity_type === 'configuration' ? 'config_item' : it.entity_type,
+              entity_id: it.entity_id,
+            })));
+            setShowItemPicker(false);
           }}
         />
       )}
