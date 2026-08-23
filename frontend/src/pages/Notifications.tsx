@@ -66,38 +66,38 @@ export default function Notifications() {
         <h1 className="text-lg font-semibold">通知中心</h1>
         <div className="flex gap-2">
           <button onClick={async () => { await markAllRead(); load(); }}
-            className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50">全部标为已读</button>
+            className="px-3 py-1.5 text-sm bg-[var(--ui-bg-surface)] border border-gray-300 rounded-lg hover:bg-[var(--ui-bg-hover)]">全部标为已读</button>
           <button onClick={async () => { await notificationApi.clearRead(); fetchUnread(); load(); }}
-            className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50">清除已读</button>
+            className="px-3 py-1.5 text-sm bg-[var(--ui-bg-surface)] border border-gray-300 rounded-lg hover:bg-[var(--ui-bg-hover)]">清除已读</button>
         </div>
       </div>
       <div className="flex gap-2 flex-wrap mb-4">
         {MODULE_FILTERS.map((f) => (
           <button key={f.key} onClick={() => setFilter(f.key)}
-            className={`px-3 py-1.5 rounded-full text-[12.5px] border ${filter === f.key ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-700 border-gray-300'}`}>
+            className={`px-3 py-1.5 rounded-full text-[12.5px] border ${filter === f.key ? 'bg-primary-600 text-white border-primary-600' : 'bg-[var(--ui-bg-surface)] text-gray-700 border-gray-300'}`}>
             {f.label}
           </button>
         ))}
       </div>
       {loading ? (
-        <div className="py-12 text-center text-sm text-gray-400">加载中...</div>
+        <div className="py-12 text-center text-sm text-[var(--ui-text-tertiary)]">加载中...</div>
       ) : items.length === 0 ? (
-        <div className="py-12 text-center text-sm text-gray-400">暂无通知</div>
+        <div className="py-12 text-center text-sm text-[var(--ui-text-tertiary)]">暂无通知</div>
       ) : groups.map((g) => (
         <div key={g.label} className="mb-4">
-          <div className="text-xs text-gray-400 font-semibold mb-2">{g.label}</div>
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="text-xs text-[var(--ui-text-tertiary)] font-semibold mb-2">{g.label}</div>
+          <div className="bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg overflow-hidden">
             {g.rows.map((n) => {
               const ic = notificationIcon(n.event_type);
               return (
                 <div key={n.id} onClick={() => onRowClick(n)}
-                  className={`px-3.5 py-3 border-b border-gray-50 last:border-b-0 flex gap-3 items-start cursor-pointer hover:bg-gray-50 ${!n.is_read ? 'bg-blue-50' : ''}`}>
+                  className={`px-3.5 py-3 border-b border-gray-50 last:border-b-0 flex gap-3 items-start cursor-pointer hover:bg-[var(--ui-bg-hover)] ${!n.is_read ? 'bg-blue-50' : ''}`}>
                   <span className="rounded-md flex items-center justify-center flex-shrink-0"
                     style={{ background: ic.bg, width: 30, height: 30 }}>{ic.icon}</span>
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm">{n.title}</div>
-                    {n.body && <div className="text-[13px] text-gray-500 mt-0.5">{n.body}</div>}
-                    <div className="text-xs text-gray-400 mt-1">{relativeTime(n.created_at)}</div>
+                    {n.body && <div className="text-[13px] text-[var(--ui-text-secondary)] mt-0.5">{n.body}</div>}
+                    <div className="text-xs text-[var(--ui-text-tertiary)] mt-1">{relativeTime(n.created_at)}</div>
                   </div>
                   {!n.is_read && <span className="w-2 h-2 rounded-full bg-blue-600 mt-1.5 flex-shrink-0" />}
                 </div>

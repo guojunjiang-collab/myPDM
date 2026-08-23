@@ -63,7 +63,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="border-t border-gray-200" />
+      <div className="border-t border-[var(--ui-border)]" />
 
       {/* 全局概览 */}
       <KpiStrip partsMasters={components.length} documents={documents.length} configItems={configItems.length} changeOpen={changeOpen} />

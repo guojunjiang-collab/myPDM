@@ -55,19 +55,19 @@ export function Modal({ open, title, onClose, children, width = 'md', zIndex = 5
       style={{ zIndex }}
     >
       <div
-        className={`bg-white rounded-lg shadow-xl w-full mx-4 ${widthMap[width]} transform transition-transform duration-300 ${
+        className={`bg-[var(--ui-bg-surface)] rounded-lg shadow-xl w-full mx-4 ${widthMap[width]} transform transition-transform duration-300 ${
           open ? 'scale-100' : 'scale-95'
         } ${height ? 'flex flex-col' : ''}`}
         style={height ? { height } : undefined}
       >
         {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--ui-border)]">
             <h3 className="text-lg font-semibold">{title}</h3>
             <div className="flex items-center gap-3">
               {headerAction}
               <button
                 onClick={onClose}
-                className="text-gray-400 hover:text-gray-600 text-xl"
+                className="text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] text-xl"
               >
                 ×
               </button>
@@ -110,7 +110,7 @@ export function ConfirmModal({
 
   return (
     <Modal open={open} title={title} onClose={onCancel} width="sm">
-      <p className="text-gray-600 mb-4">{content}</p>
+      <p className="text-[var(--ui-text-secondary)] mb-4">{content}</p>
       <div className="flex justify-end gap-2">
         <Button variant="secondary" onClick={onCancel}>
           {cancelText}

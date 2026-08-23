@@ -112,7 +112,7 @@ export default function MemberManageModal({ open, projectId, ownerId, onClose, o
           return (
             <div key={m.user_id} className="flex items-center gap-2 py-2">
               <span className="font-medium">{m.user_name}</span>
-              <span className="text-xs text-gray-400">{m.username}</span>
+              <span className="text-xs text-[var(--ui-text-tertiary)]">{m.username}</span>
               {isOwner ? (
                 <Badge size="xs" tone="blue" label="负责人" />
               ) : (
@@ -127,7 +127,7 @@ export default function MemberManageModal({ open, projectId, ownerId, onClose, o
             </div>
           );
         })}
-        {draft.length === 0 && <div className="text-sm text-gray-400 py-4 text-center">暂无成员</div>}
+        {draft.length === 0 && <div className="text-sm text-[var(--ui-text-tertiary)] py-4 text-center">暂无成员</div>}
       </div>
 
       <div className="flex items-center justify-end gap-2 border-t pt-3 mt-3">

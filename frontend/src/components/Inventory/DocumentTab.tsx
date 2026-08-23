@@ -134,7 +134,7 @@ export default function DocumentTab() {
           <div className="relative" ref={menuRef}>
             <Button onClick={() => setShowMenu(!showMenu)}>+ 新建单据 ▾</Button>
             {showMenu && (
-              <div className="absolute right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
+              <div className="absolute right-0 mt-1 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-lg z-20 overflow-hidden">
                 {DOC_TYPES.map((t) => (
                   <Button key={t.key} variant="ghost" size="sm" className="w-full !justify-start rounded-none"
                     onClick={() => { setCreating(t.key); setShowMenu(false); }}>{t.label}</Button>
@@ -146,28 +146,28 @@ export default function DocumentTab() {
       </div>
 
       {/* 表格 */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
+      <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+          <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
             <tr>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">单据号</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">类型</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">状态</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">库管员</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">创建人</th>
-              <th className="text-center px-4 py-3 text-sm font-medium text-gray-500">创建时间</th>
-              <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">操作</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">单据号</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">类型</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">状态</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">库管员</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">创建人</th>
+              <th className="text-center px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">创建时间</th>
+              <th className="text-right px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td></tr>
             ) : docs.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">暂无数据</td></tr>
             ) : filteredDocs.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">无匹配结果</td></tr>
             ) : filteredDocs.map((d) => (
-              <tr key={d.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setDetailId(d.id)}>
+              <tr key={d.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => setDetailId(d.id)}>
                 <td className="px-4 py-3 text-sm font-medium text-primary-600">{d.doc_number}</td>
                 <td className="px-4 py-3 text-sm font-medium">{DOC_TYPES.find((t) => t.key === d.doc_type)?.label}</td>
                 <td className="px-4 py-3 text-sm font-medium">

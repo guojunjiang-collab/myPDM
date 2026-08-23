@@ -37,13 +37,13 @@ export function MyTodosTile({ onCount }: { onCount?: (n: number) => void }) {
       {loaded && items.length === 0 ? <EmptyState text="✅ 暂无待办" /> : (
         <div className="flex flex-col gap-2.5 flex-1">
           {items.slice(0, 5).map((it) => (
-            <Link key={`${it.type}:${it.id}`} to={TYPE_ROUTE[it.type] || '/'} className="flex items-center gap-2 text-base hover:bg-gray-50 rounded px-1 py-0.5">
+            <Link key={`${it.type}:${it.id}`} to={TYPE_ROUTE[it.type] || '/'} className="flex items-center gap-2 text-base hover:bg-[var(--ui-bg-hover)] rounded px-1 py-0.5">
               <Badge tone={TYPE_TAG[it.type]?.tone ?? 'gray'} label={TYPE_TAG[it.type]?.label ?? it.type} />
               <span className={`truncate flex-1 ${it.kind === 'rejected' ? 'text-red-600' : 'text-gray-700'}`}>
                 {it.title}{it.kind === 'rejected' ? ' · 被驳回' : ''}
               </span>
               {it.kind === 'review' && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: PRIO_DOT[it.priority] || '#888' }} />}
-              <span className="text-sm text-gray-400 shrink-0">{relativeTime(it.updated_at || '', now)}</span>
+              <span className="text-sm text-[var(--ui-text-tertiary)] shrink-0">{relativeTime(it.updated_at || '', now)}</span>
             </Link>
           ))}
           {items.length > 5 && <Link to="/ec" className="text-sm text-blue-600 mt-auto">查看全部 {items.length} 项 →</Link>}

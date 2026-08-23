@@ -28,9 +28,9 @@ export default function SharedLeftPanel({ tasks, expanded, childMap, onToggle, o
   const hasProject = !!(project?.code);
 
   return (
-    <div className="shrink-0 border-r border-gray-200 bg-white" style={{ width: LEFT_W }}>
+    <div className="shrink-0 border-r border-[var(--ui-border)] bg-[var(--ui-bg-surface)]" style={{ width: LEFT_W }}>
       {!hideHeader && (
-      <div className="bg-gray-50 border-b border-gray-200 flex items-center text-sm font-medium text-gray-500 sticky top-0 z-10" style={{ height: ROW_H }}>
+      <div className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] flex items-center text-sm font-medium text-[var(--ui-text-secondary)] sticky top-0 z-10" style={{ height: ROW_H }}>
         <span className="shrink-0 truncate text-left pl-2" style={{ width: CODE_W }}>任务编号</span>
         <span className="px-1 flex-1 min-w-0 truncate text-left">任务名称</span>
         <span className="px-1 shrink-0 truncate text-center" style={{ width: ASSIGNEE_W }}>负责人</span>
@@ -38,20 +38,20 @@ export default function SharedLeftPanel({ tasks, expanded, childMap, onToggle, o
       </div>
       )}
       {hasProject && project && (
-        <div className="flex items-center border-b border-gray-200 bg-gray-50 text-sm" style={{ height: ROW_H }}>
+        <div className="flex items-center border-b border-[var(--ui-border)] bg-[var(--ui-bg-subtle)] text-sm" style={{ height: ROW_H }}>
           <span className="shrink-0 truncate font-semibold text-gray-700 pl-2" style={{ width: CODE_W }} title={project.code}>
             {project.code}
           </span>
           <span className="px-1 flex-1 min-w-0 flex items-center">
-            <span className="text-gray-400 mr-1 shrink-0">📁</span>
+            <span className="text-[var(--ui-text-tertiary)] mr-1 shrink-0">📁</span>
             <span className="font-medium text-gray-700 truncate" title={project.name}>{project.name}</span>
           </span>
-          <span className="px-1 shrink-0 truncate text-xs text-gray-500 text-center" style={{ width: ASSIGNEE_W }} title={project.owner_name || ''}>
+          <span className="px-1 shrink-0 truncate text-xs text-[var(--ui-text-secondary)] text-center" style={{ width: ASSIGNEE_W }} title={project.owner_name || ''}>
             {project.owner_name || '—'}
           </span>
           <span className="px-1 shrink-0 flex items-center justify-center" style={{ width: STATUS_W }}>
             {project.status && (
-              <span className={`px-1.5 py-0.5 text-xs rounded ${STATUS_BADGE[project.status] || 'bg-gray-100 text-gray-600'}`}>{project.status}</span>
+              <span className={`px-1.5 py-0.5 text-xs rounded ${STATUS_BADGE[project.status] || 'bg-gray-100 text-[var(--ui-text-secondary)]'}`}>{project.status}</span>
             )}
           </span>
         </div>
@@ -91,7 +91,7 @@ export default function SharedLeftPanel({ tasks, expanded, childMap, onToggle, o
                 onClick={() => onRowClick?.(t.id)} />
               <span className="px-1 shrink-0 flex items-center justify-center" style={{ width: STATUS_W }}
                 onClick={() => onRowClick?.(t.id)}>
-                <span className={`px-1.5 py-0.5 text-xs rounded whitespace-nowrap ${STATUS_BADGE[t.status] || 'bg-gray-100 text-gray-600'}`}>{t.status}</span>
+                <span className={`px-1.5 py-0.5 text-xs rounded whitespace-nowrap ${STATUS_BADGE[t.status] || 'bg-gray-100 text-[var(--ui-text-secondary)]'}`}>{t.status}</span>
               </span>
             </div>
             {isDragBelow && <div className="h-1"><div className="h-1 bg-primary-500 rounded-full mx-1" /></div>}

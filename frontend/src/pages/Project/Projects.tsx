@@ -595,40 +595,40 @@ export default function Projects() {
               )}
             </div>
 
-            <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
+            <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-y-auto flex-1 min-h-0">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+                <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
                   <tr>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 select-none whitespace-nowrap">编号</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 select-none whitespace-nowrap">名称</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 select-none whitespace-nowrap">负责人</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 select-none whitespace-nowrap">状态</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 select-none whitespace-nowrap">计划起止</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 select-none whitespace-nowrap">成员</th>
-                    <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 select-none whitespace-nowrap">操作</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] select-none whitespace-nowrap">编号</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] select-none whitespace-nowrap">名称</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] select-none whitespace-nowrap">负责人</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] select-none whitespace-nowrap">状态</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] select-none whitespace-nowrap">计划起止</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] select-none whitespace-nowrap">成员</th>
+                    <th className="px-4 py-2 text-right text-sm font-medium text-[var(--ui-text-secondary)] select-none whitespace-nowrap">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {loading ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center text-gray-500">加载中...</td>
+                      <td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td>
                     </tr>
                   ) : filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center text-gray-500">暂无项目</td>
+                      <td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">暂无项目</td>
                     </tr>
                   ) : (
                     filtered.map((p) => (
                       <tr key={p.id} onClick={() => handleSelectProject(p.id)}
-                          className="hover:bg-gray-50 cursor-pointer">
+                          className="hover:bg-[var(--ui-bg-hover)] cursor-pointer">
                         <td className="px-4 py-2 text-sm font-medium">{p.code}</td>
                         <td className="px-4 py-2 text-sm">{p.name}</td>
-                        <td className="px-4 py-2 text-sm text-gray-600">{p.owner_name}</td>
+                        <td className="px-4 py-2 text-sm text-[var(--ui-text-secondary)]">{p.owner_name}</td>
                         <td className="px-4 py-2">
                           <Badge status={p.status} domain="project" />
                         </td>
-                        <td className="px-4 py-2 text-sm text-gray-500">{p.planned_start || '—'} ~ {p.planned_end || '—'}</td>
-                        <td className="px-4 py-2 text-sm text-gray-500">{p.member_count ?? 0}</td>
+                        <td className="px-4 py-2 text-sm text-[var(--ui-text-secondary)]">{p.planned_start || '—'} ~ {p.planned_end || '—'}</td>
+                        <td className="px-4 py-2 text-sm text-[var(--ui-text-secondary)]">{p.member_count ?? 0}</td>
                         <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                           {can('project:update') && (
                             <Button variant="link" size="xs" className="mr-3" onClick={(e) => handleOpenEdit(p, e)}>编辑</Button>
@@ -649,15 +649,15 @@ export default function Projects() {
         {tab === 'detail' && (
           <div className="h-full flex flex-col">
             {!currentProject || currentProject.id !== selectedProjectId ? (
-              <div className="flex-1 flex items-center justify-center text-gray-400">
+              <div className="flex-1 flex items-center justify-center text-[var(--ui-text-tertiary)]">
                 {selectedProjectId ? '加载中...' : '请从项目汇总中选择一个项目'}
               </div>
             ) : (
               <>
-                <div className="flex items-center gap-3 mb-4 shrink-0 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2">
+                <div className="flex items-center gap-3 mb-4 shrink-0 bg-[var(--ui-bg-subtle)] border border-[var(--ui-border)] rounded-lg px-4 py-2">
                   <span className="font-semibold">{currentProject.code} · {currentProject.name}</span>
                   <Badge status={currentProject.status} domain="project" />
-                  <span className="text-sm text-gray-500">负责人 {currentProject.owner_name}</span>
+                  <span className="text-sm text-[var(--ui-text-secondary)]">负责人 {currentProject.owner_name}</span>
                   <div className="flex-1" />
                   <Button variant="secondary" size="sm" onClick={() => setDeliverableOpen(true)}>交付物汇总</Button>
                   {isManager && (
@@ -677,7 +677,7 @@ export default function Projects() {
                     <option value="">全部状态</option>
                     {(['未开始', '进行中', '已完成', '挂起'] as TaskStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
                   </Select>
-                  <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none whitespace-nowrap">
+                  <label className="flex items-center gap-1.5 text-sm text-[var(--ui-text-secondary)] cursor-pointer select-none whitespace-nowrap">
                     <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)}
                       className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
                     只看我的任务
@@ -702,10 +702,10 @@ export default function Projects() {
                   )}
                   {viewMode === 'gantt' && (
                     <>
-                      <span className="text-sm text-gray-400">视图:</span>
+                      <span className="text-sm text-[var(--ui-text-tertiary)]">视图:</span>
                       {(['day', 'week', 'month'] as const).map((s) => (
                         <button key={s} onClick={() => setGanttScale(s)}
-                          className={`px-2 py-1.5 text-sm rounded ${ganttScale === s ? 'bg-primary-600 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+                          className={`px-2 py-1.5 text-sm rounded ${ganttScale === s ? 'bg-primary-600 text-white' : 'bg-[var(--ui-bg-surface)] border border-gray-300 text-[var(--ui-text-secondary)] hover:bg-[var(--ui-bg-hover)]'}`}>
                           {s === 'day' ? '日' : s === 'week' ? '周' : '月'}
                         </button>
                       ))}
@@ -720,8 +720,8 @@ export default function Projects() {
                   )}
                 </div>
 
-                <div className="border border-gray-200 rounded-lg overflow-hidden flex-1 min-h-0">
-                  <div className="overflow-y-auto h-full bg-white" style={{ overflowX: 'hidden' }}
+                <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden flex-1 min-h-0">
+                  <div className="overflow-y-auto h-full bg-[var(--ui-bg-surface)]" style={{ overflowX: 'hidden' }}
                        onMouseLeave={() => setHoveredId(null)}
                        onDragLeave={() => { setDragOver(null); if (expandTimerRef.current) { clearTimeout(expandTimerRef.current); expandTimerRef.current = null; } }}>
                     <div className="flex">
@@ -743,8 +743,8 @@ export default function Projects() {
                         onDrop={handleDrop}
                       />
                       {viewMode === 'table' ? (
-                        <div className="flex-1 bg-white">
-                           <div className="bg-gray-50 border-b border-gray-200 flex items-center text-sm font-medium text-gray-500 sticky top-0 z-10" style={{ height: 36 }}>
+                        <div className="flex-1 bg-[var(--ui-bg-surface)]">
+                           <div className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] flex items-center text-sm font-medium text-[var(--ui-text-secondary)] sticky top-0 z-10" style={{ height: 36 }}>
                             <span className="px-2 shrink-0 truncate text-left" style={{ width: 64 }}>优先级</span>
                             <span className="px-2 shrink-0 truncate text-left" style={{ width: 100 }}>计划开始</span>
                             <span className="px-2 shrink-0 truncate text-left" style={{ width: 100 }}>计划完成</span>
@@ -753,12 +753,12 @@ export default function Projects() {
                           </div>
                           {currentProject && (
                             <>
-                              <div className="flex items-center bg-gray-50 border-b border-gray-200 text-sm" style={{ height: 36 }}>
-                                <span className="px-2 shrink-0 truncate text-gray-400" style={{ width: 64 }}>—</span>
-                                <span className="px-2 shrink-0 truncate text-gray-500" style={{ width: 100 }}>{currentProject.planned_start || '—'}</span>
-                                <span className="px-2 shrink-0 truncate text-gray-500" style={{ width: 100 }}>{currentProject.planned_end || '—'}</span>
-                                <span className="px-2 flex-1 min-w-0 truncate text-gray-500" title={currentProject.description || undefined}>{currentProject.description || '—'}</span>
-                                <div className="shrink-0 flex items-center justify-end px-4 text-gray-400">
+                              <div className="flex items-center bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] text-sm" style={{ height: 36 }}>
+                                <span className="px-2 shrink-0 truncate text-[var(--ui-text-tertiary)]" style={{ width: 64 }}>—</span>
+                                <span className="px-2 shrink-0 truncate text-[var(--ui-text-secondary)]" style={{ width: 100 }}>{currentProject.planned_start || '—'}</span>
+                                <span className="px-2 shrink-0 truncate text-[var(--ui-text-secondary)]" style={{ width: 100 }}>{currentProject.planned_end || '—'}</span>
+                                <span className="px-2 flex-1 min-w-0 truncate text-[var(--ui-text-secondary)]" title={currentProject.description || undefined}>{currentProject.description || '—'}</span>
+                                <div className="shrink-0 flex items-center justify-end px-4 text-[var(--ui-text-tertiary)]">
                                   {isManager && (
                                     <Button variant="link" size="xs" className="mr-2" onClick={() => setMemberOpen(true)}>成员</Button>
                                   )}
@@ -788,10 +788,10 @@ export default function Projects() {
                                       className={`flex items-center border-b border-gray-100 text-sm ${hoveredId === t.id ? 'bg-primary-50' : ''} ${overdue ? 'bg-red-50' : ''} cursor-pointer ${isDragInto ? 'bg-blue-50 ring-2 ring-primary-300 ring-inset' : ''} ${isDragging ? 'opacity-40' : ''}`}
                                       style={{ height: 36 }}>
                                       <span className="px-2 shrink-0 truncate" style={{ width: 64 }}>{t.priority}</span>
-                                      <span className="px-2 shrink-0 truncate text-gray-500" style={{ width: 100 }}>{t.planned_start || '—'}</span>
-                                      <span className="px-2 shrink-0 truncate text-gray-500" style={{ width: 100 }}>{t.planned_end || '—'}</span>
-                                      <span className="px-2 flex-1 min-w-0 truncate text-gray-500" title={t.description || undefined}>{t.description || '—'}</span>
-                                      <div className="shrink-0 flex items-center justify-end px-4 text-gray-400" onClick={(e) => e.stopPropagation()}>
+                                      <span className="px-2 shrink-0 truncate text-[var(--ui-text-secondary)]" style={{ width: 100 }}>{t.planned_start || '—'}</span>
+                                      <span className="px-2 shrink-0 truncate text-[var(--ui-text-secondary)]" style={{ width: 100 }}>{t.planned_end || '—'}</span>
+                                      <span className="px-2 flex-1 min-w-0 truncate text-[var(--ui-text-secondary)]" title={t.description || undefined}>{t.description || '—'}</span>
+                                      <div className="shrink-0 flex items-center justify-end px-4 text-[var(--ui-text-tertiary)]" onClick={(e) => e.stopPropagation()}>
                                         {(t.link_count ?? 0) > 0 && <span className="mr-2">🔗 {t.link_count}</span>}
                                         {isManager && <Button variant="link" size="xs" className="mr-2" onClick={() => openCreate(t.id)}>+子</Button>}
                                         {can('project.task:delete') && <Button variant="danger" size="xs" onClick={() => setDelTask(t)}>删除</Button>}
@@ -800,7 +800,7 @@ export default function Projects() {
                                   );
                                   if (isDragBelow) rightRows.push(<div key={t.id + '-below'} className="h-1"><div className="h-1 bg-primary-500 rounded-full mx-1" /></div>);
                                 }
-                                return <>{rightRows.length > 0 ? rightRows : tasks.length === 0 ? <div className="px-4 py-8 text-center text-gray-400">暂无任务</div> : <div className="px-4 py-8 text-center text-gray-400">无匹配任务</div>}</>;
+                                return <>{rightRows.length > 0 ? rightRows : tasks.length === 0 ? <div className="px-4 py-8 text-center text-[var(--ui-text-tertiary)]">暂无任务</div> : <div className="px-4 py-8 text-center text-[var(--ui-text-tertiary)]">无匹配任务</div>}</>;
                               })()}
                             </>
                           )}
@@ -862,8 +862,8 @@ export default function Projects() {
       <Modal open={createOpen} title={editingProject ? '编辑项目' : '新建项目'} onClose={() => { setCreateOpen(false); setEditingProject(null); }} width="lg">
         <div className="space-y-4 max-h-[75vh] overflow-y-auto px-1">
           <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">项目名称 <span className="text-red-500">*</span></label>
+            <div className="col-span-2 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">项目名称 <span className="text-red-500">*</span></label>
               <Input size="xs"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -871,8 +871,8 @@ export default function Projects() {
               />
             </div>
             {editingProject && (
-              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                <label className="block text-xs text-gray-500 mb-0.5">状态</label>
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">状态</label>
                 <Select size="xs"
                   value={form.status}
                   onChange={(e) => setForm({ ...form, status: e.target.value as ProjectStatus })}
@@ -882,8 +882,8 @@ export default function Projects() {
               </div>
             )}
             {editingProject && (
-              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                <label className="block text-xs text-gray-500 mb-0.5">负责人</label>
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">负责人</label>
                 <Select size="xs"
                   value={form.owner_id}
                   onChange={(e) => setForm({ ...form, owner_id: e.target.value })}
@@ -892,24 +892,24 @@ export default function Projects() {
                 </Select>
               </div>
             )}
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">计划开始</label>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">计划开始</label>
               <Input size="xs"
                 type="date"
                 value={form.planned_start}
                 onChange={(e) => setForm({ ...form, planned_start: e.target.value })}
               />
             </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">计划完成</label>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">计划完成</label>
               <Input size="xs"
                 type="date"
                 value={form.planned_end}
                 onChange={(e) => setForm({ ...form, planned_end: e.target.value })}
               />
             </div>
-            <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">描述</label>
+            <div className="col-span-2 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">描述</label>
               <Textarea size="xs"
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}

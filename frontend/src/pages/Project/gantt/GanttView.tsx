@@ -317,9 +317,9 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
     /* eslint-disable-next-line */
   }, [pan]);
 
-  if (loading && !data) return <div className="p-8 text-center text-gray-400">加载甘特图...</div>;
+  if (loading && !data) return <div className="p-8 text-center text-[var(--ui-text-tertiary)]">加载甘特图...</div>;
   if (!data || !range) return null;
-  if (data.tasks.length === 0) return <div className="p-8 text-center text-gray-400">该项目还没有任务,先在"项目详情"中添加任务。</div>;
+  if (data.tasks.length === 0) return <div className="p-8 text-center text-[var(--ui-text-tertiary)]">该项目还没有任务,先在"项目详情"中添加任务。</div>;
 
   // 日历铺满可视宽度:不足时向后补天数填满
   const availChartW = Math.max(0, viewportW - (hideLeftPanel ? 0 : LEFT_W));
@@ -353,10 +353,10 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
   });
 
   const dateHeader = (
-    <div className="bg-gray-50 border-b border-gray-200 relative flex items-center" style={{ width: chartW, height: ROW_H, flexShrink: 0, cursor: pan ? 'grabbing' : 'grab' }}
+    <div className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] relative flex items-center" style={{ width: chartW, height: ROW_H, flexShrink: 0, cursor: pan ? 'grabbing' : 'grab' }}
       onMouseDown={onPanDown}>
           {tickList.map((tk, i) => (
-            <div key={i} className={`absolute top-0 text-[10px] flex items-center ${tk.major ? 'text-gray-600' : 'text-gray-300'}`}
+            <div key={i} className={`absolute top-0 text-[10px] flex items-center ${tk.major ? 'text-[var(--ui-text-secondary)]' : 'text-gray-300'}`}
               style={{ left: tk.x, height: ROW_H, borderLeft: tk.major ? '1px solid #e5e7eb' : 'none', paddingLeft: 2 }}>
               {tk.label}
             </div>
@@ -454,7 +454,7 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
     return (
       <div className="min-w-0 flex-1">
         {/* 日期抬头:不在 overflow 容器内,sticky top-0 穿透到外层垂直滚动容器;transform 同步水平位置 */}
-        <div className="sticky top-0 bg-gray-50" style={{ height: ROW_H, zIndex: 1 }}>
+        <div className="sticky top-0 bg-[var(--ui-bg-subtle)]" style={{ height: ROW_H, zIndex: 1 }}>
           <div ref={dateHeaderTranslateRef} style={{ width: chartW, willChange: 'transform' }}>
             {dateHeader}
           </div>
@@ -468,13 +468,13 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
   }
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
+    <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden">
       <div ref={calendarScrollRef} className="overflow-auto" style={{ maxHeight: '70vh' }}
            onMouseLeave={() => setHovered(null)}>
         {/* 表头行:overflow-auto 直接子元素,sticky top-0 固定垂直 */}
         <div className="sticky top-0 z-30 flex" style={{ height: ROW_H, width: LEFT_W + chartW }}>
           {/* 左侧表头:sticky left-0 固定水平 */}
-          <div className="bg-gray-50 border-b border-gray-200 sticky left-0 z-30 flex items-center text-sm font-medium text-gray-500"
+          <div className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky left-0 z-30 flex items-center text-sm font-medium text-[var(--ui-text-secondary)]"
             style={{ width: LEFT_W, height: ROW_H, flexShrink: 0 }}>
             <span className="shrink-0 truncate text-left pl-2" style={{ width: CODE_W }}>任务编号</span>
             <span className="px-1 flex-1 min-w-0 truncate text-left">任务名称</span>
@@ -486,7 +486,7 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
         </div>
         {/* 内容行:左侧任务列表 + 右侧图表,共用同一滚动容器 */}
         <div className="flex" style={{ width: LEFT_W + chartW }}>
-          <div className="sticky left-0 z-20 bg-white" style={{ width: LEFT_W, flexShrink: 0 }}>
+          <div className="sticky left-0 z-20 bg-[var(--ui-bg-surface)]" style={{ width: LEFT_W, flexShrink: 0 }}>
             <SharedLeftPanel
               tasks={visibleTasks}
               expanded={expanded}

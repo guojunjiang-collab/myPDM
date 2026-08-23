@@ -95,7 +95,7 @@ export const STATUS_FILL: Record<string, string> = {
 
 // 左侧状态列的徽章配色(与项目详情表一致)
 export const STATUS_BADGE: Record<string, string> = {
-  未开始: 'bg-gray-100 text-gray-600',
+  未开始: 'bg-gray-100 text-[var(--ui-text-secondary)]',
   进行中: 'bg-blue-50 text-blue-700',
   已完成: 'bg-green-50 text-green-700',
   挂起: 'bg-amber-50 text-amber-700',

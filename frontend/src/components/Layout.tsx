@@ -121,10 +121,10 @@ export default function Layout() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-[var(--ui-bg-subtle)]">
       {/* 侧边栏 */}
-      <aside className="w-56 min-w-56 bg-white border-r border-gray-200 flex flex-col">
-        <div className="h-14 bg-white border-b border-gray-200 flex items-center px-4">
+      <aside className="w-56 min-w-56 bg-[var(--ui-bg-surface)] border-r border-[var(--ui-border)] flex flex-col">
+        <div className="h-14 bg-[var(--ui-bg-surface)] border-b border-[var(--ui-border)] flex items-center px-4">
           <h1 className="text-lg font-semibold">🏗️ {import.meta.env.VITE_APP_TITLE || 'PDM系统'}</h1>
         </div>
         <nav className="flex-1 p-2">
@@ -138,7 +138,7 @@ export default function Layout() {
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg mb-1 transition-colors ${
                   location.pathname === item.path
                     ? 'bg-primary-50 text-primary-600'
-                    : 'text-gray-600 hover:bg-gray-100'
+                    : 'text-[var(--ui-text-secondary)] hover:bg-[var(--ui-bg-hover)]'
                 }`}
               >
                 <span>{item.icon}</span>
@@ -147,20 +147,20 @@ export default function Layout() {
             )
           )}
         </nav>
-        <div className="p-2 border-t border-gray-200">
+        <div className="p-2 border-t border-[var(--ui-border)]">
           {syncMsg && (
             <div className={`text-xs px-2 py-1 rounded text-center mb-1 ${syncMsg.includes('成功') || syncMsg.includes('已清除') ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
               {syncMsg}
             </div>
           )}
-          <div className="text-xs text-gray-400 text-center">{APP_VERSION} · {import.meta.env.VITE_APP_TITLE || 'PDM系统'}</div>
+          <div className="text-xs text-[var(--ui-text-tertiary)] text-center">{APP_VERSION} · {import.meta.env.VITE_APP_TITLE || 'PDM系统'}</div>
         </div>
       </aside>
 
       {/* 主内容区 */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* 顶部栏 */}
-        <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4">
+        <header className="h-14 bg-[var(--ui-bg-surface)] border-b border-[var(--ui-border)] flex items-center justify-between px-4">
           <div className="left">
             {headerContent ?? (
               <span className="text-lg font-semibold text-gray-800">
@@ -174,7 +174,7 @@ export default function Layout() {
               <span className={`inline-block w-2 h-2 rounded-full ${
                 syncError ? 'bg-red-500' : isSyncing ? 'bg-yellow-400 animate-pulse' : 'bg-green-500'
               }`}></span>
-              <span className="text-gray-400">
+              <span className="text-[var(--ui-text-tertiary)]">
                 {syncError ? '同步失败' : isSyncing ? '同步中' : `已同步 (${lastSyncText})`}
               </span>
               {syncError && (
@@ -199,7 +199,7 @@ export default function Layout() {
             </button>
             <button
               onClick={handleLogout}
-              className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+              className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-[var(--ui-bg-hover)]"
             >
               退出登录
             </button>

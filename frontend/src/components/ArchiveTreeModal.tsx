@@ -38,7 +38,7 @@ function TreeNodeItem({ node, depth, attId, token }: { node: ArchiveTreeNode; de
 
   return (
     <React.Fragment>
-      <tr className={`hover:bg-gray-50 ${isDir ? 'cursor-pointer' : ''}`}
+      <tr className={`hover:bg-[var(--ui-bg-hover)] ${isDir ? 'cursor-pointer' : ''}`}
         onClick={() => { if (isDir) setExpanded(!expanded); }}>
         <td className="px-3 py-1.5 text-xs whitespace-nowrap" style={{ paddingLeft: `calc(16px + ${depth} * var(--ui-tree-indent))` }}>
           <span className="inline-flex items-center gap-1">
@@ -50,7 +50,7 @@ function TreeNodeItem({ node, depth, attId, token }: { node: ArchiveTreeNode; de
             <span className={isDir ? 'font-medium' : ''}>{isDir ? '📁 ' : '📄 '}{node.name}</span>
           </span>
         </td>
-        <td className="px-2 py-1.5 text-xs text-gray-500 w-20 text-right">
+        <td className="px-2 py-1.5 text-xs text-[var(--ui-text-secondary)] w-20 text-right">
           {isDir ? '-' : formatSize(node.size)}
         </td>
         <td className="px-2 py-1.5 text-center w-24" onClick={e => e.stopPropagation()}>
@@ -111,19 +111,19 @@ export default function ArchiveTreeModal({
   return (
     <Modal open={open} title={`压缩包预览：${fileName}`} onClose={onClose} width="lg">
       {loading ? (
-        <div className="py-8 text-center text-sm text-gray-400">读取中...</div>
+        <div className="py-8 text-center text-sm text-[var(--ui-text-tertiary)]">读取中...</div>
       ) : error ? (
         <div className="py-8 text-center text-sm text-red-500">{error}</div>
       ) : data ? (
         <>
-          <div className="flex gap-4 mb-3 px-2 text-xs text-gray-500">
+          <div className="flex gap-4 mb-3 px-2 text-xs text-[var(--ui-text-secondary)]">
             <span>共 {data.total_files} 个文件</span>
             <span>总大小 {formatSize(data.total_size)}</span>
           </div>
           <div className="border rounded-lg overflow-auto max-h-[60vh]">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-gray-50 text-xs text-gray-500 border-b">
+                  <tr className="bg-[var(--ui-bg-subtle)] text-xs text-[var(--ui-text-secondary)] border-b">
                     <th className="px-3 py-1.5 text-left">名称</th>
                     <th className="px-2 py-1.5 text-right w-20">大小</th>
                     <th className="px-2 py-1.5 text-center w-24">操作</th>

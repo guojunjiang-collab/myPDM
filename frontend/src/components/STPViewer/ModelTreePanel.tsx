@@ -6,7 +6,7 @@ function Chevron({ expanded }: { expanded: boolean }) {
   return (
     <svg
       viewBox="0 0 16 16"
-      className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
+      className={`w-3.5 h-3.5 text-[var(--ui-text-tertiary)] transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
       fill="currentColor"
     >
       <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
@@ -69,7 +69,7 @@ function NodeRow({ node, depth }: { node: TreeNode; depth: number }) {
         ref={rowRef}
         onClick={() => { if (!noModel) selectNode(node.id); }}
         className={`group flex items-center gap-0.5 py-0.5 pr-2 cursor-pointer select-none text-sm transition-colors relative
-          ${selected ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}
+          ${selected ? 'bg-blue-50 text-blue-700' : 'text-[var(--ui-text-secondary)] hover:bg-[var(--ui-bg-hover)]'}`}
         style={{ paddingLeft: indent }}
         title={node.name}
       >
@@ -93,7 +93,7 @@ function NodeRow({ node, depth }: { node: TreeNode; depth: number }) {
           <button
             onClick={(e) => { e.stopPropagation(); toggleNodeVisibility(node); }}
             className={`w-4 h-4 flex items-center justify-center shrink-0 rounded transition-colors
-              ${visible ? 'text-gray-400 hover:text-blue-500 hover:bg-blue-50' : 'text-gray-300 hover:text-gray-400'}`}
+              ${visible ? 'text-[var(--ui-text-tertiary)] hover:text-blue-500 hover:bg-blue-50' : 'text-gray-300 hover:text-[var(--ui-text-tertiary)]'}`}
           >
             <EyeIcon visible={visible} />
           </button>
@@ -102,14 +102,14 @@ function NodeRow({ node, depth }: { node: TreeNode; depth: number }) {
         )}
 
         {/* Name */}
-        <span className={`truncate flex-1 ml-0.5 ${noModel ? 'text-gray-400 italic' : ''} ${visible ? '' : 'text-gray-300 line-through'}`}>
+        <span className={`truncate flex-1 ml-0.5 ${noModel ? 'text-[var(--ui-text-tertiary)] italic' : ''} ${visible ? '' : 'text-gray-300 line-through'}`}>
           {node.name}
-          {noModel && <span className="text-xs ml-1 text-gray-400">(无模型)</span>}
+          {noModel && <span className="text-xs ml-1 text-[var(--ui-text-tertiary)]">(无模型)</span>}
         </span>
 
         {/* Child count badge */}
         {isGroup && (
-          <span className="text-sm text-gray-400 tabular-nums bg-gray-100 rounded px-1 py-px ml-1">
+          <span className="text-sm text-[var(--ui-text-tertiary)] tabular-nums bg-gray-100 rounded px-1 py-px ml-1">
             {node.children.length}
           </span>
         )}
@@ -136,21 +136,21 @@ export function ModelTreePanel() {
   if (loadingState !== 'ready' || !treeData) return null;
 
   return (
-    <div className="flex flex-col h-full bg-white border-r border-gray-200">
+    <div className="flex flex-col h-full bg-[var(--ui-bg-surface)] border-r border-[var(--ui-border)]">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-100">
-        <span className="text-sm font-semibold text-gray-500 uppercase tracking-wider">模型树</span>
+        <span className="text-sm font-semibold text-[var(--ui-text-secondary)] uppercase tracking-wider">模型树</span>
         <button
           onClick={() => selectNode(null)}
-          className="text-sm text-gray-400 hover:text-blue-500 transition-colors"
+          className="text-sm text-[var(--ui-text-tertiary)] hover:text-blue-500 transition-colors"
         >
           取消选中
         </button>
       </div>
 
       {/* Isolate mode toggle */}
-      <label className="flex items-center justify-between px-3 py-1.5 border-b border-gray-100 cursor-pointer select-none hover:bg-gray-50/50 transition-colors">
-        <span className="text-sm text-gray-500">隔离模式</span>
+      <label className="flex items-center justify-between px-3 py-1.5 border-b border-gray-100 cursor-pointer select-none hover:bg-[var(--ui-bg-hover)] transition-colors">
+        <span className="text-sm text-[var(--ui-text-secondary)]">隔离模式</span>
         <div className="relative">
           <input
             type="checkbox"
@@ -159,7 +159,7 @@ export function ModelTreePanel() {
             className="sr-only"
           />
           <div className={`w-7 h-4 rounded-full transition-colors ${isolateMode ? 'bg-blue-500' : 'bg-gray-200'}`}>
-            <div className={`w-3 h-3 rounded-full bg-white shadow-sm transition-transform mt-0.5 ${isolateMode ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+            <div className={`w-3 h-3 rounded-full bg-[var(--ui-bg-surface)] shadow-sm transition-transform mt-0.5 ${isolateMode ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
           </div>
         </div>
       </label>

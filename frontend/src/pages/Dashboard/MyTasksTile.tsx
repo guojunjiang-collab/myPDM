@@ -60,13 +60,13 @@ export function MyTasksTile({ onOverdue }: { onOverdue?: (n: number) => void }) 
       {loaded && items.length === 0 ? <EmptyState text="暂无指派给你的任务" /> : (
         <div className="flex flex-col gap-3 overflow-y-auto max-h-[360px] pr-1">
           {groups.map((g) => (
-            <div key={g.project.id} className="rounded-lg border border-gray-100 bg-gray-50">
+            <div key={g.project.id} className="rounded-lg border border-gray-100 bg-[var(--ui-bg-subtle)]">
               <Link
                 to={`/projects?project_id=${g.project.id}`}
-                className="block px-3 py-1.5 border-b border-gray-200 text-sm font-medium text-gray-500 hover:text-blue-600"
+                className="block px-3 py-1.5 border-b border-[var(--ui-border)] text-sm font-medium text-[var(--ui-text-secondary)] hover:text-blue-600"
               >
                 {g.project.code} · {g.project.name}
-                <span className="text-gray-400 ml-1">({g.tasks.length})</span>
+                <span className="text-[var(--ui-text-tertiary)] ml-1">({g.tasks.length})</span>
               </Link>
               {g.tasks.map((t) => {
                 const od = overdueDays(t.planned_end, now);
@@ -76,15 +76,15 @@ export function MyTasksTile({ onOverdue }: { onOverdue?: (n: number) => void }) 
                   <Link
                     key={t.task_id}
                     to={`/projects?project_id=${t.project_id}&task_id=${t.task_id}`}
-                    className={`block px-3 py-1.5 hover:bg-gray-100 transition-colors ${od > 0 ? 'bg-red-50/50' : ''}`}
+                    className={`block px-3 py-1.5 hover:bg-[var(--ui-bg-hover)] transition-colors ${od > 0 ? 'bg-red-50/50' : ''}`}
                   >
                     <div className="flex items-center gap-2 text-sm min-w-0">
-                      <span className="text-gray-500 shrink-0" title={t.code}>{t.code}</span>
+                      <span className="text-[var(--ui-text-secondary)] shrink-0" title={t.code}>{t.code}</span>
                       <span className={`shrink-0 ${od > 0 ? 'text-red-700' : 'text-gray-800'}`} title={t.name}>{t.name}</span>
-                      <span className="text-gray-400 truncate flex-1 min-w-0" title={t.description || ''}>{t.description || ''}</span>
+                      <span className="text-[var(--ui-text-tertiary)] truncate flex-1 min-w-0" title={t.description || ''}>{t.description || ''}</span>
                       <Badge status={t.status} domain="task" className="shrink-0" />
-                      <span className="text-gray-400 shrink-0">{startStr}</span>
-                      <span className="text-gray-400 shrink-0">{endStr}</span>
+                      <span className="text-[var(--ui-text-tertiary)] shrink-0">{startStr}</span>
+                      <span className="text-[var(--ui-text-tertiary)] shrink-0">{endStr}</span>
                     </div>
                   </Link>
                 );

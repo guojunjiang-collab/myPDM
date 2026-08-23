@@ -43,11 +43,11 @@ export default function WechatCallback() {
   if (bindingInfo.mode === 'binding') {
     const ok = bindingInfo.result === 'success';
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-md text-center">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--ui-bg-subtle)]">
+        <div className="w-full max-w-md p-8 bg-[var(--ui-bg-surface)] rounded-lg shadow-md text-center">
           <h1 className="text-xl font-semibold mb-4">{ok ? '绑定成功' : '绑定失败'}</h1>
           {!ok && <p className="text-sm text-red-600 mb-4">{bindingInfo.message || '未知错误'}</p>}
-          {ok && <p className="text-sm text-gray-500 mb-4">该微信入口已绑定到当前账号</p>}
+          {ok && <p className="text-sm text-[var(--ui-text-secondary)] mb-4">该微信入口已绑定到当前账号</p>}
           <Button variant="primary" onClick={() => navigate('/settings')}>
             返回系统设置
           </Button>
@@ -57,8 +57,8 @@ export default function WechatCallback() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-gray-500">正在登录...</div>
+    <div className="min-h-screen flex items-center justify-center bg-[var(--ui-bg-subtle)]">
+      <div className="text-[var(--ui-text-secondary)]">正在登录...</div>
     </div>
   );
 }

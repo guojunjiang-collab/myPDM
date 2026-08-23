@@ -170,17 +170,17 @@ export default function STPViewerPage() {
   // 对比模式的前置态
   if (compareLeftId && compareRightId) {
     if (cmpError) return <div className="w-screen h-screen flex items-center justify-center text-red-500">{cmpError}</div>;
-    if (state !== 'ready') return <div className="w-screen h-screen flex items-center justify-center text-gray-500">加载对比数据...</div>;
+    if (state !== 'ready') return <div className="w-screen h-screen flex items-center justify-center text-[var(--ui-text-secondary)]">加载对比数据...</div>;
   }
 
   // 装配模式的前置态（加载/空/错误）
   if (assemblyRevId) {
     if (asmError) return <div className="w-screen h-screen flex items-center justify-center text-red-500">{asmError}</div>;
-    if (!asmInstances) return <div className="w-screen h-screen flex items-center justify-center text-gray-500">加载中...</div>;
-    if (asmInstances.length === 0) return <div className="w-screen h-screen flex items-center justify-center text-gray-500">该装配暂无已摆位的零件（先导入装配 STEP）</div>;
+    if (!asmInstances) return <div className="w-screen h-screen flex items-center justify-center text-[var(--ui-text-secondary)]">加载中...</div>;
+    if (asmInstances.length === 0) return <div className="w-screen h-screen flex items-center justify-center text-[var(--ui-text-secondary)]">该装配暂无已摆位的零件（先导入装配 STEP）</div>;
   } else {
-    if (state === 'checking') return <div className="w-screen h-screen flex items-center justify-center text-gray-500">加载中...</div>;
-    if (state === 'converting') return <div className="w-screen h-screen flex items-center justify-center text-gray-500">模型转换中，请稍后...</div>;
+    if (state === 'checking') return <div className="w-screen h-screen flex items-center justify-center text-[var(--ui-text-secondary)]">加载中...</div>;
+    if (state === 'converting') return <div className="w-screen h-screen flex items-center justify-center text-[var(--ui-text-secondary)]">模型转换中，请稍后...</div>;
     if (state === 'error') return <div className="w-screen h-screen flex items-center justify-center text-red-500">加载失败，请关闭后重试</div>;
   }
 
@@ -215,7 +215,7 @@ export default function STPViewerPage() {
           })()}
           <ViewCube />
           {compareLeftId && compareRightId && cmpLeftInstances.length === 0 && cmpRightInstances.length === 0 && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center text-gray-500 pointer-events-none">
+            <div className="absolute inset-0 z-20 flex items-center justify-center text-[var(--ui-text-secondary)] pointer-events-none">
               两个部件均无 3D 模型
             </div>
           )}
@@ -224,8 +224,8 @@ export default function STPViewerPage() {
 
       {/* 单件模式下载/解析进度 */}
       {!assemblyRevId && state === 'loading' && (
-        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/90 gap-4">
-          <div className="text-gray-500 text-sm">正在下载模型... {downloadPct}%</div>
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-[var(--ui-bg-surface)] gap-4">
+          <div className="text-[var(--ui-text-secondary)] text-sm">正在下载模型... {downloadPct}%</div>
           <div className="w-72 h-2 bg-gray-200 rounded-full overflow-hidden">
             <div className="h-full bg-blue-500 rounded-full transition-all duration-300" style={{ width: `${downloadPct}%` }} />
           </div>
@@ -239,26 +239,26 @@ export default function STPViewerPage() {
       )}
       {/* 单件：解析渲染中（非阻塞角标） */}
       {!assemblyRevId && url && state === 'ready' && loadingState !== 'ready' && loadingState !== 'error' && (
-        <div className="absolute top-3 right-3 z-30 flex items-center gap-2 bg-white/90 rounded-full shadow px-3 py-1.5 pointer-events-none">
+        <div className="absolute top-3 right-3 z-30 flex items-center gap-2 bg-[var(--ui-bg-surface)] rounded-full shadow px-3 py-1.5 pointer-events-none">
           <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-green-500 border-t-transparent" />
-          <span className="text-gray-600 text-xs">正在解析渲染...</span>
+          <span className="text-[var(--ui-text-secondary)] text-xs">正在解析渲染...</span>
         </div>
       )}
 
       {/* 装配：流式加载进度（非阻塞角标） */}
       {(assemblyRevId || (compareLeftId && compareRightId)) && streamProgress && streamProgress.loaded < streamProgress.total && (
-        <div className="absolute top-3 right-3 z-30 flex items-center gap-2 bg-white/90 rounded-full shadow px-3 py-1.5 pointer-events-none">
+        <div className="absolute top-3 right-3 z-30 flex items-center gap-2 bg-[var(--ui-bg-surface)] rounded-full shadow px-3 py-1.5 pointer-events-none">
           <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-blue-500 border-t-transparent" />
-          <span className="text-gray-600 text-xs tabular-nums">
+          <span className="text-[var(--ui-text-secondary)] text-xs tabular-nums">
             已加载 {streamProgress.loaded}/{streamProgress.total}
           </span>
         </div>
       )}
       {loadingState === 'error' && (
-        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/90 gap-4">
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-[var(--ui-bg-surface)] gap-4">
           <div className="text-red-500 text-sm">模型加载失败</div>
-          {errorMessage && <div className="text-gray-400 text-xs">{errorMessage}</div>}
-          <div className="text-gray-400 text-xs mt-1">请关闭后重试</div>
+          {errorMessage && <div className="text-[var(--ui-text-tertiary)] text-xs">{errorMessage}</div>}
+          <div className="text-[var(--ui-text-tertiary)] text-xs mt-1">请关闭后重试</div>
         </div>
       )}
     </div>

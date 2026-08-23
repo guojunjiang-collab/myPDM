@@ -334,14 +334,14 @@ export default function Users() {
   return (
     <div>
       {/* Tab 切换栏 */}
-      <div className="flex gap-2 mb-4 border-b border-gray-200">
+      <div className="flex gap-2 mb-4 border-b border-[var(--ui-border)]">
         <button
-          className={`px-4 py-2 -mb-px border-b-2 ${activeTab === 'all' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-gray-500'}`}
+          className={`px-4 py-2 -mb-px border-b-2 ${activeTab === 'all' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-[var(--ui-text-secondary)]'}`}
           onClick={() => setActiveTab('all')}
         >全部用户</button>
         {isAdmin() && (
           <button
-            className={`px-4 py-2 -mb-px border-b-2 ${activeTab === 'pending' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-gray-500'}`}
+            className={`px-4 py-2 -mb-px border-b-2 ${activeTab === 'pending' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-[var(--ui-text-secondary)]'}`}
             onClick={() => setActiveTab('pending')}
           >
             待审批
@@ -352,7 +352,7 @@ export default function Users() {
         )}
         {can('user_groups:read' as any) && (
           <button
-            className={`px-4 py-2 -mb-px border-b-2 ${activeTab === 'groups' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-gray-500'}`}
+            className={`px-4 py-2 -mb-px border-b-2 ${activeTab === 'groups' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-[var(--ui-text-secondary)]'}`}
             onClick={() => setActiveTab('groups')}
           >用户组</button>
         )}
@@ -400,37 +400,37 @@ export default function Users() {
       </div>
 
       {/* 列表 */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-hidden">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
             <tr>
-              <th onClick={() => handleSort('username' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">用户名 {getSortIcon('username' as keyof User)}</th>
-              <th onClick={() => handleSort('real_name' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">姓名 {getSortIcon('real_name' as keyof User)}</th>
-              <th onClick={() => handleSort('role' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">角色 {getSortIcon('role' as keyof User)}</th>
-              <th onClick={() => handleSort('department' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">部门 {getSortIcon('department' as keyof User)}</th>
-              <th onClick={() => handleSort('status' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">状态 {getSortIcon('status' as keyof User)}</th>
-              <th onClick={() => handleSort('created_at' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none">创建时间 {getSortIcon('created_at' as keyof User)}</th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">操作</th>
+              <th onClick={() => handleSort('username' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none">用户名 {getSortIcon('username' as keyof User)}</th>
+              <th onClick={() => handleSort('real_name' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none">姓名 {getSortIcon('real_name' as keyof User)}</th>
+              <th onClick={() => handleSort('role' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none">角色 {getSortIcon('role' as keyof User)}</th>
+              <th onClick={() => handleSort('department' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none">部门 {getSortIcon('department' as keyof User)}</th>
+              <th onClick={() => handleSort('status' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none">状态 {getSortIcon('status' as keyof User)}</th>
+              <th onClick={() => handleSort('created_at' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none">创建时间 {getSortIcon('created_at' as keyof User)}</th>
+              <th className="px-4 py-3 text-right text-sm font-medium text-[var(--ui-text-secondary)]">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td></tr>
             ) : displayData.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">暂无数据</td></tr>
             ) : (
               displayData.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50">
+                <tr key={user.id} className="hover:bg-[var(--ui-bg-hover)]">
                   <td className="px-4 py-3 text-sm font-medium">{user.username}</td>
                   <td className="px-4 py-3 text-sm">{user.real_name}</td>
                   <td className="px-4 py-3">
                     <RoleTag role={user.role} />
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{user.department || '-'}</td>
+                  <td className="px-4 py-3 text-sm text-[var(--ui-text-secondary)]">{user.department || '-'}</td>
                   <td className="px-4 py-3">
                     <StatusTag status={user.status} />
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{formatDateTime(user.created_at)}</td>
+                  <td className="px-4 py-3 text-sm text-[var(--ui-text-secondary)]">{formatDateTime(user.created_at)}</td>
                 <td className="px-4 py-3 text-right">
                     {isAdmin() && (
                       <>
@@ -464,7 +464,7 @@ export default function Users() {
                 placeholder="3-64个字符"
               />
               {editingUser && (
-                <p className="text-xs text-gray-400 mt-1">用户名不可修改</p>
+                <p className="text-xs text-[var(--ui-text-tertiary)] mt-1">用户名不可修改</p>
               )}
             </div>
           )}
@@ -539,8 +539,8 @@ export default function Users() {
           {isAdmin() && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">所属组</label>
-              <div className="max-h-32 overflow-auto border border-gray-200 rounded p-2">
-                {groups.length === 0 && <span className="text-gray-400 text-sm">暂无用户组</span>}
+              <div className="max-h-32 overflow-auto border border-[var(--ui-border)] rounded p-2">
+                {groups.length === 0 && <span className="text-[var(--ui-text-tertiary)] text-sm">暂无用户组</span>}
                 {groups.map((g) => (
                   <label key={g.id} className="flex items-center gap-2 py-0.5">
                     <input
@@ -620,14 +620,14 @@ export default function Users() {
             </h2>
           </div>
           {unverifiedUsers.length === 0 ? (
-            <div className="text-center py-16 text-gray-400">
+            <div className="text-center py-16 text-[var(--ui-text-tertiary)]">
               <div className="text-4xl mb-3">&#x2705;</div>
               <p>暂无待审批用户</p>
             </div>
           ) : (
             <table className="w-full">
               <thead>
-                <tr className="border-b bg-gray-50 text-left text-sm text-gray-600">
+                <tr className="border-b bg-[var(--ui-bg-subtle)] text-left text-sm text-[var(--ui-text-secondary)]">
                   <th className="px-4 py-2.5">用户名</th>
                   <th className="px-4 py-2.5">姓名</th>
                   <th className="px-4 py-2.5">申请时间</th>
@@ -636,13 +636,13 @@ export default function Users() {
               </thead>
               <tbody>
                 {unverifiedUsers.map((u) => (
-                  <tr key={u.id} className="border-b hover:bg-gray-50 text-sm">
+                  <tr key={u.id} className="border-b hover:bg-[var(--ui-bg-hover)] text-sm">
                     <td className="px-4 py-2.5 font-medium text-gray-800">{u.username}</td>
-                    <td className="px-4 py-2.5 text-gray-600">{u.real_name || '-'}</td>
-                    <td className="px-4 py-2.5 text-gray-500">{u.created_at?.slice(0, 10) || '-'}</td>
+                    <td className="px-4 py-2.5 text-[var(--ui-text-secondary)]">{u.real_name || '-'}</td>
+                    <td className="px-4 py-2.5 text-[var(--ui-text-secondary)]">{u.created_at?.slice(0, 10) || '-'}</td>
                     <td className="px-4 py-2.5">
                       {approvingId === u.id ? (
-                        <span className="text-gray-400 text-xs">处理中...</span>
+                        <span className="text-[var(--ui-text-tertiary)] text-xs">处理中...</span>
                       ) : (
                         <Select
                           size="xs"
@@ -677,18 +677,18 @@ export default function Users() {
               >新建用户组</Button>
             )}
           </div>
-          <table className="min-w-full divide-y divide-gray-200 bg-white rounded-lg border border-gray-200">
-            <thead className="bg-gray-50 border-b border-gray-200"><tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">名称</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">描述</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">成员数</th>
-              {isAdmin() && <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">操作</th>}
+          <table className="min-w-full divide-y divide-gray-200 bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)]">
+            <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]"><tr>
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">名称</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">描述</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">成员数</th>
+              {isAdmin() && <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">操作</th>}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
               {groups.map((g) => (
-                <tr key={g.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => viewGroupDetail(g.id)}>
+                <tr key={g.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => viewGroupDetail(g.id)}>
                   <td className="px-4 py-2 text-sm font-medium">{g.name}</td>
-                  <td className="px-4 py-2 text-sm text-gray-600">{g.description || '-'}</td>
+                  <td className="px-4 py-2 text-sm text-[var(--ui-text-secondary)]">{g.description || '-'}</td>
                   <td className="px-4 py-2 text-sm">{g.member_count}</td>
                   {isAdmin() && (
                     <td className="px-4 py-2 text-sm space-x-2" onClick={(e) => e.stopPropagation()}>
@@ -699,7 +699,7 @@ export default function Users() {
                 </tr>
               ))}
               {groups.length === 0 && (
-                <tr><td colSpan={isAdmin() ? 4 : 3} className="px-4 py-8 text-center text-gray-500">暂无用户组</td></tr>
+                <tr><td colSpan={isAdmin() ? 4 : 3} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">暂无用户组</td></tr>
               )}
             </tbody>
           </table>
@@ -710,8 +710,8 @@ export default function Users() {
       <Modal open={groupModalOpen} title={editingGroup ? '编辑用户组' : '新建用户组'} onClose={() => setGroupModalOpen(false)} width="lg">
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">名称 <span className="text-red-500">*</span></label>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">名称 <span className="text-red-500">*</span></label>
               <Input
                 type="text"
                 value={groupForm.name}
@@ -721,8 +721,8 @@ export default function Users() {
                 maxLength={64}
               />
             </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">描述</label>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">描述</label>
               <Input
                 type="text"
                 value={groupForm.description}
@@ -741,27 +741,27 @@ export default function Users() {
               onChange={(e) => setMemberSearch(e.target.value)}
               className="mb-2"
             />
-            <div className="max-h-52 overflow-auto border border-gray-200 rounded-lg">
+            <div className="max-h-52 overflow-auto border border-[var(--ui-border)] rounded-lg">
               {users.filter((u) => {
                 if (!memberSearch.trim()) return true;
                 const kw = memberSearch.trim().toLowerCase();
                 return u.real_name.toLowerCase().includes(kw) || u.username.toLowerCase().includes(kw);
               }).length === 0 ? (
-                <div className="text-sm text-gray-400 py-4 text-center">无匹配用户</div>
+                <div className="text-sm text-[var(--ui-text-tertiary)] py-4 text-center">无匹配用户</div>
               ) : (
                 users.filter((u) => {
                   if (!memberSearch.trim()) return true;
                   const kw = memberSearch.trim().toLowerCase();
                   return u.real_name.toLowerCase().includes(kw) || u.username.toLowerCase().includes(kw);
                 }).map((u) => (
-                  <label key={u.id} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
+                  <label key={u.id} className="flex items-center gap-2 px-3 py-1.5 hover:bg-[var(--ui-bg-hover)] cursor-pointer">
                     <input
                       type="checkbox"
                       checked={memberSelectedIds.includes(String(u.id))}
                       onChange={(e) => setMemberSelectedIds((prev) =>
                         e.target.checked ? [...prev, String(u.id)] : prev.filter((x) => x !== String(u.id)))}
                     />
-                    <span className="text-sm">{u.real_name}（{u.username}）<span className="text-gray-400 ml-1">{u.role}</span></span>
+                    <span className="text-sm">{u.real_name}（{u.username}）<span className="text-[var(--ui-text-tertiary)] ml-1">{u.role}</span></span>
                   </label>
                 ))
               )}
@@ -782,37 +782,37 @@ export default function Users() {
           <Modal open={!!viewingGroupId} title="用户组详情" onClose={() => setViewingGroupId(null)} width="md">
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                  <div className="text-xs text-gray-500 mb-0.5">名称</div>
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                  <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">名称</div>
                   <div className="text-sm font-medium">{g?.name || '-'}</div>
                 </div>
-                <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                  <div className="text-xs text-gray-500 mb-0.5">成员数</div>
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                  <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">成员数</div>
                   <div className="text-sm font-medium">{viewingGroupMembers.length}</div>
                 </div>
-                <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 col-span-2">
-                  <div className="text-xs text-gray-500 mb-0.5">描述</div>
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100 col-span-2">
+                  <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">描述</div>
                   <div className="text-sm">{g?.description || '-'}</div>
                 </div>
               </div>
               <div className="border-t pt-3">
                 <h4 className="text-sm font-medium text-gray-700 mb-2">成员列表</h4>
                 {memberUsers.length === 0 ? (
-                  <div className="text-sm text-gray-400 py-4 text-center border border-dashed border-gray-300 rounded-lg">暂无成员</div>
+                  <div className="text-sm text-[var(--ui-text-tertiary)] py-4 text-center border border-dashed border-gray-300 rounded-lg">暂无成员</div>
                 ) : (
                   <table className="w-full text-sm border rounded-lg overflow-hidden">
-                    <thead className="bg-gray-50 border-b">
+                    <thead className="bg-[var(--ui-bg-subtle)] border-b">
                       <tr>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium">姓名</th>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium">用户名</th>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium">角色</th>
+                        <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">姓名</th>
+                        <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">用户名</th>
+                        <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">角色</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {memberUsers.map((u) => (
                         <tr key={u.id}>
                           <td className="px-3 py-2">{u.real_name}</td>
-                          <td className="px-3 py-2 text-gray-500">{u.username}</td>
+                          <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{u.username}</td>
                           <td className="px-3 py-2"><RoleTag role={u.role} /></td>
                         </tr>
                       ))}

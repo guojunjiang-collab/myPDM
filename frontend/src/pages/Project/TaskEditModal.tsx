@@ -299,26 +299,26 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
         {/* === 核心信息区 === */}
         <div className="shrink-0 mb-3">
           <div className="grid grid-cols-6 gap-3">
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <div className="text-xs text-gray-500 mb-0.5">编号</div>
-              <div className="text-sm text-gray-900 font-medium font-mono py-1">{task?.code || '—'}</div>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">编号</div>
+              <div className="text-sm text-[var(--ui-text-primary)] font-medium font-mono py-1">{task?.code || '—'}</div>
             </div>
-            <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">名称 <span className="text-red-500">*</span></label>
+            <div className="col-span-2 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">名称 <span className="text-red-500">*</span></label>
               <Input size="xs" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">类型</label>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">类型</label>
               <Select size="xs" value={form.task_type} onChange={(e) => setForm({ ...form, task_type: e.target.value as TaskType })}>
                 {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
               </Select>
             </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">状态</label>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">状态</label>
               <Badge status={form.status} domain="task" />
             </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">优先级</label>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">优先级</label>
               <Select size="xs" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as TaskPriority })}>
                 {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
               </Select>
@@ -328,14 +328,14 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
 
         {/* === TAB 区（编辑模式：显示 TAB，新建模式：直接显示表单） === */}
         {task ? (
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
-            <div className="flex border-b border-gray-200 shrink-0">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-hidden flex-1 min-h-0 flex flex-col">
+            <div className="flex border-b border-[var(--ui-border)] shrink-0">
               {([['info', '基本信息'], ['links', '关联对象'], ['comments', '评论'], ['logs', '操作记录']] as [typeof tab, string][]).map(([key, label]) => (
                 <button
                   key={key}
                   onClick={() => setTab(key)}
                   className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                    tab === key ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+                    tab === key ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'
                   }`}
                 >
                   {label}
@@ -360,33 +360,33 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                   <div>
                     <h4 className="text-sm font-semibold text-gray-700 mb-2">计划周期</h4>
                     <div className="grid grid-cols-4 gap-3">
-                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                        <div className="text-xs text-gray-500 mb-0.5">
+                      <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                        <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">
                           计划开始{hasChildren && <span className="text-primary-600 ml-1">（子任务汇总）</span>}
                         </div>
                         <Input size="xs" type="date" value={form.planned_start}
                                onChange={(e) => setForm({ ...form, planned_start: e.target.value })}
                                disabled={hasChildren}
                                title={hasChildren ? '有子任务，计划周期由子任务统计而来，不可手动修改' : undefined}
-                               className="disabled:cursor-not-allowed disabled:text-gray-400" />
+                               className="disabled:cursor-not-allowed disabled:text-[var(--ui-text-tertiary)]" />
                       </div>
-                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                        <div className="text-xs text-gray-500 mb-0.5">
+                      <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                        <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">
                           计划完成{hasChildren && <span className="text-primary-600 ml-1">（子任务汇总）</span>}
                         </div>
                         <Input size="xs" type="date" value={form.planned_end}
                                onChange={(e) => setForm({ ...form, planned_end: e.target.value })}
                                disabled={hasChildren}
                                title={hasChildren ? '有子任务，计划周期由子任务统计而来，不可手动修改' : undefined}
-                               className="disabled:cursor-not-allowed disabled:text-gray-400" />
+                               className="disabled:cursor-not-allowed disabled:text-[var(--ui-text-tertiary)]" />
                       </div>
-                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                        <div className="text-xs text-gray-500 mb-0.5">实际开始</div>
-                        <div className="text-sm text-gray-400 py-1">{form.actual_start || '—'}</div>
+                      <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                        <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">实际开始</div>
+                        <div className="text-sm text-[var(--ui-text-tertiary)] py-1">{form.actual_start || '—'}</div>
                       </div>
-                      <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                        <div className="text-xs text-gray-500 mb-0.5">实际完成</div>
-                        <div className="text-sm text-gray-400 py-1">{form.actual_end || '—'}</div>
+                      <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                        <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">实际完成</div>
+                        <div className="text-sm text-[var(--ui-text-tertiary)] py-1">{form.actual_end || '—'}</div>
                       </div>
                     </div>
                   </div>
@@ -430,7 +430,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                                 onFocus={() => setTaskDropOpen(true)}
                               />
                               {taskDropOpen && (
-                                <div className="absolute z-50 mt-1 w-72 bg-white border border-gray-200 rounded shadow-lg max-h-48 overflow-y-auto">
+                                <div className="absolute z-50 mt-1 w-72 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded shadow-lg max-h-48 overflow-y-auto">
                                   {allTasks
                                     .filter(t => {
                                       const q = depTaskSearch.toLowerCase();
@@ -446,14 +446,14 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                                           setTaskDropOpen(false);
                                         }}
                                       >
-                                        <span className="font-mono text-xs text-gray-500 mr-1">{t.code}</span>{t.name}
+                                        <span className="font-mono text-xs text-[var(--ui-text-secondary)] mr-1">{t.code}</span>{t.name}
                                       </div>
                                     ))}
                                   {allTasks.filter(t => {
                                     const q = depTaskSearch.toLowerCase();
                                     return !q || t.code.toLowerCase().includes(q) || t.name.toLowerCase().includes(q);
                                   }).length === 0 && (
-                                    <div className="px-3 py-2 text-sm text-gray-400">无匹配任务</div>
+                                    <div className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)]">无匹配任务</div>
                                   )}
                                 </div>
                               )}
@@ -489,16 +489,16 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                           return (
                             <li key={d.id} className="flex items-center gap-2 text-sm">
                               <Badge size="xs" tone={d.is_violation ? 'red' : 'gray'} label={d.dep_type} />
-                              <span className="text-gray-500">{isPred ? '后置→' : '←前置'}</span>
+                              <span className="text-[var(--ui-text-secondary)]">{isPred ? '后置→' : '←前置'}</span>
                               <span className="truncate">{other ? `${other.code} ${other.name}` : otherId}</span>
-                              {d.lag_days ? <span className="text-gray-400">lag {d.lag_days}d</span> : null}
+                              {d.lag_days ? <span className="text-[var(--ui-text-tertiary)]">lag {d.lag_days}d</span> : null}
                               {canEditDeps && (
                                 <Button variant="danger" size="xs" className="ml-auto" onClick={async () => { await projectApi.removeDep(projectId, d.id); loadDeps(); }}>删除</Button>
                               )}
                             </li>
                           );
                         })}
-                        {deps.length === 0 && <li className="text-xs text-gray-400">暂无依赖</li>}
+                        {deps.length === 0 && <li className="text-xs text-[var(--ui-text-tertiary)]">暂无依赖</li>}
                       </ul>
                     </div>
                   )}
@@ -518,19 +518,19 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                       </div>
                     </div>
                     {links.length > 0 ? (
-                      <div className="border border-gray-200 rounded-lg overflow-hidden max-h-48 overflow-y-auto">
+                      <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden max-h-48 overflow-y-auto">
                         <table className="w-full text-sm">
-                          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+                          <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
                             <tr>
-                              <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-20 whitespace-nowrap">类型</th>
-                              <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-36 whitespace-nowrap">件号</th>
-                              <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">名称</th>
-                              <th className="text-right px-3 py-2 text-xs font-medium text-gray-500 w-12">操作</th>
+                              <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-20 whitespace-nowrap">类型</th>
+                              <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-36 whitespace-nowrap">件号</th>
+                              <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">名称</th>
+                              <th className="text-right px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-12">操作</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
                             {links.map((l) => (
-                              <tr key={l.id} className="hover:bg-gray-50 cursor-pointer"
+                              <tr key={l.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer"
                                   onClick={() => {
                                     if (l.entity_type === 'part' || l.entity_type === 'assembly') {
                                       setDetailEntityId(l.entity_id);
@@ -554,7 +554,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                         </table>
                       </div>
                     ) : (
-                      <div className="text-xs text-gray-400 py-4">暂无关联</div>
+                      <div className="text-xs text-[var(--ui-text-tertiary)] py-4">暂无关联</div>
                     )}
                   </div>
                 </div>
@@ -572,7 +572,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{c.user_name}</span>
-                            <span className="text-xs text-gray-400">{formatDateTime(c.created_at)}</span>
+                            <span className="text-xs text-[var(--ui-text-tertiary)]">{formatDateTime(c.created_at)}</span>
                             <div className="flex-1" />
                             <Button variant="danger" size="xs" onClick={() => removeComment(c.id)}>删除</Button>
                           </div>
@@ -580,7 +580,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                         </div>
                       </div>
                     ))}
-                    {comments.length === 0 && <div className="text-xs text-gray-400 py-4">暂无评论</div>}
+                    {comments.length === 0 && <div className="text-xs text-[var(--ui-text-tertiary)] py-4">暂无评论</div>}
                   </div>
                   <div className="flex gap-2">
                     <Input value={newComment} onChange={(e) => setNewComment(e.target.value)}
@@ -595,28 +595,28 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
               {tab === 'logs' && (
                 <div>
                   {taskLogsLoading ? (
-                    <div className="text-center text-gray-400 py-8">加载中...</div>
+                    <div className="text-center text-[var(--ui-text-tertiary)] py-8">加载中...</div>
                   ) : taskLogs.length === 0 ? (
-                    <div className="text-center text-gray-400 py-8">暂无操作记录</div>
+                    <div className="text-center text-[var(--ui-text-tertiary)] py-8">暂无操作记录</div>
                   ) : (
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-50 border-b sticky top-0 z-10">
+                      <thead className="bg-[var(--ui-bg-subtle)] border-b sticky top-0 z-10">
                         <tr>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">时间</th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">用户</th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">操作</th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">详情</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">时间</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">用户</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">操作</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">详情</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {taskLogs.map((l) => (
                           <tr key={l.id}>
-                            <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{formatDateTime(l.created_at)}</td>
+                            <td className="px-3 py-2 text-[var(--ui-text-secondary)] whitespace-nowrap">{formatDateTime(l.created_at)}</td>
                             <td className="px-3 py-2">{l.username}</td>
                             <td className="px-3 py-2">
                               <Badge tone={logActionTone(l.action)} label={l.action} />
                             </td>
-                            <td className="px-3 py-2 text-gray-500">{l.detail || '-'}</td>
+                            <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{l.detail || '-'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -643,31 +643,31 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
             <div>
               <h4 className="text-sm font-semibold text-gray-700 mb-2">计划周期</h4>
               <div className="grid grid-cols-4 gap-3">
-                <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                  <div className="text-xs text-gray-500 mb-0.5">
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                  <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">
                     计划开始{hasChildren && <span className="text-primary-600 ml-1">（子任务汇总）</span>}
                   </div>
                   <Input size="xs" type="date" value={form.planned_start} onChange={(e) => setForm({ ...form, planned_start: e.target.value })}
                          disabled={hasChildren}
                          title={hasChildren ? '有子任务，计划周期由子任务统计而来，不可手动修改' : undefined}
-                         className="disabled:cursor-not-allowed disabled:text-gray-400" />
+                         className="disabled:cursor-not-allowed disabled:text-[var(--ui-text-tertiary)]" />
                 </div>
-                <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                  <div className="text-xs text-gray-500 mb-0.5">
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                  <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">
                     计划完成{hasChildren && <span className="text-primary-600 ml-1">（子任务汇总）</span>}
                   </div>
                   <Input size="xs" type="date" value={form.planned_end} onChange={(e) => setForm({ ...form, planned_end: e.target.value })}
                          disabled={hasChildren}
                          title={hasChildren ? '有子任务，计划周期由子任务统计而来，不可手动修改' : undefined}
-                         className="disabled:cursor-not-allowed disabled:text-gray-400" />
+                         className="disabled:cursor-not-allowed disabled:text-[var(--ui-text-tertiary)]" />
                 </div>
-                <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                  <div className="text-xs text-gray-500 mb-0.5">实际开始</div>
-                  <div className="text-sm text-gray-400 py-1">—</div>
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                  <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">实际开始</div>
+                  <div className="text-sm text-[var(--ui-text-tertiary)] py-1">—</div>
                 </div>
-                <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                  <div className="text-xs text-gray-500 mb-0.5">实际完成</div>
-                  <div className="text-sm text-gray-400 py-1">—</div>
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                  <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">实际完成</div>
+                  <div className="text-sm text-[var(--ui-text-tertiary)] py-1">—</div>
                 </div>
               </div>
             </div>

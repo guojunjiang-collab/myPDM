@@ -26,13 +26,13 @@ const txtColor = (s: string) =>
     : s === 'approved' ? 'text-primary-600'
       : s === 'rejected' ? 'text-red-600'
         : s === 'reviewing' ? 'text-amber-600'
-          : 'text-gray-500';
+          : 'text-[var(--ui-text-secondary)]';
 
 function InfoItem({ label, value, icon }: { label: string; value: string; icon?: string }) {
   return (
-    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-      <div className="text-sm text-gray-900 font-medium">
+    <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+      <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{label}</div>
+      <div className="text-sm text-[var(--ui-text-primary)] font-medium">
         {icon && <span className="mr-1">{icon}</span>}{value}
       </div>
     </div>
@@ -94,25 +94,25 @@ export default function DocumentDetail({ docId, onClose, onChanged }:
           {/* 明细 */}
           <div>
             <h4 className="text-sm font-semibold text-gray-700 mb-2">📋 明细</h4>
-            <div className="rounded-lg border border-gray-200 overflow-hidden">
+            <div className="rounded-lg border border-[var(--ui-border)] overflow-hidden">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
                   <tr>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">物料</th>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">批次</th>
-                    {doc.doc_type === 'adjustment' && <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">方向</th>}
-                    {doc.doc_type === 'stocktake' && <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">账面</th>}
-                    {doc.doc_type === 'stocktake' && <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">实盘</th>}
-                    <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">数量</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">物料</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">批次</th>
+                    {doc.doc_type === 'adjustment' && <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">方向</th>}
+                    {doc.doc_type === 'stocktake' && <th className="text-right px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">账面</th>}
+                    {doc.doc_type === 'stocktake' && <th className="text-right px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">实盘</th>}
+                    <th className="text-right px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">数量</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {(doc.lines || []).map((l) => (
                     <tr key={l.id}>
                       <td className="px-3 py-2 text-sm">{matName(l.material_id)}</td>
-                      <td className="px-3 py-2 text-sm text-gray-500">{l.batch_no || '-'}</td>
+                      <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{l.batch_no || '-'}</td>
                       {doc.doc_type === 'adjustment' && <td className="px-3 py-2 text-sm">{l.direction === 'out' ? '报损-' : '盘盈+'}</td>}
-                      {doc.doc_type === 'stocktake' && <td className="px-3 py-2 text-sm text-right text-gray-500">{l.book_quantity ?? '-'}</td>}
+                      {doc.doc_type === 'stocktake' && <td className="px-3 py-2 text-sm text-right text-[var(--ui-text-secondary)]">{l.book_quantity ?? '-'}</td>}
                       {doc.doc_type === 'stocktake' && (
                         <td className="px-3 py-2 text-right">
                           {doc.status === 'approved' && isKeeper ? (
@@ -135,21 +135,21 @@ export default function DocumentDetail({ docId, onClose, onChanged }:
             <h4 className="text-sm font-semibold text-gray-700 mb-2">
               👥 审批记录
               {(doc.reviewers || []).length > 0 && (
-                <span className="ml-2 text-xs font-normal text-gray-500">
+                <span className="ml-2 text-xs font-normal text-[var(--ui-text-secondary)]">
                   （{(doc.review_records || []).filter((r: any) => r.decision === 'approved').length}/{(doc.reviewers || []).length} 已通过 · {doc.review_mode === 'any' ? '或签' : '会签'}）
                 </span>
               )}
             </h4>
             {(doc.review_records || []).length === 0 ? (
-              <div className="text-center text-gray-400 py-3 text-sm border border-dashed border-gray-300 rounded-lg">暂无审批记录</div>
+              <div className="text-center text-[var(--ui-text-tertiary)] py-3 text-sm border border-dashed border-gray-300 rounded-lg">暂无审批记录</div>
             ) : (
               <div className="space-y-2">
                 {(doc.review_records || []).map((r: any) => (
-                  <div key={r.id} className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 text-sm">
-                    <span className="font-medium text-gray-900">{r.reviewer_name}</span>
+                  <div key={r.id} className="flex items-center gap-3 px-3 py-2 bg-[var(--ui-bg-subtle)] rounded-lg border border-[var(--ui-border)] text-sm">
+                    <span className="font-medium text-[var(--ui-text-primary)]">{r.reviewer_name}</span>
                     <Badge status={r.decision} domain="decision" />
-                    {r.comment && <span className="text-gray-500">{r.comment}</span>}
-                    <span className="ml-auto text-xs text-gray-400">{fmt(r.created_at)}</span>
+                    {r.comment && <span className="text-[var(--ui-text-secondary)]">{r.comment}</span>}
+                    <span className="ml-auto text-xs text-[var(--ui-text-tertiary)]">{fmt(r.created_at)}</span>
                   </div>
                 ))}
               </div>
@@ -168,13 +168,13 @@ export default function DocumentDetail({ docId, onClose, onChanged }:
                       {i < (doc.status_logs || []).length - 1 && <div className="w-0.5 flex-1 bg-gray-200 min-h-[16px]" />}
                     </div>
                     <div className="flex-1 pb-1">
-                      <div className="text-sm text-gray-900">
+                      <div className="text-sm text-[var(--ui-text-primary)]">
                         <span className="font-medium">{log.operator_name || '-'}</span>
-                        <span className="text-gray-400 mx-1">·</span>
+                        <span className="text-[var(--ui-text-tertiary)] mx-1">·</span>
                         <span className={txtColor(log.to_status)}>{BADGE_DOMAINS.inventoryDoc[log.to_status]?.label || log.to_status}</span>
                       </div>
-                      {log.comment && <div className="text-sm text-gray-500 mt-0.5">{log.comment}</div>}
-                      <div className="text-xs text-gray-400 mt-0.5">{fmt(log.created_at)}</div>
+                      {log.comment && <div className="text-sm text-[var(--ui-text-secondary)] mt-0.5">{log.comment}</div>}
+                      <div className="text-xs text-[var(--ui-text-tertiary)] mt-0.5">{fmt(log.created_at)}</div>
                     </div>
                   </div>
                 ))}
@@ -186,13 +186,13 @@ export default function DocumentDetail({ docId, onClose, onChanged }:
           {doc.remark && (
             <div>
               <h4 className="text-sm font-semibold text-gray-700 mb-2">📝 备注</h4>
-              <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap border border-gray-200">{doc.remark}</div>
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap border border-[var(--ui-border)]">{doc.remark}</div>
             </div>
           )}
 
           {/* 操作（其余动作在列表「操作」列；此处保留需详情上下文的改派/过账） */}
           {doc.status === 'approved' && (
-            <div className="flex flex-wrap gap-2 justify-end border-t border-gray-200 pt-4">
+            <div className="flex flex-wrap gap-2 justify-end border-t border-[var(--ui-border)] pt-4">
               <Select value={reassign} onChange={(e) => setReassign(e.target.value)}>
                 <option value="">改派库管员…</option>
                 {users.filter((u) => u.role !== 'guest').map((u) => (

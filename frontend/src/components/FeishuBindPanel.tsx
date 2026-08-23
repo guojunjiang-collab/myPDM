@@ -60,9 +60,9 @@ export default function FeishuBindPanel() {
 
   return (
     <div className="max-w-md">
-      <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+      <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] p-6 space-y-4">
         <h3 className="text-lg font-medium">飞书绑定</h3>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-[var(--ui-text-secondary)]">
           绑定后，飞书免登将直接进入当前账号；每个飞书入口只能绑定一个账号。
         </p>
         {error && (
@@ -71,16 +71,16 @@ export default function FeishuBindPanel() {
           </div>
         )}
         {loading ? (
-          <p className="text-sm text-gray-400">加载中...</p>
+          <p className="text-sm text-[var(--ui-text-tertiary)]">加载中...</p>
         ) : providers.length === 0 ? (
-          <p className="text-sm text-gray-400">未配置飞书应用</p>
+          <p className="text-sm text-[var(--ui-text-tertiary)]">未配置飞书应用</p>
         ) : (
           providers.map((p) => {
             const b = bindings[p.key];
             return (
               <div
                 key={p.key}
-                className="flex items-center justify-between border border-gray-200 rounded-lg px-4 py-3"
+                className="flex items-center justify-between border border-[var(--ui-border)] rounded-lg px-4 py-3"
               >
                 <div className="flex items-center gap-3">
                   {b?.avatar_url && (
@@ -89,9 +89,9 @@ export default function FeishuBindPanel() {
                   <div>
                     <p className="text-sm font-medium">{p.name}</p>
                     {b ? (
-                      <p className="text-xs text-gray-500">{b.name || '已绑定'}</p>
+                      <p className="text-xs text-[var(--ui-text-secondary)]">{b.name || '已绑定'}</p>
                     ) : (
-                      <p className="text-xs text-gray-400">未绑定</p>
+                      <p className="text-xs text-[var(--ui-text-tertiary)]">未绑定</p>
                     )}
                   </div>
                 </div>

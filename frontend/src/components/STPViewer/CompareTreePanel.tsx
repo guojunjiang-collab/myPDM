@@ -15,7 +15,7 @@ function Chevron({ expanded }: { expanded: boolean }) {
   return (
     <svg
       viewBox="0 0 16 16"
-      className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
+      className={`w-3.5 h-3.5 text-[var(--ui-text-tertiary)] transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
       fill="currentColor"
     >
       <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
@@ -73,7 +73,7 @@ function SideCell({ side, node, which, indent, leading }: {
         <button
           onClick={(e) => { e.stopPropagation(); toggleMeshes(node.key, which); }}
           className={`w-4 h-4 flex items-center justify-center shrink-0 rounded transition-colors
-            ${visible ? 'text-gray-400 hover:text-blue-500 hover:bg-blue-50' : 'text-gray-300 hover:text-gray-400'}`}
+            ${visible ? 'text-[var(--ui-text-tertiary)] hover:text-blue-500 hover:bg-blue-50' : 'text-gray-300 hover:text-[var(--ui-text-tertiary)]'}`}
           title={visible ? '隐藏' : '显示'}
         >
           <EyeIcon visible={visible} />
@@ -83,13 +83,13 @@ function SideCell({ side, node, which, indent, leading }: {
       )}
       <span
         className={`truncate flex-1 text-xs
-          ${noModel ? 'text-gray-400 italic' : 'text-gray-700'}
+          ${noModel ? 'text-[var(--ui-text-tertiary)] italic' : 'text-gray-700'}
           ${visible ? '' : 'text-gray-300 line-through'}`}
         title={label}
       >
         {label}
-        {count !== null && count !== undefined && <span className="text-gray-400 ml-1">×{count}</span>}
-        {noModel && <span className="text-gray-400 ml-1">(无模型)</span>}
+        {count !== null && count !== undefined && <span className="text-[var(--ui-text-tertiary)] ml-1">×{count}</span>}
+        {noModel && <span className="text-[var(--ui-text-tertiary)] ml-1">(无模型)</span>}
       </span>
       {/* 增删改的底色已足够表意，不再重复文字标签；
           「位置变」保留 —— 紫色底在这套界面里没有约定俗成的含义，
@@ -121,7 +121,7 @@ function InstanceCell({ present, label, meshUuids, indent }: {
         <button
           onClick={(e) => { e.stopPropagation(); toggleMeshes(meshUuids); }}
           className={`w-3.5 h-3.5 flex items-center justify-center shrink-0 rounded transition-colors
-            ${visible ? 'text-gray-400 hover:text-blue-500' : 'text-gray-300'}`}
+            ${visible ? 'text-[var(--ui-text-tertiary)] hover:text-blue-500' : 'text-gray-300'}`}
           title={visible ? '隐藏' : '显示'}
         >
           <EyeIcon visible={visible} />
@@ -129,7 +129,7 @@ function InstanceCell({ present, label, meshUuids, indent }: {
       ) : (
         <span className="w-3.5 shrink-0" />
       )}
-      <span className={`truncate flex-1 text-[11px] ${visible ? 'text-gray-600' : 'text-gray-300 line-through'}`}>
+      <span className={`truncate flex-1 text-[11px] ${visible ? 'text-[var(--ui-text-secondary)]' : 'text-gray-300 line-through'}`}>
         {present ? label : <span className="text-gray-300 italic">—</span>}
       </span>
     </div>
@@ -189,7 +189,7 @@ function InstanceRow({ inst, depth, node }: { inst: CompareInstanceNode; depth: 
       ? 'bg-green-50 hover:bg-green-100'
       : inst.changeType === 'delete'
         ? 'bg-red-50 hover:bg-red-100'
-        : 'hover:bg-gray-50';
+        : 'hover:bg-[var(--ui-bg-hover)]';
 
   return (
     <li>
@@ -292,26 +292,26 @@ export function CompareTreePanel() {
   if (!compare || !view) return null;
 
   return (
-    <div className="flex flex-col h-full bg-white border-r border-gray-200">
+    <div className="flex flex-col h-full bg-[var(--ui-bg-surface)] border-r border-[var(--ui-border)]">
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-100">
-        <span className="text-sm font-semibold text-gray-500">BOM 对比树</span>
+        <span className="text-sm font-semibold text-[var(--ui-text-secondary)]">BOM 对比树</span>
         <button
           onClick={() => selectCompareKey(null)}
-          className="text-sm text-gray-400 hover:text-primary-600 transition-colors"
+          className="text-sm text-[var(--ui-text-tertiary)] hover:text-primary-600 transition-colors"
         >
           取消选中
         </button>
       </div>
 
-      <div className="flex items-stretch text-xs font-medium text-gray-500 bg-gray-50 border-b border-gray-200">
+      <div className="flex items-stretch text-xs font-medium text-[var(--ui-text-secondary)] bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
         <span className="flex-1 min-w-0 px-2 py-1 truncate">
           左 · {compare.tree.left?.code || '-'} {compare.tree.left?.version || ''}
-          {compare.leftMissing && <span className="text-gray-400 ml-1">(无模型)</span>}
+          {compare.leftMissing && <span className="text-[var(--ui-text-tertiary)] ml-1">(无模型)</span>}
         </span>
         <span className="w-px bg-gray-200 shrink-0" />
         <span className="flex-1 min-w-0 px-2 py-1 truncate">
           右 · {compare.tree.right?.code || '-'} {compare.tree.right?.version || ''}
-          {compare.rightMissing && <span className="text-gray-400 ml-1">(无模型)</span>}
+          {compare.rightMissing && <span className="text-[var(--ui-text-tertiary)] ml-1">(无模型)</span>}
         </span>
       </div>
 

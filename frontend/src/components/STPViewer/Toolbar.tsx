@@ -35,25 +35,25 @@ export function Toolbar() {
   ];
 
   return (
-    <div className="relative border-b border-gray-100 bg-white shadow-sm">
+    <div className="relative border-b border-gray-100 bg-[var(--ui-bg-surface)] shadow-sm">
       <div className="flex items-center gap-3 px-4 py-2">
       {compare && (
         <>
-          <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50 overflow-hidden shrink-0">
+          <div className="flex items-center rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg-subtle)] overflow-hidden shrink-0">
             {DISPLAY_MODES.map((m, i) => (
               <button
                 key={m.value}
                 onClick={() => setDisplayMode(m.value)}
                 className={`px-2.5 py-1.5 text-sm font-medium transition-colors
-                  ${compare.displayMode === m.value ? 'bg-primary-50 text-primary-600' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}
-                  ${i > 0 ? 'border-l border-gray-200' : ''}`}
+                  ${compare.displayMode === m.value ? 'bg-primary-50 text-primary-600' : 'text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] hover:bg-[var(--ui-bg-hover)]'}
+                  ${i > 0 ? 'border-l border-[var(--ui-border)]' : ''}`}
               >
                 {m.label}
               </button>
             ))}
           </div>
 
-          <label className="flex items-center gap-1.5 text-sm text-gray-500 cursor-pointer select-none shrink-0">
+          <label className="flex items-center gap-1.5 text-sm text-[var(--ui-text-secondary)] cursor-pointer select-none shrink-0">
             <input
               type="checkbox"
               checked={compare.onlyDiff}
@@ -63,7 +63,7 @@ export function Toolbar() {
             仅显示差异
           </label>
 
-          <div className="flex items-center gap-2 text-sm text-gray-500 shrink-0">
+          <div className="flex items-center gap-2 text-sm text-[var(--ui-text-secondary)] shrink-0">
             <span className="font-medium">幽灵</span>
             <input
               type="range"
@@ -75,7 +75,7 @@ export function Toolbar() {
               className="w-16 h-1 accent-primary-500"
               title="淡出零件的不透明度"
             />
-            <span className="tabular-nums text-gray-400 w-8">{compare.ghostOpacity.toFixed(2)}</span>
+            <span className="tabular-nums text-[var(--ui-text-tertiary)] w-8">{compare.ghostOpacity.toFixed(2)}</span>
           </div>
 
           <div className="w-px h-5 bg-gray-200 shrink-0" />
@@ -83,15 +83,15 @@ export function Toolbar() {
       )}
 
       {/* Section planes toggles */}
-      <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50 overflow-hidden shrink-0">
+      <div className="flex items-center rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg-subtle)] overflow-hidden shrink-0">
         {(['x', 'y', 'z'] as const).map((axis, i) => {
           const plane = getPlane(axis);
           return (
             <label
               key={axis}
               className={`flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium uppercase cursor-pointer select-none transition-colors
-                ${plane ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}
-                ${i > 0 ? 'border-l border-gray-200' : ''}`}
+                ${plane ? 'bg-blue-50 text-blue-600' : 'text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] hover:bg-[var(--ui-bg-hover)]'}
+                ${i > 0 ? 'border-l border-[var(--ui-border)]' : ''}`}
             >
               <input
                 type="checkbox"
@@ -113,13 +113,13 @@ export function Toolbar() {
         className={`text-sm px-3 py-1.5 rounded-md font-medium transition-colors
           ${measureMode === 'distance'
             ? 'bg-blue-50 text-blue-600 border border-blue-200'
-            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-transparent'}`}
+            : 'text-[var(--ui-text-secondary)] hover:text-gray-700 hover:bg-[var(--ui-bg-hover)] border border-transparent'}`}
       >
         测量
       </button>
 
       {/* Explode */}
-      <div className="flex items-center gap-2 text-sm text-gray-500">
+      <div className="flex items-center gap-2 text-sm text-[var(--ui-text-secondary)]">
         <span className="font-medium">爆炸</span>
         <input
           type="range"
@@ -136,7 +136,7 @@ export function Toolbar() {
 
       {/* Reset */}
       <button onClick={resetAction}
-        className="text-sm px-3 py-1.5 rounded-md font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-transparent transition-colors"
+        className="text-sm px-3 py-1.5 rounded-md font-medium text-[var(--ui-text-secondary)] hover:text-gray-700 hover:bg-[var(--ui-bg-hover)] border border-transparent transition-colors"
       >
         重置
       </button>
@@ -147,7 +147,7 @@ export function Toolbar() {
         className={`text-sm px-3 py-1.5 rounded-md font-medium transition-colors
           ${cameraMode === 'orthographic'
             ? 'bg-blue-50 text-blue-600 border border-blue-200'
-            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-transparent'}`}
+            : 'text-[var(--ui-text-secondary)] hover:text-gray-700 hover:bg-[var(--ui-bg-hover)] border border-transparent'}`}
       >
         {cameraMode === 'orthographic' ? '平行' : '透视'}
       </button>
@@ -158,7 +158,7 @@ export function Toolbar() {
         className={`text-sm px-3 py-1.5 rounded-md font-medium transition-colors
           ${wireframe
             ? 'bg-blue-50 text-blue-600 border border-blue-200'
-            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-transparent'}`}
+            : 'text-[var(--ui-text-secondary)] hover:text-gray-700 hover:bg-[var(--ui-bg-hover)] border border-transparent'}`}
       >
         线框
       </button>
@@ -173,7 +173,7 @@ export function Toolbar() {
             ? 'text-gray-300 cursor-not-allowed border border-transparent'
             : autoColor
               ? 'bg-blue-50 text-blue-600 border border-blue-200'
-              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-transparent'}`}
+              : 'text-[var(--ui-text-secondary)] hover:text-gray-700 hover:bg-[var(--ui-bg-hover)] border border-transparent'}`}
       >
         上色
       </button>
@@ -181,15 +181,15 @@ export function Toolbar() {
 
       {/* Section plane slider popup */}
       {activeAxes.length > 0 && (
-        <div className="absolute left-1/2 -translate-x-1/2 top-full z-20 bg-white border border-gray-200 rounded-lg shadow-lg px-4 py-3">
+        <div className="absolute left-1/2 -translate-x-1/2 top-full z-20 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-lg px-4 py-3">
           {(['x', 'y', 'z'] as const).map((axis) => {
             const plane = getPlane(axis);
             return plane ? (
               <div key={axis} className="flex items-center gap-2 text-sm py-0.5">
-                <span className="font-semibold uppercase text-gray-400 w-4">{axis}</span>
+                <span className="font-semibold uppercase text-[var(--ui-text-tertiary)] w-4">{axis}</span>
                 <button
                   onClick={() => toggleClipFlip(axis)}
-                  className={`text-xs px-1.5 py-0.5 rounded transition-colors ${(plane as any).flip ? 'text-blue-500 bg-blue-50' : 'text-gray-400 hover:text-gray-600'}`}
+                  className={`text-xs px-1.5 py-0.5 rounded transition-colors ${(plane as any).flip ? 'text-blue-500 bg-blue-50' : 'text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)]'}`}
                   title="切换剖面方向"
                 >
                   {(plane as any).flip ? '>' : '<'}

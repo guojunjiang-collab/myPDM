@@ -44,7 +44,7 @@ function TaskCell({ tasks, onOpenTask }: {
 }) {
   const [listOpen, setListOpen] = useState(false);
 
-  if (tasks.length === 0) return <span className="text-gray-400">—</span>;
+  if (tasks.length === 0) return <span className="text-[var(--ui-text-tertiary)]">—</span>;
 
   return (
     <span className="relative inline-flex items-center gap-1" title={taskTooltip(tasks)}>
@@ -60,7 +60,7 @@ function TaskCell({ tasks, onOpenTask }: {
             +{tasks.length - 1}
           </Button>
           {listOpen && (
-            <div className="absolute right-0 top-full mt-1 z-10 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[180px]">
+            <div className="absolute right-0 top-full mt-1 z-10 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-lg py-1 min-w-[180px]">
               {tasks.slice(1).map((t) => (
                 <Button variant="ghost" size="sm" key={t.id}
                   onClick={(e) => { e.stopPropagation(); setListOpen(false); onOpenTask(t.id); }}
@@ -130,7 +130,7 @@ export default function DeliverableModal({
         }>
       <div className="flex flex-col h-full">
       {/* TAB 条 */}
-      <div className="flex items-center gap-1 border-b border-gray-200 mb-3 shrink-0">
+      <div className="flex items-center gap-1 border-b border-[var(--ui-border)] mb-3 shrink-0">
         {DELIVERABLE_TABS.map((t) => (
           <button
             key={t.key}
@@ -138,11 +138,11 @@ export default function DeliverableModal({
             className={`px-4 py-2 text-sm border-b-2 -mb-px ${
               tab === t.key
                 ? 'border-primary-600 text-primary-600 font-medium'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'
             }`}
           >
             {t.label}
-            <span className="ml-1.5 text-xs text-gray-400">
+            <span className="ml-1.5 text-xs text-[var(--ui-text-tertiary)]">
               {summary ? summary.counts[t.key] : 0}
             </span>
           </button>
@@ -166,51 +166,51 @@ export default function DeliverableModal({
           {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </Select>
         <div className="flex-1" />
-        <span className="text-sm text-gray-400">共 {items.length} 条</span>
+        <span className="text-sm text-[var(--ui-text-tertiary)]">共 {items.length} 条</span>
       </div>
 
       {/* 表格 */}
-      <div className="border border-gray-200 rounded-lg flex-1 min-h-0 overflow-y-auto">
+      <div className="border border-[var(--ui-border)] rounded-lg flex-1 min-h-0 overflow-y-auto">
         <table className="w-full">
-          <thead className="bg-gray-50 sticky top-0 z-10">
+          <thead className="bg-[var(--ui-bg-subtle)] sticky top-0 z-10">
             <tr>
-              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap w-28">编号</th>
-              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap">{tabDef.nameLabel}</th>
+              <th className="px-3 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap w-28">编号</th>
+              <th className="px-3 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">{tabDef.nameLabel}</th>
               {tabDef.showVersion && (
-                <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap w-16">版本</th>
+                <th className="px-3 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap w-16">版本</th>
               )}
               {tabDef.showExtra && (
-                <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap w-20">{tabDef.extraLabel}</th>
+                <th className="px-3 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap w-20">{tabDef.extraLabel}</th>
               )}
-              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap w-18">状态</th>
-              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap w-18">创建人</th>
-              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 whitespace-nowrap">来源任务</th>
+              <th className="px-3 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap w-18">状态</th>
+              <th className="px-3 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap w-18">创建人</th>
+              <th className="px-3 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">来源任务</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={colSpan} className="px-3 py-8 text-center text-gray-500">加载中...</td></tr>
+              <tr><td colSpan={colSpan} className="px-3 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td></tr>
             ) : items.length === 0 ? (
-              <tr><td colSpan={colSpan} className="px-3 py-8 text-center text-gray-500">{EMPTY_HINT[tab]}</td></tr>
+              <tr><td colSpan={colSpan} className="px-3 py-8 text-center text-[var(--ui-text-secondary)]">{EMPTY_HINT[tab]}</td></tr>
             ) : (
               items.map((i) => (
                 <tr key={i.entity_id} onClick={() => setDetail(i)}
-                    className="hover:bg-gray-50 cursor-pointer">
+                    className="hover:bg-[var(--ui-bg-hover)] cursor-pointer">
                   <td className="px-3 py-2 text-sm font-medium whitespace-nowrap">{i.code}</td>
                   <td className="px-3 py-2 text-sm">{i.name}</td>
                   {tabDef.showVersion && (
-                    <td className="px-3 py-2 text-sm text-gray-600 whitespace-nowrap">{i.version || '—'}</td>
+                    <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)] whitespace-nowrap">{i.version || '—'}</td>
                   )}
                   {tabDef.showExtra && (
-                    <td className="px-3 py-2 text-sm text-gray-600">{i.extra || '—'}</td>
+                    <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{i.extra || '—'}</td>
                   )}
                   <td className="px-3 py-2 text-sm whitespace-nowrap">
                     <span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
                       {statusLabel(i.status)}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-sm text-gray-600 whitespace-nowrap">{i.creator_name || '—'}</td>
-                  <td className="px-3 py-2 text-sm text-gray-600">
+                  <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)] whitespace-nowrap">{i.creator_name || '—'}</td>
+                  <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">
                     <TaskCell tasks={i.tasks} onOpenTask={onOpenTask} />
                   </td>
                 </tr>

@@ -38,21 +38,21 @@ export default function ComboBox({ value, options, placeholder = '选择...', on
   return (
     <div className="relative" ref={ref}>
       <button type="button" onClick={() => setOpen((v) => !v)}
-        className="w-full text-left px-2 py-1 border border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 truncate">
-        {selected ? selected.label : <span className="text-gray-400">{placeholder}</span>}
+        className="w-full text-left px-2 py-1 border border-gray-300 rounded text-sm bg-[var(--ui-bg-surface)] focus:outline-none focus:ring-1 focus:ring-primary-500 truncate">
+        {selected ? selected.label : <span className="text-[var(--ui-text-tertiary)]">{placeholder}</span>}
       </button>
       {open && (
-        <div className="absolute z-30 mt-1 w-full min-w-[18rem] bg-white border border-gray-200 rounded-lg shadow-lg">
+        <div className="absolute z-30 mt-1 w-full min-w-[18rem] bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-lg">
           <Input autoFocus value={query} onChange={(e) => setQuery(e.target.value)}
             placeholder="输入编号/名称搜索..."
             className="!rounded-none !border-x-0 !border-t-0 !px-2 !py-1.5" />
           <div className="max-h-56 overflow-auto">
             {filtered.length === 0 ? (
-              <div className="px-3 py-2 text-sm text-gray-400">无匹配</div>
+              <div className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)]">无匹配</div>
             ) : filtered.map((o) => (
               <button key={o.value} type="button"
                 onClick={() => { onChange(o.value); setOpen(false); setQuery(''); }}
-                className={`block w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 ${o.value === value ? 'bg-primary-50 text-primary-700' : ''}`}>
+                className={`block w-full text-left px-3 py-1.5 text-sm hover:bg-[var(--ui-bg-hover)] ${o.value === value ? 'bg-primary-50 text-primary-700' : ''}`}>
                 {o.label}
               </button>
             ))}

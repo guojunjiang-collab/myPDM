@@ -97,10 +97,10 @@ export default function Logs() {
     <div>
 
       {/* Filters */}
-      <form onSubmit={handleSearch} className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
+      <form onSubmit={handleSearch} className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] p-4 mb-4">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">用户ID</label>
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-1">用户ID</label>
             <Input
               type="text"
               value={filterUser}
@@ -109,7 +109,7 @@ export default function Logs() {
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">对象类型</label>
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-1">对象类型</label>
             <Select
               value={filterTargetType}
               onChange={(e) => setFilterTargetType(e.target.value)}
@@ -120,7 +120,7 @@ export default function Logs() {
             </Select>
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">操作类型</label>
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-1">操作类型</label>
             <Select
               value={filterAction}
               onChange={(e) => setFilterAction(e.target.value)}
@@ -131,7 +131,7 @@ export default function Logs() {
             </Select>
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">开始日期</label>
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-1">开始日期</label>
             <Input
               type="date"
               value={filterDateFrom}
@@ -139,7 +139,7 @@ export default function Logs() {
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">结束日期</label>
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-1">结束日期</label>
             <Input
               type="date"
               value={filterDateTo}
@@ -166,48 +166,48 @@ export default function Logs() {
       </form>
 
       {/* Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-hidden">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">时间</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">用户</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">操作</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">对象类型</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">对象ID</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">详情</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">IP</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">时间</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">用户</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">操作</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">对象类型</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">对象ID</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">详情</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">IP</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">加载中...</td>
+                <td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td>
               </tr>
             ) : logs.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">
                   暂无数据
                 </td>
               </tr>
             ) : (
               logs.map((log) => (
-                <tr key={log.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
+                <tr key={log.id} className="hover:bg-[var(--ui-bg-hover)]">
+                  <td className="px-4 py-3 text-sm text-[var(--ui-text-secondary)] whitespace-nowrap">
                     {formatDateTime(log.created_at)}
                   </td>
                   <td className="px-4 py-3 text-sm">{log.username}</td>
                   <td className="px-4 py-3 text-sm">
                     <Badge tone={actionTone(log.action)} label={log.action} />
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
+                  <td className="px-4 py-3 text-sm text-[var(--ui-text-secondary)]">
                     {TARGET_TYPE_OPTIONS.find(t => t.value === log.target_type)?.label || log.target_type}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500 font-mono text-xs">{log.target_id}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate" title={log.detail || ''}>
+                  <td className="px-4 py-3 text-sm text-[var(--ui-text-secondary)] font-mono text-xs">{log.target_id}</td>
+                  <td className="px-4 py-3 text-sm text-[var(--ui-text-secondary)] max-w-xs truncate" title={log.detail || ''}>
                     {log.detail || '-'}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{log.ip || '-'}</td>
+                  <td className="px-4 py-3 text-sm text-[var(--ui-text-secondary)]">{log.ip || '-'}</td>
                 </tr>
               ))
             )}
@@ -216,8 +216,8 @@ export default function Logs() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
-            <div className="text-sm text-gray-500">
+          <div className="px-4 py-3 border-t border-[var(--ui-border)] flex items-center justify-between">
+            <div className="text-sm text-[var(--ui-text-secondary)]">
               共 {total} 条记录，第 {page + 1} / {totalPages} 页
             </div>
             <div className="flex gap-2">

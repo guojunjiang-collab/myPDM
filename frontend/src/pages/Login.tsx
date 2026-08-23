@@ -78,11 +78,11 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-md">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--ui-bg-subtle)]">
+      <div className="w-full max-w-md p-8 bg-[var(--ui-bg-surface)] rounded-lg shadow-md">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-semibold">🏗️ {import.meta.env.VITE_APP_TITLE || 'PDM系统'}</h1>
-          <p className="text-gray-500 mt-2">物料清单全生命周期数字化管理平台</p>
+          <p className="text-[var(--ui-text-secondary)] mt-2">物料清单全生命周期数字化管理平台</p>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -122,10 +122,10 @@ export default function Login() {
 
         {(feishuProviders.length > 0 || wechatProviders.length > 0) && (
           <div className="mt-6">
-            <div className="flex items-center gap-3 text-gray-400 text-sm">
-              <span className="flex-1 border-t border-gray-200" />
+            <div className="flex items-center gap-3 text-[var(--ui-text-tertiary)] text-sm">
+              <span className="flex-1 border-t border-[var(--ui-border)]" />
               或
-              <span className="flex-1 border-t border-gray-200" />
+              <span className="flex-1 border-t border-[var(--ui-border)]" />
             </div>
             <div className="mt-4 space-y-2">
               {feishuProviders.map((p) => (
@@ -135,7 +135,7 @@ export default function Login() {
                   onClick={() => {
                     window.location.href = `/api/auth/feishu/authorize?provider=${p.key}`;
                   }}
-                  className="w-full py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
+                  className="w-full py-2 px-4 border border-gray-300 rounded-lg hover:bg-[var(--ui-bg-hover)] text-gray-700"
                 >
                   {p.name}
                 </button>
@@ -147,7 +147,7 @@ export default function Login() {
                   onClick={() => {
                     window.location.href = `/api/auth/wechat/authorize?provider=${p.key}`;
                   }}
-                  className="w-full py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
+                  className="w-full py-2 px-4 border border-gray-300 rounded-lg hover:bg-[var(--ui-bg-hover)] text-gray-700"
                 >
                   {p.name}
                 </button>

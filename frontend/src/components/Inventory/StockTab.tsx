@@ -51,7 +51,7 @@ export default function StockTab() {
           <option value="">全部仓库</option>
           {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
         </Select>
-        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm whitespace-nowrap">
+        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-[var(--ui-bg-hover)] text-sm whitespace-nowrap">
           <input type="checkbox" checked={lowOnly} onChange={(e) => setLowOnly(e.target.checked)}
             className="w-3.5 h-3.5" />
           仅看低库存
@@ -59,27 +59,27 @@ export default function StockTab() {
       </div>
 
       {/* 表格 */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
+      <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+          <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
             <tr>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">编码</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">名称</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">仓库</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">批次</th>
-              <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">数量</th>
-              <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">安全库存</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">编码</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">名称</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">仓库</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">批次</th>
+              <th className="text-right px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">数量</th>
+              <th className="text-right px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">安全库存</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td></tr>
             ) : allRows.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">暂无数据</td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">无匹配结果</td></tr>
             ) : rows.map((r, i) => (
-              <tr key={i} className={`hover:bg-gray-50 cursor-pointer ${r.is_low ? 'bg-red-50' : ''}`}
+              <tr key={i} className={`hover:bg-[var(--ui-bg-hover)] cursor-pointer ${r.is_low ? 'bg-red-50' : ''}`}
                 onClick={() => setDetailMatId(r.material_id)}>
                 <td className={`px-4 py-3 text-sm font-medium ${r.is_low ? 'text-red-600' : 'text-primary-600'}`}>{r.material_code}</td>
                 <td className="px-4 py-3 text-sm font-medium">{r.material_name}</td>

@@ -119,21 +119,21 @@ export function STPViewerModal({ open, attachmentId, fileName, onClose }: STPVie
       <div className="-mx-6 -my-4" style={{ height: 'calc(100vh - 88px)' }}>
         {/* Converting State */}
         {loadingState === 'converting' && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
+          <div className="absolute inset-0 flex items-center justify-center bg-[var(--ui-bg-surface)] z-10">
             <div className="text-center">
               <div className="animate-spin rounded-full h-10 w-10 border-2 border-blue-500 border-t-transparent mx-auto mb-3" />
-              <p className="text-gray-500 text-sm">模型转换中，请稍后...</p>
-              <p className="text-gray-400 text-xs mt-1">首次预览需转换格式，后续将直接加载</p>
+              <p className="text-[var(--ui-text-secondary)] text-sm">模型转换中，请稍后...</p>
+              <p className="text-[var(--ui-text-tertiary)] text-xs mt-1">首次预览需转换格式，后续将直接加载</p>
             </div>
           </div>
         )}
 
         {/* Error State */}
         {loadingState === 'error' && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
+          <div className="absolute inset-0 flex items-center justify-center bg-[var(--ui-bg-surface)] z-10">
             <div className="text-center text-red-500 text-sm">
               <p>模型加载失败</p>
-              <p className="text-gray-400 text-xs mt-1">请关闭后重试</p>
+              <p className="text-[var(--ui-text-tertiary)] text-xs mt-1">请关闭后重试</p>
             </div>
           </div>
         )}

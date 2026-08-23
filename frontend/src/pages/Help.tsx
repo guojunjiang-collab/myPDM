@@ -22,13 +22,13 @@ function H({ children }: { children: React.ReactNode }) {
 
 /** 段落 */
 function P({ children }: { children: React.ReactNode }) {
-  return <p className="text-sm text-gray-600 leading-7 mb-2">{children}</p>;
+  return <p className="text-sm text-[var(--ui-text-secondary)] leading-7 mb-2">{children}</p>;
 }
 
 /** 有序步骤 */
 function Steps({ items }: { items: React.ReactNode[] }) {
   return (
-    <ol className="list-decimal pl-5 space-y-1 text-sm text-gray-600 leading-7 mb-2">
+    <ol className="list-decimal pl-5 space-y-1 text-sm text-[var(--ui-text-secondary)] leading-7 mb-2">
       {items.map((it, i) => (
         <li key={i}>{it}</li>
       ))}
@@ -39,7 +39,7 @@ function Steps({ items }: { items: React.ReactNode[] }) {
 /** 无序列表 */
 function UL({ items }: { items: React.ReactNode[] }) {
   return (
-    <ul className="list-disc pl-5 space-y-1 text-sm text-gray-600 leading-7 mb-2">
+    <ul className="list-disc pl-5 space-y-1 text-sm text-[var(--ui-text-secondary)] leading-7 mb-2">
       {items.map((it, i) => (
         <li key={i}>{it}</li>
       ))}
@@ -67,9 +67,9 @@ function MiniTable({ head, rows }: { head: string[]; rows: React.ReactNode[][] }
     <div className="overflow-x-auto my-2">
       <table className="w-full text-sm border-collapse">
         <thead>
-          <tr className="bg-gray-50 text-gray-600">
+          <tr className="bg-[var(--ui-bg-subtle)] text-[var(--ui-text-secondary)]">
             {head.map((h, i) => (
-              <th key={i} className="border border-gray-200 px-3 py-2 text-left font-medium whitespace-nowrap">
+              <th key={i} className="border border-[var(--ui-border)] px-3 py-2 text-left font-medium whitespace-nowrap">
                 {h}
               </th>
             ))}
@@ -77,9 +77,9 @@ function MiniTable({ head, rows }: { head: string[]; rows: React.ReactNode[][] }
         </thead>
         <tbody>
           {rows.map((r, ri) => (
-            <tr key={ri} className="text-gray-600">
+            <tr key={ri} className="text-[var(--ui-text-secondary)]">
               {r.map((c, ci) => (
-                <td key={ci} className="border border-gray-200 px-3 py-2 align-top leading-6">
+                <td key={ci} className="border border-[var(--ui-border)] px-3 py-2 align-top leading-6">
                   {c}
                 </td>
               ))}
@@ -908,14 +908,14 @@ export default function Help() {
     <div className="flex gap-6 h-full overflow-hidden">
       {/* 左侧目录（固定，不随内容滚动） */}
       <aside className="w-52 shrink-0 hidden md:flex flex-col overflow-y-auto">
-        <div className="text-xs font-semibold text-gray-400 px-3 mb-2">目录</div>
+        <div className="text-xs font-semibold text-[var(--ui-text-tertiary)] px-3 mb-2">目录</div>
         <nav className="space-y-0.5">
           {sections.map((s) => (
             <button
               key={s.id}
               onClick={() => scrollTo(s.id)}
               className={`w-full text-left flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                active === s.id ? 'bg-primary-50 text-primary-600 font-medium' : 'text-gray-600 hover:bg-gray-100'
+                active === s.id ? 'bg-primary-50 text-primary-600 font-medium' : 'text-[var(--ui-text-secondary)] hover:bg-[var(--ui-bg-hover)]'
               }`}
             >
               <span>{s.icon}</span>
@@ -928,14 +928,14 @@ export default function Help() {
       {/* 右侧内容（唯一滚动区域） */}
       <div ref={scrollRef} className="flex-1 min-w-0 overflow-y-auto pr-1">
         {/* 头部横幅 */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+        <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] p-6 mb-6">
           <h1 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
             <span>🏗️</span> PDM 系统使用指南
           </h1>
-          <p className="text-sm text-gray-500 mt-2">
+          <p className="text-sm text-[var(--ui-text-secondary)] mt-2">
             面向新用户的功能说明与操作指引。左侧目录可快速跳转，遇到问题也可点击右下角 AI 助手提问。
           </p>
-          <div className="text-xs text-gray-400 mt-3">当前版本 {APP_VERSION}</div>
+          <div className="text-xs text-[var(--ui-text-tertiary)] mt-3">当前版本 {APP_VERSION}</div>
         </div>
 
         {/* 各章节 */}
@@ -944,7 +944,7 @@ export default function Help() {
             <section
               key={s.id}
               id={s.id}
-              className="bg-white rounded-lg border border-gray-200 p-6 scroll-mt-4"
+              className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] p-6 scroll-mt-4"
             >
               <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2 mb-3">
                 <span>{s.icon}</span>

@@ -14,11 +14,11 @@ export default function FloatingAssistant() {
       </button>
       {open && (
         <div style={{ width: size.width, height: size.height }}
-          className="fixed bottom-24 right-6 z-50 bg-white rounded-xl shadow-2xl border flex flex-col">
+          className="fixed bottom-24 right-6 z-50 bg-[var(--ui-bg-surface)] rounded-xl shadow-2xl border flex flex-col">
           {/* 左上角拖拽缩放手柄 */}
           <div onPointerDown={onPointerDown}
             title="拖拽调整大小"
-            className="absolute -top-1 -left-1 w-5 h-5 cursor-nwse-resize text-gray-400 hover:text-gray-600
+            className="absolute -top-1 -left-1 w-5 h-5 cursor-nwse-resize text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)]
               flex items-center justify-center select-none touch-none">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
               <path d="M0 2 L2 0 M0 6 L6 0 M0 10 L10 0" stroke="currentColor" strokeWidth="1.2" />

@@ -14,8 +14,8 @@ import PartDetailModal from '../PartDetailModal';
 import type { InvMaterial } from '../../types';
 
 // ECR 式卡片字段样式
-const cardCls = 'bg-gray-50 rounded-lg px-3 py-2 border border-gray-100';
-const cardLabelCls = 'block text-xs text-gray-500 mb-0.5';
+const cardCls = 'bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100';
+const cardLabelCls = 'block text-xs text-[var(--ui-text-secondary)] mb-0.5';
 
 export default function MaterialTab() {
   const { materials, loadMaterials } = useInventoryStore();
@@ -153,29 +153,29 @@ export default function MaterialTab() {
       </div>
 
       {/* 表格 */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
+      <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+          <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
             <tr>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">编码</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">名称</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">规格型号</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">单位</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">来源</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">追踪</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">安全库存</th>
-              <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">操作</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">编码</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">名称</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">规格型号</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">单位</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">来源</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">追踪</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">安全库存</th>
+              <th className="text-right px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td></tr>
             ) : materials.length === 0 ? (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">暂无数据</td></tr>
             ) : filteredMaterials.length === 0 ? (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">无匹配结果</td></tr>
             ) : filteredMaterials.map((m) => (
-              <tr key={m.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setDetail(m)}>
+              <tr key={m.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => setDetail(m)}>
                 <td className="px-4 py-3 text-sm font-medium">{m.code}</td>
                 <td className="px-4 py-3 text-sm font-medium">{m.name}</td>
                 <td className="px-4 py-3 text-sm font-medium">{m.spec || '-'}</td>
@@ -205,26 +205,26 @@ export default function MaterialTab() {
               {editingIsPdm ? (
                 <div className="col-span-2">
                   <label className={cardLabelCls}>PDM 关联零部件</label>
-                  <div className="rounded-lg border border-gray-200 overflow-hidden">
+                  <div className="rounded-lg border border-[var(--ui-border)] overflow-hidden">
                     <table className="w-full">
-                      <thead className="bg-gray-50 border-b border-gray-200">
+                      <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
                         <tr>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">类型</th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">件号</th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">名称</th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">规格型号</th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">版本</th>
-                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">状态</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">类型</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">件号</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">名称</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">规格型号</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">版本</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">状态</th>
                         </tr>
                       </thead>
                       <tbody>
-                        <tr className="hover:bg-gray-50 cursor-pointer"
+                        <tr className="hover:bg-[var(--ui-bg-hover)] cursor-pointer"
                           onClick={() => editing.ref_entity_id && viewEntity((editing.ref_entity_type || editing.source_type) as 'part' | 'assembly', editing.ref_entity_id)}>
-                          <td className="px-3 py-2 text-sm text-gray-500">{editing.source_type === 'part' ? '零件' : '部件'}</td>
+                          <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{editing.source_type === 'part' ? '零件' : '部件'}</td>
                           <td className="px-3 py-2 text-sm font-medium text-primary-600">{editingPdm?.code || editing.code}</td>
                           <td className="px-3 py-2 text-sm">{editingPdm?.name || editing.name}</td>
-                          <td className="px-3 py-2 text-sm text-gray-500">{editingPdm?.spec || editing.spec || '-'}</td>
-                          <td className="px-3 py-2 text-sm text-gray-500">{editingPdm?.version || '-'}</td>
+                          <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{editingPdm?.spec || editing.spec || '-'}</td>
+                          <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{editingPdm?.version || '-'}</td>
                           <td className="px-3 py-2">
                             {editingPdm ? <Badge status={editingPdm.status} /> : '-'}
                           </td>
@@ -232,7 +232,7 @@ export default function MaterialTab() {
                       </tbody>
                     </table>
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">点击上方行可查看零部件详情。</p>
+                  <p className="text-xs text-[var(--ui-text-tertiary)] mt-1">点击上方行可查看零部件详情。</p>
                 </div>
               ) : (
                 <div className={`${cardCls} col-span-2`}>
@@ -274,7 +274,7 @@ export default function MaterialTab() {
                   onChange={(e) => setEditing({ ...editing, safety_stock: e.target.value ? Number(e.target.value) : null })} size="xs" />
               </div>
             </div>
-            <div className="flex justify-end gap-2 pt-1 border-t border-gray-200">
+            <div className="flex justify-end gap-2 pt-1 border-t border-[var(--ui-border)]">
               <Button variant="secondary" className="mt-3" onClick={() => setEditing(null)}>取消</Button>
               <Button className="mt-3" onClick={saveStandalone}>保存</Button>
             </div>
@@ -287,30 +287,30 @@ export default function MaterialTab() {
         <div className="space-y-3">
           <Input placeholder="输入编码 / 名称 / 规格型号，边输入边搜索..." value={pdmKeyword} autoFocus
             onChange={(e) => setPdmKeyword(e.target.value)} />
-          <div className="max-h-80 overflow-auto rounded-lg border border-gray-200">
+          <div className="max-h-80 overflow-auto rounded-lg border border-[var(--ui-border)]">
             {pdmLoading ? (
-              <div className="px-4 py-8 text-center text-sm text-gray-400">加载中...</div>
+              <div className="px-4 py-8 text-center text-sm text-[var(--ui-text-tertiary)]">加载中...</div>
             ) : pdmResults.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm text-gray-400">无匹配结果</div>
+              <div className="px-4 py-8 text-center text-sm text-[var(--ui-text-tertiary)]">无匹配结果</div>
             ) : (
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
+                <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0">
                   <tr>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">编号</th>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">名称</th>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-24 whitespace-nowrap">版本</th>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">规格型号</th>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 w-24 whitespace-nowrap">状态</th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-gray-500 w-24 whitespace-nowrap">操作</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">编号</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">名称</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-24 whitespace-nowrap">版本</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">规格型号</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-24 whitespace-nowrap">状态</th>
+                    <th className="text-right px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-24 whitespace-nowrap">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {pdmResults.map((r) => (
-                    <tr key={`${r.entity_type}-${r.id}`} className="hover:bg-gray-50">
+                    <tr key={`${r.entity_type}-${r.id}`} className="hover:bg-[var(--ui-bg-hover)]">
                       <td className="px-3 py-2 text-sm font-medium">{r.code}</td>
                       <td className="px-3 py-2 text-sm">{r.name}</td>
-                      <td className="px-3 py-2 text-sm text-gray-500 w-24 whitespace-nowrap">{r.version || '-'}</td>
-                      <td className="px-3 py-2 text-sm text-gray-500">{r.spec || '-'}</td>
+                      <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)] w-24 whitespace-nowrap">{r.version || '-'}</td>
+                      <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{r.spec || '-'}</td>
                       <td className="px-3 py-2 w-24 whitespace-nowrap">
                         <Badge status={r.status} />
                       </td>

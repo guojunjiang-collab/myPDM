@@ -341,21 +341,21 @@ export default function Board() {
    Render
    ================================================================ */
 
-  if (loading) return <div className="text-gray-500 py-8 text-center">加载中...</div>;
+  if (loading) return <div className="text-[var(--ui-text-secondary)] py-8 text-center">加载中...</div>;
 
   return (
     <div className="flex h-full">
       {/* Left: Folder Tree */}
-      <div ref={sidebarRef} className="w-72 shrink-0 border-r border-gray-200 bg-gray-50 flex flex-col">
+      <div ref={sidebarRef} className="w-72 shrink-0 border-r border-[var(--ui-border)] bg-[var(--ui-bg-subtle)] flex flex-col">
         <div className="px-2 pt-2 pb-1">
           <Button type="button" size="sm" className="w-full" onClick={() => { setCreateModal(''); setCreateName(''); }}>
             + 新建文件夹
           </Button>
         </div>
-        <div className="px-3 py-2 text-xs font-medium text-gray-400 uppercase tracking-wide">我的文件夹</div>
+        <div className="px-3 py-2 text-xs font-medium text-[var(--ui-text-tertiary)] uppercase tracking-wide">我的文件夹</div>
         <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-2">
           {myFolders.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-6">暂无文件夹</p>
+            <p className="text-sm text-[var(--ui-text-tertiary)] text-center py-6">暂无文件夹</p>
           ) : (
             <div className="space-y-0.5">
               {myFolders.map((f) => (
@@ -375,7 +375,7 @@ export default function Board() {
               {/* 视觉 1px，热区上下各扩 3px 便于拖动 */}
               <div className="absolute inset-x-0 -top-[3px] -bottom-[3px]" />
             </div>
-            <div className="px-3 py-2 text-xs font-medium text-gray-400 uppercase tracking-wide shrink-0">📂 共享给我的</div>
+            <div className="px-3 py-2 text-xs font-medium text-[var(--ui-text-tertiary)] uppercase tracking-wide shrink-0">📂 共享给我的</div>
             <div className="shrink-0 overflow-y-auto px-2 pb-2" style={{ height: sharedPaneH }}>
               <div className="space-y-0.5">
                 {sharedFolders.map((f) => (
@@ -392,8 +392,8 @@ export default function Board() {
         {selectedFolder ? (
           <>
             {/* Header */}
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-sm font-medium text-gray-500 mb-2">{getFolderPath(allFolders, selectedFolder.id)}</h2>
+            <div className="px-6 py-4 border-b border-[var(--ui-border)]">
+              <h2 className="text-sm font-medium text-[var(--ui-text-secondary)] mb-2">{getFolderPath(allFolders, selectedFolder.id)}</h2>
               {canEditFolder && (
                 <div className="flex gap-2">
                   <Button type="button" variant="secondary" size="sm" onClick={() => { setCreateModal(selectedFolder.id); setCreateName(''); }}>
@@ -407,7 +407,7 @@ export default function Board() {
             </div>
 
             {/* Tabs */}
-            <div className="px-6 flex gap-0 border-b border-gray-200">
+            <div className="px-6 flex gap-0 border-b border-[var(--ui-border)]">
               {(['all', 'component', 'document', 'configuration'] as FilterTab[]).map((tab) => (
                 <button
                   type="button"
@@ -416,7 +416,7 @@ export default function Board() {
                   className={`px-4 py-2.5 text-sm border-b-2 transition-colors ${
                     filterTab === tab
                       ? 'border-primary-500 text-primary-700 font-medium'
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                      : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'
                   }`}
                 >
                   {tab === 'all' ? `全部 (${tabCounts.all})` : `${ENTITY_LABEL[tab]} (${tabCounts[tab]})`}
@@ -427,29 +427,29 @@ export default function Board() {
             {/* Table */}
             <div className="flex-1 overflow-auto">
               {filteredItems.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-16">暂无关联项目</p>
+                <p className="text-sm text-[var(--ui-text-tertiary)] text-center py-16">暂无关联项目</p>
               ) : (
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b">
+                  <thead className="bg-[var(--ui-bg-subtle)] border-b">
                     <tr>
-                      <th className="px-5 py-2.5 text-left text-gray-500 font-medium w-28">类型</th>
-                      <th className="px-5 py-2.5 text-left text-gray-500 font-medium">编号</th>
-                      <th className="px-5 py-2.5 text-left text-gray-500 font-medium">名称</th>
-                      <th className="px-5 py-2.5 text-left text-gray-500 font-medium w-20">版本</th>
-                      <th className="px-5 py-2.5 text-left text-gray-500 font-medium w-20">状态</th>
-                      {canEditFolder && <th className="px-5 py-2.5 text-right text-gray-500 font-medium w-20">操作</th>}
+                      <th className="px-5 py-2.5 text-left text-[var(--ui-text-secondary)] font-medium w-28">类型</th>
+                      <th className="px-5 py-2.5 text-left text-[var(--ui-text-secondary)] font-medium">编号</th>
+                      <th className="px-5 py-2.5 text-left text-[var(--ui-text-secondary)] font-medium">名称</th>
+                      <th className="px-5 py-2.5 text-left text-[var(--ui-text-secondary)] font-medium w-20">版本</th>
+                      <th className="px-5 py-2.5 text-left text-[var(--ui-text-secondary)] font-medium w-20">状态</th>
+                      {canEditFolder && <th className="px-5 py-2.5 text-right text-[var(--ui-text-secondary)] font-medium w-20">操作</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {filteredItems.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleViewDetail(item)}>
+                      <tr key={item.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => handleViewDetail(item)}>
                         <td className="px-5 py-2.5">
                           <span className="mr-1">{ENTITY_ICON[item.entity_type]}</span>
-                          <span className="text-xs text-gray-500">{ENTITY_LABEL[item.entity_type]}</span>
+                          <span className="text-xs text-[var(--ui-text-secondary)]">{ENTITY_LABEL[item.entity_type]}</span>
                         </td>
                         <td className="px-5 py-2.5 font-medium text-gray-800">{item.code}</td>
-                        <td className="px-5 py-2.5 text-gray-600">{item.name}</td>
-                        <td className="px-5 py-2.5 text-gray-500">{item.version || '-'}</td>
+                        <td className="px-5 py-2.5 text-[var(--ui-text-secondary)]">{item.name}</td>
+                        <td className="px-5 py-2.5 text-[var(--ui-text-secondary)]">{item.version || '-'}</td>
                         <td className="px-5 py-2.5"><StatusTag status={item.status} /></td>
                         {canEditFolder && (
                           <td className="px-5 py-2.5 text-right">
@@ -465,7 +465,7 @@ export default function Board() {
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center">
-            <div className="text-center text-gray-400">
+            <div className="text-center text-[var(--ui-text-tertiary)]">
               <div className="text-4xl mb-2">📂</div>
               <p className="text-sm">选择左侧文件夹查看内容</p>
             </div>
@@ -481,7 +481,7 @@ export default function Board() {
         const menuIsShared = !!menuFolder?.shared_from;
 
         return (
-          <div ref={menuRef} className="fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[120px]" style={{ left: menuAnchor.el.getBoundingClientRect().left, top: menuAnchor.el.getBoundingClientRect().bottom + 4 }}>
+          <div ref={menuRef} className="fixed z-50 bg-[var(--ui-bg-surface)] rounded-lg shadow-lg border border-[var(--ui-border)] py-1 min-w-[120px]" style={{ left: menuAnchor.el.getBoundingClientRect().left, top: menuAnchor.el.getBoundingClientRect().bottom + 4 }}>
             {menuIsShared ? (
               <Button type="button" variant="ghost" size="sm" className="w-full !justify-start rounded-none !text-red-600 hover:!bg-red-50" onClick={() => { setRemoveShareId(menuAnchor.id); setMenuAnchor(null); }}>🚫 移除共享</Button>
             ) : (
@@ -528,7 +528,7 @@ export default function Board() {
               <option value="edit">可编辑</option>
             </Select>
           </div>
-          <div className="max-h-36 overflow-y-auto border border-gray-200 rounded-lg">
+          <div className="max-h-36 overflow-y-auto border border-[var(--ui-border)] rounded-lg">
             {usersList.filter((u) => !userSearch.trim() || u.username.includes(userSearch) || u.real_name.includes(userSearch)).filter((u) => !workingShares.some((s) => s.shared_with_user_id === u.id)).map((u) => (
               <button
                 type="button"
@@ -537,7 +537,7 @@ export default function Board() {
                 className={`w-full text-left px-3 py-2 text-sm border-b border-gray-100 last:border-b-0 transition-colors ${
                   shareUserId === u.id
                     ? 'bg-primary-50 text-primary-700 font-medium'
-                    : 'hover:bg-gray-50 text-gray-700'
+                    : 'hover:bg-[var(--ui-bg-hover)] text-gray-700'
                 }`}
               >
                 {u.real_name} ({u.username})
@@ -545,7 +545,7 @@ export default function Board() {
               </button>
             ))}
             {usersList.filter((u) => !userSearch.trim() || u.username.includes(userSearch) || u.real_name.includes(userSearch)).filter((u) => !workingShares.some((s) => s.shared_with_user_id === u.id)).length === 0 && (
-              <p className="text-center text-sm text-gray-400 py-4">无匹配用户</p>
+              <p className="text-center text-sm text-[var(--ui-text-tertiary)] py-4">无匹配用户</p>
             )}
           </div>
           {shareUserId && <div className="flex justify-end"><Button type="button" size="sm" onClick={handleAddShare}>添加到列表</Button></div>}
@@ -554,7 +554,7 @@ export default function Board() {
               <h4 className="text-sm font-medium text-gray-700 mb-2">已共享 ({workingShares.length})</h4>
               <div className="space-y-1">
                 {workingShares.map((s) => (
-                  <div key={s.id} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded">
+                  <div key={s.id} className="flex items-center justify-between px-3 py-2 bg-[var(--ui-bg-subtle)] rounded">
                     <span className="text-sm">{s.shared_with_user?.real_name || '-'}</span>
                     <div className="flex items-center gap-2">
                       <Select size="xs"
@@ -572,7 +572,7 @@ export default function Board() {
             </div>
           )}
           {/* Save / Cancel */}
-          <div className="flex justify-end gap-2 pt-2 border-t border-gray-200">
+          <div className="flex justify-end gap-2 pt-2 border-t border-[var(--ui-border)]">
             <Button type="button" variant="secondary" onClick={handleCancelShares}>取消</Button>
             <Button type="button" onClick={handleSaveShares} disabled={!isShareDirty}>保存</Button>
           </div>
@@ -649,7 +649,7 @@ function BoardTreeNode({
         className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer group text-sm transition-colors ${
           isSelected
             ? 'bg-primary-50 text-primary-700'
-            : 'hover:bg-gray-100 text-gray-700'
+            : 'hover:bg-[var(--ui-bg-hover)] text-gray-700'
         }`}
         style={{ paddingLeft: `calc(8px + ${depth} * var(--ui-tree-indent))` }}
         onClick={() => onSelect(node.id)}
@@ -659,21 +659,21 @@ function BoardTreeNode({
         ) : (
           <TreeToggle leaf size="sm" />
         )}
-        <span className="text-gray-400">{isShared ? '📂' : '📁'}</span>
+        <span className="text-[var(--ui-text-tertiary)]">{isShared ? '📂' : '📁'}</span>
         <span className="flex-1 truncate">{node.name}</span>
         {/* 共享状态标识：仅根级自己的文件夹显示 */}
         {depth === 0 && !isShared && node.is_shared && (
           <span className="text-xs text-blue-500" title="已共享">🔗</span>
         )}
         {isShared && node.shared_from && (
-          <span className="text-xs text-gray-400">{node.shared_from.real_name}</span>
+          <span className="text-xs text-[var(--ui-text-tertiary)]">{node.shared_from.real_name}</span>
         )}
         {count > 0 && (
           <Badge size="xs" tone={isSelected ? 'blue' : 'gray'} label={count} />
         )}
         <button
           type="button"
-          className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded"
+          className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] rounded"
           onClick={(e) => { e.stopPropagation(); onMenu(node.id, e.currentTarget); }}
         >
           ⋮
@@ -774,14 +774,14 @@ function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) 
       <div className="space-y-4 max-h-[75vh] flex flex-col">
         {/* Already selected */}
         <div className="border rounded-lg overflow-hidden">
-          <div className="bg-gray-50 border-b px-4 py-2 text-sm font-medium text-gray-700">已选 ({selectedList.length})</div>
+          <div className="bg-[var(--ui-bg-subtle)] border-b px-4 py-2 text-sm font-medium text-gray-700">已选 ({selectedList.length})</div>
           {selectedList.length === 0 ? (
-            <div className="px-4 py-3 text-center text-sm text-gray-400">请在下方选择</div>
+            <div className="px-4 py-3 text-center text-sm text-[var(--ui-text-tertiary)]">请在下方选择</div>
           ) : (
             <div className="max-h-32 overflow-y-auto">
               <table className="w-full text-sm"><tbody className="divide-y divide-gray-100">
                 {selectedList.map((item) => (
-                  <tr key={item.id}><td className="px-3 py-1.5"><span className="mr-1">{ENTITY_ICON[item.t]}</span>{item.code}</td><td className="px-3 py-1.5 text-gray-500">{item.version || '-'}</td><td className="px-3 py-1.5 text-gray-500">{item.name}</td><td className="px-3 py-1.5 text-right"><Button type="button" variant="danger" size="xs" onClick={() => { const n = new Map(selected); n.delete(item.id); setSelected(n); }}>✕</Button></td></tr>
+                  <tr key={item.id}><td className="px-3 py-1.5"><span className="mr-1">{ENTITY_ICON[item.t]}</span>{item.code}</td><td className="px-3 py-1.5 text-[var(--ui-text-secondary)]">{item.version || '-'}</td><td className="px-3 py-1.5 text-[var(--ui-text-secondary)]">{item.name}</td><td className="px-3 py-1.5 text-right"><Button type="button" variant="danger" size="xs" onClick={() => { const n = new Map(selected); n.delete(item.id); setSelected(n); }}>✕</Button></td></tr>
                 ))}
               </tbody></table>
             </div>
@@ -798,23 +798,23 @@ function ItemPicker({ open, onClose, onConfirm, existingIds }: ItemPickerProps) 
         {dataWarning && <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-3 py-1.5">{dataWarning}</p>}
         <div className="border rounded-lg overflow-hidden flex-1 min-h-0"><div className="max-h-64 overflow-y-auto">
           {dataLoading ? (
-            <p className="p-4 text-center text-sm text-gray-400">加载中...</p>
+            <p className="p-4 text-center text-sm text-[var(--ui-text-tertiary)]">加载中...</p>
           ) : candidates.length === 0 ? (
-            <p className="p-4 text-center text-sm text-gray-400">无匹配结果</p>
+            <p className="p-4 text-center text-sm text-[var(--ui-text-tertiary)]">无匹配结果</p>
           ) : (
-            <table className="w-full text-sm table-fixed"><thead className="bg-gray-50 border-b sticky top-0"><tr>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium w-24">类型</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium w-48">编号</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
-              <th className="px-3 py-2 text-center text-gray-500 font-medium w-20">操作</th>
+            <table className="w-full text-sm table-fixed"><thead className="bg-[var(--ui-bg-subtle)] border-b sticky top-0"><tr>
+              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-24">类型</th>
+              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-48">编号</th>
+              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">版本</th>
+              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">名称</th>
+              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">状态</th>
+              <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-20">操作</th>
             </tr></thead><tbody className="divide-y divide-gray-100">
               {candidates.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50">
-                  <td className="px-3 py-2"><span className="mr-1">{ENTITY_ICON[item.t]}</span><span className="text-xs text-gray-500">{ENTITY_LABEL[item.t]}</span></td>
+                <tr key={item.id} className="hover:bg-[var(--ui-bg-hover)]">
+                  <td className="px-3 py-2"><span className="mr-1">{ENTITY_ICON[item.t]}</span><span className="text-xs text-[var(--ui-text-secondary)]">{ENTITY_LABEL[item.t]}</span></td>
                   <td className="px-3 py-2 font-medium">{item.code}</td>
-                  <td className="px-3 py-2 text-gray-500">{item.version || '-'}</td>
+                  <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{item.version || '-'}</td>
                   <td className="px-3 py-2">{item.name}</td>
                   <td className="px-3 py-2"><StatusTag status={item.status} /></td>
                   <td className="px-3 py-2 text-center whitespace-nowrap">{selected.has(item.id) ? <span className="text-xs text-green-600">已选</span> : <Button type="button" size="xs" onClick={() => setSelected(new Map(selected).set(item.id, item))}>添加</Button>}</td>

@@ -67,7 +67,7 @@ export function TaskNameCell({ name, taskType, isCritical, isOverdue, onClick, v
         : 'inline-flex items-center gap-1'}
       onClick={onClick}
     >
-      <span className={variant === 'gantt' ? 'text-gray-400 mr-1 shrink-0' : ''}>{icon}</span>
+      <span className={variant === 'gantt' ? 'text-[var(--ui-text-tertiary)] mr-1 shrink-0' : ''}>{icon}</span>
       <span
         className={variant === 'gantt'
           ? `truncate ${isCritical ? 'text-red-600 font-medium' : 'text-gray-700'}`

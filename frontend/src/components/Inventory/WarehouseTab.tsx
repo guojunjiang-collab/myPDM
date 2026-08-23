@@ -59,24 +59,24 @@ export default function WarehouseTab() {
       </div>
 
       {/* 表格 */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
+      <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+          <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
             <tr>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">编码</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">名称</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">类型</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">默认库管员</th>
-              <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">操作</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">编码</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">名称</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">类型</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">默认库管员</th>
+              <th className="text-right px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td></tr>
             ) : warehouses.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">暂无数据</td></tr>
             ) : warehouses.map((w) => (
-              <tr key={w.id} className="hover:bg-gray-50">
+              <tr key={w.id} className="hover:bg-[var(--ui-bg-hover)]">
                 <td className="px-4 py-3 text-sm font-medium">{w.code}</td>
                 <td className="px-4 py-3 text-sm font-medium">{w.name}</td>
                 <td className="px-4 py-3 text-sm font-medium">{WH_TYPES.find((t) => t.value === w.type)?.label || w.type || '-'}</td>
@@ -100,24 +100,24 @@ export default function WarehouseTab() {
         {editing && (
           <div className="space-y-3">
             <div>
-              <label className="block text-sm text-gray-600 mb-1">编码</label>
+              <label className="block text-sm text-[var(--ui-text-secondary)] mb-1">编码</label>
               <Input placeholder="仓库编码" value={editing.code || ''} disabled={!!editing.id}
                 onChange={(e) => setEditing({ ...editing, code: e.target.value })} />
             </div>
             <div>
-              <label className="block text-sm text-gray-600 mb-1">名称</label>
+              <label className="block text-sm text-[var(--ui-text-secondary)] mb-1">名称</label>
               <Input placeholder="仓库名称" value={editing.name || ''}
                 onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
             </div>
             <div>
-              <label className="block text-sm text-gray-600 mb-1">类型</label>
+              <label className="block text-sm text-[var(--ui-text-secondary)] mb-1">类型</label>
               <Select value={editing.type || 'general'}
                 onChange={(e) => setEditing({ ...editing, type: e.target.value })}>
                 {WH_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
               </Select>
             </div>
             <div>
-              <label className="block text-sm text-gray-600 mb-1">默认库管员</label>
+              <label className="block text-sm text-[var(--ui-text-secondary)] mb-1">默认库管员</label>
               <Select value={editing.default_keeper_id || ''}
                 onChange={(e) => setEditing({ ...editing, default_keeper_id: e.target.value || null })}>
                 <option value="">（无默认库管员）</option>

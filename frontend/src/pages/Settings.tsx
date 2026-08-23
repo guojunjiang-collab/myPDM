@@ -416,7 +416,7 @@ export default function Settings() {
     <div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-200 mb-4">
+      <div className="flex border-b border-[var(--ui-border)] mb-4">
         {tabs.map((tab) => {
           if (tab.adminOnly && !isAdmin()) return null;
           return (
@@ -427,7 +427,7 @@ export default function Settings() {
               className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
                 activeTab === tab.key
                   ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'
               } ${!tab.enabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
             >
               {tab.label}
@@ -440,7 +440,7 @@ export default function Settings() {
       {activeTab === 'theme' && (
         <div>
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm text-gray-500">选择界面主色风格（徽标状态色保持语义稳定，仅主按钮/链接/输入焦点随主题切换）</p>
+            <p className="text-sm text-[var(--ui-text-secondary)]">选择界面主色风格（徽标状态色保持语义稳定，仅主按钮/链接/输入焦点随主题切换）</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl">
             {THEMES.map((t) => {
@@ -453,7 +453,7 @@ export default function Settings() {
                   className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
                     selected
                       ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
+                      : 'border-[var(--ui-border)] bg-[var(--ui-bg-surface)] hover:border-gray-300'
                   }`}
                 >
                   <span
@@ -461,8 +461,8 @@ export default function Settings() {
                     style={{ backgroundColor: t.swatch }}
                   />
                   <span className="min-w-0">
-                    <span className="block text-sm font-medium text-gray-900">{t.label}</span>
-                    <span className="block text-xs text-gray-500">{t.desc}</span>
+                    <span className="block text-sm font-medium text-[var(--ui-text-primary)]">{t.label}</span>
+                    <span className="block text-xs text-[var(--ui-text-secondary)]">{t.desc}</span>
                   </span>
                   {selected && <span className="ml-auto text-blue-600 text-sm">✓</span>}
                 </button>
@@ -476,7 +476,7 @@ export default function Settings() {
       {activeTab === 'customFields' && (
         <div>
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm text-gray-500">自定义字段用于扩展零部件、图文档的结构</p>
+            <p className="text-sm text-[var(--ui-text-secondary)]">自定义字段用于扩展零部件、图文档的结构</p>
             {isAdmin() && (
               <div className="flex gap-2">
                 <Button variant="secondary" onClick={handleExportFields}>
@@ -493,35 +493,35 @@ export default function Settings() {
             )}
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-hidden">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
                 <tr>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">名称</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">标识</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">类型</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">适用类型</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">必填</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">排序</th>
-                  <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">操作</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">名称</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">标识</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">类型</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">适用类型</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">必填</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">排序</th>
+                  <th className="px-4 py-3 text-right text-sm font-medium text-[var(--ui-text-secondary)]">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">加载中...</td>
+                    <td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td>
                   </tr>
                 ) : storeCustomFields.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">
                       暂无数据
                     </td>
                   </tr>
                 ) : (
                   storeCustomFields.map((field) => (
-                    <tr key={field.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setViewingField(field)}>
+                    <tr key={field.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => setViewingField(field)}>
                       <td className="px-4 py-3 text-sm font-medium">{field.name}</td>
-                      <td className="px-4 py-3 text-sm font-mono text-gray-600">{field.field_key}</td>
+                      <td className="px-4 py-3 text-sm font-mono text-[var(--ui-text-secondary)]">{field.field_key}</td>
                       <td className="px-4 py-3 text-sm">
                         {FIELD_TYPES.find(t => t.value === field.field_type)?.label || field.field_type}
                       </td>
@@ -537,7 +537,7 @@ export default function Settings() {
                       <td className="px-4 py-3 text-sm">
                         {field.is_required ? '是' : '否'}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">{field.sort_order}</td>
+                      <td className="px-4 py-3 text-sm text-[var(--ui-text-secondary)]">{field.sort_order}</td>
                       <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                         {isAdmin() && (
                           <>
@@ -566,28 +566,28 @@ export default function Settings() {
             <Modal open={!!viewingField} title="字段详情" onClose={() => setViewingField(null)} width="md">
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                    <div className="text-xs text-gray-500 mb-0.5">名称</div>
+                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">名称</div>
                     <div className="text-sm font-medium">{viewingField.name}</div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                    <div className="text-xs text-gray-500 mb-0.5">标识</div>
+                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">标识</div>
                     <div className="text-sm font-mono">{viewingField.field_key}</div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                    <div className="text-xs text-gray-500 mb-0.5">类型</div>
+                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">类型</div>
                     <div className="text-sm">{FIELD_TYPES.find(t => t.value === viewingField.field_type)?.label || viewingField.field_type}</div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                    <div className="text-xs text-gray-500 mb-0.5">排序</div>
+                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">排序</div>
                     <div className="text-sm">{viewingField.sort_order}</div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                    <div className="text-xs text-gray-500 mb-0.5">必填</div>
+                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">必填</div>
                     <div className="text-sm">{viewingField.is_required ? '是' : '否'}</div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                    <div className="text-xs text-gray-500 mb-0.5">适用类型</div>
+                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">适用类型</div>
                     <div className="text-sm flex gap-1 flex-wrap">
                       {(Array.isArray(viewingField.applies_to) ? viewingField.applies_to : [viewingField.applies_to]).map((type) => (
                         <span key={type} className="px-2 py-0.5 text-xs bg-gray-100 rounded">{ENTITY_TYPES.find(e => e.value === type)?.label || type}</span>
@@ -595,8 +595,8 @@ export default function Settings() {
                     </div>
                   </div>
                   {viewingField.options && viewingField.options.length > 0 && (
-                    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 col-span-2">
-                      <div className="text-xs text-gray-500 mb-0.5">选项列表</div>
+                    <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100 col-span-2">
+                      <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">选项列表</div>
                       <div className="text-sm">{viewingField.options.join('、')}</div>
                     </div>
                   )}
@@ -629,9 +629,9 @@ export default function Settings() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* 导出全部数据 */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] p-6">
             <h3 className="text-lg font-medium mb-2">导出全部数据</h3>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-[var(--ui-text-secondary)] mb-4">
               将系统中的所有零件、部件、图文档、构型项、构型配置、用户看板数据导出为文件备份。请选择目标文件夹。
             </p>
             <Button variant="success" onClick={handleExportAll} disabled={exporting}>
@@ -645,9 +645,9 @@ export default function Settings() {
           </div>
 
           {/* 导入全部数据 */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] p-6">
             <h3 className="text-lg font-medium mb-2">导入全部数据</h3>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-[var(--ui-text-secondary)] mb-4">
               从导出的文件夹中选择"自定义字段定义.xlsx + 图文档清单.xlsx + 零件清单.xlsx + 部件清单.xlsx + 构型项.xlsx + 构型配置.xlsx + 用户看板.xlsx"等文件所在的文件夹，批量导入全部数据。
             </p>
             <Button onClick={handleImportAll} disabled={importing}>
@@ -661,9 +661,9 @@ export default function Settings() {
           </div>
 
           {/* 导出用户看板 */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] p-6">
             <h3 className="text-lg font-medium mb-2">导出用户看板</h3>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-[var(--ui-text-secondary)] mb-4">
               仅导出所有用户的看板数据（文件夹、关联项目、共享设置），保存为 Excel 文件。
             </p>
             <Button variant="success" onClick={handleDashExport} disabled={dashExporting}>
@@ -675,9 +675,9 @@ export default function Settings() {
           </div>
 
           {/* 导入用户看板 */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] p-6">
             <h3 className="text-lg font-medium mb-2">导入用户看板</h3>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-[var(--ui-text-secondary)] mb-4">
               选择已导出的"用户看板.xlsx"文件，导入用户看板数据。
             </p>
             <Button onClick={() => dashImportRef.current?.click()} disabled={dashImporting}>
@@ -690,9 +690,9 @@ export default function Settings() {
           </div>
 
           {/* STP 批量转换 */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] p-6">
             <h3 className="text-lg font-medium mb-2">STP 批量转换</h3>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-[var(--ui-text-secondary)] mb-4">
               将系统中所有未转换的 STP/STEP 附件转换为 GLB 格式，方便预览时直接加载。
               建议在空闲时段执行，转换过程使用最多 2 个并发进程。
             </p>
@@ -701,15 +701,15 @@ export default function Settings() {
                 {batchConverting ? '转换中...' : '批量转换 STP'}
               </Button>
               {batchStatus && (
-                <span className="text-sm text-gray-500">{batchStatus}</span>
+                <span className="text-sm text-[var(--ui-text-secondary)]">{batchStatus}</span>
               )}
             </div>
           </div>
 
           {/* 重置系统数据 */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] p-6">
             <h3 className="text-lg font-medium mb-2">重置系统数据</h3>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-[var(--ui-text-secondary)] mb-4">
               清空所有零件、部件、图文档、自定义字段、附件文件、看板、构型管理（构型项/构型配置）及变更管理（ECR/ECO）数据。需验证管理员密码。此操作不可逆，请谨慎操作。
             </p>
             <Button variant="danger" onClick={() => { setShowResetConfirm(true); setResetPassword(''); }} disabled={resetting}>
@@ -721,7 +721,7 @@ export default function Settings() {
         {/* ---- Reset Confirm Modal ---- */}
         <Modal open={showResetConfirm} title="确认重置" onClose={() => setShowResetConfirm(false)} width="sm">
           <div className="space-y-4">
-              <p className="text-sm text-gray-600">此操作将清空所有业务数据（零件、部件、图文档、附件、自定义字段、看板、构型管理、变更管理、glTF缓存），删除所有非管理员用户，并将 admin 密码重置为 admin123。此操作不可逆，请输入管理员密码确认：</p>
+              <p className="text-sm text-[var(--ui-text-secondary)]">此操作将清空所有业务数据（零件、部件、图文档、附件、自定义字段、看板、构型管理、变更管理、glTF缓存），删除所有非管理员用户，并将 admin 密码重置为 admin123。此操作不可逆，请输入管理员密码确认：</p>
             <Input
               type="password"
               value={resetPassword}
@@ -744,9 +744,9 @@ export default function Settings() {
       {/* 修改密码 */}
       {activeTab === 'password' && (
         <div className="max-w-md">
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] p-6">
             <h3 className="text-lg font-medium mb-4">修改密码</h3>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-[var(--ui-text-secondary)] mb-4">
               当前用户: <span className="font-medium">{currentUser?.username}</span>
             </p>
 
@@ -818,8 +818,8 @@ export default function Settings() {
       >
         <form onSubmit={handleSubmitField} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">字段名称</label>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">字段名称</label>
               <Input
                 type="text"
                 value={formData.name}
@@ -828,8 +828,8 @@ export default function Settings() {
                 placeholder="例如：采购周期"
               />
             </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">字段标识</label>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">字段标识</label>
               <Input
                 type="text"
                 value={formData.field_key}
@@ -839,10 +839,10 @@ export default function Settings() {
                 placeholder="lead_time"
                 disabled={!!editingField}
               />
-              <p className="mt-1 text-xs text-gray-400">创建后不可修改，用于API字段映射</p>
+              <p className="mt-1 text-xs text-[var(--ui-text-tertiary)]">创建后不可修改，用于API字段映射</p>
             </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">字段类型</label>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">字段类型</label>
               <Select
                 value={formData.field_type}
                 onChange={(e) => setFormData({ ...formData, field_type: e.target.value as 'text' | 'number' | 'select' })}
@@ -853,8 +853,8 @@ export default function Settings() {
                 ))}
               </Select>
             </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">排序序号</label>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">排序序号</label>
               <Input
                 type="number"
                 value={formData.sort_order}
@@ -862,11 +862,11 @@ export default function Settings() {
                 size="xs"
                 placeholder="0"
               />
-              <p className="mt-1 text-xs text-gray-400">越小越靠前</p>
+              <p className="mt-1 text-xs text-[var(--ui-text-tertiary)]">越小越靠前</p>
             </div>
             {(formData.field_type === 'select' || formData.field_type === 'multiselect') && (
-              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 col-span-2">
-                <label className="block text-xs text-gray-500 mb-0.5">选项</label>
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100 col-span-2">
+                <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">选项</label>
                 <Textarea
                   value={formData.options}
                   onChange={(e) => setFormData({ ...formData, options: e.target.value })}
@@ -877,8 +877,8 @@ export default function Settings() {
                 />
               </div>
             )}
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 col-span-2">
-              <label className="block text-xs text-gray-500 mb-1">适用类型</label>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100 col-span-2">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-1">适用类型</label>
               <div className="flex gap-4">
                 {ENTITY_TYPES.map((type) => (
                   <label key={type.value} className="flex items-center gap-1.5 text-sm">
@@ -918,7 +918,7 @@ export default function Settings() {
             </div>
           )}
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+          <div className="flex justify-end gap-3 pt-4 border-t border-[var(--ui-border)]">
             <Button
               type="button"
               onClick={() => setShowModal(false)}

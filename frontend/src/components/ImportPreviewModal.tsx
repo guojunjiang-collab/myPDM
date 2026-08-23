@@ -89,13 +89,13 @@ export default function ImportPreviewModal({
             </span>
           )}
           {preview.bomFiles !== undefined && (
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-[var(--ui-text-secondary)]">
               BOM文件 {preview.bomFiles} 个
               {preview.bomMatched !== undefined && `（匹配 ${preview.bomMatched} 个）`}
             </span>
           )}
           {preview.docRelationCount !== undefined && preview.docRelationCount > 0 && (
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-[var(--ui-text-secondary)]">
               关联图文档 {preview.docRelationCount} 条
             </span>
           )}
@@ -103,7 +103,7 @@ export default function ImportPreviewModal({
           {preview.type === 'configuration_item' && (
             <>
               {preview.partRelationCount !== undefined && preview.partRelationCount > 0 && (
-                <span className="text-sm text-gray-600">
+                <span className="text-sm text-[var(--ui-text-secondary)]">
                   关联零部件 {preview.partRelationCount} 个
                   {preview.partWarnings !== undefined && preview.partWarnings > 0 && (
                     <span className="text-orange-600">（未找到 {preview.partWarnings} 个）</span>
@@ -111,7 +111,7 @@ export default function ImportPreviewModal({
                 </span>
               )}
               {preview.childRelationCount !== undefined && preview.childRelationCount > 0 && (
-                <span className="text-sm text-gray-600">
+                <span className="text-sm text-[var(--ui-text-secondary)]">
                   子构型项 {preview.childRelationCount} 个
                   {preview.childWarnings !== undefined && preview.childWarnings > 0 && (
                     <span className="text-orange-600">（未找到 {preview.childWarnings} 个）</span>
@@ -142,7 +142,7 @@ export default function ImportPreviewModal({
           {preview.type === 'configuration_profile' && (
             <>
               {preview.profileItemCount !== undefined && preview.profileItemCount > 0 && (
-                <span className="text-sm text-gray-600">清单项 {preview.profileItemCount} 个</span>
+                <span className="text-sm text-[var(--ui-text-secondary)]">清单项 {preview.profileItemCount} 个</span>
               )}
               {preview.ciWarnings !== undefined && preview.ciWarnings > 0 && (
                 <span className="text-sm text-orange-600">⚠️ {preview.ciWarnings} 个关联构型项未找到</span>
@@ -153,7 +153,7 @@ export default function ImportPreviewModal({
           {preview.type === 'ecr' && (
             <>
               {preview.affectedCount !== undefined && preview.affectedCount > 0 && (
-                <span className="text-sm text-gray-600">
+                <span className="text-sm text-[var(--ui-text-secondary)]">
                   受影响对象 {preview.affectedCount} 个
                   {preview.affectedWarnings !== undefined && preview.affectedWarnings > 0 && (
                     <span className="text-orange-600">（未找到 {preview.affectedWarnings} 个）</span>
@@ -161,7 +161,7 @@ export default function ImportPreviewModal({
                 </span>
               )}
               {preview.reviewerCount !== undefined && preview.reviewerCount > 0 && (
-                <span className="text-sm text-gray-600">
+                <span className="text-sm text-[var(--ui-text-secondary)]">
                   审批人 {preview.reviewerCount} 个
                   {preview.reviewerWarnings !== undefined && preview.reviewerWarnings > 0 && (
                     <span className="text-orange-600">（未找到 {preview.reviewerWarnings} 个）</span>
@@ -177,7 +177,7 @@ export default function ImportPreviewModal({
           {preview.type === 'eco' && (
             <>
               {preview.execItemCount !== undefined && preview.execItemCount > 0 && (
-                <span className="text-sm text-gray-600">
+                <span className="text-sm text-[var(--ui-text-secondary)]">
                   执行明细 {preview.execItemCount} 个
                   {preview.execItemWarnings !== undefined && preview.execItemWarnings > 0 && (
                     <span className="text-orange-600">（未找到 {preview.execItemWarnings} 个）</span>
@@ -185,7 +185,7 @@ export default function ImportPreviewModal({
                 </span>
               )}
               {preview.reviewerCount !== undefined && preview.reviewerCount > 0 && (
-                <span className="text-sm text-gray-600">
+                <span className="text-sm text-[var(--ui-text-secondary)]">
                   审批人 {preview.reviewerCount} 个
                   {preview.reviewerWarnings !== undefined && preview.reviewerWarnings > 0 && (
                     <span className="text-orange-600">（未找到 {preview.reviewerWarnings} 个）</span>
@@ -205,15 +205,15 @@ export default function ImportPreviewModal({
         {/* 表格 */}
         <div className="border rounded-lg overflow-hidden max-h-96 overflow-y-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b sticky top-0">
+            <thead className="bg-[var(--ui-bg-subtle)] border-b sticky top-0">
               <tr>
-                <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">状态</th>
-                <th className="px-3 py-2 text-left text-gray-500 font-medium">件号/编号</th>
-                <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
-                <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-                <th className="px-3 py-2 text-left text-gray-500 font-medium">备注/说明</th>
+                <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20">状态</th>
+                <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">件号/编号</th>
+                <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">名称</th>
+                <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">版本</th>
+                <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">备注/说明</th>
                 {(['configuration_item', 'configuration_profile', 'ecr', 'eco'] as ImportPreview['type'][]).includes(preview.type) && (
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-24">关联</th>
+                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-24">关联</th>
                 )}
               </tr>
             </thead>
@@ -226,26 +226,26 @@ export default function ImportPreviewModal({
                       ? 'bg-red-50'
                       : row.status === '新增'
                         ? 'bg-green-50/30'
-                        : 'hover:bg-gray-50'
+                        : 'hover:bg-[var(--ui-bg-hover)]'
                   }`}
                 >
                   <td className="px-3 py-2">{renderStatusBadge(row)}</td>
                   <td className="px-3 py-2 font-medium">{row.code || '-'}</td>
                   <td className="px-3 py-2">{row.name || '-'}</td>
-                  <td className="px-3 py-2 text-gray-500">{row.version || '-'}</td>
-                  <td className="px-3 py-2 text-gray-500">
+                  <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{row.version || '-'}</td>
+                  <td className="px-3 py-2 text-[var(--ui-text-secondary)]">
                     {row.error ? (
                       <span className="text-red-600">{row.error}</span>
                     ) : row.remark ? (
                       row.remark
                     ) : row._bomChildren !== undefined && row._bomChildren > 0 ? (
-                      <span className="text-gray-600">{row._bomChildren} 个子项</span>
+                      <span className="text-[var(--ui-text-secondary)]">{row._bomChildren} 个子项</span>
                     ) : (
                       '-'
                     )}
                   </td>
                   {(['configuration_item', 'configuration_profile', 'ecr', 'eco'] as ImportPreview['type'][]).includes(preview.type) && (
-                    <td className="px-3 py-2 text-gray-500 text-xs">
+                    <td className="px-3 py-2 text-[var(--ui-text-secondary)] text-xs">
                       {preview.type === 'configuration_item' && (
                         <span className="space-x-1">
                           {row._partCount !== undefined && <span>零部件×{row._partCount}</span>}
@@ -275,7 +275,7 @@ export default function ImportPreviewModal({
         </div>
 
         {/* 说明 */}
-        <div className="text-xs text-gray-400 space-y-1">
+        <div className="text-xs text-[var(--ui-text-tertiary)] space-y-1">
           <p>• 🆕 新增：系统中不存在该记录，将新建</p>
           <p>• ✏️ 更新：系统中已存在该记录，将覆盖更新</p>
           <p>• ❌ 错误：必填字段缺失，将被跳过</p>

@@ -65,7 +65,7 @@ export default function DataManagement() {
 
   if (!isAdmin()) {
     return (
-      <div className="flex items-center justify-center h-64 text-gray-400">
+      <div className="flex items-center justify-center h-64 text-[var(--ui-text-tertiary)]">
         仅管理员可访问数据管理功能
       </div>
     );
@@ -127,7 +127,7 @@ export default function DataManagement() {
       <h2 className="text-xl font-semibold mb-6">数据管理</h2>
 
       {loading && (
-        <div className="text-gray-400 text-center py-8">加载中...</div>
+        <div className="text-[var(--ui-text-tertiary)] text-center py-8">加载中...</div>
       )}
 
       {error && (
@@ -144,27 +144,27 @@ export default function DataManagement() {
           </div>
 
           {/* 分表统计 */}
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden mb-6">
+          <div className="bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg overflow-hidden mb-6">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
+              <thead className="bg-[var(--ui-bg-subtle)] border-b">
                 <tr>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">表名</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-500">数量</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">最早删除时间</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">最近删除时间</th>
+                  <th className="text-left px-4 py-3 font-medium text-[var(--ui-text-secondary)]">表名</th>
+                  <th className="text-right px-4 py-3 font-medium text-[var(--ui-text-secondary)]">数量</th>
+                  <th className="text-left px-4 py-3 font-medium text-[var(--ui-text-secondary)]">最早删除时间</th>
+                  <th className="text-left px-4 py-3 font-medium text-[var(--ui-text-secondary)]">最近删除时间</th>
                 </tr>
               </thead>
               <tbody>
                 {Object.entries(stats).map(([table, s]) => (
-                  <tr key={table} className="border-b last:border-b-0 hover:bg-gray-50">
+                  <tr key={table} className="border-b last:border-b-0 hover:bg-[var(--ui-bg-hover)]">
                     <td className="px-4 py-3">{TABLE_LABELS[table] || table}</td>
-                    <td className={`px-4 py-3 text-right ${s.count > 0 ? 'text-orange-600 font-medium' : 'text-gray-400'}`}>
+                    <td className={`px-4 py-3 text-right ${s.count > 0 ? 'text-orange-600 font-medium' : 'text-[var(--ui-text-tertiary)]'}`}>
                       {s.count}
                     </td>
-                    <td className="px-4 py-3 text-gray-500">
+                    <td className="px-4 py-3 text-[var(--ui-text-secondary)]">
                       {s.earliest ? new Date(s.earliest).toLocaleString('zh-CN') : '--'}
                     </td>
-                    <td className="px-4 py-3 text-gray-500">
+                    <td className="px-4 py-3 text-[var(--ui-text-secondary)]">
                       {s.latest ? new Date(s.latest).toLocaleString('zh-CN') : '--'}
                     </td>
                   </tr>
@@ -174,15 +174,15 @@ export default function DataManagement() {
           </div>
 
           {/* 清理操作区 */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <div className="bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg p-6">
             <h3 className="font-medium mb-4">清理软删除数据</h3>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-[var(--ui-text-secondary)] mb-4">
               选择要清理的表和日期范围。清理操作不可逆，建议先备份数据库。
             </p>
 
             {/* 表选择 */}
             <div className="mb-4">
-              <div className="text-sm text-gray-600 mb-2">选择要清理的表:</div>
+              <div className="text-sm text-[var(--ui-text-secondary)] mb-2">选择要清理的表:</div>
               <div className="flex flex-wrap gap-2">
                 {Object.keys(TABLE_LABELS).map(table => (
                   <label
@@ -190,7 +190,7 @@ export default function DataManagement() {
                     className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm cursor-pointer border transition-colors ${
                       selectedTables.has(table)
                         ? 'border-blue-400 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                        : 'border-[var(--ui-border)] text-[var(--ui-text-secondary)] hover:border-gray-300'
                     }`}
                   >
                     <input
@@ -207,18 +207,18 @@ export default function DataManagement() {
 
             {/* 日期选择 */}
             <div className="mb-4">
-              <div className="text-sm text-gray-600 mb-2">清理此日期之前的数据（可选）:</div>
+              <div className="text-sm text-[var(--ui-text-secondary)] mb-2">清理此日期之前的数据（可选）:</div>
               <div className="flex flex-wrap items-center gap-2 mb-2">
-                <button onClick={() => setPresetDate(null)} className={`px-3 py-1 rounded text-xs border transition-colors ${!beforeDate ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                <button onClick={() => setPresetDate(null)} className={`px-3 py-1 rounded text-xs border transition-colors ${!beforeDate ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-[var(--ui-border)] text-[var(--ui-text-secondary)] hover:border-gray-300'}`}>
                   全部清理
                 </button>
-                <button onClick={() => setPresetDate(30)} className={`px-3 py-1 rounded text-xs border transition-colors ${beforeDate === getPresetDateStr(30) ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                <button onClick={() => setPresetDate(30)} className={`px-3 py-1 rounded text-xs border transition-colors ${beforeDate === getPresetDateStr(30) ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-[var(--ui-border)] text-[var(--ui-text-secondary)] hover:border-gray-300'}`}>
                   清理30天前
                 </button>
-                <button onClick={() => setPresetDate(90)} className={`px-3 py-1 rounded text-xs border transition-colors ${beforeDate === getPresetDateStr(90) ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                <button onClick={() => setPresetDate(90)} className={`px-3 py-1 rounded text-xs border transition-colors ${beforeDate === getPresetDateStr(90) ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-[var(--ui-border)] text-[var(--ui-text-secondary)] hover:border-gray-300'}`}>
                   清理90天前
                 </button>
-                <button onClick={() => setPresetDate(180)} className={`px-3 py-1 rounded text-xs border transition-colors ${beforeDate === getPresetDateStr(180) ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                <button onClick={() => setPresetDate(180)} className={`px-3 py-1 rounded text-xs border transition-colors ${beforeDate === getPresetDateStr(180) ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-[var(--ui-border)] text-[var(--ui-text-secondary)] hover:border-gray-300'}`}>
                   清理180天前
                 </button>
               </div>
@@ -228,7 +228,7 @@ export default function DataManagement() {
                 onChange={(e) => setBeforeDate(e.target.value)}
               />
               {!beforeDate && (
-                <span className="text-xs text-gray-400 ml-2">留空则清理所有软删除数据</span>
+                <span className="text-xs text-[var(--ui-text-tertiary)] ml-2">留空则清理所有软删除数据</span>
               )}
             </div>
 

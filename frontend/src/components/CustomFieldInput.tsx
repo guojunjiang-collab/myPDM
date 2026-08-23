@@ -15,7 +15,7 @@ export default function CustomFieldInput({ def, value, onChange, disabled, readO
   if (readOnly) {
     if (def.field_type === 'multiselect') {
       const selected = Array.isArray(value) ? value : [];
-      if (selected.length === 0) return <span className="text-sm text-gray-400">-</span>;
+      if (selected.length === 0) return <span className="text-sm text-[var(--ui-text-tertiary)]">-</span>;
       const display = selected.length > 2
         ? `${selected.slice(0, 2).join('、')} +${selected.length - 2}`
         : selected.join('、');
@@ -32,7 +32,7 @@ export default function CustomFieldInput({ def, value, onChange, disabled, readO
           const checked = selected.includes(opt);
           return (
             <label key={opt} className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded border cursor-pointer
-              ${checked ? 'bg-primary-50 border-primary-300 text-primary-700' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}
+              ${checked ? 'bg-primary-50 border-primary-300 text-primary-700' : 'bg-[var(--ui-bg-surface)] border-[var(--ui-border)] text-[var(--ui-text-secondary)] hover:border-gray-300'}
               ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
               <input type="checkbox" checked={checked} disabled={disabled}
                 onChange={() => {

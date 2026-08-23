@@ -19,7 +19,7 @@ export default function Markdown({ children }: Props) {
             <table className="border-collapse border border-gray-300" {...props} />
           ),
           th: ({ node, ...props }) => (
-            <th className="border border-gray-300 px-2 py-1 bg-gray-50" {...props} />
+            <th className="border border-gray-300 px-2 py-1 bg-[var(--ui-bg-subtle)]" {...props} />
           ),
           td: ({ node, ...props }) => (
             <td className="border border-gray-300 px-2 py-1" {...props} />

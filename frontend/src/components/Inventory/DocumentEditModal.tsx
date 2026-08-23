@@ -18,8 +18,8 @@ const DOC_LABELS: Record<InvDocType, string> = {
 };
 
 // ECR 式卡片字段样式
-const cardCls = 'bg-gray-50 rounded-lg px-3 py-2 border border-gray-100';
-const cardLabelCls = 'block text-xs text-gray-500 mb-0.5';
+const cardCls = 'bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100';
+const cardLabelCls = 'block text-xs text-[var(--ui-text-secondary)] mb-0.5';
 
 export default function DocumentEditModal({ docType, onClose, onSaved }:
   { docType: InvDocType; onClose: () => void; onSaved: () => void }) {
@@ -154,15 +154,15 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
           </div>
 
           {reviewers.length === 0 && (
-            <div className="text-center text-gray-400 py-3 text-sm border border-dashed border-gray-300 rounded-lg">
+            <div className="text-center text-[var(--ui-text-tertiary)] py-3 text-sm border border-dashed border-gray-300 rounded-lg">
               暂无审批人，请点击上方按钮添加
             </div>
           )}
 
           <div className="space-y-2">
             {reviewers.map((reviewer, index) => (
-              <div key={index} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg border border-gray-200">
-                <span className="text-xs text-gray-400 w-6 text-center">{reviewer.seq}</span>
+              <div key={index} className="flex items-center gap-3 p-2 bg-[var(--ui-bg-subtle)] rounded-lg border border-[var(--ui-border)]">
+                <span className="text-xs text-[var(--ui-text-tertiary)] w-6 text-center">{reviewer.seq}</span>
                 <Select value={reviewer.user_id}
                   onChange={(e) => updateReviewer(index, 'user_id', e.target.value)}
                   className="flex-1">
@@ -186,16 +186,16 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
             <label className="text-sm font-semibold text-gray-700">📋 明细</label>
             <Button variant="link" size="xs" onClick={addLine}>+ 加一行</Button>
           </div>
-          <div className="rounded-lg border border-gray-200">
+          <div className="rounded-lg border border-[var(--ui-border)]">
             {usesStockPicker ? (
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
                   <tr>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">物料（{isTransfer ? '源仓' : '仓库'}有货）</th>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">批次</th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">{isStocktake ? '账面量' : isTransfer ? '源仓余量' : '仓库余量'}</th>
-                    {isTransfer && <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">目标仓余量</th>}
-                    {!isStocktake && <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">{isTransfer ? '调拨数量' : '出库数量'}</th>}
+                    <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">物料（{isTransfer ? '源仓' : '仓库'}有货）</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">批次</th>
+                    <th className="text-right px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">{isStocktake ? '账面量' : isTransfer ? '源仓余量' : '仓库余量'}</th>
+                    {isTransfer && <th className="text-right px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">目标仓余量</th>}
+                    {!isStocktake && <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">{isTransfer ? '调拨数量' : '出库数量'}</th>}
                     <th className="px-3 py-2"></th>
                   </tr>
                 </thead>
@@ -218,9 +218,9 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
                             onChange={(v) => { const [mid, b] = v.split('|'); updateLine(i, { material_id: mid, batch_no: b }); }}
                           />
                         </td>
-                        <td className="px-3 py-2 text-sm text-gray-500">{l.batch_no || '-'}</td>
-                        <td className="px-3 py-2 text-sm text-right text-gray-500">{srcBal ?? '-'}</td>
-                        {isTransfer && <td className="px-3 py-2 text-sm text-right text-gray-500">{toWarehouseId ? tgtBal : '-'}</td>}
+                        <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{l.batch_no || '-'}</td>
+                        <td className="px-3 py-2 text-sm text-right text-[var(--ui-text-secondary)]">{srcBal ?? '-'}</td>
+                        {isTransfer && <td className="px-3 py-2 text-sm text-right text-[var(--ui-text-secondary)]">{toWarehouseId ? tgtBal : '-'}</td>}
                         {!isStocktake && (
                           <td className="px-3 py-2">
                             <Input size="xs" type="number" value={l.quantity}
@@ -238,12 +238,12 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
               </table>
             ) : (
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
                   <tr>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">物料</th>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">批次</th>
-                    {isAdjustment && <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">方向</th>}
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">数量</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">物料</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">批次</th>
+                    {isAdjustment && <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">方向</th>}
+                    <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">数量</th>
                     <th className="px-3 py-2"></th>
                   </tr>
                 </thead>
@@ -287,7 +287,7 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
             )}
           </div>
           {usesStockPicker && (
-            <p className="text-xs text-gray-400 mt-1.5">
+            <p className="text-xs text-[var(--ui-text-tertiary)] mt-1.5">
               {isStocktake
                 ? '盘点物料从「仓库有货」中选择，账面量为当前库存；实盘数在过账时由库管员填写。'
                 : `${isTransfer ? '调拨' : '出库'}物料仅从「${isTransfer ? '源仓' : '仓库'}有货」的库存中选择；数量超过${isTransfer ? '源仓' : '仓库'}余量会标红。`}

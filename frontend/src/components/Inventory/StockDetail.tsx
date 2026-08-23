@@ -5,9 +5,9 @@ import type { StockRow } from '../../types';
 
 function InfoItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-      <div className="text-sm text-gray-900 font-medium">{value}</div>
+    <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+      <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{label}</div>
+      <div className="text-sm text-[var(--ui-text-primary)] font-medium">{value}</div>
     </div>
   );
 }
@@ -36,15 +36,15 @@ export default function StockDetail({ materialId, rows, whName, onClose, onViewD
     <Modal open title="物料库存详情" onClose={onClose} width="3xl">
       <div className="h-[30vh] flex flex-col">
       {/* TAB 切换 */}
-      <div className="flex border-b border-gray-200 mb-4 shrink-0">
+      <div className="flex border-b border-[var(--ui-border)] mb-4 shrink-0">
         <button
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'info' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'info' ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'}`}
           onClick={() => setTab('info')}
         >
           基础信息
         </button>
         <button
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'ledger' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === 'ledger' ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'}`}
           onClick={() => setTab('ledger')}
         >
           库存流水
@@ -66,25 +66,25 @@ export default function StockDetail({ materialId, rows, whName, onClose, onViewD
 
           <div>
             <h4 className="text-sm font-semibold text-gray-700 mb-2">各仓库 / 批次库存</h4>
-            <div className="rounded-lg border border-gray-200 overflow-hidden">
+            <div className="rounded-lg border border-[var(--ui-border)] overflow-hidden">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
                   <tr>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">仓库</th>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">批次</th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">数量</th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">安全库存</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">仓库</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">批次</th>
+                    <th className="text-right px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">数量</th>
+                    <th className="text-right px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">安全库存</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {rows.length === 0 ? (
-                    <tr><td colSpan={4} className="px-3 py-6 text-center text-sm text-gray-400">暂无库存</td></tr>
+                    <tr><td colSpan={4} className="px-3 py-6 text-center text-sm text-[var(--ui-text-tertiary)]">暂无库存</td></tr>
                   ) : rows.map((r, i) => (
                     <tr key={i} className={r.is_low ? 'bg-red-50' : ''}>
                       <td className="px-3 py-2 text-sm">{whName(r.warehouse_id)}</td>
-                      <td className="px-3 py-2 text-sm text-gray-500">{r.batch_no || '-'}</td>
+                      <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{r.batch_no || '-'}</td>
                       <td className={`px-3 py-2 text-sm text-right font-medium ${r.is_low ? 'text-red-600' : ''}`}>{r.quantity}</td>
-                      <td className="px-3 py-2 text-sm text-right text-gray-500">{r.safety_stock ?? '-'}</td>
+                      <td className="px-3 py-2 text-sm text-right text-[var(--ui-text-secondary)]">{r.safety_stock ?? '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -97,34 +97,34 @@ export default function StockDetail({ materialId, rows, whName, onClose, onViewD
       {/* TAB 2: 库存流水（滚动容器） */}
       {tab === 'ledger' && (
         <div className="flex-1 min-h-0 overflow-y-auto">
-          <div className="rounded-lg border border-gray-200 overflow-hidden">
+          <div className="rounded-lg border border-[var(--ui-border)] overflow-hidden">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
+              <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0">
                 <tr>
-                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">单据</th>
-                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">类型</th>
-                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">仓库</th>
-                  <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">增减</th>
-                  <th className="text-right px-3 py-2 text-xs font-medium text-gray-500">过账后余额</th>
-                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">操作人</th>
-                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">时间</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">单据</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">类型</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">仓库</th>
+                  <th className="text-right px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">增减</th>
+                  <th className="text-right px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">过账后余额</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">操作人</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">时间</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {ledger.length === 0 ? (
-                  <tr><td colSpan={7} className="px-3 py-6 text-center text-sm text-gray-400">暂无流水</td></tr>
+                  <tr><td colSpan={7} className="px-3 py-6 text-center text-sm text-[var(--ui-text-tertiary)]">暂无流水</td></tr>
                 ) : ledger.map((l) => (
-                  <tr key={l.id} className={l.doc_id ? 'hover:bg-gray-50 cursor-pointer' : ''}
+                  <tr key={l.id} className={l.doc_id ? 'hover:bg-[var(--ui-bg-hover)] cursor-pointer' : ''}
                     onClick={() => l.doc_id && onViewDoc(l.doc_id)}>
                     <td className="px-3 py-2 text-sm text-primary-600">{l.doc_number}</td>
-                    <td className="px-3 py-2 text-sm text-gray-500">{DOC_TYPE_LABEL[l.doc_type] || l.doc_type || '-'}</td>
-                    <td className="px-3 py-2 text-sm text-gray-500">{whName(l.warehouse_id)}</td>
+                    <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{DOC_TYPE_LABEL[l.doc_type] || l.doc_type || '-'}</td>
+                    <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{whName(l.warehouse_id)}</td>
                     <td className={`px-3 py-2 text-sm text-right font-medium ${l.direction === 'in' ? 'text-green-600' : 'text-red-600'}`}>
                       {l.direction === 'in' ? '+' : '-'}{l.quantity}
                     </td>
-                    <td className="px-3 py-2 text-sm text-right text-gray-500">{l.balance_after}</td>
-                    <td className="px-3 py-2 text-sm text-gray-500">{l.operator_name || '-'}</td>
-                    <td className="px-3 py-2 text-sm text-gray-500">{l.created_at ? new Date(l.created_at).toLocaleString('zh-CN') : '-'}</td>
+                    <td className="px-3 py-2 text-sm text-right text-[var(--ui-text-secondary)]">{l.balance_after}</td>
+                    <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{l.operator_name || '-'}</td>
+                    <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{l.created_at ? new Date(l.created_at).toLocaleString('zh-CN') : '-'}</td>
                   </tr>
                 ))}
               </tbody>
