@@ -1,8 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore, can } from '../../stores/auth';
 import { useNotificationStore } from '../../stores/notification';
 import { MORE_ITEMS, filterVisible } from '../nav';
+import { THEMES, getStoredTheme, setTheme } from '../../lib/theme';
+import type { ThemeKey } from '../../lib/theme';
 
 export default function MorePage() {
   const { user, logout } = useAuthStore();
@@ -13,6 +15,12 @@ export default function MorePage() {
   useEffect(() => {
     fetchUnread();
   }, [fetchUnread]);
+
+  const [theme, setThemeState] = useState<ThemeKey>(() => getStoredTheme());
+  const handleThemeChange = (key: ThemeKey) => {
+    setTheme(key);
+    setThemeState(key);
+  };
 
   return (
     <div className="p-4 flex flex-col gap-3">
@@ -37,6 +45,33 @@ export default function MorePage() {
             )}
           </Link>
         ))}
+      </div>
+      {/* 界面主题 */}
+      <div className="bg-white rounded-lg p-4">
+        <div className="text-sm font-medium mb-3">界面主题</div>
+        <div className="flex gap-3">
+          {THEMES.map((t) => {
+            const selected = theme === t.key;
+            return (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => handleThemeChange(t.key)}
+                className={`flex-1 flex flex-col items-center gap-1.5 rounded-lg border py-3 transition-colors ${
+                  selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'
+                }`}
+              >
+                <span
+                  className="w-7 h-7 rounded-full border border-black/10"
+                  style={{ backgroundColor: t.swatch }}
+                />
+                <span className={`text-xs ${selected ? 'text-blue-600 font-medium' : 'text-gray-600'}`}>
+                  {t.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
       <button
         onClick={logout}

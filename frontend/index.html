@@ -5,6 +5,17 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PDM系统</title>
+    <script>
+      // 多主题：在 CSS 加载前应用持久化主题，避免闪烁（FOUC）
+      (function () {
+        try {
+          var t = localStorage.getItem('pdm-theme');
+          if (t === 'forest' || t === 'warm') {
+            document.documentElement.dataset.theme = t;
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

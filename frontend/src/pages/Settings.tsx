@@ -16,6 +16,8 @@ import { exportAllData, exportCustomFieldDefs, importCustomFieldDefs, importAllD
 import Logs from './Logs';
 import FeishuBindPanel from '../components/FeishuBindPanel';
 import WechatBindPanel from '../components/WechatBindPanel';
+import { THEMES, getStoredTheme, setTheme } from '../lib/theme';
+import type { ThemeKey } from '../lib/theme';
 
 const FIELD_TYPES = [
   { value: 'text', label: '单行文本' },
@@ -55,9 +57,15 @@ export default function Settings() {
   const logout = useAuthStore((state) => state.logout);
   const [loading, setLoading] = useState(true);
 
-  type TabKey = 'password' | 'feishuBind' | 'wechatBind' | 'logs' | 'customFields' | 'dataManagement';
+  type TabKey = 'password' | 'feishuBind' | 'wechatBind' | 'logs' | 'customFields' | 'dataManagement' | 'theme';
 
   const [activeTab, setActiveTab] = useState<TabKey>('password');
+  const [theme, setThemeState] = useState<ThemeKey>(() => getStoredTheme());
+
+  const handleThemeChange = (key: ThemeKey) => {
+    setTheme(key);
+    setThemeState(key);
+  };
 
   const tabs: { key: TabKey; label: string; enabled: boolean; adminOnly: boolean }[] = [
     { key: 'customFields', label: '自定义字段', enabled: true, adminOnly: false },
@@ -66,6 +74,7 @@ export default function Settings() {
     { key: 'feishuBind', label: '飞书绑定', enabled: true, adminOnly: false },
     { key: 'wechatBind', label: '微信绑定', enabled: true, adminOnly: false },
     { key: 'logs', label: '操作日志', enabled: true, adminOnly: true },
+    { key: 'theme', label: '界面主题', enabled: true, adminOnly: false },
   ];
 
   // Password change state
@@ -426,6 +435,42 @@ export default function Settings() {
           );
         })}
       </div>
+
+      {/* 界面主题 */}
+      {activeTab === 'theme' && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm text-gray-500">选择界面主色风格（徽标状态色保持语义稳定，仅主按钮/链接/输入焦点随主题切换）</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl">
+            {THEMES.map((t) => {
+              const selected = theme === t.key;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => handleThemeChange(t.key)}
+                  className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
+                    selected
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <span
+                    className="w-8 h-8 rounded-full shrink-0 border border-black/10"
+                    style={{ backgroundColor: t.swatch }}
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-gray-900">{t.label}</span>
+                    <span className="block text-xs text-gray-500">{t.desc}</span>
+                  </span>
+                  {selected && <span className="ml-auto text-blue-600 text-sm">✓</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* 自定义字段 */}
       {activeTab === 'customFields' && (
