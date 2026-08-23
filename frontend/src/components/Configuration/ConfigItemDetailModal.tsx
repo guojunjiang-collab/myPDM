@@ -14,6 +14,8 @@ import AssemblyPartPicker from '../AssemblyPartPicker';
 import VersionSelectModal from '../VersionSelectModal';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
+import Input from '../ui/Input';
+import Textarea from '../ui/Textarea';
 
 function BomChevron({ expanded }: { expanded: boolean }) {
   return (
@@ -42,8 +44,9 @@ function InfoCard({ label, value, readonly, onChange }: {
       {readonly ? (
         <div className="text-sm text-gray-900 font-medium">{value || '—'}</div>
       ) : (
-        <input value={value} onChange={(e) => onChange?.(e.target.value)}
-          className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono" />
+        <Input value={value} onChange={(e) => onChange?.(e.target.value)}
+          size="xs"
+          className="font-mono" />
       )}
     </div>
   );
@@ -286,7 +289,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
           ) : (<span className={`text-xs ${c.is_required ? 'text-green-600' : 'text-orange-600'}`}>{c.is_required ? '必选' : '可选'}</span>)}
         </td>
         <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
-          {canEdit ? (<input type="number" min={1} defaultValue={c.quantity || 1} className="w-14 text-xs px-1 py-0.5 border border-gray-200 rounded text-center" onBlur={async (e) => { const val = parseInt(e.target.value) || 1; if (val === c.quantity) return; try { await configurationApi.updateChild(parentRevisionId, c.id, { quantity: val }); if (parentRevisionId === internalRevId) { setChildren(prev => prev.map(x => x.id === c.id ? { ...x, quantity: val } : x)); } else { setSubChildren(prev => { const s = { ...prev }; s[parentRevisionId] = (s[parentRevisionId] || []).map((x: any) => x.id === c.id ? { ...x, quantity: val } : x); return s; }); } } catch {} }} />) : (c.quantity || 1)}
+          {canEdit ? (<Input type="number" min={1} defaultValue={c.quantity || 1} size="xs" className="!w-14 text-center" onBlur={async (e) => { const val = parseInt(e.target.value) || 1; if (val === c.quantity) return; try { await configurationApi.updateChild(parentRevisionId, c.id, { quantity: val }); if (parentRevisionId === internalRevId) { setChildren(prev => prev.map(x => x.id === c.id ? { ...x, quantity: val } : x)); } else { setSubChildren(prev => { const s = { ...prev }; s[parentRevisionId] = (s[parentRevisionId] || []).map((x: any) => x.id === c.id ? { ...x, quantity: val } : x); return s; }); } } catch {} }} />) : (c.quantity || 1)}
         </td>
         {canEdit && (
           <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
@@ -435,7 +438,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
                               </td>
                               <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
                                 {canEdit ? (
-                                  <input type="number" min={1} defaultValue={p.quantity || 1} className="w-14 text-xs px-1 py-0.5 border border-gray-200 rounded text-center"
+                                  <Input type="number" min={1} defaultValue={p.quantity || 1} size="xs" className="!w-14 text-center"
                                     onBlur={async (e) => { const val = parseInt(e.target.value) || 1; if (val === p.quantity) return; try { await configurationApi.updatePart(internalRevId, p.id, { quantity: val }); setParts(prev => prev.map(x => x.id === p.id ? { ...x, quantity: val } : x)); } catch {} }} />
                                 ) : (p.quantity || 1)}
                               </td>
@@ -493,7 +496,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
 
       {showCheckinModal && (
         <Modal open={showCheckinModal} onClose={() => setShowCheckinModal(false)} title="签入说明" width="md">
-          <div className="p-4"><textarea className="w-full border rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" rows={3} placeholder="请输入签入说明（选填）..." value={checkinNote} onChange={(e) => setCheckinNote(e.target.value)} />
+          <div className="p-4"><Textarea rows={3} placeholder="请输入签入说明（选填）..." value={checkinNote} onChange={(e) => setCheckinNote(e.target.value)} />
             <div className="flex justify-end gap-2 mt-4">
               <Button variant="secondary" onClick={() => setShowCheckinModal(false)}>取消</Button>
               <Button onClick={async () => { setSaving(true); await doAction(() => configurationApi.checkin(internalRevId, checkinNote || ''), '签入成功'); setSaving(false); setShowCheckinModal(false); setCheckinNote(''); }} disabled={saving}>{saving ? '保存中...' : '确认签入'}</Button>

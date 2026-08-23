@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ProfileReviewer, ProfileReviewRecord } from '../../types';
 import Button from '../ui/Button';
+import Textarea from '../ui/Textarea';
 
 interface Props {
   reviewers: ProfileReviewer[];
@@ -50,8 +51,8 @@ export default function ProfileReviewPanel({ reviewers, records, reviewMode, can
       </table>
       {canReview && (
         <div className="flex flex-col gap-2 border-t pt-2">
-          <textarea
-            className="border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+          <Textarea
+            size="xs"
             rows={2}
             placeholder="审批意见（可选）"
             value={comment}

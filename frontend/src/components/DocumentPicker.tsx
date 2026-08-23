@@ -4,6 +4,8 @@ import { documentsApi, customFieldsApi } from '../services/api';
 import { Modal } from './Modal';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
+import Input from './ui/Input';
+import Select from './ui/Select';
 import type { Document, CustomFieldDefinition, CustomFieldValue } from '../types';
 
 /* ----------------------------------------------------------------
@@ -284,24 +286,23 @@ export default function DocumentPicker({
 
         {/* ---- 2. 搜索 & 筛选 ---- */}
         <div className="flex gap-2 items-center">
-          <input
+          <Input
             type="text"
             placeholder="搜索编号、名称..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+            className="flex-1"
           />
-          <select
+          <Select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
           >
             <option value="">全部状态</option>
             <option value="draft">草稿</option>
             <option value="frozen">冻结</option>
             <option value="released">发布</option>
             <option value="obsolete">作废</option>
-          </select>
+          </Select>
         </div>
 
         {/* ---- 快速新建 ---- */}
@@ -313,11 +314,11 @@ export default function DocumentPicker({
           {quickOpen && (
             <div className="px-4 py-3 border-t space-y-2 bg-gray-50">
               <div className="flex gap-2">
-                <input value={quickForm.code} onChange={e => setQuickForm({ ...quickForm, code: e.target.value })} placeholder="编号 *" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
-                <input value={quickForm.name} onChange={e => setQuickForm({ ...quickForm, name: e.target.value })} placeholder="名称 *" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                <Input value={quickForm.code} onChange={e => setQuickForm({ ...quickForm, code: e.target.value })} placeholder="编号 *" size="xs" className="flex-1" />
+                <Input value={quickForm.name} onChange={e => setQuickForm({ ...quickForm, name: e.target.value })} placeholder="名称 *" size="xs" className="flex-1" />
               </div>
               <div className="flex gap-2">
-                <input value={quickForm.remark} onChange={e => setQuickForm({ ...quickForm, remark: e.target.value })} placeholder="备注" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500" />
+                <Input value={quickForm.remark} onChange={e => setQuickForm({ ...quickForm, remark: e.target.value })} placeholder="备注" size="xs" className="flex-1" />
                 <Button size="sm" type="button" onClick={handleQuickCreate} disabled={quickCreating} className="whitespace-nowrap">
                   {quickCreating ? '创建中...' : '新建并添加'}
                 </Button>

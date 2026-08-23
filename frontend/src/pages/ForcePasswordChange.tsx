@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/auth';
 import { authApi } from '../services/api';
+import Input from '../components/ui/Input';
 
 export default function ForcePasswordChange() {
   const navigate = useNavigate();
@@ -78,32 +79,29 @@ export default function ForcePasswordChange() {
           <form onSubmit={handleSubmit}>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">原密码</label>
-              <input
+              <Input
                 type="password"
                 value={oldPassword}
                 onChange={(e) => setOldPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 required
               />
             </div>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">新密码</label>
-              <input
+              <Input
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 required
               />
               <p className="mt-1 text-xs text-gray-400">至少8位，需包含大写字母、小写字母和数字</p>
             </div>
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-1">确认新密码</label>
-              <input
+              <Input
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 required
               />
             </div>

@@ -4,6 +4,8 @@ import { inventoryApi } from '../../services/inventoryApi';
 import { canEdit, isAdmin } from '../../stores/auth';
 import { Modal, ConfirmModal } from '../Modal';
 import Button from '../ui/Button';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
 import type { Warehouse } from '../../types';
 
 const WH_TYPES = [
@@ -12,8 +14,6 @@ const WH_TYPES = [
   { value: 'defective', label: '不良品库' },
   { value: 'general', label: '通用' },
 ];
-
-const inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500';
 
 export default function WarehouseTab() {
   const { warehouses, loadWarehouses, users } = useInventoryStore();
@@ -101,30 +101,30 @@ export default function WarehouseTab() {
           <div className="space-y-3">
             <div>
               <label className="block text-sm text-gray-600 mb-1">编码</label>
-              <input placeholder="仓库编码" value={editing.code || ''} disabled={!!editing.id}
-                onChange={(e) => setEditing({ ...editing, code: e.target.value })} className={inputCls} />
+              <Input placeholder="仓库编码" value={editing.code || ''} disabled={!!editing.id}
+                onChange={(e) => setEditing({ ...editing, code: e.target.value })} />
             </div>
             <div>
               <label className="block text-sm text-gray-600 mb-1">名称</label>
-              <input placeholder="仓库名称" value={editing.name || ''}
-                onChange={(e) => setEditing({ ...editing, name: e.target.value })} className={inputCls} />
+              <Input placeholder="仓库名称" value={editing.name || ''}
+                onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
             </div>
             <div>
               <label className="block text-sm text-gray-600 mb-1">类型</label>
-              <select value={editing.type || 'general'}
-                onChange={(e) => setEditing({ ...editing, type: e.target.value })} className={inputCls}>
+              <Select value={editing.type || 'general'}
+                onChange={(e) => setEditing({ ...editing, type: e.target.value })}>
                 {WH_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="block text-sm text-gray-600 mb-1">默认库管员</label>
-              <select value={editing.default_keeper_id || ''}
-                onChange={(e) => setEditing({ ...editing, default_keeper_id: e.target.value || null })} className={inputCls}>
+              <Select value={editing.default_keeper_id || ''}
+                onChange={(e) => setEditing({ ...editing, default_keeper_id: e.target.value || null })}>
                 <option value="">（无默认库管员）</option>
                 {users.filter((u) => u.role !== 'guest').map((u) => (
                   <option key={u.id} value={u.id}>{u.real_name}</option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="secondary" onClick={() => setEditing(null)}>取消</Button>

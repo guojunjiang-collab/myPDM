@@ -7,6 +7,9 @@ import { isAdmin } from '../stores/auth';
 import type { CustomFieldDefinition } from '../types';
 import { Modal } from '../components/Modal';
 import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
+import Select from '../components/ui/Select';
+import Textarea from '../components/ui/Textarea';
 import { useDataStore } from '../stores/data';
 import { exportAllData, exportCustomFieldDefs, importCustomFieldDefs, importAllData, exportDashboardFile, previewDashboardImportFromFile, executeDashboardImport } from '../services/importExport';
 
@@ -674,12 +677,11 @@ export default function Settings() {
         <Modal open={showResetConfirm} title="确认重置" onClose={() => setShowResetConfirm(false)} width="sm">
           <div className="space-y-4">
               <p className="text-sm text-gray-600">此操作将清空所有业务数据（零件、部件、图文档、附件、自定义字段、看板、构型管理、变更管理、glTF缓存），删除所有非管理员用户，并将 admin 密码重置为 admin123。此操作不可逆，请输入管理员密码确认：</p>
-            <input
+            <Input
               type="password"
               value={resetPassword}
               onChange={(e) => setResetPassword(e.target.value)}
               placeholder="请输入管理员密码"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
               autoFocus
               onKeyDown={(e) => e.key === 'Enter' && handleResetData()}
             />
@@ -711,32 +713,29 @@ export default function Settings() {
               <form onSubmit={handleChangePassword} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">原密码</label>
-                  <input
+                  <Input
                     type="password"
                     value={passwordForm.oldPassword}
                     onChange={(e) => setPasswordForm({ ...passwordForm, oldPassword: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     required
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">新密码</label>
-                  <input
+                  <Input
                     type="password"
                     value={passwordForm.newPassword}
                     onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     required
                     minLength={6}
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">确认新密码</label>
-                  <input
+                  <Input
                     type="password"
                     value={passwordForm.confirmPassword}
                     onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     required
                   />
                 </div>
@@ -776,21 +775,22 @@ export default function Settings() {
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">字段名称</label>
-              <input
+              <Input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                size="xs"
                 placeholder="例如：采购周期"
               />
             </div>
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">字段标识</label>
-              <input
+              <Input
                 type="text"
                 value={formData.field_key}
                 onChange={(e) => setFormData({ ...formData, field_key: e.target.value })}
-                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono"
+                size="xs"
+                className="font-mono"
                 placeholder="lead_time"
                 disabled={!!editingField}
               />
@@ -798,23 +798,23 @@ export default function Settings() {
             </div>
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">字段类型</label>
-              <select
+              <Select
                 value={formData.field_type}
                 onChange={(e) => setFormData({ ...formData, field_type: e.target.value as 'text' | 'number' | 'select' })}
-                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                size="xs"
               >
                 {FIELD_TYPES.map((type) => (
                   <option key={type.value} value={type.value}>{type.label}</option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">排序序号</label>
-              <input
+              <Input
                 type="number"
                 value={formData.sort_order}
                 onChange={(e) => setFormData({ ...formData, sort_order: Number(e.target.value) })}
-                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                size="xs"
                 placeholder="0"
               />
               <p className="mt-1 text-xs text-gray-400">越小越靠前</p>
@@ -822,10 +822,11 @@ export default function Settings() {
             {(formData.field_type === 'select' || formData.field_type === 'multiselect') && (
               <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 col-span-2">
                 <label className="block text-xs text-gray-500 mb-0.5">选项</label>
-                <textarea
+                <Textarea
                   value={formData.options}
                   onChange={(e) => setFormData({ ...formData, options: e.target.value })}
-                  className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+                  size="xs"
+                  className="resize-none"
                   rows={3}
                   placeholder="每行一个选项"
                 />

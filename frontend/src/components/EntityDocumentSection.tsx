@@ -12,6 +12,9 @@ import ArchiveTreeModal from './ArchiveTreeModal';
 import DocumentDetailContent from './DocumentDetailContent';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
+import Input from './ui/Input';
+import Select from './ui/Select';
+import Textarea from './ui/Textarea';
 
 /* ----------------------------------------------------------------
    Types
@@ -442,28 +445,28 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                 <label className="block text-xs text-gray-500 mb-0.5">编号</label>
-                <input type="text" value={editingDoc.code} disabled className="w-full text-sm px-2 py-1 border border-gray-200 rounded disabled:bg-gray-100 disabled:text-gray-400" />
+                <Input type="text" value={editingDoc.code} disabled size="xs" />
               </div>
               <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                 <label className="block text-xs text-gray-500 mb-0.5">名称 <span className="text-red-500">*</span></label>
-                <input type="text" value={editFormData.name} onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                <Input type="text" value={editFormData.name} onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })} size="xs" />
               </div>
               <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                 <label className="block text-xs text-gray-500 mb-0.5">版本</label>
-                <input type="text" value={editingDoc.version || ''} disabled className="w-full text-sm px-2 py-1 border border-gray-200 rounded disabled:bg-gray-100 disabled:text-gray-400" />
+                <Input type="text" value={editingDoc.version || ''} disabled size="xs" />
               </div>
               <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                 <label className="block text-xs text-gray-500 mb-0.5">状态</label>
-                <select value={editFormData.status} onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500">
+                <Select value={editFormData.status} onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })} size="xs">
                   <option value="draft">草稿</option>
                   <option value="frozen">冻结</option>
                   <option value="released">发布</option>
                   <option value="obsolete">作废</option>
-                </select>
+                </Select>
               </div>
               <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                 <label className="block text-xs text-gray-500 mb-0.5">备注</label>
-                <textarea value={editFormData.remark} onChange={(e) => setEditFormData({ ...editFormData, remark: e.target.value })} rows={1} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" />
+                <Textarea value={editFormData.remark} onChange={(e) => setEditFormData({ ...editFormData, remark: e.target.value })} rows={1} size="xs" className="resize-none" />
               </div>
             </div>
 
@@ -475,14 +478,14 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
                     <div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                       <label className="block text-xs text-gray-500 mb-0.5">{def.name}{def.is_required && <span className="text-red-500 ml-1">*</span>}</label>
                       {def.field_type === 'select' && def.options?.length ? (
-                        <select value={editCustomValues[def.id] ?? ''} onChange={(e) => setEditCustomValues({ ...editCustomValues, [def.id]: e.target.value })} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500">
+                        <Select value={editCustomValues[def.id] ?? ''} onChange={(e) => setEditCustomValues({ ...editCustomValues, [def.id]: e.target.value })} size="xs">
                           <option value="">请选择</option>
                           {def.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                        </select>
+                        </Select>
                       ) : def.field_type === 'number' ? (
-                        <input type="number" value={editCustomValues[def.id] ?? ''} onChange={(e) => setEditCustomValues({ ...editCustomValues, [def.id]: e.target.value ? Number(e.target.value) : null })} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                        <Input type="number" value={editCustomValues[def.id] ?? ''} onChange={(e) => setEditCustomValues({ ...editCustomValues, [def.id]: e.target.value ? Number(e.target.value) : null })} size="xs" />
                       ) : (
-                        <input type="text" value={editCustomValues[def.id] ?? ''} onChange={(e) => setEditCustomValues({ ...editCustomValues, [def.id]: e.target.value })} className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                        <Input type="text" value={editCustomValues[def.id] ?? ''} onChange={(e) => setEditCustomValues({ ...editCustomValues, [def.id]: e.target.value })} size="xs" />
                       )}
                     </div>
                   ))}

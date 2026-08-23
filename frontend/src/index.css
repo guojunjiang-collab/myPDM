@@ -32,9 +32,11 @@
   --ui-btn-ghost-bg: #f3f4f6;        --ui-btn-ghost-hover: #e5e7eb;
   --ui-btn-ghost-text: #374151;
   --ui-btn-danger-bg: #dc2626;       --ui-btn-danger-hover: #b91c1c;
-  --ui-btn-danger-active: #991b1b;
+  --ui-btn-danger-active: #991b1b;   --ui-btn-danger-text: #ffffff;
   --ui-btn-success-bg: #16a34a;      --ui-btn-success-hover: #15803d;
+  --ui-btn-success-text: #ffffff;
   --ui-btn-dark-bg: #6b7280;         --ui-btn-dark-hover: #4b5563;
+  --ui-btn-dark-text: #ffffff;
   --ui-btn-link-text: #0284c7;       --ui-btn-link-hover: #075985;
 
   /* 表单 */

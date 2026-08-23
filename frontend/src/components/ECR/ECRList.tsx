@@ -9,6 +9,8 @@ import { ECRCreateModal } from './ECRCreateModal';
 import { ECRDetailModal } from './ECRDetailModal';
 import { ECRCcPicker } from './ECRCcPicker';
 import Button from '../ui/Button';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
 
 const PAGE_SIZE = 20;
 
@@ -290,33 +292,31 @@ export function ECRList() {
     <div className="flex-1 min-h-0 flex flex-col">
       {/* Header & Filters */}
       <div className="flex items-center gap-2 mb-4 shrink-0">
-        <input
+        <Input
           type="text"
           placeholder="搜索..."
           value={search}
           onChange={(e) => handleSearchChange(e.target.value)}
-          className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="!w-44"
         />
-        <select
+        <Select
           value={statusFilter}
           onChange={(e) => handleStatusChange(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
         >
           <option value="">全部状态</option>
           {Object.entries(statusLabels).map(([value, label]) => (
             <option key={value} value={value}>{label}</option>
           ))}
-        </select>
-        <select
+        </Select>
+        <Select
           value={priorityFilter}
           onChange={(e) => handlePriorityChange(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
         >
           <option value="">全部优先级</option>
           {Object.entries(priorityLabels).map(([value, label]) => (
             <option key={value} value={value}>{label}</option>
           ))}
-        </select>
+        </Select>
         <div className="flex-1" />
         {canEdit() && (
           <Button onClick={() => setCreateOpen(true)}>

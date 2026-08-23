@@ -11,6 +11,7 @@ import { ECRBomImpactView } from './ECRBomImpactView';
 import DocumentDetailModal from '../DocumentDetailModal';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
+import Textarea from '../ui/Textarea';
 import type { ECRRequest, ECRReviewRecord, ECRAffectedItem, ECRStatusLog, ECRDocumentLink, Document } from '../../types';
 
 const REASON_LABELS: Record<string, string> = {
@@ -565,11 +566,11 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
           {showCloseForm && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <h4 className="text-sm font-semibold text-red-700 mb-2">关闭 ECR</h4>
-              <textarea
+              <Textarea
                 value={closeComment}
                 onChange={(e) => setCloseComment(e.target.value)}
                 rows={2}
-                className="w-full border border-red-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+                className="!border-red-300 resize-none"
                 placeholder="关闭原因（可选）"
               />
               <div className="flex gap-2 mt-2">

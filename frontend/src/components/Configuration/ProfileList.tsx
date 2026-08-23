@@ -7,6 +7,8 @@ import ProfileEditModal from './ProfileEditModal';
 import ProfileStatusBadge from './ProfileStatusBadge';
 import ProfileCompareModal from './ProfileCompareModal';
 import Button from '../ui/Button';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
 
 export default function ProfileList() {
   const [items, setItems] = useState<ConfigurationProfile[]>([]);
@@ -115,27 +117,25 @@ export default function ProfileList() {
     <div className="flex-1 min-h-0 flex flex-col">
       {/* 搜索 + 新建 */}
       <div className="flex items-center gap-2 mb-4 shrink-0">
-        <select
+        <Select
           value={searchField}
           onChange={(e) => setSearchField(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
         >
           <option value="all">全部字段</option>
           <option value="code">编号</option>
           <option value="name">名称</option>
           <option value="remark">备注</option>
-        </select>
-        <input
+        </Select>
+        <Input
           type="text"
           placeholder={searchField === 'all' ? '搜索...' : `搜索${searchField === 'code' ? '编号' : searchField === 'name' ? '名称' : '备注'}...`}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="!w-44"
         />
-        <select
+        <Select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
         >
           <option value="">全部状态</option>
           <option value="draft">草稿</option>
@@ -143,7 +143,7 @@ export default function ProfileList() {
           <option value="active">生效中</option>
           <option value="rejected">已驳回</option>
           <option value="archived">已归档</option>
-        </select>
+        </Select>
         <Button variant="secondary" onClick={() => setCompareOpen(true)}>
           ⇄ 配置对比
         </Button>
@@ -230,16 +230,16 @@ export default function ProfileList() {
       {ccTargetId && (
         <div className="flex items-center gap-2 mt-2 px-4 py-2 bg-blue-50 rounded-lg border border-blue-200">
           <span className="text-sm text-blue-700">选择知会人：</span>
-          <select
+          <Select
             onChange={(e) => { if (e.target.value) handleCcAdd(e.target.value); }}
-            className="border border-blue-300 rounded px-2 py-1 text-sm bg-white"
+            size="xs"
             autoFocus
           >
             <option value="">请选择</option>
             {ccUsers.map((u) => (
               <option key={u.id} value={u.id}>{u.real_name}</option>
             ))}
-          </select>
+          </Select>
           <Button variant="link" size="xs" onClick={() => setCcTargetId(null)}>取消</Button>
         </div>
       )}

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/auth';
 import { authApi } from '../services/api';
 import { getFeishuProviderParam, isFeishuClient } from '../lib/feishu';
+import Input from '../components/ui/Input';
 
 interface OAuthProvider {
   key: string;
@@ -86,11 +87,10 @@ export default function Login() {
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">用户名</label>
-            <input
+            <Input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               placeholder="请输入用户名"
               required
             />
@@ -98,11 +98,10 @@ export default function Login() {
 
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-1">密码</label>
-            <input
+            <Input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               placeholder="请输入密码"
               required
             />

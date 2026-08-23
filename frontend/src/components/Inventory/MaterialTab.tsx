@@ -7,6 +7,8 @@ import { canEdit, isAdmin } from '../../stores/auth';
 import { Modal, ConfirmModal } from '../Modal';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
 import MaterialDetail from './MaterialDetail';
 import PartDetailModal from '../PartDetailModal';
 import type { InvMaterial } from '../../types';
@@ -14,7 +16,6 @@ import type { InvMaterial } from '../../types';
 // ECR 式卡片字段样式
 const cardCls = 'bg-gray-50 rounded-lg px-3 py-2 border border-gray-100';
 const cardLabelCls = 'block text-xs text-gray-500 mb-0.5';
-const cardInputCls = 'w-full text-sm px-2 py-1 border border-gray-200 rounded bg-white focus:outline-none focus:ring-2 focus:ring-primary-500';
 
 export default function MaterialTab() {
   const { materials, loadMaterials } = useInventoryStore();
@@ -139,9 +140,9 @@ export default function MaterialTab() {
     <div className="flex-1 min-h-0 flex flex-col">
       {/* 工具栏 */}
       <div className="flex items-center gap-2 mb-4 shrink-0">
-        <input type="text" placeholder="搜索编码/名称/规格..." value={search}
+        <Input type="text" placeholder="搜索编码/名称/规格..." value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-64 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          className="!w-64" />
         <div className="flex-1" />
         {canEdit() && (
           <>
@@ -241,36 +242,36 @@ export default function MaterialTab() {
               )}
               <div className={cardCls}>
                 <label className={cardLabelCls}>编码</label>
-                <input placeholder="物料编码" value={editing.code || ''} disabled={!!editing.id}
-                  onChange={(e) => setEditing({ ...editing, code: e.target.value })} className={cardInputCls} />
+                <Input placeholder="物料编码" value={editing.code || ''} disabled={!!editing.id}
+                  onChange={(e) => setEditing({ ...editing, code: e.target.value })} size="xs" />
               </div>
               <div className={cardCls}>
                 <label className={cardLabelCls}>名称</label>
-                <input placeholder="物料名称" value={editing.name || ''}
-                  onChange={(e) => setEditing({ ...editing, name: e.target.value })} className={cardInputCls} />
+                <Input placeholder="物料名称" value={editing.name || ''}
+                  onChange={(e) => setEditing({ ...editing, name: e.target.value })} size="xs" />
               </div>
               <div className={cardCls}>
                 <label className={cardLabelCls}>规格型号</label>
-                <input placeholder="规格型号（选填）" value={editing.spec || ''}
-                  onChange={(e) => setEditing({ ...editing, spec: e.target.value })} className={cardInputCls} />
+                <Input placeholder="规格型号（选填）" value={editing.spec || ''}
+                  onChange={(e) => setEditing({ ...editing, spec: e.target.value })} size="xs" />
               </div>
               <div className={cardCls}>
                 <label className={cardLabelCls}>单位</label>
-                <input placeholder="如 个 / kg / m" value={editing.unit || ''}
-                  onChange={(e) => setEditing({ ...editing, unit: e.target.value })} className={cardInputCls} />
+                <Input placeholder="如 个 / kg / m" value={editing.unit || ''}
+                  onChange={(e) => setEditing({ ...editing, unit: e.target.value })} size="xs" />
               </div>
               <div className={cardCls}>
                 <label className={cardLabelCls}>追踪方式</label>
-                <select value={editing.track_mode || 'quantity'}
-                  onChange={(e) => setEditing({ ...editing, track_mode: e.target.value as any })} className={cardInputCls}>
+                <Select value={editing.track_mode || 'quantity'}
+                  onChange={(e) => setEditing({ ...editing, track_mode: e.target.value as any })} size="xs">
                   <option value="quantity">按数量</option>
                   <option value="batch">按批次</option>
-                </select>
+                </Select>
               </div>
               <div className={cardCls}>
                 <label className={cardLabelCls}>安全库存（选填）</label>
-                <input placeholder="低于则预警" type="number" value={editing.safety_stock ?? ''}
-                  onChange={(e) => setEditing({ ...editing, safety_stock: e.target.value ? Number(e.target.value) : null })} className={cardInputCls} />
+                <Input placeholder="低于则预警" type="number" value={editing.safety_stock ?? ''}
+                  onChange={(e) => setEditing({ ...editing, safety_stock: e.target.value ? Number(e.target.value) : null })} size="xs" />
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-1 border-t border-gray-200">
@@ -284,9 +285,8 @@ export default function MaterialTab() {
       {/* 从 PDM 启用 */}
       <Modal open={pdmMode} title="从 PDM 零件/部件启用库存" onClose={() => setPdmMode(false)} width="full">
         <div className="space-y-3">
-          <input placeholder="输入编码 / 名称 / 规格型号，边输入边搜索..." value={pdmKeyword} autoFocus
-            onChange={(e) => setPdmKeyword(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          <Input placeholder="输入编码 / 名称 / 规格型号，边输入边搜索..." value={pdmKeyword} autoFocus
+            onChange={(e) => setPdmKeyword(e.target.value)} />
           <div className="max-h-80 overflow-auto rounded-lg border border-gray-200">
             {pdmLoading ? (
               <div className="px-4 py-8 text-center text-sm text-gray-400">加载中...</div>

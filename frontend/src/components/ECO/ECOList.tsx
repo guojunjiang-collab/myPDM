@@ -9,6 +9,8 @@ import { ECODetailModal } from './ECODetailModal';
 import { ECRCcPicker } from '../ECR/ECRCcPicker';
 import { ECOCcPicker } from './ECOCcPicker';
 import Button from '../ui/Button';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
 
 const PAGE_SIZE = 20;
 
@@ -148,19 +150,17 @@ export function ECOList() {
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       <div className="flex items-center gap-2 mb-4 shrink-0">
-        <input type="text" placeholder="搜索..." value={search}
+        <Input type="text" placeholder="搜索..." value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
-        <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+          className="!w-44" />
+        <Select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
           <option value="">全部状态</option>
           {Object.entries(statusLabels).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-        <select value={priorityFilter} onChange={(e) => { setPriorityFilter(e.target.value); setPage(1); }}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+        </Select>
+        <Select value={priorityFilter} onChange={(e) => { setPriorityFilter(e.target.value); setPage(1); }}>
           <option value="">全部优先级</option>
           {Object.entries(priorityLabels).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
+        </Select>
         <div className="flex-1" />
         {canEdit() && <Button onClick={() => { editReqId.current++; setEditingEco(null); setCreateOpen(true); }}>+ 新建 ECO</Button>}
       </div>

@@ -17,6 +17,8 @@ import { ECODetailModal } from './ECO/ECODetailModal';
 import { ECRDetailModal } from './ECR/ECRDetailModal';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
+import Input from './ui/Input';
+import Textarea from './ui/Textarea';
 import type { DocumentRevision, DocumentIteration, CustomFieldDefinition } from '../types';
 
 interface Props {
@@ -383,10 +385,11 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 shrink-0 mb-3">
               <InfoCard label="图文档编号" readonly={!canEdit}>
                 {canEdit ? (
-                  <input
+                  <Input
                     value={editForm.code}
                     onChange={(e) => autoSave({ code: e.target.value })}
-                    className="w-full text-sm px-2 py-1 border border-gray-200 rounded font-mono focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    size="xs"
+                    className="font-mono"
                   />
                 ) : (
                   <div className="text-sm text-gray-900 font-medium font-mono">{doc.code}</div>
@@ -394,10 +397,10 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
               </InfoCard>
               <InfoCard label="名称" readonly={!canEdit}>
                 {canEdit ? (
-                  <input
+                  <Input
                     value={editForm.name}
                     onChange={(e) => autoSave({ name: e.target.value })}
-                    className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    size="xs"
                   />
                 ) : (
                   <div className="text-sm text-gray-900 font-medium">{doc.name}</div>
@@ -721,12 +724,11 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
       {/* 签入说明弹窗 */}
       {showCheckinModal && (
         <Modal open={showCheckinModal} title="签入说明" onClose={() => setShowCheckinModal(false)} width="md">
-          <textarea
+          <Textarea
             value={checkinNote}
             onChange={(e) => setCheckinNote(e.target.value)}
             placeholder="请输入签入说明（选填）..."
             rows={4}
-            className="w-full text-sm px-3 py-2 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
           <div className="flex justify-end gap-2 mt-3">
             <Button variant="secondary" size="sm" onClick={() => setShowCheckinModal(false)}>取消</Button>

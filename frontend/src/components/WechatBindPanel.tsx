@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { authApi } from '../services/api';
+import Badge from './ui/Badge';
 
 interface WechatProvider {
   key: string;
@@ -95,7 +96,7 @@ export default function WechatBindPanel() {
                 </div>
                 {b ? (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs px-2 py-1 bg-green-50 text-green-700 rounded-full">已绑定</span>
+                    <Badge tone="green" label="已绑定" />
                     <button
                       onClick={() => handleUnbind(p)}
                       className="text-xs text-red-500 hover:text-red-700 hover:underline"

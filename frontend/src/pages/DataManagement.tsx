@@ -3,6 +3,7 @@ import api from '../services/api';
 import { isAdmin } from '../stores/auth';
 import { ConfirmModal } from '../components/Modal';
 import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
 
 interface TableStats {
   count: number;
@@ -221,11 +222,10 @@ export default function DataManagement() {
                   清理180天前
                 </button>
               </div>
-              <input
+              <Input
                 type="date"
                 value={beforeDate}
                 onChange={(e) => setBeforeDate(e.target.value)}
-                className="border border-gray-300 rounded px-3 py-1.5 text-sm"
               />
               {!beforeDate && (
                 <span className="text-xs text-gray-400 ml-2">留空则清理所有软删除数据</span>

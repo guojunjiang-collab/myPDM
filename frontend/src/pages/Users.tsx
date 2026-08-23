@@ -6,6 +6,8 @@ import { isAdmin, can } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
+import Select from '../components/ui/Select';
 import { useTableSort } from '../hooks/useTableSort';
 import { formatDateTime } from '../utils/date';
 import { previewUsersImport, executeUsersImport } from '../services/importExport';
@@ -388,12 +390,12 @@ export default function Users() {
 
       {/* 搜索 */}
       <div className="mb-4">
-        <input
+        <Input
           type="text"
           placeholder="搜索用户名/姓名/部门..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 w-full max-w-md"
+          className="max-w-md"
         />
       </div>
 
@@ -452,11 +454,10 @@ export default function Users() {
           {!editingUser && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">用户名 <span className="text-red-500">*</span></label>
-              <input
+              <Input
                 type="text"
                 value={formData.username}
                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 required
                 minLength={3}
                 maxLength={64}
@@ -471,7 +472,7 @@ export default function Users() {
           {editingUser && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">用户名</label>
-              <input type="text" value={formData.username} disabled className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500" />
+              <Input type="text" value={formData.username} disabled />
             </div>
           )}
 
@@ -479,26 +480,24 @@ export default function Users() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">姓名 <span className="text-red-500">*</span></label>
-              <input
+              <Input
                 type="text"
                 value={formData.real_name}
                 onChange={(e) => setFormData({ ...formData, real_name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 required
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">角色 <span className="text-red-500">*</span></label>
-              <select
+              <Select
                 value={formData.role}
                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <option value="admin">管理员</option>
                 <option value="engineer">工程师</option>
                 <option value="production">生产人员</option>
                 <option value="guest">访客</option>
-              </select>
+              </Select>
             </div>
           </div>
 
@@ -506,20 +505,18 @@ export default function Users() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">部门</label>
-              <input
+              <Input
                 type="text"
                 value={formData.department}
                 onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">电话</label>
-              <input
+              <Input
                 type="text"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
           </div>
@@ -528,14 +525,13 @@ export default function Users() {
           {editingUser && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">状态</label>
-              <select
+              <Select
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <option value="active">正常</option>
                 <option value="disabled">禁用</option>
-              </select>
+              </Select>
             </div>
           )}
 
@@ -565,11 +561,10 @@ export default function Users() {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               密码 {editingUser ? '' : <span className="text-red-500">*</span>}
             </label>
-            <input
+            <Input
               type="password"
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               minLength={6}
               placeholder={editingUser ? '留空则不修改密码' : '至少6个字符'}
               {...((!editingUser) ? { required: true } : {})}
@@ -649,18 +644,19 @@ export default function Users() {
                       {approvingId === u.id ? (
                         <span className="text-gray-400 text-xs">处理中...</span>
                       ) : (
-                        <select
+                        <Select
+                          size="xs"
                           defaultValue=""
                           onChange={(e) => {
                             if (e.target.value) handleApprove(u.id, e.target.value);
                           }}
-                          className="px-2 py-1 text-xs border border-gray-300 rounded bg-white cursor-pointer select-none whitespace-nowrap"
+                          className="cursor-pointer select-none whitespace-nowrap"
                         >
                           <option value="" disabled>审批</option>
                           <option value="engineer">工程师</option>
                           <option value="production">生产人员</option>
                           <option value="guest">访客</option>
-                        </select>
+                        </Select>
                       )}
                     </td>
                   </tr>
@@ -716,34 +712,34 @@ export default function Users() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">名称 <span className="text-red-500">*</span></label>
-              <input
+              <Input
                 type="text"
                 value={groupForm.name}
                 onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })}
-                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                size="xs"
                 required
                 maxLength={64}
               />
             </div>
             <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
               <label className="block text-xs text-gray-500 mb-0.5">描述</label>
-              <input
+              <Input
                 type="text"
                 value={groupForm.description}
                 onChange={(e) => setGroupForm({ ...groupForm, description: e.target.value })}
-                className="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                size="xs"
                 maxLength={255}
               />
             </div>
           </div>
           <div className="border-t pt-3">
             <h4 className="text-sm font-medium text-gray-700 mb-2">成员</h4>
-            <input
+            <Input
               type="text"
               placeholder="搜索用户..."
               value={memberSearch}
               onChange={(e) => setMemberSearch(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 mb-2 text-sm"
+              className="mb-2"
             />
             <div className="max-h-52 overflow-auto border border-gray-200 rounded-lg">
               {users.filter((u) => {

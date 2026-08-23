@@ -3,6 +3,8 @@ import { useInventoryStore } from '../../stores/inventory';
 import { inventoryApi } from '../../services/inventoryApi';
 import StockDetail from './StockDetail';
 import DocumentDetail from './DocumentDetail';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
 import type { StockRow } from '../../types';
 
 export default function StockTab() {
@@ -42,14 +44,13 @@ export default function StockTab() {
     <div className="flex-1 min-h-0 flex flex-col">
       {/* 工具栏 */}
       <div className="flex items-center gap-2 mb-4 shrink-0">
-        <input type="text" placeholder="搜索物料编码/名称..." value={material}
+        <Input type="text" placeholder="搜索物料编码/名称..." value={material}
           onChange={(e) => setMaterial(e.target.value)}
-          className="w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
-        <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+          className="!w-44" />
+        <Select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
           <option value="">全部仓库</option>
           {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-        </select>
+        </Select>
         <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm whitespace-nowrap">
           <input type="checkbox" checked={lowOnly} onChange={(e) => setLowOnly(e.target.checked)}
             className="w-3.5 h-3.5" />

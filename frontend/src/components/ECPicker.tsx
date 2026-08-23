@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Modal } from './Modal';
 import Button from './ui/Button';
+import Input from './ui/Input';
 import { useAuthStore } from '../stores/auth';
 
 interface ECPickerProps {
@@ -59,11 +60,11 @@ export default function ECPicker({ open, onClose, onConfirm }: ECPickerProps) {
 
   return (
     <Modal open={open} title="选择 EC(变更单)" onClose={onClose} width="lg" zIndex={60}>
-      <input
+      <Input
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="搜索单号/标题"
-        className="w-full mb-3 px-3 py-2 border border-gray-300 rounded-lg"
+        className="mb-3"
       />
       <div className="max-h-80 overflow-y-auto divide-y">
         {filtered.map((r) => (

@@ -5,6 +5,7 @@ import PartDetailModal from './PartDetailModal';
 import { partsApi, bomApi } from '../services/api';
 import type { PartListItem, BOMCompareNode, BOMCompareResponse } from '../types';
 import Button from './ui/Button';
+import Input from './ui/Input';
 
 interface Props {
   open: boolean;
@@ -148,14 +149,13 @@ function PartPicker({ label, valueId, onPick, onSearch, filterType }: {
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
       <div className="relative">
-        <input
+        <Input
           type="text"
           value={open ? q : selected ? `${selected.code}_${selected.name}_${selected.version}` : ''}
           placeholder="输入件号或名称搜索..."
           onFocus={() => { setOpen(true); setQ(''); }}
           onChange={(e) => doSearch(e.target.value)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
         />
         {open && (
           <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-auto">

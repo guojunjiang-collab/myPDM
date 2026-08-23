@@ -8,6 +8,9 @@ import { flattenTree } from './flattenTree';
 import { maxLevelOf, buildCollapsedForLevel } from './expandLevel';
 import PartDetailModal from '../PartDetailModal';
 import Button from '../ui/Button';
+import Badge from '../ui/Badge';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
 
 /** BOM 结构树的展开箭头，与零部件详情子项清单保持同一风格 */
 function BomChevron({ expanded }: { expanded: boolean }) {
@@ -810,17 +813,18 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
     <div className="flex flex-col h-full">
       {/* 汇总栏 */}
       <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 border-b border-gray-200 flex-wrap shrink-0">
-        <span className="bg-green-100 text-green-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">已匹配 {totalMatched}</span>
-        <span className="bg-yellow-100 text-yellow-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">可新建 {totalNew}</span>
-        <span className="bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">冲突 {totalConflict}</span>
-        <span className="bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">已签出 {totalCheckedOut}</span>
+        <Badge tone="green" label={`已匹配 ${totalMatched}`} />
+        <Badge tone="amber" label={`可新建 ${totalNew}`} />
+        <Badge tone="red" label={`冲突 ${totalConflict}`} />
+        <Badge tone="blue" label={`已签出 ${totalCheckedOut}`} />
         <label className="flex items-center gap-1 text-xs text-gray-600 ml-1">
           展开层级
-          <select
+          <Select
             value={expandSel}
             disabled={maxLevel === 0}
             onChange={e => applyExpandSel(e.target.value)}
-            className="border border-gray-300 rounded px-1.5 py-1 text-xs disabled:bg-gray-100 disabled:text-gray-400"
+            size="xs"
+            className="!w-24"
           >
             <option value="collapsed">全部折叠</option>
             {Array.from({ length: Math.max(0, maxLevel - 1) }, (_, i) => i + 1).map(k => (
@@ -828,7 +832,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
             ))}
             <option value="all">全部展开</option>
             {expandSel === 'custom' && <option value="custom">自定义</option>}
-          </select>
+          </Select>
         </label>
         <div className="flex-1" />
         <Button
@@ -909,15 +913,16 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                       const fromPdm = cadVal === '' && pdmVal !== '';
                       const conflict = cadVal !== '' && pdmVal !== '' && cadVal.trim() !== pdmVal.trim();
                       const value = fromPdm ? pdmVal : cadVal;
-                      const toneCls = fromPdm ? ' text-green-600 border-green-400'
-                        : conflict ? ' text-red-600 border-red-400' : '';
+                      const toneCls = fromPdm ? ' !text-green-600 !border-green-400'
+                        : conflict ? ' !text-red-600 !border-red-400' : '';
                       const title = fromPdm ? `PDM 值（CAD 为空）: ${pdmVal}`
                         : conflict ? `与 PDM 不同 — CAD: ${cadVal} / PDM: ${pdmVal}` : undefined;
                       return (
                       <td key={col.target} className="p-2" style={{ width: col.target === 'version' ? 56 : 100 }} title={title}>
-                        <input value={value} disabled={!canEditProps(row)}
+                        <Input value={value} disabled={!canEditProps(row)}
                           onChange={e => commitEdit(row, attr, e.target.value, 'builtin')}
-                          className={`border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200${toneCls}`} />
+                          size="xs"
+                          className={`${toneCls}`} />
                       </td>
                       );
                     })}
@@ -942,15 +947,15 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                       : <span className="text-amber-600">— 无 —</span>}
                     </td>
                     <td className="p-2" style={{ width: 76 }}>
-                      {row.match_status === 'matched' && <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full">已匹配</span>}
-                      {row.match_status === 'new' && <span className="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">可新建</span>}
-                      {row.match_status === 'conflict' && <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full">冲突</span>}
-                      {row.match_status === 'unknown' && <span className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">未知</span>}
+                      {row.match_status === 'matched' && <Badge status="matched" domain="match" />}
+                      {row.match_status === 'new' && <Badge status="new" domain="match" />}
+                      {row.match_status === 'conflict' && <Badge status="conflict" domain="match" />}
+                      {row.match_status === 'unknown' && <Badge status="unknown" domain="match" />}
                     </td>
                     <td className="p-2" style={{ width: 76 }}>
-                      {row.checkout_status === 'not_checked_out' && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">未签出</span>}
-                      {row.checkout_status === 'checked_out' && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">已签出</span>}
-                      {row.checkout_status === 'other_checked_out' && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">他人签出</span>}
+                      {row.checkout_status === 'not_checked_out' && <Badge status="not_checked_out" domain="checkout" />}
+                      {row.checkout_status === 'checked_out' && <Badge status="checked_out" domain="checkout" />}
+                      {row.checkout_status === 'other_checked_out' && <Badge status="other_checked_out" domain="checkout" />}
                       {row.checkout_status === null && <span className="text-gray-400">—</span>}
                     </td>
                     <td className="p-2 text-center" style={{ width: 160 }}>
@@ -1014,26 +1019,28 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                       : cadValue.trim() === pdmValue.trim();
                     const conflict = cadValue !== '' && pdmValue !== '' && !sameVal;
                     const value = fromPdm ? pdmValue : cadValue;
-                    const toneCls = fromPdm ? ' text-green-600 border-green-400'
-                      : conflict ? ' text-red-600 border-red-400' : '';
+                    const toneCls = fromPdm ? ' !text-green-600 !border-green-400'
+                      : conflict ? ' !text-red-600 !border-red-400' : '';
                     const title = fromPdm ? `PDM 值（CAD 为空）: ${pdmValue}`
                       : conflict ? `与 PDM 不同 — CAD: ${cadValue} / PDM: ${pdmValue}` : undefined;
                     const isSelect = fieldDef?.field_type === 'select' && fieldDef?.options?.length > 0;
                     return (
                       <td key={col} className="p-2" style={{ width: 250, maxWidth: 250 }} title={title}>
                         {isSelect ? (
-                          <select value={value} disabled={!canEditProps(row) || !catiaProp}
+                          <Select value={value} disabled={!canEditProps(row) || !catiaProp}
                             onChange={e => { if (!catiaProp) return; commitEdit(row, catiaProp, e.target.value); }}
                             title={value || undefined}
-                            className={`border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200 truncate${toneCls}`}>
+                            size="xs"
+                            className={`truncate${toneCls}`}>
                             <option value="">—</option>
                             {fieldDef.options.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
-                          </select>
+                          </Select>
                         ) : (
-                          <input value={value} disabled={!canEditProps(row) || !catiaProp}
+                          <Input value={value} disabled={!canEditProps(row) || !catiaProp}
                             onChange={e => { if (!catiaProp) return; commitEdit(row, catiaProp, e.target.value); }}
                             title={value || undefined}
-                            className={`border border-gray-300 rounded px-1.5 py-0.5 w-full disabled:bg-gray-100 disabled:border-gray-200 truncate${toneCls}`} />
+                            size="xs"
+                            className={`truncate${toneCls}`} />
                         )}
                       </td>
                     );

@@ -7,10 +7,10 @@ export const BTN_BASE_CLASS =
 export const BTN_VARIANT_CLASS: Record<ButtonVariant, string> = {
   primary:   'bg-[var(--ui-btn-primary-bg)] text-[var(--ui-btn-primary-text)] hover:bg-[var(--ui-btn-primary-hover)] active:bg-[var(--ui-btn-primary-active)]',
   secondary: 'border border-[var(--ui-btn-secondary-border)] bg-[var(--ui-btn-secondary-bg)] text-[var(--ui-btn-secondary-text)] hover:bg-[var(--ui-btn-secondary-hover)]',
-  danger:    'bg-[var(--ui-btn-danger-bg)] text-white hover:bg-[var(--ui-btn-danger-hover)] active:bg-[var(--ui-btn-danger-active)]',
-  success:   'bg-[var(--ui-btn-success-bg)] text-white hover:bg-[var(--ui-btn-success-hover)]',
+  danger:    'bg-[var(--ui-btn-danger-bg)] text-[var(--ui-btn-danger-text)] hover:bg-[var(--ui-btn-danger-hover)] active:bg-[var(--ui-btn-danger-active)]',
+  success:   'bg-[var(--ui-btn-success-bg)] text-[var(--ui-btn-success-text)] hover:bg-[var(--ui-btn-success-hover)]',
   ghost:     'bg-[var(--ui-btn-ghost-bg)] text-[var(--ui-btn-ghost-text)] hover:bg-[var(--ui-btn-ghost-hover)]',
-  dark:      'bg-[var(--ui-btn-dark-bg)] text-white hover:bg-[var(--ui-btn-dark-hover)]',
+  dark:      'bg-[var(--ui-btn-dark-bg)] text-[var(--ui-btn-dark-text)] hover:bg-[var(--ui-btn-dark-hover)]',
   link:      'text-[var(--ui-btn-link-text)] hover:text-[var(--ui-btn-link-hover)] hover:underline',
 };
 

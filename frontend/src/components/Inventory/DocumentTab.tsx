@@ -7,6 +7,8 @@ import { canDownload } from '../../stores/auth';
 import { BADGE_DOMAINS } from '../../constants/badges';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
 import DocumentEditModal from './DocumentEditModal';
 import DocumentDetail from './DocumentDetail';
 import type { InvDocType } from '../../types';
@@ -66,8 +68,6 @@ export default function DocumentTab() {
     return () => document.removeEventListener('mousedown', onClick);
   }, []);
 
-  const selectCls = 'px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white';
-
   const act = async (fn: () => Promise<any>) => {
     try { await fn(); await load(); }
     catch (e: any) { alert(e?.response?.data?.detail || '操作失败'); }
@@ -118,17 +118,17 @@ export default function DocumentTab() {
     <div className="flex-1 min-h-0 flex flex-col">
       {/* 工具栏 */}
       <div className="flex gap-2 mb-4 items-center shrink-0">
-        <input type="text" placeholder="搜索单据号/业务/创建人/物料..." value={search}
+        <Input type="text" placeholder="搜索单据号/业务/创建人/物料..." value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-80 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
-        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className={selectCls}>
+          className="!w-80" />
+        <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
           <option value="">全部类型</option>
           {DOC_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
-        </select>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={selectCls}>
+        </Select>
+        <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           <option value="">全部状态</option>
           {Object.entries(BADGE_DOMAINS.inventoryDoc).map(([k, def]) => <option key={k} value={k}>{def.label}</option>)}
-        </select>
+        </Select>
         <div className="flex-1" />
         {canDownload() && (
           <div className="relative" ref={menuRef}>
