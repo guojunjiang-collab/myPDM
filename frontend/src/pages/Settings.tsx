@@ -11,7 +11,7 @@ import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import Textarea from '../components/ui/Textarea';
 import { useDataStore } from '../stores/data';
-import { exportAllData, exportCustomFieldDefs, importCustomFieldDefs, importAllData, exportDashboardFile, previewDashboardImportFromFile, executeDashboardImport } from '../services/importExport';
+import { exportCustomFieldDefs, importCustomFieldDefs } from '../services/importExport';
 
 import Logs from './Logs';
 import FeishuBindPanel from '../components/FeishuBindPanel';
@@ -119,16 +119,9 @@ export default function Settings() {
   const [viewingField, setViewingField] = useState<CustomFieldDefinition | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetPassword, setResetPassword] = useState('');
-  const [exporting, setExporting] = useState(false);
-  const [exportProgress, setExportProgress] = useState('');
-  const [importing, setImporting] = useState(false);
-  const [importProgress, setImportProgress] = useState('');
   const [batchConverting, setBatchConverting] = useState(false);
   const [batchStatus, setBatchStatus] = useState('');
-  const [dashExporting, setDashExporting] = useState(false);
-  const [dashImporting, setDashImporting] = useState(false);
   const fieldImportRef = useRef<HTMLInputElement>(null);
-  const dashImportRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (activeTab === 'customFields') {
@@ -282,32 +275,6 @@ export default function Settings() {
     }
   };
 
-  const handleExportAll = async () => {
-    setExporting(true);
-    setExportProgress('准备导出...');
-    try {
-      await exportAllData((msg) => setExportProgress(msg));
-    } catch (e: any) {
-      setExportProgress('');
-      alert(e?.message || '导出失败，请重试');
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const handleImportAll = async () => {
-    setImporting(true);
-    setImportProgress('准备导入...');
-    try {
-      await importAllData((msg) => setImportProgress(msg));
-    } catch (e: any) {
-      setImportProgress('');
-      alert(e?.message || '导入失败，请重试');
-    } finally {
-      setImporting(false);
-    }
-  };
-
   // STP 批量转换
   const handleBatchConvert = async () => {
     setBatchConverting(true);
@@ -391,37 +358,6 @@ export default function Settings() {
       alert(error?.response?.data?.detail || '重置失败，请确认密码正确');
     } finally {
       setResetting(false);
-    }
-  };
-
-  // 导出用户看板（直接下载文件）
-  const handleDashExport = async () => {
-    setDashExporting(true);
-    try {
-      await exportDashboardFile();
-    } catch (e: any) {
-      alert(e?.message || '导出失败，请重试');
-    } finally {
-      setDashExporting(false);
-    }
-  };
-
-  // 导入用户看板（直接选择文件）
-  const handleDashImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setDashImporting(true);
-    try {
-      await useDataStore.getState().syncAll();
-      const preview = await previewDashboardImportFromFile(file);
-      await executeDashboardImport(preview);
-      await useDataStore.getState().syncAll();
-      alert('用户看板导入完成');
-    } catch (e: any) {
-      alert(e?.message || '导入失败，请重试');
-    } finally {
-      setDashImporting(false);
-      e.target.value = '';
     }
   };
 
@@ -637,67 +573,6 @@ export default function Settings() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* 导出全部数据 */}
-          <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] p-6">
-            <h3 className="text-lg font-medium mb-2">导出全部数据</h3>
-            <p className="text-sm text-[var(--ui-text-secondary)] mb-4">
-              将系统中的所有零件、部件、图文档、构型项、构型配置、用户看板数据导出为文件备份。请选择目标文件夹。
-            </p>
-            <Button variant="success" onClick={handleExportAll} disabled={exporting}>
-              {exporting ? '导出中...' : '导出全部数据'}
-            </Button>
-            {exportProgress && (
-              <p className={`mt-3 text-sm ${exporting ? 'text-blue-600' : 'text-green-600'}`}>
-                {exporting ? '⏳' : '✅'} {exportProgress}
-              </p>
-            )}
-          </div>
-
-          {/* 导入全部数据 */}
-          <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] p-6">
-            <h3 className="text-lg font-medium mb-2">导入全部数据</h3>
-            <p className="text-sm text-[var(--ui-text-secondary)] mb-4">
-              从导出的文件夹中选择"自定义字段定义.xlsx + 图文档清单.xlsx + 零件清单.xlsx + 部件清单.xlsx + 构型项.xlsx + 构型配置.xlsx + 用户看板.xlsx"等文件所在的文件夹，批量导入全部数据。
-            </p>
-            <Button onClick={handleImportAll} disabled={importing}>
-              {importing ? '导入中...' : '导入全部数据'}
-            </Button>
-            {importProgress && (
-              <p className={`mt-3 text-sm ${importing ? 'text-blue-600' : 'text-green-600'}`}>
-                {importing ? '⏳' : '✅'} {importProgress}
-              </p>
-            )}
-          </div>
-
-          {/* 导出用户看板 */}
-          <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] p-6">
-            <h3 className="text-lg font-medium mb-2">导出用户看板</h3>
-            <p className="text-sm text-[var(--ui-text-secondary)] mb-4">
-              仅导出所有用户的看板数据（文件夹、关联项目、共享设置），保存为 Excel 文件。
-            </p>
-            <Button variant="success" onClick={handleDashExport} disabled={dashExporting}>
-              {dashExporting ? '导出中...' : '导出用户看板'}
-            </Button>
-            {dashExporting && (
-              <p className="mt-3 text-sm text-blue-600">⏳ 导出中...</p>
-            )}
-          </div>
-
-          {/* 导入用户看板 */}
-          <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] p-6">
-            <h3 className="text-lg font-medium mb-2">导入用户看板</h3>
-            <p className="text-sm text-[var(--ui-text-secondary)] mb-4">
-              选择已导出的"用户看板.xlsx"文件，导入用户看板数据。
-            </p>
-            <Button onClick={() => dashImportRef.current?.click()} disabled={dashImporting}>
-              {dashImporting ? '导入中...' : '导入用户看板'}
-            </Button>
-            <input ref={dashImportRef} type="file" accept=".xlsx" onChange={handleDashImport} className="hidden" disabled={dashImporting} />
-            {dashImporting && (
-              <p className="mt-3 text-sm text-blue-600">⏳ 导入中...</p>
-            )}
-          </div>
-
           {/* STP 批量转换 */}
           <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] p-6">
             <h3 className="text-lg font-medium mb-2">STP 批量转换</h3>

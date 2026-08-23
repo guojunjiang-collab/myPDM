@@ -49,8 +49,6 @@ PERMISSIONS: dict[str, list[str]] = {
     "dashboard.folder:unshare": ["admin", "engineer", "production", "guest"],
     "dashboard.item:add": ["admin", "engineer", "production", "guest"],
     "dashboard.item:delete": ["admin", "engineer", "production", "guest"],
-    "dashboard:export_all": ["admin"],
-    "dashboard:import_all": ["admin"],
     "dashboard:read": ["admin", "engineer", "production", "guest"],
     "documents.attachment:delete": ["admin", "engineer"],
     "documents.attachment:download": ["admin", "engineer", "production", "guest"],
