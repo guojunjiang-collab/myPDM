@@ -373,7 +373,8 @@ export default function Board() {
       // 图文档：直接做附件预览（与附件预览一致——新窗口按格式分发）
       try {
         const res: any = await documentsApi.listAttachments(item.entity_id);
-        const atts: any[] = Array.isArray(res) ? res : (res?.items || []);
+        // documentsApi.listAttachments 返回 axios 响应（未 .then(r => r.data)），兼容两种结构
+        const atts: any[] = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : (res?.items || []));
         const att = atts[0];
         if (att) {
           await previewAttachment(att.id, att.file_name || '', {
