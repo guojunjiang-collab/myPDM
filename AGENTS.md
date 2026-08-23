@@ -10,13 +10,13 @@
 
 ### 基本信息
 
-| 属性     | 値                                    |
-| ------ | ------------------------------------ |
-| 项目名称   | 网页版 BOM 管理工具 (PDM 系统)                |
-| 项目类型   | 前后端分离 Web 应用                         |
-| 版本     | v3.3.2                               |
-| 架构     | React SPA + RESTful API (Docker 部署)  |
-| 语言     | TypeScript + Python                   |
+| 属性   | 値                                   |
+| ---- | ----------------------------------- |
+| 项目名称 | 网页版 BOM 管理工具 (PDM 系统)               |
+| 项目类型 | 前后端分离 Web 应用                        |
+| 版本   | v3.3.2                              |
+| 架构   | React SPA + RESTful API (Docker 部署) |
+| 语言   | TypeScript + Python                 |
 
 ### 核心功能
 
@@ -47,55 +47,55 @@
 
 ### 后端
 
-| 类别       | 技术                                       |
-| -------- | ---------------------------------------- |
-| 框架       | FastAPI                                   |
-| ASGI 服务器 | Uvicorn（开发环境 `--reload`）               |
-| ORM      | SQLAlchemy 2.0                            |
-| 数据验证     | Pydantic 2.x                              |
-| 认证       | JWT (python-jose + passlib/bcrypt)        |
-| 数据库      | PostgreSQL 16                             |
-| 缓存       | Redis 7                                   |
-| 文件存储     | 本地文件系统 (`./uploads/`)                    |
-| 3D 转换    | MayoConv (STP → glTF/glb via AppImage)    |
-| Office 转换 | LibreOffice (Office → PDF 在线预览)           |
-| AI 模型   | DeepSeek (OpenAI 兼容接口)                    |
-| 文档生成     | python-docx, openpyxl, pypdf              |
-| 第三方登录   | httpx（飞书 OpenAPI / 微信开放平台 OAuth2）        |
-| 压缩包解析   | rarfile, py7zr                            |
-| 测试       | pytest                                    |
+| 类别        | 技术                                     |
+| --------- | -------------------------------------- |
+| 框架        | FastAPI                                |
+| ASGI 服务器  | Uvicorn（开发环境 `--reload`）               |
+| ORM       | SQLAlchemy 2.0                         |
+| 数据验证      | Pydantic 2.x                           |
+| 认证        | JWT (python-jose + passlib/bcrypt)     |
+| 数据库       | PostgreSQL 16                          |
+| 缓存        | Redis 7                                |
+| 文件存储      | 本地文件系统 (`./uploads/`)                  |
+| 3D 转换     | MayoConv (STP → glTF/glb via AppImage) |
+| Office 转换 | LibreOffice (Office → PDF 在线预览)        |
+| AI 模型     | DeepSeek (OpenAI 兼容接口)                 |
+| 文档生成      | python-docx, openpyxl, pypdf           |
+| 第三方登录     | httpx（飞书 OpenAPI / 微信开放平台 OAuth2）      |
+| 压缩包解析     | rarfile, py7zr                         |
+| 测试        | pytest                                 |
 
 **依赖文件**: `backend/requirements.txt`
 
 ### 前端
 
-| 类别       | 技术                                       |
-| -------- | ---------------------------------------- |
-| 框架       | React 18 + TypeScript                    |
-| 构建工具     | Vite 5                                   |
-| 样式       | Tailwind CSS 3 + @tailwindcss/typography |
-| 路由       | React Router 6                           |
-| 状态管理     | Zustand (persist 持久化)                    |
-| HTTP 客户端 | Axios                                    |
-| 3D 渲染   | Three.js + @react-three/fiber + @react-three/drei |
+| 类别       | 技术                                                |
+| -------- | ------------------------------------------------- |
+| 框架       | React 18 + TypeScript                             |
+| 构建工具     | Vite 5                                            |
+| 样式       | Tailwind CSS 3 + @tailwindcss/typography          |
+| 路由       | React Router 6                                    |
+| 状态管理     | Zustand (persist 持久化)                             |
+| HTTP 客户端 | Axios                                             |
+| 3D 渲染    | Three.js + @react-three/fiber + @react-three/drei |
 | Markdown | react-markdown + remark-gfm + marked + rehype-raw |
-| 数学公式     | katex                                    |
-| 配置解析     | js-yaml                                  |
-| 电子表格     | xlsx                                     |
-| 日期       | dayjs                                    |
-| 测试       | Vitest（node 环境，`src/**/*.test.ts`）        |
+| 数学公式     | katex                                             |
+| 配置解析     | js-yaml                                           |
+| 电子表格     | xlsx                                              |
+| 日期       | dayjs                                             |
+| 测试       | Vitest（node 环境，`src/**/*.test.ts`）                |
 
 **源码目录**: `frontend/`
 **构建输出**: `frontend/dist/`
 
 ### 基础设施
 
-| 服务         | 容器名           | 端口                                     |
-| ---------- | ------------- | -------------------------------------- |
-| Nginx      | bom_nginx     | 443 HTTPS (映射 `${NGINX_HOST_PORT:-8080}`) + 80 (映射 `${NGINX_HTTP_HOST_PORT:-8081}`) |
-| FastAPI    | bom_backend   | 8000（开发挂载卷 + `--reload`）             |
-| PostgreSQL | bom_postgres  | 5432                                   |
-| Redis      | bom_redis     | 6379                                   |
+| 服务         | 容器名          | 端口                                                                                  |
+| ---------- | ------------ | ----------------------------------------------------------------------------------- |
+| Nginx      | bom_nginx    | 443 HTTPS (映射 `${NGINX_HOST_PORT:-8080}`) + 80 (映射 `${NGINX_HTTP_HOST_PORT:-8081}`) |
+| FastAPI    | bom_backend  | 8000（开发挂载卷 + `--reload`）                                                            |
+| PostgreSQL | bom_postgres | 5432                                                                                |
+| Redis      | bom_redis    | 6379                                                                                |
 
 ---
 
@@ -111,12 +111,14 @@ D:\OpenCode\myPDM\
 │   │   ├── components/           # 可复用组件
 │   │   │   ├── Layout.tsx        # 导航布局（侧边栏+顶栏，含通知铃铛）
 │   │   │   ├── Modal.tsx / Toast.tsx / Loading.tsx / CustomFieldInput.tsx
+│   │   │   ├── CheckinNoteModal.tsx / CcPicker.tsx   # 签入说明 / 知会用户（共享弹窗）
+│   │   │   ├── ui/               # 共享 UI 基座（Button/Input/Select/Badge/Textarea/TreeToggle + Tabs/Alert/Dropdown/FormModal/FormField/ModalFooter/FilterBar/EntityPickerModal）
 │   │   │   ├── NotificationBell.tsx
 │   │   │   ├── BOMTreeTable.tsx / ArchiveTreeModal.tsx / PartCompareModal.tsx
 │   │   │   ├── EntityEditModal.tsx / EntityDocumentSection.tsx / ImportPreviewModal.tsx
 │   │   │   ├── VersionHistory.tsx / VersionSelectModal.tsx
 │   │   │   ├── PartDetailContent.tsx / AssemblyDetailContent.tsx / DocumentDetailContent.tsx
-│   │   │   ├── AssemblyPartPicker.tsx / DocumentPicker.tsx / ECPicker.tsx
+│   │   │   ├── AssemblyPartPicker.tsx / DocumentPicker.tsx（EntityPickerModal 薄封装）/ ECPicker.tsx
 │   │   │   ├── PartAttachmentBucket.tsx / ComponentAttachmentBucket.tsx
 │   │   │   ├── FeishuBindPanel.tsx / WechatBindPanel.tsx
 │   │   │   ├── PartDetailModal/   # 零部件详情弹窗（BOM/附件/文档/Where-Used Tab）
@@ -237,11 +239,7 @@ D:\OpenCode\myPDM\
 
 ### 后端 (Python)
 
-遵循 `D:\OpenCode\AGENTS.MD` 顶层规范，按以下优先级：
 
-1. **项目级**: 本文件 (如与顶层冲突，以本文件为准)
-2. **顶层**: `D:\OpenCode\AGENTS.MD`
-3. **OpenCode 默认**
 
 **Python 特定规则**:
 
@@ -263,17 +261,67 @@ D:\OpenCode\myPDM\
 
 ---
 
+## 🎨 弹窗与 UI 统一规范（2026-08 弹窗统一整改后）
+
+> 桌面端全部弹窗已统一走共享组件（分支 feat/modal-unification，19 提交）。**新增弹窗/表单必须复用下列组件，禁止新写自绘弹窗骨架**；设计文档 `docs/superpowers/specs/2026-08-23-modal-style-unification-design.md`。
+
+### 共享组件清单
+
+| 组件 | 路径 | 用途 |
+| --- | --- | --- |
+| `Modal` + `MODAL_Z` | `components/Modal.tsx` | 弹窗基座（唯一入口），导出 `Modal` / `ConfirmModal` / `MODAL_Z` |
+| `ConfirmModal` | 同上 | 确认弹窗：`type: danger/warning/info`（danger/warning→红色、info→primary）、可选 `children`（自定义内容如密码输入）、`confirmLoading` |
+| `FormModal` | `components/ui/FormModal.tsx` | 表单弹窗：`title/width/height/onSubmit/saving/error/footerLeft`；saving 时按钮「保存中…」+disabled；error 自动渲染 Alert danger；footer 走 `ModalFooter` |
+| `FormField` | `components/ui/FormField.tsx` | 表单项：`label/required/error/hint/children`，可选 `card` 模式 |
+| `ModalFooter` | `components/ui/ModalFooter.tsx` | 底部按钮区（`justify-end gap-2 pt-4 border-t border-[var(--ui-border)]`） |
+| `EntityPickerModal` | `components/ui/EntityPickerModal.tsx` | 添加类选择器骨架：已选面板（顶部常驻）+ 搜索/筛选 + 快速新建 + 候选表格（操作列「添加」无多选框、已添加 disabled）+ footer；多类型模式 typeTabs + 类型徽标；`filterParams` 触发重拉、`selectedExtra` 已选面板额外列、300ms 搜索防抖内置 |
+| `CheckinNoteModal` | `components/CheckinNoteModal.tsx` | 签入说明弹窗（`open/note/onChange/onConfirm/onCancel/saving`） |
+| `CcPicker` | `components/CcPicker.tsx` | 知会用户弹窗（`open/entityId/onClose/api?`，ECR/ECO 共用，ECO 传 `api` 覆写） |
+| `Tabs` / `Alert` / `Dropdown` / `FilterBar` | `components/ui/` | 详情弹窗 Tab；提示块（`tone: info/success/warning/danger`，`InlineError` 别名用于表单内错误）；触发器菜单；筛选工具栏 |
+
+### Modal 契约
+
+- **层级**：`MODAL_Z = { base: 50, picker: 60, overlay: 70 }`——普通弹窗 50、Picker 60、内嵌浮层（Dropdown 等）70；**禁止硬编码 zIndex 字面量**（一律走 MODAL_Z 档位）
+- **宽度语义**（widthMap）：`sm`≈确认/简单输入、`md`≈表单/确认、`lg`≈简单表单、`xl`≈Picker/详情、`full`≈复杂详情、`3xl`≈复杂详情/大表、`max`≈全屏工作台
+- **高度**：内容类详情弹窗 `height="75vh"`、对比类 90vh、全屏工作台 85vh；设置后内容区自动滚动
+- **交互契约**（内置，勿自实现）：滚动锁（模块级计数器，多弹窗叠加最后关闭才恢复 body 滚动）、Esc 仅栈顶弹窗响应、打开聚焦面板/关闭还原焦点、300ms 淡出
+- **标题栏**：`headerAction` 放标题右侧操作按钮（如「导出 PDF」），位于关闭按钮左侧
+
+### 表单与标签规范
+
+- 表单统一 `FormField`：label `block text-xs text-[var(--ui-text-secondary)] mb-0.5`；必填红色星号 `<span className="text-red-500">*</span>`
+- 节标题（分区小标题）：`text-[var(--ui-text-secondary)] font-semibold text-sm`（禁止 `text-gray-700 font-bold` 旧写法）
+- 新建表单统一简单表单（仅件号+名称等核心字段）；复杂表单保持现状不再重构
+
+### 错误与反馈规范
+
+- 表单内校验错误：`FormField error` 或 `Alert` danger（弹窗内 `mb-4`）
+- 操作结果反馈：一律 `toast`（`success` 3000ms / `error` 5000ms / `warning` 4000ms / `info` 3000ms）；批量成功「已保存 N 个」→ `toast.success`
+- 确认类操作：状态驱动 `setConfirmXxx` + 渲染 `ConfirmModal`（禁止内联条件弹窗）
+
+### 原生弹窗禁令
+
+- **桌面端**（`frontend/src/` 非 mobile）：禁止 `alert(` / `confirm(`——一律 `toast` + `ConfirmModal`（验收标准：桌面端 grep 0 残留）
+- **移动端**（`frontend/src/mobile/`）：豁免，保留 `window.alert/confirm`（范围外，勿改动）
+
+### 主题变量（四主题：light / forest / warm / dark）
+
+- 边框 `--ui-border`、次级文本 `--ui-text-secondary`、弱文本 `--ui-text-tertiary`、底色 `--ui-bg-subtle` / `--ui-bg-hover` 随主题切换；**桌面端禁止写死 `border-gray-100`**（已全局替换为 `border-[var(--ui-border)]`）
+- 深色主题无 `--color-primary`：主色一律 Tailwind `primary-600`（#0284c7）
+
+---
+
 ## 🔐 权限模型
 
 ### 用户角色
 
-| 角色     | 标识            | 说明             |
-| ------ | ------------- | -------------- |
-| 管理员    | `admin`       | 全部功能，用户管理, 软删除管理 |
-| 工程师    | `engineer`    | 创建/编辑，CRU 大部分资源  |
-| 生产人员   | `production`  | 查看、下载、导出，库存单据操作 |
-| 访客     | `guest`       | 仅查看            |
-| 待审批    | `unverified`  | 注册后待管理员审批，仅可访问待审批页 |
+| 角色   | 标识           | 说明                 |
+| ---- | ------------ | ------------------ |
+| 管理员  | `admin`      | 全部功能，用户管理, 软删除管理   |
+| 工程师  | `engineer`   | 创建/编辑，CRU 大部分资源    |
+| 生产人员 | `production` | 查看、下载、导出，库存单据操作    |
+| 访客   | `guest`      | 仅查看                |
+| 待审批  | `unverified` | 注册后待管理员审批，仅可访问待审批页 |
 
 ### 权限体系
 
@@ -310,13 +358,13 @@ enforce_object_policy("ecr_owner_or_admin", current_user, ecr)
 
 ### 前端权限检查
 
-| 方法                           | 用途                     | 底层                        |
-| ---------------------------- | ---------------------- | ------------------------- |
-| `can('perm:action')`         | **推荐**：精确权限判定          | `PERMISSIONS[perm]`       |
-| `canEdit()`                  | 新增/编辑按钮                | `can('parts:create')`    |
-| `canDownload()`              | 导出/下载                  | `can('parts:export')`    |
-| `isAdmin()`                  | 删除按钮                   | `can('parts:delete')`    |
-| `canPreview()`               | PDF 预览                 | 始终 true                  |
+| 方法                   | 用途            | 底层                    |
+| -------------------- | ------------- | --------------------- |
+| `can('perm:action')` | **推荐**：精确权限判定 | `PERMISSIONS[perm]`   |
+| `canEdit()`          | 新增/编辑按钮       | `can('parts:create')` |
+| `canDownload()`      | 导出/下载         | `can('parts:export')` |
+| `isAdmin()`          | 删除按钮          | `can('parts:delete')` |
+| `canPreview()`       | PDF 预览        | 始终 true               |
 
 ---
 
@@ -424,12 +472,12 @@ docker ps
 
 4 个容器均为 Up 时正常：
 
-| 容器           | 端口映射                         |
-| ------------ | ---------------------------- |
+| 容器           | 端口映射                                                                             |
+| ------------ | -------------------------------------------------------------------------------- |
 | bom_nginx    | :443 → `${NGINX_HOST_PORT:-8080}` (HTTPS), :80 → `${NGINX_HTTP_HOST_PORT:-8081}` |
-| bom_backend  | :8000                        |
-| bom_postgres | :5432                        |
-| bom_redis    | :6379                        |
+| bom_backend  | :8000                                                                            |
+| bom_postgres | :5432                                                                            |
+| bom_redis    | :6379                                                                            |
 
 ### 新服务器部署
 
@@ -463,12 +511,12 @@ docker-compose up -d
 
 ### 存储路径总览
 
-| 数据            | 宿主机默认路径       | 容器内路径                       | 配置方式                           |
-| ------------- | ------------- | --------------------------- | ------------------------------ |
-| Nginx 端口      | `8080`        | 443                         | `.env` → `NGINX_HOST_PORT`     |
-| PostgreSQL 数据 | `./pgdata/`   | `/var/lib/postgresql/data`  | `.env` → `PGDATA_HOST_PATH`    |
-| 上传附件          | `./uploads/`  | `/app/uploads`              | `.env` → `UPLOADS_HOST_PATH`   |
-| SSL 证书        | `./certs/`    | `/etc/nginx/certs`          | volume 挂载                      |
+| 数据            | 宿主机默认路径      | 容器内路径                      | 配置方式                         |
+| ------------- | ------------ | -------------------------- | ---------------------------- |
+| Nginx 端口      | `8080`       | 443                        | `.env` → `NGINX_HOST_PORT`   |
+| PostgreSQL 数据 | `./pgdata/`  | `/var/lib/postgresql/data` | `.env` → `PGDATA_HOST_PATH`  |
+| 上传附件          | `./uploads/` | `/app/uploads`             | `.env` → `UPLOADS_HOST_PATH` |
+| SSL 证书        | `./certs/`   | `/etc/nginx/certs`         | volume 挂载                    |
 
 ### 修改存储位置
 
@@ -486,31 +534,31 @@ UPLOADS_HOST_PATH=D:/data/uploads
 
 ## 🔧 常用命令
 
-| 操作          | 命令                                                                      |
-| ----------- | ----------------------------------------------------------------------- |
-| 启动所有服务      | `docker-compose up -d`                                                  |
-| 停止服务        | `docker-compose down`                                                   |
-| 清除数据（慎用）    | `docker-compose down -v`                                                |
-| 查看后端日志      | `docker logs bom_backend -f`                                            |
-| 重启后端        | `docker restart bom_backend`                                            |
-| 本地启动后端      | `cd backend; uvicorn app.main:app --reload --port 8100`                 |
-| 构建前端        | `cd frontend; npm run build`                                            |
-| 生成权限代码      | `cd frontend; npm run gen:perms`                                        |
-| 重启 Nginx    | `docker-compose up -d --force-recreate nginx`                           |
-| 备份数据库       | `docker exec bom_postgres pg_dump -U bomadmin bom_system > backup.sql`  |
-| 启动 CAD 桥接    | `cd cad_bridge; python server.py`                                       |
-| 打包 CAD 桥接    | `cd cad_bridge; python build_exe.py`                                    |
+| 操作        | 命令                                                                     |
+| --------- | ---------------------------------------------------------------------- |
+| 启动所有服务    | `docker-compose up -d`                                                 |
+| 停止服务      | `docker-compose down`                                                  |
+| 清除数据（慎用）  | `docker-compose down -v`                                               |
+| 查看后端日志    | `docker logs bom_backend -f`                                           |
+| 重启后端      | `docker restart bom_backend`                                           |
+| 本地启动后端    | `cd backend; uvicorn app.main:app --reload --port 8100`                |
+| 构建前端      | `cd frontend; npm run build`                                           |
+| 生成权限代码    | `cd frontend; npm run gen:perms`                                       |
+| 重启 Nginx  | `docker-compose up -d --force-recreate nginx`                          |
+| 备份数据库     | `docker exec bom_postgres pg_dump -U bomadmin bom_system > backup.sql` |
+| 启动 CAD 桥接 | `cd cad_bridge; python server.py`                                      |
+| 打包 CAD 桥接 | `cd cad_bridge; python build_exe.py`                                   |
 
 ---
 
 ## 👤 演示账号
 
-| 角色     | 用户名         | 密码      |
-| ------ | ----------- | ------- |
-| 管理员    | admin       | 123456  |
-| 工程师    | engineer    | 123456  |
-| 生产人员   | production  | 123456  |
-| 访客     | guest       | 123456  |
+| 角色   | 用户名        | 密码     |
+| ---- | ---------- | ------ |
+| 管理员  | admin      | 123456 |
+| 工程师  | engineer   | 123456 |
+| 生产人员 | production | 123456 |
+| 访客   | guest      | 123456 |
 
 ---
 
@@ -578,17 +626,17 @@ UPLOADS_HOST_PATH=D:/data/uploads
 
 ### 附件管理 (V2)
 
-| 端点                                                     | 说明                         |
-| ------------------------------------------------------ | -------------------------- |
-| `POST /api/v2/attachments/upload`                      | Multipart 上传               |
-| `GET /api/v2/attachments/{id}/stream`                  | 流式下载（二进制）                  |
-| `GET /api/v2/attachments/{id}/download`                | Base64 下载                  |
-| `GET /api/v2/attachments/{id}/preview?token=`          | **浏览器内联预览**（PDF 流式加载）      |
-| `GET /api/v2/attachments/{id}/direct-download?token=`  | 浏览器原生下载（显示进度）              |
-| `GET /api/v2/attachments/{id}/gltf`                    | STP → glTF 3D 预览           |
-| `POST /api/v2/attachments/chunk/*`                     | 分块上传（init/upload/complete） |
-| `POST /api/v2/attachments/{id}/convert`                | 触发格式转换                     |
-| `DELETE /api/v2/attachments/{id}`                      | 删除附件                       |
+| 端点                                                    | 说明                         |
+| ----------------------------------------------------- | -------------------------- |
+| `POST /api/v2/attachments/upload`                     | Multipart 上传               |
+| `GET /api/v2/attachments/{id}/stream`                 | 流式下载（二进制）                  |
+| `GET /api/v2/attachments/{id}/download`               | Base64 下载                  |
+| `GET /api/v2/attachments/{id}/preview?token=`         | **浏览器内联预览**（PDF 流式加载）      |
+| `GET /api/v2/attachments/{id}/direct-download?token=` | 浏览器原生下载（显示进度）              |
+| `GET /api/v2/attachments/{id}/gltf`                   | STP → glTF 3D 预览           |
+| `POST /api/v2/attachments/chunk/*`                    | 分块上传（init/upload/complete） |
+| `POST /api/v2/attachments/{id}/convert`               | 触发格式转换                     |
+| `DELETE /api/v2/attachments/{id}`                     | 删除附件                       |
 
 ### ECR（工程变更请求）
 
@@ -690,6 +738,12 @@ UPLOADS_HOST_PATH=D:/data/uploads
 - 检出/检入控制编辑权；`upgrade` 生成新版本；`release/freeze/obsolete` 控制状态
 - 版本升级序列：24 进制不含 I/O（A→B→…→Z→AA→…→ZZ）
 - 自动迁移在启动时执行（`migrations_components.py` / `migrations_project.py` 等）
+
+### 弹窗统一整改（2026-08）
+
+- 全桌面端弹窗统一走共享组件：`Modal` 基座（层级/滚动锁/Esc/焦点）+ `FormModal` / `ConfirmModal` / `EntityPickerModal` / `CheckinNoteModal` / `CcPicker` 分类组件；118 处原生 alert/confirm 已全部替换为 toast/ConfirmModal（移动端豁免）
+- 三份 Picker（`AssemblyPartPicker` / `DocumentPicker` / `ConfigItemPicker`）为 `EntityPickerModal` 薄封装；签入说明 ×3 统一 `CheckinNoteModal`
+- 实施台账：`.superpowers/sdd/2026-08-23-modal-style-unification-design/`（progress.md 含各任务评审结果与 deferred 清单）
 
 ### CAD 工作台与桥接服务
 
