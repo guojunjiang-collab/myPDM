@@ -184,6 +184,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
 
   useEffect(() => {
     if (open && revisionId) {
+      setActiveTab('attachments');
       setViewingIterationId(null);
       setViewingVersionId(null);
       setIterations([]);
