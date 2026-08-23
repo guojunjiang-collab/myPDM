@@ -74,7 +74,7 @@ export default function Settings() {
         key={t.key}
         type="button"
         onClick={() => handleThemeChange(t.key)}
-        className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
+        className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left text-sm transition-colors ${
           selected
             ? 'border-blue-500 bg-blue-50'
             : 'border-[var(--ui-border)] bg-[var(--ui-bg-surface)] hover:border-gray-300'
@@ -386,7 +386,7 @@ export default function Settings() {
               key={tab.key}
               onClick={() => tab.enabled && setActiveTab(tab.key)}
               disabled={!tab.enabled}
-              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              className={`px-4 h-[var(--ui-control-h)] inline-flex items-center text-sm font-medium border-b-2 -mb-px transition-colors ${
                 activeTab === tab.key
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'
@@ -564,12 +564,9 @@ export default function Settings() {
             <h3 className="font-medium text-blue-800">软删除数据管理</h3>
             <p className="text-sm text-blue-600 mt-1">查看和管理系统中被软删除的零件、部件、图文档等记录</p>
           </div>
-          <a
-            href="/data-management"
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 whitespace-nowrap"
-          >
+          <Button variant="primary" onClick={() => { window.location.href = '/data-management'; }}>
             进入管理
-          </a>
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

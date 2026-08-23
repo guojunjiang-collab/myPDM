@@ -158,19 +158,12 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
             <option key={def.id} value={`cf_${def.id}`}>{def.name}</option>
           ))}
         </Select>
-        <button
-          onClick={() => setTopLevelOnly((v) => !v)}
-          className={`px-3 py-2 rounded-lg text-sm whitespace-nowrap transition-colors select-none ${topLevelOnly ? 'bg-[var(--ui-btn-primary-bg)] text-[var(--ui-btn-primary-text)]' : 'bg-[var(--ui-bg-surface)] text-[var(--ui-text-secondary)] border border-[var(--ui-border)] hover:bg-[var(--ui-bg-hover)]'}`}
-          title="只显示没有父项的最顶层构型项"
-        >
+        <Button active={topLevelOnly} title="只显示没有父项的最顶层构型项">
           仅顶层构型项
-        </button>
-        <button
-          onClick={() => setShowAllVersions((v) => !v)}
-          className={`px-3 py-2 rounded-lg text-sm whitespace-nowrap transition-colors select-none ${showAllVersions ? 'bg-[var(--ui-btn-primary-bg)] text-[var(--ui-btn-primary-text)]' : 'bg-[var(--ui-bg-surface)] text-[var(--ui-text-secondary)] border border-[var(--ui-border)] hover:bg-[var(--ui-bg-hover)]'}`}
-        >
+        </Button>
+        <Button active={showAllVersions}>
           全部版本
-        </button>
+        </Button>
 
         <div className="flex-1" />
         {canEdit() && (

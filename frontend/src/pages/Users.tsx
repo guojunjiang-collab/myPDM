@@ -336,12 +336,12 @@ export default function Users() {
       {/* Tab 切换栏 */}
       <div className="flex gap-2 mb-4 border-b border-[var(--ui-border)]">
         <button
-          className={`px-4 py-2 -mb-px border-b-2 ${activeTab === 'all' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-[var(--ui-text-secondary)]'}`}
+          className={`px-4 h-[var(--ui-control-h)] inline-flex items-center -mb-px border-b-2 text-sm ${activeTab === 'all' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-[var(--ui-text-secondary)]'}`}
           onClick={() => setActiveTab('all')}
         >全部用户</button>
         {isAdmin() && (
           <button
-            className={`px-4 py-2 -mb-px border-b-2 ${activeTab === 'pending' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-[var(--ui-text-secondary)]'}`}
+            className={`px-4 h-[var(--ui-control-h)] inline-flex items-center -mb-px border-b-2 text-sm ${activeTab === 'pending' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-[var(--ui-text-secondary)]'}`}
             onClick={() => setActiveTab('pending')}
           >
             待审批
@@ -352,7 +352,7 @@ export default function Users() {
         )}
         {can('user_groups:read' as any) && (
           <button
-            className={`px-4 py-2 -mb-px border-b-2 ${activeTab === 'groups' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-[var(--ui-text-secondary)]'}`}
+            className={`px-4 h-[var(--ui-control-h)] inline-flex items-center -mb-px border-b-2 text-sm ${activeTab === 'groups' ? 'border-primary-600 text-primary-700 font-medium' : 'border-transparent text-[var(--ui-text-secondary)]'}`}
             onClick={() => setActiveTab('groups')}
           >用户组</button>
         )}

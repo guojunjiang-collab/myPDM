@@ -4,6 +4,7 @@ import { notificationApi } from '../services/notificationApi';
 import { useNotificationStore } from '../stores/notification';
 import { notificationIcon, NOTIFICATION_TARGET_ROUTE } from '../lib/notification';
 import { isToday } from '../lib/date';
+import Button from '../components/ui/Button';
 import type { Notification } from '../types';
 
 const MODULE_FILTERS: { key: string; label: string; targets: string[] }[] = [
@@ -65,18 +66,19 @@ export default function Notifications() {
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-lg font-semibold">通知中心</h1>
         <div className="flex gap-2">
-          <button onClick={async () => { await markAllRead(); load(); }}
-            className="px-3 py-1.5 text-sm bg-[var(--ui-bg-surface)] border border-gray-300 rounded-lg hover:bg-[var(--ui-bg-hover)]">全部标为已读</button>
-          <button onClick={async () => { await notificationApi.clearRead(); fetchUnread(); load(); }}
-            className="px-3 py-1.5 text-sm bg-[var(--ui-bg-surface)] border border-gray-300 rounded-lg hover:bg-[var(--ui-bg-hover)]">清除已读</button>
+          <Button variant="secondary" size="md" onClick={async () => { await markAllRead(); load(); }}>
+            全部标为已读
+          </Button>
+          <Button variant="secondary" size="md" onClick={async () => { await notificationApi.clearRead(); fetchUnread(); load(); }}>
+            清除已读
+          </Button>
         </div>
       </div>
       <div className="flex gap-2 flex-wrap mb-4">
         {MODULE_FILTERS.map((f) => (
-          <button key={f.key} onClick={() => setFilter(f.key)}
-            className={`px-3 py-1.5 rounded-full text-[12.5px] border ${filter === f.key ? 'bg-primary-600 text-white border-primary-600' : 'bg-[var(--ui-bg-surface)] text-gray-700 border-gray-300'}`}>
+          <Button key={f.key} size="md" active={filter === f.key} onClick={() => setFilter(f.key)}>
             {f.label}
-          </button>
+          </Button>
         ))}
       </div>
       {loading ? (

@@ -660,9 +660,9 @@ export default function Projects() {
                   <Badge status={currentProject.status} domain="project" />
                   <span className="text-sm text-[var(--ui-text-secondary)]">负责人 {currentProject.owner_name}</span>
                   <div className="flex-1" />
-                  <Button variant="secondary" size="sm" onClick={() => setDeliverableOpen(true)}>交付物汇总</Button>
+                  <Button variant="secondary" size="md" onClick={() => setDeliverableOpen(true)}>交付物汇总</Button>
                   {isManager && (
-                    <Button variant="secondary" size="sm" onClick={() => setMemberOpen(true)}>成员管理</Button>
+                    <Button variant="secondary" size="md" onClick={() => setMemberOpen(true)}>成员管理</Button>
                   )}
                 </div>
 
@@ -678,12 +678,9 @@ export default function Projects() {
                     <option value="">全部状态</option>
                     {(['未开始', '进行中', '已完成', '挂起'] as TaskStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
                   </Select>
-                  <button
-                    onClick={() => setOnlyMine((v) => !v)}
-                    className={`px-3 py-2 rounded-lg text-sm whitespace-nowrap transition-colors select-none ${onlyMine ? 'bg-[var(--ui-btn-primary-bg)] text-[var(--ui-btn-primary-text)]' : 'bg-[var(--ui-bg-surface)] text-[var(--ui-text-secondary)] border border-[var(--ui-border)] hover:bg-[var(--ui-bg-hover)]'}`}
-                  >
+                  <Button active={onlyMine}>
                     只看我的任务
-                  </button>
+                  </Button>
                   {maxTreeDepth > 0 && (
                     <Select size="xs" className="!w-auto"
                       value={expandSel}
@@ -698,9 +695,9 @@ export default function Projects() {
                     </Select>
                   )}
                   {viewMode === 'table' ? (
-                    <Button variant="secondary" size="sm" onClick={() => setViewMode('gantt')}>甘特图</Button>
+                    <Button variant="secondary" size="md" onClick={() => setViewMode('gantt')}>甘特图</Button>
                   ) : (
-                    <Button variant="secondary" size="sm" onClick={() => setViewMode('table')}>计划表</Button>
+                    <Button variant="secondary" size="md" onClick={() => setViewMode('table')}>计划表</Button>
                   )}
                   {viewMode === 'gantt' && (
                     <>
@@ -712,13 +709,13 @@ export default function Projects() {
                         </button>
                       ))}
                       {can('project.task:depend') && (
-                        <Button size="sm" onClick={() => setAutoScheduleKey((k) => k + 1)}>刷新排期</Button>
+                        <Button size="md" onClick={() => setAutoScheduleKey((k) => k + 1)}>刷新排期</Button>
                       )}
                     </>
                   )}
                   <div className="flex-1" />
                   {isManager && (
-                    <Button size="sm" onClick={() => openCreate(null)}>+ 新建顶层任务</Button>
+                    <Button size="md" onClick={() => openCreate(null)}>+ 新建顶层任务</Button>
                   )}
                 </div>
 

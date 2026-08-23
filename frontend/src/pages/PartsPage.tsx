@@ -170,19 +170,12 @@ export default function PartsPage() {
           <option value="released">发布</option>
           <option value="obsolete">作废</option>
         </Select>
-        <button
-          onClick={() => setShowAllVersions((v) => !v)}
-          className={`px-3 py-2 rounded-lg text-sm whitespace-nowrap transition-colors select-none ${showAllVersions ? 'bg-[var(--ui-btn-primary-bg)] text-[var(--ui-btn-primary-text)]' : 'bg-[var(--ui-bg-surface)] text-[var(--ui-text-secondary)] border border-[var(--ui-border)] hover:bg-[var(--ui-bg-hover)]'}`}
-        >
+        <Button active={showAllVersions}>
           全部版本
-        </button>
-        <button
-          onClick={() => setTopLevelOnly((v) => !v)}
-          className={`px-3 py-2 rounded-lg text-sm whitespace-nowrap transition-colors select-none ${topLevelOnly ? 'bg-[var(--ui-btn-primary-bg)] text-[var(--ui-btn-primary-text)]' : 'bg-[var(--ui-bg-surface)] text-[var(--ui-text-secondary)] border border-[var(--ui-border)] hover:bg-[var(--ui-bg-hover)]'}`}
-          title="只显示没有父项的最顶层零部件"
-        >
+        </Button>
+        <Button active={topLevelOnly} title="只显示没有父项的最顶层零部件">
           仅顶层零部件
-        </button>
+        </Button>
 
         <Button onClick={() => setShowCADWorkspace(true)}>
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

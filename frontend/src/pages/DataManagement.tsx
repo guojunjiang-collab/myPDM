@@ -209,18 +209,18 @@ export default function DataManagement() {
             <div className="mb-4">
               <div className="text-sm text-[var(--ui-text-secondary)] mb-2">清理此日期之前的数据（可选）:</div>
               <div className="flex flex-wrap items-center gap-2 mb-2">
-                <button onClick={() => setPresetDate(null)} className={`px-3 py-1 rounded text-xs border transition-colors ${!beforeDate ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-[var(--ui-border)] text-[var(--ui-text-secondary)] hover:border-gray-300'}`}>
+                <Button size="sm" active={!beforeDate} onClick={() => setPresetDate(null)}>
                   全部清理
-                </button>
-                <button onClick={() => setPresetDate(30)} className={`px-3 py-1 rounded text-xs border transition-colors ${beforeDate === getPresetDateStr(30) ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-[var(--ui-border)] text-[var(--ui-text-secondary)] hover:border-gray-300'}`}>
+                </Button>
+                <Button size="sm" active={beforeDate === getPresetDateStr(30)} onClick={() => setPresetDate(30)}>
                   清理30天前
-                </button>
-                <button onClick={() => setPresetDate(90)} className={`px-3 py-1 rounded text-xs border transition-colors ${beforeDate === getPresetDateStr(90) ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-[var(--ui-border)] text-[var(--ui-text-secondary)] hover:border-gray-300'}`}>
+                </Button>
+                <Button size="sm" active={beforeDate === getPresetDateStr(90)} onClick={() => setPresetDate(90)}>
                   清理90天前
-                </button>
-                <button onClick={() => setPresetDate(180)} className={`px-3 py-1 rounded text-xs border transition-colors ${beforeDate === getPresetDateStr(180) ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-[var(--ui-border)] text-[var(--ui-text-secondary)] hover:border-gray-300'}`}>
+                </Button>
+                <Button size="sm" active={beforeDate === getPresetDateStr(180)} onClick={() => setPresetDate(180)}>
                   清理180天前
-                </button>
+                </Button>
               </div>
               <Input
                 type="date"

@@ -151,14 +151,14 @@ export default function Logs() {
           <Button
             type="button"
             variant="secondary"
-            size="sm"
+            size="md"
             onClick={handleReset}
           >
             重置
           </Button>
           <Button
             type="submit"
-            size="sm"
+            size="md"
           >
             搜索
           </Button>

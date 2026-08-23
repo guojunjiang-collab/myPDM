@@ -348,7 +348,7 @@ export default function Board() {
       {/* Left: Folder Tree */}
       <div ref={sidebarRef} className="w-72 shrink-0 border-r border-[var(--ui-border)] bg-[var(--ui-bg-subtle)] flex flex-col">
         <div className="px-2 pt-2 pb-1">
-          <Button type="button" size="sm" className="w-full" onClick={() => { setCreateModal(''); setCreateName(''); }}>
+          <Button type="button" size="md" className="w-full" onClick={() => { setCreateModal(''); setCreateName(''); }}>
             + 新建文件夹
           </Button>
         </div>
@@ -396,10 +396,10 @@ export default function Board() {
               <h2 className="text-sm font-medium text-[var(--ui-text-secondary)] mb-2">{getFolderPath(allFolders, selectedFolder.id)}</h2>
               {canEditFolder && (
                 <div className="flex gap-2">
-                  <Button type="button" variant="secondary" size="sm" onClick={() => { setCreateModal(selectedFolder.id); setCreateName(''); }}>
+                  <Button type="button" variant="secondary" size="md" onClick={() => { setCreateModal(selectedFolder.id); setCreateName(''); }}>
                     + 子文件夹
                   </Button>
-                  <Button type="button" variant="secondary" size="sm" onClick={() => setPickerOpen(true)}>
+                  <Button type="button" variant="secondary" size="md" onClick={() => setPickerOpen(true)}>
                     + 关联项目
                   </Button>
                 </div>
