@@ -821,6 +821,7 @@ def list_attachments(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("attachments:list")),
 ):
+    iteration = None
     if iteration_id:
         iteration = db.query(crud_parts.models_parts.PartIteration).filter(
             crud_parts.models_parts.PartIteration.id == iteration_id,
@@ -829,7 +830,7 @@ def list_attachments(
         if not iteration:
             # 容错：传入的迭代与版本不匹配（如前端状态错配）时回退到当前迭代，避免整列 404
             iteration = None
-    if not iteration:
+    if iteration is None:
         result = crud_parts.get_part_revision_with_current_iteration(db, revision_id)
         if not result:
             raise HTTPException(404, "版本不存在")
