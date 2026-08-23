@@ -485,8 +485,8 @@ export default function Board() {
                               variant="secondary"
                               size="xs"
                               className="mr-2"
-                              disabled={!(item.attachment_count ?? 0) > 0}
-                              title={!(item.attachment_count ?? 0) > 0 ? '预览附件' : '暂无附件'}
+                              disabled={!((item.attachment_count ?? 0) > 0)}
+                              title={((item.attachment_count ?? 0) > 0) ? '预览附件' : '暂无附件'}
                               onClick={(e) => { e.stopPropagation(); handlePreview(item); }}
                             >预览</Button>
                           )}
