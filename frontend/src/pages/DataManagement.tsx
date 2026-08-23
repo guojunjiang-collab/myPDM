@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import api from '../services/api';
 import { isAdmin } from '../stores/auth';
 import { ConfirmModal } from '../components/Modal';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
+import SortableTh from '../components/ui/SortableTh';
+import { useTableSort } from '../hooks/useTableSort';
 
 interface TableStats {
   count: number;
@@ -122,6 +124,19 @@ export default function DataManagement() {
     ? Object.values(stats).reduce((sum, s) => sum + s.count, 0)
     : 0;
 
+  // 客户端排序（统计行转数组）
+  const statRows = useMemo(() => {
+    if (!stats) return [];
+    return Object.entries(stats).map(([table, s]) => ({
+      table,
+      label: TABLE_LABELS[table] || table,
+      count: s.count,
+      earliest: s.earliest ? new Date(s.earliest).getTime() : null,
+      latest: s.latest ? new Date(s.latest).getTime() : null,
+    }));
+  }, [stats]);
+  const { sortedData: sortedStatRows, sortField, sortDirection, handleSort } = useTableSort<Record<string, any>>(statRows);
+
   return (
     <div className="max-w-4xl mx-auto p-6">
       <h2 className="text-xl font-semibold mb-6">数据管理</h2>
@@ -148,24 +163,24 @@ export default function DataManagement() {
             <table className="w-full text-sm">
               <thead className="bg-[var(--ui-bg-subtle)] border-b">
                 <tr>
-                  <th className="text-left px-4 py-3 font-medium text-[var(--ui-text-secondary)]">表名</th>
-                  <th className="text-right px-4 py-3 font-medium text-[var(--ui-text-secondary)]">数量</th>
-                  <th className="text-left px-4 py-3 font-medium text-[var(--ui-text-secondary)]">最早删除时间</th>
-                  <th className="text-left px-4 py-3 font-medium text-[var(--ui-text-secondary)]">最近删除时间</th>
+                  <SortableTh sortKey="label" active={sortField === 'label'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">表名</SortableTh>
+                  <SortableTh sortKey="count" active={sortField === 'count'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-right">数量</SortableTh>
+                  <SortableTh sortKey="earliest" active={sortField === 'earliest'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">最早删除时间</SortableTh>
+                  <SortableTh sortKey="latest" active={sortField === 'latest'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">最近删除时间</SortableTh>
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(stats).map(([table, s]) => (
-                  <tr key={table} className="border-b last:border-b-0 hover:bg-[var(--ui-bg-hover)]">
-                    <td className="px-4 py-3">{TABLE_LABELS[table] || table}</td>
-                    <td className={`px-4 py-3 text-right ${s.count > 0 ? 'text-orange-600 font-medium' : 'text-[var(--ui-text-tertiary)]'}`}>
-                      {s.count}
+                {sortedStatRows.map((row) => (
+                  <tr key={row.table} className="border-b last:border-b-0 hover:bg-[var(--ui-bg-hover)]">
+                    <td className="px-4 py-3">{row.label}</td>
+                    <td className={`px-4 py-3 text-right ${row.count > 0 ? 'text-orange-600 font-medium' : 'text-[var(--ui-text-tertiary)]'}`}>
+                      {row.count}
                     </td>
                     <td className="px-4 py-3 text-[var(--ui-text-secondary)]">
-                      {s.earliest ? new Date(s.earliest).toLocaleString('zh-CN') : '--'}
+                      {row.earliest ? new Date(row.earliest).toLocaleString('zh-CN') : '--'}
                     </td>
                     <td className="px-4 py-3 text-[var(--ui-text-secondary)]">
-                      {s.latest ? new Date(s.latest).toLocaleString('zh-CN') : '--'}
+                      {row.latest ? new Date(row.latest).toLocaleString('zh-CN') : '--'}
                     </td>
                   </tr>
                 ))}

@@ -5,7 +5,9 @@ import StockDetail from './StockDetail';
 import DocumentDetail from './DocumentDetail';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
+import SortableTh from '../ui/SortableTh';
 import type { StockRow } from '../../types';
+import { useTableSort } from '../../hooks/useTableSort';
 
 export default function StockTab() {
   const { warehouses, loadWarehouses } = useInventoryStore();
@@ -38,6 +40,9 @@ export default function StockTab() {
     });
   }, [allRows, material, warehouseId, lowOnly]);
 
+  // 客户端排序
+  const { sortedData: sortedRows, sortField, sortDirection, handleSort } = useTableSort<StockRow>(rows);
+
   const whName = (id: string) => warehouses.find((w) => w.id === id)?.name || id;
 
   return (
@@ -63,12 +68,12 @@ export default function StockTab() {
         <table className="w-full">
           <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
             <tr>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">编码</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">名称</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">仓库</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">批次</th>
-              <th className="text-right px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">数量</th>
-              <th className="text-right px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">安全库存</th>
+              <SortableTh sortKey="material_code" active={sortField === 'material_code'} direction={sortDirection} onSort={(k) => handleSort(k as keyof StockRow)} className="text-left">编码</SortableTh>
+              <SortableTh sortKey="material_name" active={sortField === 'material_name'} direction={sortDirection} onSort={(k) => handleSort(k as keyof StockRow)} className="text-left">名称</SortableTh>
+              <SortableTh className="text-left">仓库</SortableTh>
+              <SortableTh sortKey="batch_no" active={sortField === 'batch_no'} direction={sortDirection} onSort={(k) => handleSort(k as keyof StockRow)} className="text-left">批次</SortableTh>
+              <SortableTh sortKey="quantity" active={sortField === 'quantity'} direction={sortDirection} onSort={(k) => handleSort(k as keyof StockRow)} className="text-right">数量</SortableTh>
+              <SortableTh sortKey="safety_stock" active={sortField === 'safety_stock'} direction={sortDirection} onSort={(k) => handleSort(k as keyof StockRow)} className="text-right">安全库存</SortableTh>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -76,9 +81,9 @@ export default function StockTab() {
               <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td></tr>
             ) : allRows.length === 0 ? (
               <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">暂无数据</td></tr>
-            ) : rows.length === 0 ? (
+            ) : sortedRows.length === 0 ? (
               <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">无匹配结果</td></tr>
-            ) : rows.map((r, i) => (
+            ) : sortedRows.map((r, i) => (
               <tr key={i} className={`cursor-pointer ${r.is_low ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-[var(--ui-bg-hover)]'}`}
                 onClick={() => setDetailMatId(r.material_id)}>
                 <td className={`px-4 py-3 text-sm font-medium ${r.is_low ? 'text-red-600' : 'text-primary-600'}`}>{r.material_code}</td>

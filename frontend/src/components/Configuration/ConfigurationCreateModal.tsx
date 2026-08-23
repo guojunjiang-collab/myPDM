@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Modal } from '../Modal';
 import { configurationApi, partsApi, customFieldsApi } from '../../services/api';
 import AssemblyPartPicker from '../AssemblyPartPicker';
@@ -11,8 +11,11 @@ import CustomFieldInput from '../CustomFieldInput';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
+import SortableTh from '../ui/SortableTh';
 import TreeToggle from '../ui/TreeToggle';
 import EntityPickerModal from '../ui/EntityPickerModal';
+import { useTableSort } from '../../hooks/useTableSort';
+import { compareVersions } from '../../constants';
 
 interface Props {
   open: boolean;
@@ -58,8 +61,11 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
 
   // 关联零部件
   const [parts, setParts] = useState<PartEntry[]>([]);
+
+  // 关联零部件表排序（类型列不排序）
+  const { sortedData: sortedParts, sortField: partsSortField, sortDirection: partsSortDirection, handleSort: handlePartsSort } = useTableSort<PartEntry>(parts, { fieldComparators: { part_version: (a, b) => compareVersions(String(a), String(b)) } });
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [versionSelectIdx, setVersionSelectIdx] = useState<number | null>(null);
+  const [versionSelectPartId, setVersionSelectPartId] = useState<string | null>(null);
 
   // 子构型项
   const [children, setChildren] = useState<ChildEntry[]>([]);
@@ -200,11 +206,11 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
     } finally { setSaving(false); }
   };
 
-  const togglePartRequired = (idx: number) => {
-    setParts(prev => prev.map((p, i) => i === idx ? { ...p, is_required: !p.is_required } : p));
+  const togglePartRequired = (partId: string) => {
+    setParts(prev => prev.map(p => p.part_id === partId ? { ...p, is_required: !p.is_required } : p));
   };
-  const updatePartQuantity = (idx: number, quantity: number) => {
-    setParts(prev => prev.map((p, i) => i === idx ? { ...p, quantity } : p));
+  const updatePartQuantity = (partId: string, quantity: number) => {
+    setParts(prev => prev.map(p => p.part_id === partId ? { ...p, quantity } : p));
   };
   const toggleChildRequired = (idx: number) => {
     setChildren(prev => prev.map((c, i) => i === idx ? { ...c, is_required: !c.is_required } : c));
@@ -449,20 +455,20 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
               <table className="w-full text-sm">
                 <thead className="bg-[var(--ui-bg-subtle)] border-b">
                   <tr>
-                    <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)] w-16">类型</th>
-                    <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)]">件号</th>
-                    <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)]">名称</th>
-                    <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)]">规格型号</th>
-                    <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)] w-14">版本</th>
-                    <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)] w-16">状态</th>
-                    <th className="px-3 py-1.5 text-center text-xs text-[var(--ui-text-secondary)] w-16">用量</th>
-                    <th className="px-3 py-1.5 text-center text-xs text-[var(--ui-text-secondary)] w-20">必选/可选</th>
-                    <th className="px-3 py-1.5 text-center text-xs text-[var(--ui-text-secondary)] w-24">操作</th>
+                    <SortableTh className="text-left w-16">类型</SortableTh>
+                    <SortableTh sortKey="part_code" active={partsSortField === 'part_code'} direction={partsSortDirection} onSort={(k) => handlePartsSort(k as keyof PartEntry)} className="text-left">件号</SortableTh>
+                    <SortableTh sortKey="part_name" active={partsSortField === 'part_name'} direction={partsSortDirection} onSort={(k) => handlePartsSort(k as keyof PartEntry)} className="text-left">名称</SortableTh>
+                    <SortableTh sortKey="part_spec" active={partsSortField === 'part_spec'} direction={partsSortDirection} onSort={(k) => handlePartsSort(k as keyof PartEntry)} className="text-left">规格型号</SortableTh>
+                    <SortableTh sortKey="part_version" active={partsSortField === 'part_version'} direction={partsSortDirection} onSort={(k) => handlePartsSort(k as keyof PartEntry)} className="text-left w-14">版本</SortableTh>
+                    <SortableTh sortKey="part_status" active={partsSortField === 'part_status'} direction={partsSortDirection} onSort={(k) => handlePartsSort(k as keyof PartEntry)} className="text-left w-16">状态</SortableTh>
+                    <SortableTh sortKey="quantity" active={partsSortField === 'quantity'} direction={partsSortDirection} onSort={(k) => handlePartsSort(k as keyof PartEntry)} className="text-center w-16">用量</SortableTh>
+                    <SortableTh sortKey="is_required" active={partsSortField === 'is_required'} direction={partsSortDirection} onSort={(k) => handlePartsSort(k as keyof PartEntry)} className="text-center w-20">必选/可选</SortableTh>
+                    <SortableTh className="text-center w-24">操作</SortableTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                   {parts.map((p, i) => (
-                     <tr key={i} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => setEditingPartEntity({ type: p.part_type as 'part' | 'assembly', id: p.part_id })}>
+                   {sortedParts.map((p) => (
+                     <tr key={p.part_id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => setEditingPartEntity({ type: p.part_type as 'part' | 'assembly', id: p.part_id })}>
                        <td className="px-3 py-1.5 text-xs">
                          <Badge tone={p.part_type === 'assembly' ? 'blue' : 'gray'} label={p.part_type === 'assembly' ? '部件' : '零件'} />
                        </td>
@@ -475,19 +481,19 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                        </td>
                        <td className="px-3 py-1.5 text-center" onClick={e => e.stopPropagation()}>
                          <Input size="xs" type="number" min={1} value={p.quantity ?? 1}
-                           onChange={(e) => updatePartQuantity(i, parseInt(e.target.value) || 1)}
+                           onChange={(e) => updatePartQuantity(p.part_id, parseInt(e.target.value) || 1)}
                            className="!w-14 text-center" />
                        </td>
                        <td className="px-3 py-1.5 text-center" onClick={e => e.stopPropagation()}>
-                         <button onClick={() => togglePartRequired(i)}
+                         <button onClick={() => togglePartRequired(p.part_id)}
                            className={`px-2 py-0.5 text-xs rounded ${p.is_required ? 'bg-[var(--ui-blue-bg)] text-[var(--ui-blue-text)]' : 'bg-[var(--ui-gray-bg)] text-[var(--ui-gray-text)]'}`}>
                            {p.is_required ? '必选' : '可选'}
                          </button>
                        </td>
                        <td className="px-3 py-1.5 text-center" onClick={e => e.stopPropagation()}>
                          <div className="flex gap-1 justify-center">
-                           <Button variant="link" size="xs" onClick={() => setVersionSelectIdx(i)}>选择</Button>
-                           <Button variant="danger" size="xs" onClick={() => setParts(prev => prev.filter((_, j) => j !== i))}>移除</Button>
+                           <Button variant="link" size="xs" onClick={() => setVersionSelectPartId(p.part_id)}>选择</Button>
+                           <Button variant="danger" size="xs" onClick={() => setParts(prev => prev.filter(x => x.part_id !== p.part_id))}>移除</Button>
                          </div>
                        </td>
                      </tr>
@@ -530,9 +536,9 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
             }}
             getKey={(r) => r.id}
             columns={[
-              { key: 'code', title: '构型号', width: '120px', render: (r) => <span className="font-medium text-xs">{r.code}</span> },
-              { key: 'name', title: '名称', render: (r) => <span className="text-xs">{r.name}</span> },
-              { key: 'spec', title: '规格型号', render: (r) => <span className="text-xs text-[var(--ui-text-tertiary)]">{r.spec || '-'}</span> },
+              { key: 'code', title: '构型号', width: '120px', sortable: true, render: (r) => <span className="font-medium text-xs">{r.code}</span> },
+              { key: 'name', title: '名称', sortable: true, render: (r) => <span className="text-xs">{r.name}</span> },
+              { key: 'spec', title: '规格型号', sortable: true, render: (r) => <span className="text-xs text-[var(--ui-text-tertiary)]">{r.spec || '-'}</span> },
             ]}
             selected={pickerSelected}
             onSelectedChange={setPickerSelected}
@@ -659,25 +665,25 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
       />
 
       {/* 版本选择器 */}
-      {versionSelectIdx !== null && parts[versionSelectIdx] && (
+      {versionSelectPartId && (
         <VersionSelectModal
-          open={versionSelectIdx !== null}
+          open={!!versionSelectPartId}
           entityType="part"
-          entityId={parts[versionSelectIdx].part_id}
-          entityName={parts[versionSelectIdx].part_name}
-          currentVersionId={parts[versionSelectIdx].revision_id || parts[versionSelectIdx].part_id}
+          entityId={versionSelectPartId}
+          entityName={parts.find(p => p.part_id === versionSelectPartId)?.part_name || ''}
+          currentVersionId={parts.find(p => p.part_id === versionSelectPartId)?.revision_id || versionSelectPartId}
           onSelect={(versionId: string) => {
             partsApi.getRevision(versionId).then(r => {
-              setParts(prev => prev.map((p, i) => i === versionSelectIdx ? {
+              setParts(prev => prev.map(p => p.part_id === versionSelectPartId ? {
                 ...p,
                 revision_id: r.id,
                 part_version: r.version || '',
                 part_status: r.status || '',
               } : p));
             }).catch(() => {});
-            setVersionSelectIdx(null);
+            setVersionSelectPartId(null);
           }}
-          onClose={() => setVersionSelectIdx(null)}
+          onClose={() => setVersionSelectPartId(null)}
         />
       )}
     </Modal>

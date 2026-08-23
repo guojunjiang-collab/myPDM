@@ -4,6 +4,9 @@ import { documentsApi } from '../../services/api';
 import type { ECRDocumentLink, Document } from '../../types';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
+import SortableTh from '../ui/SortableTh';
+import { useTableSort } from '../../hooks/useTableSort';
+import { compareVersions } from '../../constants';
 
 interface ECRDocumentPickerProps {
   open: boolean;
@@ -49,6 +52,9 @@ export function ECRDocumentPicker({ open, onClose, onSelect, alreadyLinked }: EC
       (doc.version || '').toLowerCase().includes(q)
     );
   });
+
+  // 文档表排序（勾选列不排序）
+  const { sortedData: sortedDocs, sortField, sortDirection, handleSort } = useTableSort<Document>(filteredDocs, { fieldComparators: { version: (a, b) => compareVersions(String(a), String(b)) } });
 
   const toggleSelect = (docId: string) => {
     const next = new Set(selectedIds);
@@ -97,31 +103,31 @@ export function ECRDocumentPicker({ open, onClose, onSelect, alreadyLinked }: EC
             <table className="w-full text-sm">
               <thead className="bg-[var(--ui-bg-subtle)] sticky top-0">
                 <tr>
-                  <th className="w-10 px-3 py-2 text-left">
+                  <SortableTh className="text-left w-10">
                     <input
                       type="checkbox"
                       onChange={(e) => {
                         if (e.target.checked) {
-                          const all = new Set(filteredDocs.filter((d) => !alreadyLinked.includes(d.id)).map((d) => d.id));
+                          const all = new Set(sortedDocs.filter((d) => !alreadyLinked.includes(d.id)).map((d) => d.id));
                           setSelectedIds(all);
                         } else {
                           setSelectedIds(new Set());
                         }
                       }}
                       checked={
-                        filteredDocs.length > 0 &&
-                        filteredDocs.every((d) => alreadyLinked.includes(d.id) || selectedIds.has(d.id))
+                        sortedDocs.length > 0 &&
+                        sortedDocs.every((d) => alreadyLinked.includes(d.id) || selectedIds.has(d.id))
                       }
                       className="rounded border-gray-300"
                     />
-                  </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-[var(--ui-text-secondary)]">文档编号</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-[var(--ui-text-secondary)]">文档名称</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-[var(--ui-text-secondary)]">版本</th>
+                  </SortableTh>
+                  <SortableTh sortKey="code" active={sortField === 'code'} direction={sortDirection} onSort={(k) => handleSort(k as keyof Document)} className="text-left">文档编号</SortableTh>
+                  <SortableTh sortKey="name" active={sortField === 'name'} direction={sortDirection} onSort={(k) => handleSort(k as keyof Document)} className="text-left">文档名称</SortableTh>
+                  <SortableTh sortKey="version" active={sortField === 'version'} direction={sortDirection} onSort={(k) => handleSort(k as keyof Document)} className="text-left">版本</SortableTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredDocs.map((doc) => {
+                {sortedDocs.map((doc) => {
                   const isAlreadyLinked = alreadyLinked.includes(doc.id);
                   const isSelected = selectedIds.has(doc.id);
                   return (

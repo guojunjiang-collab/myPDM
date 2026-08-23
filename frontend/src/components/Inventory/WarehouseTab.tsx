@@ -8,7 +8,9 @@ import FormField from '../ui/FormField';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
+import SortableTh from '../ui/SortableTh';
 import type { Warehouse } from '../../types';
+import { useTableSort } from '../../hooks/useTableSort';
 
 const WH_TYPES = [
   { value: 'raw', label: '原料库' },
@@ -26,6 +28,9 @@ export default function WarehouseTab() {
   // 保存 loading/错误（阶段2c 补缺口）
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // 客户端排序
+  const { sortedData: sortedWarehouses, sortField, sortDirection, handleSort } = useTableSort<Warehouse>(warehouses);
 
   const reload = async () => {
     setLoading(true);
@@ -75,11 +80,11 @@ export default function WarehouseTab() {
         <table className="w-full">
           <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
             <tr>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">编码</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">名称</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">类型</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">默认库管员</th>
-              <th className="text-right px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">操作</th>
+              <SortableTh sortKey="code" active={sortField === 'code'} direction={sortDirection} onSort={(k) => handleSort(k as keyof Warehouse)} className="text-left">编码</SortableTh>
+              <SortableTh sortKey="name" active={sortField === 'name'} direction={sortDirection} onSort={(k) => handleSort(k as keyof Warehouse)} className="text-left">名称</SortableTh>
+              <SortableTh sortKey="type" active={sortField === 'type'} direction={sortDirection} onSort={(k) => handleSort(k as keyof Warehouse)} className="text-left">类型</SortableTh>
+              <SortableTh className="text-left">默认库管员</SortableTh>
+              <SortableTh align="right">操作</SortableTh>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -87,7 +92,7 @@ export default function WarehouseTab() {
               <tr><td colSpan={5} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td></tr>
             ) : warehouses.length === 0 ? (
               <tr><td colSpan={5} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">暂无数据</td></tr>
-            ) : warehouses.map((w) => (
+            ) : sortedWarehouses.map((w) => (
               <tr key={w.id} className="hover:bg-[var(--ui-bg-hover)]">
                 <td className="px-4 py-3 text-sm font-medium">{w.code}</td>
                 <td className="px-4 py-3 text-sm font-medium">{w.name}</td>

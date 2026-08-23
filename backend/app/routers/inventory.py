@@ -142,9 +142,11 @@ async def list_ledger(material_id: uuid.UUID = Query(None), warehouse_id: uuid.U
 @router.get("/documents")
 async def list_documents(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
                          doc_type: str = Query(None), status: str = Query(None), search: str = Query(None),
+                         sort_field: str = Query('created_at'), sort_order: str = Query('desc'),
                          db: Session = Depends(get_db),
                          current_user: User = Depends(require_permission("inventory.doc:read"))):
-    params = DocumentListParams(page=page, page_size=page_size, doc_type=doc_type, status=status, search=search)
+    params = DocumentListParams(page=page, page_size=page_size, doc_type=doc_type, status=status, search=search,
+                                sort_field=sort_field, sort_order=sort_order)
     docs, total = crud_inventory.list_documents(db, params, current_user)
     items = [_doc_brief(db, d) for d in docs]
     # 批量取每张单据的物料摘要（供前端按物料/单据内容搜索），避免逐单 N+1

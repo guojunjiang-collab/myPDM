@@ -18,7 +18,10 @@ import { ECRDetailModal } from './ECR/ECRDetailModal';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
 import Input from './ui/Input';
+import SortableTh from './ui/SortableTh';
 import CheckinNoteModal from './CheckinNoteModal';
+import { useTableSort } from '../hooks/useTableSort';
+import { compareVersions } from '../constants';
 import type { DocumentRevision, DocumentIteration, CustomFieldDefinition } from '../types';
 
 interface Props {
@@ -97,6 +100,11 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
 
   const loadSeq = useRef(0);
   const uploadInputRef = useRef<HTMLInputElement>(null);
+
+  // 附件/版本/迭代 TAB 客户端排序
+  const { sortedData: sortedAttachments, sortField: attSortField, sortDirection: attSortDirection, handleSort: handleAttSort } = useTableSort<AttInfo>(attachments);
+  const { sortedData: sortedVersions, sortField: verSortField, sortDirection: verSortDirection, handleSort: handleVerSort } = useTableSort<DocumentRevision>(versions, { fieldComparators: { version: (a, b) => compareVersions(String(a), String(b)) } });
+  const { sortedData: sortedIterations, sortField: iterSortField, sortDirection: iterSortDirection, handleSort: handleIterSort } = useTableSort<DocumentIteration>(iterations);
 
   const loadDoc = useCallback(async () => {
     if (!effectiveRevisionId) return;
@@ -522,14 +530,14 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                         <table className="w-full text-sm">
                           <thead className="bg-[var(--ui-bg-subtle)] border-b">
                             <tr>
-                              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">文件名</th>
-                              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-24">大小</th>
-                              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-40">上传时间</th>
-                              <th className="px-3 py-2 text-right text-[var(--ui-text-secondary)] font-medium w-56">操作</th>
+                              <SortableTh sortKey="file_name" active={attSortField === 'file_name'} direction={attSortDirection} onSort={(k) => handleAttSort(k as keyof AttInfo)} className="text-left">文件名</SortableTh>
+                              <SortableTh sortKey="file_size" active={attSortField === 'file_size'} direction={attSortDirection} onSort={(k) => handleAttSort(k as keyof AttInfo)} className="text-left w-24">大小</SortableTh>
+                              <SortableTh sortKey="created_at" active={attSortField === 'created_at'} direction={attSortDirection} onSort={(k) => handleAttSort(k as keyof AttInfo)} className="text-left w-40">上传时间</SortableTh>
+                              <SortableTh align="right" className="w-56">操作</SortableTh>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
-                            {attachments.map((att) => (
+                            {sortedAttachments.map((att) => (
                               <tr key={att.id} className="hover:bg-[var(--ui-bg-hover)]">
                                 <td className="px-3 py-2 text-primary-600">{att.file_name}</td>
                                 <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{formatFileSize(att.file_size || 0)}</td>
@@ -599,14 +607,14 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                     <table className="w-full text-sm">
                       <thead className="bg-[var(--ui-bg-subtle)] border-b">
                         <tr>
-                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">版本</th>
-                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20">状态</th>
-                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-44">创建时间</th>
-                          <th className="px-3 py-2 text-right text-[var(--ui-text-secondary)] font-medium w-24">操作</th>
+                          <SortableTh sortKey="version" active={verSortField === 'version'} direction={verSortDirection} onSort={(k) => handleVerSort(k as keyof DocumentRevision)} className="text-left w-16">版本</SortableTh>
+                          <SortableTh sortKey="status" active={verSortField === 'status'} direction={verSortDirection} onSort={(k) => handleVerSort(k as keyof DocumentRevision)} className="text-left w-20">状态</SortableTh>
+                          <SortableTh sortKey="created_at" active={verSortField === 'created_at'} direction={verSortDirection} onSort={(k) => handleVerSort(k as keyof DocumentRevision)} className="text-left w-44">创建时间</SortableTh>
+                          <SortableTh align="right" className="w-24">操作</SortableTh>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {versions.map((v) => {
+                        {sortedVersions.map((v) => {
                           const isCurrent = v.id === currentRevisionId;
                           const isViewing = v.id === viewingVersionId;
                           return (
@@ -643,15 +651,15 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                     <table className="w-full text-sm">
                       <thead className="bg-[var(--ui-bg-subtle)] border-b">
                         <tr>
-                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">迭代</th>
-                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-44">签入时间</th>
-                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">签入说明</th>
-                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">创建人</th>
-                          <th className="px-3 py-2 text-right text-[var(--ui-text-secondary)] font-medium w-24">操作</th>
+                          <SortableTh sortKey="iteration" active={iterSortField === 'iteration'} direction={iterSortDirection} onSort={(k) => handleIterSort(k as keyof DocumentIteration)} className="text-left w-16">迭代</SortableTh>
+                          <SortableTh sortKey="check_in_date" active={iterSortField === 'check_in_date'} direction={iterSortDirection} onSort={(k) => handleIterSort(k as keyof DocumentIteration)} className="text-left w-44">签入时间</SortableTh>
+                          <SortableTh sortKey="check_in_note" active={iterSortField === 'check_in_note'} direction={iterSortDirection} onSort={(k) => handleIterSort(k as keyof DocumentIteration)} className="text-left">签入说明</SortableTh>
+                          <SortableTh sortKey="creator_name" active={iterSortField === 'creator_name'} direction={iterSortDirection} onSort={(k) => handleIterSort(k as keyof DocumentIteration)} className="text-left">创建人</SortableTh>
+                          <SortableTh align="right" className="w-24">操作</SortableTh>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {iterations.map((it) => {
+                        {sortedIterations.map((it) => {
                           const isCurrent = it.id === currentIterationId;
                           const isViewing = it.id === viewingIterationId;
                           return (

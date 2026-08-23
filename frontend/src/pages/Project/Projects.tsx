@@ -10,9 +10,11 @@ import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import Textarea from '../../components/ui/Textarea';
+import SortableTh from '../../components/ui/SortableTh';
 import { toast } from '../../components/Toast';
 import { useHeaderTabs } from '../../hooks/useHeaderTabs';
 import { usePersistedTabState } from '../../hooks/usePersistedTabState';
+import { useTableSort } from '../../hooks/useTableSort';
 import MemberManageModal from './MemberManageModal';
 import DeliverableModal from './DeliverableModal';
 import TaskEditModal from './TaskEditModal';
@@ -192,6 +194,9 @@ export default function Projects() {
     (!search || p.name.includes(search) || p.code.includes(search)) &&
     (!statusFilter || p.status === statusFilter)
   );
+
+  // 客户端排序（全量数据）
+  const { sortedData: sortedProjects, sortField, sortDirection, handleSort } = useTableSort<Project>(filtered);
 
   const handleOpenCreate = () => {
     setEditingProject(null);
@@ -600,13 +605,13 @@ export default function Projects() {
               <table className="w-full">
                 <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
                   <tr>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] select-none whitespace-nowrap">编号</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] select-none whitespace-nowrap">名称</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] select-none whitespace-nowrap">负责人</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] select-none whitespace-nowrap">状态</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] select-none whitespace-nowrap">计划起止</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] select-none whitespace-nowrap">成员</th>
-                    <th className="px-4 py-2 text-right text-sm font-medium text-[var(--ui-text-secondary)] select-none whitespace-nowrap">操作</th>
+                    <SortableTh sortKey="code" active={sortField === 'code'} direction={sortDirection} onSort={(k) => handleSort(k as keyof Project)} className="text-left">编号</SortableTh>
+                    <SortableTh sortKey="name" active={sortField === 'name'} direction={sortDirection} onSort={(k) => handleSort(k as keyof Project)} className="text-left">名称</SortableTh>
+                    <SortableTh sortKey="owner_name" active={sortField === 'owner_name'} direction={sortDirection} onSort={(k) => handleSort(k as keyof Project)} className="text-left">负责人</SortableTh>
+                    <SortableTh sortKey="status" active={sortField === 'status'} direction={sortDirection} onSort={(k) => handleSort(k as keyof Project)} className="text-left">状态</SortableTh>
+                    <SortableTh className="text-left">计划起止</SortableTh>
+                    <SortableTh sortKey="member_count" active={sortField === 'member_count'} direction={sortDirection} onSort={(k) => handleSort(k as keyof Project)} className="text-left">成员</SortableTh>
+                    <SortableTh align="right">操作</SortableTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -614,12 +619,12 @@ export default function Projects() {
                     <tr>
                       <td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td>
                     </tr>
-                  ) : filtered.length === 0 ? (
+                  ) : sortedProjects.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">暂无项目</td>
                     </tr>
                   ) : (
-                    filtered.map((p) => (
+                    sortedProjects.map((p) => (
                       <tr key={p.id} onClick={() => handleSelectProject(p.id)}
                           className="hover:bg-[var(--ui-bg-hover)] cursor-pointer">
                         <td className="px-4 py-2 text-sm font-medium">{p.code}</td>

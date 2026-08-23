@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Modal } from '../Modal';
 import { toast } from '../Toast';
 import { ecrApi, usersApi, documentsApi, customFieldsApi } from '../../services/api';
@@ -13,7 +13,10 @@ import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
+import SortableTh from '../ui/SortableTh';
 import Textarea from '../ui/Textarea';
+import { useTableSort } from '../../hooks/useTableSort';
+import { compareVersions } from '../../constants';
 
 const REASON_OPTIONS = [
   { value: 'quality_defect', label: '质量缺陷' },
@@ -117,6 +120,19 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
   const [docData, setDocData] = useState<Record<string, any>>({});
   const [docAttachments, setDocAttachments] = useState<Record<string, any[]>>({});
   const [docCustomValues, setDocCustomValues] = useState<Record<string, Record<string, any>>>({});
+
+  // 关联图文档表排序（值混合 link 顶层与 docData，包装扁平排序键）
+  const sortableDocLinks = useMemo(() => documentLinks.map((link: any) => {
+    const doc = docData[link.document_id];
+    return {
+      ...link,
+      _code: doc?.code || link.document_code || '',
+      _name: doc?.name || link.document_name || '',
+      _version: doc?.version || link.document_version || '',
+      _status: doc?.status || '',
+    };
+  }), [documentLinks, docData]);
+  const { sortedData: sortedDocLinks, sortField: docSortField, sortDirection: docSortDirection, handleSort: handleDocSort } = useTableSort<any>(sortableDocLinks, { fieldComparators: { _version: (a, b) => compareVersions(String(a), String(b)) } });
   const [versionSelectState, setVersionSelectState] = useState<{ docId: string; oldDocId: string } | null>(null);
   const docFieldDefs = useDataStore((s) => s.customFieldDefs).filter((d) => d.applies_to?.includes('document'));
   const descRef = useRef<HTMLTextAreaElement>(null);
@@ -580,15 +596,15 @@ export function ECRCreateModal({ open, onClose, onSuccess, editingEcr }: ECRCrea
             ) : (
               <table className="w-full text-sm">
                 <thead className="bg-[var(--ui-bg-subtle)] border-b"><tr>
-                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">图文档编号</th>
-                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">图文档名称</th>
-                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">版本</th>
-                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">状态</th>
+                  <SortableTh sortKey="_code" active={docSortField === '_code'} direction={docSortDirection} onSort={(k) => handleDocSort(k)} className="text-left">图文档编号</SortableTh>
+                  <SortableTh sortKey="_name" active={docSortField === '_name'} direction={docSortDirection} onSort={(k) => handleDocSort(k)} className="text-left">图文档名称</SortableTh>
+                  <SortableTh sortKey="_version" active={docSortField === '_version'} direction={docSortDirection} onSort={(k) => handleDocSort(k)} className="text-left w-16">版本</SortableTh>
+                  <SortableTh sortKey="_status" active={docSortField === '_status'} direction={docSortDirection} onSort={(k) => handleDocSort(k)} className="text-left w-16">状态</SortableTh>
                   {docFieldDefs.map((def) => (<th key={def.id} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium whitespace-nowrap">{def.name}</th>))}
-                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">附件</th>
-                  <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium whitespace-nowrap w-28">操作</th>
+                  <SortableTh className="text-left">附件</SortableTh>
+                  <SortableTh className="text-center whitespace-nowrap w-28">操作</SortableTh>
                 </tr></thead>
-                <tbody className="divide-y">{documentLinks.map((link) => {
+                <tbody className="divide-y">{sortedDocLinks.map((link) => {
                   const doc = docData[link.document_id]; const atts = docAttachments[link.document_id] || [];
                   return (<tr key={link.document_id} className="hover:bg-[var(--ui-bg-hover)]">
                     <td className="px-3 py-2 text-sm font-medium">{doc?.code || link.document_code}</td>

@@ -10,11 +10,13 @@ import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
 import Dropdown from '../ui/Dropdown';
+import SortableTh from '../ui/SortableTh';
 import { ConfirmModal } from '../Modal';
 import { toast } from '../Toast';
 import DocumentEditModal from './DocumentEditModal';
 import DocumentDetail from './DocumentDetail';
 import type { InvDocType } from '../../types';
+import { useTableSort } from '../../hooks/useTableSort';
 
 const DOC_TYPES: { key: InvDocType; label: string }[] = [
   { key: 'inbound', label: '入库单' }, { key: 'outbound', label: '出库单' },
@@ -62,6 +64,9 @@ export default function DocumentTab() {
         .some((v) => (v || '').toLowerCase().includes(kw));
     });
   }, [docs, search]);
+
+  // 客户端排序（全量数据）
+  const { sortedData: sortedDocs, sortField, sortDirection, handleSort } = useTableSort<any>(filteredDocs);
 
   // 点击外部关闭新建菜单 → Dropdown 内置处理
 
@@ -147,13 +152,13 @@ export default function DocumentTab() {
         <table className="w-full">
           <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
             <tr>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">单据号</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">类型</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">状态</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">库管员</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">创建人</th>
-              <th className="text-center px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">创建时间</th>
-              <th className="text-right px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">操作</th>
+              <SortableTh sortKey="doc_number" active={sortField === 'doc_number'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">单据号</SortableTh>
+              <SortableTh sortKey="doc_type" active={sortField === 'doc_type'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">类型</SortableTh>
+              <SortableTh sortKey="status" active={sortField === 'status'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">状态</SortableTh>
+              <SortableTh sortKey="keeper_name" active={sortField === 'keeper_name'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">库管员</SortableTh>
+              <SortableTh sortKey="creator_name" active={sortField === 'creator_name'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">创建人</SortableTh>
+              <SortableTh sortKey="created_at" active={sortField === 'created_at'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-center">创建时间</SortableTh>
+              <SortableTh align="right">操作</SortableTh>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -161,9 +166,9 @@ export default function DocumentTab() {
               <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td></tr>
             ) : docs.length === 0 ? (
               <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">暂无数据</td></tr>
-            ) : filteredDocs.length === 0 ? (
+            ) : sortedDocs.length === 0 ? (
               <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">无匹配结果</td></tr>
-            ) : filteredDocs.map((d) => (
+            ) : sortedDocs.map((d) => (
               <tr key={d.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => setDetailId(d.id)}>
                 <td className="px-4 py-3 text-sm font-medium text-primary-600">{d.doc_number}</td>
                 <td className="px-4 py-3 text-sm font-medium">{DOC_TYPES.find((t) => t.key === d.doc_type)?.label}</td>

@@ -14,10 +14,12 @@ import ConfigItemDetailModal from './Configuration/ConfigItemDetailModal';
 import TaskEditModal from '../pages/Project/TaskEditModal';
 import ProfileEditModal from './Configuration/ProfileEditModal';
 import { useTableSort } from '../hooks/useTableSort';
+import { compareVersions } from '../constants';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
 import Input from './ui/Input';
 import Select from './ui/Select';
+import SortableTh from './ui/SortableTh';
 import CheckinNoteModal from './CheckinNoteModal';
 
 /** BOM 结构树的展开箭头，与 STPViewer 模型树(ModelTreePanel)保持同一风格 */
@@ -93,6 +95,13 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
     ...item,
   }) as BomSortableItem), [bomItems]);
   const { sortedData: sortedBomItems, sortField, sortDirection, handleSort, getSortIcon } = useTableSort<BomSortableItem>(bomFlatForSort);
+
+  // 版本 Tab 排序（独立实例，版本按 A→B→ZZ 序列）
+  const { sortedData: sortedVersions, sortField: verSortField, sortDirection: verSortDirection, handleSort: handleVerSort } = useTableSort<any>(versions, { fieldComparators: { version: (a, b) => compareVersions(String(a), String(b)) } });
+  // 迭代 Tab 排序（独立实例）
+  const { sortedData: sortedIterations, sortField: iterSortField, sortDirection: iterSortDirection, handleSort: handleIterSort } = useTableSort<any>(iterationsList);
+  // BOM 子项版本选择弹窗排序（独立实例，版本按序列）
+  const { sortedData: sortedVersionSelectRevisions, sortField: verSelSortField, sortDirection: verSelSortDirection, handleSort: handleVerSelSort } = useTableSort<any>(versionSelectRevisions, { fieldComparators: { version: (a, b) => compareVersions(String(a), String(b)) } });
 
   // 对展开的子项应用与顶层相同的排序
   const sortBomChildren = useCallback((list: any[]): any[] => {
@@ -843,14 +852,14 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                       <thead>
                         <tr className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
                           <th className="px-4 py-3 w-10"></th>
-                          <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">版本</th>
-                          <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">状态</th>
-                          <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">创建时间</th>
-                          <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">操作</th>
+                          <SortableTh sortKey="version" active={verSortField === 'version'} direction={verSortDirection} onSort={(k) => handleVerSort(k)} className="text-left">版本</SortableTh>
+                          <SortableTh sortKey="status" active={verSortField === 'status'} direction={verSortDirection} onSort={(k) => handleVerSort(k)} className="text-left">状态</SortableTh>
+                          <SortableTh sortKey="created_at" active={verSortField === 'created_at'} direction={verSortDirection} onSort={(k) => handleVerSort(k)} className="text-left">创建时间</SortableTh>
+                          <SortableTh className="text-left">操作</SortableTh>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {versions.map((v: any) => (
+                        {sortedVersions.map((v: any) => (
                           <tr key={v.id} className={`hover:bg-[var(--ui-bg-hover)] ${v.id === revision?.id ? 'bg-blue-50' : ''}`}>
                             <td className="px-4 py-3">
                               <input
@@ -899,15 +908,15 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
-                        <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">迭代</th>
-                        <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">签入时间</th>
-                        <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">签入说明</th>
-                        <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">创建人</th>
-                        <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">操作</th>
+                        <SortableTh sortKey="iteration" active={iterSortField === 'iteration'} direction={iterSortDirection} onSort={(k) => handleIterSort(k)} className="text-left">迭代</SortableTh>
+                        <SortableTh sortKey="check_in_date" active={iterSortField === 'check_in_date'} direction={iterSortDirection} onSort={(k) => handleIterSort(k)} className="text-left">签入时间</SortableTh>
+                        <SortableTh sortKey="check_in_note" active={iterSortField === 'check_in_note'} direction={iterSortDirection} onSort={(k) => handleIterSort(k)} className="text-left">签入说明</SortableTh>
+                        <SortableTh sortKey="creator_name" active={iterSortField === 'creator_name'} direction={iterSortDirection} onSort={(k) => handleIterSort(k)} className="text-left">创建人</SortableTh>
+                        <SortableTh className="text-left">操作</SortableTh>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {iterationsList.map((it: any) => (
+                      {sortedIterations.map((it: any) => (
                         <tr key={it.id} className={`hover:bg-[var(--ui-bg-hover)] ${it.id === iteration?.id ? 'bg-blue-50' : ''}`}>
                           <td className="px-4 py-3">#{it.iteration}</td>
                           <td className="px-4 py-3 text-[var(--ui-text-secondary)]">{it.check_in_date ? new Date(it.check_in_date).toLocaleString('zh-CN') : '未签入'}</td>
@@ -991,13 +1000,13 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
               <table className="w-full text-sm">
                 <thead className="bg-[var(--ui-bg-subtle)] border-b">
                   <tr>
-                    <th className="text-left px-3 py-2 text-[var(--ui-text-secondary)] font-medium">版本</th>
-                    <th className="text-left px-3 py-2 text-[var(--ui-text-secondary)] font-medium">状态</th>
-                    <th className="text-left px-3 py-2 text-[var(--ui-text-secondary)] font-medium">创建时间</th>
+                    <SortableTh sortKey="version" active={verSelSortField === 'version'} direction={verSelSortDirection} onSort={(k) => handleVerSelSort(k)} className="text-left">版本</SortableTh>
+                    <SortableTh sortKey="status" active={verSelSortField === 'status'} direction={verSelSortDirection} onSort={(k) => handleVerSelSort(k)} className="text-left">状态</SortableTh>
+                    <SortableTh sortKey="created_at" active={verSelSortField === 'created_at'} direction={verSelSortDirection} onSort={(k) => handleVerSelSort(k)} className="text-left">创建时间</SortableTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {versionSelectRevisions.map((v: any) => (
+                  {sortedVersionSelectRevisions.map((v: any) => (
                     <tr key={v.id} className={`hover:bg-[var(--ui-bg-hover)] cursor-pointer ${v.id === versionSelectItem.child_revision_id ? 'bg-blue-50' : ''}`}
                       onClick={async () => {
                         if (v.id === versionSelectItem.child_revision_id) { setVersionSelectItem(null); return; }
@@ -1051,18 +1060,16 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
       <Modal
         open={!!matrixPopup}
         onClose={() => setMatrixPopup(null)}
-        title={matrixPopup ? `${matrixPopup.child_code} 变换矩阵` : ''}
+        title={matrixPopup ? `${matrixPopup.child_code} 变换矩阵（单位：m）` : ''}
         width="lg"
         zIndex={MODAL_Z.picker}
       >
         <div className="space-y-3">
           {(matrixPopup?.cad_instances || []).map((inst: any, idx: number) => (
             <div key={idx} className="border rounded-lg p-3 bg-[var(--ui-bg-subtle)]">
-              <div className="flex items-center gap-3 mb-2">
-                <Badge tone="gray" label={inst.source === 'step' ? 'STEP' : inst.source || '—'} />
-                <span className="text-xs text-[var(--ui-text-secondary)]">实例 {idx + 1}</span>
-                {inst.label && <span className="text-xs text-[var(--ui-text-secondary)]">"{inst.label}"</span>}
-              </div>
+              {(matrixPopup?.cad_instances || []).length > 1 && (
+                <div className="mb-2 text-xs text-[var(--ui-text-secondary)]">实例 {idx + 1}</div>
+              )}
               <div className="grid grid-cols-4 gap-x-3 gap-y-1 font-mono text-xs">
                 {(inst.matrix || []).map((v: number, i: number) => (
                   <div key={i} className="text-right">
@@ -1071,9 +1078,6 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                     </span>
                   </div>
                 ))}
-              </div>
-              <div className="mt-1 text-xs text-[var(--ui-text-tertiary)]">
-                平移 (x,y,z): {[3,7,11].map(i => Number((inst.matrix || [])[i] || 0).toFixed(3).replace(/\.?0+$/, '')).join(', ')}m
               </div>
             </div>
           ))}

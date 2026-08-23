@@ -7,6 +7,7 @@ import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
 import TreeToggle from '../ui/TreeToggle';
+import { compareVersions } from '../../constants';
 
 interface ConfigItem {
   id: string;
@@ -64,10 +65,10 @@ export default function ConfigItemPicker({ open, onClose, onConfirm, excludeId }
   }, [excludeId]);
 
   const columns = useMemo(() => ([
-    { key: 'code', title: '构型号', width: '140px', render: (i: ConfigItem) => <span className="font-medium">{i.code}</span> },
-    { key: 'name', title: '名称', render: (i: ConfigItem) => i.name },
-    { key: 'version', title: '版本', width: '70px', render: (i: ConfigItem) => <span className="text-[var(--ui-text-secondary)]">{i.version}</span> },
-    { key: 'status', title: '状态', width: '80px', render: (i: ConfigItem) => <Badge status={i.status} /> },
+    { key: 'code', title: '构型号', width: '140px', sortable: true, render: (i: ConfigItem) => <span className="font-medium">{i.code}</span> },
+    { key: 'name', title: '名称', sortable: true, render: (i: ConfigItem) => i.name },
+    { key: 'version', title: '版本', width: '70px', sortable: true, comparator: (a: unknown, b: unknown) => compareVersions(String(a), String(b)), render: (i: ConfigItem) => <span className="text-[var(--ui-text-secondary)]">{i.version}</span> },
+    { key: 'status', title: '状态', width: '80px', sortable: true, render: (i: ConfigItem) => <Badge status={i.status} /> },
   ]), []);
 
   // filterParams 需稳定引用：仅 status/refreshToken 变化时重建（避免每次渲染触发全量重拉）

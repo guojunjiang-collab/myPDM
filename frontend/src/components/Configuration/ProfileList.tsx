@@ -9,6 +9,8 @@ import ProfileCompareModal from './ProfileCompareModal';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
+import SortableTh from '../ui/SortableTh';
+import { useTableSort } from '../../hooks/useTableSort';
 
 export default function ProfileList() {
   const [items, setItems] = useState<ConfigurationProfile[]>([]);
@@ -59,11 +61,14 @@ export default function ProfileList() {
     });
   }, [items, search, searchField, statusFilter]);
 
+  // 客户端排序（全量数据）
+  const { sortedData: sortedProfiles, sortField, sortDirection, handleSort } = useTableSort<ConfigurationProfile>(filteredData);
+
   // 分页
   const PAGE_SIZE = 20;
-  const total = filteredData.length;
+  const total = sortedProfiles.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const pagedData = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pagedData = sortedProfiles.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // 搜索变化时重置页码
   useEffect(() => { setPage(1); }, [search, searchField, statusFilter]);
@@ -165,12 +170,12 @@ export default function ProfileList() {
         <table className="w-full">
           <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
             <tr>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">编号</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">名称</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">状态</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">架次</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">创建时间</th>
-              <th className="text-right px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)] w-0 whitespace-nowrap">操作</th>
+              <SortableTh sortKey="code" active={sortField === 'code'} direction={sortDirection} onSort={(k) => handleSort(k as keyof ConfigurationProfile)} className="text-left">编号</SortableTh>
+              <SortableTh sortKey="name" active={sortField === 'name'} direction={sortDirection} onSort={(k) => handleSort(k as keyof ConfigurationProfile)} className="text-left">名称</SortableTh>
+              <SortableTh sortKey="status" active={sortField === 'status'} direction={sortDirection} onSort={(k) => handleSort(k as keyof ConfigurationProfile)} className="text-left">状态</SortableTh>
+              <SortableTh className="text-left">架次</SortableTh>
+              <SortableTh sortKey="created_at" active={sortField === 'created_at'} direction={sortDirection} onSort={(k) => handleSort(k as keyof ConfigurationProfile)} className="text-left">创建时间</SortableTh>
+              <SortableTh align="right" className="w-0 whitespace-nowrap">操作</SortableTh>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">

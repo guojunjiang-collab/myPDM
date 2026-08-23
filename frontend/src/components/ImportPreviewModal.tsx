@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { Modal, MODAL_Z } from './Modal';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
+import SortableTh from './ui/SortableTh';
+import { useTableSort } from '../hooks/useTableSort';
+import { compareVersions } from '../constants';
 import type { ImportPreview, ImportRow } from '../services/importExport';
 
 interface ImportPreviewModalProps {
@@ -66,6 +69,9 @@ export default function ImportPreviewModal({
       setExecuting(false);
     }
   };
+
+  // 预览表排序（关联列不排序）
+  const { sortedData: sortedRows, sortField, sortDirection, handleSort } = useTableSort<ImportRow>(rows, { fieldComparators: { version: (a, b) => compareVersions(String(a), String(b)) } });
 
   const renderStatusBadge = (row: ImportRow) => {
     if (row.status === '新增') {
@@ -207,18 +213,18 @@ export default function ImportPreviewModal({
           <table className="w-full text-sm">
             <thead className="bg-[var(--ui-bg-subtle)] border-b sticky top-0">
               <tr>
-                <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20">状态</th>
-                <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">件号/编号</th>
-                <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">名称</th>
-                <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">版本</th>
-                <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">备注/说明</th>
+                <SortableTh sortKey="status" active={sortField === 'status'} direction={sortDirection} onSort={(k) => handleSort(k as keyof ImportRow)} className="text-left w-20">状态</SortableTh>
+                <SortableTh sortKey="code" active={sortField === 'code'} direction={sortDirection} onSort={(k) => handleSort(k as keyof ImportRow)} className="text-left">件号/编号</SortableTh>
+                <SortableTh sortKey="name" active={sortField === 'name'} direction={sortDirection} onSort={(k) => handleSort(k as keyof ImportRow)} className="text-left">名称</SortableTh>
+                <SortableTh sortKey="version" active={sortField === 'version'} direction={sortDirection} onSort={(k) => handleSort(k as keyof ImportRow)} className="text-left w-16">版本</SortableTh>
+                <SortableTh sortKey="remark" active={sortField === 'remark'} direction={sortDirection} onSort={(k) => handleSort(k as keyof ImportRow)} className="text-left">备注/说明</SortableTh>
                 {(['configuration_item', 'configuration_profile', 'ecr', 'eco'] as ImportPreview['type'][]).includes(preview.type) && (
-                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-24">关联</th>
+                  <SortableTh className="text-left w-24">关联</SortableTh>
                 )}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {rows.map((row, idx) => (
+              {sortedRows.map((row, idx) => (
                 <tr
                   key={idx}
                   className={`${

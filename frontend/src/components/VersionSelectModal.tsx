@@ -4,6 +4,9 @@ import { formatDateTime } from '../utils/date';
 import { Modal, MODAL_Z } from './Modal';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
+import SortableTh from './ui/SortableTh';
+import { useTableSort } from '../hooks/useTableSort';
+import { compareVersions } from '../constants';
 
 interface VersionItem {
   id: string;
@@ -56,6 +59,8 @@ export default function VersionSelectModal({
 
   const title = entityName ? `选择版本 - ${entityName}` : '选择版本';
 
+  const { sortedData: sortedVersions, sortField, sortDirection, handleSort } = useTableSort<VersionItem>(versions, { fieldComparators: { version: (a, b) => compareVersions(String(a), String(b)) } });
+
   return (
     <Modal open={open} title={title} onClose={onClose} width="full" zIndex={MODAL_Z.overlay}>
       {loading ? (
@@ -67,16 +72,16 @@ export default function VersionSelectModal({
           <table className="w-full text-sm table-fixed">
             <thead className="bg-[var(--ui-bg-subtle)] border-b">
               <tr>
-                <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20 whitespace-nowrap">版本</th>
-                <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-14 whitespace-nowrap">状态</th>
-                <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-44 whitespace-nowrap">创建时间</th>
-                <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20 whitespace-nowrap">创建人</th>
-                <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">备注</th>
-                <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-16 whitespace-nowrap">操作</th>
+                <SortableTh sortKey="version" active={sortField === 'version'} direction={sortDirection} onSort={(k) => handleSort(k as keyof VersionItem)} className="text-left w-20 whitespace-nowrap">版本</SortableTh>
+                <SortableTh sortKey="status" active={sortField === 'status'} direction={sortDirection} onSort={(k) => handleSort(k as keyof VersionItem)} className="text-left w-14 whitespace-nowrap">状态</SortableTh>
+                <SortableTh sortKey="created_at" active={sortField === 'created_at'} direction={sortDirection} onSort={(k) => handleSort(k as keyof VersionItem)} className="text-left w-44 whitespace-nowrap">创建时间</SortableTh>
+                <SortableTh className="text-left w-20 whitespace-nowrap">创建人</SortableTh>
+                <SortableTh className="text-left">备注</SortableTh>
+                <SortableTh className="text-center w-16 whitespace-nowrap">操作</SortableTh>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {versions.map((v) => {
+              {sortedVersions.map((v) => {
                 const isCurrent = v.id === currentVersionId;
                 const creator = v.revisions && v.revisions.length > 0 ? v.revisions[0].user : null;
                 return (

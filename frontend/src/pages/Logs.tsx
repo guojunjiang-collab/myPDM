@@ -4,9 +4,11 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
+import SortableTh from '../components/ui/SortableTh';
 import type { BadgeTone } from '../constants/badges';
 import type { OperationLog } from '../types';
 import { formatDateTime } from '../utils/date';
+import { useServerSort } from '../hooks/useServerSort';
 
 const PAGE_SIZE = 20;
 
@@ -49,9 +51,15 @@ export default function Logs() {
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
 
+  const sort = useServerSort('created_at', 'desc');
+
   useEffect(() => {
     loadLogs();
-  }, [page, filterUser, filterTargetType, filterAction, filterDateFrom, filterDateTo]);
+  }, [page, filterUser, filterTargetType, filterAction, filterDateFrom, filterDateTo, sort.sortField, sort.sortOrder]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [sort.sortField, sort.sortOrder]);
 
   const loadLogs = async () => {
     setLoading(true);
@@ -59,6 +67,8 @@ export default function Logs() {
       const params: Record<string, string | number> = {
         skip: page * PAGE_SIZE,
         limit: PAGE_SIZE,
+        sort_field: sort.sortField ?? 'created_at',
+        sort_order: sort.sortOrder,
       };
       if (filterUser) params.user_id = filterUser;
       if (filterTargetType) params.target_type = filterTargetType;
@@ -170,13 +180,13 @@ export default function Logs() {
         <table className="w-full">
           <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">时间</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">用户</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">操作</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">对象类型</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">对象ID</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">详情</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">IP</th>
+              <SortableTh sortKey="created_at" active={sort.isActive('created_at')} direction={sort.direction} onSort={sort.handleSort}>时间</SortableTh>
+              <SortableTh sortKey="user_name" active={sort.isActive('user_name')} direction={sort.direction} onSort={sort.handleSort}>用户</SortableTh>
+              <SortableTh sortKey="action" active={sort.isActive('action')} direction={sort.direction} onSort={sort.handleSort}>操作</SortableTh>
+              <SortableTh sortKey="target_type" active={sort.isActive('target_type')} direction={sort.direction} onSort={sort.handleSort}>对象类型</SortableTh>
+              <SortableTh>对象ID</SortableTh>
+              <SortableTh>详情</SortableTh>
+              <SortableTh sortKey="ip" active={sort.isActive('ip')} direction={sort.direction} onSort={sort.handleSort}>IP</SortableTh>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">

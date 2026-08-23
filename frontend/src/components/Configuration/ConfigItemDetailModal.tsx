@@ -15,7 +15,10 @@ import VersionSelectModal from '../VersionSelectModal';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
+import SortableTh from '../ui/SortableTh';
 import CheckinNoteModal from '../CheckinNoteModal';
+import { useTableSort } from '../../hooks/useTableSort';
+import { compareVersions } from '../../constants';
 
 function BomChevron({ expanded }: { expanded: boolean }) {
   return (
@@ -70,6 +73,21 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
   const [children, setChildren] = useState<any[]>([]);
   const [versions, setVersions] = useState<ConfigurationItemRevision[]>([]);
   const [iterations, setIterations] = useState<any[]>([]);
+
+  // TAB 客户端排序（parts 的值在 part_detail 子对象，包装扁平排序键）
+  const sortableParts = useMemo(() => parts.map((p: any) => ({
+    ...p,
+    _code: p.part_detail?.code ?? '',
+    _name: p.part_detail?.name ?? '',
+    _version: p.part_detail?.version ?? '',
+    _status: p.part_detail?.status ?? '',
+    _check_out_user_name: p.part_detail?.check_out_user_name ?? '',
+    _is_required: p.is_required ? 1 : 0,
+    _quantity: p.quantity ?? 1,
+  })), [parts]);
+  const { sortedData: sortedParts, sortField: partsSortField, sortDirection: partsSortDirection, handleSort: handlePartsSort } = useTableSort<any>(sortableParts, { fieldComparators: { _version: (a, b) => compareVersions(String(a), String(b)) } });
+  const { sortedData: sortedVersions, sortField: verSortField, sortDirection: verSortDirection, handleSort: handleVerSort } = useTableSort<any>(versions, { fieldComparators: { version: (a, b) => compareVersions(String(a), String(b)) } });
+  const { sortedData: sortedIterations, sortField: iterSortField, sortDirection: iterSortDirection, handleSort: handleIterSort } = useTableSort<any>(iterations);
   const [cfDefs, setCfDefs] = useState<any[]>([]);
   const [cfValues, setCfValues] = useState<Record<string, any>>({});
   const [selectedPartMasterId, setSelectedPartMasterId] = useState<string | null>(null);
@@ -85,7 +103,8 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
   const savedPatchRef = useRef<Record<string, string>>({});
   const cfTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const [partPickerOpen, setPartPickerOpen] = useState(false);
-  const [versionSelectIdx, setVersionSelectIdx] = useState<number | null>(null);
+  const [versionSelectPartId, setVersionSelectPartId] = useState<string | null>(null);
+  const [versionSelectPart, setVersionSelectPart] = useState<any | null>(null);
 
   const loadDetail = useCallback(async () => {
     if (!internalRevId) return;
@@ -405,18 +424,18 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
                   {parts.length === 0 ? (<div className="text-[var(--ui-text-tertiary)] text-sm py-4 text-center">暂无关联零部件</div>) : (
                     <div className="border rounded-lg overflow-hidden"><table className="w-full text-sm">
                       <thead><tr className="bg-[var(--ui-bg-subtle)] border-b">
-                        <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">件号</th>
-                        <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">中文名称</th>
-                        <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-14">版本</th>
-                        <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-16">状态</th>
-                        <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-20">签出状态</th>
-                        <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-20 whitespace-nowrap">可选/必选</th>
-                        <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-14">数量</th>
-                        <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-14">预览</th>
-                        <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-24">操作</th>
+                        <SortableTh sortKey="_code" active={partsSortField === '_code'} direction={partsSortDirection} onSort={(k) => handlePartsSort(k)} className="text-left">件号</SortableTh>
+                        <SortableTh sortKey="_name" active={partsSortField === '_name'} direction={partsSortDirection} onSort={(k) => handlePartsSort(k)} className="text-left">中文名称</SortableTh>
+                        <SortableTh sortKey="_version" active={partsSortField === '_version'} direction={partsSortDirection} onSort={(k) => handlePartsSort(k)} className="text-center w-14">版本</SortableTh>
+                        <SortableTh sortKey="_status" active={partsSortField === '_status'} direction={partsSortDirection} onSort={(k) => handlePartsSort(k)} className="text-center w-16">状态</SortableTh>
+                        <SortableTh sortKey="_check_out_user_name" active={partsSortField === '_check_out_user_name'} direction={partsSortDirection} onSort={(k) => handlePartsSort(k)} className="text-center w-20">签出状态</SortableTh>
+                        <SortableTh sortKey="_is_required" active={partsSortField === '_is_required'} direction={partsSortDirection} onSort={(k) => handlePartsSort(k)} className="text-center w-20 whitespace-nowrap">可选/必选</SortableTh>
+                        <SortableTh sortKey="_quantity" active={partsSortField === '_quantity'} direction={partsSortDirection} onSort={(k) => handlePartsSort(k)} className="text-center w-14">数量</SortableTh>
+                        <SortableTh className="text-center w-14">预览</SortableTh>
+                        <SortableTh className="text-center w-24">操作</SortableTh>
                       </tr></thead>
                       <tbody className="divide-y divide-gray-200">
-                        {parts.map((p: any, i: number) => {
+                        {sortedParts.map((p: any, i: number) => {
                           const pd = p.part_detail || {};
                           const isAssembly = p.part_type === 'assembly';
                           const canPreview = isAssembly || pd.has_3d;
@@ -455,7 +474,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
                                 <div className="flex items-center justify-center gap-1 whitespace-nowrap">
                                   {canEdit && (
                                     <>
-                                      <Button variant="link" size="xs" onClick={() => setVersionSelectIdx(i)}>选择</Button>
+                                      <Button variant="link" size="xs" onClick={() => { setVersionSelectPartId(p.part_id || p.id); setVersionSelectPart(p); }}>选择</Button>
                                       <Button variant="danger" size="xs" onClick={() => setConfirmRemovePart(p)}>移除</Button>
                                     </>
                                   )}
@@ -479,15 +498,15 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
               )}
               {activeTab === 'docs' && internalRevId && (<EntityDocumentSection entityType="configuration" entityId={internalRevId} editable={isCheckedOutByMe && isDraft} entityCode={master?.code} entityName={master?.name} />)}
               {activeTab === 'versions' && (
-                <table className="w-full text-sm"><thead><tr className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]"><th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">版本</th><th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">状态</th><th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">创建时间</th><th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">操作</th></tr></thead><tbody className="divide-y divide-gray-200">
-                  {versions.map((v: any) => (
+                <table className="w-full text-sm"><thead><tr className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]"><SortableTh sortKey="version" active={verSortField === 'version'} direction={verSortDirection} onSort={(k) => handleVerSort(k)} className="text-left">版本</SortableTh><SortableTh sortKey="status" active={verSortField === 'status'} direction={verSortDirection} onSort={(k) => handleVerSort(k)} className="text-left">状态</SortableTh><SortableTh sortKey="created_at" active={verSortField === 'created_at'} direction={verSortDirection} onSort={(k) => handleVerSort(k)} className="text-left">创建时间</SortableTh><SortableTh className="text-left">操作</SortableTh></tr></thead><tbody className="divide-y divide-gray-200">
+                  {sortedVersions.map((v: any) => (
                     <tr key={v.id} className={`hover:bg-[var(--ui-bg-hover)] ${v.id === revision?.id ? 'bg-blue-50' : ''}`}><td className="px-4 py-3">{v.version}</td><td className="px-4 py-3"><Badge status={v.status} /></td><td className="px-4 py-3 text-[var(--ui-text-secondary)]">{v.created_at ? new Date(v.created_at).toLocaleDateString('zh-CN') : ''}</td><td className="px-4 py-3">{v.id === revision?.id ? (<span className="text-primary-600 text-xs">当前</span>) : (<Button variant="link" size="xs" onClick={() => setInternalRevId(v.id)}>切换</Button>)}</td></tr>
                   ))}
                 </tbody></table>
               )}
               {activeTab === 'iterations' && (
-                <table className="w-full text-sm"><thead><tr className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]"><th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">迭代</th><th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">签入时间</th><th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">签入说明</th><th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">创建人</th><th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">操作</th></tr></thead><tbody className="divide-y divide-gray-200">
-                  {iterations.map((it: any) => (
+                <table className="w-full text-sm"><thead><tr className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]"><SortableTh sortKey="iteration" active={iterSortField === 'iteration'} direction={iterSortDirection} onSort={(k) => handleIterSort(k)} className="text-left">迭代</SortableTh><SortableTh sortKey="created_at" active={iterSortField === 'created_at'} direction={iterSortDirection} onSort={(k) => handleIterSort(k)} className="text-left">签入时间</SortableTh><SortableTh sortKey="check_in_note" active={iterSortField === 'check_in_note'} direction={iterSortDirection} onSort={(k) => handleIterSort(k)} className="text-left">签入说明</SortableTh><SortableTh sortKey="creator_name" active={iterSortField === 'creator_name'} direction={iterSortDirection} onSort={(k) => handleIterSort(k)} className="text-left">创建人</SortableTh><SortableTh className="text-left">操作</SortableTh></tr></thead><tbody className="divide-y divide-gray-200">
+                  {sortedIterations.map((it: any) => (
                     <tr key={it.id} className={`hover:bg-[var(--ui-bg-hover)] ${it.iteration === revision?.latest_iteration ? 'bg-blue-50' : ''}`}><td className="px-4 py-3">#{it.iteration}</td><td className="px-4 py-3 text-[var(--ui-text-secondary)]">{it.created_at ? new Date(it.created_at).toLocaleString('zh-CN') : '未签入'}</td><td className="px-4 py-3">{it.check_in_note || '—'}</td><td className="px-4 py-3 text-[var(--ui-text-secondary)]">{it.creator_name || '—'}</td><td className="px-4 py-3"><div className="flex items-center gap-2">{it.iteration === revision?.latest_iteration ? (<span className="text-primary-600 text-xs">当前</span>) : (<Button variant="link" size="xs" onClick={() => handleViewIteration(it)}>查看数据</Button>)}{it.iteration > 1 && isAdminUser && (<Button variant="danger" size="xs" onClick={() => handleDeleteIteration(it)}>删除</Button>)}</div></td></tr>
                   ))}
                 </tbody></table>
@@ -549,16 +568,17 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
       />
 
       {/* 版本选择器 */}
-      {versionSelectIdx !== null && parts[versionSelectIdx] && (
+      {versionSelectPartId !== null && (
         <VersionSelectModal
-          open={versionSelectIdx !== null}
+          open={versionSelectPartId !== null}
           entityType="part"
-          entityId={parts[versionSelectIdx].part_id}
-          entityName={parts[versionSelectIdx].part_detail?.name || ''}
-          currentVersionId={parts[versionSelectIdx].part_detail?.revision_id || parts[versionSelectIdx].part_id}
+          entityId={versionSelectPartId}
+          entityName={versionSelectPart?.part_detail?.name || ''}
+          currentVersionId={versionSelectPart?.part_detail?.revision_id || versionSelectPart?.part_id}
           onSelect={async (versionId: string) => {
-            const target = parts[versionSelectIdx];
-            setVersionSelectIdx(null);
+            const target = versionSelectPart;
+            setVersionSelectPartId(null);
+            if (!target) return;
             try {
               await configurationApi.updatePart(internalRevId, target.id, { revision_id: versionId });
               toast.success('已更新绑定版本');
@@ -567,7 +587,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
               toast.error(e?.response?.data?.detail || '更新版本失败');
             }
           }}
-          onClose={() => setVersionSelectIdx(null)}
+          onClose={() => setVersionSelectPartId(null)}
         />
       )}
 

@@ -11,6 +11,8 @@ import { CcPicker } from '../CcPicker';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
+import SortableTh from '../ui/SortableTh';
+import { useServerSort } from '../../hooks/useServerSort';
 
 const PAGE_SIZE = 20;
 
@@ -48,10 +50,16 @@ export function ECOList() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
+  const sort = useServerSort('created_at', 'desc');
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, unknown> = { page, page_size: PAGE_SIZE };
+      const params: Record<string, unknown> = {
+        page, page_size: PAGE_SIZE,
+        sort_field: sort.sortField ?? 'created_at',
+        sort_order: sort.sortOrder,
+      };
       if (search) params.search = search;
       if (statusFilter) params.status = statusFilter;
       if (priorityFilter) params.priority = priorityFilter;
@@ -61,9 +69,12 @@ export function ECOList() {
       setTotal(data.total || 0);
     } catch { toast.error('加载失败'); }
     finally { setLoading(false); }
-  }, [page, search, statusFilter, priorityFilter]);
+  }, [page, search, statusFilter, priorityFilter, sort.sortField, sort.sortOrder]);
 
   useEffect(() => { load(); }, [load]);
+
+  // 排序变化时重置到第 1 页
+  useEffect(() => { setPage(1); }, [sort.sortField, sort.sortOrder]);
 
   const handleSubmit = async (id: string) => {
     setActionLoading(id);
@@ -165,13 +176,13 @@ export function ECOList() {
         <table className="w-full">
           <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">ECO 编号</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">标题</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">状态</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">优先级</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">创建人</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">创建时间</th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">操作</th>
+              <SortableTh sortKey="eco_number" active={sort.isActive('eco_number')} direction={sort.direction} onSort={sort.handleSort}>ECO 编号</SortableTh>
+              <SortableTh sortKey="title" active={sort.isActive('title')} direction={sort.direction} onSort={sort.handleSort}>标题</SortableTh>
+              <SortableTh sortKey="status" active={sort.isActive('status')} direction={sort.direction} onSort={sort.handleSort}>状态</SortableTh>
+              <SortableTh sortKey="priority" active={sort.isActive('priority')} direction={sort.direction} onSort={sort.handleSort}>优先级</SortableTh>
+              <SortableTh sortKey="creator_name" active={sort.isActive('creator_name')} direction={sort.direction} onSort={sort.handleSort}>创建人</SortableTh>
+              <SortableTh sortKey="created_at" active={sort.isActive('created_at')} direction={sort.direction} onSort={sort.handleSort}>创建时间</SortableTh>
+              <SortableTh align="right">操作</SortableTh>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">

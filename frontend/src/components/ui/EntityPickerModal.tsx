@@ -2,12 +2,20 @@ import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, MODAL_Z } from '../Modal';
 import Button from './Button';
 import Input from './Input';
+import SortableTh from './SortableTh';
+import { useTableSort } from '../../hooks/useTableSort';
 
 export interface EntityPickerColumn<T> {
   key: string;
   title: string;
   width?: string;
   render: (item: T) => ReactNode;
+  /** 是否可点击表头排序；缺省 false */
+  sortable?: boolean;
+  /** 排序取值函数；缺省取 item[key]（key 与字段名不一致或需转换时提供） */
+  sortValue?: (item: T) => string | number | null | undefined;
+  /** 排序比较器（如版本号 A→B→ZZ 序列）；缺省数值/zh-CN 字符串比较 */
+  comparator?: (aVal: unknown, bVal: unknown) => number;
 }
 
 interface EntityPickerModalProps<T> {
@@ -148,6 +156,43 @@ export default function EntityPickerModal<T>({
     ] as EntityPickerColumn<T>[];
   }, [columns, renderTypeBadge]);
 
+  // 候选表排序（动态列：取值优先走列的 sortValue，缺省取 item[key]；比较器优先走列的 comparator）
+  const { sortedData: sortedItems, sortField, sortDirection, handleSort } = useTableSort<any>(
+    items as any[],
+    {
+      getValue: (item: any, field: string | number | symbol) => {
+        const col = displayColumns.find((c) => c.key === String(field));
+        if (col?.sortValue) return col.sortValue(item);
+        return item?.[String(field)];
+      },
+      fieldComparators: Object.fromEntries(
+        displayColumns.filter((c) => c.comparator).map((c) => [c.key, c.comparator])
+      ) as Record<string, (a: unknown, b: unknown) => number>,
+    }
+  );
+
+  // 已选面板排序（与候选表共用列定义与排序状态；数据源为已选集合）
+  const sortedSelected = useMemo(() => {
+    if (!sortField || !sortDirection) return effectiveSelected;
+    const col = columns.find((c) => c.key === String(sortField));
+    return [...effectiveSelected].sort((a, b) => {
+      const av = col?.sortValue ? col.sortValue(a) : (a as any)?.[String(sortField)];
+      const bv = col?.sortValue ? col.sortValue(b) : (b as any)?.[String(sortField)];
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      let cmp: number;
+      if (col?.comparator) {
+        cmp = col.comparator(av, bv);
+      } else if (typeof av === 'number' && typeof bv === 'number') {
+        cmp = av - bv;
+      } else {
+        cmp = String(av).localeCompare(String(bv), 'zh-CN');
+      }
+      return sortDirection === 'desc' ? -cmp : cmp;
+    });
+  }, [effectiveSelected, sortField, sortDirection, columns]);
+
   const footerLeft = (
     <span className="text-[var(--ui-text-secondary)] text-sm">
       已选 <b className="text-[var(--ui-text-primary)]">{effectiveSelected.length}</b> 项
@@ -193,18 +238,26 @@ export default function EntityPickerModal<T>({
               <thead>
                 <tr className="bg-[var(--ui-bg-subtle)] text-[var(--ui-text-secondary)]">
                   {columns.map((c) => (
-                    <th key={c.key} className="text-left font-medium px-3 py-1.5 whitespace-nowrap" style={c.width ? { width: c.width } : undefined}>
+                    <SortableTh
+                      key={c.key}
+                      sortKey={c.sortable ? c.key : undefined}
+                      active={sortField === c.key}
+                      direction={sortDirection}
+                      onSort={(k) => handleSort(k as any)}
+                      className="text-left font-medium px-3 py-1.5"
+                      style={c.width ? { width: c.width } : undefined}
+                    >
                       {c.title}
-                    </th>
+                    </SortableTh>
                   ))}
                   {selectedExtraTitle && (
-                    <th className="text-left font-medium px-3 py-1.5 whitespace-nowrap">{selectedExtraTitle}</th>
+                    <SortableTh className="text-left font-medium px-3 py-1.5">{selectedExtraTitle}</SortableTh>
                   )}
-                  <th className="w-10" />
+                  <SortableTh className="w-10" />
                 </tr>
               </thead>
               <tbody>
-                {effectiveSelected.map((item) => (
+                {sortedSelected.map((item) => (
                   <tr key={getKey(item)} className="border-t border-[var(--ui-border)]">
                     {columns.map((c) => (
                       <td key={c.key} className="px-3 py-1.5">{c.render(item)}</td>
@@ -278,11 +331,19 @@ export default function EntityPickerModal<T>({
             <thead className="sticky top-0 z-10">
               <tr className="bg-[var(--ui-bg-subtle)] text-[var(--ui-text-secondary)]">
                 {displayColumns.map((c) => (
-                  <th key={c.key} className="text-left font-medium px-3 py-2 whitespace-nowrap" style={c.width ? { width: c.width } : undefined}>
+                  <SortableTh
+                    key={c.key}
+                    sortKey={c.sortable ? c.key : undefined}
+                    active={sortField === c.key}
+                    direction={sortDirection}
+                    onSort={(k) => handleSort(k as any)}
+                    className="text-left font-medium px-3 py-2"
+                    style={c.width ? { width: c.width } : undefined}
+                  >
                     {c.title}
-                  </th>
+                  </SortableTh>
                 ))}
-                <th className="w-20 text-left font-medium px-3 py-2">操作</th>
+                <SortableTh className="w-20 text-left font-medium px-3 py-2">操作</SortableTh>
               </tr>
             </thead>
             <tbody>
@@ -299,7 +360,7 @@ export default function EntityPickerModal<T>({
                   </td>
                 </tr>
               ) : (
-                items.map((item) => {
+                sortedItems.map((item) => {
                   const added = selectedSet.has(getKey(item));
                   return (
                     <tr key={getKey(item)} className="border-t border-[var(--ui-border)]">

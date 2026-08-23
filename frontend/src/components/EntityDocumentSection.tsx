@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { entityDocumentsApi, customFieldsApi, documentsApi, mediaApi, v2UploadApi, CHUNK_THRESHOLD, CHUNK_SIZE } from '../services/api';
 import { previewAttachment } from '../utils/attachmentPreview';
 import type { EntityDocument, CustomFieldDefinition, CustomFieldValue, Document, DocumentAttachment } from '../types';
@@ -15,7 +15,10 @@ import Badge from './ui/Badge';
 import Button from './ui/Button';
 import Input from './ui/Input';
 import Select from './ui/Select';
+import SortableTh from './ui/SortableTh';
 import Textarea from './ui/Textarea';
+import { useTableSort } from '../hooks/useTableSort';
+import { compareVersions } from '../constants';
 
 /* ----------------------------------------------------------------
    Types
@@ -292,6 +295,18 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
 
   const existingDocIds = new Set(docs.map((d) => d.document_id));
 
+  // 关联图文档表排序（值在 ed.document 子对象，包装扁平排序键）
+  const sortableDocs = useMemo(() => docs.map((ed: any) => ({
+    ...ed,
+    _code: ed.document?.code ?? '',
+    _name: ed.document?.name ?? '',
+    _version: ed.document?.version ?? '',
+    _status: ed.document?.status ?? '',
+  })), [docs]);
+  const { sortedData: sortedDocs, sortField, sortDirection, handleSort } = useTableSort<any>(sortableDocs, { fieldComparators: { _version: (a, b) => compareVersions(String(a), String(b)) } });
+  // 编辑弹窗附件子表排序
+  const { sortedData: sortedEditAttachments, sortField: attSortField, sortDirection: attSortDirection, handleSort: handleAttSort } = useTableSort<any>(editAttachments);
+
   /* 固定列 + 动态自定义字段列 */
   const hasEditableAction = editable && canEdit();
 
@@ -316,22 +331,22 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
             <table className="w-full text-sm">
               <thead className="bg-[var(--ui-bg-subtle)] border-b">
                 <tr>
-                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">图文档编号</th>
-                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">图文档名称</th>
-                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">版本</th>
-                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">状态</th>
+                  <SortableTh sortKey="_code" active={sortField === '_code'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">图文档编号</SortableTh>
+                  <SortableTh sortKey="_name" active={sortField === '_name'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">图文档名称</SortableTh>
+                  <SortableTh sortKey="_version" active={sortField === '_version'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left w-16">版本</SortableTh>
+                  <SortableTh sortKey="_status" active={sortField === '_status'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left w-16">状态</SortableTh>
                   {/* 动态自定义字段列 */}
                   {docFieldDefs.map((def) => (
                     <th key={def.id} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium whitespace-nowrap">
                       {def.name}
                     </th>
                   ))}
-                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">附件</th>
-                  <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-20">操作</th>
+                  <SortableTh className="text-left">附件</SortableTh>
+                  <SortableTh className="text-center w-20">操作</SortableTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {docs.map((ed) => {
+                {sortedDocs.map((ed: any) => {
                   const vals = docFieldValues[ed.document_id] || {};
                   const isAccessible = (ed.document as any).accessible !== false;
                   return (
@@ -520,13 +535,13 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
                   <table className="w-full text-sm">
                     <thead className="bg-[var(--ui-bg-subtle)] border-b">
                       <tr>
-                        <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">文件名</th>
-                        <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-24">大小</th>
-                        <th className="px-3 py-2 text-right text-[var(--ui-text-secondary)] font-medium w-24">操作</th>
+                        <SortableTh sortKey="file_name" active={attSortField === 'file_name'} direction={attSortDirection} onSort={(k) => handleAttSort(k)} className="text-left">文件名</SortableTh>
+                        <SortableTh sortKey="file_size" active={attSortField === 'file_size'} direction={attSortDirection} onSort={(k) => handleAttSort(k)} className="text-left w-24">大小</SortableTh>
+                        <SortableTh align="right" className="w-24">操作</SortableTh>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {editAttachments.map(att => (
+                      {sortedEditAttachments.map(att => (
                         <tr key={att.id} className="hover:bg-[var(--ui-bg-hover)]">
                           <td className="px-3 py-2"><span className="text-primary-600">{att.file_name}</span></td>
                           <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{att.file_size != null ? (att.file_size < 1024 ? att.file_size + ' B' : att.file_size < 1048576 ? (att.file_size / 1024).toFixed(1) + ' KB' : (att.file_size / 1048576).toFixed(1) + ' MB') : '-'}</td>

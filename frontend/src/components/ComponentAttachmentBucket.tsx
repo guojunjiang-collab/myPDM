@@ -4,8 +4,10 @@ import type { ComponentAttachment } from '../services/api';
 import { previewAttachment } from '../utils/attachmentPreview';
 import ArchiveTreeModal from './ArchiveTreeModal';
 import Button from './ui/Button';
+import SortableTh from './ui/SortableTh';
 import { ConfirmModal } from './Modal';
 import { toast } from './Toast';
+import { useTableSort } from '../hooks/useTableSort';
 
 interface Props {
   componentId: string;
@@ -27,6 +29,8 @@ export default function ComponentAttachmentBucket({ componentId, category, label
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { sortedData: sortedItems, sortField, sortDirection, handleSort } = useTableSort<ComponentAttachment>(items);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -128,13 +132,13 @@ export default function ComponentAttachmentBucket({ componentId, category, label
           <table className="w-full text-sm">
             <thead className="bg-[var(--ui-bg-subtle)] border-b">
               <tr>
-                <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">文件名</th>
-                <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-24">大小</th>
-                <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-32">操作</th>
+                <SortableTh sortKey="file_name" active={sortField === 'file_name'} direction={sortDirection} onSort={(k) => handleSort(k as keyof ComponentAttachment)} className="text-left">文件名</SortableTh>
+                <SortableTh sortKey="file_size" active={sortField === 'file_size'} direction={sortDirection} onSort={(k) => handleSort(k as keyof ComponentAttachment)} className="text-left w-24">大小</SortableTh>
+                <SortableTh className="text-center w-32">操作</SortableTh>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {items.map((att) => (
+              {sortedItems.map((att) => (
                 <tr key={att.id} className="hover:bg-[var(--ui-bg-hover)]">
                   <td className="px-3 py-2"><span className="text-primary-600">{att.file_name}</span></td>
                   <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{fmtSize(att.file_size)}</td>

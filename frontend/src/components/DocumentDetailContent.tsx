@@ -5,6 +5,8 @@ import { previewAttachment } from '../utils/attachmentPreview';
 import { toast } from './Toast';
 import { formatDateTime } from '../utils/date';
 import Badge from './ui/Badge';
+import SortableTh from './ui/SortableTh';
+import { useTableSort } from '../hooks/useTableSort';
 
 interface DocumentDetailContentProps {
   doc: Document;
@@ -43,6 +45,8 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
   useEffect(() => {
     loadAttachments();
   }, [doc.id]);
+
+  const { sortedData: sortedAttachments, sortField, sortDirection, handleSort } = useTableSort<DocumentAttachment>(attachments);
 
   // 下载附件（直接流式下载，不阻塞界面）
   const handleDownload = async (attId: string, fileName: string) => {
@@ -122,14 +126,14 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
             <table className="w-full text-sm">
               <thead className="bg-[var(--ui-bg-subtle)] border-b">
                 <tr>
-                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">文件名</th>
-                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-24">大小</th>
-                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-40">上传时间</th>
-                  <th className="px-3 py-2 text-right text-[var(--ui-text-secondary)] font-medium w-32">操作</th>
+                  <SortableTh sortKey="file_name" active={sortField === 'file_name'} direction={sortDirection} onSort={(k) => handleSort(k as keyof DocumentAttachment)} className="text-left">文件名</SortableTh>
+                  <SortableTh sortKey="file_size" active={sortField === 'file_size'} direction={sortDirection} onSort={(k) => handleSort(k as keyof DocumentAttachment)} className="text-left w-24">大小</SortableTh>
+                  <SortableTh sortKey="created_at" active={sortField === 'created_at'} direction={sortDirection} onSort={(k) => handleSort(k as keyof DocumentAttachment)} className="text-left w-40">上传时间</SortableTh>
+                  <SortableTh align="right" className="w-32">操作</SortableTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {attachments.map(att => (
+                {sortedAttachments.map(att => (
                   <tr key={att.id} className="hover:bg-[var(--ui-bg-hover)]">
                     <td className="px-3 py-2">
                       <span className="text-primary-600">{att.file_name}</span>

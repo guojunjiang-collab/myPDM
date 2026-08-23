@@ -3,6 +3,9 @@ import { documentsApi } from '../../services/api';
 import { getStatusLabel } from '../../pages/BOM/helpers';
 import { formatDateTime } from '../../utils/date';
 import Badge from '../ui/Badge';
+import SortableTh from '../ui/SortableTh';
+import { useTableSort } from '../../hooks/useTableSort';
+import { compareVersions } from '../../constants';
 
 interface Props {
   revisionId: string;
@@ -52,6 +55,13 @@ export default function DocWhereUsedTab(props: Props) {
   const ecr = useLazy(() => documentsApi.whereUsedEcrs(revisionId), revisionId);
   const th = "px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium";
   const tbl = "w-full text-sm border rounded";
+
+  // 五个反查表客户端排序
+  const cfgSort = useTableSort<any>(cfg.data, { fieldComparators: { version: (a, b) => compareVersions(String(a), String(b)) } });
+  const prtSort = useTableSort<any>(prt.data, { fieldComparators: { version: (a, b) => compareVersions(String(a), String(b)) } });
+  const tskSort = useTableSort<any>(tsk.data);
+  const ecoSort = useTableSort<any>(eco.data);
+  const ecrSort = useTableSort<any>(ecr.data);
 
   return (
     <div className="space-y-2">

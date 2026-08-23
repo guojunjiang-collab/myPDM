@@ -8,6 +8,7 @@ import Button from './ui/Button';
 import Input from './ui/Input';
 import Select from './ui/Select';
 import TreeToggle from './ui/TreeToggle';
+import { compareVersions } from '../constants';
 import type { Document, CustomFieldDefinition, CustomFieldValue } from '../types';
 
 /* ----------------------------------------------------------------
@@ -154,13 +155,18 @@ export default function DocumentPicker({
   }, [documentsList, existingDocIds, fieldValues]);
 
   const columns = useMemo(() => ([
-    { key: 'code', title: '图文档编号', width: '160px', render: (d: CandidateItem) => <span className="font-medium">{d.code}</span> },
-    { key: 'name', title: '图文档名称', render: (d: CandidateItem) => d.name },
-    { key: 'version', title: '版本', width: '70px', render: (d: CandidateItem) => <span className="text-[var(--ui-text-secondary)]">{d.version}</span> },
-    { key: 'status', title: '状态', width: '80px', render: (d: CandidateItem) => <Badge status={d.status} /> },
+    { key: 'code', title: '图文档编号', width: '160px', sortable: true, render: (d: CandidateItem) => <span className="font-medium">{d.code}</span> },
+    { key: 'name', title: '图文档名称', sortable: true, render: (d: CandidateItem) => d.name },
+    { key: 'version', title: '版本', width: '70px', sortable: true, comparator: (a: unknown, b: unknown) => compareVersions(String(a), String(b)), render: (d: CandidateItem) => <span className="text-[var(--ui-text-secondary)]">{d.version}</span> },
+    { key: 'status', title: '状态', width: '80px', sortable: true, render: (d: CandidateItem) => <Badge status={d.status} /> },
     ...fieldDefs.map((def) => ({
       key: def.id,
       title: def.name,
+      sortable: true,
+      sortValue: (d: CandidateItem) => {
+        const v = (d.customFieldValues || {})[def.id];
+        return Array.isArray(v) ? String(v.join(',')) : (v === undefined || v === null ? '' : String(v));
+      },
       render: (d: CandidateItem) => <span className="text-[var(--ui-text-secondary)] whitespace-nowrap">{renderFieldValue((d.customFieldValues || {})[def.id])}</span>,
     })),
   ]), [fieldDefs]);

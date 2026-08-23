@@ -17,7 +17,10 @@ import DocumentDetailModal from '../DocumentDetailModal';
 import EntityEditModal from '../EntityEditModal';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
+import SortableTh from '../ui/SortableTh';
 import TreeToggle from '../ui/TreeToggle';
+import { useTableSort } from '../../hooks/useTableSort';
+import { compareVersions } from '../../constants';
 
 interface Props { ecoId: string; onClose: () => void; onRefresh: () => void; executionMode?: boolean; }
 
@@ -51,6 +54,10 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
   const [showReleasePicker, setShowReleasePicker] = useState(false);
   const [documentLinks, setDocumentLinks] = useState<ECRDocumentLink[]>([]);
   const [releaseItems, setReleaseItems] = useState<any[]>([]);
+
+  // 关联图文档表排序
+  const { sortedData: sortedDocuments, sortField: docSortField, sortDirection: docSortDirection, handleSort: handleDocSort } = useTableSort<any>(documents, { fieldComparators: { version: (a, b) => compareVersions(String(a), String(b)) } });
+
   const [versionSelectState, setVersionSelectState] = useState<{ docId: string; oldDocId: string } | null>(null);
   const [editEntity, setEditEntity] = useState<{ type: string; id: string } | null>(null);
   const [showPublishAll, setShowPublishAll] = useState(false);
@@ -250,16 +257,16 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-[var(--ui-bg-subtle)] border-b"><tr>
-                      <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">图文档编号</th>
-                      <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">图文档名称</th>
-                      <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">版本</th>
-                      <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">状态</th>
+                      <SortableTh sortKey="code" active={docSortField === 'code'} direction={docSortDirection} onSort={(k) => handleDocSort(k)} className="text-left">图文档编号</SortableTh>
+                      <SortableTh sortKey="name" active={docSortField === 'name'} direction={docSortDirection} onSort={(k) => handleDocSort(k)} className="text-left">图文档名称</SortableTh>
+                      <SortableTh sortKey="version" active={docSortField === 'version'} direction={docSortDirection} onSort={(k) => handleDocSort(k)} className="text-left w-16">版本</SortableTh>
+                      <SortableTh sortKey="status" active={docSortField === 'status'} direction={docSortDirection} onSort={(k) => handleDocSort(k)} className="text-left w-16">状态</SortableTh>
                       {docFieldDefs.map((def) => <th key={def.id} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium whitespace-nowrap">{def.name}</th>)}
-                      <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">附件</th>
-                      <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium whitespace-nowrap w-24">操作</th>
+                      <SortableTh className="text-left">附件</SortableTh>
+                      <SortableTh className="text-center whitespace-nowrap w-24">操作</SortableTh>
                     </tr></thead>
                     <tbody className="divide-y divide-gray-100">
-                      {documents.map((doc) => {
+                      {sortedDocuments.map((doc) => {
                         const atts = docAttachments[doc.id] || [];
                         return (
                           <tr key={doc.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => setViewDocRevisionId(doc._revision_id || doc.id)}>

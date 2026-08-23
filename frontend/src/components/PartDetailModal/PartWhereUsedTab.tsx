@@ -4,6 +4,9 @@ import BomWhereUsedTree from '../../pages/BOM/BomWhereUsedTree';
 import { getStatusLabel } from '../../pages/BOM/helpers';
 import { formatDateTime } from '../../utils/date';
 import Badge from '../ui/Badge';
+import SortableTh from '../ui/SortableTh';
+import { useTableSort } from '../../hooks/useTableSort';
+import { compareVersions } from '../../constants';
 
 interface Props {
   revisionId: string;
@@ -49,6 +52,11 @@ export default function PartWhereUsedTab(props: Props) {
   const tsk = useLazy(() => partsApi.whereUsedTasks(revisionId), revisionId);
   const prof = useLazy(() => partsApi.whereUsedProfiles(revisionId), revisionId);
 
+  // 三个反查表客户端排序
+  const cfgSort = useTableSort<any>(cfg.data);
+  const tskSort = useTableSort<any>(tsk.data);
+  const profSort = useTableSort<any>(prof.data);
+
   return (
     <div className="space-y-2 overflow-y-auto max-h-full">
       {/* 1) 父项零部件 */}
@@ -69,15 +77,15 @@ export default function PartWhereUsedTab(props: Props) {
           : (
           <table className="w-full text-sm border rounded">
             <thead className="bg-[var(--ui-bg-subtle)] border-b"><tr>
-              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">构型项件号</th>
-              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">名称</th>
-              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">版本</th>
-              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20">状态</th>
-              <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-24 whitespace-nowrap">可选/必选</th>
-              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">用量</th>
+              <SortableTh sortKey="code" active={cfgSort.sortField === 'code'} direction={cfgSort.sortDirection} onSort={(k) => cfgSort.handleSort(k)} className="text-left">构型项件号</SortableTh>
+              <SortableTh sortKey="name" active={cfgSort.sortField === 'name'} direction={cfgSort.sortDirection} onSort={(k) => cfgSort.handleSort(k)} className="text-left">名称</SortableTh>
+              <SortableTh sortKey="version" active={cfgSort.sortField === 'version'} direction={cfgSort.sortDirection} onSort={(k) => cfgSort.handleSort(k)} className="text-left w-16">版本</SortableTh>
+              <SortableTh sortKey="status" active={cfgSort.sortField === 'status'} direction={cfgSort.sortDirection} onSort={(k) => cfgSort.handleSort(k)} className="text-left w-20">状态</SortableTh>
+              <SortableTh sortKey="is_required" active={cfgSort.sortField === 'is_required'} direction={cfgSort.sortDirection} onSort={(k) => cfgSort.handleSort(k)} className="text-center w-24 whitespace-nowrap">可选/必选</SortableTh>
+              <SortableTh sortKey="quantity" active={cfgSort.sortField === 'quantity'} direction={cfgSort.sortDirection} onSort={(k) => cfgSort.handleSort(k)} className="text-left w-16">用量</SortableTh>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {cfg.data.map((r: any) => (
+              {cfgSort.sortedData.map((r: any) => (
                 <tr key={r.config_item_revision_id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer"
                     onClick={() => props.onOpenConfig(r.config_item_revision_id)}>
                   <td className="px-3 py-2 font-medium">{r.code}</td>
@@ -103,16 +111,16 @@ export default function PartWhereUsedTab(props: Props) {
           : (
           <table className="w-full text-sm border rounded">
             <thead className="bg-[var(--ui-bg-subtle)] border-b"><tr>
-              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-32">项目</th>
-              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-28">任务编号</th>
-              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">任务</th>
-              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20">负责人</th>
-              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-28">计划开始</th>
-              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-28">计划完成</th>
-              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20">状态</th>
+              <SortableTh sortKey="project_name" active={tskSort.sortField === 'project_name'} direction={tskSort.sortDirection} onSort={(k) => tskSort.handleSort(k)} className="text-left w-32">项目</SortableTh>
+              <SortableTh className="text-left w-28">任务编号</SortableTh>
+              <SortableTh className="text-left">任务</SortableTh>
+              <SortableTh className="text-left w-20">负责人</SortableTh>
+              <SortableTh className="text-left w-28">计划开始</SortableTh>
+              <SortableTh className="text-left w-28">计划完成</SortableTh>
+              <SortableTh className="text-left w-20">状态</SortableTh>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {tsk.data.map((r: any) => (
+              {tskSort.sortedData.map((r: any) => (
                 <tr key={r.task.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer"
                     onClick={() => props.onOpenTask(r.project_id, r.task)}>
                   <td className="px-3 py-2">{r.project_name}</td>
@@ -137,13 +145,13 @@ export default function PartWhereUsedTab(props: Props) {
           : (
           <table className="w-full text-sm border rounded">
             <thead className="bg-[var(--ui-bg-subtle)] border-b"><tr>
-              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">配置编号</th>
-              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">名称</th>
-              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20">状态</th>
-              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">用量</th>
+              <SortableTh sortKey="code" active={profSort.sortField === 'code'} direction={profSort.sortDirection} onSort={(k) => profSort.handleSort(k)} className="text-left">配置编号</SortableTh>
+              <SortableTh sortKey="name" active={profSort.sortField === 'name'} direction={profSort.sortDirection} onSort={(k) => profSort.handleSort(k)} className="text-left">名称</SortableTh>
+              <SortableTh sortKey="status" active={profSort.sortField === 'status'} direction={profSort.sortDirection} onSort={(k) => profSort.handleSort(k)} className="text-left w-20">状态</SortableTh>
+              <SortableTh sortKey="quantity" active={profSort.sortField === 'quantity'} direction={profSort.sortDirection} onSort={(k) => profSort.handleSort(k)} className="text-left w-16">用量</SortableTh>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {prof.data.map((r: any) => (
+              {profSort.sortedData.map((r: any) => (
                 <tr key={r.profile_id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer"
                     onClick={() => props.onOpenProfile(r.profile_id)}>
                   <td className="px-3 py-2 font-medium">{r.code}</td>

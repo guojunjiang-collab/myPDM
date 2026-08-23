@@ -136,18 +136,24 @@ async def list_ecrs(
     search: str = Query(None),
     status: str = Query(None),
     priority: str = Query(None),
+    sort_field: str = Query('created_at'),
+    sort_order: str = Query('desc'),
     updated_since: float = Query(None, description="仅返回指定 UNIX 时间戳之后更新的记录（含已删除）"),
     brief: bool = Query(False, description="仅返回简要字段：ecr_number, title, status, priority, creator_name, updated_at, deleted_at"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("ecr:read"))
 ):
-  """获取 ECR 列表（分页 + 筛选）。非管理员用户看不到他人创建的草稿 ECR"""
+  """获取 ECR 列表（分页 + 筛选 + 排序）。非管理员用户看不到他人创建的草稿 ECR"""
   params = schemas_ecr.ECRListParams(
       page=page, page_size=page_size,
-      search=search, status=status, priority=priority
+      search=search, status=status, priority=priority,
+      sort_field=sort_field, sort_order=sort_order
   )
   include_deleted = bool(updated_since)
-  items, total = crud_ecr.get_ecrs(db, params, current_user, include_deleted=include_deleted, updated_since=updated_since)
+  try:
+      items, total = crud_ecr.get_ecrs(db, params, current_user, include_deleted=include_deleted, updated_since=updated_since)
+  except ValueError as e:
+      raise HTTPException(400, str(e))
 
   if brief:
       brief_items = [

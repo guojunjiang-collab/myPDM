@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Modal, MODAL_Z } from '../Modal';
 import { toast } from '../Toast';
 import { ecoApi, usersApi, documentsApi, ecrApi, partsApi, customFieldsApi } from '../../services/api';
@@ -12,8 +12,11 @@ import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
+import SortableTh from '../ui/SortableTh';
 import Textarea from '../ui/Textarea';
 import TreeToggle from '../ui/TreeToggle';
+import { useTableSort } from '../../hooks/useTableSort';
+import { compareVersions } from '../../constants';
 import { ECOEditView } from './ECOEditView';
 import { ECRDocumentPicker } from '../ECR/ECRDocumentPicker';
 import AssemblyPartPicker from '../AssemblyPartPicker';
@@ -95,6 +98,19 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
   const [docData, setDocData] = useState<Record<string, any>>({});
   const [docAttachments, setDocAttachments] = useState<Record<string, any[]>>({});
   const [docCustomValues, setDocCustomValues] = useState<Record<string, Record<string, any>>>({});
+
+  // 关联图文档表排序（值混合 link 顶层与 docData，包装扁平排序键）
+  const sortableDocLinks = useMemo(() => documentLinks.map((link: any) => {
+    const doc = docData[link.document_id];
+    return {
+      ...link,
+      _code: doc?.code || link.document_code || '',
+      _name: doc?.name || link.document_name || '',
+      _version: doc?.version || link.document_version || '',
+      _status: doc?.status || '',
+    };
+  }), [documentLinks, docData]);
+  const { sortedData: sortedDocLinks, sortField: docSortField, sortDirection: docSortDirection, handleSort: handleDocSort } = useTableSort<any>(sortableDocLinks, { fieldComparators: { _version: (a, b) => compareVersions(String(a), String(b)) } });
   const [versionSelectState, setVersionSelectState] = useState<{ docId: string; oldDocId: string } | null>(null);
   const [releaseVersionState, setReleaseVersionState] = useState<{ itemIdx: number; entityType: string; entityId: string; entityName: string } | null>(null);
   const [viewPartMasterId, setViewPartMasterId] = useState<string | null>(null);
@@ -520,19 +536,19 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
               <table className="w-full text-sm">
                 <thead className="bg-[var(--ui-bg-subtle)] border-b">
                   <tr>
-                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">图文档编号</th>
-                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">图文档名称</th>
-                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">版本</th>
-                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">状态</th>
+                    <SortableTh sortKey="_code" active={docSortField === '_code'} direction={docSortDirection} onSort={(k) => handleDocSort(k)} className="text-left">图文档编号</SortableTh>
+                    <SortableTh sortKey="_name" active={docSortField === '_name'} direction={docSortDirection} onSort={(k) => handleDocSort(k)} className="text-left">图文档名称</SortableTh>
+                    <SortableTh sortKey="_version" active={docSortField === '_version'} direction={docSortDirection} onSort={(k) => handleDocSort(k)} className="text-left w-16">版本</SortableTh>
+                    <SortableTh sortKey="_status" active={docSortField === '_status'} direction={docSortDirection} onSort={(k) => handleDocSort(k)} className="text-left w-16">状态</SortableTh>
                     {docFieldDefs.map((def) => (
                       <th key={def.id} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium whitespace-nowrap">{def.name}</th>
                     ))}
-                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">附件</th>
-                    <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium whitespace-nowrap w-28">操作</th>
+                    <SortableTh className="text-left">附件</SortableTh>
+                    <SortableTh className="text-center whitespace-nowrap w-28">操作</SortableTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {documentLinks.map((link) => {
+                  {sortedDocLinks.map((link) => {
                     const doc = docData[link.document_id];
                     const atts = docAttachments[link.document_id] || [];
                     return (
@@ -757,6 +773,7 @@ function EcrPicker({ onSelect }: { onSelect: (id: string, number: string) => voi
     const map: Record<string, string> = { draft: '草稿', reviewing: '审核中', approved: '已批准', rejected: '已驳回', executing: '执行中', completed: '已完成', closed: '已关闭' };
     return map[s] || s;
   };
+  const { sortedData: sortedResults, sortField, sortDirection, handleSort } = useTableSort<any>(results);
   return (
     <div>
       <div className="flex gap-2 mb-3">
@@ -768,12 +785,12 @@ function EcrPicker({ onSelect }: { onSelect: (id: string, number: string) => voi
       {searching ? <p className="text-xs text-[var(--ui-text-tertiary)] text-center py-4">加载中...</p> : (
         <table className="w-full text-sm border-collapse">
           <thead><tr className="bg-[var(--ui-bg-subtle)] border-b">
-            <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium text-xs">ECR 编号</th>
-            <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium text-xs">标题</th>
-            <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium text-xs w-20">状态</th>
+            <SortableTh sortKey="ecr_number" active={sortField === 'ecr_number'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left font-medium text-xs">ECR 编号</SortableTh>
+            <SortableTh sortKey="title" active={sortField === 'title'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left font-medium text-xs">标题</SortableTh>
+            <SortableTh sortKey="status" active={sortField === 'status'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left font-medium text-xs w-20">状态</SortableTh>
           </tr></thead>
           <tbody className="divide-y">
-            {results.map(e => (
+            {sortedResults.map(e => (
               <tr key={e.id || e.ecr_number} className="hover:bg-blue-50 cursor-pointer" onClick={() => onSelect(e.id || e.ecr_number, e.ecr_number)}>
                 <td className="px-3 py-2 font-mono text-xs text-blue-600">{e.ecr_number || '-'}</td>
                 <td className="px-3 py-2 text-xs truncate max-w-0">{e.title || '无标题'}</td>

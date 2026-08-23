@@ -11,9 +11,11 @@ import Alert from '../ui/Alert';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
+import SortableTh from '../ui/SortableTh';
 import MaterialDetail from './MaterialDetail';
 import PartDetailModal from '../PartDetailModal';
 import type { InvMaterial } from '../../types';
+import { useTableSort } from '../../hooks/useTableSort';
 
 // ECR 式卡片字段样式
 const cardCls = 'bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]';
@@ -148,6 +150,9 @@ export default function MaterialTab() {
       (m.spec || '').toLowerCase().includes(kw));
   }, [materials, search]);
 
+  // 客户端排序
+  const { sortedData: sortedMaterials, sortField, sortDirection, handleSort } = useTableSort<any>(filteredMaterials);
+
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       {/* 工具栏 */}
@@ -169,14 +174,14 @@ export default function MaterialTab() {
         <table className="w-full">
           <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
             <tr>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">编码</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">名称</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">规格型号</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">单位</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">来源</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">追踪</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">安全库存</th>
-              <th className="text-right px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">操作</th>
+              <SortableTh sortKey="code" active={sortField === 'code'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">编码</SortableTh>
+              <SortableTh sortKey="name" active={sortField === 'name'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">名称</SortableTh>
+              <SortableTh sortKey="spec" active={sortField === 'spec'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">规格型号</SortableTh>
+              <SortableTh sortKey="unit" active={sortField === 'unit'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">单位</SortableTh>
+              <SortableTh sortKey="source_type" active={sortField === 'source_type'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">来源</SortableTh>
+              <SortableTh sortKey="track_mode" active={sortField === 'track_mode'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">追踪</SortableTh>
+              <SortableTh sortKey="safety_stock" active={sortField === 'safety_stock'} direction={sortDirection} onSort={(k) => handleSort(k)} className="text-left">安全库存</SortableTh>
+              <SortableTh align="right">操作</SortableTh>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -184,9 +189,9 @@ export default function MaterialTab() {
               <tr><td colSpan={8} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td></tr>
             ) : materials.length === 0 ? (
               <tr><td colSpan={8} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">暂无数据</td></tr>
-            ) : filteredMaterials.length === 0 ? (
+            ) : sortedMaterials.length === 0 ? (
               <tr><td colSpan={8} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">无匹配结果</td></tr>
-            ) : filteredMaterials.map((m) => (
+            ) : sortedMaterials.map((m) => (
               <tr key={m.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => setDetail(m)}>
                 <td className="px-4 py-3 text-sm font-medium">{m.code}</td>
                 <td className="px-4 py-3 text-sm font-medium">{m.name}</td>

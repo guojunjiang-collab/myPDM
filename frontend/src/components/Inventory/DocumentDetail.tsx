@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useInventoryStore } from '../../stores/inventory';
 import { useAuthStore } from '../../stores/auth';
 import { inventoryApi } from '../../services/inventoryApi';
@@ -8,6 +8,8 @@ import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
+import SortableTh from '../ui/SortableTh';
+import { useTableSort } from '../../hooks/useTableSort';
 import type { InvDocument, InvDocType } from '../../types';
 
 const DOC_TYPE_LABEL: Record<InvDocType, string> = {
@@ -61,6 +63,10 @@ export default function DocumentDetail({ docId, onClose, onChanged }:
   };
   const whName = (id?: string | null) => (id ? warehouses.find((w) => w.id === id)?.name || id : '-');
 
+  // 明细表排序（物料列按 matName 转换后的名称排）
+  const sortableLines = useMemo(() => (doc?.lines || []).map((l: any) => ({ ...l, _matName: matName(l.material_id) })), [doc, materials]);
+  const { sortedData: sortedLines, sortField: lineSortField, sortDirection: lineSortDirection, handleSort: handleLineSort } = useTableSort<any>(sortableLines);
+
   const isAdmin = user?.role === 'admin';
   const isKeeper = !!doc && (doc.keeper_id === user?.id || isAdmin);
 
@@ -98,16 +104,16 @@ export default function DocumentDetail({ docId, onClose, onChanged }:
               <table className="w-full">
                 <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
                   <tr>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">物料</th>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">批次</th>
-                    {doc.doc_type === 'adjustment' && <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">方向</th>}
-                    {doc.doc_type === 'stocktake' && <th className="text-right px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">账面</th>}
-                    {doc.doc_type === 'stocktake' && <th className="text-right px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">实盘</th>}
-                    <th className="text-right px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">数量</th>
+                    <SortableTh sortKey="_matName" active={lineSortField === '_matName'} direction={lineSortDirection} onSort={(k) => handleLineSort(k)} className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">物料</SortableTh>
+                    <SortableTh sortKey="batch_no" active={lineSortField === 'batch_no'} direction={lineSortDirection} onSort={(k) => handleLineSort(k)} className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">批次</SortableTh>
+                    {doc.doc_type === 'adjustment' && <SortableTh sortKey="direction" active={lineSortField === 'direction'} direction={lineSortDirection} onSort={(k) => handleLineSort(k)} className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">方向</SortableTh>}
+                    {doc.doc_type === 'stocktake' && <SortableTh sortKey="book_quantity" active={lineSortField === 'book_quantity'} direction={lineSortDirection} onSort={(k) => handleLineSort(k)} className="text-right px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">账面</SortableTh>}
+                    {doc.doc_type === 'stocktake' && <SortableTh sortKey="counted_quantity" active={lineSortField === 'counted_quantity'} direction={lineSortDirection} onSort={(k) => handleLineSort(k)} className="text-right px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">实盘</SortableTh>}
+                    <SortableTh sortKey="quantity" active={lineSortField === 'quantity'} direction={lineSortDirection} onSort={(k) => handleLineSort(k)} className="text-right px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">数量</SortableTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {(doc.lines || []).map((l) => (
+                  {sortedLines.map((l) => (
                     <tr key={l.id}>
                       <td className="px-3 py-2 text-sm">{matName(l.material_id)}</td>
                       <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{l.batch_no || '-'}</td>

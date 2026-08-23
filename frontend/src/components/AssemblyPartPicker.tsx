@@ -7,6 +7,7 @@ import Button from './ui/Button';
 import Input from './ui/Input';
 import Select from './ui/Select';
 import TreeToggle from './ui/TreeToggle';
+import { compareVersions } from '../constants';
 
 /* ----------------------------------------------------------------
    Types
@@ -132,10 +133,10 @@ export default function AssemblyPartPicker({
   }, [existingChildIds, ancestorIds, currentAssemblyId]);
 
   const columns = useMemo(() => ([
-    { key: 'code', title: '件号', width: '160px', render: (i: CandidateItem) => <span className="font-medium">{i.code}</span> },
-    { key: 'name', title: '中文名称', render: (i: CandidateItem) => i.name },
-    { key: 'version', title: '版本', width: '70px', render: (i: CandidateItem) => <span className="text-[var(--ui-text-secondary)]">{i.version}</span> },
-    { key: 'status', title: '状态', width: '80px', render: (i: CandidateItem) => <Badge status={i.status} /> },
+    { key: 'code', title: '件号', width: '160px', sortable: true, render: (i: CandidateItem) => <span className="font-medium">{i.code}</span> },
+    { key: 'name', title: '中文名称', sortable: true, render: (i: CandidateItem) => i.name },
+    { key: 'version', title: '版本', width: '70px', sortable: true, comparator: (a: unknown, b: unknown) => compareVersions(String(a), String(b)), render: (i: CandidateItem) => <span className="text-[var(--ui-text-secondary)]">{i.version}</span> },
+    { key: 'status', title: '状态', width: '80px', sortable: true, render: (i: CandidateItem) => <Badge status={i.status} /> },
   ]), []);
 
   // filterParams 需稳定引用：仅 status/refreshToken/ancestorIds 变化时重建（避免每次渲染触发全量重拉）；

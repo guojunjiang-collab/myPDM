@@ -3,9 +3,12 @@ import { Modal } from './Modal';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
 import Input from './ui/Input';
+import SortableTh from './ui/SortableTh';
 import type { BadgeTone } from '../constants/badges';
 import { partsApi, documentsApi, configurationApi } from '../services/api';
 import { useDataStore } from '../stores/data';
+import { useTableSort } from '../hooks/useTableSort';
+import { compareVersions } from '../constants';
 
 /* ================================================================
    关联项目选择器（用户看板「+ 关联项目」弹窗，项目任务等复用）
@@ -117,6 +120,9 @@ export default function ItemPicker({ open, onClose, onConfirm, existingIds }: It
 
   const selectedList = Array.from(selected.values());
 
+  // 候选表排序（类型列不排序）
+  const { sortedData: sortedCandidates, sortField, sortDirection, handleSort } = useTableSort<any>(candidates, { fieldComparators: { version: (a, b) => compareVersions(String(a), String(b)) } });
+
   return (
     <Modal open={open} title="关联对象" onClose={onClose} width="full">
       <div className="space-y-4 max-h-[75vh] flex flex-col">
@@ -153,14 +159,14 @@ export default function ItemPicker({ open, onClose, onConfirm, existingIds }: It
             <p className="p-4 text-center text-sm text-[var(--ui-text-tertiary)]">无匹配结果</p>
           ) : (
             <table className="w-full text-sm table-fixed"><thead className="bg-[var(--ui-bg-subtle)] border-b sticky top-0"><tr>
-              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-24">类型</th>
-              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-48">编号</th>
-              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">版本</th>
-              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">名称</th>
-              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">状态</th>
-              <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-20">操作</th>
+              <SortableTh className="text-left w-24">类型</SortableTh>
+              <SortableTh sortKey="code" active={sortField === 'code'} direction={sortDirection} onSort={(k) => handleSort(k as any)} className="text-left w-48">编号</SortableTh>
+              <SortableTh sortKey="version" active={sortField === 'version'} direction={sortDirection} onSort={(k) => handleSort(k as any)} className="text-left w-16">版本</SortableTh>
+              <SortableTh sortKey="name" active={sortField === 'name'} direction={sortDirection} onSort={(k) => handleSort(k as any)} className="text-left">名称</SortableTh>
+              <SortableTh sortKey="status" active={sortField === 'status'} direction={sortDirection} onSort={(k) => handleSort(k as any)} className="text-left w-16">状态</SortableTh>
+              <SortableTh className="text-center w-20">操作</SortableTh>
             </tr></thead><tbody className="divide-y divide-gray-100">
-              {candidates.map((item) => (
+              {sortedCandidates.map((item) => (
                 <tr key={item.id} className="hover:bg-[var(--ui-bg-hover)]">
                   <td className="px-3 py-2"><Badge size="xs" tone={typeBadge(item.sub || item.t).tone} label={typeBadge(item.sub || item.t).label} /></td>
                   <td className="px-3 py-2 font-medium">{item.code}</td>

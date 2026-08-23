@@ -163,6 +163,8 @@ class ECOListParams(BaseSchema):
     search: Optional[str] = None
     status: Optional[str] = None
     priority: Optional[str] = None
+    sort_field: Optional[str] = Field('created_at', description="排序字段: eco_number/title/status/priority/creator_name/created_at")
+    sort_order: Optional[str] = Field('desc', description="排序方向: asc/desc")
 
 
 class ECOListItem(BaseSchema):
