@@ -5,7 +5,7 @@ import { useDataStore } from '../../stores/data';
 import type { ConfigurationItemDetail, ConfigurationItemRevision } from '../../types';
 import { Loading } from '../Loading';
 import { toast } from '../Toast';
-import { Modal } from '../Modal';
+import { Modal, ConfirmModal } from '../Modal';
 import EntityDocumentSection from '../EntityDocumentSection';
 import CustomFieldInput from '../CustomFieldInput';
 import ConfigItemPicker from './ConfigItemPicker';
@@ -188,10 +188,13 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
     } catch {}
   };
 
-  const handleDeleteIteration = async (it: any) => {
-    if (!internalRevId || !confirm(`确定删除迭代 #${it.iteration}？`)) return;
-    try { await configurationApi.deleteIteration(internalRevId, it.id); toast.success('迭代已删除'); setIterations(await configurationApi.iterations(internalRevId)); } catch (e: any) { toast.error(e?.response?.data?.detail || '删除失败'); }
-  };
+  // 删除迭代确认（状态驱动 ConfirmModal）
+  const [confirmDelIter, setConfirmDelIter] = useState<any | null>(null);
+  const handleDeleteIteration = (it: any) => { if (!internalRevId) return; setConfirmDelIter(it); };
+  // 移除子构型项确认
+  const [confirmRemoveChild, setConfirmRemoveChild] = useState<{ parentRevId: string; childId: string } | null>(null);
+  // 移除关联零部件确认
+  const [confirmRemovePart, setConfirmRemovePart] = useState<any | null>(null);
 
   const loadSubChildren = async (revId: string) => {
     if (subChildren[revId]) return;
@@ -235,9 +238,9 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
         const mt = await mediaApi.token(stp.id, 'gltf');
         window.open(`/stp-viewer?id=${stp.id}&token=${encodeURIComponent(mt)}&code=${encodeURIComponent(pd.code || '')}&version=${encodeURIComponent(pd.version || '')}&name=${encodeURIComponent(pd.name || '')}`, '_blank');
       } else {
-        alert('该零件没有 STP/STEP 附件');
+        toast.info('该零件没有 STP/STEP 附件');
       }
-    } catch { alert('打开预览失败'); }
+    } catch { toast.error('打开预览失败'); }
   }, []);
 
   const renderChildRow = (c: any, level: number, parentRevisionId: string): React.ReactNode => {
@@ -295,7 +298,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
           <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2">
               <Button variant="link" size="xs" onClick={() => { setPickerParentId(revId); setCfgPickerOpen(true); }}>+子项</Button>
-              <Button variant="danger" size="xs" onClick={async () => { if (!confirm('确定移除此子构型项？')) return; try { await configurationApi.removeChild(parentRevisionId, c.id); setSubChildren(prev => { const s = { ...prev }; delete s[parentRevisionId]; return s; }); refreshChildren(parentRevisionId); } catch {} }}>移除</Button>
+              <Button variant="danger" size="xs" onClick={() => setConfirmRemoveChild({ parentRevId: parentRevisionId, childId: c.id })}>移除</Button>
             </div>
           </td>
         )}
@@ -453,7 +456,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
                                   {canEdit && (
                                     <>
                                       <Button variant="link" size="xs" onClick={() => setVersionSelectIdx(i)}>选择</Button>
-                                      <Button variant="danger" size="xs" onClick={async () => { if (!confirm('确定移除此关联零部件？')) return; try { await configurationApi.removePart(internalRevId, p.id); setParts(prev => prev.filter(x => x.id !== p.id)); } catch {} }}>移除</Button>
+                                      <Button variant="danger" size="xs" onClick={() => setConfirmRemovePart(p)}>移除</Button>
                                     </>
                                   )}
                                   {!canEdit && <span className="text-xs text-[var(--ui-text-tertiary)]">—</span>}
@@ -566,6 +569,55 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
 
       {nestedConfigRevId && (<ConfigItemDetailModal revisionId={nestedConfigRevId} open={!!nestedConfigRevId} onClose={() => setNestedConfigRevId(null)} />)}
       {selectedPartMasterId && (<PartDetailModal masterId={selectedPartMasterId} open={!!selectedPartMasterId} onClose={() => setSelectedPartMasterId(null)} />)}
+
+      {/* 删除迭代确认 */}
+      <ConfirmModal
+        open={!!confirmDelIter}
+        title="确认删除"
+        content={confirmDelIter ? `确定删除迭代 #${confirmDelIter.iteration}？` : ''}
+        confirmText="删除"
+        cancelText="取消"
+        type="danger"
+        onConfirm={async () => {
+          if (!confirmDelIter || !internalRevId) return;
+          try { await configurationApi.deleteIteration(internalRevId, confirmDelIter.id); toast.success('迭代已删除'); setIterations(await configurationApi.iterations(internalRevId)); } catch (e: any) { toast.error(e?.response?.data?.detail || '删除失败'); }
+          setConfirmDelIter(null);
+        }}
+        onCancel={() => setConfirmDelIter(null)}
+      />
+
+      {/* 移除子构型项确认 */}
+      <ConfirmModal
+        open={!!confirmRemoveChild}
+        title="确认移除"
+        content="确定移除此子构型项？"
+        confirmText="移除"
+        cancelText="取消"
+        type="danger"
+        onConfirm={async () => {
+          if (!confirmRemoveChild) return;
+          const { parentRevId, childId } = confirmRemoveChild;
+          try { await configurationApi.removeChild(parentRevId, childId); setSubChildren(prev => { const s = { ...prev }; delete s[parentRevId]; return s; }); refreshChildren(parentRevId); } catch {}
+          setConfirmRemoveChild(null);
+        }}
+        onCancel={() => setConfirmRemoveChild(null)}
+      />
+
+      {/* 移除关联零部件确认 */}
+      <ConfirmModal
+        open={!!confirmRemovePart}
+        title="确认移除"
+        content="确定移除此关联零部件？"
+        confirmText="移除"
+        cancelText="取消"
+        type="danger"
+        onConfirm={async () => {
+          if (!confirmRemovePart || !internalRevId) return;
+          try { await configurationApi.removePart(internalRevId, confirmRemovePart.id); setParts(prev => prev.filter(x => x.id !== confirmRemovePart.id)); } catch {}
+          setConfirmRemovePart(null);
+        }}
+        onCancel={() => setConfirmRemovePart(null)}
+      />
     </Modal>
   );
 }

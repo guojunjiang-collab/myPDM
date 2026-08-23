@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { authApi } from '../services/api';
 import Badge from './ui/Badge';
+import { ConfirmModal } from './Modal';
 
 interface WechatProvider {
   key: string;
@@ -43,8 +44,9 @@ export default function WechatBindPanel() {
     }
   };
 
-  const handleUnbind = async (provider: WechatProvider) => {
-    if (!confirm(`确定要解除「${provider.name}」的绑定吗？`)) return;
+  // 解绑确认（状态驱动 ConfirmModal）
+  const [unbindProvider, setUnbindProvider] = useState<WechatProvider | null>(null);
+  const doUnbind = async (provider: WechatProvider) => {
     try {
       await authApi.wechatUnbind(provider.key);
       setBindings((prev) => {
@@ -56,6 +58,7 @@ export default function WechatBindPanel() {
       setError('解除绑定失败，请重试');
     }
   };
+  const handleUnbind = (provider: WechatProvider) => setUnbindProvider(provider);
 
   return (
     <div className="max-w-md">
@@ -117,6 +120,18 @@ export default function WechatBindPanel() {
           })
         )}
       </div>
+
+      {/* 解绑确认 */}
+      <ConfirmModal
+        open={!!unbindProvider}
+        title="确认解绑"
+        content={unbindProvider ? `确定要解除「${unbindProvider.name}」的绑定吗？` : ''}
+        confirmText="解除"
+        cancelText="取消"
+        type="danger"
+        onConfirm={() => { if (unbindProvider) doUnbind(unbindProvider); setUnbindProvider(null); }}
+        onCancel={() => setUnbindProvider(null)}
+      />
     </div>
   );
 }

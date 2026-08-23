@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
-import { Modal } from '../Modal';
+import { Modal, ConfirmModal } from '../Modal';
 import ConfigItemPicker from './ConfigItemPicker';
 import ConfigItemDetailModal from './ConfigItemDetailModal';
 import PartDetailModal from '../PartDetailModal';
@@ -506,11 +506,10 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
   };
 
   // ── Approval flow handlers ──
-  const handleSubmitReview = async () => {
+  // 无审批人提交确认（状态驱动 ConfirmModal）
+  const [noReviewerConfirm, setNoReviewerConfirm] = useState(false);
+  const doSubmitReview = async () => {
     if (!profileId) return;
-    if (reviewers.length === 0) {
-      if (!confirm('当前无审批人，提交后将直接生效。确认提交？')) return;
-    }
     setSaving(true);
     try {
       await configurationProfileApi.submit(profileId);
@@ -518,6 +517,14 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
     } catch (e: any) {
       setError(e?.response?.data?.detail || '操作失败');
     } finally { setSaving(false); }
+  };
+  const handleSubmitReview = () => {
+    if (!profileId) return;
+    if (reviewers.length === 0) {
+      setNoReviewerConfirm(true);
+      return;
+    }
+    doSubmitReview();
   };
 
   const handleWithdraw = async () => {
@@ -1133,6 +1140,17 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         onClose={() => setPartDetailMasterId(null)}
       />
     )}
+
+    {/* 无审批人提交确认 */}
+    <ConfirmModal
+      open={noReviewerConfirm}
+      title="确认提交"
+      content="当前无审批人，提交后将直接生效。确认提交？"
+      confirmText="确认提交"
+      type="warning"
+      onConfirm={() => { setNoReviewerConfirm(false); doSubmitReview(); }}
+      onCancel={() => setNoReviewerConfirm(false)}
+    />
   </>
 );
 }

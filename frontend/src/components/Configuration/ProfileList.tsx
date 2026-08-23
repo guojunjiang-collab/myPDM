@@ -73,11 +73,17 @@ export default function ProfileList() {
     try { await configurationProfileApi.delete(deleteId); setDeleteId(null); load(); } catch {}
   };
 
-  const handleSubmit = async (profile: ConfigurationProfile) => {
-    if ((profile.reviewer_count ?? profile.reviewers?.length ?? 0) === 0) {
-      if (!confirm('当前无审批人，提交后将直接生效。确认提交？')) return;
-    }
+  // 无审批人提交确认（状态驱动 ConfirmModal）
+  const [submitConfirm, setSubmitConfirm] = useState<ConfigurationProfile | null>(null);
+  const doSubmit = async (profile: ConfigurationProfile) => {
     try { await configurationProfileApi.submit(profile.id); load(); } catch {}
+  };
+  const handleSubmit = (profile: ConfigurationProfile) => {
+    if ((profile.reviewer_count ?? profile.reviewers?.length ?? 0) === 0) {
+      setSubmitConfirm(profile);
+      return;
+    }
+    doSubmit(profile);
   };
   const handleWithdraw = async (id: string) => {
     try { await configurationProfileApi.withdraw(id); load(); } catch {}
@@ -85,10 +91,9 @@ export default function ProfileList() {
   const handleReopen = async (id: string) => {
     try { await configurationProfileApi.reopen(id); load(); } catch {}
   };
-  const handleArchive = async (id: string) => {
-    if (!confirm('确认归档该配置？')) return;
-    try { await configurationProfileApi.archive(id); load(); } catch {}
-  };
+  // 归档确认（状态驱动 ConfirmModal）
+  const [archiveConfirmId, setArchiveConfirmId] = useState<string | null>(null);
+  const handleArchive = (id: string) => setArchiveConfirmId(id);
 
   const handleCcOpen = async (id: string) => {
     setCcTargetId(id);
@@ -289,6 +294,32 @@ export default function ProfileList() {
         content="确定要删除该构型配置吗？配置清单将一并删除。"
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}
+      />
+
+      {/* 无审批人提交确认 */}
+      <ConfirmModal
+        open={!!submitConfirm}
+        title="确认提交"
+        content="当前无审批人，提交后将直接生效。确认提交？"
+        confirmText="确认提交"
+        type="warning"
+        onConfirm={() => { if (submitConfirm) doSubmit(submitConfirm); setSubmitConfirm(null); }}
+        onCancel={() => setSubmitConfirm(null)}
+      />
+
+      {/* 归档确认 */}
+      <ConfirmModal
+        open={!!archiveConfirmId}
+        title="确认归档"
+        content="确认归档该配置？"
+        confirmText="归档"
+        type="danger"
+        onConfirm={async () => {
+          if (!archiveConfirmId) return;
+          try { await configurationProfileApi.archive(archiveConfirmId); load(); } catch {}
+          setArchiveConfirmId(null);
+        }}
+        onCancel={() => setArchiveConfirmId(null)}
       />
 
       <ProfileCompareModal open={compareOpen} onClose={() => setCompareOpen(false)} />
