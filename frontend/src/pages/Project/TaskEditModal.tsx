@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
@@ -261,6 +261,23 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
     await projectApi.deleteComment(projectId, tid, commentId);
     loadComments(tid);
   };
+
+  /** 关联对象排序：类型/件号/名称/版本/状态 */
+  const [linkSort, setLinkSort] = useState<{ key: string; dir: 'asc' | 'desc' } | null>(null);
+  const toggleLinkSort = (key: string) => {
+    setLinkSort((s) => (s?.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }));
+  };
+  const sortedLinks = useMemo(() => {
+    if (!linkSort) return links;
+    const dir = linkSort.dir === 'asc' ? 1 : -1;
+    return [...links].sort((a, b) => {
+      const get = (l: TaskLink) => linkSort.key === 'entity_type' ? (LINK_BADGE[l.entity_type]?.label ?? l.entity_type) : ((l as any)[linkSort.key] ?? '');
+      return String(get(a)).localeCompare(String(get(b)), 'zh') * dir;
+    });
+  }, [links, linkSort]);
+  const LinkSortArrow = ({ k }: { k: string }) => (
+    <span className="ml-0.5 text-[10px]">{linkSort?.key === k ? (linkSort.dir === 'asc' ? '▲' : '▼') : '↕'}</span>
+  );
 
   const handleViewEntity = async (entityType: string, entityId: string) => {
     if (entityType === 'ec') {
@@ -553,16 +570,16 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                         <table className="w-full text-sm">
                           <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
                             <tr>
-                              <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-20 whitespace-nowrap">类型</th>
-                              <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-36 whitespace-nowrap">件号</th>
-                              <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)]">名称</th>
-                              <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-16 whitespace-nowrap">版本</th>
-                              <th className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-20 whitespace-nowrap">状态</th>
+                              <th onClick={() => toggleLinkSort('entity_type')} className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-20 whitespace-nowrap cursor-pointer select-none">类型<LinkSortArrow k="entity_type" /></th>
+                              <th onClick={() => toggleLinkSort('entity_code')} className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-36 whitespace-nowrap cursor-pointer select-none">件号<LinkSortArrow k="entity_code" /></th>
+                              <th onClick={() => toggleLinkSort('entity_name')} className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] cursor-pointer select-none">名称<LinkSortArrow k="entity_name" /></th>
+                              <th onClick={() => toggleLinkSort('entity_version')} className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-16 whitespace-nowrap cursor-pointer select-none">版本<LinkSortArrow k="entity_version" /></th>
+                              <th onClick={() => toggleLinkSort('entity_status')} className="text-left px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-20 whitespace-nowrap cursor-pointer select-none">状态<LinkSortArrow k="entity_status" /></th>
                               <th className="text-right px-3 py-2 text-xs font-medium text-[var(--ui-text-secondary)] w-40">操作</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
-                            {links.map((l) => (
+                            {sortedLinks.map((l) => (
                               <tr key={l.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer"
                                   onClick={() => {
                                     if (l.entity_type === 'part' || l.entity_type === 'assembly') {
