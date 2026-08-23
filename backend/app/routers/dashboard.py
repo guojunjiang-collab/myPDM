@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 import uuid
 
@@ -33,6 +34,17 @@ def _build_component_item(item, rev: PartRevision, db: Session) -> dict:
     attachment_count = db.query(PartAttachment).join(
         PartIteration, PartIteration.id == PartAttachment.iteration_id
     ).filter(PartIteration.revision_id == rev.id).count()
+    # 生产附件是否含 STP/STEP（零件 3D 预览可用性）
+    has_stp = db.query(PartAttachment).join(
+        PartIteration, PartIteration.id == PartAttachment.iteration_id
+    ).filter(
+        PartIteration.revision_id == rev.id,
+        PartAttachment.category == "production",
+        or_(
+            PartAttachment.file_name.ilike("%.stp"),
+            PartAttachment.file_name.ilike("%.step"),
+        ),
+    ).first() is not None
     return {
         "id": item.id,
         "entity_type": mtype,
@@ -44,6 +56,7 @@ def _build_component_item(item, rev: PartRevision, db: Session) -> dict:
         "status": rev.status,
         "check_out_user_name": _checkout_name(db, rev.check_out_user_id),
         "attachment_count": attachment_count,
+        "has_stp": has_stp,
     }
 
 

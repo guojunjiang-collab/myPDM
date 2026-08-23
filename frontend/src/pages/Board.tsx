@@ -28,6 +28,8 @@ interface DashboardItem {
   version: string;
   status: string;
   attachment_count?: number;
+  /** 生产附件是否含 STP/STEP（零件 3D 预览可用性） */
+  has_stp?: boolean;
 }
 
 interface FolderNode {
@@ -502,8 +504,8 @@ export default function Board() {
                               type="button"
                               size="xs"
                               className="mr-2"
-                              disabled={item.entity_type === 'assembly' ? false : !((item.attachment_count ?? 0) > 0)}
-                              title={item.entity_type === 'assembly' ? '装配体 3D 预览' : (((item.attachment_count ?? 0) > 0) ? '3D 预览' : '暂无 STP 附件')}
+                              disabled={item.entity_type === 'assembly' ? false : !item.has_stp}
+                              title={item.entity_type === 'assembly' ? '装配体 3D 预览' : (item.has_stp ? '3D 预览' : '生产附件无 STP 文件')}
                               onClick={(e) => { e.stopPropagation(); handlePreview(item); }}
                             >3D</Button>
                           )}
