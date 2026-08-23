@@ -530,7 +530,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                               <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">文件名</th>
                               <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-24">大小</th>
                               <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-40">上传时间</th>
-                              <th className="px-3 py-2 text-right text-[var(--ui-text-secondary)] font-medium w-40">操作</th>
+                              <th className="px-3 py-2 text-right text-[var(--ui-text-secondary)] font-medium w-56">操作</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
@@ -539,7 +539,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                                 <td className="px-3 py-2 text-primary-600">{att.file_name}</td>
                                 <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{formatFileSize(att.file_size || 0)}</td>
                                 <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{formatDateTime(att.created_at)}</td>
-                                <td className="px-3 py-2 text-right">
+                                <td className="px-3 py-2 text-right whitespace-nowrap">
                                   <Button variant="link" size="xs" className="mr-2"
                                     onClick={() => previewAttachment(att.id, att.file_name || 'preview', {
                                       onArchive: (id, name) => setArchivePreview({ attId: id, fileName: name }),
