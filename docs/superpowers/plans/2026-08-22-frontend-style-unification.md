@@ -1028,12 +1028,12 @@ git commit -m "style: 残余色级/色系收敛（50→100、yellow→amber）"
 
 ### Task 19: 全量验收
 
-- [ ] **Step 1: 构建与测试**
+- [x] **Step 1: 构建与测试**
 
 Run: `cd frontend && npm run build` 和 `cd frontend && npm run test`
 Expected: 均 PASS
 
-- [ ] **Step 2: grep 校验业务代码无内联状态色**
+- [x] **Step 2: grep 校验业务代码无内联状态色**
 
 Run（在 `frontend/src`）：
 ```
@@ -1041,15 +1041,15 @@ grep -rn "bg-blue-100\|bg-orange-100\|bg-green-100\|bg-red-100\|bg-yellow-100\|b
 ```
 Expected: 仅 `components/ui/` 与 `constants/` 下文件命中（`badgeMeta.ts`/`buttonMeta.ts` 是 `var(--ui-*)` 类，不应命中；命中 `bg-primary-600` 等的豁免项：移动端分段控件 tab 选中态（Task 16 已声明）、非按钮语义的装饰元素（如进度条、加载动画），逐一确认后记录在提交说明）。
 
-- [ ] **Step 3: 桌面逐页抽查**（每页检查：状态/类型/必选徽标、按钮、表单一致；零部件页重点看装配类型徽标已变蓝）
+- [x] **Step 3: 桌面逐页抽查**（每页检查：状态/类型/必选徽标、按钮、表单一致；零部件页重点看装配类型徽标已变蓝）
 
 零部件列表/详情、图文档列表/详情、ECR 列表/详情、ECO 列表/详情、构型项/概要、库存（物料/单据）、项目（列表/甘特/任务）、用户管理（角色/状态徽标）、日志、看板、通知、设置、数据管理。
 
-- [ ] **Step 4: 移动端逐页抽查**
+- [x] **Step 4: 移动端逐页抽查**
 
 零部件、图文档、EC、构型、库存、项目、任务详情、通知、更多、看板。
 
-- [ ] **Step 5: 验收记录提交**
+- [x] **Step 5: 验收记录提交**
 
 ```bash
 git add docs/superpowers/specs/2026-08-22-frontend-style-unification-design.md docs/superpowers/plans/2026-08-22-frontend-style-unification.md
@@ -1063,3 +1063,110 @@ git commit -m "docs: 风格统一验收通过，补充验收记录"
 - **Spec 覆盖**：映射表 20 域 → Task 2；CSS 变量 → Task 1；Badge/Button/Input 组件 → Task 3-5；桌面徽标 → Task 6-11；移动端徽标 → Task 12；按钮 → Task 13-16；表单 → Task 17；色级/色系收敛 + 冲突修复（必选/可选、装配类型、库存 approved、unverified、disabled 移动端）→ 散落在 Task 6-12 对应模块；多风格预留 → Task 1 变量 + Task 3 元数据；验收 → Task 19。
 - **占位符**：无 TBD/TODO；所有任务含实际代码或明确搜索模式与映射规则。
 - **类型一致性**：`Badge` props（status/domain/tone/label/size）、`Button` props（variant/size）、`resolveBadge` 签名在 Task 2/4 中定义并贯穿 Task 6-18；`INPUT_BASE_CLASS` 在 Task 5 定义、Task 17 引用。
+
+---
+
+## 验收记录 (2026-08-22)
+
+> 由 Task 19 全量验收生成（分支 feat/mobile2）。本记录同时覆盖构建/测试、grep 校验、桌面/移动端逐页抽查与豁免登记。**验收结论：核心目标达成（DONE），存在 8 处非豁免内联色残留（详见「发现的问题」），需控制器裁决后续处理。**
+
+### Step 1: 构建与测试
+
+| 项目 | 命令 | 结果 |
+|---|---|---|
+| 生产构建 | `cd frontend && npm run build` | ✅ PASS（`✓ built in 10.43s`，仅既有 chunk-size 警告，非错误） |
+| 单元测试 | `cd frontend && npm run test` | ✅ PASS（23 个测试文件 / 159 个用例全部通过，exit 0） |
+
+### Step 2: grep 校验（业务代码内联状态色）
+
+- 命令：`rg -n "bg-blue-100|bg-orange-100|bg-green-100|bg-red-100|bg-yellow-100|bg-teal-100|bg-purple-100|bg-indigo-100|bg-primary-600|bg-red-500|bg-red-600|bg-green-600|bg-emerald-500" -g "*.tsx" frontend/src`
+- 结果：**31 处命中，全部位于业务代码**；`components/ui/` 与 `constants/` 下 **0 命中**（`badgeMeta.ts`/`buttonMeta.ts`/`badges.ts` 均为 `var(--ui-*)` 类，符合预期 ✅）。
+- 命中分类：**8 处非豁免残留（7 按钮上下文 + 1 徽标上下文）** + **23 处豁免/装饰**（登记如下）。
+
+#### 豁免登记表（23 处，逐一确认）
+
+| # | 文件:行 | 上下文 | 豁免类别 |
+|---|---|---|---|
+| 1 | pages/Board.tsx:795 | 实体类型筛选 tab 选中态 | 视图切换条/选中态控件 |
+| 2 | mobile/MobileLayout.tsx:63 | 通知未读数角标 | 计数小徽标（装饰） |
+| 3 | pages/Notifications.tsx:77 | 模块筛选胶囊选中态 | 视图切换条/选中态控件 |
+| 4 | pages/MarkdownReader.tsx:120 | 文档信息卡片头部条 | 信息栏（装饰） |
+| 5 | components/CADWorkspace/CADBOMMatchTable.tsx:149-150 | BOM 匹配行高亮（new/checked_out） | 行高亮/差异行 |
+| 6 | components/Layout.tsx:175 | 同步状态指示圆点 | 状态圆点（装饰） |
+| 7 | mobile/pages/DashboardPage.tsx:330 | 未读通知圆点 | 状态圆点（装饰） |
+| 8 | pages/Project/Projects.tsx:708 | 甘特刻度视图切换（日/周/月） | 视图切换条/甘特条 |
+| 9 | mobile/pages/MorePage.tsx:20 | 用户头像 | 头像（装饰） |
+| 10 | mobile/pages/MorePage.tsx:34 | 通知未读数角标 | 计数小徽标（装饰） |
+| 11 | components/ECR/ECRAffectedItemPicker.tsx:187 | 类型筛选 tab 选中态 | 视图切换条/选中态控件 |
+| 12 | mobile/pages/PartDetailPage.tsx:731 | 版本选择 ✓ 圆钮选中态 | 移动端选中态控件（Task 16 已声明豁免） |
+| 13 | mobile/pages/UsersListPage.tsx:70 | 用户头像 | 头像（装饰） |
+| 14 | components/ECR/ECRDetailModal.tsx:526 | 状态记录时间线圆点 | 时间线圆点（装饰） |
+| 15 | components/Inventory/DocumentDetail.tsx:18-23 | 单据状态时间线圆点/文字 | 时间线圆点（装饰） |
+| 16 | components/STPViewer/CompareTreePanel.tsx:189-191 | 对比树 增/删 行高亮 | 差异行 |
+| 17 | components/Toast.tsx:69 | Toast 类型配色（error） | Toast（装饰，非按钮） |
+| 18-19 | components/Configuration/ConfigurationCreateModal.tsx:363,511 | 必选/可选 交互切换 chip（点击翻转） | 选中态控件（⚠ 见备注①） |
+| 20-21 | components/Configuration/ConfigItemDetailModal.tsx:288,434 | 必选/可选 交互切换 chip（点击翻转） | 选中态控件（⚠ 见备注①） |
+
+> 备注①：必选/可选切换 chip 为交互控件（选中态语义），豁免；但配色跨文件不一致——`ConfigurationCreateModal` 为 必选=blue/可选=green，`ConfigItemDetailModal` 为 必选=green/可选=orange；且与 Task 6 冲突修复 #2 的规范（必选=蓝、可选=灰，`PartWhereUsedTab.tsx:88` 已按 Badge 实现）不统一。建议控制器纳入后续收敛。
+>
+> 另：移动端分段控件选中态已按 Task 16 承诺改用 `bg-[var(--ui-btn-primary-bg)]`（见 `mobile/pages/BomComparePage.tsx:406,412` 等），本次命中项均为非按钮语义装饰/选中态，无需处理。
+
+#### 发现的问题（非豁免残留，8 处 → 交控制器裁决，本次未改动业务代码）
+
+| # | 文件:行 | 上下文 | 分类 | 说明 |
+|---|---|---|---|---|
+| V1 | pages/Login.tsx:115 | 登录提交按钮 `bg-primary-600` | 按钮上下文 FAIL | 认证页不在 Task 13-16 文件清单内（范围缺口） |
+| V2 | pages/FeishuCallback.tsx:52 | 「返回系统设置」`<Link>` 伪装按钮 `bg-primary-600` | 按钮上下文 FAIL | 同上 |
+| V3 | pages/WechatCallback.tsx:52 | 「返回系统设置」`<Link>` 伪装按钮 `bg-primary-600` | 按钮上下文 FAIL | 同上 |
+| V4 | pages/ForcePasswordChange.tsx:114 | 提交按钮 `bg-primary-600` | 按钮上下文 FAIL | 同上 |
+| V5 | components/Modal.tsx:104,106 | ConfirmModal 确认按钮 typeClasses（danger=`bg-red-600`/warning=`bg-orange-500`/info=`bg-primary-600`） | 按钮上下文 FAIL | 共享 Modal 组件未组件化按钮（范围缺口） |
+| V6 | components/ImportPreviewModal.tsx:298-301 | 「确认导入」按钮 `bg-primary-600`/`bg-primary-400` | 按钮上下文 FAIL | Task 11 仅处理其徽标，按钮未转换 |
+| V7 | components/PartDetailModal.tsx:1076 | 变换矩阵弹窗 STEP 来源标签 `bg-indigo-100 text-indigo-700` | 徽标上下文 FAIL | 类型标签，Task 6/13 覆盖文件内遗漏 |
+
+> V1-V6 为**按钮上下文内联色**（全局约束明确禁止，但均处于任务文件清单之外=范围缺口）；V7 为**徽标上下文**遗漏。按约束约定：**本次不修复**，仅记录上报，建议由控制器安排后续专项（或纳入下轮收敛任务）。
+
+### Step 3/4: 逐页抽查（代码级）
+
+> 抽查口径：状态/类型/必选徽标 → `<Badge>`；按钮 → `<Button>`；表单 → `<Input>/<Select>/<Textarea>`；移动端主操作按钮为 touch 尺寸（≥44px）。
+
+**桌面端**
+
+| 页面 | 徽标 | 按钮 | 表单 | 结论 |
+|---|---|---|---|---|
+| 零部件列表/详情 | Badge（装配类型=蓝 ✅ 修复#1，PartsPage.tsx:264 `tone: 'blue'`） | Button | Input/Select/Textarea | ✅（V7 除外） |
+| 图文档列表/详情 | Badge | Button | Input/Select/Textarea | ✅ |
+| ECR 列表/详情 | Badge（ECRStatusBadge→Badge） | Button | Input/Select/Textarea | ✅ |
+| ECO 列表/详情 | Badge（ECOStatusBadge→Badge） | Button | Input/Select/Textarea | ✅ |
+| 构型项/概要 | Badge | Button | Input/Select/Textarea | ✅（必选/可选 chip 见备注①） |
+| 库存（物料/单据） | Badge | Button | Input/Select/Textarea | ✅（时间线圆点豁免） |
+| 项目 列表/甘特/任务 | Badge | Button | Input/Select/Textarea | ✅（甘特刻度切换豁免；DeliverableModal.tsx:208 灰色状态 chip 未组件化，中性色、非本轮 grep 目标，建议关注） |
+| 用户管理 | Badge（RoleTag/StatusTag → Badge domain=role/user） | Button | Input/Select | ✅ |
+| 日志 | Badge | Button | Input/Select | ✅ |
+| 看板 | Badge（STATUS_TAG 映射 BadgeTone） | Button | Input/Select | ✅ |
+| 通知 | 无状态徽标 | 原生中性按钮（页面整体不在任务范围） | 无表单 | ✅（观察：整页未组件化，选中胶囊豁免） |
+| 设置 | — | Button | Input/Select/Textarea | ✅ |
+| 数据管理 | — | Button | Input | ✅ |
+
+**移动端**
+
+| 页面 | 徽标 | 按钮 | 结论 |
+|---|---|---|---|
+| 零部件（列表/详情） | Badge | Button（touch：PartsListPage:130、PartDetailPage:759） | ✅（版本选择 ✓ 圆钮选中态豁免） |
+| 图文档（列表/详情） | Badge | Button | ✅ |
+| EC | Badge | —（列表页无操作按钮） | ✅ |
+| 构型（项/概要/详情） | Badge | Button | ✅ |
+| 库存 | Badge | — | ✅ |
+| 项目（列表/甘特） | Badge | Button | ✅（GanttPage 纯图表无徽标/按钮） |
+| 任务详情 | Badge | Button | ✅ |
+| 通知 | — | Button（touch：NotificationsPage:120） | ✅ |
+| 更多 | 计数角标/头像（豁免） | 原生「退出登录」（MorePage 不在 Task 16 清单） | ✅（观察：退出登录为原生按钮，仅文字红，未组件化） |
+| 看板 | Badge | Button | ✅ |
+
+### Step 5: 提交
+
+- 本验收记录提交：`git commit -m "docs: 风格统一验收通过，补充验收记录"`（仅 docs 两个文件）。
+
+### 工作区状态说明（与本任务无关，提请控制器留意）
+
+1. `frontend/src/mobile/components/MobileCardList.tsx` 存在**未提交改动**（onClick 签名增加事件参数 + 行加 `data-anchor`），Task 16 提交说明曾注明该文件「未暂存未改动」，本次验收时发现其已被修改且未提交——疑似并行工作遗留，构建可过，请控制器决定提交或回退。
+2. 仓库根目录存在未跟踪文件 `_verify_status.py`（一次性验证脚本残留），未纳入提交。
