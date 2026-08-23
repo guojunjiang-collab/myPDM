@@ -103,7 +103,7 @@ export function Toolbar() {
         <span className="font-medium">幽灵</span>
         <input
           type="range"
-          min={0.02}
+          min={0.05}
           max={0.3}
           step={0.01}
           value={vs.ghostOpacity}

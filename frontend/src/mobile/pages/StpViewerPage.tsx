@@ -171,7 +171,7 @@ function ToolsPanel() {
         <div className="text-xs text-[var(--ui-text-tertiary)] font-medium">幽灵</div>
         <input
           type="range"
-          min={0.02}
+          min={0.05}
           max={0.3}
           step={0.01}
           value={vs.ghostOpacity}
