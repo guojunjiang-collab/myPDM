@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { previewAttachment } from '../utils/attachmentPreview';
 import { boardApi, usersApi, partsApi, documentsApi, configurationApi, mediaApi } from '../services/api';
 import { useDataStore } from '../stores/data';
 import { Modal, ConfirmModal } from '../components/Modal';
@@ -369,7 +370,20 @@ export default function Board() {
       setDetailComponentId(item.master_id || item.entity_id);
       setDetailItem(null);
     } else if (item.entity_type === 'document') {
-      // 图文档：打开详情弹窗（默认附件页）
+      // 图文档：直接复用附件预览（PDF/图片/Office/3D 等按格式分发）
+      try {
+        const res: any = await documentsApi.listAttachments(item.entity_id);
+        const atts: any[] = Array.isArray(res) ? res : (res?.items || []);
+        const att = atts[0];
+        if (att) {
+          await previewAttachment(att.id, att.file_name || '', {
+            // 压缩包：降级打开详情弹窗（附件区含压缩包浏览）
+            onArchive: () => { setDetailDocId(item.entity_id); setDetailComponentId(null); setDetailItem(null); },
+          });
+          return;
+        }
+      } catch { /* 忽略，走 fallback */ }
+      // 无附件：打开详情弹窗（默认附件页）
       setDetailDocId(item.entity_id);
       setDetailComponentId(null);
       setDetailItem(null);
