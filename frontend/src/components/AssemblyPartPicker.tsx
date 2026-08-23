@@ -319,7 +319,7 @@ export default function AssemblyPartPicker({
             placeholder="搜索件号、名称..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="flex-1"
+            className="flex-1 min-w-0"
           />
           <Select
             className="!w-auto"
