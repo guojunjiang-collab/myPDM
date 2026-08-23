@@ -404,12 +404,12 @@ export default function Users() {
         <table className="w-full">
           <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
             <tr>
-              <th onClick={() => handleSort('username' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-[var(--ui-text-primary)] select-none">用户名 {getSortIcon('username' as keyof User)}</th>
-              <th onClick={() => handleSort('real_name' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-[var(--ui-text-primary)] select-none">姓名 {getSortIcon('real_name' as keyof User)}</th>
-              <th onClick={() => handleSort('role' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-[var(--ui-text-primary)] select-none">角色 {getSortIcon('role' as keyof User)}</th>
-              <th onClick={() => handleSort('department' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-[var(--ui-text-primary)] select-none">部门 {getSortIcon('department' as keyof User)}</th>
-              <th onClick={() => handleSort('status' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-[var(--ui-text-primary)] select-none">状态 {getSortIcon('status' as keyof User)}</th>
-              <th onClick={() => handleSort('created_at' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-[var(--ui-text-primary)] select-none">创建时间 {getSortIcon('created_at' as keyof User)}</th>
+              <th onClick={() => handleSort('username' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer select-none">用户名 {getSortIcon('username' as keyof User)}</th>
+              <th onClick={() => handleSort('real_name' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer select-none">姓名 {getSortIcon('real_name' as keyof User)}</th>
+              <th onClick={() => handleSort('role' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer select-none">角色 {getSortIcon('role' as keyof User)}</th>
+              <th onClick={() => handleSort('department' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer select-none">部门 {getSortIcon('department' as keyof User)}</th>
+              <th onClick={() => handleSort('status' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer select-none">状态 {getSortIcon('status' as keyof User)}</th>
+              <th onClick={() => handleSort('created_at' as keyof User)} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer select-none">创建时间 {getSortIcon('created_at' as keyof User)}</th>
               <th className="px-4 py-3 text-right text-sm font-medium text-[var(--ui-text-secondary)]">操作</th>
             </tr>
           </thead>
