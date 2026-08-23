@@ -345,16 +345,16 @@ export default function Board() {
 
   return (
     <div className="flex h-full gap-4 p-4 bg-[var(--ui-bg-page)]">
-      {/* Left: 文件夹树卡片 */}
-      <div ref={sidebarRef} className="w-72 shrink-0 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-[10px] shadow-sm flex flex-col overflow-hidden">
-        <div className="px-3 pt-3">
+      {/* Left: 文件夹树（子卡片直接落在页面底） */}
+      <div ref={sidebarRef} className="w-72 shrink-0 flex flex-col">
+        <div className="pb-3">
           <Button type="button" size="md" className="w-full" onClick={() => { setCreateModal(''); setCreateName(''); }}>
             + 新建文件夹
           </Button>
         </div>
-        <div className="flex-1 min-h-0 flex flex-col gap-2.5 p-3">
+        <div className="flex-1 min-h-0 flex flex-col gap-2.5">
           {/* 子卡① 我的文件夹 */}
-          <div className="flex-1 min-h-0 flex flex-col bg-[var(--ui-bg-subtle)] border border-[var(--ui-border)] rounded-lg overflow-y-auto">
+          <div className="flex-1 min-h-0 flex flex-col bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-sm overflow-y-auto">
             <div className="px-3 py-2 text-xs font-medium text-[var(--ui-text-tertiary)] uppercase tracking-wide shrink-0">我的文件夹</div>
             <div className="space-y-0.5">
               {myFolders.length === 0 ? (
@@ -377,7 +377,7 @@ export default function Board() {
                 <div className="w-9 h-1 rounded-full bg-[var(--ui-border)] group-hover:bg-primary-500 transition-colors" />
               </div>
               {/* 子卡② 共享给我的 */}
-              <div className="shrink-0 bg-[var(--ui-bg-subtle)] border border-[var(--ui-border)] rounded-lg overflow-y-auto" style={{ height: sharedPaneH }}>
+              <div className="shrink-0 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-sm overflow-y-auto" style={{ height: sharedPaneH }}>
                 <div className="px-3 py-2 text-xs font-medium text-[var(--ui-text-tertiary)] uppercase tracking-wide shrink-0">📂 共享给我的</div>
                 <div className="space-y-0.5">
                   {sharedFolders.map((f) => (
@@ -390,13 +390,13 @@ export default function Board() {
         </div>
       </div>
 
-      {/* Right: 内容区卡片 */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-[10px] shadow-sm overflow-hidden">
-        <div className="flex-1 min-h-0 flex flex-col gap-2.5 p-3">
+      {/* Right: 内容区（子卡片直接落在页面底） */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 min-h-0 flex flex-col gap-2.5">
         {selectedFolder ? (
           <>
             {/* 子卡① 头部：路径 + 操作按钮 */}
-            <div className="shrink-0 bg-[var(--ui-bg-subtle)] border border-[var(--ui-border)] rounded-lg px-5 py-4">
+            <div className="shrink-0 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-sm px-5 py-4">
               <h2 className="text-sm font-medium text-[var(--ui-text-secondary)] mb-2">{getFolderPath(allFolders, selectedFolder.id)}</h2>
               {canEditFolder && (
                 <div className="flex gap-2">
@@ -411,7 +411,7 @@ export default function Board() {
             </div>
 
             {/* 子卡② Tab 行 */}
-            <div className="shrink-0 bg-[var(--ui-bg-subtle)] border border-[var(--ui-border)] rounded-lg px-4 flex gap-0">
+            <div className="shrink-0 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-sm px-4 flex gap-0">
               {(['all', 'component', 'document', 'configuration'] as FilterTab[]).map((tab) => (
                 <button
                   type="button"
@@ -429,7 +429,7 @@ export default function Board() {
             </div>
 
             {/* 子卡③ 内容表格 */}
-            <div className="flex-1 min-h-0 bg-[var(--ui-bg-subtle)] border border-[var(--ui-border)] rounded-lg overflow-auto">
+            <div className="flex-1 min-h-0 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-sm overflow-auto">
               {filteredItems.length === 0 ? (
                 <p className="text-sm text-[var(--ui-text-tertiary)] text-center py-16">暂无关联项目</p>
               ) : (
@@ -468,7 +468,7 @@ export default function Board() {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center bg-[var(--ui-bg-subtle)] border border-[var(--ui-border)] rounded-lg">
+          <div className="flex-1 flex items-center justify-center bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-sm">
             <div className="text-center text-[var(--ui-text-tertiary)]">
               <div className="text-4xl mb-2">📂</div>
               <p className="text-sm">选择左侧文件夹查看内容</p>
