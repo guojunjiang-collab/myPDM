@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { mediaApi } from '../../services/api';
+import Button from '../../components/ui/Button';
 
 /**
  * 移动端附件预览（统一交互：预览按钮 → 新浏览器标签打开）：
@@ -131,13 +132,15 @@ export default function AttachmentPreview({ attachment }: { attachment: PreviewA
           )}
         </div>
         {previewable && (
-          <button
+          <Button
             onClick={onPreview}
             disabled={converting}
-            className="shrink-0 min-h-10 px-3 rounded-lg bg-primary-600 text-white text-xs disabled:opacity-60"
+            variant="primary"
+            size="xs"
+            className="shrink-0 min-h-10 px-3 rounded-lg"
           >
             {converting ? (isStp ? '加载中...' : '转换中...') : isStp ? '3D 预览' : '预览'}
-          </button>
+          </Button>
         )}
       </div>
       {error && <p className="text-xs text-red-500 mt-2">{error}</p>}

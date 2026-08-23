@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/auth';
 import { authApi } from '../services/api';
+import Button from '../components/ui/Button';
 import { getFeishuProviderParam, isFeishuClient } from '../lib/feishu';
 
 interface OAuthProvider {
@@ -91,39 +92,42 @@ export default function MobileLogin() {
           required
         />
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <button
+        <Button
           type="submit"
           disabled={loading}
-          className="h-12 rounded-lg bg-primary-600 text-white text-base font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          size="touch"
+          className="w-full"
         >
           {loading ? '登录中...' : '登录'}
-        </button>
+        </Button>
       </form>
       {(feishuProviders.length > 0 || wechatProviders.length > 0) && (
         <div className="w-full max-w-sm mt-6 flex flex-col gap-2">
           {feishuProviders.map((p) => (
-            <button
+            <Button
               key={`feishu-${p.key}`}
-              type="button"
+              variant="secondary"
+              size="touch"
+              className="w-full"
               onClick={() => {
                 window.location.href = `/api/auth/feishu/authorize?provider=${p.key}`;
               }}
-              className="h-11 rounded-lg bg-white border border-gray-200 text-sm text-gray-700"
             >
               {p.name}
-            </button>
+            </Button>
           ))}
           {wechatProviders.map((p) => (
-            <button
+            <Button
               key={`wechat-${p.key}`}
-              type="button"
+              variant="secondary"
+              size="touch"
+              className="w-full"
               onClick={() => {
                 window.location.href = `/api/auth/wechat/authorize?provider=${p.key}`;
               }}
-              className="h-11 rounded-lg bg-white border border-gray-200 text-sm text-gray-700"
             >
               {p.name}
-            </button>
+            </Button>
           ))}
         </div>
       )}

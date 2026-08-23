@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { boardApi, partsApi, documentsApi, mediaApi } from '../../services/api';
 import Badge from '../../components/ui/Badge';
+import Button from '../../components/ui/Button';
 import type { BadgeTone } from '../../constants/badges';
 import EmptyState from '../components/EmptyState';
 import DetailOverlayStack from '../components/DetailOverlayStack';
@@ -192,7 +193,7 @@ export default function BoardPage() {
               key={f.key}
               type="button"
               onClick={() => setFilterTab(f.key)}
-              className={`min-h-10 px-3 rounded-lg text-xs ${filterTab === f.key ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+              className={`min-h-10 px-3 rounded-lg text-xs ${filterTab === f.key ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
             >
               {f.label}
             </button>
@@ -447,14 +448,16 @@ function ItemRow({ item, depth, onClick }: { item: DashboardItem; depth: number;
               <span className="text-xs text-gray-500 truncate">{item.check_out_user_name}</span>
             )}
             {previewable === true ? (
-              <button
+              <Button
                 type="button"
                 onClick={onPreview}
                 disabled={previewingId === item.id}
-                className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-primary-600 text-white disabled:opacity-60"
+                variant="primary"
+                size="xs"
+                className="shrink-0 min-h-8"
               >
                 {previewingId === item.id ? '加载中...' : '预览'}
-              </button>
+              </Button>
             ) : (
               <span className="invisible shrink-0 px-2 py-0.5 rounded text-xs whitespace-nowrap">预览</span>
             )}

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Button from '../../components/ui/Button';
 
 /** 自定义下拉筛选（参考项目详情-层级下拉样式）：触发按钮 + 下拉面板，点击外部关闭 */
 export default function FilterDropdown({
@@ -16,13 +17,14 @@ export default function FilterDropdown({
   const current = options.find((o) => o.key === value) ?? options[0];
   return (
     <div className="relative">
-      <button
-        type="button"
+      <Button
+        variant="secondary"
+        size="xs"
+        className={`min-h-10 px-3 rounded-lg ${className ?? ''}`}
         onClick={() => setOpen((o) => !o)}
-        className={`min-h-10 px-3 rounded-lg bg-white border border-gray-200 text-xs text-gray-600 ${className ?? ''}`}
       >
         {current?.label ?? ''}
-      </button>
+      </Button>
       {open && (
         <>
           {/* 点击外部关闭 */}

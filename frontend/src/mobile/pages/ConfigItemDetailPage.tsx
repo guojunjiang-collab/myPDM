@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { configurationApi, customFieldsApi, mediaApi, partsApi } from '../../services/api';
 import { useDetailOverlayPush } from '../hooks/useDetailOverlay';
 import Badge from '../../components/ui/Badge';
+import Button from '../../components/ui/Button';
 import EmptyState from '../components/EmptyState';
 import ConfigTree from '../components/ConfigTree';
 import { openAttachmentInNewTab } from '../components/AttachmentPreview';
@@ -226,7 +227,7 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
               key={t.key}
               onClick={() => setTab(t.key)}
               className={`flex-1 min-h-10 text-xs whitespace-nowrap ${
-                tab === t.key ? 'bg-primary-600 text-white font-medium' : 'text-gray-500'
+                tab === t.key ? 'bg-[var(--ui-btn-primary-bg)] text-white font-medium' : 'text-gray-500'
               }`}
             >
               {t.label}
@@ -344,14 +345,16 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                     {/* 预览按钮固定占位（w-10 = 状态徽标内容宽度）：无 3D 时留空，类型徽标与必装徽标对齐 */}
                     <span className="shrink-0 w-10 flex justify-end">
                       {p.part_detail?.has_3d === true && (
-                        <button
+                        <Button
                           type="button"
                           onClick={(e) => onPreviewPart(p, e)}
                           disabled={previewingId === p.id}
-                          className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-primary-600 text-white disabled:opacity-60"
+                          variant="primary"
+                          size="xs"
+                          className="shrink-0 min-h-8"
                         >
                           {previewingId === p.id ? '加载中...' : '预览'}
-                        </button>
+                        </Button>
                       )}
                     </span>
                   </span>
@@ -402,14 +405,16 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                         {doc?.name || doc?.file_name || ''}
                       </span>
                       {doc?.file_id && (
-                        <button
+                        <Button
                           type="button"
                           onClick={(e) => onPreviewDoc(raw, doc, e)}
                           disabled={previewingId === raw.id}
-                          className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-primary-600 text-white disabled:opacity-60"
+                          variant="primary"
+                          size="xs"
+                          className="shrink-0 min-h-8"
                         >
                           {previewingId === raw.id ? '加载中...' : '预览'}
-                        </button>
+                        </Button>
                       )}
                     </span>
                   </button>

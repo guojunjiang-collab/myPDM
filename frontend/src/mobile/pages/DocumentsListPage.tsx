@@ -81,7 +81,7 @@ export default function DocumentsListPage() {
           <button
             onClick={() => setShowAllVersions((v) => !v)}
             className={`shrink-0 min-h-11 px-3 rounded-lg text-sm font-medium ${
-              showAllVersions ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'
+              showAllVersions ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-white text-gray-600 border border-gray-200'
             }`}
           >
             全部版本

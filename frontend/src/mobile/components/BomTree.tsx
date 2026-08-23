@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mediaApi, partsApi } from '../../services/api';
 import Badge from '../../components/ui/Badge';
+import Button from '../../components/ui/Button';
 import type { BomChild } from '../pages/PartBomPage';
 
 /**
@@ -148,14 +149,16 @@ export default function BomTree({ rootItems, onNavigate }: Props) {
                 </span>
               )}
               {/* 预览按钮（深色小按钮，同状态徽标尺寸）；装配体/零件均提供 3D 预览 */}
-              <button
+              <Button
                 type="button"
                 onClick={(e) => onPreview(b, e)}
                 disabled={previewingId === b.child_revision_id}
-                className="shrink-0 ml-2 px-2 py-0.5 rounded text-xs font-medium bg-primary-600 text-white disabled:opacity-60"
+                variant="primary"
+                size="xs"
+                className="shrink-0 ml-2 min-h-8"
               >
                 {previewingId === b.child_revision_id ? '加载中...' : '预览'}
-              </button>
+              </Button>
             </span>
           </button>
         </div>

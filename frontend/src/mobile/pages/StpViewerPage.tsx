@@ -11,6 +11,7 @@ import { ViewCube } from '../../components/STPViewer/ViewCube';
 import { buildCompareTree } from '../../components/STPViewer/buildCompareTree';
 import { useViewerStore } from '../../stores/viewerStore';
 import { backInterceptReducer } from '../hooks/backIntercept';
+import Button from '../../components/ui/Button';
 import type { BackAction, BackLayer } from '../hooks/backIntercept';
 
 /**
@@ -52,7 +53,7 @@ function ToolsPanel() {
   const btnBase =
     'w-full min-h-11 rounded-lg border text-sm font-medium transition-colors ' +
     'active:opacity-80';
-  const btnOn = 'bg-primary-600 text-white border-primary-600';
+  const btnOn = 'bg-[var(--ui-btn-primary-bg)] text-white border-[var(--ui-btn-primary-bg)]';
   const btnOff = 'bg-white text-gray-600 border-gray-200';
   const btnDisabled = 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed';
 
@@ -76,7 +77,7 @@ function ToolsPanel() {
                 onClick={() => vs.setDisplayMode(m.value)}
                 className={`flex-1 min-h-10 text-xs font-medium ${
                   compare.displayMode === m.value
-                    ? 'bg-primary-600 text-white'
+                    ? 'bg-[var(--ui-btn-primary-bg)] text-white'
                     : 'bg-white text-gray-500'
                 } ${i > 0 ? 'border-l border-gray-200' : ''}`}
               >
@@ -198,13 +199,14 @@ function ToolsPanel() {
       </button>
 
       {/* 重置 */}
-      <button
-        type="button"
+      <Button
         onClick={vs.triggerResetView}
-        className="w-full min-h-11 rounded-lg bg-gray-100 text-gray-700 text-sm font-medium active:opacity-80"
+        variant="ghost"
+        size="touch"
+        className="w-full"
       >
         重置视图
-      </button>
+      </Button>
     </div>
   );
 }
@@ -496,13 +498,12 @@ export function StpViewerCore({
         {unsupportedMode && (
           <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-gray-100">
             <div className="text-sm text-gray-500">该模式暂不支持移动端查看，请使用电脑浏览器</div>
-            <button
-              type="button"
+            <Button
               onClick={onBack}
-              className="min-h-11 px-4 rounded-lg bg-primary-600 text-white text-sm"
+              size="touch"
             >
               返回
-            </button>
+            </Button>
           </div>
         )}
 
@@ -539,37 +540,34 @@ export function StpViewerCore({
         {!unsupportedMode && phase === 'ready' && compareMode && cmpLeftInstances.length === 0 && cmpRightInstances.length === 0 && (
           <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-gray-50">
             <div className="text-sm text-gray-500">两侧装配均无已摆位的零件（先导入装配 STEP）</div>
-            <button
-              type="button"
+            <Button
               onClick={onBack}
-              className="min-h-11 px-4 rounded-lg bg-primary-600 text-white text-sm"
+              size="touch"
             >
               返回
-            </button>
+            </Button>
           </div>
         )}
         {!unsupportedMode && phase === 'ready' && assemblyRevId && asmInstances && asmInstances.length === 0 && (
           <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-gray-50">
             <div className="text-sm text-gray-500">该装配暂无已摆位的零件（先导入装配 STEP）</div>
-            <button
-              type="button"
+            <Button
               onClick={onBack}
-              className="min-h-11 px-4 rounded-lg bg-primary-600 text-white text-sm"
+              size="touch"
             >
               返回
-            </button>
+            </Button>
           </div>
         )}
         {!unsupportedMode && phase === 'error' && (
           <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-gray-50">
             <div className="text-sm text-red-500">加载失败，请关闭后重试</div>
-            <button
-              type="button"
+            <Button
               onClick={onBack}
-              className="min-h-11 px-4 rounded-lg bg-primary-600 text-white text-sm"
+              size="touch"
             >
               返回
-            </button>
+            </Button>
           </div>
         )}
 
@@ -596,20 +594,22 @@ export function StpViewerCore({
         {/* 浮动按钮（抽屉打开时被遮罩盖住不可点） */}
         {!unsupportedMode && phase === 'ready' && (url || asmInstances || compareMode) && (
           <>
-            <button
-              type="button"
+            <Button
               onClick={() => openDrawer('tree')}
-              className="absolute left-3 bottom-5 z-20 min-w-11 min-h-11 px-3 rounded-full bg-white shadow-md border border-gray-200 text-xs text-gray-700 flex items-center justify-center gap-1"
+              variant="secondary"
+              size="xs"
+              className="absolute left-3 bottom-5 z-20 min-w-11 min-h-11 px-3 rounded-full shadow-md"
             >
               模型树
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
               onClick={() => openDrawer('tools')}
-              className="absolute right-3 bottom-5 z-20 min-w-11 min-h-11 px-3 rounded-full bg-white shadow-md border border-gray-200 text-xs text-gray-700 flex items-center justify-center gap-1"
+              variant="secondary"
+              size="xs"
+              className="absolute right-3 bottom-5 z-20 min-w-11 min-h-11 px-3 rounded-full shadow-md"
             >
               工具
-            </button>
+            </Button>
           </>
         )}
 

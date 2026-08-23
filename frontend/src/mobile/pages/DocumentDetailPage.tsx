@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { customFieldsApi, documentsApi } from '../../services/api';
 import Badge from '../../components/ui/Badge';
+import Button from '../../components/ui/Button';
 import EmptyState from '../components/EmptyState';
 import AttachmentPreview, { openAttachmentInNewTab } from '../components/AttachmentPreview';
 import DocWhereUsedTab from './DocWhereUsedTab';
@@ -256,7 +257,7 @@ export default function DocumentDetailPage({ id: propId, onBack, onNavigate }: P
           </div>
           {/* 标题栏最右侧：附件"预览"按钮（图文档只有一个附件，一直显示便于快速点击） */}
           {!attachmentsError && attachments.length > 0 && (
-            <button
+            <Button
               onClick={async () => {
                 try {
                   await openAttachmentInNewTab(attachments[0]);
@@ -264,10 +265,12 @@ export default function DocumentDetailPage({ id: propId, onBack, onNavigate }: P
                   /* 静默：失败不阻塞页面 */
                 }
               }}
-              className="shrink-0 min-h-8 px-3 rounded-lg bg-primary-600 text-white text-xs"
+              variant="primary"
+              size="xs"
+              className="shrink-0 min-h-8"
             >
               预览
-            </button>
+            </Button>
           )}
         </div>
         <div className="flex mt-1 bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -285,7 +288,7 @@ export default function DocumentDetailPage({ id: propId, onBack, onNavigate }: P
                 }
               }}
               className={`flex-1 min-h-10 text-xs whitespace-nowrap ${
-                activeTab === t.key ? 'bg-primary-600 text-white font-medium' : 'text-gray-500'
+                activeTab === t.key ? 'bg-[var(--ui-btn-primary-bg)] text-white font-medium' : 'text-gray-500'
               }`}
             >
               {t.label}

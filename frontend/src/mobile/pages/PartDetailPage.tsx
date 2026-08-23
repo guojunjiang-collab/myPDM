@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { customFieldsApi, entityDocumentsApi, mediaApi, partsApi } from '../../services/api';
 import Badge from '../../components/ui/Badge';
+import Button from '../../components/ui/Button';
 import EmptyState from '../components/EmptyState';
 import AttachmentPreview, { openAttachmentInNewTab } from '../components/AttachmentPreview';
 import type { PreviewAttachment } from '../components/AttachmentPreview';
@@ -518,13 +519,15 @@ export default function PartDetailPage({
           </div>
           {/* 标题行最右侧：3D（无生产附件 STP 的零件不显示） */}
           {revisionId && hasStp === true && (
-            <button
+            <Button
               onClick={on3DPreview}
               disabled={stpLoading}
-              className="shrink-0 min-h-8 px-3 rounded-lg bg-primary-600 text-white text-xs disabled:opacity-60"
+              variant="primary"
+              size="xs"
+              className="shrink-0 min-h-8"
             >
               {stpLoading ? '加载中...' : '3D'}
-            </button>
+            </Button>
           )}
         </div>
         <div className="flex mt-1 bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -542,7 +545,7 @@ export default function PartDetailPage({
                 }
               }}
               className={`flex-1 min-h-10 text-xs whitespace-nowrap ${
-                activeTab === t.key ? 'bg-primary-600 text-white font-medium' : 'text-gray-500'
+                activeTab === t.key ? 'bg-[var(--ui-btn-primary-bg)] text-white font-medium' : 'text-gray-500'
               }`}
             >
               {t.label}
@@ -674,14 +677,16 @@ export default function PartDetailPage({
                             {l.document?.name || ''}
                           </span>
                           {l.document?.file_id && (
-                            <button
+                            <Button
                               type="button"
                               onClick={(e) => onPreviewDoc(l, e)}
                               disabled={previewingId === l.id}
-                              className="shrink-0 px-2.5 min-h-7 rounded bg-primary-50 text-primary-600 text-xs font-medium disabled:opacity-60"
+                              variant="primary"
+                              size="xs"
+                              className="shrink-0 min-h-8"
                             >
                               {previewingId === l.id ? '加载中...' : '预览'}
-                            </button>
+                            </Button>
                           )}
                         </span>
                       </button>
@@ -748,13 +753,14 @@ export default function PartDetailPage({
                       ? `已选：${versions.find((v) => v.id === cmpSel[0])?.version ?? '?'} vs ${versions.find((v) => v.id === cmpSel[1])?.version ?? '?'}`
                       : '请再选择一个版本'}
                   </span>
-                  <button
+                  <Button
                     onClick={startVersionCompare}
                     disabled={cmpSel.length !== 2}
-                    className="shrink-0 min-h-10 px-4 rounded-lg bg-primary-600 text-white text-sm font-medium disabled:opacity-40"
+                    size="touch"
+                    className="shrink-0"
                   >
                     开始对比
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>

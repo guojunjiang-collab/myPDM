@@ -4,6 +4,7 @@ import { partsApi } from '../../services/api';
 import { useDebounced } from '../../hooks/useDebounced';
 import MobileCardList from '../components/MobileCardList';
 import Badge from '../../components/ui/Badge';
+import Button from '../../components/ui/Button';
 import EmptyState from '../components/EmptyState';
 import FilterDropdown from '../components/FilterDropdown';
 import DetailOverlayStack from '../components/DetailOverlayStack';
@@ -124,12 +125,13 @@ export default function PartsListPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <button
+          <Button
             onClick={() => navigate('/parts/compare')}
-            className="shrink-0 min-h-11 px-3 rounded-lg bg-primary-600 text-white text-sm font-medium"
+            size="touch"
+            className="shrink-0"
           >
             ⇄ 对比
-          </button>
+          </Button>
         </div>
         {/* 行2：类型下拉（左）+ 状态下拉 + 顶层/全部版本开关（右） */}
         <div className="flex items-center gap-2 mt-2">
@@ -138,13 +140,13 @@ export default function PartsListPage() {
           <div className="flex-1" />
           <button
             onClick={() => setTopLevel((v) => !v)}
-            className={`min-h-10 px-3 rounded-lg text-xs ${topLevel ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+            className={`min-h-10 px-3 rounded-lg text-xs ${topLevel ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
           >
             顶层
           </button>
           <button
             onClick={() => setShowAllVersions((v) => !v)}
-            className={`min-h-10 px-3 rounded-lg text-xs ${showAllVersions ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+            className={`min-h-10 px-3 rounded-lg text-xs ${showAllVersions ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
           >
             全部版本
           </button>

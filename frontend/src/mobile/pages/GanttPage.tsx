@@ -123,7 +123,7 @@ export default function GanttPage({ projectId, onBack }: Props) {
                 key={s.key}
                 onClick={() => setScale(s.key)}
                 className={`min-h-8 px-3 text-xs ${
-                  scale === s.key ? 'bg-primary-600 text-white font-medium' : 'text-gray-500'
+                  scale === s.key ? 'bg-[var(--ui-btn-primary-bg)] text-white font-medium' : 'text-gray-500'
                 }`}
               >
                 {s.label}

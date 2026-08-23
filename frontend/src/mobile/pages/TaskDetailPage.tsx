@@ -4,6 +4,7 @@ import { projectApi } from '../../services/projectApi';
 import { logsApi, ecrApi, ecoApi, partsApi, documentsApi, mediaApi } from '../../services/api';
 import { useDetailOverlayPush } from '../hooks/useDetailOverlay';
 import Badge from '../../components/ui/Badge';
+import Button from '../../components/ui/Button';
 import EmptyState from '../components/EmptyState';
 import AttachmentPreview, { openAttachmentInNewTab, isAttachmentPreviewable } from '../components/AttachmentPreview';
 import type { PreviewAttachment } from '../components/AttachmentPreview';
@@ -342,7 +343,7 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
               key={t.key}
               onClick={() => setTab(t.key)}
               className={`flex-1 min-h-10 text-xs whitespace-nowrap ${
-                tab === t.key ? 'bg-primary-600 text-white font-medium' : 'text-gray-500'
+                tab === t.key ? 'bg-[var(--ui-btn-primary-bg)] text-white font-medium' : 'text-gray-500'
               }`}
             >
               {t.label}
@@ -468,14 +469,16 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
                               {l.entity_name || l.entity_remark || ''}
                             </span>
                             {previewableMap[l.id] === true && (
-                              <button
+                              <Button
                                 type="button"
                                 onClick={(e) => onPreview(l, e)}
                                 disabled={previewingId === l.id}
-                                className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-primary-600 text-white disabled:opacity-60"
+                                variant="primary"
+                                size="xs"
+                                className="shrink-0 min-h-8"
                               >
                                 {previewingId === l.id ? '加载中...' : '预览'}
-                              </button>
+                              </Button>
                             )}
                           </span>
                         </button>
@@ -540,14 +543,15 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
                 rows={2}
                 className="flex-1 min-w-0 text-sm px-2 py-1.5 border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-1 focus:ring-primary-500"
               />
-              <button
-                type="button"
+              <Button
                 onClick={sendComment}
                 disabled={!commentText.trim() || commentSending}
-                className="shrink-0 min-h-9 px-3 rounded-lg bg-primary-600 text-white text-sm font-medium disabled:opacity-50"
+                variant="primary"
+                size="xs"
+                className="shrink-0 min-h-9 px-3 rounded-lg text-sm"
               >
                 {commentSending ? '发送中...' : '发送'}
-              </button>
+              </Button>
             </div>
           </div>
         )}

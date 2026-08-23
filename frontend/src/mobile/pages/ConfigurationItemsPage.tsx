@@ -131,13 +131,13 @@ export default function ConfigurationItemsPage() {
           />
           <button
             onClick={() => setTopLevel((v) => !v)}
-            className={`shrink-0 min-h-11 px-3 rounded-lg text-xs ${topLevel ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+            className={`shrink-0 min-h-11 px-3 rounded-lg text-xs ${topLevel ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
           >
             顶层
           </button>
           <button
             onClick={() => setShowAllVersions((v) => !v)}
-            className={`shrink-0 min-h-11 px-3 rounded-lg text-xs ${showAllVersions ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+            className={`shrink-0 min-h-11 px-3 rounded-lg text-xs ${showAllVersions ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
           >
             全部版本
           </button>

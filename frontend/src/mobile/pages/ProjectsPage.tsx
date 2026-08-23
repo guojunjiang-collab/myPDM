@@ -7,6 +7,7 @@ import { useAuthStore } from '../../stores/auth';
 import DetailOverlayStack from '../components/DetailOverlayStack';
 import MobileCardList from '../components/MobileCardList';
 import Badge from '../../components/ui/Badge';
+import Button from '../../components/ui/Button';
 import EmptyState from '../components/EmptyState';
 import { formatMeta } from '../components/formatMeta';
 import TaskDetailPage from './TaskDetailPage';
@@ -426,20 +427,21 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
                     type="button"
                     onClick={() => setOnlyMine((v) => !v)}
                     className={`min-h-8 px-2.5 rounded-lg text-xs ${
-                      onlyMine ? 'bg-primary-600 text-white' : 'bg-white border border-gray-200 text-gray-600'
+                      onlyMine ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-white border border-gray-200 text-gray-600'
                     }`}
                   >
                     我的
                   </button>
                   {maxTreeDepth > 0 && (
                     <div className="relative">
-                      <button
-                        type="button"
+                      <Button
+                        variant="secondary"
+                        size="xs"
+                        className="w-14 min-h-8 rounded-lg"
                         onClick={() => setExpandOpen((o) => !o)}
-                        className="w-14 min-h-8 rounded-lg bg-white border border-gray-200 text-xs text-gray-600"
                       >
                         {expandLabel}
-                      </button>
+                      </Button>
                       {expandOpen && (
                         <>
                           {/* 点击外部关闭 */}
@@ -478,13 +480,14 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
                     </div>
                   )}
                   {/* 甘特图入口（层级下拉右侧） */}
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
+                    size="xs"
+                    className="min-h-8 rounded-lg px-2.5"
                     onClick={openGantt}
-                    className="min-h-8 px-2.5 rounded-lg bg-white border border-gray-200 text-xs text-gray-600"
                   >
                     甘特图
-                  </button>
+                  </Button>
                 </div>
               </div>
               {visibleTasks.length === 0 ? (

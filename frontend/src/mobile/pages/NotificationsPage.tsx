@@ -5,6 +5,7 @@ import { useNotificationStore } from '../../stores/notification';
 import { notificationIcon, NOTIFICATION_TARGET_ROUTE } from '../../lib/notification';
 import { isToday } from '../../lib/date';
 import EmptyState from '../components/EmptyState';
+import Button from '../../components/ui/Button';
 import { formatMeta } from '../components/formatMeta';
 import type { Notification } from '../../types';
 
@@ -114,12 +115,12 @@ export default function NotificationsPage() {
           <div className="min-h-11 flex items-center text-xs text-gray-500">
             {unread > 0 ? `未读 ${unread} 条` : '全部已读'}
           </div>
-          <button
+          <Button
             onClick={onMarkAllRead}
-            className="min-h-11 px-4 rounded-lg bg-primary-600 text-white text-sm font-medium"
+            size="touch"
           >
             全部已读
-          </button>
+          </Button>
         </div>
       </div>
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { userGroupsApi, usersApi } from '../../services/api';
 import { can } from '../../stores/auth';
 import Badge from '../../components/ui/Badge';
+import Button from '../../components/ui/Button';
 import EmptyState from '../components/EmptyState';
 import { useDebounced } from '../../hooks/useDebounced';
 
@@ -239,7 +240,7 @@ export default function UsersListPage() {
               key={t.key}
               onClick={() => setActiveTab(t.key)}
               className={`flex-1 min-h-10 text-xs whitespace-nowrap ${
-                activeTab === t.key ? 'bg-primary-600 text-white font-medium' : 'text-gray-500'
+                activeTab === t.key ? 'bg-[var(--ui-btn-primary-bg)] text-white font-medium' : 'text-gray-500'
               }`}
             >
               {t.label}
@@ -259,7 +260,7 @@ export default function UsersListPage() {
                 <button
                   key={f.key}
                   onClick={() => setRoleFilter(f.key)}
-                  className={`min-h-10 px-3 rounded-lg text-xs ${roleFilter === f.key ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+                  className={`min-h-10 px-3 rounded-lg text-xs ${roleFilter === f.key ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
                 >
                   {f.label}
                 </button>
@@ -356,18 +357,22 @@ export default function UsersListPage() {
                   actions={
                     canManage ? (
                       <div className="shrink-0 flex gap-2">
-                        <button
+                        <Button
                           onClick={() => setChoosingRole(u)}
-                          className="min-h-10 px-3 rounded-lg text-xs text-green-700 border border-green-200 bg-green-50"
+                          variant="success"
+                          size="xs"
+                          className="min-h-10 px-3 rounded-lg"
                         >
                           通过
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           onClick={() => onReject(u)}
-                          className="min-h-10 px-3 rounded-lg text-xs text-red-600 border border-red-200 bg-red-50"
+                          variant="danger"
+                          size="xs"
+                          className="min-h-10 px-3 rounded-lg"
                         >
                           拒绝
-                        </button>
+                        </Button>
                       </div>
                     ) : undefined
                   }
@@ -394,20 +399,24 @@ export default function UsersListPage() {
             <div className="text-xs text-gray-500 mb-3">选择分配的角色：</div>
             <div className="flex flex-col gap-2">
               {(['engineer', 'production', 'guest'] as const).map((r) => (
-                <button
+                <Button
                   key={r}
                   onClick={() => onApprove(choosingRole, r)}
-                  className="min-h-11 rounded-lg text-sm font-medium bg-primary-50 text-primary-700 border border-primary-200"
+                  variant="primary"
+                  size="touch"
+                  className="w-full"
                 >
                   {ROLE_LABEL[r]}
-                </button>
+                </Button>
               ))}
-              <button
+              <Button
                 onClick={() => setChoosingRole(null)}
-                className="min-h-11 rounded-lg text-sm text-gray-500 bg-gray-100"
+                variant="ghost"
+                size="touch"
+                className="w-full"
               >
                 取消
-              </button>
+              </Button>
             </div>
           </div>
         </div>

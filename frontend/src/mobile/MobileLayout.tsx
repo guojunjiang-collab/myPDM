@@ -5,6 +5,7 @@ import { useNotificationStore } from '../stores/notification';
 import { can, useAuthStore } from '../stores/auth';
 import { MOBILE_TABS, MORE_ITEMS, filterVisible } from './nav';
 import { useHelpDrawer } from './helpDrawer';
+import Button from '../components/ui/Button';
 
 export default function MobileLayout() {
   const user = useAuthStore((s) => s.user); // 订阅登录态：登录/角色变化时触发重渲染
@@ -34,13 +35,14 @@ export default function MobileLayout() {
         <span className="min-w-0 text-center text-base font-medium truncate">{title}</span>
         {/* 帮助文档页：目录按钮固定在标题栏右侧 */}
         {isHelpPage && (
-          <button
-            type="button"
+          <Button
             onClick={() => openHelpDrawer(true)}
-            className="absolute right-3 min-h-7 px-2.5 rounded-lg bg-primary-600 text-white text-xs flex items-center gap-1"
+            variant="primary"
+            size="xs"
+            className="absolute right-3 min-h-8 rounded-lg"
           >
             <span>☰</span> 目录
-          </button>
+          </Button>
         )}
       </header>
       <main className="flex-1 overflow-y-auto pb-16">

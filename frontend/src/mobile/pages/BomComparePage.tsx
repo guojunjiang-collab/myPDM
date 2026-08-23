@@ -4,6 +4,7 @@ import { bomApi, partsApi } from '../../services/api';
 import type { BOMCompareNode, BOMCompareResponse } from '../../types';
 import type { PartListItem } from '../../types';
 import Badge from '../../components/ui/Badge';
+import Button from '../../components/ui/Button';
 import type { BadgeTone } from '../../constants/badges';
 import { StpViewerCore } from './StpViewerPage';
 
@@ -376,20 +377,22 @@ export default function BomComparePage() {
           }}
         />
         <div className="flex gap-2">
-          <button
+          <Button
             onClick={handleCompare}
             disabled={!leftId || !rightId || loading}
-            className="flex-1 min-h-11 rounded-lg bg-primary-600 text-white text-sm font-medium disabled:opacity-50"
+            size="touch"
+            className="flex-1"
           >
             {loading ? '对比中...' : '开始对比'}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={open3D}
             disabled={!leftId || !rightId}
-            className="flex-1 min-h-11 rounded-lg bg-white border border-primary-600 text-primary-600 text-sm font-medium disabled:opacity-50"
+            size="touch"
+            className="flex-1"
           >
             🧊 3D 对比
-          </button>
+          </Button>
         </div>
         {error && <p className="text-center text-xs text-red-500 py-1">{error}</p>}
       </div>
@@ -400,13 +403,13 @@ export default function BomComparePage() {
           <div className="flex items-center gap-2 px-3 pt-2">
             <button
               onClick={() => setActiveTab('tree')}
-              className={`min-h-9 px-3 rounded-full text-xs ${activeTab === 'tree' ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+              className={`min-h-9 px-3 rounded-full text-xs ${activeTab === 'tree' ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
             >
               BOM树对比
             </button>
             <button
               onClick={() => setActiveTab('property')}
-              className={`min-h-9 px-3 rounded-full text-xs ${activeTab === 'property' ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+              className={`min-h-9 px-3 rounded-full text-xs ${activeTab === 'property' ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
             >
               属性对比
             </button>

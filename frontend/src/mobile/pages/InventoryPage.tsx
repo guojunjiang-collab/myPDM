@@ -235,7 +235,7 @@ export default function InventoryPage() {
               key={t.key}
               onClick={() => setSection(t.key)}
               className={`flex-1 h-11 rounded-lg text-sm font-medium transition-colors ${
-                section === t.key ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'
+                section === t.key ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-white text-gray-600 border border-gray-200'
               }`}
             >
               {t.label}
