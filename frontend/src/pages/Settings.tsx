@@ -59,7 +59,7 @@ export default function Settings() {
 
   type TabKey = 'password' | 'feishuBind' | 'wechatBind' | 'logs' | 'customFields' | 'dataManagement' | 'theme';
 
-  const [activeTab, setActiveTab] = useState<TabKey>('password');
+  const [activeTab, setActiveTab] = useState<TabKey>('theme');
   const [theme, setThemeState] = useState<ThemeKey>(() => getStoredTheme());
 
   const handleThemeChange = (key: ThemeKey) => {
