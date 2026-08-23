@@ -52,7 +52,19 @@
   --ui-font-size-sm: 12px;
   --ui-font-size-base: 14px;
   --ui-font-size-lg: 16px;
+  --ui-font-size-xl: 18px;
   --ui-line-height: 1.5;
+  /* 控件尺寸 token（随字体缩放，统一高度消除漂移） */
+  --ui-control-h: calc(36px * var(--ui-font-scale));
+  --ui-control-h-sm: calc(28px * var(--ui-font-scale));
+  --ui-control-h-xs: calc(24px * var(--ui-font-scale));
+  --ui-control-px: calc(12px * var(--ui-font-scale));
+  --ui-control-px-sm: calc(10px * var(--ui-font-scale));
+  --ui-control-px-xs: calc(8px * var(--ui-font-scale));
+  --ui-control-radius: 8px;
+  --ui-control-radius-sm: 6px;
+  --ui-control-border-w: 1px;
+  --ui-control-gap: 4px;
   /* 背景组 */
   --ui-bg-page: #f5f5f5;
   --ui-bg-surface: #ffffff;
@@ -305,4 +317,5 @@ body {
   .text-xs   { font-size: var(--ui-font-size-sm); }
   .text-sm   { font-size: var(--ui-font-size-base); }
   .text-base { font-size: var(--ui-font-size-lg); }
+  .text-lg   { font-size: var(--ui-font-size-xl); }
 }

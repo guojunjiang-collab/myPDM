@@ -8,7 +8,7 @@ interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'siz
 
 const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select({ size = 'md', className = '', children, ...rest }, ref) {
   return (
-    <select ref={ref} className={`${INPUT_BASE_CLASS} ${size === 'xs' ? '!px-2 !py-1 !text-xs' : ''} ${className}`.trim()} {...rest}>
+    <select ref={ref} className={`${INPUT_BASE_CLASS} ${size === 'xs' ? '!h-[var(--ui-control-h-xs)] !px-2 !text-xs' : ''} ${className}`.trim()} {...rest}>
       {children}
     </select>
   );
