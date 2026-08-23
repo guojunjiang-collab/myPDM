@@ -74,6 +74,15 @@ html[data-theme='forest'] {
   --ui-btn-link-text: #15803d;       --ui-btn-link-hover: #166534;
   --ui-input-focus-ring: #34d399;    --ui-input-focus-border: #059669;
   --color-primary: #059669;
+
+  /* 背景预设（浅色主题微差） */
+  --ui-bg-page: #f4f7f5;
+  --ui-bg-surface: #ffffff;
+  --ui-bg-subtle: #f0f5f1;
+  --ui-bg-hover: #e8efe9;
+  --ui-border: #e2e8e4;
+  --ui-text-secondary: #5b6b60;
+  --ui-text-tertiary: #8fa094;
 }
 
 /* 酒红：主色 rose-800 系 */
@@ -83,6 +92,15 @@ html[data-theme='warm'] {
   --ui-btn-link-text: #9f1239;       --ui-btn-link-hover: #881337;
   --ui-input-focus-ring: #fb7185;    --ui-input-focus-border: #e11d48;
   --color-primary: #e11d48;
+
+  /* 背景预设（浅色主题微差） */
+  --ui-bg-page: #faf7f5;
+  --ui-bg-surface: #fffdfb;
+  --ui-bg-subtle: #f6f1ed;
+  --ui-bg-hover: #efe7e1;
+  --ui-border: #ece3dd;
+  --ui-text-secondary: #6e6158;
+  --ui-text-tertiary: #a3948a;
 }
 
 * {
