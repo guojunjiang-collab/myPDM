@@ -650,8 +650,8 @@ onExecuteFreeze={(itemId, newEntityId) => handleExecuteAction('freeze', itemId, 
         alreadyLinked={documentLinks.map(d => d.document_id)}
       />
 
-      {/* ECR 选择弹窗（共享 Modal，消灭 z-[100] 自绘遮罩） */}
-      <Modal open={showEcrPicker} title="选择 ECR" onClose={() => setShowEcrPicker(false)} width="lg" zIndex={MODAL_Z.picker}>
+      {/* ECR 选择弹窗（共享 Modal，消灭 z-[100] 自绘遮罩；height 限定防 ECR 长列表超高） */}
+      <Modal open={showEcrPicker} title="选择 ECR" onClose={() => setShowEcrPicker(false)} width="lg" height="70vh" zIndex={MODAL_Z.picker}>
         <EcrPicker onSelect={async (id, number) => {
           try {
             await ecoApi.update(localEco!.id, { ecr_id: id } as any);
