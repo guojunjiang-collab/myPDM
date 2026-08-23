@@ -22,7 +22,6 @@ export function useSceneVisualState(
   origColorRef: MutableRefObject<Map<string, number>>,
 ) {
   const selectedNodeId = useViewerStore((s) => s.selectedNodeId);
-  const isolateMode = useViewerStore((s) => s.isolateMode);
   const ghostOpacity = useViewerStore((s) => s.ghostOpacity);
   const nodeMap = useViewerStore((s) => s.nodeMap);
   const hiddenParts = useViewerStore((s) => s.hiddenParts);
@@ -55,24 +54,19 @@ export function useSceneVisualState(
 
       if (!sel) {
         if (std.emissive) { std.emissive.setHex(0x000000); std.emissiveIntensity = 0; }
-        // 无选中节点：幽灵透明度全局淡出（装配预览看内部结构；1 = 不透明）
-        std.transparent = ghostOpacity < 1;
-        std.opacity = ghostOpacity;
-        std.depthWrite = ghostOpacity >= 1;
+        // 无选中节点：保持不透明（幽灵滑块仅在有选中零件时生效）
+        std.transparent = false; std.opacity = 1; std.depthWrite = true;
       } else if (sel.has(mesh.uuid)) {
         if (std.emissive) { std.emissive.setHex(0x224488); std.emissiveIntensity = 0.5; }
         std.transparent = false; std.opacity = 1; std.depthWrite = true;
       } else {
         if (std.emissive) { std.emissive.setHex(0x000000); std.emissiveIntensity = 0; }
-        if (isolateMode) {
-          std.transparent = true; std.opacity = 0.12; std.depthWrite = false;
-        } else {
-          std.transparent = false; std.opacity = 1; std.depthWrite = true;
-        }
+        // 有选中节点：非选中零件按幽灵滑块淡出
+        std.transparent = true; std.opacity = ghostOpacity; std.depthWrite = false;
       }
       std.needsUpdate = true;
     });
-  }, [groupRef, selectedNodeId, isolateMode, ghostOpacity, nodeMap, hiddenParts, wireframe]);
+  }, [groupRef, selectedNodeId, ghostOpacity, nodeMap, hiddenParts, wireframe]);
 
   // 自动上色：按零件名称着色；关闭时还原原始色。只改 color，不触碰 emissive/opacity。
   useEffect(() => {
