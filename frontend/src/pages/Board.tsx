@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { previewAttachment } from '../utils/attachmentPreview';
 import { boardApi, usersApi, partsApi, documentsApi, configurationApi, mediaApi } from '../services/api';
 import { useDataStore } from '../stores/data';
 import { Modal, ConfirmModal } from '../components/Modal';
@@ -369,10 +370,22 @@ export default function Board() {
       setDetailComponentId(item.master_id || item.entity_id);
       setDetailItem(null);
     } else if (item.entity_type === 'document') {
-      // 图文档：与图文档管理页一致的预览行为——打开详情弹窗（默认附件页，可预览各附件）
-      setDetailDocId(item.entity_id);
-      setDetailComponentId(null);
-      setDetailItem(null);
+      // 图文档：直接做附件预览（与附件预览一致——新窗口按格式分发）
+      try {
+        const res: any = await documentsApi.listAttachments(item.entity_id);
+        const atts: any[] = Array.isArray(res) ? res : (res?.items || []);
+        const att = atts[0];
+        if (att) {
+          await previewAttachment(att.id, att.file_name || '', {
+            // 压缩包无法直接预览：明确提示，不打开详情弹窗
+            onArchive: () => alert('压缩包附件请在图文档详情中查看'),
+          });
+          return;
+        }
+        alert('该图文档暂无附件可预览');
+      } catch {
+        alert('附件预览失败，请重试');
+      }
     }
   };
 
