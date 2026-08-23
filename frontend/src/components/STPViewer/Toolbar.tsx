@@ -36,7 +36,7 @@ export function Toolbar() {
   ];
 
   return (
-    <div className="relative border-b border-gray-100 bg-[var(--ui-bg-surface)] shadow-sm">
+    <div className="relative border-b border-[var(--ui-border)] bg-[var(--ui-bg-subtle)] shadow-sm">
       <div className="flex items-center gap-3 px-4 py-2">
       {compare && (
         <>
