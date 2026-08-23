@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { AssemblyPartItem } from '../types';
 import { partsApi } from '../services/api';
 import Badge from './ui/Badge';
+import TreeToggle from './ui/TreeToggle';
 
 interface BOMTreeTableProps {
   /** 根版本 revision_id */
@@ -138,12 +139,9 @@ export default function BOMTreeTable({ revisionId, assemblyCode, assemblyName, r
         <td className="px-3 py-2 text-[var(--ui-text-tertiary)] whitespace-nowrap">
           <span className="text-xs text-[var(--ui-text-tertiary)]">{'-'.repeat(level + 1)}{level + 1}</span>
           {hasChildren && (
-            <button
-              onClick={(e) => { e.stopPropagation(); toggleExpand(node); }}
-              className="inline-flex items-center w-5 h-5 text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] ml-1"
-            >
-              {node.expanded ? '\u25BC' : '\u25B6'}
-            </button>
+            <span className="ml-1">
+              <TreeToggle expanded={node.expanded} onClick={() => toggleExpand(node)} size="md" title={node.expanded ? '折叠' : '展开'} />
+            </span>
           )}
         </td>
         <td className={`px-3 py-2 font-medium ${dataCellCls}`} onClick={rowClick}>{item.child_detail?.code || '-'}</td>
@@ -207,10 +205,9 @@ export default function BOMTreeTable({ revisionId, assemblyCode, assemblyName, r
                     <td className="px-3 py-2 text-[var(--ui-text-tertiary)] whitespace-nowrap">
                       <span className="text-xs text-[var(--ui-text-tertiary)]">0</span>
                       {flatRows.length > 0 && (
-                        <button onClick={(e) => { e.stopPropagation(); toggleAll(); }}
-                          className="inline-flex items-center w-5 h-5 text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] ml-1">
-                          {allExpanded ? '\u25BC' : '\u25B6'}
-                        </button>
+                        <span className="ml-1">
+                          <TreeToggle expanded={allExpanded} onClick={toggleAll} size="md" title={allExpanded ? '全部折叠' : '全部展开'} />
+                        </span>
                       )}
                     </td>
                     <td className="px-3 py-2 font-medium">{assemblyCode}</td>
