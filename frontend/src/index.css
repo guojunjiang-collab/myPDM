@@ -170,10 +170,11 @@ html[data-theme='dark'] .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { bor
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  color: var(--color-text);
-  background-color: var(--color-bg);
-  line-height: 1.5;
+  font-family: var(--ui-font-family);
+  font-size: calc(var(--ui-font-size-lg) * var(--ui-font-scale));
+  line-height: var(--ui-line-height);
+  color: var(--ui-text-primary);
+  background-color: var(--ui-bg-page);
 }
 
 #root {
@@ -219,4 +220,11 @@ body {
   .print-area h4 {
     break-after: avoid;
   }
+}
+
+/* 字号档位：Tailwind 固定值类改为读 var，主题可整体缩放（浅色值 = 原值） */
+@layer utilities {
+  .text-xs   { font-size: var(--ui-font-size-sm); }
+  .text-sm   { font-size: var(--ui-font-size-base); }
+  .text-base { font-size: var(--ui-font-size-lg); }
 }
