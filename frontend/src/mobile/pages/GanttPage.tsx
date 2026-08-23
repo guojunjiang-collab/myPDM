@@ -243,11 +243,11 @@ export default function GanttPage({ projectId, onBack }: Props) {
                     </div>
                   );
                 })}
-                {/* 行分隔线 */}
+                {/* 行分隔线（深色下 --ui-border 与底色对比过弱，与左列同用 --ui-border-strong） */}
                 {data.tasks.map((t, i) => (
                   <div
                     key={'l' + t.id}
-                    className="absolute left-0 right-0 border-t border-[var(--ui-border)]"
+                    className="absolute left-0 right-0 border-t border-[var(--ui-border-strong)]"
                     style={{ top: i * ROW_H }}
                   />
                 ))}
