@@ -348,8 +348,8 @@ export default function Board() {
     if (isComponentType(item.entity_type)) {
       // 找该 revision 的 STP/STEP 附件，打开 3D 查看器
       try {
-        const res = await partsApi.listAttachments(item.entity_id);
-        const atts: any[] = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+        const res: any = await partsApi.listAttachments(item.entity_id);
+        const atts: any[] = Array.isArray(res) ? res : (res?.items || []);
         const stp = atts.find((a) => /\.(stp|step)$/i.test(a.file_name || ''));
         if (stp) {
           window.open(`/stp-viewer?id=${stp.id}`, '_blank');

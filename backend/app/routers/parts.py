@@ -827,8 +827,9 @@ def list_attachments(
             crud_parts.models_parts.PartIteration.revision_id == revision_id,
         ).first()
         if not iteration:
-            raise HTTPException(404, "迭代不存在或不属于该版本")
-    else:
+            # 容错：传入的迭代与版本不匹配（如前端状态错配）时回退到当前迭代，避免整列 404
+            iteration = None
+    if not iteration:
         result = crud_parts.get_part_revision_with_current_iteration(db, revision_id)
         if not result:
             raise HTTPException(404, "版本不存在")
