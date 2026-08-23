@@ -42,8 +42,8 @@ function cfDisplay(v: unknown): string | null {
 function OverviewRow({ label, children }: { label: string; children?: ReactNode }) {
   return (
     <div className="py-2.5">
-      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-      <div className="text-sm text-gray-900 break-all">{children}</div>
+      <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{label}</div>
+      <div className="text-sm text-[var(--ui-text-primary)] break-all">{children}</div>
     </div>
   );
 }
@@ -236,17 +236,17 @@ export default function DocumentDetailPage({ id: propId, onBack, onNavigate }: P
   return (
     <div className="flex flex-col">
       {/* 顶部：返回按钮 + 标题（编号/名称）+ 分段 Tab（sticky 跟随列表页模式） */}
-      <div className="sticky top-0 z-10 bg-gray-50 px-2 pt-2 pb-1">
+      <div className="sticky top-0 z-10 bg-[var(--ui-bg-subtle)] px-2 pt-2 pb-1">
         <div className="flex items-center gap-1 min-h-10">
           <button
             aria-label="返回"
             onClick={() => (onBack ? onBack() : navigate(-1))}
-            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-gray-600"
+            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-[var(--ui-text-secondary)]"
           >
             ‹
           </button>
           {/* 标题：编号 + 版本徽标 + 名称（版本徽标主色浅底，名称过长省略不影响版本可见） */}
-          <div className="min-w-0 flex-1 flex items-center gap-1.5 text-base font-medium text-gray-900 truncate">
+          <div className="min-w-0 flex-1 flex items-center gap-1.5 text-base font-medium text-[var(--ui-text-primary)] truncate">
             <span className="shrink-0">{detail?.code ?? id}</span>
             {detail?.version && (
               <span className="shrink-0 px-1.5 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-700">
@@ -273,7 +273,7 @@ export default function DocumentDetailPage({ id: propId, onBack, onNavigate }: P
             </Button>
           )}
         </div>
-        <div className="flex mt-1 bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="flex mt-1 bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-hidden">
           {TABS.map((t) => (
             <button
               key={t.key}
@@ -288,7 +288,7 @@ export default function DocumentDetailPage({ id: propId, onBack, onNavigate }: P
                 }
               }}
               className={`flex-1 min-h-10 text-xs whitespace-nowrap ${
-                activeTab === t.key ? 'bg-[var(--ui-btn-primary-bg)] text-white font-medium' : 'text-gray-500'
+                activeTab === t.key ? 'bg-[var(--ui-btn-primary-bg)] text-white font-medium' : 'text-[var(--ui-text-secondary)]'
               }`}
             >
               {t.label}
@@ -297,7 +297,7 @@ export default function DocumentDetailPage({ id: propId, onBack, onNavigate }: P
         </div>
       </div>
 
-      {loading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+      {loading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
       {!loading && error && <p className="text-center text-xs text-red-400 py-3">{error}</p>}
       {!loading && !error && !detail && <EmptyState text="未找到图文档" />}
 
@@ -305,13 +305,13 @@ export default function DocumentDetailPage({ id: propId, onBack, onNavigate }: P
         <div className="p-3">
           {activeTab === 'overview' && (
             <div>
-              {cfLoading && <p className="text-center text-xs text-gray-400 py-2">自定义字段加载中...</p>}
+              {cfLoading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-2">自定义字段加载中...</p>}
               {!cfLoading && cfError && (
                 <p className="text-center text-xs text-red-400 py-2">自定义字段加载失败</p>
               )}
               {/* 基本信息区 */}
               <div className="mb-3">
-                <div className="text-sm font-bold text-gray-900 mb-2">基本信息</div>
+                <div className="text-sm font-bold text-[var(--ui-text-primary)] mb-2">基本信息</div>
                 <div className="grid grid-cols-2 gap-2">
                   {overviewRows.length === 0 ? (
                     <div className="col-span-2">
@@ -319,9 +319,9 @@ export default function DocumentDetailPage({ id: propId, onBack, onNavigate }: P
                     </div>
                   ) : (
                     overviewRows.map((r) => (
-                      <div key={r.label} className="bg-white rounded-lg px-3 py-2.5 min-h-14 shadow-sm">
-                        <div className="text-xs text-gray-500 mb-0.5 truncate">{r.label}</div>
-                        <div className="text-sm text-gray-900 break-all">{r.value ?? '-'}</div>
+                      <div key={r.label} className="bg-[var(--ui-bg-surface)] rounded-lg px-3 py-2.5 min-h-14 shadow-sm">
+                        <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5 truncate">{r.label}</div>
+                        <div className="text-sm text-[var(--ui-text-primary)] break-all">{r.value ?? '-'}</div>
                       </div>
                     ))
                   )}
@@ -330,12 +330,12 @@ export default function DocumentDetailPage({ id: propId, onBack, onNavigate }: P
               {/* 自定义字段区（无定义时不显示） */}
               {!cfLoading && !cfError && cfRows.length > 0 && (
                 <div>
-                  <div className="text-sm font-bold text-gray-900 mb-2">自定义字段</div>
+                  <div className="text-sm font-bold text-[var(--ui-text-primary)] mb-2">自定义字段</div>
                   <div className="grid grid-cols-2 gap-2">
                     {cfRows.map((r) => (
-                      <div key={r.label} className="bg-white rounded-lg px-3 py-2.5 min-h-14 shadow-sm">
-                        <div className="text-xs text-gray-500 mb-0.5 truncate">{r.label}</div>
-                        <div className="text-sm text-gray-900 break-all">{r.value ?? '-'}</div>
+                      <div key={r.label} className="bg-[var(--ui-bg-surface)] rounded-lg px-3 py-2.5 min-h-14 shadow-sm">
+                        <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5 truncate">{r.label}</div>
+                        <div className="text-sm text-[var(--ui-text-primary)] break-all">{r.value ?? '-'}</div>
                       </div>
                     ))}
                   </div>
@@ -345,7 +345,7 @@ export default function DocumentDetailPage({ id: propId, onBack, onNavigate }: P
           )}
           {activeTab === 'attachments' && (
             <div className="flex flex-col gap-2">
-              {loadingAttachments && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+              {loadingAttachments && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
               {!loadingAttachments && attachmentsError && (
                 <p className="text-center text-xs text-red-400 py-3">{attachmentsError}</p>
               )}
@@ -361,7 +361,7 @@ export default function DocumentDetailPage({ id: propId, onBack, onNavigate }: P
           )}
           {activeTab === 'versions' && (
             <div className="flex flex-col gap-2">
-              {verLoading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+              {verLoading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
               {!verLoading && verError && (
                 <p className="text-center text-xs text-red-400 py-3">版本加载失败，请稍后重试</p>
               )}
@@ -374,14 +374,14 @@ export default function DocumentDetailPage({ id: propId, onBack, onNavigate }: P
                   <div
                     key={v.id}
                     className={`rounded-lg px-4 py-3 shadow-sm ${
-                      v.id === id ? 'bg-primary-50 border border-primary-300' : 'bg-white'
+                      v.id === id ? 'bg-primary-50 border border-primary-300' : 'bg-[var(--ui-bg-surface)]'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-base font-medium text-gray-900">版本 {v.version}</span>
+                      <span className="text-base font-medium text-[var(--ui-text-primary)]">版本 {v.version}</span>
                       <Badge status={v.status} />
                     </div>
-                    <div className="text-xs text-gray-500 mt-1.5 space-y-0.5">
+                    <div className="text-xs text-[var(--ui-text-secondary)] mt-1.5 space-y-0.5">
                       <div>最新迭代：{v.latest_iteration}</div>
                       {v.check_out_user_name && <div>检出人：{v.check_out_user_name}</div>}
                       <div>创建时间：{fmtDateTime(v.created_at)}</div>

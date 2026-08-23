@@ -30,8 +30,8 @@ export default function MobileLayout() {
   }, [fetchUnread]);
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
-      <header className="h-12 shrink-0 sticky top-0 z-30 relative flex items-center justify-center px-3 bg-white border-b border-gray-200">
+    <div className="h-full flex flex-col bg-[var(--ui-bg-subtle)]">
+      <header className="h-12 shrink-0 sticky top-0 z-30 relative flex items-center justify-center px-3 bg-[var(--ui-bg-surface)] border-b border-[var(--ui-border)]">
         <span className="min-w-0 text-center text-base font-medium truncate">{title}</span>
         {/* 帮助文档页：目录按钮固定在标题栏右侧 */}
         {isHelpPage && (
@@ -48,13 +48,13 @@ export default function MobileLayout() {
       <main className="flex-1 overflow-y-auto pb-16">
         <Outlet />
       </main>
-      <nav className="fixed bottom-0 inset-x-0 h-14 bg-white border-t border-gray-200 flex z-20">
+      <nav className="fixed bottom-0 inset-x-0 h-14 bg-[var(--ui-bg-surface)] border-t border-[var(--ui-border)] flex z-20">
         {tabs.map((t) => (
           <NavLink
             key={t.key}
             to={t.path}
             className={({ isActive }) =>
-              `flex-1 flex flex-col items-center justify-center gap-0.5 min-h-14 ${isActive ? 'text-primary-600' : 'text-gray-500'}`
+              `flex-1 flex flex-col items-center justify-center gap-0.5 min-h-14 ${isActive ? 'text-primary-600' : 'text-[var(--ui-text-secondary)]'}`
             }
           >
             <span className="relative text-lg leading-none">

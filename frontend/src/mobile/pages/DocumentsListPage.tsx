@@ -69,11 +69,11 @@ export default function DocumentsListPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="sticky top-0 bg-gray-50 px-3 pt-2 pb-1 z-10">
+      <div className="sticky top-0 bg-[var(--ui-bg-subtle)] px-3 pt-2 pb-1 z-10">
         {/* 行1：搜索框 + 全部版本开关 */}
         <div className="flex items-center gap-2">
           <input
-            className="flex-1 min-w-0 h-11 px-4 rounded-lg bg-white border border-gray-200 text-base"
+            className="flex-1 min-w-0 h-11 px-4 rounded-lg bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] text-base"
             placeholder="搜索编号/名称..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -81,7 +81,7 @@ export default function DocumentsListPage() {
           <button
             onClick={() => setShowAllVersions((v) => !v)}
             className={`shrink-0 min-h-11 px-3 rounded-lg text-sm font-medium ${
-              showAllVersions ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-white text-gray-600 border border-gray-200'
+              showAllVersions ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-[var(--ui-bg-surface)] text-[var(--ui-text-secondary)] border border-[var(--ui-border)]'
             }`}
           >
             全部版本
@@ -92,7 +92,7 @@ export default function DocumentsListPage() {
           <FilterDropdown value={statusFilter} options={STATUS_FILTERS} onChange={setStatusFilter} />
         </div>
       </div>
-      {loading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+      {loading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
       {!loading && error && <p className="text-center text-xs text-red-400 py-3">{error}</p>}
       {!loading && !error && items.length === 0 && <EmptyState text="未找到图文档" />}
       <MobileCardList
@@ -100,13 +100,13 @@ export default function DocumentsListPage() {
         keyOf={(d) => d.id}
         renderMain={(d) => (
           <div className="flex items-center gap-2 min-w-0">
-            <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">{d.code}</span>
+            <span className="flex-1 min-w-0 truncate text-sm font-medium text-[var(--ui-text-primary)]">{d.code}</span>
             {!showAllVersions && (d as any).version_count > 1 && (
               <span className="shrink-0 px-1.5 py-0.5 rounded-lg text-xs bg-primary-50 text-primary-600">
                 {(d as any).version_count} 个版本
               </span>
             )}
-            <span className="shrink-0 text-xs text-gray-500">{d.version}</span>
+            <span className="shrink-0 text-xs text-[var(--ui-text-secondary)]">{d.version}</span>
             <span className="shrink-0 w-12 flex justify-end">
               <Badge status={d.status} />
             </span>
@@ -114,9 +114,9 @@ export default function DocumentsListPage() {
         )}
         renderMeta={(d) => (
           <div className="flex items-center gap-2 min-w-0">
-            <span className="flex-1 min-w-0 truncate text-xs text-gray-500">{d.name}</span>
+            <span className="flex-1 min-w-0 truncate text-xs text-[var(--ui-text-secondary)]">{d.name}</span>
             {d.check_out_user_name && (
-              <span className="shrink-0 text-xs text-gray-500">{d.check_out_user_name}</span>
+              <span className="shrink-0 text-xs text-[var(--ui-text-secondary)]">{d.check_out_user_name}</span>
             )}
           </div>
         )}

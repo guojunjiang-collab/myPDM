@@ -67,19 +67,19 @@ function UserCard({
   actions?: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-lg px-4 py-3 shadow-sm flex items-center gap-3">
+    <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm flex items-center gap-3">
       <span className="shrink-0 w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center text-base">
         {u.real_name?.[0] ?? u.username?.[0] ?? '?'}
       </span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
+          <span className="flex-1 min-w-0 truncate text-sm font-medium text-[var(--ui-text-primary)]">
             {u.real_name || u.username}
           </span>
           {u.role && <Badge status={u.role} domain="role" />}
           {u.status && <Badge status={u.status} domain="user" />}
         </div>
-        <div className="text-xs text-gray-500 mt-0.5 truncate">
+        <div className="text-xs text-[var(--ui-text-secondary)] mt-0.5 truncate">
           {u.username}
           {u.created_at ? ` · ${fmtDate(u.created_at)}` : ''}
         </div>
@@ -234,14 +234,14 @@ export default function UsersListPage() {
   return (
     <div className="flex flex-col h-full">
       {/* Tab 切换 */}
-      <div className="sticky top-0 bg-gray-50 px-2 pt-2 pb-1 z-10">
-        <div className="flex bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="sticky top-0 bg-[var(--ui-bg-subtle)] px-2 pt-2 pb-1 z-10">
+        <div className="flex bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-hidden">
           {TABS.map((t) => (
             <button
               key={t.key}
               onClick={() => setActiveTab(t.key)}
               className={`flex-1 min-h-10 text-xs whitespace-nowrap ${
-                activeTab === t.key ? 'bg-[var(--ui-btn-primary-bg)] text-white font-medium' : 'text-gray-500'
+                activeTab === t.key ? 'bg-[var(--ui-btn-primary-bg)] text-white font-medium' : 'text-[var(--ui-text-secondary)]'
               }`}
             >
               {t.label}
@@ -251,7 +251,7 @@ export default function UsersListPage() {
         {activeTab === 'users' && (
           <>
             <input
-              className="w-full h-11 px-4 mt-2 rounded-lg bg-white border border-gray-200 text-base"
+              className="w-full h-11 px-4 mt-2 rounded-lg bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] text-base"
               placeholder="搜索姓名/用户名..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -261,7 +261,7 @@ export default function UsersListPage() {
                 <button
                   key={f.key}
                   onClick={() => setRoleFilter(f.key)}
-                  className={`min-h-10 px-3 rounded-lg text-xs ${roleFilter === f.key ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+                  className={`min-h-10 px-3 rounded-lg text-xs ${roleFilter === f.key ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-[var(--ui-bg-surface)] text-[var(--ui-text-secondary)] border border-[var(--ui-border)]'}`}
                 >
                   {f.label}
                 </button>
@@ -274,7 +274,7 @@ export default function UsersListPage() {
       {/* Tab1 全部用户（只读） */}
       {activeTab === 'users' && (
         <div className="flex-1 min-h-0 overflow-y-auto">
-          {loading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+          {loading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
           {!loading && error && <p className="text-center text-xs text-red-400 py-3">加载失败，请稍后重试</p>}
           {!loading && !error && filtered.length === 0 && <EmptyState text="未找到用户" />}
           {!loading && !error && filtered.length > 0 && (
@@ -290,7 +290,7 @@ export default function UsersListPage() {
       {/* Tab2 用户组（只读） */}
       {activeTab === 'groups' && (
         <div className="flex-1 min-h-0 overflow-y-auto">
-          {groupsLoading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+          {groupsLoading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
           {!groupsLoading && groupsError && (
             <p className="text-center text-xs text-red-400 py-3">加载失败，请稍后重试</p>
           )}
@@ -298,7 +298,7 @@ export default function UsersListPage() {
           {!groupsLoading && !groupsError && groups.length > 0 && (
             <div className="p-3 flex flex-col gap-2">
               {groups.map((g) => (
-                <div key={g.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
+                <div key={g.id} className="bg-[var(--ui-bg-surface)] rounded-lg shadow-sm overflow-hidden">
                   <div className="w-full flex items-center gap-2 px-4 py-3 min-h-12">
                     <TreeToggle
                       expanded={expandedGroup === g.id}
@@ -313,7 +313,7 @@ export default function UsersListPage() {
                       <span className="flex-1 min-w-0">
                         <span className="block text-sm text-gray-800 truncate">{g.name}</span>
                         {g.description && (
-                          <span className="block text-xs text-gray-500 truncate mt-0.5">{g.description}</span>
+                          <span className="block text-xs text-[var(--ui-text-secondary)] truncate mt-0.5">{g.description}</span>
                         )}
                       </span>
                       <Badge tone="gray" label={`${g.member_count ?? 0} 人`} size="xs" />
@@ -322,9 +322,9 @@ export default function UsersListPage() {
                   {expandedGroup === g.id && (
                     <div className="border-t border-gray-100 px-4 py-2 flex flex-col">
                       {!membersByGroup[g.id] ? (
-                        <p className="text-xs text-gray-400 py-2">加载中...</p>
+                        <p className="text-xs text-[var(--ui-text-tertiary)] py-2">加载中...</p>
                       ) : membersByGroup[g.id].length === 0 ? (
-                        <p className="text-xs text-gray-400 py-2">暂无成员</p>
+                        <p className="text-xs text-[var(--ui-text-tertiary)] py-2">暂无成员</p>
                       ) : (
                         membersByGroup[g.id].map((uid) => {
                           const m = userById.get(uid);
@@ -335,7 +335,7 @@ export default function UsersListPage() {
                               </span>
                               <span className="text-sm text-gray-800 truncate">{m?.real_name || m?.username || uid}</span>
                               {m?.real_name && m.username !== m.real_name && (
-                                <span className="text-xs text-gray-400 truncate">{m.username}</span>
+                                <span className="text-xs text-[var(--ui-text-tertiary)] truncate">{m.username}</span>
                               )}
                             </div>
                           );
@@ -353,7 +353,7 @@ export default function UsersListPage() {
       {/* Tab3 待审批 */}
       {activeTab === 'pending' && (
         <div className="flex-1 min-h-0 overflow-y-auto">
-          {loading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+          {loading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
           {!loading && error && <p className="text-center text-xs text-red-400 py-3">加载失败，请稍后重试</p>}
           {!loading && !error && pending.length === 0 && <EmptyState text="暂无待审批账号" />}
           {!loading && !error && pending.length > 0 && (
@@ -398,13 +398,13 @@ export default function UsersListPage() {
           onClick={() => setChoosingRole(null)}
         >
           <div
-            className="bg-white rounded-lg w-72 p-4 shadow-xl"
+            className="bg-[var(--ui-bg-surface)] rounded-lg w-72 p-4 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="text-sm font-medium text-gray-900 mb-1">
+            <div className="text-sm font-medium text-[var(--ui-text-primary)] mb-1">
               审批通过「{choosingRole.real_name || choosingRole.username}」
             </div>
-            <div className="text-xs text-gray-500 mb-3">选择分配的角色：</div>
+            <div className="text-xs text-[var(--ui-text-secondary)] mb-3">选择分配的角色：</div>
             <div className="flex flex-col gap-2">
               {(['engineer', 'production', 'guest'] as const).map((r) => (
                 <Button

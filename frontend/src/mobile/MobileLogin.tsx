@@ -72,19 +72,19 @@ export default function MobileLogin() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 bg-gray-50">
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 bg-[var(--ui-bg-subtle)]">
       <h1 className="text-2xl font-bold mb-1">🏗️ {import.meta.env.VITE_APP_TITLE || 'PDM系统'}</h1>
-      <p className="text-sm text-gray-500 mb-8">移动端 · 只读查询</p>
+      <p className="text-sm text-[var(--ui-text-secondary)] mb-8">移动端 · 只读查询</p>
       <form onSubmit={handleSubmit} className="w-full max-w-sm flex flex-col gap-3">
         <input
-          className="h-12 px-4 rounded-lg bg-white border border-gray-200 text-base focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="h-12 px-4 rounded-lg bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] text-base focus:outline-none focus:ring-2 focus:ring-primary-500"
           placeholder="用户名"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           required
         />
         <input
-          className="h-12 px-4 rounded-lg bg-white border border-gray-200 text-base focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="h-12 px-4 rounded-lg bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] text-base focus:outline-none focus:ring-2 focus:ring-primary-500"
           type="password"
           placeholder="密码"
           value={password}

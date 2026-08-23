@@ -49,9 +49,9 @@ function fmtDateTime(v?: string | null): string {
 
 function FieldCard({ label, children }: { label: string; children?: ReactNode }) {
   return (
-    <div className="bg-white rounded-lg px-3 py-3 shadow-sm min-h-14">
-      <div className="text-xs text-gray-500 mb-1">{label}</div>
-      <div className="text-sm text-gray-900 break-all">{children}</div>
+    <div className="bg-[var(--ui-bg-surface)] rounded-lg px-3 py-3 shadow-sm min-h-14">
+      <div className="text-xs text-[var(--ui-text-secondary)] mb-1">{label}</div>
+      <div className="text-sm text-[var(--ui-text-primary)] break-all">{children}</div>
     </div>
   );
 }
@@ -324,26 +324,26 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
   return (
     <div className="flex flex-col">
       {/* 顶部：返回 + 标题 + Tab */}
-      <div className="sticky top-0 z-10 bg-gray-50 px-2 pt-2 pb-1">
+      <div className="sticky top-0 z-10 bg-[var(--ui-bg-subtle)] px-2 pt-2 pb-1">
         <div className="flex items-center gap-1 min-h-10">
           <button
             aria-label="返回"
             onClick={backClick}
-            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-gray-600"
+            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-[var(--ui-text-secondary)]"
           >
             ‹
           </button>
-          <div className="min-w-0 flex-1 text-base font-medium text-gray-900 truncate">
+          <div className="min-w-0 flex-1 text-base font-medium text-[var(--ui-text-primary)] truncate">
             {cur.code} {cur.name}
           </div>
         </div>
-        <div className="flex mt-1 bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="flex mt-1 bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-hidden">
           {TABS.map((t) => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
               className={`flex-1 min-h-10 text-xs whitespace-nowrap ${
-                tab === t.key ? 'bg-[var(--ui-btn-primary-bg)] text-white font-medium' : 'text-gray-500'
+                tab === t.key ? 'bg-[var(--ui-btn-primary-bg)] text-white font-medium' : 'text-[var(--ui-text-secondary)]'
               }`}
             >
               {t.label}
@@ -370,22 +370,22 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
                 <span>{cur.assignee_name || '—'}</span>
               </FieldCard>
             </div>
-            <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
-              <div className="text-sm font-bold text-gray-900 mb-2">时间计划</div>
-              <div className="text-xs text-gray-500 space-y-1">
+            <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
+              <div className="text-sm font-bold text-[var(--ui-text-primary)] mb-2">时间计划</div>
+              <div className="text-xs text-[var(--ui-text-secondary)] space-y-1">
                 <div>
-                  <span className="text-gray-400">计划</span>
+                  <span className="text-[var(--ui-text-tertiary)]">计划</span>
                   <span className="ml-2">{fmtDate(cur.planned_start)} ~ {fmtDate(cur.planned_end)}</span>
                 </div>
                 <div>
-                  <span className="text-gray-400">实际</span>
+                  <span className="text-[var(--ui-text-tertiary)]">实际</span>
                   <span className="ml-2">{fmtDate(cur.actual_start)} ~ {fmtDate(cur.actual_end)}</span>
                 </div>
               </div>
             </div>
             {cur.description && (
-              <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
-                <div className="text-sm font-bold text-gray-900 mb-1.5">说明</div>
+              <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
+                <div className="text-sm font-bold text-[var(--ui-text-primary)] mb-1.5">说明</div>
                 <div className="text-xs text-gray-700 whitespace-pre-wrap break-all">{cur.description}</div>
               </div>
             )}
@@ -402,15 +402,15 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
                 <button
                   key={c.id}
                   onClick={() => openChild(c)}
-                  className="w-full text-left bg-white rounded-lg px-4 py-2.5 min-h-12 shadow-sm"
+                  className="w-full text-left bg-[var(--ui-bg-surface)] rounded-lg px-4 py-2.5 min-h-12 shadow-sm"
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
+                    <span className="flex-1 min-w-0 truncate text-sm font-medium text-[var(--ui-text-primary)]">
                       {c.code} {c.name}
                     </span>
                     <Badge status={c.status} domain="task" />
                   </div>
-                  <div className="mt-1 text-xs text-gray-500 flex flex-wrap items-center gap-2">
+                  <div className="mt-1 text-xs text-[var(--ui-text-secondary)] flex flex-wrap items-center gap-2">
                     <span>{TASK_TYPE_LABEL[c.task_type] ?? c.task_type}</span>
                     <span>{c.assignee_name || '未分配'}</span>
                     <span>{fmtDate(c.planned_start)} ~ {fmtDate(c.planned_end)}</span>
@@ -425,7 +425,7 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
         {tab === 'links' && (
           <div className="flex flex-col gap-4">
             {linksLoading ? (
-              <p className="text-center text-xs text-gray-400 py-3">加载中...</p>
+              <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>
             ) : links.length === 0 ? (
               <EmptyState text="暂无关联对象" />
             ) : (
@@ -435,7 +435,7 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
                 return (
                   <section key={sec.key}>
                     <div className="flex items-center gap-1.5 px-1 mb-1.5">
-                      <span className="text-sm font-bold text-gray-900">{sec.title}</span>
+                      <span className="text-sm font-bold text-[var(--ui-text-primary)]">{sec.title}</span>
                       <Badge tone="gray" label={secLinks.length} size="xs" />
                     </div>
                     <div className="flex flex-col gap-1.5">
@@ -443,15 +443,15 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
                         <button
                           key={l.id}
                           onClick={() => openLink(l)}
-                          className="w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm"
+                          className="w-full text-left bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 min-h-14 shadow-sm"
                         >
                           {/* 行1：编号 + 版本 + 类型徽标（零部件）+ 状态徽标（右） */}
                           <span className="flex items-center gap-2 min-w-0">
-                            <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
+                            <span className="flex-1 min-w-0 truncate text-sm font-medium text-[var(--ui-text-primary)]">
                               {l.entity_code || l.entity_name || '未知对象'}
                             </span>
                             {l.entity_version && (
-                              <span className="shrink-0 text-xs text-gray-400">{l.entity_version}</span>
+                              <span className="shrink-0 text-xs text-[var(--ui-text-tertiary)]">{l.entity_version}</span>
                             )}
                             {(l.entity_type === 'part' || l.entity_type === 'assembly') && (
                               <Badge
@@ -465,7 +465,7 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
                           </span>
                           {/* 行2：名称/描述（左）+ 预览按钮（右下角，预查确认可预览才显示） */}
                           <span className="mt-1 flex items-center gap-2 min-w-0 min-h-7">
-                            <span className="flex-1 min-w-0 truncate text-xs text-gray-500">
+                            <span className="flex-1 min-w-0 truncate text-xs text-[var(--ui-text-secondary)]">
                               {l.entity_name || l.entity_remark || ''}
                             </span>
                             {previewableMap[l.id] === true && (
@@ -495,17 +495,17 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
         {tab === 'logs' && (
           <div className="flex flex-col gap-2">
             {logsLoading ? (
-              <p className="text-center text-xs text-gray-400 py-3">加载中...</p>
+              <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>
             ) : logs.length === 0 ? (
               <EmptyState text="暂无操作记录" />
             ) : (
               logs.map((lg, i) => (
-                <div key={i} className="bg-white rounded-lg px-4 py-2.5 shadow-sm">
+                <div key={i} className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-2.5 shadow-sm">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs text-gray-500">{lg.user_name || '系统'}</span>
-                    <span className="shrink-0 text-xs text-gray-400">{fmtDate(lg.created_at)}</span>
+                    <span className="text-xs text-[var(--ui-text-secondary)]">{lg.user_name || '系统'}</span>
+                    <span className="shrink-0 text-xs text-[var(--ui-text-tertiary)]">{fmtDate(lg.created_at)}</span>
                   </div>
-                  <div className="mt-1 text-sm text-gray-900 break-all">
+                  <div className="mt-1 text-sm text-[var(--ui-text-primary)] break-all">
                     {lg.detail || lg.action || '—'}
                   </div>
                 </div>
@@ -518,16 +518,16 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
         {tab === 'comments' && (
           <div className="flex flex-col gap-3">
             {commentsLoading ? (
-              <p className="text-center text-xs text-gray-400 py-3">加载中...</p>
+              <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>
             ) : comments.length === 0 ? (
               <EmptyState text="暂无评论" />
             ) : (
               <div className="flex flex-col gap-2">
                 {comments.map((c) => (
-                  <div key={c.id} className="bg-white rounded-lg px-4 py-2.5 shadow-sm">
+                  <div key={c.id} className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-2.5 shadow-sm">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium text-gray-900">{c.user_name || '用户'}</span>
-                      <span className="shrink-0 text-xs text-gray-400">{fmtDateTime(c.created_at)}</span>
+                      <span className="text-sm font-medium text-[var(--ui-text-primary)]">{c.user_name || '用户'}</span>
+                      <span className="shrink-0 text-xs text-[var(--ui-text-tertiary)]">{fmtDateTime(c.created_at)}</span>
                     </div>
                     <div className="mt-1 text-sm text-gray-700 whitespace-pre-wrap break-all">{c.content}</div>
                   </div>
@@ -535,13 +535,13 @@ export default function TaskDetailPage({ projectId, task: rootTask, onBack, onNa
               </div>
             )}
             {/* 输入区 */}
-            <div className="bg-white rounded-lg p-2 shadow-sm flex items-end gap-2">
+            <div className="bg-[var(--ui-bg-surface)] rounded-lg p-2 shadow-sm flex items-end gap-2">
               <textarea
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
                 placeholder="写下评论..."
                 rows={2}
-                className="flex-1 min-w-0 text-sm px-2 py-1.5 border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-1 focus:ring-primary-500"
+                className="flex-1 min-w-0 text-sm px-2 py-1.5 border border-[var(--ui-border)] rounded-lg resize-none focus:outline-none focus:ring-1 focus:ring-primary-500"
               />
               <Button
                 onClick={sendComment}

@@ -131,29 +131,29 @@ export default function PartBomPage() {
   return (
     <div className="flex flex-col">
       {/* 顶部：返回按钮 + 标题（当前节点 件号/名称） + 返回零部件列表 */}
-      <div className="sticky top-0 z-10 bg-gray-50 px-2 pt-2 pb-1">
+      <div className="sticky top-0 z-10 bg-[var(--ui-bg-subtle)] px-2 pt-2 pb-1">
         <div className="flex items-center gap-1 min-h-10">
           <button
             aria-label="返回"
             onClick={() => navigate(-1)}
-            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-gray-600"
+            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-[var(--ui-text-secondary)]"
           >
             ‹
           </button>
-          <div className="min-w-0 flex-1 text-base font-medium text-gray-900 truncate">{displayTitle}</div>
+          <div className="min-w-0 flex-1 text-base font-medium text-[var(--ui-text-primary)] truncate">{displayTitle}</div>
         </div>
         <div className="flex items-center gap-2 mt-1 min-h-8">
           <button
             onClick={() => navigate('/parts')}
-            className="min-h-8 px-2 rounded-full text-xs text-primary-600 bg-white border border-gray-200"
+            className="min-h-8 px-2 rounded-full text-xs text-primary-600 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)]"
           >
             ‹ 零部件列表
           </button>
-          <span className="text-xs text-gray-400 truncate">BOM 结构（点击行打开子项，箭头展开层级）</span>
+          <span className="text-xs text-[var(--ui-text-tertiary)] truncate">BOM 结构（点击行打开子项，箭头展开层级）</span>
         </div>
       </div>
 
-      {loading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+      {loading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
       {!loading && error && <p className="text-center text-xs text-red-400 py-3">{error}</p>}
       {!loading && !error && items.length === 0 && <EmptyState text={emptyText} />}
       {!loading && !error && items.length > 0 && <BomTree rootItems={items} />}

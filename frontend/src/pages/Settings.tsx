@@ -67,6 +67,32 @@ export default function Settings() {
     setThemeState(key);
   };
 
+  const renderThemeOption = (t: (typeof THEMES)[number]) => {
+    const selected = theme === t.key;
+    return (
+      <button
+        key={t.key}
+        type="button"
+        onClick={() => handleThemeChange(t.key)}
+        className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
+          selected
+            ? 'border-blue-500 bg-blue-50'
+            : 'border-[var(--ui-border)] bg-[var(--ui-bg-surface)] hover:border-gray-300'
+        }`}
+      >
+        <span
+          className="w-8 h-8 rounded-full shrink-0 border border-black/10"
+          style={{ backgroundColor: t.swatch }}
+        />
+        <span className="min-w-0">
+          <span className="block text-sm font-medium text-[var(--ui-text-primary)]">{t.label}</span>
+          <span className="block text-xs text-[var(--ui-text-secondary)]">{t.desc}</span>
+        </span>
+        {selected && <span className="ml-auto text-blue-600 text-sm">✓</span>}
+      </button>
+    );
+  };
+
   const tabs: { key: TabKey; label: string; enabled: boolean; adminOnly: boolean }[] = [
     { key: 'customFields', label: '自定义字段', enabled: true, adminOnly: false },
     { key: 'dataManagement', label: '数据管理', enabled: true, adminOnly: true },
@@ -442,32 +468,15 @@ export default function Settings() {
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm text-[var(--ui-text-secondary)]">选择界面主色风格（徽标状态色保持语义稳定，仅主按钮/链接/输入焦点随主题切换）</p>
           </div>
+          <div className="text-xs text-[var(--ui-text-tertiary)] mb-2">浅色</div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl">
-            {THEMES.map((t) => {
-              const selected = theme === t.key;
-              return (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => handleThemeChange(t.key)}
-                  className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
-                    selected
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-[var(--ui-border)] bg-[var(--ui-bg-surface)] hover:border-gray-300'
-                  }`}
-                >
-                  <span
-                    className="w-8 h-8 rounded-full shrink-0 border border-black/10"
-                    style={{ backgroundColor: t.swatch }}
-                  />
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium text-[var(--ui-text-primary)]">{t.label}</span>
-                    <span className="block text-xs text-[var(--ui-text-secondary)]">{t.desc}</span>
-                  </span>
-                  {selected && <span className="ml-auto text-blue-600 text-sm">✓</span>}
-                </button>
-              );
-            })}
+            {THEMES.filter((t) => t.key !== 'dark').map((t) => renderThemeOption(t))}
+          </div>
+          <div className="mt-5">
+            <div className="text-xs text-[var(--ui-text-tertiary)] mb-2">深色</div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl">
+              {THEMES.filter((t) => t.key === 'dark').map((t) => renderThemeOption(t))}
+            </div>
           </div>
         </div>
       )}

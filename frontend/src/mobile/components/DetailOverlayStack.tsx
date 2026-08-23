@@ -27,7 +27,7 @@ export default function DetailOverlayStack({
       {stack.map((d, idx) => (
         <div
           key={idx}
-          className={`fixed inset-0 z-50 bg-gray-50 overflow-y-auto ${idx === stack.length - 1 ? '' : 'hidden'}`}
+          className={`fixed inset-0 z-50 bg-[var(--ui-bg-subtle)] overflow-y-auto ${idx === stack.length - 1 ? '' : 'hidden'}`}
         >
           {renderLayer(d, onNavigate)}
         </div>

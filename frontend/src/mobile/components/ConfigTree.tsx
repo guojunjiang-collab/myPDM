@@ -64,14 +64,14 @@ export default function ConfigTree({ rootItems, onOpenChild }: Props) {
     const detail = c.child_detail;
     return (
       <Fragment key={c.id}>
-        <div className="flex items-stretch min-h-10 border-b border-gray-50 bg-white">
+        <div className="flex items-stretch min-h-10 border-b border-gray-50 bg-[var(--ui-bg-surface)]">
           {/* 缩进 + 层级竖线（每级一条，位置 = 父项展开按钮中心） */}
           <span className="relative shrink-0" style={{ width: `calc(${depth} * ${INDENT})` }}>
             {depth > 0 &&
               Array.from({ length: depth }).map((_, i) => (
                 <span
                   key={i}
-                  className="absolute top-0 bottom-0 border-l border-gray-200"
+                  className="absolute top-0 bottom-0 border-l border-[var(--ui-border)]"
                   style={{ left: `calc(${i} * ${INDENT} + ${BTN / 2}px)` }}
                 />
               ))}
@@ -101,14 +101,14 @@ export default function ConfigTree({ rootItems, onOpenChild }: Props) {
           >
             {/* 行1：代码(左) + 数量 + 版本 + 状态(右) */}
             <span className="flex items-center min-w-0">
-              <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
+              <span className="flex-1 min-w-0 truncate text-sm font-medium text-[var(--ui-text-primary)]">
                 {detail?.code || revId}
               </span>
               {c.quantity != null && (
-                <span className="shrink-0 w-8 truncate text-center text-xs text-gray-500">x{c.quantity}</span>
+                <span className="shrink-0 w-8 truncate text-center text-xs text-[var(--ui-text-secondary)]">x{c.quantity}</span>
               )}
               {detail?.version && (
-                <span className="shrink-0 w-7 truncate text-center text-xs text-gray-500">{detail.version}</span>
+                <span className="shrink-0 w-7 truncate text-center text-xs text-[var(--ui-text-secondary)]">{detail.version}</span>
               )}
               <span className="shrink-0 w-12 flex justify-end">
                 {detail?.status && <Badge status={detail.status} />}
@@ -116,12 +116,12 @@ export default function ConfigTree({ rootItems, onOpenChild }: Props) {
             </span>
             {/* 行2：名称(左) + 要求/检出(右) */}
             <span className="flex items-center min-w-0 mt-0.5">
-              <span className="flex-1 min-w-0 truncate text-xs text-gray-500">
+              <span className="flex-1 min-w-0 truncate text-xs text-[var(--ui-text-secondary)]">
                 {detail?.name || ''}
                 {!c.is_required && <span className="text-amber-500">（选装）</span>}
               </span>
               {detail?.check_out_user_name && (
-                <span className="shrink-0 truncate text-right text-xs text-gray-500">
+                <span className="shrink-0 truncate text-right text-xs text-[var(--ui-text-secondary)]">
                   {detail.check_out_user_name}
                 </span>
               )}
@@ -129,9 +129,9 @@ export default function ConfigTree({ rootItems, onOpenChild }: Props) {
           </button>
         </div>
         {isOpen && (
-          <div className="bg-white">
+          <div className="bg-[var(--ui-bg-surface)]">
             {isLoading && (
-              <div className="py-2 text-xs text-gray-400" style={{ paddingLeft: `calc((${depth} + 1) * ${INDENT} + ${BTN}px)` }}>
+              <div className="py-2 text-xs text-[var(--ui-text-tertiary)]" style={{ paddingLeft: `calc((${depth} + 1) * ${INDENT} + ${BTN}px)` }}>
                 加载中...
               </div>
             )}
@@ -141,7 +141,7 @@ export default function ConfigTree({ rootItems, onOpenChild }: Props) {
               </div>
             )}
             {!isLoading && !hasError && kids && kids.length === 0 && (
-              <div className="py-2 text-xs text-gray-400" style={{ paddingLeft: `calc((${depth} + 1) * ${INDENT} + ${BTN}px)` }}>
+              <div className="py-2 text-xs text-[var(--ui-text-tertiary)]" style={{ paddingLeft: `calc((${depth} + 1) * ${INDENT} + ${BTN}px)` }}>
                 该构型项无下级子构型项
               </div>
             )}
@@ -153,7 +153,7 @@ export default function ConfigTree({ rootItems, onOpenChild }: Props) {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+    <div className="bg-[var(--ui-bg-surface)] rounded-lg shadow-sm overflow-hidden">
       {rootItems.map((c) => renderNode(c, 0))}
     </div>
   );

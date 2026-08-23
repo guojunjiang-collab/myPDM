@@ -177,7 +177,7 @@ export default function BoardPage() {
 
   /* ---------------- 渲染：文件夹按树形结构展开 ---------------- */
 
-  if (loading) return <p className="text-center text-xs text-gray-400 py-3">加载中...</p>;
+  if (loading) return <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>;
   if (error) return <p className="text-center text-xs text-red-400 py-3">{error}</p>;
 
   if (myFolders.length === 0 && sharedFolders.length === 0) {
@@ -187,14 +187,14 @@ export default function BoardPage() {
   return (
     <div className="flex flex-col h-full">
       {/* 顶部：类型筛选（过滤树中所有层级的条目） */}
-      <div className="sticky top-0 bg-gray-50 px-3 pt-2 pb-1 z-10">
+      <div className="sticky top-0 bg-[var(--ui-bg-subtle)] px-3 pt-2 pb-1 z-10">
         <div className="flex gap-2">
           {FILTER_TABS.map((f) => (
             <button
               key={f.key}
               type="button"
               onClick={() => setFilterTab(f.key)}
-              className={`min-h-10 px-3 rounded-lg text-xs ${filterTab === f.key ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+              className={`min-h-10 px-3 rounded-lg text-xs ${filterTab === f.key ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-[var(--ui-bg-surface)] text-[var(--ui-text-secondary)] border border-[var(--ui-border)]'}`}
             >
               {f.label}
             </button>
@@ -204,8 +204,8 @@ export default function BoardPage() {
 
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-4">
         <section>
-          <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide px-1 mb-1">📁 我的文件夹</h2>
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          <h2 className="text-xs font-medium text-[var(--ui-text-tertiary)] uppercase tracking-wide px-1 mb-1">📁 我的文件夹</h2>
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg shadow-sm overflow-hidden">
             {myFolders.map((f) => (
               <FolderTreeNode
                 key={f.id}
@@ -222,8 +222,8 @@ export default function BoardPage() {
         </section>
         {sharedFolders.length > 0 && (
           <section>
-            <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide px-1 mb-1">📂 共享给我的</h2>
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <h2 className="text-xs font-medium text-[var(--ui-text-tertiary)] uppercase tracking-wide px-1 mb-1">📂 共享给我的</h2>
+            <div className="bg-[var(--ui-bg-surface)] rounded-lg shadow-sm overflow-hidden">
               {sharedFolders.map((f) => (
                 <FolderTreeNode
                   key={f.id}
@@ -282,7 +282,7 @@ function FolderTreeNode({
             Array.from({ length: depth }).map((_, i) => (
               <span
                 key={i}
-                className="absolute top-0 bottom-0 border-l border-gray-200"
+                className="absolute top-0 bottom-0 border-l border-[var(--ui-border)]"
                 style={{ left: `calc(${i} * ${INDENT} + 18px)` }}
               />
             ))}
@@ -306,7 +306,7 @@ function FolderTreeNode({
           <span className="text-sm shrink-0">{shared ? '📂' : '📁'}</span>
           <span className="flex-1 min-w-0 truncate text-sm text-gray-800">{folder.name}</span>
           {shared && folder.shared_from && (
-            <span className="text-xs text-gray-400 shrink-0">{folder.shared_from.real_name}</span>
+            <span className="text-xs text-[var(--ui-text-tertiary)] shrink-0">{folder.shared_from.real_name}</span>
           )}
         </button>
       </div>
@@ -416,7 +416,7 @@ function ItemRow({ item, depth, onClick }: { item: DashboardItem; depth: number;
           Array.from({ length: depth }).map((_, i) => (
             <span
               key={i}
-              className="absolute top-0 bottom-0 border-l border-gray-200"
+              className="absolute top-0 bottom-0 border-l border-[var(--ui-border)]"
               style={{ left: `calc(${i} * ${INDENT} + 18px)` }}
             />
           ))}
@@ -427,25 +427,25 @@ function ItemRow({ item, depth, onClick }: { item: DashboardItem; depth: number;
       </span>
       <span className="flex-1 min-w-0 flex flex-col justify-center py-1.5 pr-3">
         <span className="flex items-center gap-2 min-w-0">
-          <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">{item.code}</span>
+          <span className="flex-1 min-w-0 truncate text-sm font-medium text-[var(--ui-text-primary)]">{item.code}</span>
           {/* 类型徽标：件号与版本之间（零件/部件/图文档/构型项） */}
           <Badge
             tone={ENTITY_BADGE[item.entity_type]?.tone ?? 'gray'}
             label={ENTITY_BADGE[item.entity_type]?.label ?? '对象'}
             size="xs"
           />
-          <span className="shrink-0 text-xs text-gray-500">{item.version}</span>
+          <span className="shrink-0 text-xs text-[var(--ui-text-secondary)]">{item.version}</span>
           <Badge
             tone={STATUS_TAG[item.status]?.tone ?? 'gray'}
             label={STATUS_TAG[item.status]?.label ?? item.status}
           />
         </span>
         <span className="flex items-center gap-2 min-w-0 mt-0.5">
-          <span className="flex-1 min-w-0 truncate text-xs text-gray-500">{item.name}</span>
+          <span className="flex-1 min-w-0 truncate text-xs text-[var(--ui-text-secondary)]">{item.name}</span>
           {/* 检出状态向右靠：与预览按钮成组靠右，间距 gap-2；无按钮时保留不可见同宽占位，排版整齐 */}
           <span className="ml-auto shrink-0 min-w-0 flex items-center gap-2">
             {item.check_out_user_name && (
-              <span className="text-xs text-gray-500 truncate">{item.check_out_user_name}</span>
+              <span className="text-xs text-[var(--ui-text-secondary)] truncate">{item.check_out_user_name}</span>
             )}
             {previewable === true ? (
               <Button

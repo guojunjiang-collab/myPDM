@@ -68,20 +68,20 @@ function fmtDateTime(v?: string | null): string {
 }
 
 function ReviewRecords({ records }: { records: Array<{ id?: string; reviewer_name?: string; reviewer_id?: string; decision?: string; comment?: string; created_at?: string }> }) {
-  if (records.length === 0) return <div className="text-xs text-gray-400 py-2 text-center">暂无审批记录</div>;
+  if (records.length === 0) return <div className="text-xs text-[var(--ui-text-tertiary)] py-2 text-center">暂无审批记录</div>;
   return (
     <div className="flex flex-col gap-2">
       {records.map((r) => (
-        <div key={r.id ?? r.reviewer_id ?? r.created_at ?? 'r'} className="rounded-lg px-3 py-2 bg-gray-50 border border-gray-100">
+        <div key={r.id ?? r.reviewer_id ?? r.created_at ?? 'r'} className="rounded-lg px-3 py-2 bg-[var(--ui-bg-subtle)] border border-gray-100">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-900">{r.reviewer_name || r.reviewer_id || '-'}</span>
+            <span className="text-sm font-medium text-[var(--ui-text-primary)]">{r.reviewer_name || r.reviewer_id || '-'}</span>
             <Badge
               tone={r.decision === 'approved' ? 'green' : r.decision === 'rejected' ? 'red' : 'orange'}
               label={r.decision === 'approved' ? '通过' : r.decision === 'rejected' ? '拒绝' : r.decision === 'returned' ? '退回' : r.decision || '-'}
             />
           </div>
-          {r.comment && <div className="text-xs text-gray-500 mt-1">{r.comment}</div>}
-          {r.created_at && <div className="text-xs text-gray-400 mt-1">{fmtDateTime(r.created_at)}</div>}
+          {r.comment && <div className="text-xs text-[var(--ui-text-secondary)] mt-1">{r.comment}</div>}
+          {r.created_at && <div className="text-xs text-[var(--ui-text-tertiary)] mt-1">{fmtDateTime(r.created_at)}</div>}
         </div>
       ))}
     </div>
@@ -95,13 +95,13 @@ function StatusLogs({ logs, domain }: { logs: Array<{ id?: string; to_status?: s
         <div key={log.id ?? log.created_at ?? 'l'} className="flex gap-3">
           <div className="w-2.5 h-2.5 mt-1.5 rounded-full shrink-0 bg-primary-500" />
           <div className="flex-1 pb-1">
-            <div className="text-sm text-gray-900 break-all">
+            <div className="text-sm text-[var(--ui-text-primary)] break-all">
               <span className="font-medium">{log.operator_name || '-'}</span>
-              <span className="text-gray-400 mx-1">·</span>
+              <span className="text-[var(--ui-text-tertiary)] mx-1">·</span>
               <span>{resolveBadge(log.to_status, domain).label || log.to_status || '-'}</span>
             </div>
-            {log.comment && <div className="text-xs text-gray-500 mt-0.5">{log.comment}</div>}
-            {log.created_at && <div className="text-xs text-gray-400 mt-0.5">{fmtDateTime(log.created_at)}</div>}
+            {log.comment && <div className="text-xs text-[var(--ui-text-secondary)] mt-0.5">{log.comment}</div>}
+            {log.created_at && <div className="text-xs text-[var(--ui-text-tertiary)] mt-0.5">{fmtDateTime(log.created_at)}</div>}
           </div>
         </div>
       ))}
@@ -234,10 +234,10 @@ export default function EcPage({ detail, onBack }: Props = {}) {
   /* ---------------- 列表视图（独立界面：ECR 或 ECO，无 Tab 切换） ---------------- */
   return (
     <div className="flex flex-col h-full">
-      <div className="sticky top-0 bg-gray-50 px-3 pt-2 pb-1 z-10">
-        <div className="text-sm font-semibold text-gray-900 mb-2">{isEco ? 'ECO 变更单' : 'ECR 变更请求'}</div>
+      <div className="sticky top-0 bg-[var(--ui-bg-subtle)] px-3 pt-2 pb-1 z-10">
+        <div className="text-sm font-semibold text-[var(--ui-text-primary)] mb-2">{isEco ? 'ECO 变更单' : 'ECR 变更请求'}</div>
         <input
-          className="w-full h-11 px-4 rounded-lg bg-white border border-gray-200 text-base"
+          className="w-full h-11 px-4 rounded-lg bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] text-base"
           placeholder="搜索编号/标题..."
           value={isEco ? ecoSearch : ecrSearch}
           onChange={(e) => (isEco ? setEcoSearch(e.target.value) : setEcrSearch(e.target.value))}
@@ -246,7 +246,7 @@ export default function EcPage({ detail, onBack }: Props = {}) {
 
       {!isEco && (
         <>
-          {ecrsLoading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+          {ecrsLoading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
           {!ecrsLoading && ecrsError && <p className="text-center text-xs text-red-400 py-3">{ecrsError}</p>}
           {!ecrsLoading && !ecrsError && filteredEcrs.length === 0 && <EmptyState text="暂无 ECR" />}
           <MobileCardList
@@ -277,7 +277,7 @@ export default function EcPage({ detail, onBack }: Props = {}) {
 
       {isEco && (
         <>
-          {ecosLoading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+          {ecosLoading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
           {!ecosLoading && ecosError && <p className="text-center text-xs text-red-400 py-3">{ecosError}</p>}
           {!ecosLoading && !ecosError && filteredEcos.length === 0 && <EmptyState text="暂无 ECO" />}
           <MobileCardList
@@ -356,33 +356,33 @@ function EcrDetailView({ ecrId, onBack }: { ecrId: string; onBack: () => void })
 
   return (
     <div className="flex flex-col">
-      <div className="sticky top-0 z-10 bg-gray-50 px-2 pt-2 pb-1">
+      <div className="sticky top-0 z-10 bg-[var(--ui-bg-subtle)] px-2 pt-2 pb-1">
         <div className="flex items-center gap-1 min-h-10">
           <button
             aria-label="返回"
             onClick={onBack}
-            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-gray-600"
+            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-[var(--ui-text-secondary)]"
           >
             ‹
           </button>
-          <div className="min-w-0 flex-1 text-base font-medium text-gray-900 truncate">{title}</div>
+          <div className="min-w-0 flex-1 text-base font-medium text-[var(--ui-text-primary)] truncate">{title}</div>
         </div>
       </div>
 
-      {loading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+      {loading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
       {!loading && error && <p className="text-center text-xs text-red-400 py-3">{error}</p>}
       {!loading && !error && !ecr && <EmptyState text="未找到 ECR" />}
 
       {!loading && !error && ecr && (
         <div className="p-3 flex flex-col gap-3">
           {/* 基础信息 */}
-          <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
             <div className="flex items-center gap-2">
               <Badge status={ecr.status} domain="ecr" />
               <Badge status={ecr.priority} domain="priority" />
             </div>
-            <div className="mt-2 text-sm text-gray-900 break-all">{ecr.ecr_number} {ecr.title}</div>
-            <div className="mt-1 text-xs text-gray-500">
+            <div className="mt-2 text-sm text-[var(--ui-text-primary)] break-all">{ecr.ecr_number} {ecr.title}</div>
+            <div className="mt-1 text-xs text-[var(--ui-text-secondary)]">
               {formatMeta([
                 ['类别', CATEGORY_LABEL[ecr.category || ''] || ecr.category || undefined],
                 ['审批模式', ecr.review_mode === 'any' ? '或签' : '会签'],
@@ -392,29 +392,29 @@ function EcrDetailView({ ecrId, onBack }: { ecrId: string; onBack: () => void })
                 ['关联 ECO', ecr.eco_id || undefined],
               ])}
             </div>
-            {ecr.reason && <div className="mt-2 text-xs text-gray-600 whitespace-pre-wrap">原因：{ecr.reason}</div>}
+            {ecr.reason && <div className="mt-2 text-xs text-[var(--ui-text-secondary)] whitespace-pre-wrap">原因：{ecr.reason}</div>}
           </div>
 
           {/* 影响项 */}
-          <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
             <div className="text-sm font-medium text-gray-800 mb-2">影响项（{(ecr.affected_items || []).length}）</div>
             {(ecr.affected_items || []).length === 0 ? (
-              <div className="text-xs text-gray-400 py-2 text-center">暂无影响项</div>
+              <div className="text-xs text-[var(--ui-text-tertiary)] py-2 text-center">暂无影响项</div>
             ) : (
               <div className="flex flex-col gap-2">
                 {(ecr.affected_items || []).map((it: ECRAffectedItem) => (
-                  <div key={it.id} className="rounded-lg px-3 py-2 bg-gray-50 border border-gray-100">
-                    <div className="text-sm text-gray-900 break-all">
+                  <div key={it.id} className="rounded-lg px-3 py-2 bg-[var(--ui-bg-subtle)] border border-gray-100">
+                    <div className="text-sm text-[var(--ui-text-primary)] break-all">
                       {it.entity_code ? `${it.entity_code} ${it.entity_name}` : it.entity_name}
                     </div>
-                    <div className="text-xs text-gray-500 mt-0.5">
+                    <div className="text-xs text-[var(--ui-text-secondary)] mt-0.5">
                       {formatMeta([
                         ['类型', it.entity_type === 'assembly' ? '部件' : it.entity_type === 'part' ? '零件' : it.entity_type],
                         ['版本', it.entity_version || undefined],
                         ['变更', it.change_type || undefined],
                       ])}
                     </div>
-                    {it.change_description && <div className="text-xs text-gray-600 mt-0.5 whitespace-pre-wrap">{it.change_description}</div>}
+                    {it.change_description && <div className="text-xs text-[var(--ui-text-secondary)] mt-0.5 whitespace-pre-wrap">{it.change_description}</div>}
                   </div>
                 ))}
               </div>
@@ -422,14 +422,14 @@ function EcrDetailView({ ecrId, onBack }: { ecrId: string; onBack: () => void })
           </div>
 
           {/* 审批记录 */}
-          <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
             <div className="text-sm font-medium text-gray-800 mb-2">审批记录</div>
             <ReviewRecords records={ecr.review_records || []} />
           </div>
 
           {/* 状态流转 */}
           {statusLogs.length > 0 && (
-            <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+            <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
               <div className="text-sm font-medium text-gray-800 mb-2">状态流转</div>
               <StatusLogs logs={statusLogs} domain="ecr" />
             </div>
@@ -486,33 +486,33 @@ function EcoDetailView({ ecoId, onBack }: { ecoId: string; onBack: () => void })
 
   return (
     <div className="flex flex-col">
-      <div className="sticky top-0 z-10 bg-gray-50 px-2 pt-2 pb-1">
+      <div className="sticky top-0 z-10 bg-[var(--ui-bg-subtle)] px-2 pt-2 pb-1">
         <div className="flex items-center gap-1 min-h-10">
           <button
             aria-label="返回"
             onClick={onBack}
-            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-gray-600"
+            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-[var(--ui-text-secondary)]"
           >
             ‹
           </button>
-          <div className="min-w-0 flex-1 text-base font-medium text-gray-900 truncate">{title}</div>
+          <div className="min-w-0 flex-1 text-base font-medium text-[var(--ui-text-primary)] truncate">{title}</div>
         </div>
       </div>
 
-      {loading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+      {loading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
       {!loading && error && <p className="text-center text-xs text-red-400 py-3">{error}</p>}
       {!loading && !error && !eco && <EmptyState text="未找到 ECO" />}
 
       {!loading && !error && eco && (
         <div className="p-3 flex flex-col gap-3">
           {/* 基础信息 */}
-          <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
             <div className="flex items-center gap-2">
               <Badge status={eco.status} domain="eco" />
               <Badge status={eco.priority} domain="priority" />
             </div>
-            <div className="mt-2 text-sm text-gray-900 break-all">{eco.eco_number} {eco.title}</div>
-            <div className="mt-1 text-xs text-gray-500">
+            <div className="mt-2 text-sm text-[var(--ui-text-primary)] break-all">{eco.eco_number} {eco.title}</div>
+            <div className="mt-1 text-xs text-[var(--ui-text-secondary)]">
               {formatMeta([
                 ['类别', CATEGORY_LABEL[eco.category || ''] || eco.category || undefined],
                 ['审批模式', eco.review_mode === 'any' ? '或签' : '会签'],
@@ -523,22 +523,22 @@ function EcoDetailView({ ecoId, onBack }: { ecoId: string; onBack: () => void })
                 ['关联 ECR', eco.ecr_number || undefined],
               ])}
             </div>
-            {eco.reason && <div className="mt-2 text-xs text-gray-600 whitespace-pre-wrap">原因：{eco.reason}</div>}
+            {eco.reason && <div className="mt-2 text-xs text-[var(--ui-text-secondary)] whitespace-pre-wrap">原因：{eco.reason}</div>}
           </div>
 
           {/* 执行项 */}
-          <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
             <div className="text-sm font-medium text-gray-800 mb-2">执行项（{(eco.execution_items || []).length}）</div>
             {(eco.execution_items || []).length === 0 ? (
-              <div className="text-xs text-gray-400 py-2 text-center">暂无执行项</div>
+              <div className="text-xs text-[var(--ui-text-tertiary)] py-2 text-center">暂无执行项</div>
             ) : (
               <div className="flex flex-col gap-2">
                 {(eco.execution_items || []).map((it) => (
-                  <div key={it.id} className="rounded-lg px-3 py-2 bg-gray-50 border border-gray-100">
-                    <div className="text-sm text-gray-900 break-all">
+                  <div key={it.id} className="rounded-lg px-3 py-2 bg-[var(--ui-bg-subtle)] border border-gray-100">
+                    <div className="text-sm text-[var(--ui-text-primary)] break-all">
                       {it.entity_code ? `${it.entity_code} ${it.entity_name}` : it.entity_name}
                     </div>
-                    <div className="text-xs text-gray-500 mt-0.5 flex flex-wrap items-center gap-2">
+                    <div className="text-xs text-[var(--ui-text-secondary)] mt-0.5 flex flex-wrap items-center gap-2">
                       <Badge status={it.status} domain="exec" />
                       <span>
                         {formatMeta([
@@ -556,14 +556,14 @@ function EcoDetailView({ ecoId, onBack }: { ecoId: string; onBack: () => void })
           </div>
 
           {/* 审批记录 */}
-          <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
             <div className="text-sm font-medium text-gray-800 mb-2">审批记录</div>
             <ReviewRecords records={eco.review_records || []} />
           </div>
 
           {/* 状态流转 */}
           {statusLogs.length > 0 && (
-            <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+            <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
               <div className="text-sm font-medium text-gray-800 mb-2">状态流转</div>
               <StatusLogs logs={statusLogs} domain="eco" />
             </div>

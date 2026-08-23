@@ -2,9 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { THEMES, isThemeKey } from './theme';
 
 describe('theme', () => {
-  it('THEMES 包含 default 且至少 3 个主题', () => {
-    expect(THEMES.length).toBeGreaterThanOrEqual(3);
+  it('THEMES 包含 default 且至少 4 个主题', () => {
+    expect(THEMES.length).toBeGreaterThanOrEqual(4);
     expect(THEMES.some((t) => t.key === 'default')).toBe(true);
+    expect(THEMES.some((t) => t.key === 'dark')).toBe(true);
     expect(THEMES.every((t) => t.label && t.swatch)).toBe(true);
   });
 
@@ -17,7 +18,7 @@ describe('theme', () => {
     expect(isThemeKey('default')).toBe(true);
     expect(isThemeKey('forest')).toBe(true);
     expect(isThemeKey('warm')).toBe(true);
-    expect(isThemeKey('dark')).toBe(false);
+    expect(isThemeKey('dark')).toBe(true);
     expect(isThemeKey('')).toBe(false);
     expect(isThemeKey(null)).toBe(false);
     expect(isThemeKey(undefined)).toBe(false);

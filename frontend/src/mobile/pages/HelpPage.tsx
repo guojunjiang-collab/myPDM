@@ -26,13 +26,13 @@ export default function HelpPage() {
       {drawerOpen && (
         <>
           <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setDrawerOpen(false)} />
-          <div className="fixed right-0 top-0 bottom-0 z-50 w-72 max-w-[80vw] bg-white shadow-xl flex flex-col">
+          <div className="fixed right-0 top-0 bottom-0 z-50 w-72 max-w-[80vw] bg-[var(--ui-bg-surface)] shadow-xl flex flex-col">
             <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between shrink-0">
               <span className="text-sm font-semibold text-gray-800">目录</span>
               <button
                 aria-label="关闭目录"
                 onClick={() => setDrawerOpen(false)}
-                className="text-2xl leading-none text-gray-400 w-8 h-8 flex items-center justify-center"
+                className="text-2xl leading-none text-[var(--ui-text-tertiary)] w-8 h-8 flex items-center justify-center"
               >
                 ×
               </button>
@@ -43,7 +43,7 @@ export default function HelpPage() {
                   key={s.id}
                   type="button"
                   onClick={() => jumpTo(s.id)}
-                  className="w-full text-left flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 active:bg-gray-50"
+                  className="w-full text-left flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 active:bg-[var(--ui-bg-hover)]"
                 >
                   <span>{s.icon}</span>
                   <span className="flex-1 min-w-0 truncate">{s.title}</span>

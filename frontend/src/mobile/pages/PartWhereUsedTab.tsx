@@ -79,12 +79,12 @@ function RowCard({
     <button
       onClick={onClick}
       disabled={!onClick}
-      className={`w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 flex flex-col gap-1 shadow-sm ${
+      className={`w-full text-left bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 min-h-14 flex flex-col gap-1 shadow-sm ${
         onClick ? '' : 'cursor-default'
       }`}
     >
-      <div className="text-sm font-medium text-gray-900 break-all">{main}</div>
-      <div className="text-xs text-gray-500 break-all">{meta}</div>
+      <div className="text-sm font-medium text-[var(--ui-text-primary)] break-all">{main}</div>
+      <div className="text-xs text-[var(--ui-text-secondary)] break-all">{meta}</div>
     </button>
   );
 }
@@ -173,7 +173,7 @@ export default function PartWhereUsedTab({ revisionId, onNavigate }: Props) {
     <div className="flex flex-col gap-2">
       <Section title="父项零部件" count={parents.length}>
         {traceLoading ? (
-          <p className="text-center text-xs text-gray-400 py-3">加载中...</p>
+          <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>
         ) : traceError ? (
           <p className="text-center text-xs text-red-400 py-3">反查失败，请稍后重试</p>
         ) : parents.length === 0 ? (
@@ -188,24 +188,24 @@ export default function PartWhereUsedTab({ revisionId, onNavigate }: Props) {
                   ? onNavigate(`/parts/${p.master_id}`)
                   : navigate(`/parts/${p.master_id}`))
               }
-              className={`w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm ${
+              className={`w-full text-left bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 min-h-14 shadow-sm ${
                 p.master_id ? '' : 'cursor-default'
               }`}
             >
               {/* 行1：件号(左) + 用量(中) + 版本(中) + 状态(右)——参考 BOM Tab 排版 */}
               <span className="flex items-center min-w-0">
-                <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">{p.code}</span>
-                <span className="shrink-0 w-8 truncate text-center text-xs text-gray-500">
+                <span className="flex-1 min-w-0 truncate text-sm font-medium text-[var(--ui-text-primary)]">{p.code}</span>
+                <span className="shrink-0 w-8 truncate text-center text-xs text-[var(--ui-text-secondary)]">
                   x{trace[i]?.quantity ?? 1}
                 </span>
-                <span className="shrink-0 w-7 truncate text-center text-xs text-gray-500">{p.version}</span>
+                <span className="shrink-0 w-7 truncate text-center text-xs text-[var(--ui-text-secondary)]">{p.version}</span>
                 <span className="shrink-0 w-12 flex justify-end">
                   {p.status && <Badge status={p.status} />}
                 </span>
               </span>
               {/* 行2：名称（反查链无检出人字段，仅显示名称） */}
               <span className="flex items-center min-w-0 mt-0.5">
-                <span className="flex-1 min-w-0 truncate text-xs text-gray-500">{p.name}</span>
+                <span className="flex-1 min-w-0 truncate text-xs text-[var(--ui-text-secondary)]">{p.name}</span>
               </span>
             </button>
           ))
@@ -214,7 +214,7 @@ export default function PartWhereUsedTab({ revisionId, onNavigate }: Props) {
 
       <Section title="被构型项引用" count={cfgs.length}>
         {cfgLoading ? (
-          <p className="text-center text-xs text-gray-400 py-3">加载中...</p>
+          <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>
         ) : cfgError ? (
           <p className="text-center text-xs text-red-400 py-3">加载失败，请稍后重试</p>
         ) : cfgs.length === 0 ? (
@@ -223,20 +223,20 @@ export default function PartWhereUsedTab({ revisionId, onNavigate }: Props) {
           cfgs.map((r) => (
             <button
               key={r.config_item_revision_id}
-              className="w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm cursor-default"
+              className="w-full text-left bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 min-h-14 shadow-sm cursor-default"
             >
               {/* 行1：编号 + 用量(中) + 版本(中) + 状态(右)——参考父项零部件排版 */}
               <span className="flex items-center min-w-0">
-                <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">{r.code}</span>
-                <span className="shrink-0 w-8 truncate text-center text-xs text-gray-500">x{r.quantity ?? 1}</span>
-                <span className="shrink-0 w-7 truncate text-center text-xs text-gray-500">{r.version}</span>
+                <span className="flex-1 min-w-0 truncate text-sm font-medium text-[var(--ui-text-primary)]">{r.code}</span>
+                <span className="shrink-0 w-8 truncate text-center text-xs text-[var(--ui-text-secondary)]">x{r.quantity ?? 1}</span>
+                <span className="shrink-0 w-7 truncate text-center text-xs text-[var(--ui-text-secondary)]">{r.version}</span>
                 <span className="shrink-0 w-12 flex justify-end">
                   {r.status && <Badge status={r.status} />}
                 </span>
               </span>
               {/* 行2：名称 + 必选/可选 */}
               <span className="flex items-center min-w-0 mt-0.5">
-                <span className="flex-1 min-w-0 truncate text-xs text-gray-500">{r.name}</span>
+                <span className="flex-1 min-w-0 truncate text-xs text-[var(--ui-text-secondary)]">{r.name}</span>
                 <Badge
                   tone={r.is_required ? 'blue' : 'gray'}
                   label={r.is_required ? '必选' : '可选'}
@@ -249,7 +249,7 @@ export default function PartWhereUsedTab({ revisionId, onNavigate }: Props) {
 
       <Section title="被项目任务引用" count={tasks.length}>
         {taskLoading ? (
-          <p className="text-center text-xs text-gray-400 py-3">加载中...</p>
+          <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>
         ) : taskError ? (
           <p className="text-center text-xs text-red-400 py-3">加载失败，请稍后重试</p>
         ) : tasks.length === 0 ? (
@@ -261,10 +261,10 @@ export default function PartWhereUsedTab({ revisionId, onNavigate }: Props) {
               main={`${r.task.name}${r.task.code ? `（${r.task.code}）` : ''}`}
               meta={
                 <span className="flex flex-wrap items-center gap-2">
-                  <span className="text-gray-600">{r.project_name}</span>
-                  {r.task.assignee_name && <span className="text-gray-500">负责人：{r.task.assignee_name}</span>}
+                  <span className="text-[var(--ui-text-secondary)]">{r.project_name}</span>
+                  {r.task.assignee_name && <span className="text-[var(--ui-text-secondary)]">负责人：{r.task.assignee_name}</span>}
                   {r.task.status && <Badge status={r.task.status} domain="task" />}
-                  <span className="text-gray-500">
+                  <span className="text-[var(--ui-text-secondary)]">
                     {formatMeta([
                       ['开始', fmtDate(r.task.planned_start)],
                       ['完成', fmtDate(r.task.planned_end)],
@@ -284,7 +284,7 @@ export default function PartWhereUsedTab({ revisionId, onNavigate }: Props) {
 
       <Section title="被构型配置引用" count={profiles.length}>
         {profLoading ? (
-          <p className="text-center text-xs text-gray-400 py-3">加载中...</p>
+          <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>
         ) : profError ? (
           <p className="text-center text-xs text-red-400 py-3">加载失败，请稍后重试</p>
         ) : profiles.length === 0 ? (
@@ -297,7 +297,7 @@ export default function PartWhereUsedTab({ revisionId, onNavigate }: Props) {
               meta={
                 <span className="flex flex-wrap items-center gap-2">
                   {r.status && <Badge status={r.status} domain="profile" />}
-                  <span className="text-gray-500">用量 ×{r.quantity ?? 1}</span>
+                  <span className="text-[var(--ui-text-secondary)]">用量 ×{r.quantity ?? 1}</span>
                 </span>
               }
             />

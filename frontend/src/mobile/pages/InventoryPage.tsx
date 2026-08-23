@@ -219,9 +219,9 @@ export default function InventoryPage() {
   /* ---------------- 列表视图（两段：库存查询 / 单据） ---------------- */
   return (
     <div className="flex flex-col h-full">
-      <div className="sticky top-0 bg-gray-50 px-3 pt-2 pb-1 z-10">
+      <div className="sticky top-0 bg-[var(--ui-bg-subtle)] px-3 pt-2 pb-1 z-10">
         <input
-          className="w-full h-11 px-4 rounded-lg bg-white border border-gray-200 text-base"
+          className="w-full h-11 px-4 rounded-lg bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] text-base"
           placeholder={section === 'stock' ? '搜索物料编码/名称...' : '搜索单据号/业务/创建人...'}
           value={section === 'stock' ? stockSearch : docSearch}
           onChange={(e) => (section === 'stock' ? setStockSearch(e.target.value) : setDocSearch(e.target.value))}
@@ -235,7 +235,7 @@ export default function InventoryPage() {
               key={t.key}
               onClick={() => setSection(t.key)}
               className={`flex-1 h-11 rounded-lg text-sm font-medium transition-colors ${
-                section === t.key ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-white text-gray-600 border border-gray-200'
+                section === t.key ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-[var(--ui-bg-surface)] text-[var(--ui-text-secondary)] border border-[var(--ui-border)]'
               }`}
             >
               {t.label}
@@ -246,7 +246,7 @@ export default function InventoryPage() {
 
       {section === 'stock' && (
         <>
-          {stockLoading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+          {stockLoading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
           {!stockLoading && stockError && <p className="text-center text-xs text-red-400 py-3">{stockError}</p>}
           {!stockLoading && !stockError && filteredStock.length === 0 && <EmptyState text="暂无库存数据" />}
           <MobileCardList
@@ -273,7 +273,7 @@ export default function InventoryPage() {
 
       {section === 'documents' && (
         <>
-          {docLoading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+          {docLoading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
           {!docLoading && docError && <p className="text-center text-xs text-red-400 py-3">{docError}</p>}
           {!docLoading && !docError && filteredDocs.length === 0 && <EmptyState text="暂无单据" />}
           <MobileCardList
@@ -346,28 +346,28 @@ function StockDetailView({ materialId, rows, whName, onBack, onViewDoc }: {
 
   return (
     <div className="flex flex-col">
-      <div className="sticky top-0 z-10 bg-gray-50 px-2 pt-2 pb-1">
+      <div className="sticky top-0 z-10 bg-[var(--ui-bg-subtle)] px-2 pt-2 pb-1">
         <div className="flex items-center gap-1 min-h-10">
           <button
             aria-label="返回"
             onClick={onBack}
-            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-gray-600"
+            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-[var(--ui-text-secondary)]"
           >
             ‹
           </button>
-          <div className="min-w-0 flex-1 text-base font-medium text-gray-900 truncate">{title}</div>
+          <div className="min-w-0 flex-1 text-base font-medium text-[var(--ui-text-primary)] truncate">{title}</div>
         </div>
       </div>
 
       <div className="p-3 flex flex-col gap-3">
         {/* 基础信息 */}
         {first && (
-          <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
             <div className="flex items-center gap-2">
               {anyLow && <Badge tone="red" label="低库存" />}
             </div>
-            <div className="mt-1 text-sm text-gray-900 break-all">{first.material_code} {first.material_name}</div>
-            <div className="mt-1 text-xs text-gray-500">
+            <div className="mt-1 text-sm text-[var(--ui-text-primary)] break-all">{first.material_code} {first.material_name}</div>
+            <div className="mt-1 text-xs text-[var(--ui-text-secondary)]">
               {formatMeta([
                 ['单位', first.unit || undefined],
                 ['总库存', `${total}${first.unit || ''}`],
@@ -378,20 +378,20 @@ function StockDetailView({ materialId, rows, whName, onBack, onViewDoc }: {
         )}
 
         {/* 各仓库 / 批次库存 */}
-        <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+        <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
           <div className="text-sm font-medium text-gray-800 mb-2">各仓库 / 批次库存</div>
           {rows.length === 0 ? (
-            <div className="text-xs text-gray-400 py-2 text-center">暂无库存</div>
+            <div className="text-xs text-[var(--ui-text-tertiary)] py-2 text-center">暂无库存</div>
           ) : (
             <div className="flex flex-col gap-2">
               {rows.map((r, i) => (
-                <div key={i} className={`rounded-lg px-3 py-2 border ${r.is_low ? 'bg-red-50 border-red-100' : 'bg-gray-50 border-gray-100'}`}>
-                  <div className="text-sm text-gray-900 break-all">
+                <div key={i} className={`rounded-lg px-3 py-2 border ${r.is_low ? 'bg-red-50 border-red-100' : 'bg-[var(--ui-bg-subtle)] border-gray-100'}`}>
+                  <div className="text-sm text-[var(--ui-text-primary)] break-all">
                     {whName(r.warehouse_id)}
-                    <span className="text-gray-400 mx-1">·</span>
+                    <span className="text-[var(--ui-text-tertiary)] mx-1">·</span>
                     <span className={r.is_low ? 'text-red-600' : ''}>{r.quantity}</span>
                   </div>
-                  <div className="text-xs text-gray-500 mt-0.5">
+                  <div className="text-xs text-[var(--ui-text-secondary)] mt-0.5">
                     {formatMeta([
                       ['批次', r.batch_no || undefined],
                       ['安全库存', r.safety_stock != null ? String(r.safety_stock) : undefined],
@@ -404,12 +404,12 @@ function StockDetailView({ materialId, rows, whName, onBack, onViewDoc }: {
         </div>
 
         {/* 库存流水 */}
-        <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+        <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
           <div className="text-sm font-medium text-gray-800 mb-2">库存流水</div>
-          {ledgerLoading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+          {ledgerLoading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
           {!ledgerLoading && ledgerError && <p className="text-center text-xs text-red-400 py-3">{ledgerError}</p>}
           {!ledgerLoading && !ledgerError && ledger.length === 0 && (
-            <div className="text-xs text-gray-400 py-2 text-center">暂无流水</div>
+            <div className="text-xs text-[var(--ui-text-tertiary)] py-2 text-center">暂无流水</div>
           )}
           {!ledgerLoading && !ledgerError && ledger.length > 0 && (
             <div className="flex flex-col gap-2">
@@ -417,7 +417,7 @@ function StockDetailView({ materialId, rows, whName, onBack, onViewDoc }: {
                 <button
                   key={l.id}
                   onClick={() => l.doc_id && onViewDoc(l.doc_id)}
-                  className="text-left rounded-lg px-3 py-2 bg-gray-50 border border-gray-100 disabled:opacity-100"
+                  className="text-left rounded-lg px-3 py-2 bg-[var(--ui-bg-subtle)] border border-gray-100 disabled:opacity-100"
                   disabled={!l.doc_id}
                 >
                   <div className="flex items-baseline justify-between gap-2">
@@ -428,7 +428,7 @@ function StockDetailView({ materialId, rows, whName, onBack, onViewDoc }: {
                       {l.direction === 'in' ? '+' : '-'}{l.quantity}
                     </span>
                   </div>
-                  <div className="text-xs text-gray-500 mt-0.5">
+                  <div className="text-xs text-[var(--ui-text-secondary)] mt-0.5">
                     {formatMeta([
                       ['类型', DOC_TYPE_LABEL[l.doc_type || ''] || l.doc_type || undefined],
                       ['仓库', whName(l.warehouse_id)],
@@ -486,32 +486,32 @@ function DocDetailView({ docId, whName, matName, onBack }: {
 
   return (
     <div className="flex flex-col">
-      <div className="sticky top-0 z-10 bg-gray-50 px-2 pt-2 pb-1">
+      <div className="sticky top-0 z-10 bg-[var(--ui-bg-subtle)] px-2 pt-2 pb-1">
         <div className="flex items-center gap-1 min-h-10">
           <button
             aria-label="返回"
             onClick={onBack}
-            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-gray-600"
+            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-[var(--ui-text-secondary)]"
           >
             ‹
           </button>
-          <div className="min-w-0 flex-1 text-base font-medium text-gray-900 truncate">{doc?.doc_number || '单据详情'}</div>
+          <div className="min-w-0 flex-1 text-base font-medium text-[var(--ui-text-primary)] truncate">{doc?.doc_number || '单据详情'}</div>
         </div>
       </div>
 
-      {loading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+      {loading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
       {!loading && error && <p className="text-center text-xs text-red-400 py-3">{error}</p>}
       {!loading && !error && !doc && <EmptyState text="未找到单据" />}
 
       {!loading && !error && doc && (
         <div className="p-3 flex flex-col gap-3">
           {/* 基础信息 */}
-          <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
             <div className="flex items-center gap-2">
               <Badge status={doc.status} domain="inventoryDoc" />
-              <span className="text-xs text-gray-500">{DOC_TYPE_LABEL[doc.doc_type]}</span>
+              <span className="text-xs text-[var(--ui-text-secondary)]">{DOC_TYPE_LABEL[doc.doc_type]}</span>
             </div>
-            <div className="mt-2 text-xs text-gray-500">
+            <div className="mt-2 text-xs text-[var(--ui-text-secondary)]">
               {formatMeta([
                 ['业务子类', doc.biz_type || undefined],
                 ['审批模式', doc.review_mode === 'any' ? '或签' : '会签'],
@@ -525,16 +525,16 @@ function DocDetailView({ docId, whName, matName, onBack }: {
           </div>
 
           {/* 明细 */}
-          <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
             <div className="text-sm font-medium text-gray-800 mb-2">明细（{(doc.lines || []).length}）</div>
             {(doc.lines || []).length === 0 ? (
-              <div className="text-xs text-gray-400 py-2 text-center">暂无明细</div>
+              <div className="text-xs text-[var(--ui-text-tertiary)] py-2 text-center">暂无明细</div>
             ) : (
               <div className="flex flex-col gap-2">
                 {(doc.lines || []).map((l) => (
-                  <div key={l.id ?? `${l.material_id}-${l.batch_no}`} className="rounded-lg px-3 py-2 bg-gray-50 border border-gray-100">
-                    <div className="text-sm text-gray-900 break-all">{matName(l.material_id)}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">
+                  <div key={l.id ?? `${l.material_id}-${l.batch_no}`} className="rounded-lg px-3 py-2 bg-[var(--ui-bg-subtle)] border border-gray-100">
+                    <div className="text-sm text-[var(--ui-text-primary)] break-all">{matName(l.material_id)}</div>
+                    <div className="text-xs text-[var(--ui-text-secondary)] mt-0.5">
                       {formatMeta([
                         ['批次', l.batch_no || undefined],
                         ['方向', l.direction === 'out' ? '出' : l.direction === 'in' ? '入' : undefined],
@@ -550,23 +550,23 @@ function DocDetailView({ docId, whName, matName, onBack }: {
           </div>
 
           {/* 审批记录 */}
-          <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
             <div className="text-sm font-medium text-gray-800 mb-2">审批记录</div>
             {(doc.review_records || []).length === 0 ? (
-              <div className="text-xs text-gray-400 py-2 text-center">暂无审批记录</div>
+              <div className="text-xs text-[var(--ui-text-tertiary)] py-2 text-center">暂无审批记录</div>
             ) : (
               <div className="flex flex-col gap-2">
                 {(doc.review_records || []).map((r: DocReviewRecord, i: number) => (
-                  <div key={r.id ?? i} className="rounded-lg px-3 py-2 bg-gray-50 border border-gray-100">
+                  <div key={r.id ?? i} className="rounded-lg px-3 py-2 bg-[var(--ui-bg-subtle)] border border-gray-100">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900">{r.reviewer_name || '-'}</span>
+                      <span className="text-sm font-medium text-[var(--ui-text-primary)]">{r.reviewer_name || '-'}</span>
                       <Badge
                         tone={r.decision === 'approved' ? 'green' : 'red'}
                         label={r.decision === 'approved' ? '通过' : r.decision === 'rejected' ? '拒绝' : r.decision === 'returned' ? '退回' : r.decision || '-'}
                       />
                     </div>
-                    {r.comment && <div className="text-xs text-gray-500 mt-1">{r.comment}</div>}
-                    {r.created_at && <div className="text-xs text-gray-400 mt-1">{fmtDateTime(r.created_at)}</div>}
+                    {r.comment && <div className="text-xs text-[var(--ui-text-secondary)] mt-1">{r.comment}</div>}
+                    {r.created_at && <div className="text-xs text-[var(--ui-text-tertiary)] mt-1">{fmtDateTime(r.created_at)}</div>}
                   </div>
                 ))}
               </div>
@@ -575,20 +575,20 @@ function DocDetailView({ docId, whName, matName, onBack }: {
 
           {/* 状态流转 */}
           {(doc.status_logs || []).length > 0 && (
-            <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+            <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
               <div className="text-sm font-medium text-gray-800 mb-2">状态流转</div>
               <div className="flex flex-col gap-2">
                 {(doc.status_logs || []).map((log: DocStatusLog, i: number) => (
                   <div key={log.id ?? i} className="flex gap-3">
                     <div className="w-2.5 h-2.5 mt-1.5 rounded-full shrink-0 bg-primary-500" />
                     <div className="flex-1 pb-1">
-                      <div className="text-sm text-gray-900 break-all">
+                      <div className="text-sm text-[var(--ui-text-primary)] break-all">
                         <span className="font-medium">{log.operator_name || '-'}</span>
-                        <span className="text-gray-400 mx-1">·</span>
+                        <span className="text-[var(--ui-text-tertiary)] mx-1">·</span>
                         <span>{resolveBadge(log.to_status, 'inventoryDoc').label || log.to_status || '-'}</span>
                       </div>
-                      {log.comment && <div className="text-xs text-gray-500 mt-0.5">{log.comment}</div>}
-                      {log.created_at && <div className="text-xs text-gray-400 mt-0.5">{fmtDateTime(log.created_at)}</div>}
+                      {log.comment && <div className="text-xs text-[var(--ui-text-secondary)] mt-0.5">{log.comment}</div>}
+                      {log.created_at && <div className="text-xs text-[var(--ui-text-tertiary)] mt-0.5">{fmtDateTime(log.created_at)}</div>}
                     </div>
                   </div>
                 ))}
@@ -598,9 +598,9 @@ function DocDetailView({ docId, whName, matName, onBack }: {
 
           {/* 备注 */}
           {doc.remark && (
-            <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+            <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
               <div className="text-sm font-medium text-gray-800 mb-2">备注</div>
-              <div className="text-xs text-gray-600 whitespace-pre-wrap">{doc.remark}</div>
+              <div className="text-xs text-[var(--ui-text-secondary)] whitespace-pre-wrap">{doc.remark}</div>
             </div>
           )}
         </div>

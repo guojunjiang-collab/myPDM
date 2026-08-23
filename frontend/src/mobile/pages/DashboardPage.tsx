@@ -58,7 +58,7 @@ interface StatCard {
 
 function Section({ title, badge, children }: { title: string; badge?: number; children: ReactNode }) {
   return (
-    <section className="bg-white rounded-xl border border-gray-200 p-3">
+    <section className="bg-[var(--ui-bg-surface)] rounded-xl border border-[var(--ui-border)] p-3">
       <div className="flex items-center gap-2 mb-2">
         <h2 className="text-sm font-semibold text-gray-800">{title}</h2>
         {badge !== undefined && badge > 0 && (
@@ -212,10 +212,10 @@ export default function DashboardPage() {
     <div className="p-3 flex flex-col gap-3">
       {/* 问候语（同桌面 GreetingHeader 文案） */}
       <div className="px-1">
-        <div className="text-base font-medium text-gray-900">
+        <div className="text-base font-medium text-[var(--ui-text-primary)]">
           {greeting(new Date().getHours())}，{user?.real_name || '同事'}
         </div>
-        <div className="text-xs text-gray-400 mt-0.5">
+        <div className="text-xs text-[var(--ui-text-tertiary)] mt-0.5">
           你有 {todos.length} 项待处理{unread > 0 ? `、${unread} 条未读通知` : ''}
         </div>
       </div>
@@ -223,15 +223,15 @@ export default function DashboardPage() {
       {/* 关键统计卡片网格 */}
       <Section title="关键统计">
         {statsState === 'loading' ? (
-          <p className="text-center text-xs text-gray-400 py-3">加载中...</p>
+          <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>
         ) : statsState === 'error' ? (
           <p className="text-center text-xs text-red-400 py-3">统计加载失败</p>
         ) : (
           <div className="grid grid-cols-2 gap-2">
             {statCards.map((c) => (
-              <div key={c.label} className="bg-gray-50 rounded-lg px-4 py-3 flex flex-col items-center">
-                <span className={`text-xl font-medium ${c.highlight ? 'text-red-600' : 'text-gray-900'}`}>{c.value}</span>
-                <span className="text-xs text-gray-500 mt-1">{c.label}</span>
+              <div key={c.label} className="bg-[var(--ui-bg-subtle)] rounded-lg px-4 py-3 flex flex-col items-center">
+                <span className={`text-xl font-medium ${c.highlight ? 'text-red-600' : 'text-[var(--ui-text-primary)]'}`}>{c.value}</span>
+                <span className="text-xs text-[var(--ui-text-secondary)] mt-1">{c.label}</span>
               </div>
             ))}
           </div>
@@ -241,7 +241,7 @@ export default function DashboardPage() {
       {/* 我的任务（桌面 MyTasksTile 数据接口，按项目分组） */}
       <Section title="我的任务" badge={overdueCount}>
         {tasksState === 'loading' ? (
-          <p className="text-center text-xs text-gray-400 py-3">加载中...</p>
+          <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>
         ) : tasksState === 'error' ? (
           <p className="text-center text-xs text-red-400 py-3">任务加载失败</p>
         ) : tasks.length === 0 ? (
@@ -249,10 +249,10 @@ export default function DashboardPage() {
         ) : (
           <div className="flex flex-col gap-3">
             {taskGroups.map((g) => (
-              <div key={g.projectCode} className="rounded-lg border border-gray-100 bg-gray-50 overflow-hidden">
-                <div className="px-3 py-1.5 border-b border-gray-200 text-sm font-medium text-gray-500 truncate">
+              <div key={g.projectCode} className="rounded-lg border border-gray-100 bg-[var(--ui-bg-subtle)] overflow-hidden">
+                <div className="px-3 py-1.5 border-b border-[var(--ui-border)] text-sm font-medium text-[var(--ui-text-secondary)] truncate">
                   {g.projectCode} · {g.projectName}
-                  <span className="text-gray-400 ml-1">({g.tasks.length})</span>
+                  <span className="text-[var(--ui-text-tertiary)] ml-1">({g.tasks.length})</span>
                 </div>
                 {g.tasks.map((t) => {
                   const od = !!(t.planned_end && t.planned_end.slice(0, 10) < fmtDate(today.toISOString()));
@@ -263,12 +263,12 @@ export default function DashboardPage() {
                       onClick={() => navigate(`/projects/${t.project_id}`)}
                       className={`w-full flex items-center gap-2 px-3 py-1.5 text-left ${od ? 'bg-red-50/50' : ''}`}
                     >
-                      <span className="shrink-0 text-xs font-mono text-gray-500">{t.code}</span>
+                      <span className="shrink-0 text-xs font-mono text-[var(--ui-text-secondary)]">{t.code}</span>
                       <span className={`flex-1 min-w-0 truncate text-sm ${od ? 'text-red-700' : 'text-gray-800'}`}>
                         {t.name}
                       </span>
                       <Badge status={t.status} domain="task" />
-                      <span className="shrink-0 text-xs text-gray-400">
+                      <span className="shrink-0 text-xs text-[var(--ui-text-tertiary)]">
                         {fmtDate(t.planned_start)}~{fmtDate(t.planned_end)}
                       </span>
                     </button>
@@ -283,7 +283,7 @@ export default function DashboardPage() {
       {/* 待办摘要（桌面 MyTodosTile 数据接口） */}
       <Section title="待我处理" badge={todos.length}>
         {todosState === 'loading' ? (
-          <p className="text-center text-xs text-gray-400 py-3">加载中...</p>
+          <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>
         ) : todosState === 'error' ? (
           <p className="text-center text-xs text-red-400 py-3">待办加载失败</p>
         ) : todos.length === 0 ? (
@@ -307,10 +307,10 @@ export default function DashboardPage() {
                 {it.kind === 'review' && (
                   <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: PRIO_DOT[it.priority] || '#888' }} />
                 )}
-                <span className="text-xs text-gray-400 shrink-0">{relativeTime(it.updated_at, now)}</span>
+                <span className="text-xs text-[var(--ui-text-tertiary)] shrink-0">{relativeTime(it.updated_at, now)}</span>
               </div>
             ))}
-            {todos.length > 5 && <div className="text-center text-xs text-gray-400 pt-2">共 {todos.length} 项，移动端暂只展示前 5 项</div>}
+            {todos.length > 5 && <div className="text-center text-xs text-[var(--ui-text-tertiary)] pt-2">共 {todos.length} 项，移动端暂只展示前 5 项</div>}
           </div>
         )}
       </Section>
@@ -318,7 +318,7 @@ export default function DashboardPage() {
       {/* 通知摘要（未读通知，桌面通知中心 API） */}
       <Section title="通知" badge={unread}>
         {notifsState === 'loading' ? (
-          <p className="text-center text-xs text-gray-400 py-3">加载中...</p>
+          <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>
         ) : notifsState === 'error' ? (
           <p className="text-center text-xs text-red-400 py-3">通知加载失败</p>
         ) : notifs.length === 0 ? (
@@ -329,10 +329,10 @@ export default function DashboardPage() {
               <div key={n.id} className="flex items-center gap-2 py-2.5 border-b border-gray-50 last:border-b-0">
                 <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
                 <span className="flex-1 text-sm text-gray-700 min-w-0 truncate">{n.title}</span>
-                <span className="text-xs text-gray-400 shrink-0">{relativeTime(n.created_at, now)}</span>
+                <span className="text-xs text-[var(--ui-text-tertiary)] shrink-0">{relativeTime(n.created_at, now)}</span>
               </div>
             ))}
-            {notifs.length > 3 && <div className="text-center text-xs text-gray-400 pt-2">共 {unread} 条未读</div>}
+            {notifs.length > 3 && <div className="text-center text-xs text-[var(--ui-text-tertiary)] pt-2">共 {unread} 条未读</div>}
           </div>
         )}
       </Section>

@@ -123,12 +123,12 @@ export default function AttachmentPreview({ attachment }: { attachment: PreviewA
   };
 
   return (
-    <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+    <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-sm font-medium text-gray-900 break-all">{fileName}</div>
+          <div className="text-sm font-medium text-[var(--ui-text-primary)] break-all">{fileName}</div>
           {attachment.file_size != null && (
-            <div className="text-xs text-gray-500 mt-0.5">{fmtSize(attachment.file_size)}</div>
+            <div className="text-xs text-[var(--ui-text-secondary)] mt-0.5">{fmtSize(attachment.file_size)}</div>
           )}
         </div>
         {previewable && (

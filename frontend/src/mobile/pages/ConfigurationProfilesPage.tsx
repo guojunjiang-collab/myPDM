@@ -76,15 +76,15 @@ export default function ConfigurationProfilesPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="sticky top-0 bg-gray-50 px-3 pt-2 pb-1 z-10">
+      <div className="sticky top-0 bg-[var(--ui-bg-subtle)] px-3 pt-2 pb-1 z-10">
         <input
-          className="w-full h-11 px-4 rounded-lg bg-white border border-gray-200 text-base"
+          className="w-full h-11 px-4 rounded-lg bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] text-base"
           placeholder="搜索编号/名称/备注..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
-      {loading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+      {loading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
       {!loading && error && <p className="text-center text-xs text-red-400 py-3">{error}</p>}
       {!loading && !error && filtered.length === 0 && <EmptyState text="暂无配置概要" />}
       <MobileCardList
@@ -144,37 +144,37 @@ function ProfileDetailView({ profileId, onBack }: { profileId: string; onBack: (
 
   return (
     <div className="flex flex-col">
-      <div className="sticky top-0 z-10 bg-gray-50 px-2 pt-2 pb-1">
+      <div className="sticky top-0 z-10 bg-[var(--ui-bg-subtle)] px-2 pt-2 pb-1">
         <div className="flex items-center gap-1 min-h-10">
           <button
             aria-label="返回"
             onClick={onBack}
-            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-gray-600"
+            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-[var(--ui-text-secondary)]"
           >
             ‹
           </button>
-          <div className="min-w-0 flex-1 text-base font-medium text-gray-900 truncate">{title}</div>
+          <div className="min-w-0 flex-1 text-base font-medium text-[var(--ui-text-primary)] truncate">{title}</div>
         </div>
       </div>
 
-      {loading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+      {loading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
       {!loading && error && <p className="text-center text-xs text-red-400 py-3">{error}</p>}
       {!loading && !error && !profile && <EmptyState text="未找到配置概要" />}
 
       {!loading && !error && profile && (
         <div className="p-3 flex flex-col gap-3">
           {/* 基础信息 */}
-          <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
             <div className="flex items-center gap-2">
               <Badge status={profile.status} domain="profile" />
               {profile.configuration_item && (
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-[var(--ui-text-secondary)]">
                   构型项 {profile.configuration_item.code} {profile.configuration_item.name}
                 </span>
               )}
             </div>
-            <div className="mt-2 text-sm text-gray-900 break-all">{profile.code} {profile.name}</div>
-            <div className="mt-1 text-xs text-gray-500">
+            <div className="mt-2 text-sm text-[var(--ui-text-primary)] break-all">{profile.code} {profile.name}</div>
+            <div className="mt-1 text-xs text-[var(--ui-text-secondary)]">
               {formatMeta([
                 ['架次', profile.effectivity_start || profile.effectivity_end ? `${profile.effectivity_start || '—'} ~ ${profile.effectivity_end || '—'}` : undefined],
                 ['创建时间', fmtDate(profile.created_at)],
@@ -182,23 +182,23 @@ function ProfileDetailView({ profileId, onBack }: { profileId: string; onBack: (
               ])}
             </div>
             {profile.remark && (
-              <div className="mt-2 text-xs text-gray-600 whitespace-pre-wrap">{profile.remark}</div>
+              <div className="mt-2 text-xs text-[var(--ui-text-secondary)] whitespace-pre-wrap">{profile.remark}</div>
             )}
           </div>
 
           {/* 配置清单 */}
-          <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
             <div className="text-sm font-medium text-gray-800 mb-2">配置清单（{(profile.items || []).length}）</div>
             {(profile.items || []).length === 0 ? (
-              <div className="text-xs text-gray-400 py-2 text-center">暂无清单项</div>
+              <div className="text-xs text-[var(--ui-text-tertiary)] py-2 text-center">暂无清单项</div>
             ) : (
               <div className="flex flex-col gap-2">
                 {(profile.items || []).map((it) => (
-                  <div key={it.id} className="rounded-lg px-3 py-2 bg-gray-50 border border-gray-100">
-                    <div className="text-sm text-gray-900 break-all">
+                  <div key={it.id} className="rounded-lg px-3 py-2 bg-[var(--ui-bg-subtle)] border border-gray-100">
+                    <div className="text-sm text-[var(--ui-text-primary)] break-all">
                       {it.item_code ? `${it.item_code} ${it.item_name || ''}` : it.item_name || it.item_id}
                     </div>
-                    <div className="text-xs text-gray-500 mt-0.5">
+                    <div className="text-xs text-[var(--ui-text-secondary)] mt-0.5">
                       {formatMeta([
                         ['来源', it.source_type === 'child' ? '子项' : it.source_type === 'direct' ? '直接' : it.source_type],
                         ['要求', it.is_required ? '必装' : '选装'],
@@ -212,23 +212,23 @@ function ProfileDetailView({ profileId, onBack }: { profileId: string; onBack: (
           </div>
 
           {/* 审批记录 */}
-          <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
             <div className="text-sm font-medium text-gray-800 mb-2">审批记录</div>
             {(profile.review_records || []).length === 0 ? (
-              <div className="text-xs text-gray-400 py-2 text-center">暂无审批记录</div>
+              <div className="text-xs text-[var(--ui-text-tertiary)] py-2 text-center">暂无审批记录</div>
             ) : (
               <div className="flex flex-col gap-2">
                 {(profile.review_records || []).map((r) => (
-                  <div key={r.id} className="rounded-lg px-3 py-2 bg-gray-50 border border-gray-100">
+                  <div key={r.id} className="rounded-lg px-3 py-2 bg-[var(--ui-bg-subtle)] border border-gray-100">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900">{r.reviewer_name || r.reviewer_id || '-'}</span>
+                      <span className="text-sm font-medium text-[var(--ui-text-primary)]">{r.reviewer_name || r.reviewer_id || '-'}</span>
                       <Badge
                         tone={r.decision === 'approved' ? 'green' : r.decision === 'rejected' ? 'red' : 'orange'}
                         label={r.decision === 'approved' ? '通过' : r.decision === 'rejected' ? '拒绝' : r.decision === 'returned' ? '退回' : r.decision || '-'}
                       />
                     </div>
-                    {r.comment && <div className="text-xs text-gray-500 mt-1">{r.comment}</div>}
-                    {r.created_at && <div className="text-xs text-gray-400 mt-1">{fmtDateTime(r.created_at)}</div>}
+                    {r.comment && <div className="text-xs text-[var(--ui-text-secondary)] mt-1">{r.comment}</div>}
+                    {r.created_at && <div className="text-xs text-[var(--ui-text-tertiary)] mt-1">{fmtDateTime(r.created_at)}</div>}
                   </div>
                 ))}
               </div>
@@ -237,20 +237,20 @@ function ProfileDetailView({ profileId, onBack }: { profileId: string; onBack: (
 
           {/* 状态流转 */}
           {(profile.status_logs || []).length > 0 && (
-            <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+            <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
               <div className="text-sm font-medium text-gray-800 mb-2">状态流转</div>
               <div className="flex flex-col gap-2">
                 {(profile.status_logs || []).map((log) => (
                   <div key={log.id} className="flex gap-3">
                     <div className="w-2.5 h-2.5 mt-1.5 rounded-full shrink-0 bg-primary-500" />
                     <div className="flex-1 pb-1">
-                      <div className="text-sm text-gray-900 break-all">
+                      <div className="text-sm text-[var(--ui-text-primary)] break-all">
                         <span className="font-medium">{log.operator_name || '-'}</span>
-                        <span className="text-gray-400 mx-1">·</span>
+                        <span className="text-[var(--ui-text-tertiary)] mx-1">·</span>
                         <span>{resolveBadge(log.to_status, 'profile').label || log.to_status || '-'}</span>
                       </div>
-                      {log.comment && <div className="text-xs text-gray-500 mt-0.5">{log.comment}</div>}
-                      {log.created_at && <div className="text-xs text-gray-400 mt-0.5">{fmtDateTime(log.created_at)}</div>}
+                      {log.comment && <div className="text-xs text-[var(--ui-text-secondary)] mt-0.5">{log.comment}</div>}
+                      {log.created_at && <div className="text-xs text-[var(--ui-text-tertiary)] mt-0.5">{fmtDateTime(log.created_at)}</div>}
                     </div>
                   </div>
                 ))}

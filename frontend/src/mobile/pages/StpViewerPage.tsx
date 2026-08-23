@@ -54,8 +54,8 @@ function ToolsPanel() {
     'w-full min-h-11 rounded-lg border text-sm font-medium transition-colors ' +
     'active:opacity-80';
   const btnOn = 'bg-[var(--ui-btn-primary-bg)] text-white border-[var(--ui-btn-primary-bg)]';
-  const btnOff = 'bg-white text-gray-600 border-gray-200';
-  const btnDisabled = 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed';
+  const btnOff = 'bg-[var(--ui-bg-surface)] text-[var(--ui-text-secondary)] border-[var(--ui-border)]';
+  const btnDisabled = 'bg-[var(--ui-bg-subtle)] text-gray-300 border-gray-100 cursor-not-allowed';
 
   const DISPLAY_MODES = [
     { value: 'both' as const, label: '叠加' },
@@ -68,8 +68,8 @@ function ToolsPanel() {
       {/* 对比显示（仅对比模式） */}
       {compare && (
         <div className="flex flex-col gap-1.5">
-          <div className="text-xs text-gray-400 font-medium">对比显示</div>
-          <div className="flex rounded-lg overflow-hidden border border-gray-200">
+          <div className="text-xs text-[var(--ui-text-tertiary)] font-medium">对比显示</div>
+          <div className="flex rounded-lg overflow-hidden border border-[var(--ui-border)]">
             {DISPLAY_MODES.map((m, i) => (
               <button
                 key={m.value}
@@ -78,14 +78,14 @@ function ToolsPanel() {
                 className={`flex-1 min-h-10 text-xs font-medium ${
                   compare.displayMode === m.value
                     ? 'bg-[var(--ui-btn-primary-bg)] text-white'
-                    : 'bg-white text-gray-500'
-                } ${i > 0 ? 'border-l border-gray-200' : ''}`}
+                    : 'bg-[var(--ui-bg-surface)] text-[var(--ui-text-secondary)]'
+                } ${i > 0 ? 'border-l border-[var(--ui-border)]' : ''}`}
               >
                 {m.label}
               </button>
             ))}
           </div>
-          <label className="flex items-center gap-2 min-h-10 text-sm text-gray-600 select-none">
+          <label className="flex items-center gap-2 min-h-10 text-sm text-[var(--ui-text-secondary)] select-none">
             <input
               type="checkbox"
               checked={compare.onlyDiff}
@@ -95,7 +95,7 @@ function ToolsPanel() {
             仅显示差异
           </label>
           <div className="flex items-center gap-2">
-            <span className="shrink-0 text-xs text-gray-500">幽灵</span>
+            <span className="shrink-0 text-xs text-[var(--ui-text-secondary)]">幽灵</span>
             <input
               type="range"
               min={0.02}
@@ -106,7 +106,7 @@ function ToolsPanel() {
               className="flex-1 h-8 accent-primary-600"
               aria-label="幽灵透明度"
             />
-            <span className="shrink-0 w-8 text-right text-xs tabular-nums text-gray-400">
+            <span className="shrink-0 w-8 text-right text-xs tabular-nums text-[var(--ui-text-tertiary)]">
               {compare.ghostOpacity.toFixed(2)}
             </span>
           </div>
@@ -115,7 +115,7 @@ function ToolsPanel() {
 
       {/* 测量 */}
       <div className="flex flex-col gap-1.5">
-        <div className="text-xs text-gray-400 font-medium">测量</div>
+        <div className="text-xs text-[var(--ui-text-tertiary)] font-medium">测量</div>
         <button
           type="button"
           onClick={() => vs.setMeasureMode(measureMode === 'distance' ? 'off' : 'distance')}
@@ -127,7 +127,7 @@ function ToolsPanel() {
 
       {/* 剖切 */}
       <div className="flex flex-col gap-1.5">
-        <div className="text-xs text-gray-400 font-medium">剖切</div>
+        <div className="text-xs text-[var(--ui-text-tertiary)] font-medium">剖切</div>
         {(['x', 'y', 'z'] as const).map((axis) => {
           const plane = planeOf(axis);
           return (
@@ -169,7 +169,7 @@ function ToolsPanel() {
 
       {/* 爆炸 */}
       <div className="flex flex-col gap-1.5">
-        <div className="text-xs text-gray-400 font-medium">爆炸</div>
+        <div className="text-xs text-[var(--ui-text-tertiary)] font-medium">爆炸</div>
         <input
           type="range"
           min={0}
@@ -468,16 +468,16 @@ export function StpViewerCore({
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-gray-100 flex flex-col">
       {/* 顶部返回条：返回按钮 + 模型名 */}
-      <div className="flex items-center gap-1 bg-white border-b border-gray-200 px-2 shrink-0">
+      <div className="flex items-center gap-1 bg-[var(--ui-bg-surface)] border-b border-[var(--ui-border)] px-2 shrink-0">
         <button
           type="button"
           aria-label="返回"
           onClick={onBack}
-          className="shrink-0 min-w-11 h-11 flex items-center justify-center text-2xl leading-none text-gray-600"
+          className="shrink-0 min-w-11 h-11 flex items-center justify-center text-2xl leading-none text-[var(--ui-text-secondary)]"
         >
           ‹
         </button>
-        <div className="min-w-0 flex-1 text-sm font-medium text-gray-900 truncate">{displayTitle}</div>
+        <div className="min-w-0 flex-1 text-sm font-medium text-[var(--ui-text-primary)] truncate">{displayTitle}</div>
       </div>
 
       {/* 画布容器：touch-action: none 防止页面手势抢走单指旋转/双指缩放 */}
@@ -497,7 +497,7 @@ export function StpViewerCore({
         {/* 桌面工程模式（配置清单）暂不支持移动端 */}
         {unsupportedMode && (
           <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-gray-100">
-            <div className="text-sm text-gray-500">该模式暂不支持移动端查看，请使用电脑浏览器</div>
+            <div className="text-sm text-[var(--ui-text-secondary)]">该模式暂不支持移动端查看，请使用电脑浏览器</div>
             <Button
               onClick={onBack}
               size="touch"
@@ -508,19 +508,19 @@ export function StpViewerCore({
         )}
 
         {!unsupportedMode && phase === 'checking' && (
-          <div className="absolute inset-0 z-30 flex items-center justify-center bg-gray-50">
-            <span className="text-sm text-gray-500">加载中...</span>
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-[var(--ui-bg-subtle)]">
+            <span className="text-sm text-[var(--ui-text-secondary)]">加载中...</span>
           </div>
         )}
         {!unsupportedMode && phase === 'converting' && (
-          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-gray-50">
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-[var(--ui-bg-subtle)]">
             <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
-            <span className="text-sm text-gray-500">模型转换中，请稍后...</span>
+            <span className="text-sm text-[var(--ui-text-secondary)]">模型转换中，请稍后...</span>
           </div>
         )}
         {!unsupportedMode && phase === 'loading' && (
-          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-white/90">
-            <div className="text-sm text-gray-600">
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-[var(--ui-bg-surface)]">
+            <div className="text-sm text-[var(--ui-text-secondary)]">
               {compareMode
                 ? '正在加载对比模型...'
                 : assemblyRevId
@@ -538,8 +538,8 @@ export function StpViewerCore({
           </div>
         )}
         {!unsupportedMode && phase === 'ready' && compareMode && cmpLeftInstances.length === 0 && cmpRightInstances.length === 0 && (
-          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-gray-50">
-            <div className="text-sm text-gray-500">两侧装配均无已摆位的零件（先导入装配 STEP）</div>
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-[var(--ui-bg-subtle)]">
+            <div className="text-sm text-[var(--ui-text-secondary)]">两侧装配均无已摆位的零件（先导入装配 STEP）</div>
             <Button
               onClick={onBack}
               size="touch"
@@ -549,8 +549,8 @@ export function StpViewerCore({
           </div>
         )}
         {!unsupportedMode && phase === 'ready' && assemblyRevId && asmInstances && asmInstances.length === 0 && (
-          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-gray-50">
-            <div className="text-sm text-gray-500">该装配暂无已摆位的零件（先导入装配 STEP）</div>
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-[var(--ui-bg-subtle)]">
+            <div className="text-sm text-[var(--ui-text-secondary)]">该装配暂无已摆位的零件（先导入装配 STEP）</div>
             <Button
               onClick={onBack}
               size="touch"
@@ -560,7 +560,7 @@ export function StpViewerCore({
           </div>
         )}
         {!unsupportedMode && phase === 'error' && (
-          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-gray-50">
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-[var(--ui-bg-subtle)]">
             <div className="text-sm text-red-500">加载失败，请关闭后重试</div>
             <Button
               onClick={onBack}
@@ -573,16 +573,16 @@ export function StpViewerCore({
 
         {/* 单件：glTF 解析渲染中（非阻塞角标） */}
         {!unsupportedMode && phase === 'ready' && url && loadingState !== 'ready' && loadingState !== 'error' && (
-          <div className="absolute top-3 right-3 z-20 flex items-center gap-2 bg-white/90 rounded-full shadow px-3 py-1.5 pointer-events-none">
+          <div className="absolute top-3 right-3 z-20 flex items-center gap-2 bg-[var(--ui-bg-surface)] rounded-full shadow px-3 py-1.5 pointer-events-none">
             <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-green-500 border-t-transparent" />
-            <span className="text-gray-600 text-xs">正在解析渲染...</span>
+            <span className="text-[var(--ui-text-secondary)] text-xs">正在解析渲染...</span>
           </div>
         )}
         {!unsupportedMode && loadingState === 'error' && (
-          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-white/90">
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-[var(--ui-bg-surface)]">
             <div className="text-red-500 text-sm">模型加载失败</div>
-            {errorMessage && <div className="text-gray-400 text-xs">{errorMessage}</div>}
-            <div className="text-gray-400 text-xs">请关闭后重试</div>
+            {errorMessage && <div className="text-[var(--ui-text-tertiary)] text-xs">{errorMessage}</div>}
+            <div className="text-[var(--ui-text-tertiary)] text-xs">请关闭后重试</div>
           </div>
         )}
 
@@ -617,14 +617,14 @@ export function StpViewerCore({
         {drawer === 'tree' && (
           <>
             <div className="absolute inset-0 z-30 bg-black/30" onClick={closeDrawer} />
-            <div className="absolute inset-y-0 left-0 z-40 w-64 bg-white shadow-lg flex flex-col">
+            <div className="absolute inset-y-0 left-0 z-40 w-64 bg-[var(--ui-bg-surface)] shadow-lg flex flex-col">
               <div className="flex items-center justify-between px-3 border-b border-gray-100 shrink-0">
-                <span className="text-sm font-semibold text-gray-500 truncate">模型树</span>
+                <span className="text-sm font-semibold text-[var(--ui-text-secondary)] truncate">模型树</span>
                 <button
                   type="button"
                   aria-label="关闭模型树"
                   onClick={closeDrawer}
-                  className="shrink-0 min-w-11 h-11 flex items-center justify-center text-gray-400 text-xl"
+                  className="shrink-0 min-w-11 h-11 flex items-center justify-center text-[var(--ui-text-tertiary)] text-xl"
                 >
                   ✕
                 </button>
@@ -640,14 +640,14 @@ export function StpViewerCore({
         {drawer === 'tools' && (
           <>
             <div className="absolute inset-0 z-30 bg-black/30" onClick={closeDrawer} />
-            <div className="absolute inset-y-0 right-0 z-40 w-64 bg-white shadow-lg flex flex-col">
+            <div className="absolute inset-y-0 right-0 z-40 w-64 bg-[var(--ui-bg-surface)] shadow-lg flex flex-col">
               <div className="flex items-center justify-between px-3 border-b border-gray-100 shrink-0">
-                <span className="text-sm font-semibold text-gray-500">工具</span>
+                <span className="text-sm font-semibold text-[var(--ui-text-secondary)]">工具</span>
                 <button
                   type="button"
                   aria-label="关闭工具"
                   onClick={closeDrawer}
-                  className="shrink-0 min-w-11 h-11 flex items-center justify-center text-gray-400 text-xl"
+                  className="shrink-0 min-w-11 h-11 flex items-center justify-center text-[var(--ui-text-tertiary)] text-xl"
                 >
                   ✕
                 </button>

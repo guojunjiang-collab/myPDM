@@ -2,8 +2,8 @@
  * 多主题切换（浅色变体集）。
  *
  * 机制：业务代码零改动——ui 组件颜色全部走 var(--ui-*)，
- * 主题只需在 <html data-theme="..."> 上覆盖品牌主色相关变量
- * （index.css 中 html[data-theme='forest'|'warm'] 块）。
+ * 主题只需在 <html data-theme="..."> 上覆盖相关变量
+ * （index.css 中 html[data-theme='forest'|'warm'|'dark'] 块）。
  * 徽标语义色（绿=成功/红=危险/琥珀=进行中等）跨主题保持稳定，
  * 避免状态语义混淆；仅主按钮/链接/表单焦点随主题切换。
  */
@@ -13,6 +13,7 @@ export const THEMES = [
   { key: 'default', label: '默认蓝', desc: '经典天蓝', swatch: '#0284c7' },
   { key: 'forest', label: '森林绿', desc: '沉稳森林绿', swatch: '#15803d' },
   { key: 'warm', label: '酒红', desc: '暖调酒红', swatch: '#9f1239' },
+  { key: 'dark', label: '深色', desc: '黑夜模式，暗色护眼界面', swatch: '#111827' },
 ] as const;
 
 export type ThemeKey = (typeof THEMES)[number]['key'];

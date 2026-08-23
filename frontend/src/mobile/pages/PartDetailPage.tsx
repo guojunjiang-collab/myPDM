@@ -498,17 +498,17 @@ export default function PartDetailPage({
   return (
     <div className="flex flex-col">
       {/* 顶部：返回按钮 + 标题（编号/名称）+ 分段 Tab（sticky 跟随列表页模式） */}
-      <div className="sticky top-0 z-10 bg-gray-50 px-2 pt-2 pb-1">
+      <div className="sticky top-0 z-10 bg-[var(--ui-bg-subtle)] px-2 pt-2 pb-1">
         <div className="flex items-center gap-1 min-h-10">
           <button
             aria-label="返回"
             onClick={() => (onBack ? onBack() : navigate(-1))}
-            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-gray-600"
+            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-[var(--ui-text-secondary)]"
           >
             ‹
           </button>
           {/* 标题：件号 + 版本徽标 + 名称（版本徽标主色浅底，名称过长省略不影响版本可见） */}
-          <div className="min-w-0 flex-1 flex items-center gap-1.5 text-base font-medium text-gray-900 truncate">
+          <div className="min-w-0 flex-1 flex items-center gap-1.5 text-base font-medium text-[var(--ui-text-primary)] truncate">
             <span className="shrink-0">{detail?.code ?? id}</span>
             {curRev?.version && (
               <span className="shrink-0 px-1.5 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-700">
@@ -530,7 +530,7 @@ export default function PartDetailPage({
             </Button>
           )}
         </div>
-        <div className="flex mt-1 bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="flex mt-1 bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-hidden">
           {TABS.map((t) => (
             <button
               key={t.key}
@@ -545,7 +545,7 @@ export default function PartDetailPage({
                 }
               }}
               className={`flex-1 min-h-10 text-xs whitespace-nowrap ${
-                activeTab === t.key ? 'bg-[var(--ui-btn-primary-bg)] text-white font-medium' : 'text-gray-500'
+                activeTab === t.key ? 'bg-[var(--ui-btn-primary-bg)] text-white font-medium' : 'text-[var(--ui-text-secondary)]'
               }`}
             >
               {t.label}
@@ -554,7 +554,7 @@ export default function PartDetailPage({
         </div>
       </div>
 
-      {loading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+      {loading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
       {!loading && error && <p className="text-center text-xs text-red-400 py-3">{error}</p>}
       {!loading && !error && !detail && <EmptyState text="未找到零部件" />}
 
@@ -562,18 +562,18 @@ export default function PartDetailPage({
         <div className="p-3">
           {activeTab === 'overview' && (
             <div>
-              {cfLoading && <p className="text-center text-xs text-gray-400 py-2">自定义字段加载中...</p>}
+              {cfLoading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-2">自定义字段加载中...</p>}
               {!cfLoading && cfError && (
                 <p className="text-center text-xs text-red-400 py-2">自定义字段加载失败</p>
               )}
               {/* 基本信息区 */}
               <div className="mb-3">
-                <div className="text-sm font-bold text-gray-900 mb-2">基本信息</div>
+                <div className="text-sm font-bold text-[var(--ui-text-primary)] mb-2">基本信息</div>
                 <div className="grid grid-cols-2 gap-2">
                   {overviewRows.map((r) => (
-                    <div key={r.label} className="bg-white rounded-lg px-3 py-2.5 min-h-14 shadow-sm">
-                      <div className="text-xs text-gray-500 mb-0.5 truncate">{r.label}</div>
-                      <div className="text-sm text-gray-900 break-all">{r.value ?? '-'}</div>
+                    <div key={r.label} className="bg-[var(--ui-bg-surface)] rounded-lg px-3 py-2.5 min-h-14 shadow-sm">
+                      <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5 truncate">{r.label}</div>
+                      <div className="text-sm text-[var(--ui-text-primary)] break-all">{r.value ?? '-'}</div>
                     </div>
                   ))}
                 </div>
@@ -581,12 +581,12 @@ export default function PartDetailPage({
               {/* 自定义字段区（无定义时不显示） */}
               {!cfLoading && !cfError && cfRows.length > 0 && (
                 <div>
-                  <div className="text-sm font-bold text-gray-900 mb-2">自定义字段</div>
+                  <div className="text-sm font-bold text-[var(--ui-text-primary)] mb-2">自定义字段</div>
                   <div className="grid grid-cols-2 gap-2">
                     {cfRows.map((r) => (
-                      <div key={r.label} className="bg-white rounded-lg px-3 py-2.5 min-h-14 shadow-sm">
-                        <div className="text-xs text-gray-500 mb-0.5 truncate">{r.label}</div>
-                        <div className="text-sm text-gray-900 break-all">{r.value ?? '-'}</div>
+                      <div key={r.label} className="bg-[var(--ui-bg-surface)] rounded-lg px-3 py-2.5 min-h-14 shadow-sm">
+                        <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5 truncate">{r.label}</div>
+                        <div className="text-sm text-[var(--ui-text-primary)] break-all">{r.value ?? '-'}</div>
                       </div>
                     ))}
                   </div>
@@ -600,7 +600,7 @@ export default function PartDetailPage({
               <EmptyState text="该零部件暂无版本，无 BOM 结构" />
             ) : (
               <div className="flex flex-col gap-2">
-                {bomLoading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+                {bomLoading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
                 {!bomLoading && bomError && (
                   <p className="text-center text-xs text-red-400 py-3">{bomError}</p>
                 )}
@@ -619,7 +619,7 @@ export default function PartDetailPage({
               <EmptyState text="该零部件暂无版本，无附件" />
             ) : (
               <div>
-                {attLoading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+                {attLoading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
                 {!attLoading && attError && (
                   <p className="text-center text-xs text-red-400 py-3">{attError}</p>
                 )}
@@ -644,7 +644,7 @@ export default function PartDetailPage({
               <EmptyState text="该零部件暂无版本，无关联图文档" />
             ) : (
               <div>
-                {docLoading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+                {docLoading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
                 {!docLoading && docError && (
                   <p className="text-center text-xs text-red-400 py-3">图文档加载失败</p>
                 )}
@@ -661,19 +661,19 @@ export default function PartDetailPage({
                           if (onNavigate) onNavigate(to);
                           else navigate(to);
                         }}
-                        className="w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm"
+                        className="w-full text-left bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 min-h-14 shadow-sm"
                       >
                         {/* 行1：编号（左）+ 版本 + 状态（右） */}
                         <span className="flex items-center gap-2 min-w-0">
-                          <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
+                          <span className="flex-1 min-w-0 truncate text-sm font-medium text-[var(--ui-text-primary)]">
                             {l.document?.code ?? '未知文档'}
                           </span>
-                          <span className="shrink-0 text-xs text-gray-500">{l.document?.version}</span>
+                          <span className="shrink-0 text-xs text-[var(--ui-text-secondary)]">{l.document?.version}</span>
                           <Badge status={l.document?.status ?? 'draft'} />
                         </span>
                         {/* 行2：名称（左）+ 预览按钮（右对齐，有附件才显示） */}
                         <span className="mt-1 flex items-center gap-2 min-w-0 min-h-7">
-                          <span className="flex-1 min-w-0 truncate text-xs text-gray-500">
+                          <span className="flex-1 min-w-0 truncate text-xs text-[var(--ui-text-secondary)]">
                             {l.document?.name || ''}
                           </span>
                           {l.document?.file_id && (
@@ -698,9 +698,9 @@ export default function PartDetailPage({
 
           {activeTab === 'versions' && (
             <div>
-              <p className="text-xs text-gray-400 px-1 mb-2">点击选择两个版本进行 BOM 对比</p>
+              <p className="text-xs text-[var(--ui-text-tertiary)] px-1 mb-2">点击选择两个版本进行 BOM 对比</p>
               <div className="flex flex-col gap-2">
-                {verLoading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+                {verLoading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
                 {!verLoading && verError && (
                   <p className="text-center text-xs text-red-400 py-3">{verError}</p>
                 )}
@@ -718,11 +718,11 @@ export default function PartDetailPage({
                         className={`rounded-lg px-4 py-3 shadow-sm text-left ${
                           v.id === revisionId
                             ? 'bg-primary-50 border border-primary-300'
-                            : 'bg-white'
+                            : 'bg-[var(--ui-bg-surface)]'
                         } ${selected ? 'ring-2 ring-primary-500' : ''}`}
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-base font-medium text-gray-900">版本 {v.version}</span>
+                          <span className="text-base font-medium text-[var(--ui-text-primary)]">版本 {v.version}</span>
                           <span className="flex items-center gap-2">
                             <Badge status={v.status} />
                             <span
@@ -736,7 +736,7 @@ export default function PartDetailPage({
                             </span>
                           </span>
                         </div>
-                        <div className="text-xs text-gray-500 mt-1.5 space-y-0.5">
+                        <div className="text-xs text-[var(--ui-text-secondary)] mt-1.5 space-y-0.5">
                           <div>最新迭代：{v.latest_iteration}</div>
                           {v.check_out_user_name && <div>检出人：{v.check_out_user_name}</div>}
                           <div>创建时间：{fmtDateTime(v.created_at)}</div>
@@ -747,8 +747,8 @@ export default function PartDetailPage({
               </div>
               {/* 底部操作条：选中 ≥1 个版本时显示 */}
               {cmpSel.length > 0 && (
-                <div className="sticky bottom-0 bg-white border-t border-gray-200 px-3 py-2 mt-3 flex items-center gap-2">
-                  <span className="flex-1 text-xs text-gray-500 min-w-0 truncate">
+                <div className="sticky bottom-0 bg-[var(--ui-bg-surface)] border-t border-[var(--ui-border)] px-3 py-2 mt-3 flex items-center gap-2">
+                  <span className="flex-1 text-xs text-[var(--ui-text-secondary)] min-w-0 truncate">
                     {cmpSel.length === 2
                       ? `已选：${versions.find((v) => v.id === cmpSel[0])?.version ?? '?'} vs ${versions.find((v) => v.id === cmpSel[1])?.version ?? '?'}`
                       : '请再选择一个版本'}

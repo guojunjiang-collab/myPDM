@@ -89,7 +89,7 @@ function TaskTreeNode({
   return (
     <>
       <div
-        className={`rounded-lg shadow-sm flex items-stretch ${isMine ? 'bg-primary-100' : 'bg-white'}`}
+        className={`rounded-lg shadow-sm flex items-stretch ${isMine ? 'bg-primary-100' : 'bg-[var(--ui-bg-surface)]'}`}
       >
         {/* 缩进 + 层级竖线（每级一条，位置 = 该级箭头中心，同看板文件夹树） */}
         <span className="relative shrink-0" style={{ width: `calc(${depth} * ${INDENT})` }}>
@@ -97,7 +97,7 @@ function TaskTreeNode({
             Array.from({ length: depth }).map((_, i) => (
               <span
                 key={i}
-                className="absolute top-0 bottom-0 border-l border-gray-200"
+                className="absolute top-0 bottom-0 border-l border-[var(--ui-border)]"
                 style={{ left: `calc(${i} * ${INDENT} + ${BTN / 2}px)` }}
               />
             ))}
@@ -120,12 +120,12 @@ function TaskTreeNode({
           className="flex-1 min-w-0 flex flex-col justify-center py-2 pr-3 text-left"
         >
           <span className="flex items-center gap-2 min-w-0">
-            <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
+            <span className="flex-1 min-w-0 truncate text-sm font-medium text-[var(--ui-text-primary)]">
               {task.code} {task.name}
             </span>
             <Badge status={task.status} domain="task" />
           </span>
-          <span className="mt-0.5 text-xs text-gray-500 flex flex-wrap items-center gap-2">
+          <span className="mt-0.5 text-xs text-[var(--ui-text-secondary)] flex flex-wrap items-center gap-2">
             <span>
               {formatMeta([
                 ['计划', `${task.planned_start || '—'} ~ ${task.planned_end || '—'}`],
@@ -373,32 +373,32 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
     const title = project ? `${project.code} ${project.name}` : id;
     return (
       <div className="flex flex-col">
-        <div className="sticky top-0 z-10 bg-gray-50 px-2 pt-2 pb-1">
+        <div className="sticky top-0 z-10 bg-[var(--ui-bg-subtle)] px-2 pt-2 pb-1">
           <div className="flex items-center gap-1 min-h-10">
             <button
               aria-label="返回"
               onClick={() => (onBack ? onBack() : navigate(-1))}
-              className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-gray-600"
+              className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-[var(--ui-text-secondary)]"
             >
               ‹
             </button>
-            <div className="min-w-0 flex-1 text-base font-medium text-gray-900 truncate">{title}</div>
+            <div className="min-w-0 flex-1 text-base font-medium text-[var(--ui-text-primary)] truncate">{title}</div>
           </div>
         </div>
 
-        {detailLoading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+        {detailLoading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
         {!detailLoading && detailError && <p className="text-center text-xs text-red-400 py-3">{detailError}</p>}
         {!detailLoading && !detailError && !project && <EmptyState text="未找到项目" />}
 
         {!detailLoading && !detailError && project && (
           <div className="p-3 flex flex-col gap-3">
             {/* 项目头：状态 + 负责人 + 计划起止 + 创建时间 */}
-            <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+            <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
               <div className="flex items-center gap-2">
                 <Badge status={project.status} domain="project" />
-                <span className="text-xs text-gray-500">负责人 {project.owner_name}</span>
+                <span className="text-xs text-[var(--ui-text-secondary)]">负责人 {project.owner_name}</span>
               </div>
-              <div className="mt-2 text-xs text-gray-500">
+              <div className="mt-2 text-xs text-[var(--ui-text-secondary)]">
                 {formatMeta([
                   ['计划', `${project.planned_start || '—'} ~ ${project.planned_end || '—'}`],
                   ['创建时间', fmtDate(project.created_at)],
@@ -407,13 +407,13 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
             </div>
 
             {/* 进度摘要：完成/总数 + 完成率 + 最近计划完成 */}
-            <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
+            <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm">
               <div className="text-sm font-medium text-gray-800 mb-2">进度摘要</div>
               <div className="flex items-baseline gap-3">
                 <span className="text-xl font-medium text-primary-600">{percent}%</span>
-                <span className="text-xs text-gray-500">任务完成 {stats.done} / {stats.total}</span>
+                <span className="text-xs text-[var(--ui-text-secondary)]">任务完成 {stats.done} / {stats.total}</span>
               </div>
-              <div className="mt-2 text-xs text-gray-500">
+              <div className="mt-2 text-xs text-[var(--ui-text-secondary)]">
                 {formatMeta([
                   ['最近计划完成', stats.latestPlannedEnd ? fmtDate(stats.latestPlannedEnd) : '—'],
                 ])}
@@ -423,14 +423,14 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
             {/* 任务树：默认展开第 1 层级；下拉控件展开各层级/收起；甘特图按钮；行点击打开任务详情（多 Tab） */}
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between gap-2 px-1">
-                <span className="text-xs text-gray-400">任务列表（{stats.total}）</span>
+                <span className="text-xs text-[var(--ui-text-tertiary)]">任务列表（{stats.total}）</span>
                 <div className="flex items-center gap-1.5">
                   {/* 「我的」筛选：只显示我的任务及父项 */}
                   <button
                     type="button"
                     onClick={() => setOnlyMine((v) => !v)}
                     className={`min-h-8 px-2.5 rounded-lg text-xs ${
-                      onlyMine ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-white border border-gray-200 text-gray-600'
+                      onlyMine ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] text-[var(--ui-text-secondary)]'
                     }`}
                   >
                     我的
@@ -449,7 +449,7 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
                         <>
                           {/* 点击外部关闭 */}
                           <div className="fixed inset-0 z-30" onClick={() => setExpandOpen(false)} />
-                          <div className="absolute right-0 top-full mt-1 z-40 min-w-32 bg-white rounded-lg shadow-lg border border-gray-200 py-1">
+                          <div className="absolute right-0 top-full mt-1 z-40 min-w-32 bg-[var(--ui-bg-surface)] rounded-lg shadow-lg border border-[var(--ui-border)] py-1">
                             {(
                               [
                                 { value: 'collapsed', label: '全部折叠' },
@@ -530,15 +530,15 @@ export default function ProjectsPage({ detailId, onBack }: Props = {}) {
   /* ---------------- 列表视图（/projects） ---------------- */
   return (
     <div className="flex flex-col h-full">
-      <div className="sticky top-0 bg-gray-50 px-3 pt-2 pb-1 z-10">
+      <div className="sticky top-0 bg-[var(--ui-bg-subtle)] px-3 pt-2 pb-1 z-10">
         <input
-          className="w-full h-11 px-4 rounded-lg bg-white border border-gray-200 text-base"
+          className="w-full h-11 px-4 rounded-lg bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] text-base"
           placeholder="搜索编号/名称..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
-      {listLoading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+      {listLoading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
       {!listLoading && listError && <p className="text-center text-xs text-red-400 py-3">{listError}</p>}
       {!listLoading && !listError && filtered.length === 0 && <EmptyState text="未找到项目" />}
       <MobileCardList

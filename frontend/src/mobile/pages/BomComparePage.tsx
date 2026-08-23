@@ -29,7 +29,7 @@ const ROW_BG: Record<string, string> = {
   delete: 'bg-red-50',
   modify: 'bg-yellow-50',
   internal: 'bg-orange-50',
-  none: 'bg-white',
+  none: 'bg-[var(--ui-bg-surface)]',
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -65,8 +65,8 @@ function PropertyTable({ left, right, onlyDiff }: { left: any; right: any; onlyD
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-3">
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-        <div className="flex bg-gray-50 text-xs font-medium text-gray-600 border-b border-gray-200">
+      <div className="bg-[var(--ui-bg-surface)] rounded-lg shadow-sm overflow-hidden">
+        <div className="flex bg-[var(--ui-bg-subtle)] text-xs font-medium text-[var(--ui-text-secondary)] border-b border-[var(--ui-border)]">
           <span className="w-20 shrink-0 px-3 py-2">字段</span>
           <span className="flex-1 min-w-0 px-3 py-2">左值</span>
           <span className="flex-1 min-w-0 px-3 py-2">右值</span>
@@ -80,7 +80,7 @@ function PropertyTable({ left, right, onlyDiff }: { left: any; right: any; onlyD
               key={i}
               className={`flex border-b border-gray-50 last:border-b-0 ${changed ? 'bg-yellow-50' : ''}`}
             >
-              <span className="w-20 shrink-0 px-3 py-2 text-xs text-gray-500 whitespace-nowrap">{r.label}</span>
+              <span className="w-20 shrink-0 px-3 py-2 text-xs text-[var(--ui-text-secondary)] whitespace-nowrap">{r.label}</span>
               <span className="flex-1 min-w-0 px-3 py-2 text-sm break-all">{lvs || '-'}</span>
               <span className={`flex-1 min-w-0 px-3 py-2 text-sm break-all ${changed ? 'font-semibold text-red-600' : ''}`}>
                 {rvs || '-'}
@@ -130,7 +130,7 @@ function PartPicker({
 
   return (
     <div className="relative">
-      <div className="text-xs text-gray-500 mb-1">{label}</div>
+      <div className="text-xs text-[var(--ui-text-secondary)] mb-1">{label}</div>
       <input
         type="text"
         value={selected ? `${selected.code} ${selected.name}（${selected.version}）` : q}
@@ -139,13 +139,13 @@ function PartPicker({
           setSelected(null);
           doSearch(e.target.value);
         }}
-        className="w-full h-11 px-3 rounded-lg bg-white border border-gray-200 text-sm"
+        className="w-full h-11 px-3 rounded-lg bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] text-sm"
       />
       {!selected && q.trim() && (
-        <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-auto">
-          {searching && <div className="px-3 py-2 text-sm text-gray-400">搜索中...</div>}
+        <div className="absolute z-20 w-full mt-1 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-lg max-h-56 overflow-auto">
+          {searching && <div className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)]">搜索中...</div>}
           {!searching && results.length === 0 && (
-            <div className="px-3 py-2 text-sm text-gray-400">无匹配结果</div>
+            <div className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)]">无匹配结果</div>
           )}
           {!searching &&
             results.map((o) => (
@@ -158,11 +158,11 @@ function PartPicker({
                   setQ('');
                   setResults([]);
                 }}
-                className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-b-0 flex items-center gap-2"
+                className="w-full text-left px-3 py-2.5 text-sm hover:bg-[var(--ui-bg-hover)] border-b border-gray-100 last:border-b-0 flex items-center gap-2"
               >
                 <span className="font-medium">{o.code}</span>
-                <span className="text-gray-500 truncate">{o.name}</span>
-                <span className="ml-auto text-gray-400 text-xs">{o.version}</span>
+                <span className="text-[var(--ui-text-secondary)] truncate">{o.name}</span>
+                <span className="ml-auto text-[var(--ui-text-tertiary)] text-xs">{o.version}</span>
               </button>
             ))}
         </div>
@@ -347,20 +347,20 @@ export default function BomComparePage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="sticky top-0 z-10 bg-gray-50 px-2 pt-2 pb-1">
+      <div className="sticky top-0 z-10 bg-[var(--ui-bg-subtle)] px-2 pt-2 pb-1">
         <div className="flex items-center gap-1 min-h-10">
           <button
             aria-label="返回"
             onClick={() => navigate(-1)}
-            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-gray-600"
+            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-[var(--ui-text-secondary)]"
           >
             ‹
           </button>
-          <div className="min-w-0 flex-1 text-base font-medium text-gray-900 truncate">BOM 对比</div>
+          <div className="min-w-0 flex-1 text-base font-medium text-[var(--ui-text-primary)] truncate">BOM 对比</div>
         </div>
       </div>
 
-      <div className="p-3 flex flex-col gap-2 bg-gray-50">
+      <div className="p-3 flex flex-col gap-2 bg-[var(--ui-bg-subtle)]">
         <PartPicker
           label="左零部件"
           onPick={(revId) => {
@@ -404,17 +404,17 @@ export default function BomComparePage() {
           <div className="flex items-center gap-2 px-3 pt-2">
             <button
               onClick={() => setActiveTab('tree')}
-              className={`min-h-9 px-3 rounded-full text-xs ${activeTab === 'tree' ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+              className={`min-h-9 px-3 rounded-full text-xs ${activeTab === 'tree' ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-[var(--ui-bg-surface)] text-[var(--ui-text-secondary)] border border-[var(--ui-border)]'}`}
             >
               BOM树对比
             </button>
             <button
               onClick={() => setActiveTab('property')}
-              className={`min-h-9 px-3 rounded-full text-xs ${activeTab === 'property' ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+              className={`min-h-9 px-3 rounded-full text-xs ${activeTab === 'property' ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-[var(--ui-bg-surface)] text-[var(--ui-text-secondary)] border border-[var(--ui-border)]'}`}
             >
               属性对比
             </button>
-            <label className="ml-auto flex items-center gap-1 text-xs text-gray-600 select-none">
+            <label className="ml-auto flex items-center gap-1 text-xs text-[var(--ui-text-secondary)] select-none">
               <input
                 type="checkbox"
                 checked={onlyDiff}
@@ -455,9 +455,9 @@ export default function BomComparePage() {
                     两侧 BOM 一致
                   </div>
                 ) : visibleNodes.length === 0 ? (
-                  <div className="text-sm text-gray-500 text-center py-6">无差异节点</div>
+                  <div className="text-sm text-[var(--ui-text-secondary)] text-center py-6">无差异节点</div>
                 ) : (
-                  <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                  <div className="bg-[var(--ui-bg-surface)] rounded-lg shadow-sm overflow-hidden">
                     {visibleNodes.map((n) => {
                       const l = n.left;
                       const r = n.right;
@@ -496,7 +496,7 @@ export default function BomComparePage() {
                           <span className="relative shrink-0" style={{ width: `calc(4px + ${depth} * var(--ui-tree-indent))` }}>
                             {depth > 0 && (
                               <span
-                                className="absolute top-0 bottom-0 border-l border-gray-200"
+                                className="absolute top-0 bottom-0 border-l border-[var(--ui-border)]"
                                 style={{ left: `calc(2px + ${depth} * var(--ui-tree-indent))` }}
                               />
                             )}
@@ -519,19 +519,19 @@ export default function BomComparePage() {
                             className="flex-1 min-w-0 flex flex-col justify-center py-1.5 pl-1 text-left"
                           >
                             <span className="flex items-center gap-2 min-w-0">
-                              <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
+                              <span className="flex-1 min-w-0 truncate text-sm font-medium text-[var(--ui-text-primary)]">
                                 {code}
                               </span>
                               {qtyLabel && (
                                 <span
-                                  className={`shrink-0 text-xs ${qtyChanged ? 'text-orange-600 font-medium' : 'text-gray-500'}`}
+                                  className={`shrink-0 text-xs ${qtyChanged ? 'text-orange-600 font-medium' : 'text-[var(--ui-text-secondary)]'}`}
                                 >
                                   {qtyLabel}
                                 </span>
                               )}
                               <Badge tone={cm.tone} label={cm.label} size="xs" />
                             </span>
-                            <span className="text-xs text-gray-500 mt-0.5 truncate">
+                            <span className="text-xs text-[var(--ui-text-secondary)] mt-0.5 truncate">
                               {name}
                               {desc ? ` · ${desc}` : ''}
                             </span>

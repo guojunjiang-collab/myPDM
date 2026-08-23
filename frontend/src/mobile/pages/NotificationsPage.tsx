@@ -110,9 +110,9 @@ export default function NotificationsPage() {
   return (
     <div className="flex flex-col">
       {/* 操作栏（sticky）：未读数 + 全部已读 */}
-      <div className="sticky top-0 z-10 bg-gray-50 px-3 pt-2 pb-1">
+      <div className="sticky top-0 z-10 bg-[var(--ui-bg-subtle)] px-3 pt-2 pb-1">
         <div className="flex items-center justify-between gap-2">
-          <div className="min-h-11 flex items-center text-xs text-gray-500">
+          <div className="min-h-11 flex items-center text-xs text-[var(--ui-text-secondary)]">
             {unread > 0 ? `未读 ${unread} 条` : '全部已读'}
           </div>
           <Button
@@ -124,7 +124,7 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      {loading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+      {loading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
       {!loading && error && <p className="text-center text-xs text-red-400 py-3">{error}</p>}
       {!loading && !error && items.length === 0 && <EmptyState text="暂无通知" />}
 
@@ -132,7 +132,7 @@ export default function NotificationsPage() {
         <div className="p-3 flex flex-col gap-3">
           {groups.map((g) => (
             <section key={g.label}>
-              <div className="px-1 mb-1.5 text-xs text-gray-400 font-medium">{g.label}</div>
+              <div className="px-1 mb-1.5 text-xs text-[var(--ui-text-tertiary)] font-medium">{g.label}</div>
               <div className="flex flex-col gap-2">
                 {g.rows.map((n) => {
                   const ic = notificationIcon(n.event_type);
@@ -141,7 +141,7 @@ export default function NotificationsPage() {
                       key={n.id}
                       onClick={() => onRowClick(n)}
                       className={`text-left rounded-lg px-4 py-3 min-h-14 flex gap-3 items-start shadow-sm ${
-                        n.is_read ? 'bg-white' : 'bg-blue-50'
+                        n.is_read ? 'bg-[var(--ui-bg-surface)]' : 'bg-blue-50'
                       }`}
                     >
                       <span
@@ -151,9 +151,9 @@ export default function NotificationsPage() {
                         {ic.icon}
                       </span>
                       <span className="flex-1 min-w-0">
-                        <span className="block text-sm font-medium text-gray-900 break-all">{n.title}</span>
-                        {n.body && <span className="block text-xs text-gray-500 mt-0.5 break-all">{n.body}</span>}
-                        <span className="block text-xs text-gray-400 mt-1">
+                        <span className="block text-sm font-medium text-[var(--ui-text-primary)] break-all">{n.title}</span>
+                        {n.body && <span className="block text-xs text-[var(--ui-text-secondary)] mt-0.5 break-all">{n.body}</span>}
+                        <span className="block text-xs text-[var(--ui-text-tertiary)] mt-1">
                           {formatMeta([['时间', fmtDateTime(n.created_at)]])}
                         </span>
                       </span>

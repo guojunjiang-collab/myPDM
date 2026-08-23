@@ -94,14 +94,14 @@ export default function BomTree({ rootItems, onNavigate }: Props) {
     const hasError = !!errors[b.child_revision_id];
     return (
       <Fragment key={b.id}>
-        <div className="flex items-stretch min-h-10 border-b border-gray-50 bg-white">
+        <div className="flex items-stretch min-h-10 border-b border-gray-50 bg-[var(--ui-bg-surface)]">
           {/* 缩进 + 层级竖线（每级一条，位置 = 父项展开按钮中心） */}
           <span className="relative shrink-0" style={{ width: `calc(${depth} * ${INDENT})` }}>
             {depth > 0 &&
               Array.from({ length: depth }).map((_, i) => (
                 <span
                   key={i}
-                  className="absolute top-0 bottom-0 border-l border-gray-200"
+                  className="absolute top-0 bottom-0 border-l border-[var(--ui-border)]"
                   style={{ left: `calc(${i} * ${INDENT} + ${BTN / 2}px)` }}
                 />
               ))}
@@ -133,11 +133,11 @@ export default function BomTree({ rootItems, onNavigate }: Props) {
           >
             {/* 行1：件号(左) + 用量 + 版本 + 状态(右) */}
             <span className="flex items-center min-w-0">
-              <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
+              <span className="flex-1 min-w-0 truncate text-sm font-medium text-[var(--ui-text-primary)]">
                 {b.child_code}
               </span>
-              <span className="shrink-0 w-8 truncate text-center text-xs text-gray-500">x{b.quantity}</span>
-              <span className="shrink-0 w-7 truncate text-center text-xs text-gray-500">
+              <span className="shrink-0 w-8 truncate text-center text-xs text-[var(--ui-text-secondary)]">x{b.quantity}</span>
+              <span className="shrink-0 w-7 truncate text-center text-xs text-[var(--ui-text-secondary)]">
                 {b.child_version}
               </span>
               <span className="shrink-0 w-12 flex justify-end">
@@ -146,9 +146,9 @@ export default function BomTree({ rootItems, onNavigate }: Props) {
             </span>
             {/* 行2：名称(左) + 检出状态 + 预览按钮（靠右） */}
             <span className="flex items-center min-w-0 mt-0.5">
-              <span className="flex-1 min-w-0 truncate text-xs text-gray-500">{b.child_name}</span>
+              <span className="flex-1 min-w-0 truncate text-xs text-[var(--ui-text-secondary)]">{b.child_name}</span>
               {b.child_check_out_user_name && (
-                <span className="shrink-0 truncate text-right text-xs text-gray-500">
+                <span className="shrink-0 truncate text-right text-xs text-[var(--ui-text-secondary)]">
                   {b.child_check_out_user_name}
                 </span>
               )}
@@ -167,10 +167,10 @@ export default function BomTree({ rootItems, onNavigate }: Props) {
           </button>
         </div>
         {isOpen && (
-          <div className="bg-white">
+          <div className="bg-[var(--ui-bg-surface)]">
             {/* 提示对齐该节点子行内容起点：(depth+1) 级缩进 + 按钮宽 */}
             {isLoading && (
-              <div className="py-2 text-xs text-gray-400" style={{ paddingLeft: `calc((${depth} + 1) * ${INDENT} + ${BTN}px)` }}>
+              <div className="py-2 text-xs text-[var(--ui-text-tertiary)]" style={{ paddingLeft: `calc((${depth} + 1) * ${INDENT} + ${BTN}px)` }}>
                 加载中...
               </div>
             )}
@@ -180,7 +180,7 @@ export default function BomTree({ rootItems, onNavigate }: Props) {
               </div>
             )}
             {!isLoading && !hasError && kids && kids.length === 0 && (
-              <div className="py-2 text-xs text-gray-400" style={{ paddingLeft: `calc((${depth} + 1) * ${INDENT} + ${BTN}px)` }}>
+              <div className="py-2 text-xs text-[var(--ui-text-tertiary)]" style={{ paddingLeft: `calc((${depth} + 1) * ${INDENT} + ${BTN}px)` }}>
                 该零部件无下级 BOM
               </div>
             )}
@@ -192,7 +192,7 @@ export default function BomTree({ rootItems, onNavigate }: Props) {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+    <div className="bg-[var(--ui-bg-surface)] rounded-lg shadow-sm overflow-hidden">
       {rootItems.map((b) => renderNode(b, 0))}
     </div>
   );

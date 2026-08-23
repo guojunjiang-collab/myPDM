@@ -201,17 +201,17 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
   return (
     <div className="flex flex-col">
       {/* 顶部：返回 + 标题 + Tab */}
-      <div className="sticky top-0 z-10 bg-gray-50 px-2 pt-2 pb-1">
+      <div className="sticky top-0 z-10 bg-[var(--ui-bg-subtle)] px-2 pt-2 pb-1">
         <div className="flex items-center gap-1 min-h-10">
           <button
             aria-label="返回"
             onClick={() => (onBack ? onBack() : window.history.back())}
-            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-gray-600"
+            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-[var(--ui-text-secondary)]"
           >
             ‹
           </button>
           {/* 标题：构型号 + 版本徽标 + 名称（版本徽标主色浅底，名称过长省略不影响版本可见） */}
-          <div className="min-w-0 flex-1 flex items-center gap-1.5 text-base font-medium text-gray-900 truncate">
+          <div className="min-w-0 flex-1 flex items-center gap-1.5 text-base font-medium text-[var(--ui-text-primary)] truncate">
             <span className="shrink-0">{code}</span>
             {detail?.revision.version && (
               <span className="shrink-0 px-1.5 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-700">
@@ -221,13 +221,13 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
             <span className="flex-1 min-w-0 truncate">{name}</span>
           </div>
         </div>
-        <div className="flex mt-1 bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="flex mt-1 bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-hidden">
           {TABS.map((t) => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
               className={`flex-1 min-h-10 text-xs whitespace-nowrap ${
-                tab === t.key ? 'bg-[var(--ui-btn-primary-bg)] text-white font-medium' : 'text-gray-500'
+                tab === t.key ? 'bg-[var(--ui-btn-primary-bg)] text-white font-medium' : 'text-[var(--ui-text-secondary)]'
               }`}
             >
               {t.label}
@@ -237,14 +237,14 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
       </div>
 
       <div className="p-3">
-        {loading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+        {loading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
         {!loading && error && <p className="text-center text-xs text-red-400 py-3">{error}</p>}
         {!loading && !error && !detail && <EmptyState text="未找到构型项" />}
 
         {!loading && !error && detail && tab === 'overview' && (
           <div>
             {/* 基本信息区：2 列网格卡片（参照零部件详情-概览） */}
-            <div className="text-sm font-bold text-gray-900 mb-2">基本信息</div>
+            <div className="text-sm font-bold text-[var(--ui-text-primary)] mb-2">基本信息</div>
             <div className="grid grid-cols-2 gap-2">
               {(
                 [
@@ -264,34 +264,34 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                   { label: '更新时间', value: fmtDate(detail.revision.check_out_date) },
                 ] as Array<{ label: string; value?: ReactNode }>
               ).map((r) => (
-                <div key={r.label} className="bg-white rounded-lg px-3 py-2.5 min-h-14 shadow-sm">
-                  <div className="text-xs text-gray-500 mb-0.5 truncate">{r.label}</div>
-                  <div className="text-sm text-gray-900 break-all">{r.value ?? '-'}</div>
+                <div key={r.label} className="bg-[var(--ui-bg-surface)] rounded-lg px-3 py-2.5 min-h-14 shadow-sm">
+                  <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5 truncate">{r.label}</div>
+                  <div className="text-sm text-[var(--ui-text-primary)] break-all">{r.value ?? '-'}</div>
                 </div>
               ))}
             </div>
             {/* 备注（有内容时单独展示） */}
             {detail.revision.remark && (
               <div className="mt-2">
-                <div className="text-sm font-bold text-gray-900 mb-2">备注</div>
-                <div className="bg-white rounded-lg px-4 py-3 shadow-sm text-xs text-gray-600 whitespace-pre-wrap">
+                <div className="text-sm font-bold text-[var(--ui-text-primary)] mb-2">备注</div>
+                <div className="bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 shadow-sm text-xs text-[var(--ui-text-secondary)] whitespace-pre-wrap">
                   {detail.revision.remark}
                 </div>
               </div>
             )}
             {/* 自定义字段区（无定义时不显示） */}
-            {cfLoading && <p className="text-center text-xs text-gray-400 py-2 mt-2">自定义字段加载中...</p>}
+            {cfLoading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-2 mt-2">自定义字段加载中...</p>}
             {!cfLoading && cfError && (
               <p className="text-center text-xs text-red-400 py-2 mt-2">自定义字段加载失败</p>
             )}
             {!cfLoading && !cfError && cfRows.length > 0 && (
               <div className="mt-2">
-                <div className="text-sm font-bold text-gray-900 mb-2">自定义字段</div>
+                <div className="text-sm font-bold text-[var(--ui-text-primary)] mb-2">自定义字段</div>
                 <div className="grid grid-cols-2 gap-2">
                   {cfRows.map((r) => (
-                    <div key={r.label} className="bg-white rounded-lg px-3 py-2.5 min-h-14 shadow-sm">
-                      <div className="text-xs text-gray-500 mb-0.5 truncate">{r.label}</div>
-                      <div className="text-sm text-gray-900 break-all">{r.value ?? '-'}</div>
+                    <div key={r.label} className="bg-[var(--ui-bg-surface)] rounded-lg px-3 py-2.5 min-h-14 shadow-sm">
+                      <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5 truncate">{r.label}</div>
+                      <div className="text-sm text-[var(--ui-text-primary)] break-all">{r.value ?? '-'}</div>
                     </div>
                   ))}
                 </div>
@@ -309,18 +309,18 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                 <button
                   key={p.id}
                   onClick={() => openPart(p.part_detail?.id, p.part_detail?.revision_id)}
-                  className="w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm"
+                  className="w-full text-left bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 min-h-14 shadow-sm"
                 >
                   {/* 行1：编号（左）+ 用量 + 版本 + 必装/选装徽标 + 状态（右）；徽标列与行2 类型徽标右对齐 */}
                   <span className="flex items-center gap-2 min-w-0">
-                    <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
+                    <span className="flex-1 min-w-0 truncate text-sm font-medium text-[var(--ui-text-primary)]">
                       {p.part_detail?.code ?? p.part_id}
                     </span>
                     {p.quantity != null && (
-                      <span className="shrink-0 truncate text-center text-xs text-gray-500">x{p.quantity}</span>
+                      <span className="shrink-0 truncate text-center text-xs text-[var(--ui-text-secondary)]">x{p.quantity}</span>
                     )}
                     {p.part_detail?.version && (
-                      <span className="shrink-0 text-center text-xs text-gray-500">{p.part_detail.version}</span>
+                      <span className="shrink-0 text-center text-xs text-[var(--ui-text-secondary)]">{p.part_detail.version}</span>
                     )}
                     {/* 必装/选装徽标与状态徽标成组靠右，间距紧凑；状态徽标位置不动 */}
                     <span className="shrink-0 flex items-center gap-1.5">
@@ -335,7 +335,7 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                   </span>
                   {/* 行2：名称（左）+ 类型徽标（固定位置）+ 预览按钮占位（无 3D 时留空，徽标不跳动） */}
                   <span className="mt-1 flex items-center gap-1.5 min-w-0 min-h-7">
-                    <span className="flex-1 min-w-0 truncate text-xs text-gray-500">
+                    <span className="flex-1 min-w-0 truncate text-xs text-[var(--ui-text-secondary)]">
                       {p.part_detail?.name || ''}
                     </span>
                     <Badge
@@ -387,21 +387,21 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                   <button
                     key={raw.id ?? doc?.id ?? 'd'}
                     onClick={() => openDocument(raw.document_id)}
-                    className="w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm"
+                    className="w-full text-left bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 min-h-14 shadow-sm"
                   >
                     {/* 行1：编号（左）+ 版本 + 状态（右） */}
                     <span className="flex items-center gap-2 min-w-0">
-                      <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
+                      <span className="flex-1 min-w-0 truncate text-sm font-medium text-[var(--ui-text-primary)]">
                         {doc?.code ?? '图文档'}
                       </span>
                       {doc?.version && (
-                        <span className="shrink-0 text-xs text-gray-400">{doc.version}</span>
+                        <span className="shrink-0 text-xs text-[var(--ui-text-tertiary)]">{doc.version}</span>
                       )}
                       {doc?.status && <Badge status={doc.status} />}
                     </span>
                     {/* 行2：名称（左）+ 预览按钮（右下角，有附件才显示；样式同任务详情关联对象） */}
                     <span className="mt-1 flex items-center gap-2 min-w-0 min-h-7">
-                      <span className="flex-1 min-w-0 truncate text-xs text-gray-500">
+                      <span className="flex-1 min-w-0 truncate text-xs text-[var(--ui-text-secondary)]">
                         {doc?.name || doc?.file_name || ''}
                       </span>
                       {doc?.file_id && (
@@ -434,14 +434,14 @@ export default function ConfigItemDetailPage({ revisionId, onBack, onNavigate }:
                 <div
                   key={v.id}
                   className={`rounded-lg px-4 py-3 shadow-sm ${
-                    v.id === revisionId ? 'bg-primary-50 border border-primary-300' : 'bg-white'
+                    v.id === revisionId ? 'bg-primary-50 border border-primary-300' : 'bg-[var(--ui-bg-surface)]'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-base font-medium text-gray-900">版本 {v.version}</span>
+                    <span className="text-base font-medium text-[var(--ui-text-primary)]">版本 {v.version}</span>
                     <Badge status={v.status} />
                   </div>
-                  <div className="text-xs text-gray-500 mt-1.5 space-y-0.5">
+                  <div className="text-xs text-[var(--ui-text-secondary)] mt-1.5 space-y-0.5">
                     <div>最新迭代：{v.latest_iteration}</div>
                     {v.check_out_user_name && <div>检出人：{v.check_out_user_name}</div>}
                     <div>创建时间：{fmtDateTime(v.created_at)}</div>

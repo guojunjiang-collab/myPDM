@@ -29,7 +29,7 @@ export default function FilterDropdown({
         <>
           {/* 点击外部关闭 */}
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full mt-1 z-40 min-w-28 bg-white rounded-lg shadow-lg border border-gray-200 py-1">
+          <div className="absolute left-0 top-full mt-1 z-40 min-w-28 bg-[var(--ui-bg-surface)] rounded-lg shadow-lg border border-[var(--ui-border)] py-1">
             {options.map((opt) => (
               <button
                 key={opt.key}

@@ -52,7 +52,7 @@ function Section({ title, count, children }: { title: string; count: number; chi
   return (
     <div className="mb-4">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-sm font-bold text-gray-900">{title}</span>
+        <span className="text-sm font-bold text-[var(--ui-text-primary)]">{title}</span>
         <Badge tone="gray" label={count} size="xs" />
       </div>
       {children}
@@ -71,7 +71,7 @@ function State({
   empty: boolean;
   children: ReactNode;
 }) {
-  if (loading) return <p className="text-center text-xs text-gray-400 py-3">加载中...</p>;
+  if (loading) return <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>;
   if (error) return <p className="text-center text-xs text-red-400 py-3">加载失败，请稍后重试</p>;
   if (empty) return <EmptyState text="暂无引用" />;
   return <div className="flex flex-col gap-2">{children}</div>;
@@ -98,19 +98,19 @@ function RowCard({
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left bg-white rounded-lg px-4 py-3 min-h-14 shadow-sm ${
+      className={`w-full text-left bg-[var(--ui-bg-surface)] rounded-lg px-4 py-3 min-h-14 shadow-sm ${
         onClick ? '' : 'cursor-default'
       }`}
     >
       <span className="flex items-center min-w-0">
-        <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">{code}</span>
-        <span className="shrink-0 w-7 truncate text-center text-xs text-gray-500">{version}</span>
+        <span className="flex-1 min-w-0 truncate text-sm font-medium text-[var(--ui-text-primary)]">{code}</span>
+        <span className="shrink-0 w-7 truncate text-center text-xs text-[var(--ui-text-secondary)]">{version}</span>
         <span className="shrink-0 w-12 flex justify-end">
           {status && <Badge status={status} domain={domain} />}
         </span>
       </span>
       <span className="flex items-center min-w-0 mt-0.5">
-        <span className="flex-1 min-w-0 truncate text-xs text-gray-500">{name}</span>
+        <span className="flex-1 min-w-0 truncate text-xs text-[var(--ui-text-secondary)]">{name}</span>
         {badge}
       </span>
     </button>

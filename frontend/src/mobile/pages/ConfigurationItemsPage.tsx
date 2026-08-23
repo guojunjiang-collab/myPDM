@@ -120,30 +120,30 @@ export default function ConfigurationItemsPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="sticky top-0 bg-gray-50 px-3 pt-2 pb-1 z-10">
+      <div className="sticky top-0 bg-[var(--ui-bg-subtle)] px-3 pt-2 pb-1 z-10">
         {/* 搜索框 + 工具栏（顶层/全部版本）同一行 */}
         <div className="flex items-center gap-2">
           <input
-            className="flex-1 min-w-0 h-11 px-4 rounded-lg bg-white border border-gray-200 text-base"
+            className="flex-1 min-w-0 h-11 px-4 rounded-lg bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] text-base"
             placeholder="搜索构型号/名称..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
           <button
             onClick={() => setTopLevel((v) => !v)}
-            className={`shrink-0 min-h-11 px-3 rounded-lg text-xs ${topLevel ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+            className={`shrink-0 min-h-11 px-3 rounded-lg text-xs ${topLevel ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-[var(--ui-bg-surface)] text-[var(--ui-text-secondary)] border border-[var(--ui-border)]'}`}
           >
             顶层
           </button>
           <button
             onClick={() => setShowAllVersions((v) => !v)}
-            className={`shrink-0 min-h-11 px-3 rounded-lg text-xs ${showAllVersions ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+            className={`shrink-0 min-h-11 px-3 rounded-lg text-xs ${showAllVersions ? 'bg-[var(--ui-btn-primary-bg)] text-white' : 'bg-[var(--ui-bg-surface)] text-[var(--ui-text-secondary)] border border-[var(--ui-border)]'}`}
           >
             全部版本
           </button>
         </div>
       </div>
-      {loading && <p className="text-center text-xs text-gray-400 py-3">加载中...</p>}
+      {loading && <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>}
       {!loading && error && <p className="text-center text-xs text-red-400 py-3">{error}</p>}
       {!loading && !error && filtered.length === 0 && <EmptyState text="暂无构型项" />}
       <MobileCardList
@@ -151,13 +151,13 @@ export default function ConfigurationItemsPage() {
         keyOf={(i) => i.revision_id}
         renderMain={(i) => (
           <div className="flex items-center gap-2 min-w-0">
-            <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">{i.code}</span>
+            <span className="flex-1 min-w-0 truncate text-sm font-medium text-[var(--ui-text-primary)]">{i.code}</span>
             {!showAllVersions && i.version_count && i.version_count > 1 && (
               <span className="shrink-0 px-1.5 py-0.5 rounded-lg text-xs bg-primary-50 text-primary-600">
                 {i.version_count} 个版本
               </span>
             )}
-            <span className="shrink-0 text-xs text-gray-500">{i.version}</span>
+            <span className="shrink-0 text-xs text-[var(--ui-text-secondary)]">{i.version}</span>
             <span className="shrink-0 w-12 flex justify-end">
               <Badge status={i.status} />
             </span>
@@ -165,9 +165,9 @@ export default function ConfigurationItemsPage() {
         )}
         renderMeta={(i) => (
           <div className="flex items-center gap-2 min-w-0">
-            <span className="flex-1 min-w-0 truncate text-xs text-gray-500">{i.name}</span>
+            <span className="flex-1 min-w-0 truncate text-xs text-[var(--ui-text-secondary)]">{i.name}</span>
             {i.check_out_user_name && (
-              <span className="shrink-0 text-xs text-gray-500">{i.check_out_user_name}</span>
+              <span className="shrink-0 text-xs text-[var(--ui-text-secondary)]">{i.check_out_user_name}</span>
             )}
           </div>
         )}

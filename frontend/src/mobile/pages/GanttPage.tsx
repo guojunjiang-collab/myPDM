@@ -116,23 +116,23 @@ export default function GanttPage({ projectId, onBack }: Props) {
   return (
     <div className="flex flex-col h-full">
       {/* 顶部：返回 + 标题 + 缩放切换 */}
-      <div className="sticky top-0 z-20 bg-gray-50 px-2 pt-2 pb-1">
+      <div className="sticky top-0 z-20 bg-[var(--ui-bg-subtle)] px-2 pt-2 pb-1">
         <div className="flex items-center gap-1 min-h-10">
           <button
             aria-label="返回"
             onClick={() => (onBack ? onBack() : window.history.back())}
-            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-gray-600"
+            className="shrink-0 min-w-10 h-10 flex items-center justify-center text-2xl leading-none text-[var(--ui-text-secondary)]"
           >
             ‹
           </button>
-          <div className="min-w-0 flex-1 text-base font-medium text-gray-900 truncate">甘特图</div>
-          <div className="flex bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="min-w-0 flex-1 text-base font-medium text-[var(--ui-text-primary)] truncate">甘特图</div>
+          <div className="flex bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-hidden">
             {SCALES.map((s) => (
               <button
                 key={s.key}
                 onClick={() => setScale(s.key)}
                 className={`min-h-8 px-3 text-xs ${
-                  scale === s.key ? 'bg-[var(--ui-btn-primary-bg)] text-white font-medium' : 'text-gray-500'
+                  scale === s.key ? 'bg-[var(--ui-btn-primary-bg)] text-white font-medium' : 'text-[var(--ui-text-secondary)]'
                 }`}
               >
                 {s.label}
@@ -143,7 +143,7 @@ export default function GanttPage({ projectId, onBack }: Props) {
       </div>
 
       {loading ? (
-        <p className="text-center text-xs text-gray-400 py-3">加载中...</p>
+        <p className="text-center text-xs text-[var(--ui-text-tertiary)] py-3">加载中...</p>
       ) : !data ? (
         <EmptyState text="甘特图加载失败" />
       ) : (
@@ -153,7 +153,7 @@ export default function GanttPage({ projectId, onBack }: Props) {
                 宽度按内容自适应（leftW），右侧 border-r 竖线分割符随左列宽度自动贴合；
                 z-20 高于右区全部元素（含今日线 z-10），滚动时分割线不被右区内容遮盖 */}
             <div
-              className="sticky left-0 z-20 bg-gray-50 shrink-0 border-r border-gray-200 relative"
+              className="sticky left-0 z-20 bg-[var(--ui-bg-subtle)] shrink-0 border-r border-[var(--ui-border)] relative"
               style={{ width: leftW }}
             >
               {/* 与右区日期表头等高的占位，保证任务行对齐 */}
@@ -167,7 +167,7 @@ export default function GanttPage({ projectId, onBack }: Props) {
                 >
                   {/* 编号：全部显示不省略（左列宽度按测量值自适应，已含保险余量） */}
                   <span
-                    className="text-xs font-medium text-gray-900 whitespace-nowrap leading-tight"
+                    className="text-xs font-medium text-[var(--ui-text-primary)] whitespace-nowrap leading-tight"
                     style={{ paddingLeft: `calc(${t.depth} * var(--ui-tree-indent))` }}
                   >
                     {t.code}
@@ -178,7 +178,7 @@ export default function GanttPage({ projectId, onBack }: Props) {
                     style={{ paddingLeft: `calc(${t.depth} * var(--ui-tree-indent))` }}
                   >
                     {t.assignee_name ? (
-                      <span className="text-gray-500">{t.assignee_name}</span>
+                      <span className="text-[var(--ui-text-secondary)]">{t.assignee_name}</span>
                     ) : (
                       <span className="text-amber-500">未分配</span>
                     )}
@@ -204,7 +204,7 @@ export default function GanttPage({ projectId, onBack }: Props) {
                   ticks(range.start, range.end, scale).map((tk, i) => (
                     <span
                       key={i}
-                      className={`absolute top-1 text-[10px] text-gray-500 ${tk.major ? 'font-medium' : ''}`}
+                      className={`absolute top-1 text-[10px] text-[var(--ui-text-secondary)] ${tk.major ? 'font-medium' : ''}`}
                       style={{ left: tk.x }}
                     >
                       {tk.label}
@@ -237,7 +237,7 @@ export default function GanttPage({ projectId, onBack }: Props) {
                       }}
                     >
                       {/* 名称始终显示，条内放不下时向右溢出；z-[5] 高于兄弟条背景、低于左列 sticky z-10（不盖任务编号列） */}
-                      <span className="relative z-[5] shrink-0 pl-1.5 pr-1 text-[10px] leading-none text-gray-900 whitespace-nowrap">
+                      <span className="relative z-[5] shrink-0 pl-1.5 pr-1 text-[10px] leading-none text-[var(--ui-text-primary)] whitespace-nowrap">
                         {t.name}
                       </span>
                     </div>
