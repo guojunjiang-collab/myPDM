@@ -3,33 +3,7 @@ import { useThree, useFrame } from '@react-three/fiber';
 import { ArcballControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useViewerStore } from '../../stores/viewerStore';
-
-const AXES = [
-  new THREE.Vector3(1, 0, 0), new THREE.Vector3(-1, 0, 0),
-  new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, -1, 0),
-  new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1),
-];
-
-const VIEWS: Record<string, THREE.Vector3> = {
-  front:  new THREE.Vector3(0, 0, 1),
-  back:   new THREE.Vector3(0, 0, -1),
-  left:   new THREE.Vector3(-1, 0, 0),
-  right:  new THREE.Vector3(1, 0, 0),
-  top:    new THREE.Vector3(0, 1, 0),
-  bottom: new THREE.Vector3(0, -1, 0),
-};
-
-/** 选与当前 up 最近的正交世界轴，跳过与视线平行的轴 */
-function bestUp(viewDir: THREE.Vector3, currentUp: THREE.Vector3): THREE.Vector3 {
-  let best = new THREE.Vector3(0, 1, 0);
-  let bestDot = -Infinity;
-  for (const axis of AXES) {
-    if (Math.abs(axis.dot(viewDir)) > 0.001) continue;
-    const d = axis.dot(currentUp);
-    if (d > bestDot) { bestDot = d; best = axis; }
-  }
-  return best.clone();
-}
+import { resolveViewJump, resolveResetJump } from './viewNavigation';
 
 export function CameraController() {
   const cameraMode = useViewerStore((s) => s.cameraMode);
@@ -100,36 +74,34 @@ export function CameraController() {
   // Standard view animation
   useEffect(() => {
     if (!viewTarget || !controlsRef.current) return;
-    const dir = VIEWS[viewTarget];
-    if (!dir) return;
-
     const controls = controlsRef.current;
     const target = (controls as any).target as THREE.Vector3 | undefined;
     const center = target ? target.clone() : new THREE.Vector3(0, 0, 0);
     const dist = camera.position.distanceTo(center) || 5;
-    const endPos = center.clone().addScaledVector(dir, dist);
-    const up = bestUp(dir, camera.up);
+    // 确定性标准视图：每个视图固定 up 轴（不依赖历史姿态），避免"点击面后模型歪了"
+    const jump = resolveViewJump(viewTarget, center, dist);
+    if (!jump) return;
     anim.current = {
       start: camera.position.clone(),
-      end: endPos,
-      up,
+      end: jump.endPos,
+      up: jump.up,
       target: center.clone(),
       elapsed: 0,
     };
     setViewTarget(null);
   }, [viewTarget]);
 
-  // 重置：恢复到初始视角
+  // 重置：恢复到初始视角（up 固定为初始 +Y）
   useEffect(() => {
     if (resetViewTrigger === 0) return;
     const { initCamPos, initCamTarget } = useViewerStore.getState();
     const endPos = new THREE.Vector3(...initCamPos);
     const tgt = new THREE.Vector3(...initCamTarget);
-    const up = bestUp(new THREE.Vector3().subVectors(endPos, tgt).normalize(), camera.up);
+    const jump = resolveResetJump(endPos);
     anim.current = {
       start: camera.position.clone(),
-      end: endPos,
-      up,
+      end: jump.endPos,
+      up: jump.up,
       target: tgt,
       elapsed: 0,
     };
