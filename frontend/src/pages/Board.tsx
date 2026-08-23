@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { boardApi, usersApi, partsApi, documentsApi, configurationApi } from '../services/api';
+import { boardApi, usersApi, partsApi, documentsApi, configurationApi, mediaApi } from '../services/api';
 import { useDataStore } from '../stores/data';
 import { Modal, ConfirmModal } from '../components/Modal';
 import PartDetailModal from '../components/PartDetailModal';
@@ -352,7 +352,8 @@ export default function Board() {
         const atts: any[] = Array.isArray(res) ? res : (res?.items || []);
         const stp = atts.find((a) => /\.(stp|step)$/i.test(a.file_name || ''));
         if (stp) {
-          window.open(`/stp-viewer?id=${stp.id}`, '_blank');
+          const mt = await mediaApi.token(stp.id, 'gltf');
+          window.open(`/stp-viewer?id=${stp.id}&token=${encodeURIComponent(mt)}`, '_blank');
           return;
         }
       } catch { /* 忽略，走 fallback */ }
