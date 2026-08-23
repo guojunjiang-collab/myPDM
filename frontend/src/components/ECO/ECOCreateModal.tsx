@@ -20,6 +20,7 @@ import { compareVersions } from '../../constants';
 import { ECOEditView } from './ECOEditView';
 import DocumentPicker from '../DocumentPicker';
 import AssemblyPartPicker from '../AssemblyPartPicker';
+import Tabs from '../ui/Tabs';
 
 const REASON_OPTIONS = [
   { value: 'quality_defect', label: '质量缺陷' },
@@ -92,6 +93,8 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
   const [bomData, setBomData] = useState<{ up: any[]; down: any[] } | null>(null);
   const [documentLinks, setDocumentLinks] = useState<ECRDocumentLink[]>([]);
   const [showDocPicker, setShowDocPicker] = useState(false);
+  // Tab 分页（与详情页一致：基本信息/ECR变更分析/关联图文档/审批/工程变更结果）
+  const [activeTab, setActiveTab] = useState<'info' | 'ecr' | 'docs' | 'reviewers' | 'items'>('info');
   const [showEcrPicker, setShowEcrPicker] = useState(false);
   const [showReleasePicker, setShowReleasePicker] = useState(false);
   const [releaseItems, setReleaseItems] = useState<any[]>([]);
@@ -195,6 +198,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         setReleaseItems([]);
       }
       setErrors({});
+      setActiveTab('info');
     }
   }, [open, editingEco]);
 
@@ -206,7 +210,7 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
       if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
     }, 0);
     return () => clearTimeout(timer);
-  }, [open, description]);
+  }, [open, description, activeTab]);
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
@@ -401,16 +405,19 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
   };
 
   return (
-    <Modal open={open} title={editingEco ? '编辑 ECO' : '新建 ECO'} onClose={onClose} width="3xl">
-      <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
-        {ecrTitle && (
-          <div className="text-sm text-[var(--ui-text-secondary)] bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-            来源 ECR: {ecrTitle}
-          </div>
-        )}
-
-        {/* 基本字段 - 卡片式 */}
-        <div className="grid grid-cols-2 gap-4">
+    <Modal open={open} title={editingEco ? '编辑 ECO' : '新建 ECO'} onClose={onClose} width="3xl" height="75vh"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>取消</Button>
+          <Button onClick={handleSubmit} disabled={loading}>
+            {loading ? '保存中...' : (localEco ? '保存' : '创建')}
+          </Button>
+        </>
+      }
+    >
+      <div className="h-full flex flex-col min-h-0">
+        {/* 常驻摘要条：ECO 编号（只读）+ 标题（必填） */}
+        <div className="grid grid-cols-2 gap-4 shrink-0 mb-3">
           <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
             <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">ECO 编号</label>
             <Input size="xs" type="text" value={localEco?.eco_number || ''} disabled
@@ -425,6 +432,31 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
             {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
           </div>
         </div>
+
+        {/* Tab 栏（必填缺失红点提示） */}
+        <div className="shrink-0 mb-3">
+          <Tabs
+            items={[
+              { key: 'info', label: <span>基本信息{!title.trim() && <span className="ml-1 text-red-500">●</span>}</span> },
+              { key: 'ecr', label: 'ECR变更分析' },
+              { key: 'docs', label: '关联图文档' },
+              { key: 'reviewers', label: <span>审批{reviewers.some(r => !r.user_id) && <span className="ml-1 text-red-500">●</span>}</span> },
+              { key: 'items', label: '工程变更结果' },
+            ]}
+            activeKey={activeTab}
+            onChange={(k) => setActiveTab(k as any)}
+          />
+        </div>
+
+        {/* Tab 内容区 */}
+        <div className="flex-1 min-h-0 overflow-auto pr-1 space-y-4">
+          {activeTab === 'info' && (
+            <>
+        {ecrTitle && (
+          <div className="text-sm text-[var(--ui-text-secondary)] bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+            来源 ECR: {ecrTitle}
+          </div>
+        )}
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
@@ -470,7 +502,10 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
             className="overflow-hidden"
             placeholder="变更详细描述（选填）" />
         </div>
-
+            </>
+          )}
+          {activeTab === 'reviewers' && (
+            <>
         {editingEco && <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-gray-700">👤 审批人</label>
@@ -507,7 +542,10 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
             ))}
           </div>
         </div>}
-
+            </>
+          )}
+          {activeTab === 'info' && (
+            <>
         {ecrItems && ecrItems.length > 0 && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">执行项（从 ECR 带入）</label>
@@ -521,7 +559,10 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
             </div>
           </div>
         )}
-
+            </>
+          )}
+          {activeTab === 'docs' && (
+            <>
         {editingEco && <div>
         {/* 关联图文档 */}
         <div className="border-t pt-4">
@@ -582,7 +623,10 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
           </div>
         </div>
         </div>}
-
+            </>
+          )}
+          {activeTab === 'ecr' && (
+            <>
         {/* ECR 变更分析（仅编辑模式） */}
         {!!localEco && (
         <div className="border-t pt-4">
@@ -624,7 +668,10 @@ onExecuteFreeze={(itemId, newEntityId) => handleExecuteAction('freeze', itemId, 
           resetKey={resetKey} hideResetButton />
         </div>
         )}
-
+            </>
+          )}
+          {activeTab === 'items' && (
+            <>
         {/* 工程变更结果（仅编辑模式） */}
         {editingEco && (
         <div className="border-t pt-4">
@@ -639,16 +686,9 @@ onExecuteFreeze={(itemId, newEntityId) => handleExecuteAction('freeze', itemId, 
           )}
         </div>
         )}
-      </div>
-
-      {/* 按钮 */}
-      <div className="flex justify-end gap-3 pt-4 border-t border-[var(--ui-border)]">
-        <Button variant="secondary" onClick={onClose}>
-          取消
-        </Button>
-        <Button onClick={handleSubmit} disabled={loading}>
-          {loading ? '保存中...' : (localEco ? '保存' : '创建')}
-        </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* 图文档选择器 — 独立弹窗（共享 DocumentPicker） */}

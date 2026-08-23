@@ -21,6 +21,7 @@ import SortableTh from '../ui/SortableTh';
 import TreeToggle from '../ui/TreeToggle';
 import { useTableSort } from '../../hooks/useTableSort';
 import { compareVersions } from '../../constants';
+import Tabs from '../ui/Tabs';
 
 interface Props { ecoId: string; onClose: () => void; onRefresh: () => void; executionMode?: boolean; }
 
@@ -63,6 +64,8 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
   const [showPublishAll, setShowPublishAll] = useState(false);
   const [publishStatus, setPublishStatus] = useState<{ has_pending: boolean; pending_count: number; total: number } | null>(null);
   const [publishedNonce, setPublishedNonce] = useState(0);  // 一键发布后递增，通知列表就地刷新已展开子项状态
+  // Tab 分页（与编辑页一致：基本信息/ECR变更分析/关联图文档/审批/工程变更结果）
+  const [activeTab, setActiveTab] = useState<'info' | 'ecr' | 'docs' | 'review' | 'items'>('info');
 
   const load = async () => {
     setLoading(true);
@@ -207,23 +210,48 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
           title="导出为 PDF 文档"
         >📄 导出PDF</Button>
       ) : undefined}
+      footer={executionMode && eco?.status === 'executing' ? (
+        <Button variant="success" size="sm" onClick={() => act(() => ecoApi.completeExecution(ecoId), '执行已完成')} disabled={actionLoading}>
+          {actionLoading ? '处理中...' : '完成执行'}
+        </Button>
+      ) : undefined}
     >
       {loading ? <div className="py-8 text-center text-[var(--ui-text-tertiary)] text-sm">加载中...</div>
       : !eco ? <div className="py-8 text-center text-[var(--ui-text-tertiary)] text-sm">未找到 ECO</div>
       : (
         <>
-        <div className="space-y-4 pr-1">
-          {/* Header */}
-          <div className="flex items-center justify-between pb-4 border-b border-[var(--ui-border)]">
-            <div>
-              <div className="text-lg font-bold text-[var(--ui-text-primary)]">{eco.eco_number}</div>
-              <div className="text-sm text-[var(--ui-text-secondary)] mt-0.5">{eco.title}</div>
+        <div className="h-full flex flex-col min-h-0">
+          {/* 常驻摘要条：编号 + 标题 + 状态/优先级 */}
+          <div className="flex items-center justify-between gap-3 pb-3 mb-3 border-b border-[var(--ui-border)] shrink-0">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="text-lg font-bold text-[var(--ui-text-primary)] shrink-0">{eco.eco_number}</span>
+              <span className="text-sm text-[var(--ui-text-secondary)] truncate">{eco.title}</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <ECOStatusBadge status={eco.status} />
               <ECOPriorityBadge priority={eco.priority} />
             </div>
           </div>
+
+          {/* Tab 栏（与编辑页一致：基本信息/ECR变更分析/关联图文档/审批/工程变更结果） */}
+          <div className="shrink-0 mb-3">
+            <Tabs
+              items={[
+                { key: 'info', label: '基本信息' },
+                { key: 'ecr', label: 'ECR变更分析' },
+                { key: 'docs', label: '关联图文档' },
+                { key: 'review', label: '审批' },
+                { key: 'items', label: '工程变更结果' },
+              ]}
+              activeKey={activeTab}
+              onChange={(k) => setActiveTab(k as any)}
+            />
+          </div>
+
+          {/* Tab 内容区 */}
+          <div className="flex-1 min-h-0 overflow-auto pr-1 space-y-4">
+            {activeTab === 'info' && (
+              <>
 
           {/* Basic info */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -236,6 +264,10 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
           </div>
 
           <InfoItem label="变更描述" value={eco.description || '-'} className="col-span-2 md:col-span-4" />
+            </>
+          )}
+          {activeTab === 'review' && (
+            <>
 
           {/* Reviewers */}
           {eco.reviewers && eco.reviewers.length > 0 && (
@@ -244,6 +276,10 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
               <ECRReviewPanel reviewers={eco.reviewers} reviewRecords={eco.review_records || []} currentUserId={user?.id || ''} onReview={async (decision, comment) => { setActionLoading(true); try { await ecoApi.review(ecoId, decision, comment); toast.success('操作成功'); load(); } catch { toast.error('操作失败'); } finally { setActionLoading(false); } }} loading={actionLoading} />
             </div>
           )}
+            </>
+          )}
+          {activeTab === 'docs' && (
+            <>
 
           {/* Document links */}
           <div className="border-t pt-4">
@@ -291,6 +327,10 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
               )}
             </div>
           </div>
+            </>
+          )}
+          {activeTab === 'review' && (
+            <>
 
           {/* CC users */}
           {eco.cc_users && eco.cc_users.length > 0 && (
@@ -299,6 +339,10 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
               <div className="flex flex-wrap gap-2">{eco.cc_users.map((c, i) => <span key={i} className="text-xs px-2 py-1 rounded bg-purple-50 text-purple-700">{c.user_name}</span>)}</div>
             </div>
           )}
+            </>
+          )}
+          {activeTab === 'ecr' && (
+            <>
 
           {/* BOM impact */}
           {eco.ecr_id && (
@@ -352,6 +396,10 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
                 onCheckedChange={setCheckedExecIds} />
             </div>
           )}
+            </>
+          )}
+          {activeTab === 'items' && (
+            <>
 
           {/* 工程变更结果 */}
           <div className="border-t pt-4">
@@ -369,6 +417,10 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
               <ReleaseItemsTable items={releaseItems} onViewItem={viewItem} publishedNonce={publishedNonce} />
             )}
           </div>
+            </>
+          )}
+          {activeTab === 'review' && (
+            <>
 
           {/* Status logs */}
           {eco.status_logs && eco.status_logs.length > 0 && (
@@ -384,6 +436,10 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
               ))}</div>
             </div>
           )}
+            </>
+          )}
+          {activeTab === 'info' && (
+            <>
 
           {/* Timestamps */}
           <div className="border-t pt-3 grid grid-cols-2 gap-2 text-xs text-[var(--ui-text-secondary)]">
@@ -392,18 +448,10 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
             {eco.reviewed_at && <div><span className="text-[var(--ui-text-tertiary)]">审批完成</span> {fmt(eco.reviewed_at)}</div>}
             {eco.executed_at && <div><span className="text-[var(--ui-text-tertiary)]">执行完成</span> {fmt(eco.executed_at)}</div>}
           </div>
+            </>
+          )}
         </div>
-
-        {/* 执行模式底部按钮 */}
-        {executionMode && (eco.status === 'executing' || eco.status === 'approved') && (
-          <div className="flex items-center justify-between pt-4 border-t border-[var(--ui-border)]">
-            <div>
-              {eco.status === 'executing' && (
-                <Button variant="success" size="sm" onClick={() => act(() => ecoApi.completeExecution(ecoId), '执行已完成')} disabled={actionLoading}>完成执行</Button>
-              )}
-            </div>
-          </div>
-        )}
+      </div>
         </>
       )}
 
