@@ -1,4 +1,5 @@
 import { useViewerStore } from '../../stores/viewerStore';
+import Button from '../ui/Button';
 
 export function Toolbar() {
   const vs = useViewerStore((s) => s);
@@ -39,17 +40,11 @@ export function Toolbar() {
       <div className="flex items-center gap-3 px-4 py-2">
       {compare && (
         <>
-          <div className="flex items-center rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg-subtle)] overflow-hidden shrink-0">
-            {DISPLAY_MODES.map((m, i) => (
-              <button
-                key={m.value}
-                onClick={() => setDisplayMode(m.value)}
-                className={`px-2.5 py-1.5 text-sm font-medium transition-colors
-                  ${compare.displayMode === m.value ? 'bg-primary-50 text-primary-600' : 'text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] hover:bg-[var(--ui-bg-hover)]'}
-                  ${i > 0 ? 'border-l border-[var(--ui-border)]' : ''}`}
-              >
+          <div className="flex items-center gap-2 shrink-0">
+            {DISPLAY_MODES.map((m) => (
+              <Button key={m.value} size="md" active={compare.displayMode === m.value} onClick={() => setDisplayMode(m.value)}>
                 {m.label}
-              </button>
+              </Button>
             ))}
           </div>
 
@@ -78,45 +73,37 @@ export function Toolbar() {
             <span className="tabular-nums text-[var(--ui-text-tertiary)] w-8">{compare.ghostOpacity.toFixed(2)}</span>
           </div>
 
-          <div className="w-px h-5 bg-gray-200 shrink-0" />
+          <div className="w-px h-5 bg-[var(--ui-border)] shrink-0" />
         </>
       )}
 
       {/* Section planes toggles */}
-      <div className="flex items-center rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg-subtle)] overflow-hidden shrink-0">
-        {(['x', 'y', 'z'] as const).map((axis, i) => {
+      <div className="flex items-center gap-2 shrink-0">
+        {(['x', 'y', 'z'] as const).map((axis) => {
           const plane = getPlane(axis);
           return (
-            <label
+            <Button
               key={axis}
-              className={`flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium uppercase cursor-pointer select-none transition-colors
-                ${plane ? 'bg-blue-50 text-blue-600' : 'text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] hover:bg-[var(--ui-bg-hover)]'}
-                ${i > 0 ? 'border-l border-[var(--ui-border)]' : ''}`}
+              size="md"
+              active={!!plane}
+              onClick={() => (plane ? removeClipPlane(axis) : setClipPlane(axis, 0))}
             >
-              <input
-                type="checkbox"
-                checked={!!plane}
-                onChange={(e) => e.target.checked ? setClipPlane(axis, 0) : removeClipPlane(axis)}
-                className="sr-only"
-              />
-              {axis}
-            </label>
+              {axis.toUpperCase()}
+            </Button>
           );
         })}
       </div>
 
-      <div className="w-px h-5 bg-gray-200 shrink-0" />
+      <div className="w-px h-5 bg-[var(--ui-border)] shrink-0" />
 
       {/* Measure mode */}
-      <button
+      <Button
+        size="md"
+        active={measureMode === 'distance'}
         onClick={() => setMeasureMode(measureMode === 'distance' ? 'off' : 'distance')}
-        className={`text-sm px-3 py-1.5 rounded-md font-medium transition-colors
-          ${measureMode === 'distance'
-            ? 'bg-blue-50 text-blue-600 border border-blue-200'
-            : 'text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)] hover:bg-[var(--ui-bg-hover)] border border-transparent'}`}
       >
         测量
-      </button>
+      </Button>
 
       {/* Explode */}
       <div className="flex items-center gap-2 text-sm text-[var(--ui-text-secondary)]">
@@ -128,55 +115,41 @@ export function Toolbar() {
           step={0.1}
           value={explodeValue}
           onChange={(e) => setExplode(Number(e.target.value))}
-          className="w-14 h-1 accent-blue-500"
+          className="w-14 h-1 accent-primary-500"
         />
       </div>
 
-      <div className="w-px h-5 bg-gray-200 shrink-0" />
+      <div className="w-px h-5 bg-[var(--ui-border)] shrink-0" />
 
       {/* Reset */}
-      <button onClick={resetAction}
-        className="text-sm px-3 py-1.5 rounded-md font-medium text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)] hover:bg-[var(--ui-bg-hover)] border border-transparent transition-colors"
-      >
+      <Button size="md" variant="secondary" onClick={resetAction}>
         重置
-      </button>
+      </Button>
 
       {/* Camera mode */}
-      <button
+      <Button
+        size="md"
+        active={cameraMode === 'orthographic'}
         onClick={toggleCameraMode}
-        className={`text-sm px-3 py-1.5 rounded-md font-medium transition-colors
-          ${cameraMode === 'orthographic'
-            ? 'bg-blue-50 text-blue-600 border border-blue-200'
-            : 'text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)] hover:bg-[var(--ui-bg-hover)] border border-transparent'}`}
       >
         {cameraMode === 'orthographic' ? '平行' : '透视'}
-      </button>
+      </Button>
 
       {/* Wireframe */}
-      <button
-        onClick={onWireframe}
-        className={`text-sm px-3 py-1.5 rounded-md font-medium transition-colors
-          ${wireframe
-            ? 'bg-blue-50 text-blue-600 border border-blue-200'
-            : 'text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)] hover:bg-[var(--ui-bg-hover)] border border-transparent'}`}
-      >
+      <Button size="md" active={wireframe} onClick={onWireframe}>
         线框
-      </button>
+      </Button>
 
       {/* Auto color */}
-      <button
+      <Button
+        size="md"
+        active={autoColor}
         onClick={onAutoColor}
         disabled={!!compare}
         title={compare ? '对比模式下按变更类型着色' : undefined}
-        className={`text-sm px-3 py-1.5 rounded-md font-medium transition-colors
-          ${compare
-            ? 'text-gray-300 cursor-not-allowed border border-transparent'
-            : autoColor
-              ? 'bg-blue-50 text-blue-600 border border-blue-200'
-              : 'text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)] hover:bg-[var(--ui-bg-hover)] border border-transparent'}`}
       >
         上色
-      </button>
+      </Button>
       </div>
 
       {/* Section plane slider popup */}
@@ -201,7 +174,7 @@ export function Toolbar() {
                   step={0.1}
                   value={(plane as any).position}
                   onChange={(e) => setClipPlane(axis, Number(e.target.value))}
-                  className="w-48 h-1 accent-blue-500"
+                  className="w-48 h-1 accent-primary-500"
                 />
               </div>
             ) : null;
