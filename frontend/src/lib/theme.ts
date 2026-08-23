@@ -12,7 +12,7 @@ export const THEME_STORAGE_KEY = 'pdm-theme';
 export const THEMES = [
   { key: 'default', label: '默认蓝', desc: '经典天蓝', swatch: '#0284c7' },
   { key: 'forest', label: '森林绿', desc: '沉稳森林绿', swatch: '#15803d' },
-  { key: 'warm', label: '酒红', desc: '暖调酒红', swatch: '#9f1239' },
+  { key: 'warm', label: '棕色', desc: '暖调棕', swatch: '#92400e' },
   { key: 'dark', label: '深色', desc: '黑夜模式，暗色护眼界面', swatch: '#111827' },
 ] as const;
 

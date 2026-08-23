@@ -87,11 +87,11 @@ html[data-theme='forest'] {
 
 /* 酒红：主色 rose-800 系 */
 html[data-theme='warm'] {
-  --ui-btn-primary-bg: #9f1239;      --ui-btn-primary-hover: #881337;
-  --ui-btn-primary-active: #4c0519;  --ui-btn-primary-text: #ffffff;
-  --ui-btn-link-text: #9f1239;       --ui-btn-link-hover: #881337;
-  --ui-input-focus-ring: #fb7185;    --ui-input-focus-border: #e11d48;
-  --color-primary: #e11d48;
+  --ui-btn-primary-bg: #92400e;      --ui-btn-primary-hover: #78350f;
+  --ui-btn-primary-active: #451a03;  --ui-btn-primary-text: #ffffff;
+  --ui-btn-link-text: #92400e;       --ui-btn-link-hover: #78350f;
+  --ui-input-focus-ring: #fbbf24;    --ui-input-focus-border: #b45309;
+  --color-primary: #b45309;
 
   /* 背景预设（浅色主题微差） */
   --ui-bg-page: #faf7f5;
