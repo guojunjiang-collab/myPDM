@@ -343,15 +343,27 @@ export default function Board() {
     }
   };
 
-  /** 预览：打开详情弹窗并直达附件 Tab */
-  const handlePreview = (item: DashboardItem) => {
-    setPreviewMode(true);
-    if (item.entity_type === 'document') {
+  /** 预览：零件/部件 → STP/装配体 3D 预览；图文档 → 附件预览（详情弹窗附件页） */
+  const handlePreview = async (item: DashboardItem) => {
+    if (isComponentType(item.entity_type)) {
+      // 找该 revision 的 STP/STEP 附件，打开 3D 查看器
+      try {
+        const res = await partsApi.listAttachments(item.entity_id);
+        const atts: any[] = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+        const stp = atts.find((a) => /\.(stp|step)$/i.test(a.file_name || ''));
+        if (stp) {
+          window.open(`/stp-viewer?id=${stp.id}`, '_blank');
+          return;
+        }
+      } catch { /* 忽略，走 fallback */ }
+      // 无 STP 附件：打开详情弹窗直达附件 Tab
+      setPreviewMode(true);
+      setDetailComponentId(item.master_id || item.entity_id);
+      setDetailItem(null);
+    } else if (item.entity_type === 'document') {
+      // 图文档：打开详情弹窗（默认附件页）
       setDetailDocId(item.entity_id);
       setDetailComponentId(null);
-      setDetailItem(null);
-    } else if (isComponentType(item.entity_type)) {
-      setDetailComponentId(item.master_id || item.entity_id);
       setDetailItem(null);
     }
   };
