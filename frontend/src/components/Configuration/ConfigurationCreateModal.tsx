@@ -360,7 +360,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
               if (isRoot) { toggleChildRequired(arrIndex); }
               else { updateNestedField(c, 'is_required', !c.is_required); }
             }}
-              className={`px-2 py-0.5 text-sm rounded cursor-pointer ${c.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+              className={`px-2 py-0.5 text-sm rounded cursor-pointer ${c.is_required ? 'bg-[var(--ui-blue-bg)] text-[var(--ui-blue-text)]' : 'bg-[var(--ui-gray-bg)] text-[var(--ui-gray-text)]'}`}>
               {c.is_required ? '必选' : '可选'}
             </button>
           </td>
@@ -508,7 +508,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                        </td>
                        <td className="px-3 py-1.5 text-center" onClick={e => e.stopPropagation()}>
                          <button onClick={() => togglePartRequired(i)}
-                           className={`px-2 py-0.5 text-xs rounded ${p.is_required ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                           className={`px-2 py-0.5 text-xs rounded ${p.is_required ? 'bg-[var(--ui-blue-bg)] text-[var(--ui-blue-text)]' : 'bg-[var(--ui-gray-bg)] text-[var(--ui-gray-text)]'}`}>
                            {p.is_required ? '必选' : '可选'}
                          </button>
                        </td>

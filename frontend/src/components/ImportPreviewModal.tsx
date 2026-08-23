@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Modal } from './Modal';
 import Badge from './ui/Badge';
+import Button from './ui/Button';
 import type { ImportPreview, ImportRow } from '../services/importExport';
 
 interface ImportPreviewModalProps {
@@ -283,26 +284,16 @@ export default function ImportPreviewModal({
 
         {/* 按钮 */}
         <div className="flex justify-end gap-2 pt-2 border-t">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm"
-            disabled={executing}
-          >
+          <Button variant="secondary" onClick={onClose} disabled={executing}>
             取消
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="primary"
             onClick={handleConfirm}
             disabled={executing || rows.length === 0}
-            className={`px-4 py-2 rounded-lg text-white text-sm ${
-              executing
-                ? 'bg-primary-400 cursor-not-allowed'
-                : 'bg-primary-600 hover:bg-primary-700'
-            }`}
           >
             {executing ? '导入中...' : `确认导入 (${rows.filter((r) => r.status !== '错误').length}条)`}
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

@@ -285,8 +285,8 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
         <td className="px-3 py-2 text-center">{c.child_detail?.check_out_user_name ? (<span className="text-xs text-orange-600">{c.child_detail.check_out_user_name}</span>) : (<span className="text-xs text-gray-400">—</span>)}</td>
         <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
           {canEdit ? (
-            <button onClick={async () => { try { await configurationApi.updateChild(parentRevisionId, c.id, { is_required: !c.is_required }); if (parentRevisionId === internalRevId) { setChildren(prev => prev.map(x => x.id === c.id ? { ...x, is_required: !x.is_required } : x)); } else { setSubChildren(prev => { const s = { ...prev }; s[parentRevisionId] = (s[parentRevisionId] || []).map((x: any) => x.id === c.id ? { ...x, is_required: !x.is_required } : x); return s; }); } } catch {} }} className={`text-xs px-2 py-0.5 rounded ${c.is_required ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-orange-100 text-orange-700 hover:bg-orange-200'}`}>{c.is_required ? '必选' : '可选'}</button>
-          ) : (<span className={`text-xs ${c.is_required ? 'text-green-600' : 'text-orange-600'}`}>{c.is_required ? '必选' : '可选'}</span>)}
+            <button onClick={async () => { try { await configurationApi.updateChild(parentRevisionId, c.id, { is_required: !c.is_required }); if (parentRevisionId === internalRevId) { setChildren(prev => prev.map(x => x.id === c.id ? { ...x, is_required: !x.is_required } : x)); } else { setSubChildren(prev => { const s = { ...prev }; s[parentRevisionId] = (s[parentRevisionId] || []).map((x: any) => x.id === c.id ? { ...x, is_required: !x.is_required } : x); return s; }); } } catch {} }} className={`text-xs px-2 py-0.5 rounded ${c.is_required ? 'bg-[var(--ui-blue-bg)] text-[var(--ui-blue-text)] hover:opacity-80' : 'bg-[var(--ui-gray-bg)] text-[var(--ui-gray-text)] hover:opacity-80'}`}>{c.is_required ? '必选' : '可选'}</button>
+          ) : (<span className={`text-xs ${c.is_required ? 'text-[var(--ui-blue-text)]' : 'text-[var(--ui-gray-text)]'}`}>{c.is_required ? '必选' : '可选'}</span>)}
         </td>
         <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
           {canEdit ? (<Input type="number" min={1} defaultValue={c.quantity || 1} size="xs" className="!w-14 text-center" onBlur={async (e) => { const val = parseInt(e.target.value) || 1; if (val === c.quantity) return; try { await configurationApi.updateChild(parentRevisionId, c.id, { quantity: val }); if (parentRevisionId === internalRevId) { setChildren(prev => prev.map(x => x.id === c.id ? { ...x, quantity: val } : x)); } else { setSubChildren(prev => { const s = { ...prev }; s[parentRevisionId] = (s[parentRevisionId] || []).map((x: any) => x.id === c.id ? { ...x, quantity: val } : x); return s; }); } } catch {} }} />) : (c.quantity || 1)}
@@ -431,10 +431,10 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
                               <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
                                 {canEdit ? (
                                   <button onClick={async () => { try { await configurationApi.updatePart(internalRevId, p.id, { is_required: !p.is_required }); setParts(prev => prev.map(x => x.id === p.id ? { ...x, is_required: !x.is_required } : x)); } catch {} }}
-                                    className={`text-xs px-2 py-0.5 rounded ${p.is_required ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-orange-100 text-orange-700 hover:bg-orange-200'}`}>
+                                    className={`text-xs px-2 py-0.5 rounded ${p.is_required ? 'bg-[var(--ui-blue-bg)] text-[var(--ui-blue-text)] hover:opacity-80' : 'bg-[var(--ui-gray-bg)] text-[var(--ui-gray-text)] hover:opacity-80'}`}>
                                     {p.is_required ? '必选' : '可选'}
                                   </button>
-                                ) : (<span className={`text-xs ${p.is_required ? 'text-green-600' : 'text-orange-600'}`}>{p.is_required ? '必选' : '可选'}</span>)}
+                                ) : (<span className={`text-xs ${p.is_required ? 'text-[var(--ui-blue-text)]' : 'text-[var(--ui-gray-text)]'}`}>{p.is_required ? '必选' : '可选'}</span>)}
                               </td>
                               <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
                                 {canEdit ? (

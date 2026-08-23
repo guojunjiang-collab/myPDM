@@ -1073,9 +1073,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
               {(matrixPopup.cad_instances || []).map((inst: any, idx: number) => (
                 <div key={idx} className="border rounded-lg p-3 bg-gray-50">
                   <div className="flex items-center gap-3 mb-2">
-                    <span className="px-1.5 py-0.5 text-xs rounded bg-indigo-100 text-indigo-700">
-                      {inst.source === 'step' ? 'STEP' : inst.source || '—'}
-                    </span>
+                    <Badge tone="gray" label={inst.source === 'step' ? 'STEP' : inst.source || '—'} />
                     <span className="text-xs text-gray-500">实例 {idx + 1}</span>
                     {inst.label && <span className="text-xs text-gray-600">"{inst.label}"</span>}
                   </div>

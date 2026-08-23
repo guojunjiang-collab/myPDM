@@ -4,6 +4,7 @@ import { useAuthStore } from '../stores/auth';
 import { authApi } from '../services/api';
 import { getFeishuProviderParam, isFeishuClient } from '../lib/feishu';
 import Input from '../components/ui/Input';
+import Button from '../components/ui/Button';
 
 interface OAuthProvider {
   key: string;
@@ -109,13 +110,14 @@ export default function Login() {
 
           {error && <p className="mb-4 text-sm text-red-600 text-center">{error}</p>}
 
-          <button
+          <Button
             type="submit"
             disabled={loading}
-            className="w-full py-2 px-4 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            variant="primary"
+            className="w-full"
           >
             {loading ? '登录中...' : '登 录'}
-          </button>
+          </Button>
         </form>
 
         {(feishuProviders.length > 0 || wechatProviders.length > 0) && (

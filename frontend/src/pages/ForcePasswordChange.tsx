@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/auth';
 import { authApi } from '../services/api';
 import Input from '../components/ui/Input';
+import Button from '../components/ui/Button';
 
 export default function ForcePasswordChange() {
   const navigate = useNavigate();
@@ -108,13 +109,14 @@ export default function ForcePasswordChange() {
 
             {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
-            <button
+            <Button
               type="submit"
               disabled={submitting}
-              className="w-full py-2 px-4 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              variant="primary"
+              className="w-full"
             >
               {submitting ? '提交中...' : '确认修改'}
-            </button>
+            </Button>
           </form>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import Button from './ui/Button';
 
 interface ModalProps {
   open: boolean;
@@ -100,28 +101,23 @@ export function ConfirmModal({
   onCancel,
   type = 'danger',
 }: ConfirmModalProps) {
-  const typeClasses = {
-    danger: 'bg-red-600 hover:bg-red-700',
-    warning: 'bg-orange-500 hover:bg-orange-600',
-    info: 'bg-primary-600 hover:bg-primary-700',
+  // 确认按钮语义 → Button variant：danger=危险 / warning=警示（Button 无 warning 变体，就近归入 danger）/ info=主操作
+  const confirmVariantMap: Record<'danger' | 'warning' | 'info', 'danger' | 'primary'> = {
+    danger: 'danger',
+    warning: 'danger',
+    info: 'primary',
   };
 
   return (
     <Modal open={open} title={title} onClose={onCancel} width="sm">
       <p className="text-gray-600 mb-4">{content}</p>
       <div className="flex justify-end gap-2">
-        <button
-          onClick={onCancel}
-          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-        >
+        <Button variant="secondary" onClick={onCancel}>
           {cancelText}
-        </button>
-        <button
-          onClick={onConfirm}
-          className={`px-4 py-2 text-white rounded-lg ${typeClasses[type]}`}
-        >
+        </Button>
+        <Button variant={confirmVariantMap[type]} onClick={onConfirm}>
           {confirmText}
-        </button>
+        </Button>
       </div>
     </Modal>
   );

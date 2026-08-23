@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/auth';
 import { authApi } from '../services/api';
 import { parseFeishuCallbackHash } from '../lib/feishu';
+import Button from '../components/ui/Button';
 
 export default function FeishuCallback() {
   const navigate = useNavigate();
@@ -47,12 +48,9 @@ export default function FeishuCallback() {
           <h1 className="text-xl font-semibold mb-4">{ok ? '绑定成功' : '绑定失败'}</h1>
           {!ok && <p className="text-sm text-red-600 mb-4">{bindingInfo.message || '未知错误'}</p>}
           {ok && <p className="text-sm text-gray-500 mb-4">该飞书入口已绑定到当前账号</p>}
-          <Link
-            to="/settings"
-            className="inline-block px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-          >
+          <Button variant="primary" onClick={() => navigate('/settings')}>
             返回系统设置
-          </Link>
+          </Button>
         </div>
       </div>
     );
