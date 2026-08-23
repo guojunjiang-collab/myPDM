@@ -3,6 +3,7 @@ import { usersApi, userGroupsApi } from '../services/api';
 import type { User } from '../types';
 import { isAdmin, can } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
+import { toast } from '../components/Toast';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
@@ -191,7 +192,7 @@ export default function Users() {
       setDeleteId(null);
       await loadUsers();
     } catch {
-      alert('删除失败');
+      toast.error('删除失败');
     }
   };
 
@@ -201,7 +202,7 @@ export default function Users() {
       await usersApi.update(resetId, { password: '123456' });
       setResetId(null);
     } catch {
-      alert('重置密码失败');
+      toast.error('重置密码失败');
     }
   };
 
@@ -220,11 +221,9 @@ export default function Users() {
     await loadGroups();
   };
 
-  const removeGroup = async (id: string) => {
-    if (!window.confirm('确定删除该用户组？文档将恢复为全员可访问。')) return;
-    await userGroupsApi.delete(id);
-    await loadGroups();
-  };
+  // 删除用户组确认（状态驱动 ConfirmModal）
+  const [confirmGroupId, setConfirmGroupId] = useState<string | null>(null);
+  const removeGroup = (id: string) => setConfirmGroupId(id);
 
   const viewGroupDetail = async (groupId: string) => {
     setViewingGroupId(groupId);
@@ -502,6 +501,27 @@ export default function Users() {
         type="danger"
         onConfirm={handleResetPassword}
         onCancel={() => setResetId(null)}
+      />
+
+      {/* 删除用户组确认 */}
+      <ConfirmModal
+        open={!!confirmGroupId}
+        title="确认删除"
+        content="确定删除该用户组？文档将恢复为全员可访问。"
+        confirmText="删除"
+        cancelText="取消"
+        type="danger"
+        onConfirm={async () => {
+          if (!confirmGroupId) return;
+          try {
+            await userGroupsApi.delete(confirmGroupId);
+            await loadGroups();
+          } catch (e: any) {
+            toast.error(e?.response?.data?.detail || '删除用户组失败');
+          }
+          setConfirmGroupId(null);
+        }}
+        onCancel={() => setConfirmGroupId(null)}
       />
         </>
       )}

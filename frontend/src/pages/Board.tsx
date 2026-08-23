@@ -3,6 +3,7 @@ import { previewAttachment } from '../utils/attachmentPreview';
 import { boardApi, usersApi, partsApi, documentsApi, configurationApi, mediaApi } from '../services/api';
 import { useDataStore } from '../stores/data';
 import { Modal, ConfirmModal } from '../components/Modal';
+import { toast } from '../components/Toast';
 import PartDetailModal from '../components/PartDetailModal';
 import DocumentDetailModal from '../components/DocumentDetailModal';
 import ArchiveTreeModal from '../components/ArchiveTreeModal';
@@ -202,7 +203,7 @@ export default function Board() {
       await boardApi.createFolder({ name: createName.trim(), parent_id: createModal || undefined });
       setCreateModal(null); setCreateName('');
       await loadDashboard();
-    } catch (e: any) { alert(e?.response?.data?.detail || '创建失败'); }
+    } catch (e: any) { toast.error(e?.response?.data?.detail || '创建失败'); }
   };
 
   const handleRename = async () => {
@@ -210,7 +211,7 @@ export default function Board() {
     try {
       await boardApi.updateFolder(renameModal.id, { name: renameName.trim() });
       setRenameModal(null); await loadDashboard();
-    } catch { alert('重命名失败'); }
+    } catch { toast.error('重命名失败'); }
   };
 
   const handleDelete = async () => {
@@ -219,7 +220,7 @@ export default function Board() {
       await boardApi.deleteFolder(deleteId);
       if (selectedId === deleteId) setSelectedId(null);
       setDeleteId(null); await loadDashboard();
-    } catch { alert('删除失败'); }
+    } catch { toast.error('删除失败'); }
   };
 
   const handleRemoveSharedFolder = async () => {
@@ -228,17 +229,17 @@ export default function Board() {
       await boardApi.removeSharedFolder(removeShareId);
       if (selectedId === removeShareId) setSelectedId(null);
       setRemoveShareId(null); await loadDashboard();
-    } catch { alert('移除共享失败'); }
+    } catch { toast.error('移除共享失败'); }
   };
 
   const handleRemoveItem = async (itemId: string) => {
-    try { await boardApi.removeItem(itemId); await loadDashboard(); } catch { alert('移除失败'); }
+    try { await boardApi.removeItem(itemId); await loadDashboard(); } catch { toast.error('移除失败'); }
   };
 
   const handleAddItems = async (items: { entity_type: string; entity_id: string }[]) => {
     if (!selectedId) return;
     try { await boardApi.addItems(selectedId, items); setPickerOpen(false); await loadDashboard(); }
-    catch (e: any) { alert(e?.response?.data?.detail || '关联失败'); }
+    catch (e: any) { toast.error(e?.response?.data?.detail || '关联失败'); }
   };
 
   const loadShares = async (fid: string) => {
@@ -285,7 +286,7 @@ export default function Board() {
       setShareUserId('');
       setUserSearch('');
       await loadDashboard();
-    } catch (e: any) { alert(e?.response?.data?.detail || '保存失败'); }
+    } catch (e: any) { toast.error(e?.response?.data?.detail || '保存失败'); }
   };
 
   const handleCancelShares = () => {
@@ -347,13 +348,13 @@ export default function Board() {
         if (att) {
           await previewAttachment(att.id, att.file_name || '', {
             // 压缩包无法直接预览：明确提示，不打开详情弹窗
-            onArchive: () => alert('压缩包附件请在图文档详情中查看'),
+            onArchive: () => toast.info('压缩包附件请在图文档详情中查看'),
           });
           return;
         }
-        alert('该图文档暂无附件可预览');
+        toast.info('该图文档暂无附件可预览');
       } catch {
-        alert('附件预览失败，请重试');
+        toast.error('附件预览失败，请重试');
       }
     }
   };

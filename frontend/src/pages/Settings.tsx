@@ -6,6 +6,7 @@ import { useAuthStore } from '../stores/auth';
 import { isAdmin } from '../stores/auth';
 import type { CustomFieldDefinition } from '../types';
 import { Modal, ConfirmModal } from '../components/Modal';
+import { toast } from '../components/Toast';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
@@ -119,6 +120,8 @@ export default function Settings() {
   const [viewingField, setViewingField] = useState<CustomFieldDefinition | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetPassword, setResetPassword] = useState('');
+  // 重置密码校验错误（ConfirmModal children 内联展示）
+  const [resetError, setResetError] = useState<string | null>(null);
   const [batchConverting, setBatchConverting] = useState(false);
   const [batchStatus, setBatchStatus] = useState('');
   const fieldImportRef = useRef<HTMLInputElement>(null);
@@ -317,7 +320,7 @@ export default function Settings() {
     try {
       await exportCustomFieldDefs();
     } catch (e: any) {
-      alert(e?.message || '导出字段定义失败');
+      toast.error(e?.message || '导出字段定义失败');
     }
   };
 
@@ -326,9 +329,9 @@ export default function Settings() {
     if (!file) return;
     try {
       const result = await importCustomFieldDefs(file);
-      alert(`导入完成：新增 ${result.created} 个，更新 ${result.updated} 个`);
+      toast.success(`导入完成：新增 ${result.created} 个，更新 ${result.updated} 个`);
     } catch (err: any) {
-      alert(err?.message || '导入失败，请确认文件格式正确');
+      toast.error(err?.message || '导入失败，请确认文件格式正确');
     }
     // 重置 input 以便重复选择同一文件
     e.target.value = '';
@@ -336,7 +339,7 @@ export default function Settings() {
 
   const handleResetData = async () => {
     if (!resetPassword.trim()) {
-      alert('请输入管理员密码');
+      setResetError('请输入管理员密码');
       return;
     }
     setResetting(true);
@@ -350,29 +353,20 @@ export default function Settings() {
       useDataStore.getState().setCustomFieldDefs([]);
       setShowResetConfirm(false);
       setResetPassword('');
-      alert('系统已重置。admin 密码已重置为 admin123，请重新登录。');
+      toast.success('系统已重置。admin 密码已重置为 admin123，请重新登录。');
       // admin 密码已变更，强制重新登录
       logout();
       window.location.href = '/login';
     } catch (error: any) {
-      alert(error?.response?.data?.detail || '重置失败，请确认密码正确');
+      toast.error(error?.response?.data?.detail || '重置失败，请确认密码正确');
     } finally {
       setResetting(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('确定要删除该自定义字段吗？')) return;
-    try {
-      await customFieldsApi.deleteDefinition(id);
-      // 直接从 store 删除
-      useDataStore.getState().setCustomFieldDefs(
-        useDataStore.getState().customFieldDefs.filter(f => f.id !== id)
-      );
-    } catch (error) {
-      alert('删除失败');
-    }
-  };
+  // 删除自定义字段确认（状态驱动 ConfirmModal）
+  const [deleteFieldId, setDeleteFieldId] = useState<string | null>(null);
+  const handleDelete = (id: string) => setDeleteFieldId(id);
 
   return (
     <div>
@@ -613,13 +607,38 @@ export default function Settings() {
           <Input
             type="password"
             value={resetPassword}
-            onChange={(e) => setResetPassword(e.target.value)}
+            onChange={(e) => { setResetPassword(e.target.value); setResetError(null); }}
             placeholder="请输入管理员密码"
             autoFocus
             onKeyDown={(e) => e.key === 'Enter' && handleResetData()}
             className="mb-4"
           />
+          {resetError && <p className="text-red-500 text-xs -mt-3 mb-3">{resetError}</p>}
         </ConfirmModal>
+
+        {/* ---- 删除自定义字段确认 ---- */}
+        <ConfirmModal
+          open={!!deleteFieldId}
+          title="确认删除"
+          content="确定要删除该自定义字段吗？"
+          confirmText="删除"
+          cancelText="取消"
+          type="danger"
+          onConfirm={async () => {
+            if (!deleteFieldId) return;
+            try {
+              await customFieldsApi.deleteDefinition(deleteFieldId);
+              // 直接从 store 删除
+              useDataStore.getState().setCustomFieldDefs(
+                useDataStore.getState().customFieldDefs.filter(f => f.id !== deleteFieldId)
+              );
+            } catch (error) {
+              toast.error('删除失败');
+            }
+            setDeleteFieldId(null);
+          }}
+          onCancel={() => setDeleteFieldId(null)}
+        />
         </>
       )}
 
