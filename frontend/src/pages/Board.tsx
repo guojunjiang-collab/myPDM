@@ -343,10 +343,15 @@ export default function Board() {
     }
   };
 
-  /** 预览：零件/部件 → STP/装配体 3D 预览；图文档 → 附件预览（详情弹窗附件页） */
+  /** 预览：部件 → 装配体 3D；零件 → STP 附件 3D；图文档 → 附件预览 */
   const handlePreview = async (item: DashboardItem) => {
-    if (isComponentType(item.entity_type)) {
-      // 找该 revision 的 STP/STEP 附件，打开 3D 查看器
+    if (item.entity_type === 'assembly') {
+      // 部件：装配体 3D 预览（装配结构实例，不依赖附件）
+      window.open(`/stp-viewer?assembly=${item.entity_id}`, '_blank');
+      return;
+    }
+    if (item.entity_type === 'part') {
+      // 零件：找该 revision 的 STP/STEP 附件，打开 3D 查看器
       try {
         const res: any = await partsApi.listAttachments(item.entity_id);
         const atts: any[] = Array.isArray(res) ? res : (res?.items || []);
@@ -497,8 +502,8 @@ export default function Board() {
                               type="button"
                               size="xs"
                               className="mr-2"
-                              disabled={!((item.attachment_count ?? 0) > 0)}
-                              title={((item.attachment_count ?? 0) > 0) ? '3D 预览' : '暂无附件'}
+                              disabled={item.entity_type === 'assembly' ? false : !((item.attachment_count ?? 0) > 0)}
+                              title={item.entity_type === 'assembly' ? '装配体 3D 预览' : (((item.attachment_count ?? 0) > 0) ? '3D 预览' : '暂无 STP 附件')}
                               onClick={(e) => { e.stopPropagation(); handlePreview(item); }}
                             >3D</Button>
                           )}
