@@ -79,7 +79,7 @@ export default function StockTab() {
             ) : rows.length === 0 ? (
               <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">无匹配结果</td></tr>
             ) : rows.map((r, i) => (
-              <tr key={i} className={`hover:bg-[var(--ui-bg-hover)] cursor-pointer ${r.is_low ? 'bg-red-50' : ''}`}
+              <tr key={i} className={`cursor-pointer ${r.is_low ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-[var(--ui-bg-hover)]'}`}
                 onClick={() => setDetailMatId(r.material_id)}>
                 <td className={`px-4 py-3 text-sm font-medium ${r.is_low ? 'text-red-600' : 'text-primary-600'}`}>{r.material_code}</td>
                 <td className="px-4 py-3 text-sm font-medium">{r.material_name}</td>

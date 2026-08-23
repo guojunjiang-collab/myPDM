@@ -167,6 +167,7 @@ html[data-theme='dark'] .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { bor
 html[data-theme='dark'] .bg-green-50 { background-color: #052e16; }
 html[data-theme='dark'] .bg-green-100 { background-color: #14532d; }
 html[data-theme='dark'] .bg-red-50 { background-color: #450a0a; }
+html[data-theme='dark'] .bg-red-50\/50 { background-color: rgba(69, 10, 10, 0.55); }
 html[data-theme='dark'] .bg-red-100 { background-color: #7f1d1d; }
 html[data-theme='dark'] .bg-yellow-50 { background-color: #422006; }
 html[data-theme='dark'] .bg-yellow-100 { background-color: #713f12; }
@@ -228,6 +229,17 @@ html[data-theme='dark'] .hover\:bg-purple-50:hover,
 html[data-theme='dark'] .hover\:bg-purple-100:hover { background-color: #581c87; }
 html[data-theme='dark'] .hover\:bg-indigo-50:hover,
 html[data-theme='dark'] .hover\:bg-indigo-100:hover { background-color: #312e81; }
+
+/* 深色状态色行 hover 补偿（高亮行 hover 显示状态色亮调，浅色行为不变） */
+html[data-theme='dark'] .bg-red-50:hover { background-color: #7f1d1d; }
+html[data-theme='dark'] .bg-red-50\/50:hover { background-color: rgba(127, 29, 29, 0.6); }
+html[data-theme='dark'] .bg-green-50:hover { background-color: #14532d; }
+html[data-theme='dark'] .bg-yellow-50:hover { background-color: #713f12; }
+html[data-theme='dark'] .bg-blue-50:hover { background-color: #1e3a8a; }
+html[data-theme='dark'] .bg-orange-50:hover { background-color: #7c2d12; }
+html[data-theme='dark'] .bg-amber-50:hover { background-color: #78350f; }
+html[data-theme='dark'] .bg-purple-50:hover { background-color: #581c87; }
+html[data-theme='dark'] .bg-indigo-50:hover { background-color: #312e81; }
 
 * {
   box-sizing: border-box;
