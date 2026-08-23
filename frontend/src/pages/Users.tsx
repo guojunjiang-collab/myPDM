@@ -1,5 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
-import * as XLSX from 'xlsx';
+import { useEffect, useState } from 'react';
 import { usersApi, userGroupsApi } from '../services/api';
 import type { User } from '../types';
 import { isAdmin, can } from '../stores/auth';
@@ -10,7 +9,6 @@ import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import { useTableSort } from '../hooks/useTableSort';
 import { formatDateTime } from '../utils/date';
-import { previewUsersImport, executeUsersImport } from '../services/importExport';
 
 interface UserFormData {
   username: string;
@@ -46,10 +44,6 @@ export default function Users() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [resetId, setResetId] = useState<string | null>(null);
-  const [exporting, setExporting] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [importStatus, setImportStatus] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'groups'>('all');
   const [groups, setGroups] = useState<Array<{ id: string; name: string; description?: string; member_count: number }>>([]);
@@ -118,83 +112,6 @@ export default function Users() {
   useEffect(() => {
     if (activeTab === 'groups') loadGroups();
   }, [activeTab]);
-
-  const handleExport = async () => {
-    setExporting(true);
-    try {
-      const res = await usersApi.list();
-      const data = res.data;
-      const list: User[] = Array.isArray(data) ? data : (data as any)?.items || [];
-      if (list.length === 0) {
-        alert('无用户数据可导出');
-        return;
-      }
-
-      const rows = list.map((u) => ({
-        '用户名': u.username,
-        '姓名': u.real_name,
-        '角色': (() => { const m: Record<string, string> = { admin: '管理员', engineer: '工程师', production: '生产人员', guest: '访客', unverified: '未验证' }; return m[u.role] || u.role; })(),
-        '部门': u.department || '',
-        '电话': u.phone || '',
-        '状态': u.status === 'active' ? '启用' : '禁用',
-        '创建时间': u.created_at || '',
-        '更新时间': u.updated_at || '',
-      }));
-
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(rows);
-      ws['!cols'] = [{ wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 8 }, { wch: 20 }, { wch: 20 }];
-      XLSX.utils.book_append_sheet(wb, ws, '用户清单');
-      const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-      const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = '用户清单.xlsx';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (e: any) {
-      alert(e?.message || '导出失败');
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImporting(true);
-    setImportStatus('正在分析...');
-    try {
-      const preview = await previewUsersImport(file);
-      const validCount = preview.rows.filter((r) => r.status !== '错误').length;
-      const errorCount = preview.rows.length - validCount;
-      let msg = `共 ${preview.rows.length} 条：新增 ${preview.rows.filter((r) => r.status === '新增').length} 条，更新 ${preview.rows.filter((r) => r.status === '更新').length} 条`;
-      if (errorCount > 0) msg += `，${errorCount} 条错误`;
-      if (!confirm(`${msg}\n\n确认执行导入？`)) {
-        setImporting(false);
-        setImportStatus('');
-        e.target.value = '';
-        return;
-      }
-      setImportStatus('正在导入...');
-      await executeUsersImport(preview);
-      setImportStatus('导入完成');
-      await loadUsers();
-    } catch (err: any) {
-      alert(err?.message || '导入失败');
-      setImportStatus('');
-    } finally {
-      setImporting(false);
-      e.target.value = '';
-    }
-  };
 
   const handleAdd = () => {
     setEditingUser(null);
@@ -361,35 +278,8 @@ export default function Users() {
       {/* 用户 Tab */}
       {activeTab === 'all' && (
         <>
-      {/* 头部 */}
-      <div className="flex items-center justify-between mb-4">
-        {/* 导入导出（仅管理员） */}
-        {isAdmin() && (
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={handleExport} disabled={exporting}>
-              {exporting ? '导出中...' : '导出用户'}
-            </Button>
-            <Button variant="secondary" onClick={handleImportClick} disabled={importing}>
-              {importing ? (importStatus || '导入中...') : '导入用户'}
-            </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx"
-              onChange={handleImportFile}
-              className="hidden"
-            />
-          </div>
-        )}
-        {isAdmin() && (
-          <Button onClick={handleAdd}>
-            + 新增用户
-          </Button>
-        )}
-      </div>
-
-      {/* 搜索 */}
-      <div className="mb-4">
+      {/* 头部：搜索 + 新增用户 */}
+      <div className="flex items-center justify-between gap-3 mb-4">
         <Input
           type="text"
           placeholder="搜索用户名/姓名/部门..."
@@ -397,6 +287,11 @@ export default function Users() {
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-md"
         />
+        {isAdmin() && (
+          <Button onClick={handleAdd}>
+            + 新增用户
+          </Button>
+        )}
       </div>
 
       {/* 列表 */}
