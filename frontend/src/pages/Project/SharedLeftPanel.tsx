@@ -1,6 +1,6 @@
 import React from 'react';
 import type { GanttTask, ProjectTask } from '../../types/project';
-import { CODE_W, ASSIGNEE_W, STATUS_W, LEFT_W, ROW_H, INDENT } from './gantt/ganttUtils';
+import { CODE_W, ASSIGNEE_W, STATUS_W, LEFT_W, ROW_H } from './gantt/ganttUtils';
 import { TaskCodeCell, TaskNameCell, TaskAssigneeCell } from './TaskRowCells';
 import { STATUS_BADGE } from './gantt/ganttUtils';
 

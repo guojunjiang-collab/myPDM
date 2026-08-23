@@ -308,10 +308,12 @@ export default function DocumentPicker({
 
         {/* ---- 快速新建 ---- */}
         <div className="border rounded-lg overflow-hidden">
-          <Button variant="ghost" size="sm" className="w-full !justify-start" type="button" onClick={() => setQuickOpen(!quickOpen)}>
+          <div className="flex items-center">
             <TreeToggle expanded={quickOpen} onClick={() => setQuickOpen(!quickOpen)} size="sm" />
-            快速新建图文档
-          </Button>
+            <Button variant="ghost" size="sm" className="flex-1 !justify-start" type="button" onClick={() => setQuickOpen(!quickOpen)}>
+              快速新建图文档
+            </Button>
+          </div>
           {quickOpen && (
             <div className="px-4 py-3 border-t space-y-2 bg-gray-50">
               <div className="flex gap-2">

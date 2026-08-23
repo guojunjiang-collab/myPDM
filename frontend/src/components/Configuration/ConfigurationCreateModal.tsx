@@ -586,10 +586,12 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
 
                   {/* 快速新建构型项 */}
                   <div className="border rounded-lg overflow-hidden mb-3 flex-shrink-0">
-                     <Button variant="ghost" size="sm" className="w-full !justify-start" onClick={() => { setQuickCreateOpen(!quickCreateOpen); if (!quickCreateOpen) setQuickForm({ code: '', name: '' }); }}>
+                    <div className="flex items-center">
                       <TreeToggle expanded={quickCreateOpen} onClick={() => { setQuickCreateOpen(!quickCreateOpen); if (!quickCreateOpen) setQuickForm({ code: '', name: '' }); }} size="sm" />
-                      快速新建构型项
-                    </Button>
+                      <Button variant="ghost" size="sm" className="flex-1 !justify-start" onClick={() => { setQuickCreateOpen(!quickCreateOpen); if (!quickCreateOpen) setQuickForm({ code: '', name: '' }); }}>
+                        快速新建构型项
+                      </Button>
+                    </div>
                     {quickCreateOpen && (
                       <div className="px-4 py-3 border-t space-y-2 bg-gray-50">
                         <div className="flex gap-2">
