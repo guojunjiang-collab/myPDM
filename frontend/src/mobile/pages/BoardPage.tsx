@@ -275,7 +275,7 @@ function FolderTreeNode({
   const isOpen = expanded[folder.id] === true; // 默认折叠
   return (
     <>
-      <div className="flex items-stretch min-h-11 border-b border-gray-50 last:border-b-0">
+      <div className="flex items-stretch min-h-11 border-b border-[var(--ui-border)] last:border-b-0">
         {/* 缩进 + 层级竖线（每级一条，对齐对应祖先箭头区中心，同 BOM 树 i*INDENT + 18） */}
         <span className="relative shrink-0" style={{ width: `calc(${depth} * ${INDENT})` }}>
           {depth > 0 &&
@@ -408,7 +408,7 @@ function ItemRow({ item, depth, onClick }: { item: DashboardItem; depth: number;
     <button
       type="button"
       onClick={onClick}
-      className="w-full flex items-stretch min-h-11 text-left border-b border-gray-50 last:border-b-0"
+      className="w-full flex items-stretch min-h-11 text-left border-b border-[var(--ui-border)] last:border-b-0"
     >
       {/* 缩进 + 层级竖线（与文件夹行同构，竖线对齐箭头区中心） */}
       <span className="relative shrink-0" style={{ width: `calc(${depth} * ${INDENT})` }}>

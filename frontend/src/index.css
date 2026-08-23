@@ -71,6 +71,8 @@
   --ui-bg-subtle: #f9fafb;
   --ui-bg-hover: #f3f4f6;
   --ui-border: #e5e7eb;
+  --ui-border-strong: #d1d5db;
+  --ui-highlight-bg: #dbeafe;
   --ui-text-primary: #111827;
   --ui-text-secondary: #6b7280;
   --ui-text-tertiary: #9ca3af;
@@ -93,6 +95,8 @@ html[data-theme='forest'] {
   --ui-bg-subtle: #f0f5f1;
   --ui-bg-hover: #e8efe9;
   --ui-border: #e2e8e4;
+  --ui-border-strong: #c8d2cc;
+  --ui-highlight-bg: #dcfce7;
   --ui-text-secondary: #5b6b60;
   --ui-text-tertiary: #8fa094;
 }
@@ -111,6 +115,8 @@ html[data-theme='warm'] {
   --ui-bg-subtle: #f6f1ed;
   --ui-bg-hover: #efe7e1;
   --ui-border: #ece3dd;
+  --ui-border-strong: #d8cdc2;
+  --ui-highlight-bg: #fef3c7;
   --ui-text-secondary: #6e6158;
   --ui-text-tertiary: #a3948a;
 }
@@ -121,6 +127,8 @@ html[data-theme='dark'] {
   --ui-bg-page: #0f172a;  --ui-bg-surface: #1e293b;
   --ui-bg-subtle: #334155; --ui-bg-hover: #475569;
   --ui-border: #334155;
+  --ui-border-strong: #64748b;
+  --ui-highlight-bg: #1e3a5f;
   --ui-text-primary: #f8fafc; --ui-text-secondary: #cbd5e1; --ui-text-tertiary: #94a3b8;
   /* 徽标 9 组深色版（bg 半透明、text 亮色，色相保持） */
   --ui-blue-bg: rgba(59,130,246,.15);   --ui-blue-text: #93c5fd;

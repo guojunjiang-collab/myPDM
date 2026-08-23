@@ -64,7 +64,7 @@ function fmtDate(v?: string | null): string {
 
 /* 任务树节点：层级缩进 + 展开箭头 + 行内容；点击行打开任务详情。
    展开箭头/缩进/竖线参照用户看板文件夹层级（箭头区 w-9、缩进 var(--ui-tree-indent)、竖线对齐箭头中心）。
-   当前登录人负责的任务：整行浅主色底（bg-primary-100）高亮标识 */
+   当前登录人负责的任务：整行 --ui-highlight-bg 高亮标识（随主题：浅色主题浅主色底、深色主题深蓝底） */
 const INDENT = 'var(--ui-tree-indent)';
 const BTN = 36;
 
@@ -89,7 +89,7 @@ function TaskTreeNode({
   return (
     <>
       <div
-        className={`rounded-lg shadow-sm flex items-stretch ${isMine ? 'bg-primary-100' : 'bg-[var(--ui-bg-surface)]'}`}
+        className={`rounded-lg shadow-sm flex items-stretch ${isMine ? 'bg-[var(--ui-highlight-bg)]' : 'bg-[var(--ui-bg-surface)]'}`}
       >
         {/* 缩进 + 层级竖线（每级一条，位置 = 该级箭头中心，同看板文件夹树） */}
         <span className="relative shrink-0" style={{ width: `calc(${depth} * ${INDENT})` }}>

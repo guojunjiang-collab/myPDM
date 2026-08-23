@@ -153,7 +153,7 @@ export default function GanttPage({ projectId, onBack }: Props) {
                 宽度按内容自适应（leftW），右侧 border-r 竖线分割符随左列宽度自动贴合；
                 z-20 高于右区全部元素（含今日线 z-10），滚动时分割线不被右区内容遮盖 */}
             <div
-              className="sticky left-0 z-20 bg-[var(--ui-bg-subtle)] shrink-0 border-r border-[var(--ui-border)] relative"
+              className="sticky left-0 z-20 bg-[var(--ui-bg-subtle)] shrink-0 border-r border-[var(--ui-border-strong)] relative"
               style={{ width: leftW }}
             >
               {/* 与右区日期表头等高的占位，保证任务行对齐 */}
@@ -188,11 +188,11 @@ export default function GanttPage({ projectId, onBack }: Props) {
                   </span>
                 </button>
               ))}
-              {/* 行分隔线：与右侧日历区同画法（绝对定位 border-t），像素级对齐 */}
+              {/* 行分隔线：与右侧日历区同画法（绝对定位 border-t），像素级对齐；左列底色为 --ui-bg-subtle，用 --ui-border-strong 保证深色下可见 */}
               {data.tasks.map((t, i) => (
                 <div
                   key={'lb' + t.id}
-                  className="absolute left-0 right-0 border-t border-gray-100"
+                  className="absolute left-0 right-0 border-t border-[var(--ui-border-strong)]"
                   style={{ top: 28 + i * ROW_H }}
                 />
               ))}
@@ -247,7 +247,7 @@ export default function GanttPage({ projectId, onBack }: Props) {
                 {data.tasks.map((t, i) => (
                   <div
                     key={'l' + t.id}
-                    className="absolute left-0 right-0 border-t border-gray-100"
+                    className="absolute left-0 right-0 border-t border-[var(--ui-border)]"
                     style={{ top: i * ROW_H }}
                   />
                 ))}
