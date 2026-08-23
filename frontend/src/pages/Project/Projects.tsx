@@ -678,9 +678,9 @@ export default function Projects() {
                     <option value="">全部状态</option>
                     {(['未开始', '进行中', '已完成', '挂起'] as TaskStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
                   </Select>
-                  <label className="flex items-center gap-1.5 text-sm text-[var(--ui-text-secondary)] cursor-pointer select-none whitespace-nowrap">
+                  <label className="flex items-center gap-1.5 px-3 py-2 rounded-lg cursor-pointer text-sm whitespace-nowrap transition-colors select-none bg-[var(--ui-btn-primary-bg)] text-[var(--ui-btn-primary-text)] hover:bg-[var(--ui-btn-primary-hover)]">
                     <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)}
-                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                      className="w-3.5 h-3.5" />
                     只看我的任务
                   </label>
                   {maxTreeDepth > 0 && (
