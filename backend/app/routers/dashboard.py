@@ -32,7 +32,7 @@ def _build_component_item(item, rev: PartRevision, db: Session) -> dict:
     # 附件数：该 revision 下所有迭代的附件总数
     attachment_count = db.query(PartAttachment).join(
         PartIteration, PartIteration.id == PartAttachment.iteration_id
-    ).filter(PartIteration.part_revision_id == rev.id).count()
+    ).filter(PartIteration.revision_id == rev.id).count()
     return {
         "id": item.id,
         "entity_type": mtype,
