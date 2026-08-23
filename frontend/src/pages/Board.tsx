@@ -472,7 +472,7 @@ export default function Board() {
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filteredItems.map((item) => (
-                      <tr key={item.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => handleViewDetail(item)}>
+                      <tr key={item.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={(e) => { const t = e.target as HTMLElement; if (t.closest('button')) return; handleViewDetail(item); }}>
                         <td className="px-5 py-2.5"><Badge size="xs" tone={typeBadge(item.entity_type).tone} label={typeBadge(item.entity_type).label} /></td>
                         <td className="px-5 py-2.5 font-medium text-gray-800">{item.code}</td>
                         <td className="px-5 py-2.5 text-[var(--ui-text-secondary)]">{item.name}</td>
