@@ -703,10 +703,9 @@ export default function Projects() {
                     <>
                       <span className="text-sm text-[var(--ui-text-tertiary)]">视图:</span>
                       {(['day', 'week', 'month'] as const).map((s) => (
-                        <button key={s} onClick={() => setGanttScale(s)}
-                          className={`px-2 py-1.5 text-sm rounded ${ganttScale === s ? 'bg-primary-600 text-white' : 'bg-[var(--ui-bg-surface)] border border-gray-300 text-[var(--ui-text-secondary)] hover:bg-[var(--ui-bg-hover)]'}`}>
+                        <Button key={s} size="md" active={ganttScale === s} onClick={() => setGanttScale(s)}>
                           {s === 'day' ? '日' : s === 'week' ? '周' : '月'}
-                        </button>
+                        </Button>
                       ))}
                       {can('project.task:depend') && (
                         <Button size="md" onClick={() => setAutoScheduleKey((k) => k + 1)}>刷新排期</Button>
