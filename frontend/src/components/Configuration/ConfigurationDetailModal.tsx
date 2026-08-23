@@ -298,13 +298,13 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
 
   return (
     <>
-    <Modal open={!!itemId} onClose={onClose} title="构型项详情" width="full">
+    <Modal open={!!itemId} onClose={onClose} title="构型项详情" width="full" height="75vh">
       {loading ? (
         <div className="py-8 text-center text-sm text-[var(--ui-text-tertiary)]">加载中...</div>
       ) : !data ? (
         <div className="py-8 text-center text-sm text-[var(--ui-text-tertiary)]">加载失败</div>
       ) : (
-        <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-1">
+        <div className="space-y-6 pr-1">
           {/* 基本信息 - 卡片式 */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <InfoItem label="构型号" value={data.code} />
@@ -381,8 +381,9 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
       title={nestedEntity ? (nestedEntity.type === 'part' ? '零件详情' : '部件详情') : ''}
       onClose={() => { nestedReqId.current++; setNestedEntity(null); setNestedData(null); }}
       width="full"
+      height="75vh"
     >
-      <div className="max-h-[70vh] overflow-y-auto pr-1">
+      <div className="pr-1">
       {nestedLoading ? (
         <div className="py-8 text-center text-sm text-[var(--ui-text-tertiary)]">加载中...</div>
       ) : !nestedData ? (

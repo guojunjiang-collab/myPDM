@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react';
 import { formatDate } from '../lib/date';
-import { documentsApi, customFieldsApi, bomApi, userGroupsApi } from '../services/api';
-import type { Document, CustomFieldDefinition, CustomFieldValue } from '../types';
+import { documentsApi, bomApi, userGroupsApi } from '../services/api';
+import type { Document, CustomFieldDefinition } from '../types';
 import { canEdit, isAdmin } from '../stores/auth';
 import { Modal, ConfirmModal } from '../components/Modal';
-import DocumentDetailContent from '../components/DocumentDetailContent';
 import DocumentDetailModal from '../components/DocumentDetailModal';
 import { toast } from '../components/Toast';
-import VersionHistory from '../components/VersionHistory';
 import { useDataStore } from '../stores/data';
 import { useDebounced } from '../hooks/useDebounced';
 import ArchiveTreeModal from '../components/ArchiveTreeModal';
@@ -56,15 +54,9 @@ export default function Documents() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // 详情弹窗
-  const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
-  const [viewingCustomDefs, setViewingCustomDefs] = useState<CustomFieldDefinition[]>([]);
-  const [viewingCustomValues, setViewingCustomValues] = useState<Record<string, any>>({});
-  const [detailTab, setDetailTab] = useState<'detail' | 'versions'>('detail');
-  const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
-
-  // 详情/编辑合一弹窗（签入签出）
+  // 详情/编辑合一弹窗（复用 DocumentDetailModal）
   const [detailDocId, setDetailDocId] = useState<string | null>(null);
+  const [archivePreview, setArchivePreview] = useState<{ attId: string; fileName: string } | null>(null);
 
   // 用户组关联
   const [allGroups, setAllGroups] = useState<Array<{ id: string; name: string }>>([]);
@@ -162,24 +154,6 @@ export default function Documents() {
       setRefreshToken(t => t + 1);
     } catch (error) {
       toast.error('删除失败');
-    }
-  };
-
-  const handleView = async (doc: Document) => {
-    setViewingDoc(doc);
-    setDetailTab('detail');
-    const allDefs = useDataStore.getState().customFieldDefs;
-    const docDefs = allDefs.filter((d: CustomFieldDefinition) => d.applies_to?.includes('document'));
-    setViewingCustomDefs(docDefs);
-    try {
-      const res = await customFieldsApi.getValues('document', doc.id);
-      const values: Record<string, any> = {};
-      (res.data || []).forEach((v: CustomFieldValue) => {
-        values[v.field_id] = v.value;
-      });
-      setViewingCustomValues(values);
-    } catch {
-      setViewingCustomValues({});
     }
   };
 
@@ -361,65 +335,6 @@ export default function Documents() {
         onConfirm={deleteError ? () => { setDeleteId(null); setDeleteError(null); } : handleDelete}
         onCancel={() => { setDeleteId(null); setDeleteError(null); }}
       />
-
-      {/* 图文档详情弹窗 */}
-      <Modal
-        open={!!viewingDoc}
-        title="图文档详情"
-        onClose={() => setViewingDoc(null)}
-        width="full"
-      >
-        {viewingDoc && (
-          <div>
-            <div className="flex gap-1 mb-4 border-b">
-              <button
-                onClick={() => setDetailTab('detail')}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                  detailTab === 'detail'
-                    ? 'border-primary-600 text-primary-600'
-                    : 'border-transparent text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)]'
-                }`}
-              >
-                基本信息
-              </button>
-              <button
-                onClick={() => setDetailTab('versions')}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                  detailTab === 'versions'
-                    ? 'border-primary-600 text-primary-600'
-                    : 'border-transparent text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)]'
-                }`}
-              >
-                版本历史
-              </button>
-            </div>
-
-            {detailTab === 'detail' ? (
-              <DocumentDetailContent
-                doc={viewingDoc}
-                customFieldDefs={viewingCustomDefs}
-                customFieldValues={viewingCustomValues}
-                accessible={(viewingDoc as any).accessible ?? true}
-                groupNames={((viewingDoc as any).group_ids || []).map((gid: string) => allGroups.find(g => g.id === gid)?.name || gid).filter(Boolean)}
-                onArchivePreview={(attId, fileName) => setArchivePreview({ attId, fileName })}
-              />
-            ) : (
-              <VersionHistory
-                entityType="document"
-                entityId={viewingDoc.id}
-                onViewVersion={async (id) => {
-                  try {
-                    const res = await documentsApi.detail(id);
-                    handleView(res.data);
-                  } catch {
-                    toast.error('加载版本失败');
-                  }
-                }}
-              />
-            )}
-          </div>
-        )}
-      </Modal>
 
       {archivePreview && (
         <ArchiveTreeModal

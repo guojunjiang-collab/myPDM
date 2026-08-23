@@ -7,8 +7,7 @@ import { ConfirmModal } from '../Modal';
 import { ECOStatusBadge, ECOPriorityBadge } from './ECOStatusBadge';
 import { ECOCreateModal } from './ECOCreateModal';
 import { ECODetailModal } from './ECODetailModal';
-import { ECRCcPicker } from '../ECR/ECRCcPicker';
-import { ECOCcPicker } from './ECOCcPicker';
+import { CcPicker } from '../CcPicker';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
@@ -209,9 +208,9 @@ export function ECOList() {
       {detailId && <ECODetailModal ecoId={detailId} onClose={() => setDetailId(null)} onRefresh={load} />}
       {execId && <ECODetailModal ecoId={execId} onClose={() => setExecId(null)} onRefresh={load} executionMode />}
       {ccEcoId && (
-        <ECRCcPicker
+        <CcPicker
           open={true}
-          ecrId={ccEcoId}
+          entityId={ccEcoId}
           onClose={() => setCcEcoId(null)}
           api={{
             get: (id: string) => ecoApi.detail(id),
@@ -220,7 +219,6 @@ export function ECOList() {
           }}
         />
       )}
-      {ccEcoId && <ECOCcPicker open={!!ccEcoId} ecoId={ccEcoId} onClose={() => setCcEcoId(null)} />}
 
       {/* 删除 ECO 确认 */}
       <ConfirmModal

@@ -4,7 +4,7 @@ import { previewAttachment } from '../utils/attachmentPreview';
 import type { EntityDocument, CustomFieldDefinition, CustomFieldValue, Document, DocumentAttachment } from '../types';
 import { canEdit } from '../stores/auth';
 import { useDataStore } from '../stores/data';
-import { Modal, ConfirmModal } from './Modal';
+import { Modal, ConfirmModal, MODAL_Z } from './Modal';
 import { toast } from './Toast';
 import DocumentDetailModal from './DocumentDetailModal';
 import DocumentPicker from './DocumentPicker';
@@ -436,7 +436,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
       />
 
       {/* 图文档编辑弹窗 */}
-      <Modal open={!!editingDoc} title="编辑图文档" onClose={() => setEditingDoc(null)} width="full" zIndex={60}>
+      <Modal open={!!editingDoc} title="编辑图文档" onClose={() => setEditingDoc(null)} width="full" zIndex={MODAL_Z.picker}>
         {editingDoc && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

@@ -356,7 +356,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
   };
 
   return (
-    <Modal open={open} title="图文档详情" onClose={handleClose} width="full"
+    <Modal open={open} title="图文档详情" onClose={handleClose} width="full" height="75vh"
       headerAction={(isViewingOtherVersion && doc) ? (
         <span className="flex items-center gap-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 px-2 py-0.5 rounded">
           正在查看版本 {doc.version}（只读）
@@ -369,7 +369,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
         </span>
       ) : undefined}
     >
-      <div className="h-[50vh] flex flex-col">
+      <div className="h-full flex flex-col min-h-0">
         {loading && !doc ? (
           <Loading />
         ) : !doc ? (
@@ -498,12 +498,12 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                   </button>
                 ))}
               </div>
-              <div className="p-4 overflow-y-auto flex-1">
+              <div className="p-4 overflow-y-auto flex-1 min-h-0">
                 {/* 附件管理 Tab */}
                 {activeTab === 'attachments' && (
                   <div>
                     <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-semibold text-gray-700">附件列表</h4>
+                      <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">附件列表</h4>
                       {canEdit && !isViewingHistorical && !isViewingOtherVersion && (
                         <>
                           <Button size="sm" type="button" onClick={() => uploadInputRef.current?.click()} disabled={uploading}>
@@ -557,7 +557,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                 {/* 自定义字段 Tab */}
                 {activeTab === 'custom-fields' && (
                   <div>
-                    <h4 className="text-sm font-semibold text-gray-700 mb-3">自定义字段</h4>
+                    <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-3">自定义字段</h4>
                     {cfDefs.length === 0 ? (
                       <div className="text-sm text-[var(--ui-text-tertiary)] border border-dashed border-[var(--ui-border)] rounded-lg py-8 text-center">无</div>
                     ) : (

@@ -530,7 +530,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
   if (!open) return null;
 
   return (
-    <Modal open={open} title="零部件详情" onClose={handleClose} width="3xl"
+    <Modal open={open} title="零部件详情" onClose={handleClose} width="3xl" height="75vh"
       headerAction={viewingIterationId ? (
         <span className="flex items-center gap-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 px-2 py-0.5 rounded">
           正在查看 Iteration #{viewingIteration?.iteration} 的历史数据（只读）
@@ -543,7 +543,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
         </span>
       ) : undefined}
     >
-      <div className="h-[60vh] flex flex-col">
+      <div className="h-full flex flex-col min-h-0">
         {detailLoading && !master ? (
           <Loading />
         ) : !master ? (
@@ -669,7 +669,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                 ))}
               </div>
 
-              <div className="p-4 flex-1 min-h-0">
+              <div className="p-4 flex-1 min-h-0 overflow-auto">
                 {activeTab === 'info' && currentDisplay && (
                   <div className="space-y-4">
                     <div className="text-xs text-[var(--ui-text-secondary)]">

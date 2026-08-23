@@ -7,7 +7,7 @@ import { ECRStatusBadge, ECRPriorityBadge } from './ECRStatusBadge';
 import { ConfirmModal } from '../Modal';
 import { ECRCreateModal } from './ECRCreateModal';
 import { ECRDetailModal } from './ECRDetailModal';
-import { ECRCcPicker } from './ECRCcPicker';
+import { CcPicker } from '../CcPicker';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
@@ -471,9 +471,9 @@ export function ECRList() {
       />
 
       {/* 知会用户选择 */}
-      <ECRCcPicker
+      <CcPicker
         open={!!ccEcrId}
-        ecrId={ccEcrId || ''}
+        entityId={ccEcrId || ''}
         onClose={() => setCcEcrId(null)}
       />
     </div>

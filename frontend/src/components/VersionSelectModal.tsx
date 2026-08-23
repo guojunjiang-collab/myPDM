@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { partsApi, documentsApi } from '../services/api';
 import { formatDateTime } from '../utils/date';
-import { Modal } from './Modal';
+import { Modal, MODAL_Z } from './Modal';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
 
@@ -57,7 +57,7 @@ export default function VersionSelectModal({
   const title = entityName ? `选择版本 - ${entityName}` : '选择版本';
 
   return (
-    <Modal open={open} title={title} onClose={onClose} width="full" zIndex={70}>
+    <Modal open={open} title={title} onClose={onClose} width="full" zIndex={MODAL_Z.overlay}>
       {loading ? (
         <div className="text-sm text-[var(--ui-text-secondary)] py-8 text-center">加载中...</div>
       ) : versions.length === 0 ? (

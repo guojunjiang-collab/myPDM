@@ -323,7 +323,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
   for (const c of children) rows.push(renderChildRow(c, 1, internalRevId));
 
   return (
-    <Modal open={open} title="构型项详情" onClose={handleClose} width="3xl"
+    <Modal open={open} title="构型项详情" onClose={handleClose} width="3xl" height="75vh"
       headerAction={viewingIterationData ? (
         <span className="flex items-center gap-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 px-2 py-0.5 rounded">
           正在查看 Iteration #{viewingIterationData.iteration} 的历史数据（只读）
@@ -336,7 +336,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
         </span>
       ) : undefined}
     >
-      <div className="h-[50vh] flex flex-col">
+      <div className="h-full flex flex-col min-h-0">
         {detailLoading && !master ? (<Loading />) : !master ? (<div className="text-[var(--ui-text-tertiary)] text-sm py-8 text-center">加载失败</div>) : (<>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 shrink-0 mb-3">
             {canEdit ? (<>

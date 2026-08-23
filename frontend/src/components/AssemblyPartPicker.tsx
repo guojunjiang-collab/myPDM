@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { bomApi, partsApi } from '../services/api';
-import { Modal } from './Modal';
+import { Modal, MODAL_Z } from './Modal';
 import { toast } from './Toast';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
@@ -251,7 +251,7 @@ export default function AssemblyPartPicker({
   const selectedList = useMemo(() => Array.from(selected.values()), [selected]);
 
   return (
-    <Modal open={open} title="添加子项" onClose={handleCancel} width="full" zIndex={60}>
+    <Modal open={open} title="添加子项" onClose={handleCancel} width="full" zIndex={MODAL_Z.picker}>
       <div className="space-y-4 max-h-[75vh] flex flex-col">
         {/* ---- 1. 已选子项 ---- */}
         <div className="border rounded-lg overflow-hidden">

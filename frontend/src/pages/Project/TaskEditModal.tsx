@@ -351,8 +351,8 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
   }, [tab, task]);
 
   return (
-    <Modal open={open} title={task ? '编辑任务' : '新建任务'} onClose={onClose} width="full">
-      <div className="h-[50vh] flex flex-col">
+    <Modal open={open} title={task ? '编辑任务' : '新建任务'} onClose={onClose} width="full" height="75vh">
+      <div className="h-full flex flex-col min-h-0">
         {/* === 核心信息区 === */}
         <div className="shrink-0 mb-3">
           <div className="grid grid-cols-6 gap-3">
@@ -399,12 +399,12 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                 </button>
               ))}
             </div>
-            <div className="p-4 overflow-y-auto flex-1">
+            <div className="p-4 overflow-y-auto flex-1 min-h-0">
               {tab === 'info' && (
                 <div className="space-y-4">
                   {/* 负责人 */}
                   <div>
-                    <h4 className="text-sm font-semibold text-gray-700 mb-2">负责人</h4>
+                    <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">负责人</h4>
                     <div className="w-64">
                       <Select size="xs" value={form.assignee_id} onChange={(e) => setForm({ ...form, assignee_id: e.target.value })}>
                         <option value="">未指派</option>
@@ -415,7 +415,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
 
                   {/* 计划周期（四列卡片栅格） */}
                   <div>
-                    <h4 className="text-sm font-semibold text-gray-700 mb-2">计划周期</h4>
+                    <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">计划周期</h4>
                     <div className="grid grid-cols-4 gap-3">
                       <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                         <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">
@@ -450,7 +450,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
 
                   {/* 描述 */}
                   <div>
-                    <h4 className="text-sm font-semibold text-gray-700 mb-2">描述</h4>
+                    <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">描述</h4>
                     <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
                               className="resize-none"
                               rows={3} placeholder="可选" />
@@ -460,7 +460,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                   {task?.id && (
                     <div>
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
-                        <h4 className="text-sm font-semibold text-gray-700">任务依赖</h4>
+                        <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">任务依赖</h4>
                         {canEditDeps && (
                           <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
                             <Select size="xs" value={depForm.role}
@@ -566,7 +566,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                 <div className="space-y-4">
                   <div>
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
-                      <h4 className="text-sm font-semibold text-gray-700">关联对象</h4>
+                      <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">关联对象</h4>
                       <div className="ml-auto flex items-center gap-2">
                         <Button size="sm" onClick={() => setShowItemPicker(true)}>关联对象</Button>
                         <Button size="sm" onClick={() => setShowECPicker(true)}>关联变更</Button>
@@ -645,7 +645,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
 
               {tab === 'comments' && (
                 <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-gray-700">评论</h4>
+                  <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">评论</h4>
                   <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
                     {comments.map((c) => (
                       <div key={c.id} className="flex gap-2 text-sm">
@@ -713,7 +713,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
           <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
             {/* 负责人 */}
             <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">负责人</h4>
+              <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">负责人</h4>
               <div className="w-64">
                 <Select size="xs" value={form.assignee_id} onChange={(e) => setForm({ ...form, assignee_id: e.target.value })}>
                   <option value="">未指派</option>
@@ -724,7 +724,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
 
             {/* 计划周期（四列卡片栅格） */}
             <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">计划周期</h4>
+              <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">计划周期</h4>
               <div className="grid grid-cols-4 gap-3">
                 <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-[var(--ui-border)]">
                   <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">
@@ -757,7 +757,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
 
             {/* 描述 */}
             <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">描述</h4>
+              <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">描述</h4>
               <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
                         className="resize-none"
                         rows={3} placeholder="可选" />

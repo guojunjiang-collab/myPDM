@@ -298,18 +298,19 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
       open={open}
       onClose={onClose}
       width="3xl"
-    >
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">ECR 详情</h3>
-        {detail && canDownload() && (
+      title="ECR 详情"
+      height="75vh"
+      headerAction={
+        detail && canDownload() ? (
           <Button variant="secondary" size="sm"
             onClick={() => { try { exportEcrPdf(detail, statusLogs); } catch { toast.error('导出失败'); } }}
             title="导出为 PDF 文档（展开所有信息，打印另存为 PDF）"
           >
             📄 导出PDF
           </Button>
-        )}
-      </div>
+        ) : undefined
+      }
+    >
       {loading && !detail ? (
         <div className="flex items-center justify-center py-12">
           <div className="flex items-center gap-2 text-[var(--ui-text-secondary)]">
@@ -323,7 +324,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
       ) : !detail ? (
         <div className="text-center text-[var(--ui-text-secondary)] py-12">暂无数据</div>
       ) : (
-        <div className="print-area space-y-6 max-h-[70vh] overflow-y-auto pr-1">
+        <div className="print-area space-y-6 pr-1">
           {/* Header */}
           <div className="flex items-center justify-between pb-4 border-b border-[var(--ui-border)]">
             <div>
@@ -364,7 +365,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
           {/* Description */}
           {detail.description && (
             <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">📝 变更描述</h4>
+              <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">📝 变更描述</h4>
               <div className="bg-[var(--ui-bg-subtle)] rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap border border-[var(--ui-border)]">
                 {detail.description}
               </div>
@@ -373,7 +374,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
 
           {/* Review Progress */}
           <div>
-            <h4 className="text-sm font-semibold text-gray-700 mb-3">
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-3">
               👥 审批进度
               {detail.reviewers && detail.reviewers.length > 0 && (
                 <span className="ml-2 text-xs font-normal text-[var(--ui-text-secondary)]">
@@ -464,7 +465,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
           {/* Affected Items */}
           {detail.affected_items && detail.affected_items.length > 0 && (
             <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-3">
+              <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-3">
                 📦 受影响物料 ({detail.affected_items.length})
               </h4>
               <div className="space-y-4">
@@ -512,7 +513,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
           {/* Status Log */}
           {statusLogs.length > 0 && (
             <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-3">📋 状态记录</h4>
+              <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-3">📋 状态记录</h4>
               <div className="space-y-0">
                 {statusLogs.map((log) => (
                   <div key={log.id} className="flex gap-3 pb-4">

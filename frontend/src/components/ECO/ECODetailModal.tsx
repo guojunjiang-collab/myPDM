@@ -193,7 +193,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
 
   return (
     <>
-    <Modal open={true} title={executionMode ? 'ECO 执行' : 'ECO 详情'} onClose={onClose} width="3xl"
+    <Modal open={true} title={executionMode ? 'ECO 执行' : 'ECO 详情'} onClose={onClose} width="3xl" height="75vh"
       headerAction={eco && canDownload() ? (
         <Button variant="secondary" size="sm"
           onClick={() => { if (eco) exportEcoPdf(eco).catch(() => toast.error('导出失败')); }}
@@ -205,7 +205,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
       : !eco ? <div className="py-8 text-center text-[var(--ui-text-tertiary)] text-sm">未找到 ECO</div>
       : (
         <>
-        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+        <div className="space-y-4 pr-1">
           {/* Header */}
           <div className="flex items-center justify-between pb-4 border-b border-[var(--ui-border)]">
             <div>
@@ -233,7 +233,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
           {/* Reviewers */}
           {eco.reviewers && eco.reviewers.length > 0 && (
             <div className="border-t pt-3">
-              <h4 className="text-sm font-semibold text-gray-700 mb-3">审批人 <span className="ml-2 text-xs font-normal text-[var(--ui-text-secondary)]">({eco.approved_count || 0}/{eco.reviewers_count || eco.reviewers.length} 已审批)</span></h4>
+              <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-3">审批人 <span className="ml-2 text-xs font-normal text-[var(--ui-text-secondary)]">({eco.approved_count || 0}/{eco.reviewers_count || eco.reviewers.length} 已审批)</span></h4>
               <ECRReviewPanel reviewers={eco.reviewers} reviewRecords={eco.review_records || []} currentUserId={user?.id || ''} onReview={async (decision, comment) => { setActionLoading(true); try { await ecoApi.review(ecoId, decision, comment); toast.success('操作成功'); load(); } catch { toast.error('操作失败'); } finally { setActionLoading(false); } }} loading={actionLoading} />
             </div>
           )}

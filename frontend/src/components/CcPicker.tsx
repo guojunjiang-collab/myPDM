@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Modal } from '../Modal';
-import { toast } from '../Toast';
-import { ecrApi, usersApi } from '../../services/api';
-import Button from '../ui/Button';
+import { Modal } from './Modal';
+import { toast } from './Toast';
+import { ecrApi, usersApi } from '../services/api';
+import Button from './ui/Button';
 
 interface CcPickerApi {
   get: (id: string) => Promise<any>;
@@ -10,15 +10,17 @@ interface CcPickerApi {
   uncc: (id: string, userId: string) => Promise<any>;
 }
 
-interface ECRCcPickerProps {
+interface CcPickerProps {
   open: boolean;
-  ecrId: string;
+  /** 目标单据 id（ECR/ECO） */
+  entityId: string;
   onClose: () => void;
-  /** Optional: custom API for non-ECR usage (e.g., ECO) */
+  /** 可选自定义 API（如 ECO 复用），默认 ecrApi */
   api?: CcPickerApi;
 }
 
-export function ECRCcPicker({ open, ecrId, onClose, api }: ECRCcPickerProps) {
+/** 知会用户选择弹窗：ECR/ECO 通用（合并自 ECOCcPicker/ECRCcPicker） */
+export function CcPicker({ open, entityId, onClose, api }: CcPickerProps) {
   const entityApi = api || ecrApi;
   const [users, setUsers] = useState<any[]>([]);
   const [ccUserIds, setCcUserIds] = useState<string[]>([]);
@@ -33,16 +35,17 @@ export function ECRCcPicker({ open, ecrId, onClose, api }: ECRCcPickerProps) {
       setLoading(true);
       Promise.all([
         usersApi.list({ page_size: 200 }),
-        entityApi.get(ecrId).catch(() => ({ data: { cc_users: [] } })),
-      ]).then(([usersResp, ecrResp]) => {
+        entityApi.get(entityId).catch(() => ({ data: { cc_users: [] } })),
+      ]).then(([usersResp, detailResp]) => {
         const userData = usersResp.data?.items || usersResp.data || [];
         setUsers(Array.isArray(userData) ? userData : []);
-        const detail = (ecrResp as any).data || ecrResp;
+        const detail = (detailResp as any).data || detailResp;
         const ccs: string[] = (detail.cc_users || []).map((c: any) => c.user_id);
         setCcUserIds(ccs);
       }).finally(() => setLoading(false));
     }
-  }, [open, ecrId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, entityId]);
 
   const toggleUser = (uid: string) => {
     if (ccUserIds.includes(uid)) return;
@@ -52,7 +55,7 @@ export function ECRCcPicker({ open, ecrId, onClose, api }: ECRCcPickerProps) {
   const handleUncc = async (uid: string) => {
     setUnccLoading(uid);
     try {
-      await entityApi.uncc(ecrId, uid);
+      await entityApi.uncc(entityId, uid);
       setCcUserIds((prev) => prev.filter((id) => id !== uid));
       toast.success('已取消知会');
     } catch {
@@ -66,7 +69,7 @@ export function ECRCcPicker({ open, ecrId, onClose, api }: ECRCcPickerProps) {
     if (selectedIds.length === 0) return;
     setSubmitting(true);
     try {
-      await entityApi.cc(ecrId, selectedIds);
+      await entityApi.cc(entityId, selectedIds);
       toast.success('知会成功');
       onClose();
     } catch {

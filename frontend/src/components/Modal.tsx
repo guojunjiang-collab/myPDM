@@ -116,6 +116,7 @@ export function Modal({
     }
   };
 
+  // 宽度语义档位：sm≈确认/简单输入、md≈表单/确认、lg≈简单表单、xl≈Picker/详情、full≈复杂详情、3xl≈复杂详情/大表、max≈全屏工作台
   const widthMap = {
     sm: 'max-w-sm',
     md: 'max-w-md',

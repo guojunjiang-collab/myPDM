@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Modal } from './Modal';
+import { Modal, MODAL_Z } from './Modal';
 import Button from './ui/Button';
 import Input from './ui/Input';
 import { useAuthStore } from '../stores/auth';
@@ -59,7 +59,7 @@ export default function ECPicker({ open, onClose, onConfirm }: ECPickerProps) {
   };
 
   return (
-    <Modal open={open} title="选择 EC(变更单)" onClose={onClose} width="lg" zIndex={60}>
+    <Modal open={open} title="选择 EC(变更单)" onClose={onClose} width="lg" zIndex={MODAL_Z.picker}>
       <Input
         value={search}
         onChange={(e) => setSearch(e.target.value)}

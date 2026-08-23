@@ -49,8 +49,8 @@ export default function MaterialDetail({ material, onClose, onViewEntity }: Prop
   }, [hasPdmRef, storeComponents.length, syncAll]);
 
   return (
-    <Modal open={true} title="物料详情" onClose={onClose} width="3xl">
-      <div className="space-y-6 max-h-[72vh] overflow-y-auto pr-1">
+    <Modal open={true} title="物料详情" onClose={onClose} width="3xl" height="75vh">
+      <div className="space-y-6 pr-1">
         {/* 基本信息卡片 */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <InfoItem label="编码" value={m.code} />
@@ -66,7 +66,7 @@ export default function MaterialDetail({ material, onClose, onViewEntity }: Prop
         {/* PDM 关联零部件 */}
         {hasPdmRef && (
           <div>
-            <h4 className="text-sm font-semibold text-gray-700 mb-2">🔗 PDM 关联零部件</h4>
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">🔗 PDM 关联零部件</h4>
             <div className="rounded-lg border border-[var(--ui-border)] overflow-hidden">
               <table className="w-full">
                 <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
@@ -99,7 +99,7 @@ export default function MaterialDetail({ material, onClose, onViewEntity }: Prop
         {/* 备注 */}
         {m.remark && (
           <div>
-            <h4 className="text-sm font-semibold text-gray-700 mb-2">📝 备注</h4>
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">📝 备注</h4>
             <div className="bg-[var(--ui-bg-subtle)] rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap border border-[var(--ui-border)]">{m.remark}</div>
           </div>
         )}

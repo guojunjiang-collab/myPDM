@@ -188,7 +188,7 @@ export default function DocumentEditModal({ docType, onClose, onSaved }:
         {/* 明细行 */}
         <div>
           <div className="flex justify-between items-center mb-2">
-            <label className="text-sm font-semibold text-gray-700">📋 明细</label>
+            <label className="text-[var(--ui-text-secondary)] font-semibold text-sm">📋 明细</label>
             <Button variant="link" size="xs" onClick={addLine}>+ 加一行</Button>
           </div>
           <div className="rounded-lg border border-[var(--ui-border)]">

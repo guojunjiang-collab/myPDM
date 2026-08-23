@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Modal } from './Modal';
+import { Modal, MODAL_Z } from './Modal';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
 import type { ImportPreview, ImportRow } from '../services/importExport';
@@ -78,7 +78,7 @@ export default function ImportPreviewModal({
   };
 
   return (
-    <Modal open={open} title={`${getTypeLabel()}导入预览`} onClose={onClose} width="full" zIndex={60}>
+    <Modal open={open} title={`${getTypeLabel()}导入预览`} onClose={onClose} width="full" zIndex={MODAL_Z.picker}>
       <div className="space-y-4">
         {/* 摘要 */}
         <div className="flex items-center gap-3 flex-wrap">

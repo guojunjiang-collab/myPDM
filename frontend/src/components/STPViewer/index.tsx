@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { Modal } from '../Modal';
+import { Modal, MODAL_Z } from '../Modal';
 import { ViewerCanvas } from './ViewerCanvas';
 import { Toolbar } from './Toolbar';
 import { ModelTreePanel } from './ModelTreePanel';
@@ -115,7 +115,7 @@ export function STPViewerModal({ open, attachmentId, fileName, onClose }: STPVie
   }, []);
 
   return (
-    <Modal open={open} title={`三维预览 - ${fileName || ''}`} onClose={onClose} width="full" zIndex={60}>
+    <Modal open={open} title={`三维预览 - ${fileName || ''}`} onClose={onClose} width="full" zIndex={MODAL_Z.picker}>
       <div className="-mx-6 -my-4" style={{ height: 'calc(100vh - 88px)' }}>
         {/* Converting State */}
         {loadingState === 'converting' && (

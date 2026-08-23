@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Modal } from '../Modal';
+import { Modal, MODAL_Z } from '../Modal';
 import { configurationApi } from '../../services/api';
 import { toast } from '../Toast';
 import Badge from '../ui/Badge';
@@ -103,7 +103,7 @@ export default function ConfigItemPicker({ open, onClose, onConfirm, excludeId }
   const handleCancel = () => { setSelected(new Map()); onClose(); };
 
   return (
-    <Modal open={open} title="添加子构型项" onClose={handleCancel} width="xl" zIndex={60}>
+    <Modal open={open} title="添加子构型项" onClose={handleCancel} width="xl" zIndex={MODAL_Z.picker}>
       <div className="space-y-4 max-h-[70vh] flex flex-col">
         {/* ---- 1. 已选面板 ---- */}
         {selectedList.length > 0 && (

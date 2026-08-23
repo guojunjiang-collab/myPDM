@@ -35,7 +35,7 @@ function useLazy<T>(fetcher: () => Promise<T[]>, dep: string) {
 const Section = ({ title, count, children }: any) => (
   <div className="mb-4">
     <div className="flex items-center gap-2 mb-2">
-      <span className="text-sm font-semibold text-gray-700">{title}</span>
+      <span className="text-[var(--ui-text-secondary)] font-semibold text-sm">{title}</span>
       <Badge tone="gray" label={count} size="xs" />
     </div>
     {children}

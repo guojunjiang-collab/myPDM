@@ -33,8 +33,8 @@ export default function StockDetail({ materialId, rows, whName, onClose, onViewD
   const total = rows.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
 
   return (
-    <Modal open title="物料库存详情" onClose={onClose} width="3xl">
-      <div className="h-[55vh] flex flex-col">
+    <Modal open title="物料库存详情" onClose={onClose} width="3xl" height="75vh">
+      <div className="h-full flex flex-col min-h-0">
       {/* TAB 切换 */}
       <div className="flex border-b border-[var(--ui-border)] mb-4 shrink-0">
         <button
@@ -65,7 +65,7 @@ export default function StockDetail({ materialId, rows, whName, onClose, onViewD
           )}
 
           <div>
-            <h4 className="text-sm font-semibold text-gray-700 mb-2">各仓库 / 批次库存</h4>
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">各仓库 / 批次库存</h4>
             <div className="rounded-lg border border-[var(--ui-border)] overflow-hidden">
               <table className="w-full">
                 <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">

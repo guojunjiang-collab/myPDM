@@ -75,10 +75,10 @@ export default function DocumentDetail({ docId, onClose, onChanged }:
   };
 
   return (
-    <Modal open={!!doc} title={doc ? doc.doc_number : ''} onClose={onClose} width="3xl"
+    <Modal open={!!doc} title={doc ? doc.doc_number : ''} onClose={onClose} width="3xl" height="75vh"
       headerAction={doc && <Badge status={doc.status} domain="inventoryDoc" />}>
       {doc && (
-        <div className="space-y-6 max-h-[72vh] overflow-y-auto pr-1">
+        <div className="space-y-6 pr-1">
           {/* 基本信息卡片 */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <InfoItem label="单据类型" value={DOC_TYPE_LABEL[doc.doc_type]} />
@@ -93,7 +93,7 @@ export default function DocumentDetail({ docId, onClose, onChanged }:
 
           {/* 明细 */}
           <div>
-            <h4 className="text-sm font-semibold text-gray-700 mb-2">📋 明细</h4>
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">📋 明细</h4>
             <div className="rounded-lg border border-[var(--ui-border)] overflow-hidden">
               <table className="w-full">
                 <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
@@ -132,7 +132,7 @@ export default function DocumentDetail({ docId, onClose, onChanged }:
 
           {/* 审批记录 */}
           <div>
-            <h4 className="text-sm font-semibold text-gray-700 mb-2">
+            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">
               👥 审批记录
               {(doc.reviewers || []).length > 0 && (
                 <span className="ml-2 text-xs font-normal text-[var(--ui-text-secondary)]">
@@ -159,7 +159,7 @@ export default function DocumentDetail({ docId, onClose, onChanged }:
           {/* 状态流转时间线 */}
           {(doc.status_logs || []).length > 0 && (
             <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-3">🕒 状态流转</h4>
+              <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-3">🕒 状态流转</h4>
               <div className="space-y-0">
                 {(doc.status_logs || []).map((log: any, i: number) => (
                   <div key={log.id} className="flex gap-3 pb-4">
@@ -185,7 +185,7 @@ export default function DocumentDetail({ docId, onClose, onChanged }:
           {/* 备注 */}
           {doc.remark && (
             <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">📝 备注</h4>
+              <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">📝 备注</h4>
               <div className="bg-[var(--ui-bg-subtle)] rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap border border-[var(--ui-border)]">{doc.remark}</div>
             </div>
           )}
