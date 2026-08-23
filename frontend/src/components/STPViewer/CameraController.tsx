@@ -4,7 +4,6 @@ import { ArcballControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useViewerStore } from '../../stores/viewerStore';
 import { resolveViewJump, resolveResetJump } from './viewNavigation';
-import { interruptArcballInertia } from './arcballInterrupt';
 
 export function CameraController() {
   const cameraMode = useViewerStore((s) => s.cameraMode);
@@ -76,9 +75,6 @@ export function CameraController() {
   useEffect(() => {
     if (!viewTarget || !controlsRef.current) return;
     const controls = controlsRef.current;
-    // 关键：先中断 arcball 惯性旋转。否则惯性 rAF 循环会以拖拽起点姿态持续覆盖
-    // 视图动画写入的相机姿态，导致法向视图落点偏离标准视图（模型对不齐）+ 姿态球不同步
-    interruptArcballInertia(controls);
     const target = (controls as any).target as THREE.Vector3 | undefined;
     const center = target ? target.clone() : new THREE.Vector3(0, 0, 0);
     const dist = camera.position.distanceTo(center) || 5;
@@ -101,7 +97,6 @@ export function CameraController() {
     const { initCamPos, initCamTarget } = useViewerStore.getState();
     const endPos = new THREE.Vector3(...initCamPos);
     const tgt = new THREE.Vector3(...initCamTarget);
-    interruptArcballInertia(controlsRef.current);
     const jump = resolveResetJump(endPos);
     anim.current = {
       start: camera.position.clone(),
@@ -135,8 +130,6 @@ export function CameraController() {
       (controlsRef.current as any).target.copy(tgt);
       camera.lookAt(tgt);
       (controlsRef.current as any).update();
-      // 动画结束再中断一次：防止动画期间新产生的惯性在结束后继续覆盖标准姿态
-      interruptArcballInertia(controlsRef.current);
       anim.current = null;
     }
   });
