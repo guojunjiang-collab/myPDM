@@ -48,15 +48,9 @@ export function Toolbar() {
             ))}
           </div>
 
-          <label className="flex items-center gap-1.5 text-sm text-[var(--ui-text-secondary)] cursor-pointer select-none shrink-0">
-            <input
-              type="checkbox"
-              checked={compare.onlyDiff}
-              onChange={(e) => setOnlyDiff(e.target.checked)}
-              className="accent-primary-500"
-            />
+          <Button size="md" active={compare.onlyDiff} onClick={() => setOnlyDiff(!compare.onlyDiff)}>
             仅显示差异
-          </label>
+          </Button>
 
           <div className="flex items-center gap-2 text-sm text-[var(--ui-text-secondary)] shrink-0">
             <span className="font-medium">幽灵</span>
