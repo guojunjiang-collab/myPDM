@@ -633,3 +633,85 @@ git commit -m "docs: 外观配置与树形统一验收通过，补充验收记�
 - **Spec 覆盖**：字体组/背景组/树组变量（T1）、浅色预设（T2）、深色集+灰阶补偿（T3）、字体 utilities+dist 实测（T4）、TreeToggle（T5）、桌面树（T6）、移动树（T7）、背景 A/B（T8/T9）、移动背景+dark 注册+UI 分组（T10）、验收（T11）——spec 全部章节有对应任务；二期预留（字号独立项、深色残余状态色）明确不在本轮。
 - **占位符扫描**：无 TBD/TODO；Task 6/7 行号来自 spec 现状调查（实施时以读文件为准，计划已注明）。
 - **类型一致性**：`TreeToggle` props（expanded/onClick/loading/leaf/size/title/disabled）在 T5 定义、T6/T7 消费，一致；变量名 `--ui-tree-indent`/`--ui-bg-surface` 等在 T1 定义、T2/T3/T4/T6-T11 引用，一致；主题 key `'dark'` 在 T3 CSS 与 T10 注册一致。
+
+---
+
+## 验收记录 (2026-08-22)
+
+**验收范围**：Task 1-10b 全部产出（CSS 变量 + 3 浅色预设 + 深色集与灰阶补偿 + 字体 utilities + TreeToggle + 桌面/移动树收敛 + 背景 A/B 替换 + dark 注册 + 选择器分组 + 清单外残留补做）。
+**验收性质**：代码级（无浏览器环境，视觉渲染未实测，见 §4 与 §6）。
+
+### 1. 构建与测试
+
+| 项 | 结果 |
+|---|---|
+| `cd frontend && npm run build` | **PASS**（`tsc && vite build`，1206 modules，✓ built in 11.78s；仅既有 chunk>500kB 与 StpViewerPage 动态/静态双导入警告，非新增错误） |
+| `cd frontend && npm run test` | **PASS**（Vitest run，24 测试文件 / **162 用例全部通过**，含 theme.test.ts 3 例；1.96s） |
+
+### 2. grep 校验汇总（`frontend/src`，排除 `components/ui/`、`constants/`）
+
+#### 2a. 树符号 `▼|▶|▾|▸`（字面字符）→ 3 处，全为豁免文案
+- `pages/Project/TaskEditModal.tsx:690` `▶ 开始任务`、`:705` `▶ 恢复任务`
+- `components/Inventory/DocumentTab.tsx:135` `+ 新建单据 ▾`
+- ⚠️ **补充发现（字面 grep 漏检）**：`components/BOMTreeTable.tsx:145/:212` 以 `'\u25BC'`/`'\u25B6'` 转义渲染 ▼/▶ 树符号——真实遗留，见 §7 违规 #1。
+
+#### 2b. 目标表面类（9 类含变体）→ 10 处 / 3 文件，全部归类，非豁免 FAIL = 0
+- `index.css:148-158`（6 处）— 深色灰阶补偿规则定义（设计，豁免）
+- `components/ECR/ECRReviewPanel.tsx:111`（1 处）`bg-white/60` — Task 8 豁免注释框
+- `mobile/components/MobileCardList.tsx:17/19/20`（3 处）`bg-white`/`text-gray-900`/`text-gray-500` — 并行未提交工作文件，非本计划产物（不视为违规）
+
+#### 2c. `var(--ui-tree-indent)` → 33 处 / 17 文件；清单 15 组件中 13 个已用
+- ✓ PartCompareModal / PartDetailModal / ConfigItemDetailModal / CADBOMMatchTable / CompareTreePanel / ModelTreePanel / BomTree / ConfigTree / BomComparePage / BoardPage / ProjectsPage / GanttPage / Board
+- ✗ **BOMTreeTable** — 无该变量（层级列用 `'-'.repeat(level)` 连字符徽标表达层级，无像素缩进）→ §7 违规 #2
+- ✗ **BomWhereUsedTree** — 无该变量（扁平反查表，行内展示父项，无深度缩进布局；符号已转 TreeToggle）→ §7 清单偏差 #3
+
+### 3. 四主题逐页抽查（代码级）
+
+- **THEMES 4 条目** ✓：`src/lib/theme.ts`（default 默认蓝 / forest 森林绿 / warm 酒红 / dark 深色，各含 label+swatch）
+- **主题选择器分组** ✓：Settings.tsx:471-480（浅色 default/forest/warm + 深色 dark 两组）、MorePage.tsx:74-85（同两组）
+- **Badge/Button/Input 组件化**（bg sweep 无回归）✓：
+  - 桌面：零部件 PartsPage ✓ / 图文档 Documents ✓ / ECR+ECO（EC.tsx→ECRList/ECOList）✓ / 构型（Configuration.tsx→ConfigurationList）✓ / 库存（Inventory.tsx→WarehouseTab）✓ / 项目 Projects ✓ / 用户 Users ✓ / 看板 Board ✓ / 通知 Notifications ✓（原生 `<button>` 为既有设计，非本计划回归；类已 token 化）/ 设置 Settings ✓ / 数据管理 DataManagement ✓ / 日志 Logs ✓ / 登录 Login ✓ / 阅读器 OfficeReader ✓（sheet 页签原生 button 为既有设计；bg 已 token 化）
+  - 移动：零部件 PartsListPage/PartDetailPage ✓ / 图文档 DocumentsListPage/DocumentDetailPage ✓ / EC EcPage ✓ / 构型 ConfigurationItemsPage/ConfigurationProfilesPage/ConfigItemDetailPage ✓ / 库存 InventoryPage ✓ / 项目 ProjectsPage ✓ / 任务 TaskDetailPage/GanttPage ✓ / 通知 NotificationsPage ✓ / 更多 MorePage ✓（含主题分组）/ 看板 BoardPage ✓
+- **树组件**：TreeToggle 22 文件消费（SVG chevron、`rotate-90` 旋转动画、`loading ⋯`、leaf 占位、内部 stopPropagation、aria-expanded）✓；缩进统一 `--ui-tree-indent: 14px`（BOMTreeTable/BomWhereUsedTree 除外，见 2c）
+- **三浅色主题预设** ✓：index.css `:root`（默认背景组）+ `html[data-theme='forest']`（:79-86 背景预设）+ `html[data-theme='warm']`（:97-103 背景预设）均生效
+
+### 4. 深色模式（代码级）
+
+- `html[data-theme='dark']` 块（index.css:107-143）覆盖：**背景组**（bg-page/surface/subtle/hover、border、text-primary/secondary/tertiary）、**徽标 9 组深色版**（blue/orange/green/red/gray/amber/teal/purple/indigo，半透明 bg + 亮色 text，色相保持）、**按钮**（primary/secondary/ghost/danger/success/dark/link 全 variant）、**表单**（input bg/border/text/placeholder/focus-ring/focus-border/disabled）✓
+- **灰阶补偿块**（index.css:146-164）：text-gray-300/400/500/600/700/800、bg-gray-50/100/200、border-gray-100/200/300、hover:bg-gray-50/100/200、divide-gray-100/200 ✓（specificity (0,2,0) > Tailwind 类 (0,1,0)）
+- **表面 token 应用**：`bg-[var(--ui-bg-surface)]` 全 src 214 处（桌面 + 移动均 >0）✓
+- ⚠️ 实际视觉渲染（斑马纹/弹窗/表单/徽标可读性）无法在无浏览器环境验证——记录为**代码级验收**；需控制器/PM 用 DevTools `document.documentElement.dataset.theme='dark'` 逐页确认。
+
+### 5. 豁免登记（汇总，Task 5/6/7/8/9/10/10b 累计 + 本次确认）
+
+| 类别 | 明细 |
+|---|---|
+| 树符号豁免文案 | TaskEditModal:690/705、DocumentTab:135 |
+| 半透明注释框 | ECRReviewPanel:111 `bg-white/60` |
+| `bg-gray-100` 次级面 | ProfileEditModal:1023,1056、ECRAffectedItemPicker:188、assistant/cards/TableCard:9、MessageList:27、ModelTreePanel:112、Board:794、PendingApproval:49、Settings:531,593、Help:61、tiles:69、DeliverableModal:208、SharedLeftPanel:54,94、MarkdownReader:105、OfficeReader:65 等 |
+| 状态色/装饰 | diff 行（green/red/yellow/orange/blue-50）、时间线点 bg-*-500、toast 变体（Toast:68-71）、进度条（bg-gray-200 轨道 + bg-blue-500 填充）、头像 bg-primary-600、未读角标 bg-red-500、选中/未读行 bg-blue-50、bg-primary-50/600、语义文字 text-red/green/blue/amber/primary-*、Layout 同步点 |
+| 未 token 灰阶（深色由补偿块覆盖） | text-gray-300/700/800、hover:text-gray-700、border-gray-100/300、divide-gray-50/100/200、border-gray-50、bg-gray-200/300（树列线、toggle 悬停、时间线连接线、resize 手柄）、hover:bg-gray-200 |
+| 遮罩 | bg-black/30、/40、/20、bg-gray-900/20、/85（弹窗/3D 覆盖层） |
+| 3D/非 UI 表面 | StpViewerPage:469,499、BomComparePage:552 `bg-gray-100` |
+| 非本计划产物 | MobileCardList.tsx（并行工作，3 处目标类）、_verify_status.py（未跟踪）——未触碰、未纳入提交 |
+
+### 6. QA 注意点处置（代码级确认）
+
+| 注意点 | 结论 |
+|---|---|
+| ProfileEditModal:708 hover subtle（T8 minor） | 现为 `hover:bg-[var(--ui-bg-subtle)]`（已 token 化，代码合规）；深色下 subtle(#334155) 与 hover(#475569) 反馈对比度偏弱，建议后续统一为 hover token（minor，不阻断） |
+| text-gray-300 深色层级（T3 minor） | 补偿值 #64748b 比 gray-400/500/600 的 #94a3b8 暗（层级反转，brief verbatim 值）；text-gray-300 主要用于禁用/装饰态，代码级未见混乱；若视觉 QA 发现层级混乱再调值 |
+| OfficeReader:77 border-b 无着色（T10b） | 确认（pre-existing，fallback currentColor），无风险 |
+| useHeaderTabs:33 text-gray-800 深色对比 | 深色补偿 → #cbd5e1 覆盖 ✓ |
+| MorePage 深色组单按钮全宽（T10） | 确认：深色组 1 个 flex-1 按钮拉伸全宽，视觉不对称（cosmetic，代码级记录） |
+
+### 7. 遗留违规（上报控制器，本验收不改代码）
+
+1. **`frontend/src/components/BOMTreeTable.tsx:145、:212`** — `'\u25BC'`/`'\u25B6'` 转义渲染 ▼/▶ 树符号，未转 TreeToggle（违反计划「树形符号业务代码最终 0 处（TreeToggle 内部除外）」约束）；Task 6 及历次 grep 仅查字面字符而漏检；为活代码（`components/AssemblyDetailContent.tsx:82` 零部件详情 BOM 页）。建议二期或小 fix 任务处理。
+2. **`frontend/src/components/BOMTreeTable.tsx`** — 无 `var(--ui-tree-indent)`（层级列用连字符徽标，无像素缩进），grep(c) 清单偏差（与 #1 同源）。
+3. **`frontend/src/pages/BOM/BomWhereUsedTree.tsx`** — 无 `var(--ui-tree-indent)`（扁平反查表无深度缩进布局；符号已转 TreeToggle），grep(c) 清单偏差（疑为 spec 清单机械收录，可评估豁免）。
+
+### 8. 验收结论
+
+- 构建/测试双 PASS（162 用例）；grep 表面类残留仅限豁免清单；树符号字面 0 处非豁免；四主题代码级抽查通过；深色变量块 + 灰阶补偿 + 表面 token 应用齐备。
+- 除 §7 3 处树形收敛清单偏差（1 处为真实遗留）外，计划目标全部达成。**验收结论：通过（DONE_WITH_CONCERNS，BOMTreeTable 树符号遗留报控制器）**。
