@@ -94,13 +94,13 @@ export default function Settings() {
   };
 
   const tabs: { key: TabKey; label: string; enabled: boolean; adminOnly: boolean }[] = [
-    { key: 'customFields', label: '自定义字段', enabled: true, adminOnly: false },
-    { key: 'dataManagement', label: '数据管理', enabled: true, adminOnly: true },
+    { key: 'theme', label: '界面主题', enabled: true, adminOnly: false },
     { key: 'password', label: '修改密码', enabled: true, adminOnly: false },
     { key: 'feishuBind', label: '飞书绑定', enabled: true, adminOnly: false },
     { key: 'wechatBind', label: '微信绑定', enabled: true, adminOnly: false },
+    { key: 'customFields', label: '自定义字段', enabled: true, adminOnly: false },
+    { key: 'dataManagement', label: '数据管理', enabled: true, adminOnly: true },
     { key: 'logs', label: '操作日志', enabled: true, adminOnly: true },
-    { key: 'theme', label: '界面主题', enabled: true, adminOnly: false },
   ];
 
   // Password change state
