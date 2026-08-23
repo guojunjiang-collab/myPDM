@@ -9,7 +9,7 @@ import Input from './ui/Input';
 import Select from './ui/Select';
 import TreeToggle from './ui/TreeToggle';
 import { compareVersions } from '../constants';
-import type { Document, CustomFieldDefinition, CustomFieldValue } from '../types';
+import type { Document, CustomFieldDefinition } from '../types';
 
 /* ----------------------------------------------------------------
    Types
@@ -75,6 +75,8 @@ export default function DocumentPicker({
   const [fetchedDocs, setFetchedDocs] = useState<Document[]>([]);
   const [localFieldDefs, setLocalFieldDefs] = useState<CustomFieldDefinition[]>([]);
   const [localFieldValues, setLocalFieldValues] = useState<Record<string, Record<string, unknown>>>({});
+  // 字段值批量加载完成标记：置入 filterParams 触发候选列表带值重拉
+  const [fieldValuesToken, setFieldValuesToken] = useState(0);
 
   /* ---- 快速新建 ---- */
   const [quickOpen, setQuickOpen] = useState(false);
@@ -97,41 +99,67 @@ export default function DocumentPicker({
           return Array.isArray(data) ? data : (data?.items || []) as Document[];
         });
 
-    // 外部传入字段定义/值则不需要自行加载
-    const needLoadFields = !propFieldDefs || !propFieldValues;
+    // 字段定义：外部传入优先，否则自行加载
+    const defPromise: Promise<CustomFieldDefinition[]> =
+      propFieldDefs && propFieldDefs.length > 0
+        ? Promise.resolve(propFieldDefs)
+        : customFieldsApi.listDefinitions().then((r) =>
+            (r.data || []).filter((d: CustomFieldDefinition) => d.applies_to?.includes('document'))
+          );
 
     docPromise.then((docs) => {
       setFetchedDocs(docs);
-      if (needLoadFields) {
-        customFieldsApi.listDefinitions().then((r) => {
-          const defs = (r.data || []).filter((d: CustomFieldDefinition) => d.applies_to?.includes('document'));
-          setLocalFieldDefs(defs);
-          if (defs.length > 0 && docs.length > 0) {
-            Promise.all(
-              docs.map(async (doc) => {
+      defPromise.then((defs) => {
+        setLocalFieldDefs(defs);
+        if (defs.length === 0 || docs.length === 0) return;
+        // 候选列表展示全部图文档的自定义字段值：外部仅传入已关联文档的值
+        // （且候选列表本身已排除已关联文档），因此须自行批量拉取所有候选文档的值。
+        // 批量接口按 field_key 返回，需归一化为 field_id 以便按列渲染/排序。
+        const keyToId: Record<string, string> = {};
+        for (const d of defs) keyToId[d.field_key] = d.id;
+        const merged: Record<string, Record<string, unknown>> = { ...(propFieldValues || {}) };
+        const CHUNK = 100;
+        const WAVE = 5;
+        (async () => {
+          const chunks: string[][] = [];
+          for (let i = 0; i < docs.length; i += CHUNK) {
+            const ids = docs
+              .slice(i, i + CHUNK)
+              .map((d) => d.id || d.revision_id || '')
+              .filter(Boolean);
+            if (ids.length > 0) chunks.push(ids);
+          }
+          for (let i = 0; i < chunks.length; i += WAVE) {
+            await Promise.all(
+              chunks.slice(i, i + WAVE).map(async (ids) => {
                 try {
-                  const res = await customFieldsApi.getValues('document', doc.id);
-                  const vals: Record<string, unknown> = {};
-                  (res.data || []).forEach((v: CustomFieldValue) => { vals[v.field_id] = v.value; });
-                  return { id: doc.id, vals };
+                  const res = await customFieldsApi.getValuesBatch({ type: 'document', ids: ids.join(',') });
+                  const data = (res.data || {}) as Record<string, Record<string, unknown>>;
+                  for (const [docId, fieldMap] of Object.entries(data)) {
+                    const vals: Record<string, unknown> = merged[docId] || {};
+                    for (const [fk, v] of Object.entries(fieldMap)) {
+                      const fid = keyToId[fk];
+                      if (fid) vals[fid] = v;
+                    }
+                    merged[docId] = vals;
+                  }
                 } catch {
-                  return { id: doc.id, vals: {} };
+                  // 单分块失败不影响其余
                 }
               }),
-            ).then((results) => {
-              const all: Record<string, Record<string, unknown>> = {};
-              for (const r2 of results) all[r2.id] = r2.vals;
-              setLocalFieldValues(all);
-            });
+            );
           }
-        });
-      }
+          setLocalFieldValues(merged);
+          setFieldValuesToken((t) => t + 1);
+        })();
+      });
     }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const fieldDefs = propFieldDefs && propFieldDefs.length > 0 ? propFieldDefs : localFieldDefs;
-  const fieldValues = propFieldValues || localFieldValues;
+  // localFieldValues 已合并外部传入值，覆盖全部候选文档
+  const fieldValues = localFieldValues;
   const documentsList = storeDocuments.length > 0 ? storeDocuments : fetchedDocs;
 
   const fetchData = useCallback(async (params: { search: string; status?: string }) => {
@@ -171,10 +199,11 @@ export default function DocumentPicker({
     })),
   ]), [fieldDefs]);
 
-  // filterParams 需稳定引用：仅 status/refreshToken 变化时重建（避免每次渲染触发全量重拉）
+  // filterParams 需稳定引用：仅 status/refreshToken/fieldValuesToken 变化时重建（避免每次渲染触发全量重拉；
+  // fieldValuesToken 用于字段值批量加载完成后携带值重拉候选列表）
   const filterParams = useMemo(
-    () => ({ status: statusFilter, r: refreshToken }),
-    [statusFilter, refreshToken],
+    () => ({ status: statusFilter, r: refreshToken, v: fieldValuesToken }),
+    [statusFilter, refreshToken, fieldValuesToken],
   );
 
   const handleQuickCreate = async () => {
