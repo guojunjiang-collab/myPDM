@@ -563,7 +563,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
               )}
 
               {tab === 'links' && (
-                <div className="space-y-4">
+                <div className="h-full flex flex-col gap-4 min-h-0">
                   <div>
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                       <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">关联对象</h4>
@@ -573,7 +573,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                       </div>
                     </div>
                     {links.length > 0 ? (
-                      <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden max-h-48 overflow-y-auto">
+                      <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden flex-1 min-h-0 overflow-y-auto">
                         <table className="w-full text-sm">
                           <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
                             <tr>
