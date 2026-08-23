@@ -178,6 +178,10 @@ interface ConfirmModalProps {
   onConfirm: () => void;
   onCancel: () => void;
   type?: 'danger' | 'warning' | 'info';
+  /** 自定义内容（渲染在 content 下方，如密码输入框） */
+  children?: ReactNode;
+  /** 确认按钮 loading（异步确认期间禁用） */
+  confirmLoading?: boolean;
 }
 
 export function ConfirmModal({
@@ -189,6 +193,8 @@ export function ConfirmModal({
   onConfirm,
   onCancel,
   type = 'danger',
+  children,
+  confirmLoading = false,
 }: ConfirmModalProps) {
   // 确认按钮语义 → Button variant：danger=危险 / warning=警示（Button 无 warning 变体，就近归入 danger）/ info=主操作
   const confirmVariantMap: Record<'danger' | 'warning' | 'info', 'danger' | 'primary'> = {
@@ -200,11 +206,12 @@ export function ConfirmModal({
   return (
     <Modal open={open} title={title} onClose={onCancel} width="sm">
       <p className="text-[var(--ui-text-secondary)] mb-4">{content}</p>
+      {children}
       <div className="flex justify-end gap-2">
-        <Button variant="secondary" onClick={onCancel}>
+        <Button variant="secondary" onClick={onCancel} disabled={confirmLoading}>
           {cancelText}
         </Button>
-        <Button variant={confirmVariantMap[type]} onClick={onConfirm}>
+        <Button variant={confirmVariantMap[type]} onClick={onConfirm} disabled={confirmLoading}>
           {confirmText}
         </Button>
       </div>
