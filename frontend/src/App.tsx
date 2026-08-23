@@ -69,7 +69,7 @@ function AppRoutes() {
           path="/stp-viewer"
           element={
             <ProtectedRoute>
-              <Suspense fallback={<div className="w-screen h-screen flex items-center justify-center text-gray-400">加载中...</div>}>
+              <Suspense fallback={<div className="w-screen h-screen flex items-center justify-center text-[var(--ui-text-tertiary)]">加载中...</div>}>
                 <StpViewerPage />
               </Suspense>
             </ProtectedRoute>
@@ -79,7 +79,7 @@ function AppRoutes() {
           path="/office-reader"
           element={
             <ProtectedRoute>
-              <Suspense fallback={<div className="w-screen h-screen flex items-center justify-center text-gray-400">加载中...</div>}>
+              <Suspense fallback={<div className="w-screen h-screen flex items-center justify-center text-[var(--ui-text-tertiary)]">加载中...</div>}>
                 <OfficeReader />
               </Suspense>
             </ProtectedRoute>
@@ -89,7 +89,7 @@ function AppRoutes() {
           path="/markdown-reader"
           element={
             <ProtectedRoute>
-              <Suspense fallback={<div className="w-screen h-screen flex items-center justify-center text-gray-400">加载中...</div>}>
+              <Suspense fallback={<div className="w-screen h-screen flex items-center justify-center text-[var(--ui-text-tertiary)]">加载中...</div>}>
                 <MarkdownReader />
               </Suspense>
             </ProtectedRoute>
@@ -110,7 +110,7 @@ function AppRoutes() {
           path="/stp-viewer"
           element={
             <ProtectedRoute>
-              <Suspense fallback={<div className="w-screen h-screen flex items-center justify-center text-gray-400">加载中...</div>}>
+              <Suspense fallback={<div className="w-screen h-screen flex items-center justify-center text-[var(--ui-text-tertiary)]">加载中...</div>}>
                 <STPViewer />
               </Suspense>
             </ProtectedRoute>
@@ -120,7 +120,7 @@ function AppRoutes() {
           path="/office-reader"
           element={
             <ProtectedRoute>
-              <Suspense fallback={<div className="w-screen h-screen flex items-center justify-center text-gray-400">加载中...</div>}>
+              <Suspense fallback={<div className="w-screen h-screen flex items-center justify-center text-[var(--ui-text-tertiary)]">加载中...</div>}>
                 <OfficeReader />
               </Suspense>
             </ProtectedRoute>
@@ -130,7 +130,7 @@ function AppRoutes() {
           path="/markdown-reader"
           element={
             <ProtectedRoute>
-              <Suspense fallback={<div className="w-screen h-screen flex items-center justify-center text-gray-400">加载中...</div>}>
+              <Suspense fallback={<div className="w-screen h-screen flex items-center justify-center text-[var(--ui-text-tertiary)]">加载中...</div>}>
                 <MarkdownReader />
               </Suspense>
             </ProtectedRoute>

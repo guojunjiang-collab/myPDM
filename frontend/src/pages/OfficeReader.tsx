@@ -63,18 +63,18 @@ export default function OfficeReader() {
 
   return (
     <div className="w-screen h-screen flex flex-col bg-gray-100">
-      <div className="shrink-0 px-4 py-3 bg-white border-b border-gray-200">
+      <div className="shrink-0 px-4 py-3 bg-[var(--ui-bg-surface)] border-b border-[var(--ui-border)]">
         <h1 className="text-sm font-semibold text-gray-800 truncate">文档预览：{name}</h1>
       </div>
 
       {error ? (
         <div className="flex-1 flex items-center justify-center text-sm text-red-500">{error}</div>
       ) : loading ? (
-        <div className="flex-1 flex items-center justify-center text-sm text-gray-400">加载中...</div>
+        <div className="flex-1 flex items-center justify-center text-sm text-[var(--ui-text-tertiary)]">加载中...</div>
       ) : (
         <div className="flex-1 flex flex-col min-h-0">
           {sheets.length > 1 && (
-            <div className="shrink-0 flex gap-1 px-4 pt-2 border-b bg-white overflow-x-auto">
+            <div className="shrink-0 flex gap-1 px-4 pt-2 border-b bg-[var(--ui-bg-surface)] overflow-x-auto">
               {sheets.map((s, i) => (
                 <button
                   key={s.name + i}
@@ -82,7 +82,7 @@ export default function OfficeReader() {
                   className={`px-3 py-1.5 text-sm whitespace-nowrap border-b-2 ${
                     i === activeSheet
                       ? 'border-primary-600 text-primary-600 font-medium'
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                      : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'
                   }`}
                 >
                   {s.name}
@@ -92,7 +92,7 @@ export default function OfficeReader() {
           )}
           {/* sheet_to_html 生成的表格 HTML；内容来自受信任的内部附件，无脚本注入 */}
           <div
-            className="flex-1 overflow-auto p-4 office-xlsx-table bg-white"
+            className="flex-1 overflow-auto p-4 office-xlsx-table bg-[var(--ui-bg-surface)]"
             dangerouslySetInnerHTML={{ __html: sheets[activeSheet]?.html ?? '' }}
           />
         </div>

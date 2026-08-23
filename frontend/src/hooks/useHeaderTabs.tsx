@@ -30,7 +30,7 @@ export function useHeaderTabs<T extends string>(
               className={`px-3 py-1 text-lg font-semibold rounded-md transition-colors ${
                 active === tab.key
                   ? 'text-primary-600 bg-primary-50'
-                  : 'text-gray-800 hover:bg-gray-50'
+                  : 'text-gray-800 hover:bg-[var(--ui-bg-hover)]'
               } ${enabled ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}
             >
               {tab.label}
