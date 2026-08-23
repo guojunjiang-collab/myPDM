@@ -214,7 +214,7 @@ export function ECRBomImpactView({
     </Select>
   );
 
-  const thClass = 'px-2 py-2 text-left text-xs font-semibold text-gray-500 border-b border-gray-200 whitespace-nowrap';
+  const thClass = 'px-2 py-2 text-left text-xs font-semibold text-[var(--ui-text-secondary)] border-b border-[var(--ui-border)] whitespace-nowrap';
   const tdClass = 'px-2 py-1.5 text-xs text-gray-700 border-b border-gray-100';
 
   // ── Render ─────────────────────────────────────────────────────
@@ -226,10 +226,10 @@ export function ECRBomImpactView({
       {/* ─── Upward chain table ──────────────────────────── */}
       <div>
         <div className="text-xs font-semibold text-gray-800 mb-1.5">向上溯源链</div>
-        <div className="overflow-x-auto border border-gray-200 rounded-lg">
+        <div className="overflow-x-auto border border-[var(--ui-border)] rounded-lg">
           <table className="w-full border-collapse">
             <thead>
-              <tr className="bg-gray-50">
+              <tr className="bg-[var(--ui-bg-subtle)]">
                 <th className={`${thClass} w-20`}>层级</th>
                 <th className={thClass}>件号</th>
                 <th className={thClass}>名称</th>
@@ -243,7 +243,7 @@ export function ECRBomImpactView({
             <tbody>
               {upwardChain.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-2 py-6 text-center text-xs text-gray-400">
+                  <td colSpan={8} className="px-2 py-6 text-center text-xs text-[var(--ui-text-tertiary)]">
                     暂无向上溯源数据
                   </td>
                 </tr>
@@ -253,10 +253,10 @@ export function ECRBomImpactView({
                   const idx = upwardChain.indexOf(node);
                   const hasChildren = treeNode.children.length > 0;
                   return (
-                    <tr key={`up-${idx}`} className={node.action && node.action !== 'no_change' ? ACTION_ROW_CLASS[node.action] || '' : 'hover:bg-gray-50'}>
+                    <tr key={`up-${idx}`} className={node.action && node.action !== 'no_change' ? ACTION_ROW_CLASS[node.action] || '' : 'hover:bg-[var(--ui-bg-hover)]'}>
                       <td className={`${tdClass} whitespace-nowrap`}>
                         <span className="inline-flex items-center gap-0.5">
-                          <span className="text-xs text-gray-400">{'-'.repeat(node.level ?? 0)}{node.level ?? 0}</span>
+                          <span className="text-xs text-[var(--ui-text-tertiary)]">{'-'.repeat(node.level ?? 0)}{node.level ?? 0}</span>
                           {hasChildren ? (
                             <TreeToggle expanded={expandedKeys.has(`${treeNode.node.entity_id}:${treeNode.node.level}`)} onClick={() => toggleUpwardNode(treeNode)} size="sm" />
                           ) : (
@@ -299,7 +299,7 @@ export function ECRBomImpactView({
                             placeholder="变更说明"
                           />
                         ) : (
-                          <span className="text-xs text-gray-500 max-w-32 truncate block">
+                          <span className="text-xs text-[var(--ui-text-secondary)] max-w-32 truncate block">
                             {node.change_description || '—'}
                           </span>
                         )}
@@ -317,13 +317,13 @@ export function ECRBomImpactView({
       {downwardItems.length > 0 && (
         <div>
           <div className="text-xs font-semibold text-gray-800 mb-1.5">
-            向下子项：<span className="font-normal text-gray-400">一级BOM</span>
+            向下子项：<span className="font-normal text-[var(--ui-text-tertiary)]">一级BOM</span>
           </div>
 
-          <div className="overflow-x-auto border border-gray-200 rounded-lg">
+          <div className="overflow-x-auto border border-[var(--ui-border)] rounded-lg">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="bg-gray-50">
+                <tr className="bg-[var(--ui-bg-subtle)]">
                   <th className={thClass}>件号</th>
                   <th className={thClass}>名称</th>
                   <th className={thClass}>版本</th>
@@ -336,7 +336,7 @@ export function ECRBomImpactView({
               <tbody>
                 {downwardItems.length === 0 ? (
                   <tr>
-<td colSpan={7} className="px-2 py-6 text-center text-xs text-gray-400">
+<td colSpan={7} className="px-2 py-6 text-center text-xs text-[var(--ui-text-tertiary)]">
                       暂无向下子项，点击上方按钮添加
                     </td>
                   </tr>
@@ -344,7 +344,7 @@ export function ECRBomImpactView({
                 sortedDownwardItems.map((node) => {
                   const idx = downwardItems.indexOf(node);
                   return (
-                  <tr key={`down-${idx}`} className={node.action && node.action !== 'no_change' ? ACTION_ROW_CLASS[node.action] || '' : 'hover:bg-gray-50'}>
+                  <tr key={`down-${idx}`} className={node.action && node.action !== 'no_change' ? ACTION_ROW_CLASS[node.action] || '' : 'hover:bg-[var(--ui-bg-hover)]'}>
                     <td className={`${tdClass} font-mono`}>{node.entity_code}</td>
                     <td className={tdClass}>{node.entity_name}</td>
                     <td className={tdClass}>{node.entity_version}</td>
@@ -380,7 +380,7 @@ export function ECRBomImpactView({
                           placeholder="变更说明"
                         />
                       ) : (
-                        <span className="text-xs text-gray-500 max-w-32 truncate block">
+                        <span className="text-xs text-[var(--ui-text-secondary)] max-w-32 truncate block">
                           {node.change_description || '—'}
                         </span>
                       )}
@@ -396,7 +396,7 @@ export function ECRBomImpactView({
       )}
 
       {/* Summary */}
-      <div className="text-xs text-gray-500 pt-2 border-t border-gray-100">
+      <div className="text-xs text-[var(--ui-text-secondary)] pt-2 border-t border-gray-100">
         <span className="font-semibold text-gray-800">结论：</span>
         {(() => {
           const upParents = upwardChain.filter((n) => n.level !== 0 && !n.is_change_target);

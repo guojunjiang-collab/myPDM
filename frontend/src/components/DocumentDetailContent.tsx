@@ -111,33 +111,33 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
         <h4 className="text-sm font-bold text-gray-700 mb-2">附件</h4>
 
         {loadingAttachments ? (
-          <div className="text-sm text-gray-500">加载中...</div>
+          <div className="text-sm text-[var(--ui-text-secondary)]">加载中...</div>
         ) : attachments.length === 0 ? (
-          <div className="text-sm text-gray-400 py-4 text-center border border-dashed border-gray-300 rounded-lg">
+          <div className="text-sm text-[var(--ui-text-tertiary)] py-4 text-center border border-dashed border-gray-300 rounded-lg">
             暂无附件
           </div>
         ) : (
           <div className="border rounded-lg overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
+              <thead className="bg-[var(--ui-bg-subtle)] border-b">
                 <tr>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium">文件名</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-24">大小</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-40">上传时间</th>
-                  <th className="px-3 py-2 text-right text-gray-500 font-medium w-32">操作</th>
+                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">文件名</th>
+                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-24">大小</th>
+                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-40">上传时间</th>
+                  <th className="px-3 py-2 text-right text-[var(--ui-text-secondary)] font-medium w-32">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {attachments.map(att => (
-                  <tr key={att.id} className="hover:bg-gray-50">
+                  <tr key={att.id} className="hover:bg-[var(--ui-bg-hover)]">
                     <td className="px-3 py-2">
                       <span className="text-primary-600">{att.file_name}</span>
                     </td>
-                    <td className="px-3 py-2 text-gray-500">{formatFileSize(att.file_size || 0)}</td>
-                    <td className="px-3 py-2 text-gray-500">{formatDateTime(att.created_at)}</td>
+                    <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{formatFileSize(att.file_size || 0)}</td>
+                    <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{formatDateTime(att.created_at)}</td>
                 <td className="px-3 py-2 text-right">
                   {(doc as any).accessible === false ? (
-                    <span className="inline-flex items-center gap-1 text-gray-400" title="无权限：需关联用户组成员">
+                    <span className="inline-flex items-center gap-1 text-[var(--ui-text-tertiary)]" title="无权限：需关联用户组成员">
                       🔒 <button className="text-gray-300 cursor-not-allowed" disabled>预览</button> <button className="text-gray-300 cursor-not-allowed" disabled>下载</button>
                     </span>
                   ) : (
@@ -172,17 +172,17 @@ export default function DocumentDetailContent({ doc, customFieldDefs, customFiel
 
 function InfoItem({ label, value, className }: { label: string; value: string; className?: string }) {
   return (
-    <div className={`bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 ${className || ''}`}>
-      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-      <div className="text-sm text-gray-900 font-medium whitespace-pre-wrap">{value}</div>
+    <div className={`bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100 ${className || ''}`}>
+      <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{label}</div>
+      <div className="text-sm text-[var(--ui-text-primary)] font-medium whitespace-pre-wrap">{value}</div>
     </div>
   );
 }
 
 function StatusItem({ label, status }: { label: string; status: string }) {
   return (
-    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
+    <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+      <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{label}</div>
       <Badge status={status} />
     </div>
   );

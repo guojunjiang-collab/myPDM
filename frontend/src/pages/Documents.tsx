@@ -213,7 +213,7 @@ export default function Documents() {
           <option value="released">发布</option>
           <option value="obsolete">作废</option>
         </Select>
-        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm whitespace-nowrap">
+        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-[var(--ui-bg-hover)] text-sm whitespace-nowrap">
           <input
             type="checkbox"
             checked={showAllVersions}
@@ -222,7 +222,7 @@ export default function Documents() {
           />
           全部版本
         </label>
-        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm whitespace-nowrap">
+        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-[var(--ui-bg-hover)] text-sm whitespace-nowrap">
           <input
             type="checkbox"
             checked={showAccessibleOnly}
@@ -238,27 +238,27 @@ export default function Documents() {
         )}
       </div>
 
-      <div className="relative bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
+      <div className="relative bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+          <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
             <tr>
-              <th onClick={() => onSort('code')} className="w-60 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">编号{sortIcon('code')}</th>
-              <th onClick={() => onSort('name')} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">名称{sortIcon('name')}</th>
-              <th onClick={() => onSort('created_at')} className="w-44 px-2 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">创建时间{sortIcon('created_at')}</th>
-              <th onClick={() => onSort('version')} className="w-16 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">版本{sortIcon('version')}</th>
-              <th onClick={() => onSort('status')} className="w-20 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">状态{sortIcon('status')}</th>
-              <th onClick={() => onSort('check_out_user_name')} className="w-20 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">签出状态{sortIcon('check_out_user_name')}</th>
-              <th className="w-16 px-4 py-3 text-center text-sm font-medium text-gray-500 select-none whitespace-nowrap">操作</th>
+              <th onClick={() => onSort('code')} className="w-60 px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">编号{sortIcon('code')}</th>
+              <th onClick={() => onSort('name')} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">名称{sortIcon('name')}</th>
+              <th onClick={() => onSort('created_at')} className="w-44 px-2 py-3 text-center text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">创建时间{sortIcon('created_at')}</th>
+              <th onClick={() => onSort('version')} className="w-16 px-4 py-3 text-center text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">版本{sortIcon('version')}</th>
+              <th onClick={() => onSort('status')} className="w-20 px-4 py-3 text-center text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">状态{sortIcon('status')}</th>
+              <th onClick={() => onSort('check_out_user_name')} className="w-20 px-4 py-3 text-center text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">签出状态{sortIcon('check_out_user_name')}</th>
+              <th className="w-16 px-4 py-3 text-center text-sm font-medium text-[var(--ui-text-secondary)] select-none whitespace-nowrap">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading && items.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td></tr>
             ) : items.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">无匹配数据</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">无匹配数据</td></tr>
             ) : (
               items.map((doc) => (
-                <tr key={doc.id} className={`hover:bg-gray-50 cursor-pointer ${(doc as any).accessible === false ? 'opacity-60' : ''}`} onClick={() => { setDetailDocId(doc.id); }}>
+                <tr key={doc.id} className={`hover:bg-[var(--ui-bg-hover)] cursor-pointer ${(doc as any).accessible === false ? 'opacity-60' : ''}`} onClick={() => { setDetailDocId(doc.id); }}>
                   <td className="px-4 py-3 text-sm font-medium">
                     {(doc as any).accessible === false && <span className="mr-1" title="无权限：需关联用户组成员">🔒</span>}
                     {doc.code}
@@ -269,15 +269,15 @@ export default function Documents() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm">{doc.name}</td>
-                  <td className="px-2 py-3 text-sm text-gray-500 text-center whitespace-nowrap">{formatDate(doc.created_at, 'YYYY-MM-DD HH:mm')}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500 text-center">{doc.version || '-'}</td>
+                  <td className="px-2 py-3 text-sm text-[var(--ui-text-secondary)] text-center whitespace-nowrap">{formatDate(doc.created_at, 'YYYY-MM-DD HH:mm')}</td>
+                  <td className="px-4 py-3 text-sm text-[var(--ui-text-secondary)] text-center">{doc.version || '-'}</td>
                   <td className="px-4 py-3 text-center">
                     <Badge status={doc.status} />
                   </td>
                   <td className="px-4 py-3 text-sm text-center">
                     {doc.check_out_user_name
                       ? <span className="text-orange-600">{doc.check_out_user_name}</span>
-                      : <span className="text-gray-400">—</span>}
+                      : <span className="text-[var(--ui-text-tertiary)]">—</span>}
                   </td>
                   <td className="px-4 py-3 text-center text-sm" onClick={(e) => e.stopPropagation()}>
                     {isAdmin() && (doc as any).accessible !== false && (
@@ -291,7 +291,7 @@ export default function Documents() {
         </table>
 
         <div className="sticky bottom-0 flex justify-center py-2 pointer-events-none">
-          <div className="inline-flex items-center gap-3 text-sm text-gray-600 bg-white border border-gray-200 rounded-full shadow-lg px-4 py-2 pointer-events-auto">
+          <div className="inline-flex items-center gap-3 text-sm text-[var(--ui-text-secondary)] bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-full shadow-lg px-4 py-2 pointer-events-auto">
             共 <span className="font-medium">{total}</span> 条
             <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1 || loading}>上一页</Button>
             <span className="tabular-nums">第 {page} / {pageCount} 页</span>
@@ -336,8 +336,8 @@ export default function Documents() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">关联用户组（留空=全员可预览/下载）</label>
-            <div className="max-h-40 overflow-auto border border-gray-200 rounded-lg p-2 grid grid-cols-2 gap-x-2 gap-y-0.5">
-              {allGroups.length === 0 && <span className="text-gray-400 text-sm col-span-2">暂无用户组</span>}
+            <div className="max-h-40 overflow-auto border border-[var(--ui-border)] rounded-lg p-2 grid grid-cols-2 gap-x-2 gap-y-0.5">
+              {allGroups.length === 0 && <span className="text-[var(--ui-text-tertiary)] text-sm col-span-2">暂无用户组</span>}
               {allGroups.map((g) => (
                 <label key={g.id} className="flex items-center gap-1.5 py-0.5">
                   <input
@@ -391,7 +391,7 @@ export default function Documents() {
                 className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                   detailTab === 'detail'
                     ? 'border-primary-600 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                    : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'
                 }`}
               >
                 基本信息
@@ -401,7 +401,7 @@ export default function Documents() {
                 className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                   detailTab === 'versions'
                     ? 'border-primary-600 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                    : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'
                 }`}
               >
                 版本历史

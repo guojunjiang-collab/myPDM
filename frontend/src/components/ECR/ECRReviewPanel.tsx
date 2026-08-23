@@ -18,7 +18,7 @@ const decisionConfig: Record<string, { label: string; tone: 'green' | 'red' | 'o
   returned: { label: '已退回', tone: 'orange', borderColor: 'border-l-orange-500', bgColor: 'bg-orange-50', icon: '↩️' },
 };
 
-const pendingConfig = { label: '待审批', borderColor: 'border-l-gray-300', bgColor: 'bg-white', icon: '⏳' };
+const pendingConfig = { label: '待审批', borderColor: 'border-l-gray-300', bgColor: 'bg-[var(--ui-bg-surface)]', icon: '⏳' };
 
 export function ECRReviewPanel({
   reviewers,
@@ -53,7 +53,7 @@ export function ECRReviewPanel({
 
   if (!reviewers || reviewers.length === 0) {
     return (
-      <div className="text-center text-gray-400 py-8 text-sm">
+      <div className="text-center text-[var(--ui-text-tertiary)] py-8 text-sm">
         👤 暂无审批人
       </div>
     );
@@ -84,10 +84,10 @@ export function ECRReviewPanel({
                     {config ? config.icon : pendingConfig.icon}
                   </span>
                   <div>
-                    <div className="font-medium text-sm text-gray-900">
+                    <div className="font-medium text-sm text-[var(--ui-text-primary)]">
                       {reviewer.user_name}
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-[var(--ui-text-secondary)]">
                       {reviewer.role} · 序号 {reviewer.seq}
                     </div>
                   </div>
@@ -107,11 +107,11 @@ export function ECRReviewPanel({
               {/* Review comment if exists */}
               {record && record.comment && (
                 <div className="mt-3 pl-8">
-                  <div className="text-xs text-gray-500 mb-1">审批意见：</div>
+                  <div className="text-xs text-[var(--ui-text-secondary)] mb-1">审批意见：</div>
                   <div className="text-sm text-gray-700 bg-white/60 rounded p-2 border border-gray-100">
                     {record.comment}
                   </div>
-                  <div className="text-xs text-gray-400 mt-1">
+                  <div className="text-xs text-[var(--ui-text-tertiary)] mt-1">
                     {new Date(record.created_at).toLocaleString('zh-CN')}
                   </div>
                 </div>
@@ -146,7 +146,7 @@ export function ECRReviewPanel({
                     ))}
                   </div>
                   <div className="mb-3">
-                    <label className="block text-xs text-gray-500 mb-1">
+                    <label className="block text-xs text-[var(--ui-text-secondary)] mb-1">
                       审批意见
                     </label>
                     <Textarea

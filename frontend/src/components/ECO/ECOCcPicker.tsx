@@ -50,16 +50,16 @@ export function ECOCcPicker({ open, ecoId, onClose }: Props) {
 
   return (
     <Modal open={open} onClose={onClose} title="知会用户" width="sm">
-      {loading ? <div className="py-8 text-center text-gray-400 text-sm">加载中...</div> : (
+      {loading ? <div className="py-8 text-center text-[var(--ui-text-tertiary)] text-sm">加载中...</div> : (
         <div className="max-h-64 overflow-y-auto space-y-1">
           {users.map((u: any) => {
             const alreadyCc = ccUserIds.includes(u.id);
             return (
-              <label key={u.id} className={`flex items-center gap-2 px-3 py-2 rounded cursor-pointer ${alreadyCc ? 'bg-gray-50 text-gray-400' : selectedIds.includes(u.id) ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
+              <label key={u.id} className={`flex items-center gap-2 px-3 py-2 rounded cursor-pointer ${alreadyCc ? 'bg-[var(--ui-bg-subtle)] text-[var(--ui-text-tertiary)]' : selectedIds.includes(u.id) ? 'bg-blue-50' : 'hover:bg-[var(--ui-bg-hover)]'}`}>
                 <input type="checkbox" checked={selectedIds.includes(u.id)} disabled={alreadyCc}
                   onChange={() => toggle(u.id)} className="rounded" />
                 <span className="flex-1 text-sm">{u.real_name || u.username}</span>
-                <span className="text-xs text-gray-400">{u.role}</span>
+                <span className="text-xs text-[var(--ui-text-tertiary)]">{u.role}</span>
                 {alreadyCc && <Button variant="danger" size="xs" className="ml-auto" onClick={() => handleUncc(u.id)} disabled={unccLoading === u.id}>取消</Button>}
               </label>
             );

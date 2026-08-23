@@ -63,22 +63,22 @@ export function CADConnectStep({ bridge, cadType, onCadTypeChange, onAssemblyLoa
     <div className="flex flex-col items-center py-8">
       <div className="flex gap-4 mb-6">
         <div className={`flex-1 border rounded-lg p-4 text-center min-w-[200px] ${
-          bridge.connected ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-200'
+          bridge.connected ? 'bg-green-50 border-green-300' : 'bg-[var(--ui-bg-subtle)] border-[var(--ui-border)]'
         }`}>
-          <div className={`font-bold ${bridge.connected ? 'text-green-700' : 'text-gray-400'}`}>
+          <div className={`font-bold ${bridge.connected ? 'text-green-700' : 'text-[var(--ui-text-tertiary)]'}`}>
             {bridge.connected ? '桥接服务在线' : '桥接服务离线'}
           </div>
-          <div className="text-xs text-gray-500 mt-1">ws://127.0.0.1:9527</div>
+          <div className="text-xs text-[var(--ui-text-secondary)] mt-1">ws://127.0.0.1:9527</div>
         </div>
 
         <div className={`flex-1 border rounded-lg p-4 text-center min-w-[200px] ${
-          cadDetected ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-200'
+          cadDetected ? 'bg-green-50 border-green-300' : 'bg-[var(--ui-bg-subtle)] border-[var(--ui-border)]'
         }`}>
-          <div className={`font-bold ${cadDetected ? 'text-green-700' : 'text-gray-400'}`}>
+          <div className={`font-bold ${cadDetected ? 'text-green-700' : 'text-[var(--ui-text-tertiary)]'}`}>
             {cadDetected ? `${cadLabel} 已连接` : `${cadLabel} 未连接`}
           </div>
           {docInfo && (
-            <div className="text-xs text-gray-500 mt-1">{docInfo.name} ({docInfo.type})</div>
+            <div className="text-xs text-[var(--ui-text-secondary)] mt-1">{docInfo.name} ({docInfo.type})</div>
           )}
         </div>
       </div>

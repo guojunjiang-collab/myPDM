@@ -352,7 +352,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
     const checkoutName = item.child_check_out_user_name;
     return (
       <React.Fragment key={item.child_revision_id}>
-        <tr className="hover:bg-gray-50 cursor-pointer" onClick={rowClick}>
+        <tr className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={rowClick}>
           <td
             className="relative px-3 py-2 font-medium whitespace-nowrap"
             style={{ paddingLeft: `calc(8px + ${level} * var(--ui-tree-indent))` }}
@@ -368,7 +368,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
             <span className="inline-flex items-center gap-1">
               {hasChildren ? (
                 <button type="button" onClick={(e) => { e.stopPropagation(); toggleBomExpand(item.child_revision_id); }}
-                  className="w-4 h-4 inline-flex items-center justify-center shrink-0 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-200/60"
+                  className="w-4 h-4 inline-flex items-center justify-center shrink-0 rounded text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] hover:bg-gray-200/60"
                   title={children ? '\u6298\u53E0' : '\u5C55\u5F00'}>
                   <BomChevron expanded={!!children} />
                 </button>
@@ -379,14 +379,14 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
             </span>
           </td>
           <td className="px-3 py-2">{item.child_name}</td>
-          <td className="px-3 py-2 text-gray-500">{item.child_version}</td>
+          <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{item.child_version}</td>
           <td className="px-3 py-2">
             <Badge status={item.child_status || 'draft'} />
           </td>
           <td className="px-3 py-2 text-xs">
             {checkoutName ? (
               <span className="text-orange-600">{checkoutName}</span>
-            ) : <span className="text-gray-400">—</span>}
+            ) : <span className="text-[var(--ui-text-tertiary)]">—</span>}
           </td>
           <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
             {canEdit && !viewingIterationId ? (
@@ -439,7 +439,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
             </td>
           )}
         </tr>
-        {isLoading && <tr><td colSpan={canEdit ? 9 : 8} className="px-3 py-2 text-sm text-gray-400 text-center">加载中...</td></tr>}
+        {isLoading && <tr><td colSpan={canEdit ? 9 : 8} className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)] text-center">加载中...</td></tr>}
         {children && children.map((child: any) => renderBomRow(child, level + 1, item.child_revision_id))}
       </React.Fragment>
     );
@@ -547,47 +547,47 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
         {detailLoading && !master ? (
           <Loading />
         ) : !master ? (
-          <div className="text-gray-400 text-sm py-8 text-center">加载失败</div>
+          <div className="text-[var(--ui-text-tertiary)] text-sm py-8 text-center">加载失败</div>
         ) : (
           <>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 shrink-0 mb-3">
               {canEdit ? (
                 <>
-                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                    <div className="text-xs text-gray-500 mb-0.5">件号</div>
+                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">件号</div>
                     <Input size="xs" type="text" value={editMaster.code}
                       onChange={(e) => { setEditMaster(p => ({...p, code: e.target.value})); autoSaveMaster({code: e.target.value}); }}
                       className="font-mono" />
                   </div>
-                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                    <div className="text-xs text-gray-500 mb-0.5">名称</div>
+                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">名称</div>
                     <Input size="xs" type="text" value={editMaster.name}
                       onChange={(e) => { setEditMaster(p => ({...p, name: e.target.value})); autoSaveMaster({name: e.target.value}); }} />
                   </div>
-                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                    <div className="text-xs text-gray-500 mb-0.5">类型</div>
-                    <div className="text-sm text-gray-900 font-medium">{master?.type === 'assembly' ? '部件' : '零件'}</div>
+                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">类型</div>
+                    <div className="text-sm text-[var(--ui-text-primary)] font-medium">{master?.type === 'assembly' ? '部件' : '零件'}</div>
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                    <div className="text-xs text-gray-500 mb-0.5">件号</div>
-                    <div className="text-sm text-gray-900 font-medium font-mono">{master?.code}</div>
+                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">件号</div>
+                    <div className="text-sm text-[var(--ui-text-primary)] font-medium font-mono">{master?.code}</div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                    <div className="text-xs text-gray-500 mb-0.5">名称</div>
-                    <div className="text-sm text-gray-900 font-medium">{master?.name}</div>
+                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">名称</div>
+                    <div className="text-sm text-[var(--ui-text-primary)] font-medium">{master?.name}</div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                    <div className="text-xs text-gray-500 mb-0.5">类型</div>
-                    <div className="text-sm text-gray-900 font-medium">{master?.type === 'assembly' ? '部件' : '零件'}</div>
+                  <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                    <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">类型</div>
+                    <div className="text-sm text-[var(--ui-text-primary)] font-medium">{master?.type === 'assembly' ? '部件' : '零件'}</div>
                   </div>
                 </>
               )}
             </div>
 
-            <div className="bg-white rounded-lg border border-gray-200 p-3 shrink-0 mb-3">
+            <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] p-3 shrink-0 mb-3">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-3">
                   <span className="font-semibold text-sm">版本：{revision?.version}</span>
@@ -655,14 +655,14 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
             </div>
 
 
-            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
-              <div className="flex border-b border-gray-200 shrink-0">
+            <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-hidden flex-1 min-h-0 flex flex-col">
+              <div className="flex border-b border-[var(--ui-border)] shrink-0">
                 {tabs.map((t: { key: string; label: string }) => (
                   <button key={t.key} onClick={() => setActiveTab(t.key as any)}
                     className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                       activeTab === t.key
                         ? 'border-primary-600 text-primary-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                        : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'
                     }`}>
                     {t.label}
                   </button>
@@ -672,7 +672,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
               <div className="p-4 flex-1 min-h-0">
                 {activeTab === 'info' && currentDisplay && (
                   <div className="space-y-4">
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-[var(--ui-text-secondary)]">
                       Iteration #{currentDisplay.iteration}
                       {currentDisplay.check_in_note && <span className="ml-2">签入说明：{currentDisplay.check_in_note}</span>}
                     </div>
@@ -682,7 +682,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                           <h4 className="text-sm font-semibold mb-2">自定义字段</h4>
                           <div className="grid grid-cols-3 gap-3">
                             {cfDefs.length === 0 ? (
-                              <div className="text-gray-400 text-sm col-span-3">无</div>
+                              <div className="text-[var(--ui-text-tertiary)] text-sm col-span-3">无</div>
                             ) : (
                               cfDefs.map((def: any) => {
                                 const val = cfEditValues[def.id] ?? '';
@@ -692,8 +692,8 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                                   debouncedCfSave(newVals);
                                 };
                                 return (
-                                  <div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                                    <div className="text-xs text-gray-500 mb-0.5">{def.name}</div>
+                                  <div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                                    <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{def.name}</div>
                                     {def.field_type === 'select' ? (
                                       <Select size="xs"
                                         className="mt-0.5"
@@ -735,13 +735,13 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                           <h4 className="text-sm font-semibold mb-2">自定义字段</h4>
                           <div className="grid grid-cols-3 gap-3">
                             {cfDefs.length === 0 ? (
-                              <div className="text-gray-400 text-sm col-span-3">无</div>
+                              <div className="text-[var(--ui-text-tertiary)] text-sm col-span-3">无</div>
                             ) : (
                               cfDefs.map((def: any) => {
                                 const val = cfEditValues[def.id];
                                 return (
-                                  <div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                                    <div className="text-xs text-gray-500 mb-0.5">{def.name}</div>
+                                  <div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                                    <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{def.name}</div>
                                     <div className="text-sm">{val !== undefined && val !== null ? String(val) : '—'}</div>
                                   </div>
                                 );
@@ -772,23 +772,23 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                       </div>
                     </div>
                     {bomItems.length === 0 ? (
-                      <div className="text-gray-400 text-sm py-4 text-center">暂无子项</div>
+                      <div className="text-[var(--ui-text-tertiary)] text-sm py-4 text-center">暂无子项</div>
                     ) : (
                       <div className="border rounded-lg overflow-hidden flex-1 min-h-0">
                         <div className="overflow-y-auto h-full" ref={bomScrollRef}>
                         <table className="w-full text-sm">
                         <thead>
-                          <tr className="bg-gray-50 border-b sticky top-0 z-10">
-                            <th onClick={() => handleSort('child_code')} className="px-3 py-2 text-left text-gray-500 font-medium cursor-pointer select-none whitespace-nowrap hover:text-gray-700" style={{ paddingLeft: 28 }}>件号 {getSortIcon('child_code')}</th>
-                            <th onClick={() => handleSort('child_name')} className="px-3 py-2 text-left text-gray-500 font-medium cursor-pointer select-none whitespace-nowrap hover:text-gray-700">中文名称 {getSortIcon('child_name')}</th>
-                            <th onClick={() => handleSort('child_version')} className="px-3 py-2 text-left text-gray-500 font-medium w-16 cursor-pointer select-none whitespace-nowrap hover:text-gray-700">版本 {getSortIcon('child_version')}</th>
-                            <th onClick={() => handleSort('child_status')} className="px-3 py-2 text-left text-gray-500 font-medium w-20 cursor-pointer select-none whitespace-nowrap hover:text-gray-700">状态 {getSortIcon('child_status')}</th>
-                            <th onClick={() => handleSort('child_check_out_user_name')} className="px-3 py-2 text-left text-gray-500 font-medium w-20 cursor-pointer select-none whitespace-nowrap hover:text-gray-700">签出状态 {getSortIcon('child_check_out_user_name')}</th>
-                             <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">用量</th>
-                             <th className="px-3 py-2 text-center text-gray-500 font-medium w-12 whitespace-nowrap">矩阵</th>
-                             <th className="px-3 py-2 text-center text-gray-500 font-medium w-20">预览</th>
+                          <tr className="bg-[var(--ui-bg-subtle)] border-b sticky top-0 z-10">
+                            <th onClick={() => handleSort('child_code')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium cursor-pointer select-none whitespace-nowrap hover:text-gray-700" style={{ paddingLeft: 28 }}>件号 {getSortIcon('child_code')}</th>
+                            <th onClick={() => handleSort('child_name')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium cursor-pointer select-none whitespace-nowrap hover:text-gray-700">中文名称 {getSortIcon('child_name')}</th>
+                            <th onClick={() => handleSort('child_version')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16 cursor-pointer select-none whitespace-nowrap hover:text-gray-700">版本 {getSortIcon('child_version')}</th>
+                            <th onClick={() => handleSort('child_status')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20 cursor-pointer select-none whitespace-nowrap hover:text-gray-700">状态 {getSortIcon('child_status')}</th>
+                            <th onClick={() => handleSort('child_check_out_user_name')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20 cursor-pointer select-none whitespace-nowrap hover:text-gray-700">签出状态 {getSortIcon('child_check_out_user_name')}</th>
+                             <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">用量</th>
+                             <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-12 whitespace-nowrap">矩阵</th>
+                             <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-20">预览</th>
                              {canEdit && (
-                              <th className="px-3 py-2 text-right text-gray-500 font-medium w-36">操作</th>
+                              <th className="px-3 py-2 text-right text-[var(--ui-text-secondary)] font-medium w-36">操作</th>
                             )}
                           </tr>
                         </thead>
@@ -836,22 +836,22 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
 
                 {activeTab === 'versions' && (
                   <>
-                    <p className="text-sm text-gray-500 px-4 py-2 border-b border-gray-100">
+                    <p className="text-sm text-[var(--ui-text-secondary)] px-4 py-2 border-b border-gray-100">
                       勾选两个版本进行 BOM 对比（当前版本默认已选）
                     </p>
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200">
+                        <tr className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
                           <th className="px-4 py-3 w-10"></th>
-                          <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">版本</th>
-                          <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">状态</th>
-                          <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">创建时间</th>
-                          <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">操作</th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">版本</th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">状态</th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">创建时间</th>
+                          <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">操作</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
                         {versions.map((v: any) => (
-                          <tr key={v.id} className={`hover:bg-gray-50 ${v.id === revision?.id ? 'bg-blue-50' : ''}`}>
+                          <tr key={v.id} className={`hover:bg-[var(--ui-bg-hover)] ${v.id === revision?.id ? 'bg-blue-50' : ''}`}>
                             <td className="px-4 py-3">
                               <input
                                 type="checkbox"
@@ -865,7 +865,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                             <td className="px-4 py-3">
                               <Badge status={v.status} />
                             </td>
-                            <td className="px-4 py-3 text-gray-500">{v.created_at ? new Date(v.created_at).toLocaleDateString('zh-CN') : ''}</td>
+                            <td className="px-4 py-3 text-[var(--ui-text-secondary)]">{v.created_at ? new Date(v.created_at).toLocaleDateString('zh-CN') : ''}</td>
                             <td className="px-4 py-3">
                               {v.id === revision?.id ? (
                                 <span className="text-primary-600 text-xs">当前</span>
@@ -878,8 +878,8 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                       </tbody>
                     </table>
                     {cmpSel.length > 0 && (
-                      <div className="mt-3 px-4 py-2.5 bg-gray-50 border-t border-gray-200 flex items-center gap-3">
-                        <span className="text-sm text-gray-600 flex-1">
+                      <div className="mt-3 px-4 py-2.5 bg-[var(--ui-bg-subtle)] border-t border-[var(--ui-border)] flex items-center gap-3">
+                        <span className="text-sm text-[var(--ui-text-secondary)] flex-1">
                           {cmpSel.length === 2
                             ? `已选：版本 ${versions.find((x) => x.id === cmpSel[0])?.version ?? '?'} vs 版本 ${versions.find((x) => x.id === cmpSel[1])?.version ?? '?'}`
                             : '请再选择一个版本'}
@@ -898,21 +898,21 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                 {activeTab === 'iterations' && (
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">迭代</th>
-                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">签入时间</th>
-                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">签入说明</th>
-                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">创建人</th>
-                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">操作</th>
+                      <tr className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
+                        <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">迭代</th>
+                        <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">签入时间</th>
+                        <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">签入说明</th>
+                        <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">创建人</th>
+                        <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">操作</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {iterationsList.map((it: any) => (
-                        <tr key={it.id} className={`hover:bg-gray-50 ${it.id === iteration?.id ? 'bg-blue-50' : ''}`}>
+                        <tr key={it.id} className={`hover:bg-[var(--ui-bg-hover)] ${it.id === iteration?.id ? 'bg-blue-50' : ''}`}>
                           <td className="px-4 py-3">#{it.iteration}</td>
-                          <td className="px-4 py-3 text-gray-500">{it.check_in_date ? new Date(it.check_in_date).toLocaleString('zh-CN') : '未签入'}</td>
+                          <td className="px-4 py-3 text-[var(--ui-text-secondary)]">{it.check_in_date ? new Date(it.check_in_date).toLocaleString('zh-CN') : '未签入'}</td>
                           <td className="px-4 py-3">{it.check_in_note || '—'}</td>
-                          <td className="px-4 py-3 text-gray-500">{it.creator_name || '—'}</td>
+                          <td className="px-4 py-3 text-[var(--ui-text-secondary)]">{it.creator_name || '—'}</td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
                               {it.id === iteration?.id ? (
@@ -996,21 +996,21 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
         <Modal open={!!versionSelectItem} onClose={() => setVersionSelectItem(null)} title={`选择版本 - ${versionSelectItem.child_code}`} width="md">
           <div className="p-4 max-h-60 overflow-y-auto">
             {versionSelectLoading ? (
-              <div className="text-gray-400 text-sm py-4 text-center">加载中...</div>
+              <div className="text-[var(--ui-text-tertiary)] text-sm py-4 text-center">加载中...</div>
             ) : versionSelectRevisions.length === 0 ? (
-              <div className="text-gray-400 text-sm py-4 text-center">无可用版本</div>
+              <div className="text-[var(--ui-text-tertiary)] text-sm py-4 text-center">无可用版本</div>
             ) : (
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-[var(--ui-bg-subtle)] border-b">
                   <tr>
-                    <th className="text-left px-3 py-2 text-gray-500 font-medium">版本</th>
-                    <th className="text-left px-3 py-2 text-gray-500 font-medium">状态</th>
-                    <th className="text-left px-3 py-2 text-gray-500 font-medium">创建时间</th>
+                    <th className="text-left px-3 py-2 text-[var(--ui-text-secondary)] font-medium">版本</th>
+                    <th className="text-left px-3 py-2 text-[var(--ui-text-secondary)] font-medium">状态</th>
+                    <th className="text-left px-3 py-2 text-[var(--ui-text-secondary)] font-medium">创建时间</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {versionSelectRevisions.map((v: any) => (
-                    <tr key={v.id} className={`hover:bg-gray-50 cursor-pointer ${v.id === versionSelectItem.child_revision_id ? 'bg-blue-50' : ''}`}
+                    <tr key={v.id} className={`hover:bg-[var(--ui-bg-hover)] cursor-pointer ${v.id === versionSelectItem.child_revision_id ? 'bg-blue-50' : ''}`}
                       onClick={async () => {
                         if (v.id === versionSelectItem.child_revision_id) { setVersionSelectItem(null); return; }
                         if (!revisionId) return;
@@ -1025,7 +1025,7 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
                       <td className="px-3 py-2">
                         <Badge status={v.status || 'draft'} />
                       </td>
-                      <td className="px-3 py-2 text-gray-500">{v.created_at ? new Date(v.created_at).toLocaleDateString('zh-CN') : ''}</td>
+                      <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{v.created_at ? new Date(v.created_at).toLocaleDateString('zh-CN') : ''}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1063,30 +1063,30 @@ export default function PartDetailModal({ masterId, revisionId: propRevisionId, 
       {matrixPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setMatrixPopup(null)}>
           <div className="absolute inset-0 bg-black/30" />
-          <div className="relative bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[70vh] overflow-y-auto"
+          <div className="relative bg-[var(--ui-bg-surface)] rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[70vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-4 py-3 border-b sticky top-0 bg-white">
+            <div className="flex items-center justify-between px-4 py-3 border-b sticky top-0 bg-[var(--ui-bg-surface)]">
               <span className="font-semibold text-sm">{matrixPopup.child_code} 变换矩阵</span>
-              <button onClick={() => setMatrixPopup(null)} className="text-gray-500 hover:text-gray-700 text-lg">&times;</button>
+              <button onClick={() => setMatrixPopup(null)} className="text-[var(--ui-text-secondary)] hover:text-gray-700 text-lg">&times;</button>
             </div>
             <div className="p-4 space-y-3">
               {(matrixPopup.cad_instances || []).map((inst: any, idx: number) => (
-                <div key={idx} className="border rounded-lg p-3 bg-gray-50">
+                <div key={idx} className="border rounded-lg p-3 bg-[var(--ui-bg-subtle)]">
                   <div className="flex items-center gap-3 mb-2">
                     <Badge tone="gray" label={inst.source === 'step' ? 'STEP' : inst.source || '—'} />
-                    <span className="text-xs text-gray-500">实例 {idx + 1}</span>
-                    {inst.label && <span className="text-xs text-gray-600">"{inst.label}"</span>}
+                    <span className="text-xs text-[var(--ui-text-secondary)]">实例 {idx + 1}</span>
+                    {inst.label && <span className="text-xs text-[var(--ui-text-secondary)]">"{inst.label}"</span>}
                   </div>
                   <div className="grid grid-cols-4 gap-x-3 gap-y-1 font-mono text-xs">
                     {(inst.matrix || []).map((v: number, i: number) => (
                       <div key={i} className="text-right">
-                        <span className={i % 4 === 3 ? 'text-indigo-600' : 'text-gray-600'}>
+                        <span className={i % 4 === 3 ? 'text-indigo-600' : 'text-[var(--ui-text-secondary)]'}>
                           {Number(v).toFixed(3).replace(/\.?0+$/, '')}
                         </span>
                       </div>
                     ))}
                   </div>
-                  <div className="mt-1 text-xs text-gray-400">
+                  <div className="mt-1 text-xs text-[var(--ui-text-tertiary)]">
                     平移 (x,y,z): {[3,7,11].map(i => Number((inst.matrix || [])[i] || 0).toFixed(3).replace(/\.?0+$/, '')).join(', ')}m
                   </div>
                 </div>

@@ -201,16 +201,16 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
         >📄 导出PDF</Button>
       ) : undefined}
     >
-      {loading ? <div className="py-8 text-center text-gray-400 text-sm">加载中...</div>
-      : !eco ? <div className="py-8 text-center text-gray-400 text-sm">未找到 ECO</div>
+      {loading ? <div className="py-8 text-center text-[var(--ui-text-tertiary)] text-sm">加载中...</div>
+      : !eco ? <div className="py-8 text-center text-[var(--ui-text-tertiary)] text-sm">未找到 ECO</div>
       : (
         <>
         <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
           {/* Header */}
-          <div className="flex items-center justify-between pb-4 border-b border-gray-200">
+          <div className="flex items-center justify-between pb-4 border-b border-[var(--ui-border)]">
             <div>
-              <div className="text-lg font-bold text-gray-900">{eco.eco_number}</div>
-              <div className="text-sm text-gray-500 mt-0.5">{eco.title}</div>
+              <div className="text-lg font-bold text-[var(--ui-text-primary)]">{eco.eco_number}</div>
+              <div className="text-sm text-[var(--ui-text-secondary)] mt-0.5">{eco.title}</div>
             </div>
             <div className="flex items-center gap-2">
               <ECOStatusBadge status={eco.status} />
@@ -233,7 +233,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
           {/* Reviewers */}
           {eco.reviewers && eco.reviewers.length > 0 && (
             <div className="border-t pt-3">
-              <h4 className="text-sm font-semibold text-gray-700 mb-3">审批人 <span className="ml-2 text-xs font-normal text-gray-500">({eco.approved_count || 0}/{eco.reviewers_count || eco.reviewers.length} 已审批)</span></h4>
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">审批人 <span className="ml-2 text-xs font-normal text-[var(--ui-text-secondary)]">({eco.approved_count || 0}/{eco.reviewers_count || eco.reviewers.length} 已审批)</span></h4>
               <ECRReviewPanel reviewers={eco.reviewers} reviewRecords={eco.review_records || []} currentUserId={user?.id || ''} onReview={async (decision, comment) => { setActionLoading(true); try { await ecoApi.review(ecoId, decision, comment); toast.success('操作成功'); load(); } catch { toast.error('操作失败'); } finally { setActionLoading(false); } }} loading={actionLoading} />
             </div>
           )}
@@ -245,30 +245,30 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
             </div>
             <div className="border rounded-lg overflow-hidden">
               {documentLinks.length === 0 ? (
-                <div className="px-4 py-6 text-center text-sm text-gray-400">暂无关联图文档</div>
+                <div className="px-4 py-6 text-center text-sm text-[var(--ui-text-tertiary)]">暂无关联图文档</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-gray-50 border-b"><tr>
-                      <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档编号</th>
-                      <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档名称</th>
-                      <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-                      <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
-                      {docFieldDefs.map((def) => <th key={def.id} className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap">{def.name}</th>)}
-                      <th className="px-3 py-2 text-left text-gray-500 font-medium">附件</th>
-                      <th className="px-3 py-2 text-center text-gray-500 font-medium whitespace-nowrap w-24">操作</th>
+                    <thead className="bg-[var(--ui-bg-subtle)] border-b"><tr>
+                      <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">图文档编号</th>
+                      <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">图文档名称</th>
+                      <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">版本</th>
+                      <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">状态</th>
+                      {docFieldDefs.map((def) => <th key={def.id} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium whitespace-nowrap">{def.name}</th>)}
+                      <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">附件</th>
+                      <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium whitespace-nowrap w-24">操作</th>
                     </tr></thead>
                     <tbody className="divide-y divide-gray-100">
                       {documents.map((doc) => {
                         const atts = docAttachments[doc.id] || [];
                         return (
-                          <tr key={doc.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setViewDocRevisionId(doc._revision_id || doc.id)}>
+                          <tr key={doc.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => setViewDocRevisionId(doc._revision_id || doc.id)}>
                             <td className="px-3 py-2 text-sm font-medium">{doc.code}</td>
                             <td className="px-3 py-2 text-sm">{doc.name}</td>
-                            <td className="px-3 py-2 text-sm text-gray-500">{doc.version || '-'}</td>
+                            <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{doc.version || '-'}</td>
                             <td className="px-3 py-2 text-sm"><Badge status={doc.status} /></td>
-                            {docFieldDefs.map((def) => { const vals = docCustomValues[doc.id] || {}; const val = vals[def.id]; return <td key={def.id} className="px-3 py-2 text-sm text-gray-500">{val !== undefined && val !== null && val !== '' ? String(val) : '-'}</td>; })}
-                            <td className="px-3 py-2 text-sm text-gray-500">{atts.length > 0 ? atts.map((a: any) => <div key={a.id} className="text-xs">{a.file_name} ({formatFileSize(a.file_size)})</div>) : (doc.file_name || '-')}</td>
+                            {docFieldDefs.map((def) => { const vals = docCustomValues[doc.id] || {}; const val = vals[def.id]; return <td key={def.id} className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{val !== undefined && val !== null && val !== '' ? String(val) : '-'}</td>; })}
+                            <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{atts.length > 0 ? atts.map((a: any) => <div key={a.id} className="text-xs">{a.file_name} ({formatFileSize(a.file_size)})</div>) : (doc.file_name || '-')}</td>
                             <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center justify-center gap-1">
                                 {doc.file_id && <Button variant="link" size="xs" onClick={() => handleDocPreview(doc.file_id!, doc.file_name || '')} className="whitespace-nowrap">预览</Button>}
@@ -357,7 +357,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
               )}
             </div>
             {releaseItems.length === 0 ? (
-              <div className="border rounded-lg px-4 py-6 text-center text-sm text-gray-400">暂无工程变更结果</div>
+              <div className="border rounded-lg px-4 py-6 text-center text-sm text-[var(--ui-text-tertiary)]">暂无工程变更结果</div>
             ) : (
               <ReleaseItemsTable items={releaseItems} onViewItem={viewItem} publishedNonce={publishedNonce} />
             )}
@@ -368,28 +368,28 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
             <div className="border-t pt-3">
               <h4 className="text-xs font-semibold text-gray-700 mb-1.5">状态日志</h4>
               <div className="space-y-1">{eco.status_logs.map((l, i) => (
-                <div key={i} className="text-xs px-2 py-1 rounded bg-gray-50 flex gap-2">
-                  <span className="text-gray-400">{l.from_status || '-'} → </span><span className="font-medium">{l.to_status}</span>
-                  <span className="text-gray-500">by {l.operator_name}</span>
-                  {l.comment && <span className="text-gray-400">: {l.comment}</span>}
-                  <span className="text-gray-400 ml-auto">{fmt(l.created_at)}</span>
+                <div key={i} className="text-xs px-2 py-1 rounded bg-[var(--ui-bg-subtle)] flex gap-2">
+                  <span className="text-[var(--ui-text-tertiary)]">{l.from_status || '-'} → </span><span className="font-medium">{l.to_status}</span>
+                  <span className="text-[var(--ui-text-secondary)]">by {l.operator_name}</span>
+                  {l.comment && <span className="text-[var(--ui-text-tertiary)]">: {l.comment}</span>}
+                  <span className="text-[var(--ui-text-tertiary)] ml-auto">{fmt(l.created_at)}</span>
                 </div>
               ))}</div>
             </div>
           )}
 
           {/* Timestamps */}
-          <div className="border-t pt-3 grid grid-cols-2 gap-2 text-xs text-gray-500">
-            <div><span className="text-gray-400">创建</span> {fmt(eco.created_at)}</div>
-            <div><span className="text-gray-400">更新</span> {fmt(eco.updated_at)}</div>
-            {eco.reviewed_at && <div><span className="text-gray-400">审批完成</span> {fmt(eco.reviewed_at)}</div>}
-            {eco.executed_at && <div><span className="text-gray-400">执行完成</span> {fmt(eco.executed_at)}</div>}
+          <div className="border-t pt-3 grid grid-cols-2 gap-2 text-xs text-[var(--ui-text-secondary)]">
+            <div><span className="text-[var(--ui-text-tertiary)]">创建</span> {fmt(eco.created_at)}</div>
+            <div><span className="text-[var(--ui-text-tertiary)]">更新</span> {fmt(eco.updated_at)}</div>
+            {eco.reviewed_at && <div><span className="text-[var(--ui-text-tertiary)]">审批完成</span> {fmt(eco.reviewed_at)}</div>}
+            {eco.executed_at && <div><span className="text-[var(--ui-text-tertiary)]">执行完成</span> {fmt(eco.executed_at)}</div>}
           </div>
         </div>
 
         {/* 执行模式底部按钮 */}
         {executionMode && (eco.status === 'executing' || eco.status === 'approved') && (
-          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+          <div className="flex items-center justify-between pt-4 border-t border-[var(--ui-border)]">
             <div>
               {eco.status === 'executing' && (
                 <Button variant="success" size="sm" onClick={() => act(() => ecoApi.completeExecution(ecoId), '执行已完成')} disabled={actionLoading}>完成执行</Button>
@@ -485,9 +485,9 @@ function formatFileSize(bytes: number): string {
 
 function InfoItem({ label, value, icon, className }: { label: string; value: string; icon?: string; className?: string }) {
   return (
-    <div className={`bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 ${className || ''}`}>
-      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-      <div className="text-sm text-gray-900 font-medium whitespace-pre-wrap">{icon && <span className="mr-1">{icon}</span>}{value}</div>
+    <div className={`bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100 ${className || ''}`}>
+      <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{label}</div>
+      <div className="text-sm text-[var(--ui-text-primary)] font-medium whitespace-pre-wrap">{icon && <span className="mr-1">{icon}</span>}{value}</div>
     </div>
   );
 }
@@ -529,37 +529,37 @@ function ReleaseItemsTable({ items, onViewItem, publishedNonce }: { items: any[]
     const rowNum = parseInt(idx.split('-')[0], 10);
     return (
       <>
-        <tr key={idx} className="hover:bg-gray-50 cursor-pointer" onClick={() => onViewItem(isAssembly ? 'assembly' : 'part', ri.entity_id, 'view')}>
-          <td className="px-3 py-1.5 text-xs text-gray-400 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+        <tr key={idx} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => onViewItem(isAssembly ? 'assembly' : 'part', ri.entity_id, 'view')}>
+          <td className="px-3 py-1.5 text-xs text-[var(--ui-text-tertiary)] whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
             <span>{'-'.repeat(level)}{level}</span>
             {isAssembly && <span className="ml-1 inline-flex"><TreeToggle expanded={!!childRows} onClick={() => toggleExpand(idx, ri.entity_id, ri.entity_type)} size="sm" /></span>}
           </td>
           <td className="px-3 py-1.5 text-xs"><Badge tone={isAssembly ? 'blue' : 'gray'} label={isAssembly ? '部件' : '零件'} /></td>
           <td className="px-3 py-1.5 text-xs font-mono">{ri.entity_code}</td>
           <td className="px-3 py-1.5 text-xs">{ri.entity_name}</td>
-          <td className="px-3 py-1.5 text-xs text-gray-500">{ri.spec || '-'}</td>
+          <td className="px-3 py-1.5 text-xs text-[var(--ui-text-secondary)]">{ri.spec || '-'}</td>
           <td className="px-3 py-1.5 text-xs">{ri.entity_version || 'A'}</td>
           <td className="px-3 py-1.5 text-xs whitespace-nowrap">{ri.status ? <Badge status={ri.status} /> : '-'}</td>
           <td className="px-3 py-1.5 text-xs text-center">{ri.quantity || 1}</td>
         </tr>
         {childRows && childRows.map((child: any, j: number) => renderRow(child, level + 1, `${idx}-${j}`))}
-        {loadingIdx === idx && <tr><td colSpan={8} className="px-3 py-1.5 text-xs text-gray-400 text-center">加载中...</td></tr>}
+        {loadingIdx === idx && <tr><td colSpan={8} className="px-3 py-1.5 text-xs text-[var(--ui-text-tertiary)] text-center">加载中...</td></tr>}
       </>
     );
   };
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
+    <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden">
       <table className="w-full text-sm">
-        <thead className="bg-gray-50 border-b"><tr>
-          <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-20">层级</th>
-          <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-16">类型</th>
-          <th className="px-3 py-1.5 text-left text-xs text-gray-500">件号</th>
-          <th className="px-3 py-1.5 text-left text-xs text-gray-500">中文名称</th>
-          <th className="px-3 py-1.5 text-left text-xs text-gray-500">规格型号</th>
-          <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-14">版本</th>
-          <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-20">状态</th>
-          <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-12">用量</th>
+        <thead className="bg-[var(--ui-bg-subtle)] border-b"><tr>
+          <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)] w-20">层级</th>
+          <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)] w-16">类型</th>
+          <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)]">件号</th>
+          <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)]">中文名称</th>
+          <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)]">规格型号</th>
+          <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)] w-14">版本</th>
+          <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)] w-20">状态</th>
+          <th className="px-3 py-1.5 text-center text-xs text-[var(--ui-text-secondary)] w-12">用量</th>
         </tr></thead>
         <tbody className="divide-y">{items.map((ri, i) => renderRow(ri, 0, String(i)))}</tbody>
       </table>

@@ -157,7 +157,7 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
           placeholder={searchField === 'all' ? '搜索全部字段...' : searchField === 'code' ? '搜索构型号...' : searchField === 'name' ? '搜索名称...' : searchField.startsWith('cf_') ? `搜索${configCustomDefs.find(d => d.id === searchField.replace('cf_', ''))?.name || '自定义字段'}...` : '搜索...'}
           className="!w-44"
         />
-        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm whitespace-nowrap" title="只显示没有父项的最顶层构型项">
+        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-[var(--ui-bg-hover)] text-sm whitespace-nowrap" title="只显示没有父项的最顶层构型项">
           <input
             type="checkbox"
             checked={topLevelOnly}
@@ -166,7 +166,7 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
           />
           仅顶层构型项
         </label>
-        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm whitespace-nowrap">
+        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-[var(--ui-bg-hover)] text-sm whitespace-nowrap">
           <input
             type="checkbox"
             checked={showAllVersions}
@@ -182,27 +182,27 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
         )}
       </div>
 
-      <div className="relative bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
+      <div className="relative bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+          <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
             <tr>
-              <th onClick={() => onSort('code')} className="text-left px-3 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-60">构型号{sortIcon('code')}</th>
-              <th onClick={() => onSort('name')} className="text-left px-3 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap">名称{sortIcon('name')}</th>
-              <th onClick={() => onSort('created_at')} className="text-center px-2 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-44">创建时间{sortIcon('created_at')}</th>
-              <th onClick={() => onSort('version')} className="text-center px-2 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-16">版本{sortIcon('version')}</th>
-              <th onClick={() => onSort('status')} className="text-center px-2 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-20">状态{sortIcon('status')}</th>
-              <th onClick={() => onSort('check_out_user_name')} className="text-center px-2 py-3 text-sm font-medium text-gray-500 cursor-pointer select-none whitespace-nowrap w-20">签出状态{sortIcon('check_out_user_name')}</th>
-              <th className="text-center px-2 py-3 text-sm font-medium text-gray-500 w-20">操作</th>
+              <th onClick={() => onSort('code')} className="text-left px-3 py-3 text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer select-none whitespace-nowrap w-60">构型号{sortIcon('code')}</th>
+              <th onClick={() => onSort('name')} className="text-left px-3 py-3 text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer select-none whitespace-nowrap">名称{sortIcon('name')}</th>
+              <th onClick={() => onSort('created_at')} className="text-center px-2 py-3 text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer select-none whitespace-nowrap w-44">创建时间{sortIcon('created_at')}</th>
+              <th onClick={() => onSort('version')} className="text-center px-2 py-3 text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer select-none whitespace-nowrap w-16">版本{sortIcon('version')}</th>
+              <th onClick={() => onSort('status')} className="text-center px-2 py-3 text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer select-none whitespace-nowrap w-20">状态{sortIcon('status')}</th>
+              <th onClick={() => onSort('check_out_user_name')} className="text-center px-2 py-3 text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer select-none whitespace-nowrap w-20">签出状态{sortIcon('check_out_user_name')}</th>
+              <th className="text-center px-2 py-3 text-sm font-medium text-[var(--ui-text-secondary)] w-20">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading && items.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td></tr>
             ) : items.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">暂无数据</td></tr>
             ) : (
               items.map((item) => (
-                <tr key={item.revision_id} onClick={() => onOpenDetail(item.revision_id, item.code)} className="hover:bg-gray-50 cursor-pointer">
+                <tr key={item.revision_id} onClick={() => onOpenDetail(item.revision_id, item.code)} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer">
                   <td className="px-3 py-3 text-sm font-medium">
                     {item.code}
                     {(item.version_count ?? 0) > 1 && (
@@ -212,7 +212,7 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
                     )}
                   </td>
                   <td className="px-3 py-3 text-sm">{item.name}</td>
-                  <td className="px-2 py-3 text-sm text-gray-500 text-center whitespace-nowrap">{formatDate(item.created_at, 'YYYY-MM-DD HH:mm')}</td>
+                  <td className="px-2 py-3 text-sm text-[var(--ui-text-secondary)] text-center whitespace-nowrap">{formatDate(item.created_at, 'YYYY-MM-DD HH:mm')}</td>
                   <td className="px-2 py-3 text-sm font-mono text-center">{item.version}</td>
                   <td className="px-2 py-3 text-sm text-center">
                     <Badge status={item.status} />
@@ -221,7 +221,7 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
                     {item.check_out_user_name ? (
                       <span className="text-xs text-orange-600">{item.check_out_user_name}</span>
                     ) : (
-                      <span className="text-xs text-gray-400">—</span>
+                      <span className="text-xs text-[var(--ui-text-tertiary)]">—</span>
                     )}
                   </td>
                   <td className="px-2 py-3 text-sm text-center" onClick={(e) => e.stopPropagation()}>
@@ -236,7 +236,7 @@ export default function ConfigurationList({ onOpenDetail, refreshTrigger, pendin
         </table>
 
         <div className="sticky bottom-0 flex justify-center py-2 pointer-events-none">
-          <div className="inline-flex items-center gap-3 text-sm text-gray-600 bg-white border border-gray-200 rounded-full shadow-lg px-4 py-2 pointer-events-auto">
+          <div className="inline-flex items-center gap-3 text-sm text-[var(--ui-text-secondary)] bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-full shadow-lg px-4 py-2 pointer-events-auto">
             共 <span className="font-medium">{total}</span> 条
             <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1 || loading}>上一页</Button>
             <span className="tabular-nums">第 {page} / {pageCount} 页</span>

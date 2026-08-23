@@ -326,29 +326,29 @@ export function ECRList() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
+      <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+          <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">
                 ECR 编号
               </th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">
                 标题
               </th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">
                 状态
               </th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">
                 优先级
               </th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">
                 创建人
               </th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">
                 创建时间
               </th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 whitespace-nowrap">
+              <th className="px-4 py-3 text-right text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">
                 操作
               </th>
             </tr>
@@ -356,13 +356,13 @@ export function ECRList() {
           <tbody className="divide-y divide-gray-200">
             {loading ? (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-gray-400">
+                <td colSpan={7} className="px-4 py-12 text-center text-[var(--ui-text-tertiary)]">
                   加载中...
                 </td>
               </tr>
             ) : ecrs.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-gray-400">
+                <td colSpan={7} className="px-4 py-12 text-center text-[var(--ui-text-tertiary)]">
                   暂无数据
                 </td>
               </tr>
@@ -370,7 +370,7 @@ export function ECRList() {
               ecrs.map((ecr) => (
                 <tr
                   key={ecr.id}
-                  className="hover:bg-gray-50 cursor-pointer"
+                  className="hover:bg-[var(--ui-bg-hover)] cursor-pointer"
                   onClick={() => setDetailEcrId(ecr.id)}
                 >
                   <td className="px-4 py-3 text-sm font-medium whitespace-nowrap">
@@ -404,7 +404,7 @@ export function ECRList() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-4 shrink-0">
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-[var(--ui-text-secondary)]">
             共 {total} 条，第 {page} / {totalPages} 页
           </span>
           <div className="flex gap-1 justify-end">
@@ -419,7 +419,7 @@ export function ECRList() {
               .map((p, idx, arr) => (
                 <span key={p}>
                   {idx > 0 && arr[idx - 1] !== p - 1 && (
-                    <span className="px-1 text-gray-400">...</span>
+                    <span className="px-1 text-[var(--ui-text-tertiary)]">...</span>
                   )}
                   <Button variant={p === page ? 'primary' : 'secondary'} size="sm"
                     onClick={() => setPage(p)}

@@ -168,7 +168,7 @@ export default function PartsPage() {
           <option value="released">发布</option>
           <option value="obsolete">作废</option>
         </Select>
-        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm whitespace-nowrap">
+        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-[var(--ui-bg-hover)] text-sm whitespace-nowrap">
           <input
             type="checkbox"
             checked={showAllVersions}
@@ -177,7 +177,7 @@ export default function PartsPage() {
           />
           全部版本
         </label>
-        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm whitespace-nowrap" title="只显示没有父项的最顶层零部件">
+        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-[var(--ui-bg-hover)] text-sm whitespace-nowrap" title="只显示没有父项的最顶层零部件">
           <input
             type="checkbox"
             checked={topLevelOnly}
@@ -203,32 +203,32 @@ export default function PartsPage() {
         </Button>
       </div>
 
-      <div className="relative bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
+      <div className="relative bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+          <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
             <tr>
-              <th onClick={() => onSort('code')} className="w-56 px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+              <th onClick={() => onSort('code')} className="w-56 px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
                 件号{sortIcon('code')}
               </th>
-              <th onClick={() => onSort('name')} className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+              <th onClick={() => onSort('name')} className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
                 中文名称{sortIcon('name')}
               </th>
-              <th onClick={() => onSort('created_at')} className="w-44 px-2 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+              <th onClick={() => onSort('created_at')} className="w-44 px-2 py-3 text-center text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
                 创建时间{sortIcon('created_at')}
               </th>
-              <th onClick={() => onSort('version')} className="w-16 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+              <th onClick={() => onSort('version')} className="w-16 px-4 py-3 text-center text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
                 版本{sortIcon('version')}
               </th>
-              <th onClick={() => onSort('type')} className="w-20 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+              <th onClick={() => onSort('type')} className="w-20 px-4 py-3 text-center text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
                 类型{sortIcon('type')}
               </th>
-              <th onClick={() => onSort('status')} className="w-20 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+              <th onClick={() => onSort('status')} className="w-20 px-4 py-3 text-center text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
                 状态{sortIcon('status')}
               </th>
-              <th onClick={() => onSort('check_out_user_name')} className="w-20 px-4 py-3 text-center text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
+              <th onClick={() => onSort('check_out_user_name')} className="w-20 px-4 py-3 text-center text-sm font-medium text-[var(--ui-text-secondary)] cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
                 签出状态{sortIcon('check_out_user_name')}
               </th>
-              <th className="w-16 px-4 py-3 text-center text-sm font-medium text-gray-500 select-none whitespace-nowrap">
+              <th className="w-16 px-4 py-3 text-center text-sm font-medium text-[var(--ui-text-secondary)] select-none whitespace-nowrap">
                 操作
               </th>
             </tr>
@@ -236,19 +236,19 @@ export default function PartsPage() {
           <tbody className="divide-y divide-gray-200">
             {loading && items.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">
                   加载中...
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">
                   无匹配数据
                 </td>
               </tr>
             ) : (
               items.map((item) => (
-                <tr key={item.revision_id} className="hover:bg-gray-50 cursor-pointer" onClick={() => openDetail(item.master_id, item.revision_id)}>
+                <tr key={item.revision_id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => openDetail(item.master_id, item.revision_id)}>
                   <td className="px-4 py-3 text-sm font-medium">
                     {item.code}
                     {item.version_count && item.version_count > 1 && !showAllVersions && (
@@ -258,8 +258,8 @@ export default function PartsPage() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm truncate">{item.name}</td>
-                  <td className="px-2 py-3 text-sm text-gray-500 text-center whitespace-nowrap">{formatDate(item.created_at, 'YYYY-MM-DD HH:mm')}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500 text-center">{item.version}</td>
+                  <td className="px-2 py-3 text-sm text-[var(--ui-text-secondary)] text-center whitespace-nowrap">{formatDate(item.created_at, 'YYYY-MM-DD HH:mm')}</td>
+                  <td className="px-4 py-3 text-sm text-[var(--ui-text-secondary)] text-center">{item.version}</td>
                   <td className="px-4 py-3 text-center">
                     <Badge tone={item.type === 'assembly' ? 'blue' : 'gray'} label={item.type === 'assembly' ? '部件' : '零件'} />
                   </td>
@@ -269,7 +269,7 @@ export default function PartsPage() {
                   <td className="px-4 py-3 text-sm text-center">
                     {item.check_out_user_name ? (
                       <span className="text-orange-600">{item.check_out_user_name}</span>
-                    ) : <span className="text-gray-400">—</span>}
+                    ) : <span className="text-[var(--ui-text-tertiary)]">—</span>}
                   </td>
                   <td className="px-4 py-3 text-center text-sm" onClick={(e) => e.stopPropagation()}>
                     {user?.role === 'admin' && (
@@ -287,7 +287,7 @@ export default function PartsPage() {
         </table>
 
         <div className="sticky bottom-0 flex justify-center py-2 pointer-events-none">
-          <div className="inline-flex items-center gap-3 text-sm text-gray-600 bg-white border border-gray-200 rounded-full shadow-lg px-4 py-2 pointer-events-auto">
+          <div className="inline-flex items-center gap-3 text-sm text-[var(--ui-text-secondary)] bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-full shadow-lg px-4 py-2 pointer-events-auto">
             共 <span className="font-medium">{total}</span> 条
             <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1 || loading}>上一页</Button>
             <span className="tabular-nums">第 {page} / {pageCount} 页</span>

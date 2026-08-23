@@ -258,12 +258,12 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
 
     return (
       <>
-        <tr key={idx} className="hover:bg-gray-50">
-          <td className="px-3 py-2 text-sm text-gray-400 whitespace-nowrap">
+        <tr key={idx} className="hover:bg-[var(--ui-bg-hover)]">
+          <td className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)] whitespace-nowrap">
             <span>{'-'.repeat(level)}{level}</span>
             {hasChildren && (
               <button type="button" onClick={(e) => { e.stopPropagation(); toggleExpand(idx, part.child_id); }}
-                className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
+                className="inline-flex items-center w-5 h-5 text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] ml-1">
                 {childRows ? '\u25bc' : '\u25b6'}
               </button>
             )}
@@ -273,8 +273,8 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
           </td>
           <td className="px-3 py-2 font-medium">{part.child_detail?.code || '-'}</td>
           <td className="px-3 py-2">{part.child_detail?.name || '-'}</td>
-          <td className="px-3 py-2 text-gray-500">{part.child_detail?.spec || '-'}</td>
-          <td className="px-3 py-2 text-gray-500">{part.child_detail?.version || '-'}</td>
+          <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{part.child_detail?.spec || '-'}</td>
+          <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{part.child_detail?.version || '-'}</td>
           <td className="px-3 py-2">
             <Badge status={part.child_detail?.status} />
           </td>
@@ -303,7 +303,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
           </td>
         </tr>
         {childRows && childRows.map((c: any, j: number) => renderPartRow(c, level + 1, `${idx}-${j}`))}
-        {loadingPart === idx && <tr><td colSpan={9} className="px-3 py-2 text-sm text-gray-400 text-center">加载中...</td></tr>}
+        {loadingPart === idx && <tr><td colSpan={9} className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)] text-center">加载中...</td></tr>}
       </>
     );
   };
@@ -316,7 +316,7 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
     <>
     <Modal open={open} title={title} onClose={onClose} width="full">
       {loading ? (
-        <div className="text-center py-8 text-sm text-gray-400">加载中...</div>
+        <div className="text-center py-8 text-sm text-[var(--ui-text-tertiary)]">加载中...</div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           {locked && (
@@ -325,26 +325,26 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
             </div>
           )}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">件号</label>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">件号</label>
               <Input size="xs" type="text" value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value })} disabled={!(isAdmin() && formData.version === 'A')} title={isAdmin() ? (formData.version === 'A' ? '管理员可修改件号' : '仅 A 版允许修改件号，升版后的版本不可改') : undefined} />
             </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">中文名称 <span className="text-red-500">*</span></label>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">中文名称 <span className="text-red-500">*</span></label>
               <Input size="xs" type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} disabled={locked} required />
             </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">版本</label>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">版本</label>
               <Input size="xs" type="text" value={formData.version} disabled />
             </div>
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">状态</label>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">状态</label>
               <Select size="xs" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })} disabled={locked}>
                 {STATUS_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
               </Select>
             </div>
-            <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">规格型号</label>
+            <div className="col-span-2 md:col-span-2 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">规格型号</label>
               <Textarea size="xs" ref={specRef} value={formData.spec} onChange={e => setFormData({ ...formData, spec: e.target.value })} disabled={locked} onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }} className="resize-none" rows={1} />
             </div>
           </div>
@@ -354,12 +354,12 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
             <div className="border-t pt-4">
               <h4 className="text-sm font-bold text-gray-700 mb-2">自定义字段</h4>
               {loadingCustomFields ? (
-                <div className="text-sm text-gray-500">加载中...</div>
+                <div className="text-sm text-[var(--ui-text-secondary)]">加载中...</div>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {customFieldDefs.map(def => (
-                    <div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                      <label className="block text-xs text-gray-500 mb-0.5">
+                    <div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                      <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">
                         {def.name}
                         {def.is_required && <span className="text-red-500 ml-1">*</span>}
                       </label>
@@ -388,23 +388,23 @@ export default function EntityEditModal({ open, entityType, entityId, entityCode
               </div>
               <div className="border rounded-lg overflow-hidden">
                 {loadingEditParts ? (
-                  <div className="px-4 py-8 text-center text-sm text-gray-400">加载子项中...</div>
+                  <div className="px-4 py-8 text-center text-sm text-[var(--ui-text-tertiary)]">加载子项中...</div>
                 ) : editParts.length === 0 ? (
-                  <div className="px-4 py-8 text-center text-sm text-gray-400">暂无子项</div>
+                  <div className="px-4 py-8 text-center text-sm text-[var(--ui-text-tertiary)]">暂无子项</div>
                 ) : (
                   <div className="max-h-[400px] overflow-auto">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-50 border-b sticky top-0">
+                      <thead className="bg-[var(--ui-bg-subtle)] border-b sticky top-0">
                         <tr>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">层级</th>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">类型</th>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium">件号</th>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium">中文名称</th>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium">规格型号</th>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">用量</th>
-                          <th className="px-3 py-2 text-right text-gray-500 font-medium w-32">操作</th>
+                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">层级</th>
+                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">类型</th>
+                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">件号</th>
+                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">中文名称</th>
+                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">规格型号</th>
+                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">版本</th>
+                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">状态</th>
+                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20">用量</th>
+                          <th className="px-3 py-2 text-right text-[var(--ui-text-secondary)] font-medium w-32">操作</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">

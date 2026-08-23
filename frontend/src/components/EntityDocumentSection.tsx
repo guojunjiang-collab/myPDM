@@ -311,26 +311,26 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
 
       <div className="border rounded-lg overflow-hidden">
         {loading ? (
-          <div className="px-4 py-6 text-center text-sm text-gray-400">加载中...</div>
+          <div className="px-4 py-6 text-center text-sm text-[var(--ui-text-tertiary)]">加载中...</div>
         ) : docs.length === 0 ? (
-          <div className="px-4 py-6 text-center text-sm text-gray-400">暂无关联图文档</div>
+          <div className="px-4 py-6 text-center text-sm text-[var(--ui-text-tertiary)]">暂无关联图文档</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
+              <thead className="bg-[var(--ui-bg-subtle)] border-b">
                 <tr>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档编号</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档名称</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
+                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">图文档编号</th>
+                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">图文档名称</th>
+                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">版本</th>
+                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">状态</th>
                   {/* 动态自定义字段列 */}
                   {docFieldDefs.map((def) => (
-                    <th key={def.id} className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap">
+                    <th key={def.id} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium whitespace-nowrap">
                       {def.name}
                     </th>
                   ))}
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium">附件</th>
-                  <th className="px-3 py-2 text-center text-gray-500 font-medium w-20">操作</th>
+                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">附件</th>
+                  <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-20">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -338,23 +338,23 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
                   const vals = docFieldValues[ed.document_id] || {};
                   const isAccessible = (ed.document as any).accessible !== false;
                   return (
-                    <tr key={ed.id} className={`hover:bg-gray-50 cursor-pointer ${!isAccessible ? 'opacity-60' : ''}`} onClick={() => handleViewDocument(ed)}>
+                    <tr key={ed.id} className={`hover:bg-[var(--ui-bg-hover)] cursor-pointer ${!isAccessible ? 'opacity-60' : ''}`} onClick={() => handleViewDocument(ed)}>
                       <td className="px-3 py-2 font-medium">
                         {!isAccessible && <span className="mr-1" title="无权限：需关联用户组成员">🔒</span>}
                         {ed.document.code}
                       </td>
                       <td className="px-3 py-2">{ed.document.name}</td>
-                      <td className="px-3 py-2 text-gray-500">{ed.document.version}</td>
+                      <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{ed.document.version}</td>
                       <td className="px-3 py-2">
                         <Badge status={ed.document.status} />
                       </td>
                       {/* 动态自定义字段值 */}
                       {docFieldDefs.map((def) => (
-                        <td key={def.id} className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                        <td key={def.id} className="px-3 py-2 text-[var(--ui-text-secondary)] whitespace-nowrap">
                           {renderFieldValue(vals[def.id])}
                         </td>
                       ))}
-                      <td className="px-3 py-2 text-gray-600">
+                      <td className="px-3 py-2 text-[var(--ui-text-secondary)]">
                         {ed.document.file_id && ed.document.file_name ? (
                           <span className="text-xs">{ed.document.file_name}</span>
                         ) : (
@@ -411,7 +411,7 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
                                   </Button>
                                 </>
                               ) : (
-                                <span className="text-gray-400 text-xs" title="无权限：需关联用户组成员">🔒 不可预览/下载</span>
+                                <span className="text-[var(--ui-text-tertiary)] text-xs" title="无权限：需关联用户组成员">🔒 不可预览/下载</span>
                               )
                             )
                           )}
@@ -443,20 +443,20 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
         {editingDoc && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                <label className="block text-xs text-gray-500 mb-0.5">编号</label>
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">编号</label>
                 <Input type="text" value={editingDoc.code} disabled size="xs" />
               </div>
-              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                <label className="block text-xs text-gray-500 mb-0.5">名称 <span className="text-red-500">*</span></label>
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">名称 <span className="text-red-500">*</span></label>
                 <Input type="text" value={editFormData.name} onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })} size="xs" />
               </div>
-              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                <label className="block text-xs text-gray-500 mb-0.5">版本</label>
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">版本</label>
                 <Input type="text" value={editingDoc.version || ''} disabled size="xs" />
               </div>
-              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                <label className="block text-xs text-gray-500 mb-0.5">状态</label>
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">状态</label>
                 <Select value={editFormData.status} onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })} size="xs">
                   <option value="draft">草稿</option>
                   <option value="frozen">冻结</option>
@@ -464,8 +464,8 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
                   <option value="obsolete">作废</option>
                 </Select>
               </div>
-              <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                <label className="block text-xs text-gray-500 mb-0.5">备注</label>
+              <div className="col-span-2 md:col-span-2 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">备注</label>
                 <Textarea value={editFormData.remark} onChange={(e) => setEditFormData({ ...editFormData, remark: e.target.value })} rows={1} size="xs" className="resize-none" />
               </div>
             </div>
@@ -475,8 +475,8 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
                 <h4 className="text-sm font-bold text-gray-700 mb-2">自定义字段</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {editCustomDefs.map(def => (
-                    <div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                      <label className="block text-xs text-gray-500 mb-0.5">{def.name}{def.is_required && <span className="text-red-500 ml-1">*</span>}</label>
+                    <div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                      <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">{def.name}{def.is_required && <span className="text-red-500 ml-1">*</span>}</label>
                       {def.field_type === 'select' && def.options?.length ? (
                         <Select value={editCustomValues[def.id] ?? ''} onChange={(e) => setEditCustomValues({ ...editCustomValues, [def.id]: e.target.value })} size="xs">
                           <option value="">请选择</option>
@@ -515,24 +515,24 @@ export default function EntityDocumentSection({ entityType, entityId, editable, 
                 </div>
               )}
               {editLoadingAttach ? (
-                <div className="text-sm text-gray-500">加载中...</div>
+                <div className="text-sm text-[var(--ui-text-secondary)]">加载中...</div>
               ) : editAttachments.length === 0 && !editUploading ? (
-                <div className="text-sm text-gray-400 py-4 text-center border border-dashed border-gray-300 rounded-lg">暂无附件</div>
+                <div className="text-sm text-[var(--ui-text-tertiary)] py-4 text-center border border-dashed border-gray-300 rounded-lg">暂无附件</div>
               ) : (
                 <div className="border rounded-lg overflow-hidden">
                   <table className="w-full text-sm">
-                    <thead className="bg-gray-50 border-b">
+                    <thead className="bg-[var(--ui-bg-subtle)] border-b">
                       <tr>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium">文件名</th>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium w-24">大小</th>
-                        <th className="px-3 py-2 text-right text-gray-500 font-medium w-24">操作</th>
+                        <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">文件名</th>
+                        <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-24">大小</th>
+                        <th className="px-3 py-2 text-right text-[var(--ui-text-secondary)] font-medium w-24">操作</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {editAttachments.map(att => (
-                        <tr key={att.id} className="hover:bg-gray-50">
+                        <tr key={att.id} className="hover:bg-[var(--ui-bg-hover)]">
                           <td className="px-3 py-2"><span className="text-primary-600">{att.file_name}</span></td>
-                          <td className="px-3 py-2 text-gray-500">{att.file_size != null ? (att.file_size < 1024 ? att.file_size + ' B' : att.file_size < 1048576 ? (att.file_size / 1024).toFixed(1) + ' KB' : (att.file_size / 1048576).toFixed(1) + ' MB') : '-'}</td>
+                          <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{att.file_size != null ? (att.file_size < 1024 ? att.file_size + ' B' : att.file_size < 1048576 ? (att.file_size / 1024).toFixed(1) + ' KB' : (att.file_size / 1048576).toFixed(1) + ' MB') : '-'}</td>
                           <td className="px-3 py-2 text-right">
                             <Button variant="danger" size="xs" type="button" onClick={() => handleEditDeleteAttachment(att.id)} disabled={editDeletingAttId === att.id}>
                               {editDeletingAttId === att.id ? '删除中...' : '删除'}

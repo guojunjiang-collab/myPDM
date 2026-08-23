@@ -312,7 +312,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
       </div>
       {loading && !detail ? (
         <div className="flex items-center justify-center py-12">
-          <div className="flex items-center gap-2 text-gray-500">
+          <div className="flex items-center gap-2 text-[var(--ui-text-secondary)]">
             <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -321,16 +321,16 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
           </div>
         </div>
       ) : !detail ? (
-        <div className="text-center text-gray-500 py-12">暂无数据</div>
+        <div className="text-center text-[var(--ui-text-secondary)] py-12">暂无数据</div>
       ) : (
         <div className="print-area space-y-6 max-h-[70vh] overflow-y-auto pr-1">
           {/* Header */}
-          <div className="flex items-center justify-between pb-4 border-b border-gray-200">
+          <div className="flex items-center justify-between pb-4 border-b border-[var(--ui-border)]">
             <div>
-              <div className="text-lg font-bold text-gray-900">
+              <div className="text-lg font-bold text-[var(--ui-text-primary)]">
                 {detail.ecr_number}
               </div>
-              <div className="text-sm text-gray-500 mt-0.5">{detail.title}</div>
+              <div className="text-sm text-[var(--ui-text-secondary)] mt-0.5">{detail.title}</div>
             </div>
             <div className="flex items-center gap-2">
               <ECRStatusBadge status={detail.status} />
@@ -365,7 +365,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
           {detail.description && (
             <div>
               <h4 className="text-sm font-semibold text-gray-700 mb-2">📝 变更描述</h4>
-              <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap border border-gray-200">
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap border border-[var(--ui-border)]">
                 {detail.description}
               </div>
             </div>
@@ -376,7 +376,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
             <h4 className="text-sm font-semibold text-gray-700 mb-3">
               👥 审批进度
               {detail.reviewers && detail.reviewers.length > 0 && (
-                <span className="ml-2 text-xs font-normal text-gray-500">
+                <span className="ml-2 text-xs font-normal text-[var(--ui-text-secondary)]">
                   ({detail.approved_count || 0}/{detail.reviewers_count || detail.reviewers.length} 已审批)
                 </span>
               )}
@@ -396,17 +396,17 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
               <h4 className="text-sm font-bold text-gray-700 mb-2">关联图文档</h4>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b">
+                  <thead className="bg-[var(--ui-bg-subtle)] border-b">
                     <tr>
-                      <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档编号</th>
-                      <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档名称</th>
-                      <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-                      <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
+                      <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">图文档编号</th>
+                      <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">图文档名称</th>
+                      <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">版本</th>
+                      <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">状态</th>
                       {docFieldDefs.map((def) => (
-                        <th key={def.id} className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap">{def.name}</th>
+                        <th key={def.id} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium whitespace-nowrap">{def.name}</th>
                       ))}
-                      <th className="px-3 py-2 text-left text-gray-500 font-medium">附件</th>
-                      <th className="px-3 py-2 text-center text-gray-500 font-medium whitespace-nowrap w-28">操作</th>
+                      <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">附件</th>
+                      <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium whitespace-nowrap w-28">操作</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -415,11 +415,11 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
                       const atts = docAttachments[link.document_id] || [];
                       return (
                         <tr key={link.document_id || idx}
-                          className="hover:bg-gray-50 cursor-pointer"
+                          className="hover:bg-[var(--ui-bg-hover)] cursor-pointer"
                           onClick={() => setViewDocRevisionId(link.document_id)}>
                           <td className="px-3 py-2 text-sm font-medium">{doc?.code || link.document_code}</td>
                           <td className="px-3 py-2 text-sm">{doc?.name || link.document_name}</td>
-                          <td className="px-3 py-2 text-sm text-gray-500">{doc?.version || link.document_version || '-'}</td>
+                          <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{doc?.version || link.document_version || '-'}</td>
                           <td className="px-3 py-2 text-sm">
                             {doc?.status ? (
                               <Badge status={doc.status} />
@@ -429,12 +429,12 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
                             const vals = docCustomValues[link.document_id] || {};
                             const val = vals[def.id];
                             return (
-                              <td key={def.id} className="px-3 py-2 text-sm text-gray-500">
+                              <td key={def.id} className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">
                                 {val !== undefined && val !== null && val !== '' ? String(val) : '-'}
                               </td>
                             );
                           })}
-                          <td className="px-3 py-2 text-sm text-gray-500">
+                          <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">
                             {atts.length > 0 ? atts.map((a: any) => (
                               <div key={a.id} className="text-xs">{a.file_name} ({formatFileSize(a.file_size)})</div>
                             )) : '-'}
@@ -449,7 +449,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
                                 <Button variant="link" size="xs" onClick={() => handleDocDownload(atts[0].id, atts[0].file_name)}
                                   title="下载">下载</Button>
                               )}
-                              {atts.length === 0 && <span className="text-xs text-gray-400">-</span>}
+                              {atts.length === 0 && <span className="text-xs text-[var(--ui-text-tertiary)]">-</span>}
                             </div>
                           </td>
                         </tr>
@@ -471,22 +471,22 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
                 {detail.affected_items.map((item) => (
                   <div
                     key={item.id}
-                    className="border border-gray-200 rounded-lg overflow-hidden"
+                    className="border border-[var(--ui-border)] rounded-lg overflow-hidden"
                   >
                     {/* Item header */}
-                    <div className="flex items-center gap-3 p-3 bg-gray-50">
+                    <div className="flex items-center gap-3 p-3 bg-[var(--ui-bg-subtle)]">
                       <Badge
                         tone={item.entity_type === 'part' ? 'blue' : 'gray'}
                         label={item.entity_type === 'part' ? '零件' : '部件'}
                       />
-                      <span className="text-sm font-medium text-gray-900">{item.entity_code}</span>
-                      <span className="text-sm text-gray-600">{item.entity_name}</span>
-                      <span className="text-xs text-gray-400">v{item.entity_version}</span>
+                      <span className="text-sm font-medium text-[var(--ui-text-primary)]">{item.entity_code}</span>
+                      <span className="text-sm text-[var(--ui-text-secondary)]">{item.entity_name}</span>
+                      <span className="text-xs text-[var(--ui-text-tertiary)]">v{item.entity_version}</span>
                       {item.change_type && (
                         <Badge status={item.change_type} domain="action" />
                       )}
                       {item.change_description && (
-                        <span className="text-xs text-gray-500 flex-1 truncate">
+                        <span className="text-xs text-[var(--ui-text-secondary)] flex-1 truncate">
                           {item.change_description}
                         </span>
                       )}
@@ -494,7 +494,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
 
                     {/* Bom impact result */}
                     {item.bom_impact && (
-                      <div className="p-3 border-t border-gray-200">
+                      <div className="p-3 border-t border-[var(--ui-border)]">
                         <ECRBomImpactView
                           upwardChain={item.bom_impact.upward_chain}
                           downwardItems={item.bom_impact.downward_items}
@@ -532,9 +532,9 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
                       <div className="w-0.5 flex-1 bg-gray-200 min-h-[16px]" />
                     </div>
                     <div className="flex-1 pb-1">
-                      <div className="text-sm text-gray-900">
+                      <div className="text-sm text-[var(--ui-text-primary)]">
                         <span className="font-medium">{log.operator_name}</span>
-                        <span className="text-gray-500 mx-1">·</span>
+                        <span className="text-[var(--ui-text-secondary)] mx-1">·</span>
                         <span
                           className={`${
                             log.to_status === 'approved'
@@ -550,9 +550,9 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
                         </span>
                       </div>
                       {log.comment && (
-                        <div className="text-sm text-gray-500 mt-0.5">{log.comment}</div>
+                        <div className="text-sm text-[var(--ui-text-secondary)] mt-0.5">{log.comment}</div>
                       )}
-                      <div className="text-xs text-gray-400 mt-0.5">
+                      <div className="text-xs text-[var(--ui-text-tertiary)] mt-0.5">
                         {new Date(log.created_at).toLocaleString('zh-CN')}
                       </div>
                     </div>
@@ -593,7 +593,7 @@ export function ECRDetailModal({ open, ecrId, onClose, onSuccess }: ECRDetailMod
           )}
 
           {/* Action buttons */}
-          <div className="pt-4 border-t border-gray-200 flex items-center justify-between">
+          <div className="pt-4 border-t border-[var(--ui-border)] flex items-center justify-between">
             {renderActions()}
           </div>
         </div>
@@ -624,9 +624,9 @@ function InfoItem({
   icon?: string;
 }) {
   return (
-    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-      <div className="text-sm text-gray-900 font-medium">
+    <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+      <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{label}</div>
+      <div className="text-sm text-[var(--ui-text-primary)] font-medium">
         {icon && <span className="mr-1">{icon}</span>}
         {value}
       </div>

@@ -84,18 +84,18 @@ export function ECRDocumentPicker({ open, onClose, onSelect, alreadyLinked }: EC
         />
 
         {/* Document table */}
-        <div className="max-h-64 overflow-y-auto border border-gray-200 rounded">
+        <div className="max-h-64 overflow-y-auto border border-[var(--ui-border)] rounded">
           {loading ? (
-            <div className="flex items-center justify-center py-8 text-sm text-gray-400">
+            <div className="flex items-center justify-center py-8 text-sm text-[var(--ui-text-tertiary)]">
               加载中...
             </div>
           ) : filteredDocs.length === 0 ? (
-            <div className="text-center py-8 text-sm text-gray-400">
+            <div className="text-center py-8 text-sm text-[var(--ui-text-tertiary)]">
               {search.trim() ? '未找到匹配的文档' : '暂无可关联的文档'}
             </div>
           ) : (
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 sticky top-0">
+              <thead className="bg-[var(--ui-bg-subtle)] sticky top-0">
                 <tr>
                   <th className="w-10 px-3 py-2 text-left">
                     <input
@@ -115,9 +115,9 @@ export function ECRDocumentPicker({ open, onClose, onSelect, alreadyLinked }: EC
                       className="rounded border-gray-300"
                     />
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">文档编号</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">文档名称</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">版本</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-[var(--ui-text-secondary)]">文档编号</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-[var(--ui-text-secondary)]">文档名称</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-[var(--ui-text-secondary)]">版本</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -127,7 +127,7 @@ export function ECRDocumentPicker({ open, onClose, onSelect, alreadyLinked }: EC
                   return (
                     <tr
                       key={doc.id}
-                      className={`hover:bg-gray-50 cursor-pointer ${
+                      className={`hover:bg-[var(--ui-bg-hover)] cursor-pointer ${
                         isAlreadyLinked ? 'opacity-50' : ''
                       }`}
                       onClick={() => {
@@ -145,9 +145,9 @@ export function ECRDocumentPicker({ open, onClose, onSelect, alreadyLinked }: EC
                           onClick={(e) => e.stopPropagation()}
                         />
                       </td>
-                      <td className="px-3 py-2 font-medium text-gray-900">{doc.code}</td>
-                      <td className="px-3 py-2 text-gray-600">{doc.name}</td>
-                      <td className="px-3 py-2 text-gray-400">{doc.version || '-'}</td>
+                      <td className="px-3 py-2 font-medium text-[var(--ui-text-primary)]">{doc.code}</td>
+                      <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{doc.name}</td>
+                      <td className="px-3 py-2 text-[var(--ui-text-tertiary)]">{doc.version || '-'}</td>
                     </tr>
                   );
                 })}
@@ -157,11 +157,11 @@ export function ECRDocumentPicker({ open, onClose, onSelect, alreadyLinked }: EC
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-3 border-t border-gray-200">
-          <span className="text-xs text-gray-500">
+        <div className="flex items-center justify-between pt-3 border-t border-[var(--ui-border)]">
+          <span className="text-xs text-[var(--ui-text-secondary)]">
             已选 {selectedIds.size} 个文档
             {alreadyLinked.length > 0 && (
-              <span className="ml-2 text-gray-400">
+              <span className="ml-2 text-[var(--ui-text-tertiary)]">
                 （{alreadyLinked.length} 个已关联）
               </span>
             )}

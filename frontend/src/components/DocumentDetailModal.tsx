@@ -378,7 +378,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
         {loading && !doc ? (
           <Loading />
         ) : !doc ? (
-          <div className="text-gray-400 text-sm py-8 text-center">加载失败</div>
+          <div className="text-[var(--ui-text-tertiary)] text-sm py-8 text-center">加载失败</div>
         ) : (
           <>
             {/* 信息卡片 */}
@@ -392,7 +392,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                     className="font-mono"
                   />
                 ) : (
-                  <div className="text-sm text-gray-900 font-medium font-mono">{doc.code}</div>
+                  <div className="text-sm text-[var(--ui-text-primary)] font-medium font-mono">{doc.code}</div>
                 )}
               </InfoCard>
               <InfoCard label="名称" readonly={!canEdit}>
@@ -403,14 +403,14 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                     size="xs"
                   />
                 ) : (
-                  <div className="text-sm text-gray-900 font-medium">{doc.name}</div>
+                  <div className="text-sm text-[var(--ui-text-primary)] font-medium">{doc.name}</div>
                 )}
               </InfoCard>
               <InfoCard label="用户组" readonly={!canEdit}>
                 {canEdit ? (
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 py-0.5">
                     {allGroups.length === 0 ? (
-                      <span className="text-sm text-gray-400">加载中...</span>
+                      <span className="text-sm text-[var(--ui-text-tertiary)]">加载中...</span>
                     ) : (
                       allGroups.map((g) => (
                         <label key={g.id} className="flex items-center gap-1.5 text-sm cursor-pointer">
@@ -438,7 +438,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                     )}
                   </div>
                 ) : (
-                  <div className="text-sm text-gray-900 font-medium break-all">
+                  <div className="text-sm text-[var(--ui-text-primary)] font-medium break-all">
                     {(doc as any).group_names?.length ? (doc as any).group_names.join('、') : '-'}
                   </div>
                 )}
@@ -446,7 +446,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
             </div>
 
             {/* 操作栏 */}
-            <div className="bg-white rounded-lg border border-gray-200 p-3 mb-3 shrink-0">
+            <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] p-3 mb-3 shrink-0">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className="font-semibold text-sm">版本：{doc.version || '-'}</span>
@@ -454,7 +454,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                   {isCheckedOut ? (
                     <span className="text-xs text-orange-600">已签出：{doc.check_out_user_name || '未知'}</span>
                   ) : (
-                    <span className="text-xs text-gray-400">未签出</span>
+                    <span className="text-xs text-[var(--ui-text-tertiary)]">未签出</span>
                   )}
                 </div>
                 <div className="flex gap-1 flex-wrap items-center">
@@ -490,14 +490,14 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
             </div>
 
             {/* Tab 导航 + 内容 */}
-            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
-              <div className="flex border-b border-gray-200 shrink-0">
+            <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-hidden flex-1 min-h-0 flex flex-col">
+              <div className="flex border-b border-[var(--ui-border)] shrink-0">
                 {tabs.map((t) => (
                   <button key={t.key} onClick={() => setActiveTab(t.key)}
                     className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                       activeTab === t.key
                         ? 'border-primary-600 text-primary-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                        : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'
                     }`}>
                     {t.label}
                   </button>
@@ -519,26 +519,26 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                       )}
                     </div>
                     {attachments.length === 0 ? (
-                      <div className="text-sm text-gray-400 py-8 text-center border border-dashed border-gray-300 rounded-lg">
+                      <div className="text-sm text-[var(--ui-text-tertiary)] py-8 text-center border border-dashed border-gray-300 rounded-lg">
                         {isViewingHistorical ? '该迭代暂无附件' : '暂无附件'}
                       </div>
                     ) : (
                       <div className="border rounded-lg overflow-hidden">
                         <table className="w-full text-sm">
-                          <thead className="bg-gray-50 border-b">
+                          <thead className="bg-[var(--ui-bg-subtle)] border-b">
                             <tr>
-                              <th className="px-3 py-2 text-left text-gray-500 font-medium">文件名</th>
-                              <th className="px-3 py-2 text-left text-gray-500 font-medium w-24">大小</th>
-                              <th className="px-3 py-2 text-left text-gray-500 font-medium w-40">上传时间</th>
-                              <th className="px-3 py-2 text-right text-gray-500 font-medium w-40">操作</th>
+                              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">文件名</th>
+                              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-24">大小</th>
+                              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-40">上传时间</th>
+                              <th className="px-3 py-2 text-right text-[var(--ui-text-secondary)] font-medium w-40">操作</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
                             {attachments.map((att) => (
-                              <tr key={att.id} className="hover:bg-gray-50">
+                              <tr key={att.id} className="hover:bg-[var(--ui-bg-hover)]">
                                 <td className="px-3 py-2 text-primary-600">{att.file_name}</td>
-                                <td className="px-3 py-2 text-gray-500">{formatFileSize(att.file_size || 0)}</td>
-                                <td className="px-3 py-2 text-gray-500">{formatDateTime(att.created_at)}</td>
+                                <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{formatFileSize(att.file_size || 0)}</td>
+                                <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{formatDateTime(att.created_at)}</td>
                                 <td className="px-3 py-2 text-right">
                                   <Button variant="link" size="xs" className="mr-2"
                                     onClick={() => previewAttachment(att.id, att.file_name || 'preview', {
@@ -564,7 +564,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                   <div>
                     <h4 className="text-sm font-semibold text-gray-700 mb-3">自定义字段</h4>
                     {cfDefs.length === 0 ? (
-                      <div className="text-sm text-gray-400 border border-dashed border-gray-200 rounded-lg py-8 text-center">无</div>
+                      <div className="text-sm text-[var(--ui-text-tertiary)] border border-dashed border-[var(--ui-border)] rounded-lg py-8 text-center">无</div>
                     ) : (
                       <div className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -578,8 +578,8 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                               }
                             };
                             return (
-                              <div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                                <div className="text-xs text-gray-500 mb-0.5">{def.name}</div>
+                              <div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                                <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{def.name}</div>
                                 <CustomFieldInput
                                   def={def}
                                   value={val}
@@ -592,7 +592,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                         </div>
                       </div>
                     )}
-                    <div className="mt-4 text-xs text-gray-400">
+                    <div className="mt-4 text-xs text-[var(--ui-text-tertiary)]">
                       创建人：{doc.creator_name || '-'} | 创建时间：{doc.created_at ? new Date(doc.created_at).toLocaleString('zh-CN') : '-'}
                     </div>
                   </div>
@@ -602,12 +602,12 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                 {activeTab === 'versions' && (
                   <div className="border rounded-lg overflow-hidden">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-50 border-b">
+                      <thead className="bg-[var(--ui-bg-subtle)] border-b">
                         <tr>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">状态</th>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-44">创建时间</th>
-                          <th className="px-3 py-2 text-right text-gray-500 font-medium w-24">操作</th>
+                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">版本</th>
+                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20">状态</th>
+                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-44">创建时间</th>
+                          <th className="px-3 py-2 text-right text-[var(--ui-text-secondary)] font-medium w-24">操作</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
@@ -615,12 +615,12 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                           const isCurrent = v.id === currentRevisionId;
                           const isViewing = v.id === viewingVersionId;
                           return (
-                            <tr key={v.id} className={`hover:bg-gray-50 ${isViewing ? 'bg-blue-50' : ''}`}>
+                            <tr key={v.id} className={`hover:bg-[var(--ui-bg-hover)] ${isViewing ? 'bg-blue-50' : ''}`}>
                               <td className="px-3 py-2">{v.version}</td>
                               <td className="px-3 py-2">
                                 <Badge status={v.status} />
                               </td>
-                              <td className="px-3 py-2 text-gray-500">{formatDateTime(v.created_at)}</td>
+                              <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{formatDateTime(v.created_at)}</td>
                               <td className="px-3 py-2 text-right">
                                 {isCurrent ? (
                                   <span className="text-primary-600 text-xs">当前</span>
@@ -635,7 +635,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                           );
                         })}
                         {versions.length === 0 && (
-                          <tr><td colSpan={4} className="px-3 py-4 text-center text-gray-400">暂无版本历史</td></tr>
+                          <tr><td colSpan={4} className="px-3 py-4 text-center text-[var(--ui-text-tertiary)]">暂无版本历史</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -646,13 +646,13 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                 {activeTab === 'iterations' && (
                   <div className="border rounded-lg overflow-hidden">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-50 border-b">
+                      <thead className="bg-[var(--ui-bg-subtle)] border-b">
                         <tr>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">迭代</th>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium w-44">签入时间</th>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium">签入说明</th>
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium">创建人</th>
-                          <th className="px-3 py-2 text-right text-gray-500 font-medium w-24">操作</th>
+                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">迭代</th>
+                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-44">签入时间</th>
+                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">签入说明</th>
+                          <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">创建人</th>
+                          <th className="px-3 py-2 text-right text-[var(--ui-text-secondary)] font-medium w-24">操作</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
@@ -660,15 +660,15 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                           const isCurrent = it.id === currentIterationId;
                           const isViewing = it.id === viewingIterationId;
                           return (
-                            <tr key={it.id} className={`hover:bg-gray-50 ${isViewing ? 'bg-blue-50' : ''}`}>
+                            <tr key={it.id} className={`hover:bg-[var(--ui-bg-hover)] ${isViewing ? 'bg-blue-50' : ''}`}>
                               <td className="px-3 py-2">#{it.iteration}</td>
-                              <td className="px-3 py-2 text-gray-500">
+                              <td className="px-3 py-2 text-[var(--ui-text-secondary)]">
                                 {(it.check_in_date || it.created_at)
                                   ? new Date(it.check_in_date || it.created_at as string).toLocaleString('zh-CN', { hour12: false })
                                   : '-'}
                               </td>
                               <td className="px-3 py-2 text-gray-700">{it.check_in_note || '-'}</td>
-                              <td className="px-3 py-2 text-gray-500">{(it as any).creator_name || '-'}</td>
+                              <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{(it as any).creator_name || '-'}</td>
                               <td className="px-3 py-2 text-right">
                                 <div className="flex items-center justify-end gap-2">
                                   {isCurrent ? (
@@ -699,7 +699,7 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
                           );
                         })}
                         {iterations.length === 0 && (
-                          <tr><td colSpan={4} className="px-3 py-4 text-center text-gray-400">暂无迭代记录</td></tr>
+                          <tr><td colSpan={4} className="px-3 py-4 text-center text-[var(--ui-text-tertiary)]">暂无迭代记录</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -773,8 +773,8 @@ export default function DocumentDetailModal({ open, revisionId, onClose, onSaved
 
 function InfoCard({ label, readonly, children }: { label: string; readonly: boolean; children: React.ReactNode }) {
   return (
-    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
+    <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+      <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{label}</div>
       {children}
     </div>
   );

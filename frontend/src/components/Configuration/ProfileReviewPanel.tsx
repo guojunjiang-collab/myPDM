@@ -23,12 +23,12 @@ export default function ProfileReviewPanel({ reviewers, records, reviewMode, can
 
   return (
     <div className="space-y-3">
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-[var(--ui-text-secondary)]">
         审批模式：{reviewMode === 'any' ? '或签（任一通过）' : '会签（全部通过）'}
       </div>
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-gray-500">
+          <tr className="text-left text-[var(--ui-text-secondary)]">
             <th className="py-1">审批人</th>
             <th>结果</th>
             <th>意见</th>

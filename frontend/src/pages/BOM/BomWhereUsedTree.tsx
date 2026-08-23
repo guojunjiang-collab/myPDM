@@ -64,7 +64,7 @@ export default function BomWhereUsedTree({ revisionId, root, onViewEntity, onSta
 
   if (loading) {
     return (
-      <div className="text-center py-8 text-gray-400 bg-white rounded-lg border border-gray-200">
+      <div className="text-center py-8 text-[var(--ui-text-tertiary)] bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)]">
         反查中...
       </div>
     );
@@ -84,38 +84,38 @@ export default function BomWhereUsedTree({ revisionId, root, onViewEntity, onSta
 
   if (searched && traceResult.length === 0) {
     return (
-      <div className="text-gray-400 text-sm py-2">暂无引用</div>
+      <div className="text-[var(--ui-text-tertiary)] text-sm py-2">暂无引用</div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200">
-      <div className="p-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-        <span className="text-sm text-gray-600">
+    <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)]">
+      <div className="p-3 border-b border-[var(--ui-border)] bg-[var(--ui-bg-subtle)] flex items-center justify-between">
+        <span className="text-sm text-[var(--ui-text-secondary)]">
           找到 {traceResult.length} 个关联节点（{traceTree.length} 个顶层）
         </span>
       </div>
       <div className="overflow-auto max-h-[calc(100vh-360px)]">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b sticky top-0">
+          <thead className="bg-[var(--ui-bg-subtle)] border-b sticky top-0">
             <tr>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">层级</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">类型</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium">件号</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">版本</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">状态</th>
-              <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">用量</th>
+              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">层级</th>
+              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20">类型</th>
+              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">件号</th>
+              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">名称</th>
+              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20">版本</th>
+              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20">状态</th>
+              <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20">用量</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {root && (
               <tr
-                className="bg-gray-50 hover:bg-gray-100 cursor-pointer"
+                className="bg-[var(--ui-bg-subtle)] hover:bg-[var(--ui-bg-hover)] cursor-pointer"
                 onClick={() => onViewEntity(root.masterId, root.revisionId)}
               >
                 <td className="px-3 py-2 whitespace-nowrap text-left">
-                  <span className="text-xs text-gray-400">0</span>
+                  <span className="text-xs text-[var(--ui-text-tertiary)]">0</span>
                 </td>
                 <td className="px-3 py-2">
                   <Badge tone="gray" label="零部件" />
@@ -136,7 +136,7 @@ export default function BomWhereUsedTree({ revisionId, root, onViewEntity, onSta
               return (
                 <tr
                   key={`${item.bom_item_id}-${idx}`}
-                  className="hover:bg-gray-50 cursor-pointer"
+                  className="hover:bg-[var(--ui-bg-hover)] cursor-pointer"
                   onClick={() => {
                     if (!parent) return;
                     onViewEntity(parent.master_id || parent.id, parent.revision_id);
@@ -144,7 +144,7 @@ export default function BomWhereUsedTree({ revisionId, root, onViewEntity, onSta
                 >
                   <td className="px-3 py-2 whitespace-nowrap text-left">
                     <span className="inline-flex items-center gap-0.5">
-                      <span className="text-xs text-gray-400">{'-'.repeat(item.level)}{item.level}</span>
+                      <span className="text-xs text-[var(--ui-text-tertiary)]">{'-'.repeat(item.level)}{item.level}</span>
                       {hasChildren ? (
                         <TreeToggle expanded={node.expanded} onClick={() => toggleTraceNode(item.bom_item_id)} size="sm" />
                       ) : (
@@ -157,7 +157,7 @@ export default function BomWhereUsedTree({ revisionId, root, onViewEntity, onSta
                   </td>
                   <td className="px-3 py-2 font-medium">{parent?.code || '-'}</td>
                   <td className="px-3 py-2">{parent?.name || '-'}</td>
-                  <td className="px-3 py-2 text-gray-500">{parent?.version || '-'}</td>
+                  <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{parent?.version || '-'}</td>
                   <td className="px-3 py-2">
                     <Badge status={parent?.status} />
                   </td>

@@ -577,7 +577,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
   };
 
   const partStatusBadge = (s: string | undefined) => {
-    if (!s || s === '-') return <span className="text-gray-400">-</span>;
+    if (!s || s === '-') return <span className="text-[var(--ui-text-tertiary)]">-</span>;
     return <Badge status={s} />;
   };
 
@@ -602,24 +602,24 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
     const hasSelectedParts = node.parts.some(p => p.is_selected);
 
     rows.push(
-      <tr key={node.id} className="bg-gray-50/70 cursor-pointer hover:bg-purple-50 transition-colors"
+      <tr key={node.id} className="bg-[var(--ui-bg-subtle)] cursor-pointer hover:bg-purple-50 transition-colors"
         onClick={() => handleFormalRowClick('config_item', node.id)}>
-        <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+        <td className="px-3 py-2 text-xs text-[var(--ui-text-secondary)] whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
           {levelPrefix}{level}
           {hasChildren ? (
             <button type="button" onClick={(e) => { e.stopPropagation(); toggleFormalExpand(node.id); }}
-              className="inline-flex items-center text-gray-400 hover:text-gray-600 cursor-pointer select-none ml-1">
+              className="inline-flex items-center text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] cursor-pointer select-none ml-1">
               {isExpanded ? '\u25bc' : '\u25b6'}
             </button>
           ) : null}
         </td>
         <td className="px-3 py-2 text-sm font-medium text-gray-700">{node.code}</td>
-        <td className="px-3 py-2 text-sm text-gray-600">{node.name}</td>
+        <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{node.name}</td>
         <td className="px-3 py-2 text-xs whitespace-nowrap">
           <Badge tone="purple" label="构型项" />
         </td>
-        <td className="px-3 py-2 text-sm text-gray-500">{node.version || '-'}</td>
-        <td className="px-3 py-2 text-sm text-gray-500">{partStatusBadge(node.status)}</td>
+        <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{node.version || '-'}</td>
+        <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{partStatusBadge(node.status)}</td>
         <td className="px-3 py-2 text-center text-sm">{node.quantity ?? 1}</td>
       </tr>
     );
@@ -632,14 +632,14 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         rows.push(
           <tr key={part.id} className="cursor-pointer hover:bg-blue-50 transition-colors"
             onClick={() => handleFormalRowClick(part.item_type, part.item_id)}>
-            <td className="px-3 py-2 text-xs text-gray-400 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>{'-'.repeat(level)}</td>
-            <td className="px-3 py-2 text-sm font-mono text-gray-600">{part.item_code}</td>
-            <td className="px-3 py-2 text-sm text-gray-600">{part.item_name || '-'}</td>
+            <td className="px-3 py-2 text-xs text-[var(--ui-text-tertiary)] whitespace-nowrap" onClick={(e) => e.stopPropagation()}>{'-'.repeat(level)}</td>
+            <td className="px-3 py-2 text-sm font-mono text-[var(--ui-text-secondary)]">{part.item_code}</td>
+            <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{part.item_name || '-'}</td>
             <td className="px-3 py-2 text-sm whitespace-nowrap">
               <Badge tone={part.item_type === 'assembly' ? 'blue' : 'gray'} label={part.item_type === 'assembly' ? '部件' : '零件'} />
             </td>
-            <td className="px-3 py-2 text-sm text-gray-500">{part.item_version || '-'}</td>
-            <td className="px-3 py-2 text-sm text-gray-500">{partStatusBadge(part.item_status)}</td>
+            <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{part.item_version || '-'}</td>
+            <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{partStatusBadge(part.item_status)}</td>
             <td className="px-3 py-2 text-center text-sm">{part.quantity ?? 1}</td>
           </tr>
         );
@@ -664,26 +664,26 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
 
     // ── Config Item Row ──
     rows.push(
-      <tr key={node.id} className="bg-gray-50/70 hover:bg-purple-50 transition-colors">
-        <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+      <tr key={node.id} className="bg-[var(--ui-bg-subtle)] hover:bg-purple-50 transition-colors">
+        <td className="px-3 py-2 text-xs text-[var(--ui-text-secondary)] whitespace-nowrap">
           {levelPrefix}{level}
           {hasChildren ? (
             <button
               type="button"
               onClick={() => toggleExpand(node.id)}
-              className="inline-flex items-center text-gray-400 hover:text-gray-600 cursor-pointer select-none ml-1"
+              className="inline-flex items-center text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] cursor-pointer select-none ml-1"
             >
               {isExpanded ? '\u25bc' : '\u25b6'}
             </button>
           ) : null}
         </td>
         <td className="px-3 py-2 text-sm font-medium text-gray-700">{node.code}</td>
-        <td className="px-3 py-2 text-sm text-gray-600">{node.name}</td>
+        <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{node.name}</td>
         <td className="px-3 py-2 text-xs whitespace-nowrap">
           <Badge tone="purple" label="构型项" />
         </td>
-        <td className="px-3 py-2 text-sm text-gray-500">{node.version || '-'}</td>
-        <td className="px-3 py-2 text-sm text-gray-500">{partStatusBadge(node.status)}</td>
+        <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{node.version || '-'}</td>
+        <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{partStatusBadge(node.status)}</td>
         <td className="px-3 py-2 text-center text-sm">{node.quantity ?? 1}</td>
         <td className="px-3 py-2 text-center whitespace-nowrap">
           <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
@@ -705,18 +705,18 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
       for (const part of node.parts) {
         if (part.item_type === 'config_item') continue;
         rows.push(
-        <tr key={part.id} className={`${!node.is_selected ? 'opacity-40' : ''} hover:bg-gray-50/50 transition-colors`}>
-          <td className="px-3 py-2 text-xs text-gray-400 whitespace-nowrap">
+        <tr key={part.id} className={`${!node.is_selected ? 'opacity-40' : ''} hover:bg-[var(--ui-bg-subtle)] transition-colors`}>
+          <td className="px-3 py-2 text-xs text-[var(--ui-text-tertiary)] whitespace-nowrap">
             <span className="inline-block w-4 mr-1" />
             {'-'.repeat(level)}
           </td>
-          <td className="px-3 py-2 text-sm font-mono text-gray-600">{part.item_code}</td>
-          <td className="px-3 py-2 text-sm text-gray-600">{part.item_name || '-'}</td>
+          <td className="px-3 py-2 text-sm font-mono text-[var(--ui-text-secondary)]">{part.item_code}</td>
+          <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{part.item_name || '-'}</td>
           <td className="px-3 py-2 text-sm whitespace-nowrap">
             <Badge tone={part.item_type === 'assembly' ? 'blue' : 'gray'} label={part.item_type === 'assembly' ? '部件' : '零件'} />
           </td>
-          <td className="px-3 py-2 text-sm text-gray-500">{part.item_version || '-'}</td>
-          <td className="px-3 py-2 text-sm text-gray-500">{partStatusBadge(part.item_status)}</td>
+          <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{part.item_version || '-'}</td>
+          <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{partStatusBadge(part.item_status)}</td>
           <td className="px-3 py-2 text-center text-sm">{part.quantity ?? 1}</td>
           <td className="px-3 py-2 text-center whitespace-nowrap">
             <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
@@ -818,7 +818,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
         )}
 
         {loading ? (
-          <div className="text-sm text-gray-400 py-8 text-center">加载中...</div>
+          <div className="text-sm text-[var(--ui-text-tertiary)] py-8 text-center">加载中...</div>
         ) : (
           <>
             {/* Basic Info */}
@@ -836,68 +836,68 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
               </div>
             ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                <label className="block text-xs text-gray-500 mb-0.5">编号 {isCreate && '*'}</label>
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">编号 {isCreate && '*'}</label>
                 <Input size="xs"
                   value={form.code}
                   onChange={(e) => setForm({ ...form, code: e.target.value })}
                   disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
-                  className="disabled:text-gray-400 placeholder:text-gray-300"
+                  className="disabled:text-[var(--ui-text-tertiary)] placeholder:text-gray-300"
                   placeholder="如 CFG-PROFILE-001"
                 />
               </div>
-              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                <label className="block text-xs text-gray-500 mb-0.5">名称 {isCreate && '*'}</label>
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">名称 {isCreate && '*'}</label>
                 <Input size="xs"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
-                  className="disabled:text-gray-400 placeholder:text-gray-300"
+                  className="disabled:text-[var(--ui-text-tertiary)] placeholder:text-gray-300"
                   placeholder="如 A型机翼配置"
                 />
               </div>
-              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                <label className="block text-xs text-gray-500 mb-0.5">架次起始</label>
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">架次起始</label>
                 <Input size="xs"
                   value={form.effectivity_start}
                   onChange={(e) => setForm({ ...form, effectivity_start: e.target.value })}
                   disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
-                  className="disabled:text-gray-400 placeholder:text-gray-300"
+                  className="disabled:text-[var(--ui-text-tertiary)] placeholder:text-gray-300"
                   placeholder="如 001"
                 />
               </div>
-              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                <label className="block text-xs text-gray-500 mb-0.5">架次结束</label>
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">架次结束</label>
                 <Input size="xs"
                   value={form.effectivity_end}
                   onChange={(e) => setForm({ ...form, effectivity_end: e.target.value })}
                   disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
-                  className="disabled:text-gray-400 placeholder:text-gray-300"
+                  className="disabled:text-[var(--ui-text-tertiary)] placeholder:text-gray-300"
                   placeholder="如 999"
                 />
               </div>
-              <div className="col-span-2 md:col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                <label className="block text-xs text-gray-500 mb-0.5">备注</label>
+              <div className="col-span-2 md:col-span-2 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">备注</label>
                 <Textarea size="xs"
                   ref={remarkRef}
                   value={form.remark}
                   onChange={(e) => setForm({ ...form, remark: e.target.value })}
                   rows={1}
                   disabled={!isCreate && (fieldDisabled || profile?.status !== 'draft')}
-                  className="resize-none disabled:text-gray-400"
+                  className="resize-none disabled:text-[var(--ui-text-tertiary)]"
                 />
               </div>
               {!isCreate && profile && (
-                <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                  <label className="block text-xs text-gray-500 mb-0.5">状态</label>
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                  <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">状态</label>
                   <div className="flex items-center gap-2 pt-0.5">
                     <ProfileStatusBadge status={profile.status} />
                   </div>
                 </div>
               )}
               {!isView && (!isCreate ? (profile && profile.status === 'draft') : true) && (
-                <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                  <label className="block text-xs text-gray-500 mb-0.5">审批模式</label>
+                <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                  <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">审批模式</label>
                   <div className="flex gap-3 pt-0.5 text-sm">
                     <label className="flex items-center gap-1 cursor-pointer">
                       <input type="radio" checked={reviewMode === 'all'} onChange={() => setReviewMode('all')}
@@ -947,11 +947,11 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                   </div>
                   <div className="space-y-1">
                     {reviewers.length === 0 && (
-                      <div className="text-sm text-gray-400 py-2">暂无审批人（提交时将自动生效）</div>
+                      <div className="text-sm text-[var(--ui-text-tertiary)] py-2">暂无审批人（提交时将自动生效）</div>
                     )}
                     {reviewers.map((rv, i) => (
                       <div key={i} className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400 w-5">{rv.seq || i + 1}</span>
+                        <span className="text-xs text-[var(--ui-text-tertiary)] w-5">{rv.seq || i + 1}</span>
                         <Select size="xs" value={rv.user_id}
                           onChange={(e) => updateReviewer(i, e.target.value)}
                           disabled={usersLoading}
@@ -1018,18 +1018,18 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
 
                 {/* Table-based checklist */}
                 {configTree ? (
-                  <div className="border border-gray-200 rounded-lg overflow-hidden max-h-[500px] overflow-y-auto bg-white">
+                  <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden max-h-[500px] overflow-y-auto bg-[var(--ui-bg-surface)]">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-100 sticky top-0 z-10">
                         <tr>
-                          <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-20">层级</th>
-                          <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-44 whitespace-nowrap">构型号/零部件件号</th>
-                          <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-28">名称</th>
-                          <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-16 whitespace-nowrap">类型</th>
-                          <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-16">版本</th>
-                          <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-16">状态</th>
-                          <th className="text-center px-3 py-2 text-sm font-medium text-gray-500 w-12">数量</th>
-                          <th className="text-center px-3 py-2 text-sm font-medium text-gray-500 w-24">可选</th>
+                          <th className="text-left px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-20">层级</th>
+                          <th className="text-left px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-44 whitespace-nowrap">构型号/零部件件号</th>
+                          <th className="text-left px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-28">名称</th>
+                          <th className="text-left px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-16 whitespace-nowrap">类型</th>
+                          <th className="text-left px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-16">版本</th>
+                          <th className="text-left px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-16">状态</th>
+                          <th className="text-center px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-12">数量</th>
+                          <th className="text-center px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-24">可选</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
@@ -1038,8 +1038,8 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
                     </table>
                   </div>
                 ) : (
-                  <div className="border border-gray-200 rounded-lg p-4 text-center">
-                    <p className="text-xs text-gray-400">
+                  <div className="border border-[var(--ui-border)] rounded-lg p-4 text-center">
+                    <p className="text-xs text-[var(--ui-text-tertiary)]">
                       {form.configuration_item_revision_id ? '请先关联构型项以展开配置清单' : '暂无关联构型项，无法生成配置清单'}
                     </p>
                   </div>
@@ -1051,17 +1051,17 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
             {profile && configTree && (
               <div className="border-t pt-3">
                 <h4 className="text-sm font-bold text-gray-700 mb-2">正式配置清单</h4>
-                <div className="border border-gray-200 rounded-lg overflow-hidden max-h-[600px] overflow-y-auto bg-white">
+                <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden max-h-[600px] overflow-y-auto bg-[var(--ui-bg-surface)]">
                   <table className="w-full text-sm">
                     <thead className="bg-gray-100 sticky top-0 z-10">
                       <tr>
-                        <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-20">层级</th>
-                        <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-44 whitespace-nowrap">构型号/零部件件号</th>
-                        <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-28">名称</th>
-                        <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-16 whitespace-nowrap">类型</th>
-                        <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-16">版本</th>
-                        <th className="text-left px-3 py-2 text-sm font-medium text-gray-500 w-16">状态</th>
-                        <th className="text-center px-3 py-2 text-sm font-medium text-gray-500 w-12">数量</th>
+                        <th className="text-left px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-20">层级</th>
+                        <th className="text-left px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-44 whitespace-nowrap">构型号/零部件件号</th>
+                        <th className="text-left px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-28">名称</th>
+                        <th className="text-left px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-16 whitespace-nowrap">类型</th>
+                        <th className="text-left px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-16">版本</th>
+                        <th className="text-left px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-16">状态</th>
+                        <th className="text-center px-3 py-2 text-sm font-medium text-[var(--ui-text-secondary)] w-12">数量</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -1076,13 +1076,13 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
             {profile && profile.status !== 'draft' && !isCreate && (profile.status_logs || []).length > 0 && (
               <div className="border-t pt-3">
                 <h4 className="text-sm font-bold text-gray-700 mb-2">状态日志</h4>
-                <ul className="text-xs text-gray-500 space-y-1 max-h-32 overflow-y-auto">
+                <ul className="text-xs text-[var(--ui-text-secondary)] space-y-1 max-h-32 overflow-y-auto">
                   {(profile.status_logs || []).map((l) => (
                     <li key={l.id} className="flex gap-2">
-                      <span className="text-gray-400">{l.created_at ? new Date(l.created_at).toLocaleString() : ''}</span>
+                      <span className="text-[var(--ui-text-tertiary)]">{l.created_at ? new Date(l.created_at).toLocaleString() : ''}</span>
                       <span>{l.from_status || '—'} → {l.to_status}</span>
                       <span>{l.operator_name}</span>
-                      <span className="text-gray-400">{l.comment}</span>
+                      <span className="text-[var(--ui-text-tertiary)]">{l.comment}</span>
                     </li>
                   ))}
                 </ul>
@@ -1094,7 +1094,7 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
       </div>
 
       {/* Footer Buttons — 置于滚动容器外侧，始终可见 */}
-      <div className="flex justify-end gap-2 pt-3 mt-3 border-t border-gray-200">
+      <div className="flex justify-end gap-2 pt-3 mt-3 border-t border-[var(--ui-border)]">
         <Button variant="secondary" onClick={onClose}>
           关闭
         </Button>
@@ -1147,9 +1147,9 @@ export default function ProfileEditModal({ open, profileId, readOnly, onClose, o
 
 function InfoItem({ label, value, className }: { label: string; value: React.ReactNode; className?: string }) {
   return (
-    <div className={`bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 ${className || ''}`}>
-      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-      <div className="text-sm text-gray-900 font-medium whitespace-pre-wrap">{value}</div>
+    <div className={`bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100 ${className || ''}`}>
+      <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{label}</div>
+      <div className="text-sm text-[var(--ui-text-primary)] font-medium whitespace-pre-wrap">{value}</div>
     </div>
   );
 }

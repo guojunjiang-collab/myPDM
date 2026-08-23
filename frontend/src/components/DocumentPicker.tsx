@@ -238,39 +238,39 @@ export default function DocumentPicker({
       <div className="space-y-4 max-h-[75vh] flex flex-col">
         {/* ---- 1. 已选 ---- */}
         <div className="border rounded-lg overflow-hidden">
-          <div className="bg-gray-50 border-b px-4 py-2 flex items-center justify-between">
+          <div className="bg-[var(--ui-bg-subtle)] border-b px-4 py-2 flex items-center justify-between">
             <span className="text-sm font-medium text-gray-700">
               已选图文档{selectedList.length > 0 ? ` (${selectedList.length})` : ''}
             </span>
           </div>
           {selectedList.length === 0 ? (
-            <div className="px-4 py-6 text-center text-sm text-gray-400">请在下方列表中选择要关联的图文档</div>
+            <div className="px-4 py-6 text-center text-sm text-[var(--ui-text-tertiary)]">请在下方列表中选择要关联的图文档</div>
           ) : (
             <div className="overflow-x-auto max-h-48 overflow-y-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b sticky top-0">
+                <thead className="bg-[var(--ui-bg-subtle)] border-b sticky top-0">
                   <tr>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档编号</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档名称</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">图文档编号</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">图文档名称</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">版本</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">状态</th>
                     {fieldDefs.map((def) => (
-                      <th key={def.id} className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap">{def.name}</th>
+                      <th key={def.id} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium whitespace-nowrap">{def.name}</th>
                     ))}
-                    <th className="px-3 py-2 text-right text-gray-500 font-medium w-12"></th>
+                    <th className="px-3 py-2 text-right text-[var(--ui-text-secondary)] font-medium w-12"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {selectedList.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50">
+                    <tr key={item.id} className="hover:bg-[var(--ui-bg-hover)]">
                       <td className="px-3 py-2 font-medium">{item.code}</td>
                       <td className="px-3 py-2">{item.name}</td>
-                      <td className="px-3 py-2 text-gray-500">{item.version}</td>
+                      <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{item.version}</td>
                       <td className="px-3 py-2">
                         <Badge status={item.status} />
                       </td>
                       {fieldDefs.map((def) => (
-                        <td key={def.id} className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                        <td key={def.id} className="px-3 py-2 text-[var(--ui-text-secondary)] whitespace-nowrap">
                           {renderFieldValue((fieldValues[item.id] || {})[def.id])}
                         </td>
                       ))}
@@ -315,7 +315,7 @@ export default function DocumentPicker({
             </Button>
           </div>
           {quickOpen && (
-            <div className="px-4 py-3 border-t space-y-2 bg-gray-50">
+            <div className="px-4 py-3 border-t space-y-2 bg-[var(--ui-bg-subtle)]">
               <div className="flex gap-2">
                 <Input value={quickForm.code} onChange={e => setQuickForm({ ...quickForm, code: e.target.value })} placeholder="编号 *" size="xs" className="flex-1" />
                 <Input value={quickForm.name} onChange={e => setQuickForm({ ...quickForm, name: e.target.value })} placeholder="名称 *" size="xs" className="flex-1" />
@@ -334,21 +334,21 @@ export default function DocumentPicker({
         <div className="border rounded-lg overflow-hidden flex-1 min-h-0">
           <div className="overflow-y-auto max-h-64">
             {loading ? (
-              <div className="px-4 py-8 text-center text-sm text-gray-400">加载中...</div>
+              <div className="px-4 py-8 text-center text-sm text-[var(--ui-text-tertiary)]">加载中...</div>
             ) : filtered.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm text-gray-400">无匹配结果</div>
+              <div className="px-4 py-8 text-center text-sm text-[var(--ui-text-tertiary)]">无匹配结果</div>
             ) : (
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b sticky top-0">
+                <thead className="bg-[var(--ui-bg-subtle)] border-b sticky top-0">
                   <tr>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档编号</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档名称</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">图文档编号</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">图文档名称</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">版本</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">状态</th>
                     {fieldDefs.map((def) => (
-                      <th key={def.id} className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap">{def.name}</th>
+                      <th key={def.id} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium whitespace-nowrap">{def.name}</th>
                     ))}
-                    <th className="px-3 py-2 text-center text-gray-500 font-medium w-20">操作</th>
+                    <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-20">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -356,15 +356,15 @@ export default function DocumentPicker({
                     const docId = item.id || item.revision_id || '';
                     const isAdded = selected.has(docId);
                     return (
-                      <tr key={item.id} className="hover:bg-gray-50">
+                      <tr key={item.id} className="hover:bg-[var(--ui-bg-hover)]">
                         <td className="px-3 py-2 font-medium">{item.code}</td>
                         <td className="px-3 py-2">{item.name}</td>
-                        <td className="px-3 py-2 text-gray-500">{item.version}</td>
+                        <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{item.version}</td>
                         <td className="px-3 py-2">
                           <Badge status={item.status} />
                         </td>
                         {fieldDefs.map((def) => (
-                          <td key={def.id} className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                          <td key={def.id} className="px-3 py-2 text-[var(--ui-text-secondary)] whitespace-nowrap">
                             {renderFieldValue(item.customFieldValues[def.id])}
                           </td>
                         ))}
@@ -388,7 +388,7 @@ export default function DocumentPicker({
 
         {/* ---- 底部 ---- */}
         <div className="flex justify-between items-center pt-2 border-t">
-          <span className="text-sm text-gray-500">已选 <span className="font-medium text-gray-700">{selectedList.length}</span> 项</span>
+          <span className="text-sm text-[var(--ui-text-secondary)]">已选 <span className="font-medium text-gray-700">{selectedList.length}</span> 项</span>
           <div className="flex gap-2">
             <Button variant="secondary" type="button" onClick={handleCancel}>取消</Button>
             <Button type="button" onClick={handleConfirm} disabled={selectedList.length === 0}>

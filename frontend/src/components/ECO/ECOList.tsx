@@ -164,24 +164,24 @@ export function ECOList() {
         <div className="flex-1" />
         {canEdit() && <Button onClick={() => { editReqId.current++; setEditingEco(null); setCreateOpen(true); }}>+ 新建 ECO</Button>}
       </div>
-      <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
+      <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+          <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] sticky top-0 z-10">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">ECO 编号</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">标题</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">状态</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">优先级</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">创建人</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-500 whitespace-nowrap">创建时间</th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500 whitespace-nowrap">操作</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">ECO 编号</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)]">标题</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">状态</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">优先级</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">创建人</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">创建时间</th>
+              <th className="px-4 py-3 text-right text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {loading ? (<tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">加载中...</td></tr>)
-              : ecos.length === 0 ? (<tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">暂无数据</td></tr>)
+            {loading ? (<tr><td colSpan={7} className="px-4 py-12 text-center text-[var(--ui-text-tertiary)]">加载中...</td></tr>)
+              : ecos.length === 0 ? (<tr><td colSpan={7} className="px-4 py-12 text-center text-[var(--ui-text-tertiary)]">暂无数据</td></tr>)
                 : ecos.map(eco => (
-                  <tr key={eco.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setDetailId(eco.id)}>
+                  <tr key={eco.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => setDetailId(eco.id)}>
                     <td className="px-4 py-3 text-sm font-medium whitespace-nowrap">{eco.eco_number}</td>
                     <td className="px-4 py-3 text-sm font-medium max-w-48 truncate">{eco.title}</td>
                     <td className="px-4 py-3 font-medium whitespace-nowrap"><ECOStatusBadge status={eco.status} /></td>
@@ -196,11 +196,11 @@ export function ECOList() {
       </div>
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-4 shrink-0">
-          <span className="text-sm text-gray-500">共 {total} 条，第 {page} / {totalPages} 页</span>
+          <span className="text-sm text-[var(--ui-text-secondary)]">共 {total} 条，第 {page} / {totalPages} 页</span>
           <div className="flex gap-1 justify-end">
             <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}>上一页</Button>
             {Array.from({ length: totalPages }, (_, i) => i + 1).filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2).map((p, idx, arr) => (
-              <span key={p}>{idx > 0 && arr[idx - 1] !== p - 1 && <span className="px-1 text-gray-400">...</span>}
+              <span key={p}>{idx > 0 && arr[idx - 1] !== p - 1 && <span className="px-1 text-[var(--ui-text-tertiary)]">...</span>}
                 <Button variant={p === page ? 'primary' : 'secondary'} size="sm" onClick={() => setPage(p)}>{p}</Button></span>
             ))}
             <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>下一页</Button>

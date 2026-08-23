@@ -148,7 +148,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
   const hoverClass = (row: BOMRow) => {
     if (row.match_status === 'new') return 'bg-yellow-100';
     if (row.checkout_status === 'checked_out') return 'bg-blue-100';
-    return 'bg-gray-100';
+    return 'bg-[var(--ui-bg-hover)]';
   };
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
@@ -812,12 +812,12 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
   return (
     <div className="flex flex-col h-full">
       {/* 汇总栏 */}
-      <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 border-b border-gray-200 flex-wrap shrink-0">
+      <div className="flex items-center gap-3 px-4 py-2 bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] flex-wrap shrink-0">
         <Badge tone="green" label={`已匹配 ${totalMatched}`} />
         <Badge tone="amber" label={`可新建 ${totalNew}`} />
         <Badge tone="red" label={`冲突 ${totalConflict}`} />
         <Badge tone="blue" label={`已签出 ${totalCheckedOut}`} />
-        <label className="flex items-center gap-1 text-xs text-gray-600 ml-1">
+        <label className="flex items-center gap-1 text-xs text-[var(--ui-text-secondary)] ml-1">
           展开层级
           <Select
             value={expandSel}
@@ -853,7 +853,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
           {/* ====== 左表：固定列 ====== */}
           <table className="border-collapse text-xs whitespace-nowrap">
               <thead className="sticky top-0 z-10">
-                <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
+                <tr className="bg-[var(--ui-bg-subtle)] shadow-[0_2px_0_0_#e5e7eb]">
                   <th className="p-2 text-left" style={{ width: 180, paddingLeft: 28 }}>件号</th>
                   <th className="p-2 text-center" style={{ width: 40 }}>用量</th>
                   {BUILTIN_COLUMNS.map(col => (
@@ -876,7 +876,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                   <tr key={row.path}
                     onMouseEnter={() => setHoveredIndex(ri)}
                     onMouseLeave={() => setHoveredIndex(null)}
-                    className={`border-b border-gray-200 transition-colors ${hoveredIndex === ri ? hoverClass(row) : ''}`}>
+                    className={`border-b border-[var(--ui-border)] transition-colors ${hoveredIndex === ri ? hoverClass(row) : ''}`}>
                     <td
                       className="relative p-2 font-medium whitespace-nowrap"
                       style={{ width: 180, paddingLeft: `calc(8px + ${row.level} * var(--ui-tree-indent))` }}
@@ -891,7 +891,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                       <span className="inline-flex items-center gap-1">
                         {expandable ? (
                           <button type="button" onClick={() => toggleCollapse(row.path)}
-                            className="w-4 h-4 inline-flex items-center justify-center shrink-0 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-200/60"
+                            className="w-4 h-4 inline-flex items-center justify-center shrink-0 rounded text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] hover:bg-gray-200/60"
                             title={collapsed ? '展开' : '折叠'}>
                             <BomChevron expanded={!collapsed} />
                           </button>
@@ -927,16 +927,16 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                       );
                     })}
                     <td className="p-2 text-center" style={{ width: 90 }}>
-                      {(() => { const n = row.pdm_match?.revision_id ? attCounts[row.pdm_match.revision_id]?.cad : undefined; return (<div className={`${n ? 'font-semibold text-blue-600' : 'text-gray-500'}`}>{n !== undefined ? n : '—'}</div>); })()}
+                      {(() => { const n = row.pdm_match?.revision_id ? attCounts[row.pdm_match.revision_id]?.cad : undefined; return (<div className={`${n ? 'font-semibold text-blue-600' : 'text-[var(--ui-text-secondary)]'}`}>{n !== undefined ? n : '—'}</div>); })()}
                       {isCheckedOutByMe(row) && <Button size="xs" onClick={() => handleUploadCAD(row)} disabled={uploadingCad === row.path} title={row.doc_path || 'CATIA 源文件路径未知'} className="mt-1">{uploadingCad === row.path ? '上传中...' : '上传源文件'}</Button>}
-                      {!row.pdm_match && <span className="text-gray-400">—</span>}
+                      {!row.pdm_match && <span className="text-[var(--ui-text-tertiary)]">—</span>}
                       {row.pdm_match && !isCheckedOutByMe(row) && !isCheckedOutByOther(row) && <Button disabled size="xs" className="mt-1" variant="secondary">需签出</Button>}
                       {isCheckedOutByOther(row) && <Button disabled size="xs" className="mt-1" variant="secondary">他人签出</Button>}
                     </td>
                     <td className="p-2 text-center" style={{ width: 100 }}>
-                      {(() => { const n = row.pdm_match?.revision_id ? attCounts[row.pdm_match.revision_id]?.production : undefined; return (<div className={`${n ? 'font-semibold text-amber-600' : 'text-gray-500'}`}>{n !== undefined ? n : '—'}</div>); })()}
+                      {(() => { const n = row.pdm_match?.revision_id ? attCounts[row.pdm_match.revision_id]?.production : undefined; return (<div className={`${n ? 'font-semibold text-amber-600' : 'text-[var(--ui-text-secondary)]'}`}>{n !== undefined ? n : '—'}</div>); })()}
                       {isCheckedOutByMe(row) && (<div className="flex gap-1 justify-center mt-1"><Button size="xs" variant="danger" onClick={() => handleUploadPDF(row)} disabled={uploadingPdf === row.path} title="工程图转PDF上传">{uploadingPdf === row.path ? '转换中...' : 'PDF'}</Button><Button size="xs" variant="dark" onClick={() => handleUploadSTP(row)} disabled={uploadingStp === row.path} title="导出STP上传">{uploadingStp === row.path ? '导出中...' : 'STP'}</Button></div>)}
-                      {!row.pdm_match && <span className="text-gray-400">—</span>}
+                      {!row.pdm_match && <span className="text-[var(--ui-text-tertiary)]">—</span>}
                       {row.pdm_match && !isCheckedOutByMe(row) && !isCheckedOutByOther(row) && <Button disabled size="xs" className="mt-1" variant="secondary">需签出</Button>}
                       {isCheckedOutByOther(row) && <Button disabled size="xs" className="mt-1" variant="secondary">他人签出</Button>}
                     </td>
@@ -956,7 +956,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                       {row.checkout_status === 'not_checked_out' && <Badge status="not_checked_out" domain="checkout" />}
                       {row.checkout_status === 'checked_out' && <Badge status="checked_out" domain="checkout" />}
                       {row.checkout_status === 'other_checked_out' && <Badge status="other_checked_out" domain="checkout" />}
-                      {row.checkout_status === null && <span className="text-gray-400">—</span>}
+                      {row.checkout_status === null && <span className="text-[var(--ui-text-tertiary)]">—</span>}
                     </td>
                     <td className="p-2 text-center" style={{ width: 160 }}>
                       <div className="flex gap-1 flex-wrap justify-center">
@@ -989,10 +989,10 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
         </div>
 
         {/* ====== 右区：自定义字段（单表结构，表头 sticky，保证列宽对齐） ====== */}
-        <div ref={rightScrollRef} className="flex-1 min-w-0 border-l-2 border-gray-200 overflow-auto" onScroll={handleRightScroll}>
+        <div ref={rightScrollRef} className="flex-1 min-w-0 border-l-2 border-[var(--ui-border)] overflow-auto" onScroll={handleRightScroll}>
           <table className="border-collapse text-xs whitespace-nowrap w-full">
             <thead className="sticky top-0 z-10">
-              <tr className="bg-gray-50 shadow-[0_2px_0_0_#e5e7eb]">
+              <tr className="bg-[var(--ui-bg-subtle)] shadow-[0_2px_0_0_#e5e7eb]">
                 {propertyColumns.map(col => (
                   <th key={col} className="p-2 text-left" style={{ width: 250 }}>{col}</th>
                 ))}
@@ -1005,7 +1005,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
                 <tr key={row.path}
                   onMouseEnter={() => setHoveredIndex(ri)}
                   onMouseLeave={() => setHoveredIndex(null)}
-                  className={`border-b border-gray-200 transition-colors ${hoveredIndex === ri ? hoverClass(row) : ''}`}>
+                  className={`border-b border-[var(--ui-border)] transition-colors ${hoveredIndex === ri ? hoverClass(row) : ''}`}>
                   {propertyColumns.map(col => {
                     const catiaProp = getCatiaPropForPdmField(col);
                     const fieldDef = fieldDefs.find((d: any) => d.name === col);

@@ -332,19 +332,19 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
 
     return (
       <>
-        <tr key={idx} className="hover:bg-gray-50">
-          <td className="px-3 py-2 text-sm text-gray-400 whitespace-nowrap">
+        <tr key={idx} className="hover:bg-[var(--ui-bg-hover)]">
+          <td className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)] whitespace-nowrap">
             {levelStr}
             {hasChildren && !isEmpty && (
               <button onClick={(e) => { e.stopPropagation(); toggleChildExpand(idx, childId); }}
-                className="inline-flex items-center w-5 h-5 text-gray-400 hover:text-gray-600 ml-1">
+                className="inline-flex items-center w-5 h-5 text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] ml-1">
                 {childRows ? '\u25bc' : '\u25b6'}
               </button>
             )}
           </td>
           <td className="px-3 py-2 text-sm font-medium cursor-pointer hover:text-primary-600" onClick={() => setNestedEditItem({ id: c.child_id, code: c.child_code, name: c.child_name } as ConfigurationItem)}>{c.child_code}</td>
           <td className="px-3 py-2 text-sm cursor-pointer hover:text-primary-600" onClick={() => setNestedEditItem({ id: c.child_id, code: c.child_code, name: c.child_name } as ConfigurationItem)}>{c.child_name}</td>
-          <td className="px-3 py-2 text-sm text-gray-500 cursor-pointer hover:text-primary-600" onClick={() => setNestedEditItem({ id: c.child_id, code: c.child_code, name: c.child_name } as ConfigurationItem)}>{c.child_remark || '-'}</td>
+          <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)] cursor-pointer hover:text-primary-600" onClick={() => setNestedEditItem({ id: c.child_id, code: c.child_code, name: c.child_name } as ConfigurationItem)}>{c.child_remark || '-'}</td>
           <td className="px-3 py-2 text-center text-sm">
             {isRoot ? (
               <Input size="xs" type="number" min={1} value={c.quantity ?? 1}
@@ -381,7 +381,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
           </td>
         </tr>
         {childRows && childRows.map((cc: any, j: number) => renderChildRow(cc, level + 1, `${idx}-${j}`))}
-        {loadingChild === idx && <tr><td colSpan={7} className="px-3 py-2 text-sm text-gray-400 text-center">加载中...</td></tr>}
+        {loadingChild === idx && <tr><td colSpan={7} className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)] text-center">加载中...</td></tr>}
       </>
     );
   };
@@ -419,25 +419,25 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
 
         {/* 基本信息 */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-            <label className="block text-xs text-gray-500 mb-0.5">构型号 *</label>
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">构型号 *</label>
             <Input size="xs" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })}
               className="placeholder:text-gray-300" placeholder="如 CFG-001" />
           </div>
-          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-            <label className="block text-xs text-gray-500 mb-0.5">中文名称 *</label>
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">中文名称 *</label>
             <Input size="xs" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
               className="placeholder:text-gray-300" placeholder="如 A型机翼构型" />
           </div>
           {item && (
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-              <label className="block text-xs text-gray-500 mb-0.5">创建人</label>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">创建人</label>
               <div className="text-sm text-gray-700 py-1">{creatorName || '-'}</div>
             </div>
           )}
           {isEdit && (
-            <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 col-span-2 md:col-span-4">
-              <label className="block text-xs text-gray-500 mb-0.5">创建者</label>
+            <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100 col-span-2 md:col-span-4">
+              <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">创建者</label>
               <div className="text-sm text-gray-700 py-1">{creatorName || '-'}</div>
             </div>
           )}
@@ -449,8 +449,8 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
             <h4 className="text-sm font-bold text-gray-700 mb-2">自定义字段</h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {cfDefs.map(def => (
-                <div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                  <label className="block text-xs text-gray-500 mb-0.5">
+                <div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                  <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">
                     {def.name}
                     {def.is_required && <span className="text-red-500 ml-0.5">*</span>}
                   </label>
@@ -472,32 +472,32 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
             <Button size="sm" type="button" onClick={() => setPickerOpen(true)}>关联零部件</Button>
           </div>
           {parts.length === 0 ? (
-            <p className="text-xs text-gray-400">暂无关联零部件，点击"关联零部件"添加</p>
+            <p className="text-xs text-[var(--ui-text-tertiary)]">暂无关联零部件，点击"关联零部件"添加</p>
           ) : (
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-[var(--ui-bg-subtle)] border-b">
                   <tr>
-                    <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-16">类型</th>
-                    <th className="px-3 py-1.5 text-left text-xs text-gray-500">件号</th>
-                    <th className="px-3 py-1.5 text-left text-xs text-gray-500">名称</th>
-                    <th className="px-3 py-1.5 text-left text-xs text-gray-500">规格型号</th>
-                    <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-14">版本</th>
-                    <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-16">状态</th>
-                    <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-16">用量</th>
-                    <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-20">必选/可选</th>
-                    <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-24">操作</th>
+                    <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)] w-16">类型</th>
+                    <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)]">件号</th>
+                    <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)]">名称</th>
+                    <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)]">规格型号</th>
+                    <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)] w-14">版本</th>
+                    <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)] w-16">状态</th>
+                    <th className="px-3 py-1.5 text-center text-xs text-[var(--ui-text-secondary)] w-16">用量</th>
+                    <th className="px-3 py-1.5 text-center text-xs text-[var(--ui-text-secondary)] w-20">必选/可选</th>
+                    <th className="px-3 py-1.5 text-center text-xs text-[var(--ui-text-secondary)] w-24">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                    {parts.map((p, i) => (
-                     <tr key={i} className="hover:bg-gray-50 cursor-pointer" onClick={() => setEditingPartEntity({ type: p.part_type as 'part' | 'assembly', id: p.part_id })}>
+                     <tr key={i} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => setEditingPartEntity({ type: p.part_type as 'part' | 'assembly', id: p.part_id })}>
                        <td className="px-3 py-1.5 text-xs">
                          <Badge tone={p.part_type === 'assembly' ? 'blue' : 'gray'} label={p.part_type === 'assembly' ? '部件' : '零件'} />
                        </td>
                        <td className="px-3 py-1.5 text-xs font-mono">{p.part_code}</td>
                        <td className="px-3 py-1.5 text-xs">{p.part_name}</td>
-                       <td className="px-3 py-1.5 text-xs text-gray-500">{p.part_spec || '-'}</td>
+                       <td className="px-3 py-1.5 text-xs text-[var(--ui-text-secondary)]">{p.part_spec || '-'}</td>
                        <td className="px-3 py-1.5 text-xs">{p.part_version || '-'}</td>
                        <td className="px-3 py-1.5 text-xs">
                          <Badge status={p.part_status} />
@@ -541,28 +541,28 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
           {/* 构型项选择器弹窗 */}
           {cfgPickerOpen && (
                 <div className="fixed inset-0 bg-black/40 z-[70] flex items-center justify-center" onClick={() => { setCfgPickerOpen(false); setPickerParentId(null); }}>
-              <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[75vh] flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="bg-[var(--ui-bg-surface)] rounded-lg shadow-xl w-full max-w-2xl max-h-[75vh] flex flex-col" onClick={e => e.stopPropagation()}>
                 <div className="px-4 py-3 border-b flex items-center justify-between">
                   <h4 className="text-sm font-semibold">{pickerParentId ? '选择子构型项（添加至下级）' : '选择子构型项'}</h4>
-                  <button onClick={() => setCfgPickerOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+                  <button onClick={() => setCfgPickerOpen(false)} className="text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)]">✕</button>
                 </div>
 
                 {/* 已选子项 */}
                 <div className="border-b">
-                  <div className="bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700">已选子项 ({pickerSelected.length})</div>
+                  <div className="bg-[var(--ui-bg-subtle)] px-4 py-2 text-sm font-medium text-gray-700">已选子项 ({pickerSelected.length})</div>
                   {pickerSelected.length === 0 ? (
-                    <div className="px-4 py-4 text-center text-sm text-gray-400">请在下方列表中选择</div>
+                    <div className="px-4 py-4 text-center text-sm text-[var(--ui-text-tertiary)]">请在下方列表中选择</div>
                   ) : (
                     <div className="max-h-48 overflow-y-auto">
                       <table className="w-full text-sm">
-                        <thead className="sticky top-0 bg-gray-50 border-b"><tr>
-                          <th className="px-3 py-2 text-left text-xs text-gray-500">构型号</th>
-                          <th className="px-3 py-2 text-left text-xs text-gray-500">名称</th>
-                          <th className="px-3 py-2 text-right text-xs text-gray-500 w-12"></th>
+                        <thead className="sticky top-0 bg-[var(--ui-bg-subtle)] border-b"><tr>
+                          <th className="px-3 py-2 text-left text-xs text-[var(--ui-text-secondary)]">构型号</th>
+                          <th className="px-3 py-2 text-left text-xs text-[var(--ui-text-secondary)]">名称</th>
+                          <th className="px-3 py-2 text-right text-xs text-[var(--ui-text-secondary)] w-12"></th>
                         </tr></thead>
                         <tbody className="divide-y">
                           {pickerSelected.map((s: any) => (
-                            <tr key={s.id} className="hover:bg-gray-50">
+                            <tr key={s.id} className="hover:bg-[var(--ui-bg-hover)]">
                               <td className="px-3 py-2 font-medium text-xs">{s.code}</td>
                               <td className="px-3 py-2 text-xs">{s.name}</td>
                               <td className="px-3 py-2 text-right">
@@ -581,7 +581,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                   <div className="flex gap-2 pt-4 pb-3 items-center flex-shrink-0">
                     <Input value={cfgSearch} onChange={e => setCfgSearch(e.target.value)} autoFocus
                       className="flex-1" placeholder="搜索构型号/名称（实时）..." />
-                    {cfgSearching && <span className="text-xs text-gray-400 whitespace-nowrap">搜索中...</span>}
+                    {cfgSearching && <span className="text-xs text-[var(--ui-text-tertiary)] whitespace-nowrap">搜索中...</span>}
                   </div>
 
                   {/* 快速新建构型项 */}
@@ -593,7 +593,7 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                       </Button>
                     </div>
                     {quickCreateOpen && (
-                      <div className="px-4 py-3 border-t space-y-2 bg-gray-50">
+                      <div className="px-4 py-3 border-t space-y-2 bg-[var(--ui-bg-subtle)]">
                         <div className="flex gap-2">
                           <Input size="xs" value={quickForm.code} onChange={e => setQuickForm({ ...quickForm, code: e.target.value })}
                             placeholder="构型号 *" className="flex-1" />
@@ -617,25 +617,25 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
                     )}
                   </div>
 
-                  <div className="flex-1 overflow-y-auto border border-gray-200 rounded">
+                  <div className="flex-1 overflow-y-auto border border-[var(--ui-border)] rounded">
                     {cfgResults.length === 0 ? (
-                      <div className="text-center py-8 text-sm text-gray-400">{cfgSearching ? '加载中...' : '无可用构型项'}</div>
+                      <div className="text-center py-8 text-sm text-[var(--ui-text-tertiary)]">{cfgSearching ? '加载中...' : '无可用构型项'}</div>
                     ) : (
                       <table className="w-full text-sm">
-                        <thead className="sticky top-0 bg-gray-50 border-b">
+                        <thead className="sticky top-0 bg-[var(--ui-bg-subtle)] border-b">
                           <tr>
-                            <th className="px-3 py-2 text-left text-xs text-gray-500">构型号</th>
-                            <th className="px-3 py-2 text-left text-xs text-gray-500">名称</th>
-                            <th className="px-3 py-2 text-left text-xs text-gray-500">规格型号</th>
-                            <th className="px-3 py-2 text-center text-xs text-gray-500 w-20">操作</th>
+                            <th className="px-3 py-2 text-left text-xs text-[var(--ui-text-secondary)]">构型号</th>
+                            <th className="px-3 py-2 text-left text-xs text-[var(--ui-text-secondary)]">名称</th>
+                            <th className="px-3 py-2 text-left text-xs text-[var(--ui-text-secondary)]">规格型号</th>
+                            <th className="px-3 py-2 text-center text-xs text-[var(--ui-text-secondary)] w-20">操作</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y">
                           {cfgResults.filter((r: any) => !children.some(c => c.child_id === r.id) && !pickerSelected.some(s => s.id === r.id) && r.id !== pickerParentId).map((r: any) => (
-                            <tr key={r.id} className="hover:bg-gray-50">
+                            <tr key={r.id} className="hover:bg-[var(--ui-bg-hover)]">
                               <td className="px-3 py-2 font-medium text-xs">{r.code}</td>
                               <td className="px-3 py-2 text-xs">{r.name}</td>
-                              <td className="px-3 py-2 text-xs text-gray-400">{r.spec || '-'}</td>
+                              <td className="px-3 py-2 text-xs text-[var(--ui-text-tertiary)]">{r.spec || '-'}</td>
                               <td className="px-3 py-2 text-center">
                                 <Button size="xs" onClick={() => setPickerSelected(prev => [...prev, r])}>添加</Button>
                               </td>
@@ -675,19 +675,19 @@ export default function ConfigurationCreateModal({ open, item, onClose, onSaved 
           )}
 
           {children.length === 0 ? (
-            <p className="text-sm text-gray-400 py-2">暂无子构型项，点击"添加子构型项"选择</p>
+            <p className="text-sm text-[var(--ui-text-tertiary)] py-2">暂无子构型项，点击"添加子构型项"选择</p>
           ) : (
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-[var(--ui-bg-subtle)] border-b">
                   <tr>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">层级</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">构型号</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">备注</th>
-                    <th className="px-3 py-2 text-center text-gray-500 font-medium w-16">数量</th>
-                    <th className="px-3 py-2 text-center text-gray-500 font-medium w-24">必选/可选</th>
-                    <th className="px-3 py-2 text-center text-gray-500 font-medium w-28">操作</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20">层级</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">构型号</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">名称</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">备注</th>
+                    <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-16">数量</th>
+                    <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-24">必选/可选</th>
+                    <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-28">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">

@@ -47,8 +47,8 @@ function PropertyCompareTable({ left, right, onlyDiff }: { left: any; right: any
   return (
     <div className="flex-1 min-h-0 overflow-auto">
       <table className="w-full text-sm">
-        <thead className="bg-gray-50 sticky top-0 z-10">
-          <tr className="text-xs font-medium text-gray-600 border-b">
+        <thead className="bg-[var(--ui-bg-subtle)] sticky top-0 z-10">
+          <tr className="text-xs font-medium text-[var(--ui-text-secondary)] border-b">
             <th className="px-3 py-2 text-left w-24">字段</th>
             <th className="px-3 py-2 text-left">左值</th>
             <th className="px-3 py-2 text-left">右值</th>
@@ -61,7 +61,7 @@ function PropertyCompareTable({ left, right, onlyDiff }: { left: any; right: any
             const changed = lvs !== rvs;
             return (
               <tr key={i} className={changed ? 'bg-yellow-50' : ''}>
-                <td className="px-3 py-1.5 text-gray-500 whitespace-nowrap">{r.label}</td>
+                <td className="px-3 py-1.5 text-[var(--ui-text-secondary)] whitespace-nowrap">{r.label}</td>
                 <td className="px-3 py-1.5">{lvs || '-'}</td>
                 <td className={`px-3 py-1.5 ${changed ? 'font-semibold text-red-600' : ''}`}>{rvs || '-'}</td>
               </tr>
@@ -158,26 +158,26 @@ function PartPicker({ label, valueId, onPick, onSearch, filterType }: {
           onBlur={() => setTimeout(() => setOpen(false), 150)}
         />
         {open && (
-          <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-auto">
+          <div className="absolute z-20 w-full mt-1 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-lg max-h-56 overflow-auto">
             {searching && (
-              <div className="px-3 py-2 text-sm text-gray-400">搜索中...</div>
+              <div className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)]">搜索中...</div>
             )}
             {!searching && q.trim() && results.length === 0 && (
-              <div className="px-3 py-2 text-sm text-gray-400">无匹配结果</div>
+              <div className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)]">无匹配结果</div>
             )}
             {!searching && !q.trim() && (
-              <div className="px-3 py-2 text-sm text-gray-400">输入关键词搜索</div>
+              <div className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)]">输入关键词搜索</div>
             )}
             {!searching && results.map((o) => (
               <button
                 key={o.revision_id}
                 type="button"
                 onMouseDown={() => { onPick(o.revision_id, o); setSelected(o); setOpen(false); }}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-b-0 flex items-center gap-2"
+                className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--ui-bg-hover)] border-b border-gray-100 last:border-b-0 flex items-center gap-2"
               >
                 <span className="font-medium">{o.code}</span>
-                <span className="text-gray-500 truncate">{o.name}</span>
-                <span className="ml-auto text-gray-400 text-xs">{o.version}</span>
+                <span className="text-[var(--ui-text-secondary)] truncate">{o.name}</span>
+                <span className="ml-auto text-[var(--ui-text-tertiary)] text-xs">{o.version}</span>
               </button>
             ))}
           </div>
@@ -360,7 +360,7 @@ export default function PartCompareModal({
     if (!result) return null;
     const s = result.summary;
     return (
-      <div className="flex flex-wrap gap-4 mb-3 p-3 bg-gray-50 rounded-lg border text-sm">
+      <div className="flex flex-wrap gap-4 mb-3 p-3 bg-[var(--ui-bg-subtle)] rounded-lg border text-sm">
         <span>
           新增 <span className="text-green-600 font-medium">{s.added}</span>　
           删除 <span className="text-red-600 font-medium">{s.deleted}</span>　
@@ -392,7 +392,7 @@ export default function PartCompareModal({
             <PartPicker key={`right-${resetKey}`} label="右零部件" valueId={rightId} onPick={pickRight} onSearch={handleSearch} filterType={lockedType} />
           </div>
           {lockedType && (
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-[var(--ui-text-secondary)]">
               已锁定：<span className="font-medium">{lockedType === 'assembly' ? '部件' : '零件'}对比</span>
             </div>
           )}
@@ -408,7 +408,7 @@ export default function PartCompareModal({
               🧊 3D对比
             </Button>
             {result && (
-              <label className="flex items-center gap-1 text-sm text-gray-600 cursor-pointer select-none">
+              <label className="flex items-center gap-1 text-sm text-[var(--ui-text-secondary)] cursor-pointer select-none">
                 <input type="checkbox" checked={onlyDiff} onChange={(e) => setOnlyDiff(e.target.checked)} />
                 仅显示差异
               </label>
@@ -419,9 +419,9 @@ export default function PartCompareModal({
 
           {result && (
             <div className="border rounded-lg overflow-hidden flex flex-col flex-1 min-h-0">
-              <div className="flex items-center gap-1 border-b bg-gray-50 px-1">
-                <button onClick={() => setActiveTab('property')} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'property' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>属性对比</button>
-                <button onClick={() => setActiveTab('bom')} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'bom' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>BOM树对比</button>
+              <div className="flex items-center gap-1 border-b bg-[var(--ui-bg-subtle)] px-1">
+                <button onClick={() => setActiveTab('property')} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'property' ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'}`}>属性对比</button>
+                <button onClick={() => setActiveTab('bom')} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'bom' ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'}`}>BOM树对比</button>
               </div>
 
               {activeTab === 'property' ? (
@@ -429,7 +429,7 @@ export default function PartCompareModal({
               ) : (
                 <>
                   {result.comparison.length === 0 && !identical && (
-                    <div className="text-sm text-gray-500 text-center py-6">两侧 BOM 均为空</div>
+                    <div className="text-sm text-[var(--ui-text-secondary)] text-center py-6">两侧 BOM 均为空</div>
                   )}
                   {identical && (
                     <div className="text-sm text-green-600 bg-green-50 px-3 py-2 rounded">两侧 BOM 一致</div>
@@ -454,15 +454,15 @@ export default function PartCompareModal({
                     <col className="w-px" />
                     <col className="w-40" />
                   </colgroup>
-                  <thead className="sticky top-0 bg-gray-50 z-10">
-                    <tr className="text-xs font-medium text-gray-600 border-b">
-                      <th colSpan={5} className="px-2 py-2 text-left border-r border-gray-200">左 BOM</th>
+                  <thead className="sticky top-0 bg-[var(--ui-bg-subtle)] z-10">
+                    <tr className="text-xs font-medium text-[var(--ui-text-secondary)] border-b">
+                      <th colSpan={5} className="px-2 py-2 text-left border-r border-[var(--ui-border)]">左 BOM</th>
                       <th className="w-px bg-gray-200 p-0" />
                       <th colSpan={5} className="px-2 py-2 text-left">右 BOM</th>
                       <th className="w-px bg-gray-200 p-0" />
                       <th className="px-2 py-2 text-left">变更</th>
                     </tr>
-                    <tr className="text-xs font-medium text-gray-500 border-b">
+                    <tr className="text-xs font-medium text-[var(--ui-text-secondary)] border-b">
                       <th className="px-2 py-1 text-left">件号</th>
                       <th className="px-2 py-1 text-left">名称</th>
                       <th className="px-2 py-1 text-center">版本</th>
@@ -515,7 +515,7 @@ export default function PartCompareModal({
                             <span className="inline-flex items-center gap-1">
                               {hasChildren ? (
                                 <button type="button" onClick={(e) => { e.stopPropagation(); toggle(n.key); }}
-                                  className="w-4 h-4 inline-flex items-center justify-center shrink-0 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-200/60"
+                                  className="w-4 h-4 inline-flex items-center justify-center shrink-0 rounded text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] hover:bg-gray-200/60"
                                   title={isExpanded ? '折叠' : '展开'}>
                                   <CompareChevron expanded={isExpanded} />
                                 </button>
@@ -526,9 +526,9 @@ export default function PartCompareModal({
                             </span>
                           </td>
                           <td className="px-2 py-2 text-xs text-gray-700 truncate max-w-[200px]" title={l?.detail.name || ''}>{l?.detail.name || '-'}</td>
-                          <td className="px-2 py-2 text-xs text-center text-gray-500">{l?.detail.version || '-'}</td>
-                          <td className="px-2 py-2 text-xs text-center text-gray-500">{statusLabel(l?.detail.status)}</td>
-                          <td className="px-2 py-2 text-xs text-center text-gray-500">{n.key === 'ROOT' ? '-' : (l?.quantity ?? '-')}</td>
+                          <td className="px-2 py-2 text-xs text-center text-[var(--ui-text-secondary)]">{l?.detail.version || '-'}</td>
+                          <td className="px-2 py-2 text-xs text-center text-[var(--ui-text-secondary)]">{statusLabel(l?.detail.status)}</td>
+                          <td className="px-2 py-2 text-xs text-center text-[var(--ui-text-secondary)]">{n.key === 'ROOT' ? '-' : (l?.quantity ?? '-')}</td>
                           <td className="w-px bg-gray-200 p-0" />
                           <td
                             className="relative px-2 py-2 text-xs font-medium whitespace-nowrap"
@@ -547,9 +547,9 @@ export default function PartCompareModal({
                             </span>
                           </td>
                           <td className={`px-2 py-2 text-xs text-gray-700 truncate max-w-[200px] ${versionChanged ? 'font-semibold' : ''}`} title={r?.detail.name || ''}>{r?.detail.name || '-'}</td>
-                          <td className={`px-2 py-2 text-xs text-center ${versionChanged ? 'font-semibold' : 'text-gray-500'}`}>{r?.detail.version || '-'}</td>
-                          <td className={`px-2 py-2 text-xs text-center ${statusChanged ? 'font-semibold' : 'text-gray-500'}`}>{statusLabel(r?.detail.status)}</td>
-                          <td className={`px-2 py-2 text-xs text-center ${qtyChanged ? 'font-semibold' : 'text-gray-500'}`}>{n.key === 'ROOT' ? '-' : (r?.quantity ?? '-')}</td>
+                          <td className={`px-2 py-2 text-xs text-center ${versionChanged ? 'font-semibold' : 'text-[var(--ui-text-secondary)]'}`}>{r?.detail.version || '-'}</td>
+                          <td className={`px-2 py-2 text-xs text-center ${statusChanged ? 'font-semibold' : 'text-[var(--ui-text-secondary)]'}`}>{statusLabel(r?.detail.status)}</td>
+                          <td className={`px-2 py-2 text-xs text-center ${qtyChanged ? 'font-semibold' : 'text-[var(--ui-text-secondary)]'}`}>{n.key === 'ROOT' ? '-' : (r?.quantity ?? '-')}</td>
                           <td className="w-px bg-gray-200 p-0" />
                           <td className="px-2 py-2 text-xs text-gray-700">{changeText(n)}</td>
                         </tr>

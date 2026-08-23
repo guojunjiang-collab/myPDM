@@ -205,23 +205,23 @@ export default function PartAttachmentBucket({ revisionId, iterationId, category
 
       <div className="border rounded-lg overflow-hidden">
         {loading ? (
-          <div className="px-4 py-6 text-center text-sm text-gray-400">加载中...</div>
+          <div className="px-4 py-6 text-center text-sm text-[var(--ui-text-tertiary)]">加载中...</div>
         ) : items.length === 0 && !uploading ? (
-          <div className="px-4 py-6 text-center text-sm text-gray-400">暂无附件</div>
+          <div className="px-4 py-6 text-center text-sm text-[var(--ui-text-tertiary)]">暂无附件</div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
+            <thead className="bg-[var(--ui-bg-subtle)] border-b">
               <tr>
-                <th className="px-3 py-2 text-left text-gray-500 font-medium">文件名</th>
-                <th className="px-3 py-2 text-left text-gray-500 font-medium w-24">大小</th>
-                <th className="px-3 py-2 text-center text-gray-500 font-medium w-32">操作</th>
+                <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">文件名</th>
+                <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-24">大小</th>
+                <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-32">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {items.map((att) => (
-                <tr key={att.id} className="hover:bg-gray-50">
+                <tr key={att.id} className="hover:bg-[var(--ui-bg-hover)]">
                   <td className="px-3 py-2"><span className="text-primary-600">{att.file_name}</span></td>
-                  <td className="px-3 py-2 text-gray-500">{fmtSize(att.file_size)}</td>
+                  <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{fmtSize(att.file_size)}</td>
                   <td className="px-3 py-2 text-center whitespace-nowrap">
                     <span className="inline-flex items-center gap-2">
                       <Button variant="link" size="xs" type="button" onClick={() => handlePreview(att)}>预览</Button>

@@ -154,27 +154,27 @@ export default function ProfileList() {
       </div>
 
       {/* 表格 */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-y-auto flex-1 min-h-0">
+      <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-y-auto flex-1 min-h-0">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]">
             <tr>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">编号</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">名称</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">状态</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">架次</th>
-              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">创建时间</th>
-              <th className="text-right px-4 py-3 text-sm font-medium text-gray-500 w-0 whitespace-nowrap">操作</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">编号</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">名称</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">状态</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">架次</th>
+              <th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">创建时间</th>
+              <th className="text-right px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)] w-0 whitespace-nowrap">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">加载中...</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td></tr>
             ) : items.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">暂无数据</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">暂无数据</td></tr>
             ) : pagedData.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">无匹配结果</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--ui-text-secondary)]">无匹配结果</td></tr>
             ) : pagedData.map((profile) => (
-              <tr key={profile.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setDetailId(profile.id)}>
+              <tr key={profile.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => setDetailId(profile.id)}>
                 <td className="px-4 py-3 text-sm font-medium">{profile.code}</td>
                 <td className="px-4 py-3 text-sm font-medium">{profile.name}</td>
                 <td className="px-4 py-3 text-sm font-medium"><ProfileStatusBadge status={profile.status} /></td>

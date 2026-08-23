@@ -79,7 +79,7 @@ export function ECRCcPicker({ open, ecrId, onClose, api }: ECRCcPickerProps) {
   return (
     <Modal open={open} onClose={onClose} title="知会用户" width="sm">
       {loading ? (
-        <div className="py-8 text-center text-gray-400 text-sm">加载中...</div>
+        <div className="py-8 text-center text-[var(--ui-text-tertiary)] text-sm">加载中...</div>
       ) : (
         <div className="max-h-64 overflow-y-auto space-y-1">
           {users.map((u: any) => {
@@ -88,7 +88,7 @@ export function ECRCcPicker({ open, ecrId, onClose, api }: ECRCcPickerProps) {
               <label
                 key={u.id}
                 className={`flex items-center gap-2 px-3 py-2 rounded ${
-                  alreadyCc ? 'bg-gray-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer'
+                  alreadyCc ? 'bg-[var(--ui-bg-subtle)] cursor-not-allowed' : 'hover:bg-[var(--ui-bg-hover)] cursor-pointer'
                 }`}
               >
                 <input
@@ -99,7 +99,7 @@ export function ECRCcPicker({ open, ecrId, onClose, api }: ECRCcPickerProps) {
                   className="rounded border-gray-300 text-primary-600 disabled:opacity-50"
                 />
                 <span className="text-sm">{u.real_name}</span>
-                <span className="text-xs text-gray-400">({u.username})</span>
+                <span className="text-xs text-[var(--ui-text-tertiary)]">({u.username})</span>
                 {alreadyCc && (
                   <Button variant="danger" size="xs"
                     onClick={(e) => { e.preventDefault(); handleUncc(u.id); }}

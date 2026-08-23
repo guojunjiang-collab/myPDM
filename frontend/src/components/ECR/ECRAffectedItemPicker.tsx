@@ -185,7 +185,7 @@ export function ECRAffectedItemPicker({
               className={`px-3 py-1.5 text-xs rounded-md font-medium transition-colors ${
                 activeTab === tab.value
                   ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  : 'bg-gray-100 text-[var(--ui-text-secondary)] hover:bg-gray-200'
               }`}
             >
               {tab.label}
@@ -205,15 +205,15 @@ export function ECRAffectedItemPicker({
 
         {/* Table */}
         {loading ? (
-          <div className="py-8 text-center text-sm text-gray-400">加载中...</div>
+          <div className="py-8 text-center text-sm text-[var(--ui-text-tertiary)]">加载中...</div>
         ) : rows.length === 0 ? (
-          <div className="py-8 text-center text-sm text-gray-400">
+          <div className="py-8 text-center text-sm text-[var(--ui-text-tertiary)]">
             {alreadySelected.length > 0 ? '所有项目已添加' : '暂无数据'}
           </div>
         ) : (
-          <div className="border border-gray-200 rounded-lg max-h-80 overflow-y-auto">
+          <div className="border border-[var(--ui-border)] rounded-lg max-h-80 overflow-y-auto">
             <table className="w-full border-collapse">
-              <thead className="sticky top-0 bg-gray-50 z-10">
+              <thead className="sticky top-0 bg-[var(--ui-bg-subtle)] z-10">
                 <tr>
                   <th className="w-10 px-2 py-2">
                     <input
@@ -224,25 +224,25 @@ export function ECRAffectedItemPicker({
                     />
                   </th>
                   <th
-                    className="px-2 py-2 text-left text-xs font-semibold text-gray-500 whitespace-nowrap cursor-pointer select-none"
+                    className="px-2 py-2 text-left text-xs font-semibold text-[var(--ui-text-secondary)] whitespace-nowrap cursor-pointer select-none"
                     onClick={() => handleSort('entity_type')}
                   >
                     类型 {getSortIcon('entity_type')}
                   </th>
                   <th
-                    className="px-2 py-2 text-left text-xs font-semibold text-gray-500 whitespace-nowrap cursor-pointer select-none"
+                    className="px-2 py-2 text-left text-xs font-semibold text-[var(--ui-text-secondary)] whitespace-nowrap cursor-pointer select-none"
                     onClick={() => handleSort('entity_code')}
                   >
                     编码 {getSortIcon('entity_code')}
                   </th>
                   <th
-                    className="px-2 py-2 text-left text-xs font-semibold text-gray-500 whitespace-nowrap cursor-pointer select-none"
+                    className="px-2 py-2 text-left text-xs font-semibold text-[var(--ui-text-secondary)] whitespace-nowrap cursor-pointer select-none"
                     onClick={() => handleSort('entity_name')}
                   >
                     名称 {getSortIcon('entity_name')}
                   </th>
                   <th
-                    className="px-2 py-2 text-left text-xs font-semibold text-gray-500 whitespace-nowrap cursor-pointer select-none"
+                    className="px-2 py-2 text-left text-xs font-semibold text-[var(--ui-text-secondary)] whitespace-nowrap cursor-pointer select-none"
                     onClick={() => handleSort('entity_version')}
                   >
                     版本 {getSortIcon('entity_version')}
@@ -255,7 +255,7 @@ export function ECRAffectedItemPicker({
                     key={makeKey(row.entity_type, row.entity_id)}
                     onClick={() => toggleItem(row)}
                     className={`cursor-pointer transition-colors ${
-                      isSelected(row) ? 'bg-primary-50' : 'hover:bg-gray-50'
+                      isSelected(row) ? 'bg-primary-50' : 'hover:bg-[var(--ui-bg-hover)]'
                     }`}
                   >
                     <td className="px-2 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
@@ -271,7 +271,7 @@ export function ECRAffectedItemPicker({
                     </td>
                     <td className="px-2 py-1.5 text-xs font-mono text-gray-700">{row.entity_code}</td>
                     <td className="px-2 py-1.5 text-xs text-gray-700">{row.entity_name}</td>
-                    <td className="px-2 py-1.5 text-xs text-gray-500">{row.entity_version}</td>
+                    <td className="px-2 py-1.5 text-xs text-[var(--ui-text-secondary)]">{row.entity_version}</td>
                   </tr>
                 ))}
               </tbody>
@@ -280,8 +280,8 @@ export function ECRAffectedItemPicker({
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-          <span className="text-xs text-gray-500">
+        <div className="flex items-center justify-between pt-2 border-t border-[var(--ui-border)]">
+          <span className="text-xs text-[var(--ui-text-secondary)]">
             已选择 <span className="font-semibold text-primary-600">{selectedMap.size}</span> 项
           </span>
           <div className="flex gap-2">

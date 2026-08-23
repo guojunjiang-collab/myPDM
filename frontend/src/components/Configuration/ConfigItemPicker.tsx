@@ -108,26 +108,26 @@ export default function ConfigItemPicker({ open, onClose, onConfirm, excludeId }
         {/* ---- 1. 已选面板 ---- */}
         {selectedList.length > 0 && (
           <div>
-            <h4 className="text-sm font-semibold text-gray-600 mb-2">
+            <h4 className="text-sm font-semibold text-[var(--ui-text-secondary)] mb-2">
               已选子构型项 {selectedList.length > 0 ? `(${selectedList.length})` : ''}
             </h4>
             <div className="border rounded-lg overflow-hidden max-h-40 overflow-y-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-[var(--ui-bg-subtle)] border-b">
                   <tr>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">构型号</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
-                    <th className="px-3 py-2 text-right text-gray-500 font-medium w-12"></th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">构型号</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">名称</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">版本</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">状态</th>
+                    <th className="px-3 py-2 text-right text-[var(--ui-text-secondary)] font-medium w-12"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {selectedList.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50">
+                    <tr key={item.id} className="hover:bg-[var(--ui-bg-hover)]">
                       <td className="px-3 py-2 font-medium">{item.code}</td>
                       <td className="px-3 py-2">{item.name}</td>
-                      <td className="px-3 py-2 text-gray-500">{item.version}</td>
+                      <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{item.version}</td>
                       <td className="px-3 py-2">
                         <Badge status={item.status} />
                       </td>
@@ -164,7 +164,7 @@ export default function ConfigItemPicker({ open, onClose, onConfirm, excludeId }
             </Button>
           </div>
           {quickOpen && (
-            <div className="px-4 py-3 border-t space-y-2 bg-gray-50">
+            <div className="px-4 py-3 border-t space-y-2 bg-[var(--ui-bg-subtle)]">
               <div className="flex gap-2">
                 <Input size="xs" value={quickForm.code} onChange={e => setQuickForm({ ...quickForm, code: e.target.value })} placeholder="构型号 *" className="flex-1" />
                 <Input size="xs" value={quickForm.name} onChange={e => setQuickForm({ ...quickForm, name: e.target.value })} placeholder="名称 *" className="flex-1" />
@@ -180,28 +180,28 @@ export default function ConfigItemPicker({ open, onClose, onConfirm, excludeId }
         <div className="border rounded-lg overflow-hidden flex-1 min-h-0">
           <div className="overflow-y-auto max-h-64">
             {loading ? (
-              <div className="px-4 py-8 text-center text-sm text-gray-400">加载中...</div>
+              <div className="px-4 py-8 text-center text-sm text-[var(--ui-text-tertiary)]">加载中...</div>
             ) : filtered.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm text-gray-400">无匹配结果</div>
+              <div className="px-4 py-8 text-center text-sm text-[var(--ui-text-tertiary)]">无匹配结果</div>
             ) : (
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b sticky top-0">
+                <thead className="bg-[var(--ui-bg-subtle)] border-b sticky top-0">
                   <tr>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">构型号</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
-                    <th className="px-3 py-2 text-center text-gray-500 font-medium w-20">操作</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">构型号</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">名称</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">版本</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">状态</th>
+                    <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-20">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filtered.map((item) => {
                     const isAdded = selected.has(item.id);
                     return (
-                      <tr key={item.id} className="hover:bg-gray-50">
+                      <tr key={item.id} className="hover:bg-[var(--ui-bg-hover)]">
                         <td className="px-3 py-2 font-medium">{item.code}</td>
                         <td className="px-3 py-2">{item.name}</td>
-                        <td className="px-3 py-2 text-gray-500">{item.version}</td>
+                        <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{item.version}</td>
                         <td className="px-3 py-2">
                           <Badge status={item.status} />
                         </td>
@@ -222,7 +222,7 @@ export default function ConfigItemPicker({ open, onClose, onConfirm, excludeId }
         </div>
 
         <div className="flex justify-between items-center pt-2 border-t">
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-[var(--ui-text-secondary)]">
             已选 <span className="font-medium text-gray-700">{selectedList.length}</span> 项
           </span>
           <div className="flex gap-2">

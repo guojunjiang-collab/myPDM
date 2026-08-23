@@ -179,7 +179,7 @@ export default function AssemblyPartPicker({
   };
   const getPickerSortIcon = (field: string) => {
     if (sortField !== field) return <span className="text-gray-300 ml-0.5">⇅</span>;
-    return sortDir === 'asc' ? <span className="text-gray-500 ml-0.5">↑</span> : <span className="text-gray-500 ml-0.5">↓</span>;
+    return sortDir === 'asc' ? <span className="text-[var(--ui-text-secondary)] ml-0.5">↑</span> : <span className="text-[var(--ui-text-secondary)] ml-0.5">↓</span>;
   };
   const filtered = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -255,32 +255,32 @@ export default function AssemblyPartPicker({
       <div className="space-y-4 max-h-[75vh] flex flex-col">
         {/* ---- 1. 已选子项 ---- */}
         <div className="border rounded-lg overflow-hidden">
-          <div className="bg-gray-50 border-b px-4 py-2 flex items-center justify-between">
+          <div className="bg-[var(--ui-bg-subtle)] border-b px-4 py-2 flex items-center justify-between">
             <span className="text-sm font-medium text-gray-700">
               已选子项{selectedList.length > 0 ? ` (${selectedList.length})` : ''}
             </span>
           </div>
           {selectedList.length === 0 ? (
-            <div className="px-4 py-6 text-center text-sm text-gray-400">请在下方列表中选择要添加的子项</div>
+            <div className="px-4 py-6 text-center text-sm text-[var(--ui-text-tertiary)]">请在下方列表中选择要添加的子项</div>
           ) : (
             <div className="overflow-x-auto max-h-48 overflow-y-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b sticky top-0">
+                <thead className="bg-[var(--ui-bg-subtle)] border-b sticky top-0">
                   <tr>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">件号</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">中文名称</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium w-24">用量</th>
-                    <th className="px-3 py-2 text-right text-gray-500 font-medium w-12"></th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">件号</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">中文名称</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">版本</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">状态</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-24">用量</th>
+                    <th className="px-3 py-2 text-right text-[var(--ui-text-secondary)] font-medium w-12"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {selectedList.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50">
+                    <tr key={item.id} className="hover:bg-[var(--ui-bg-hover)]">
                       <td className="px-3 py-2 font-medium">{item.code}</td>
                       <td className="px-3 py-2">{item.name}</td>
-                      <td className="px-3 py-2 text-gray-500">{item.version}</td>
+                      <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{item.version}</td>
                       <td className="px-3 py-2">
                         <Badge status={item.status} />
                       </td>
@@ -342,7 +342,7 @@ export default function AssemblyPartPicker({
             </Button>
           </div>
           {quickOpen && (
-            <div className="px-4 py-3 border-t space-y-2 bg-gray-50">
+            <div className="px-4 py-3 border-t space-y-2 bg-[var(--ui-bg-subtle)]">
               <div className="flex gap-2">
                 <Input size="xs" value={quickForm.code} onChange={e => setQuickForm({ ...quickForm, code: e.target.value })} placeholder="件号 *" className="flex-1" />
                 <Input size="xs" value={quickForm.name} onChange={e => setQuickForm({ ...quickForm, name: e.target.value })} placeholder="名称 *" className="flex-1" />
@@ -378,30 +378,30 @@ export default function AssemblyPartPicker({
         <div className="border rounded-lg overflow-hidden flex-1 min-h-0">
           <div className="overflow-y-auto max-h-64">
             {loading ? (
-              <div className="px-4 py-8 text-center text-sm text-gray-400">加载中...</div>
+              <div className="px-4 py-8 text-center text-sm text-[var(--ui-text-tertiary)]">加载中...</div>
             ) : filtered.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm text-gray-400">无匹配结果</div>
+              <div className="px-4 py-8 text-center text-sm text-[var(--ui-text-tertiary)]">无匹配结果</div>
             ) : (
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b sticky top-0">
+                <thead className="bg-[var(--ui-bg-subtle)] border-b sticky top-0">
                   <tr>
-                    <th onClick={() => handlePickerSort('code')} className="px-3 py-2 text-left text-gray-500 font-medium cursor-pointer select-none whitespace-nowrap">件号 {getPickerSortIcon('code')}</th>
-                    <th onClick={() => handlePickerSort('name')} className="px-3 py-2 text-left text-gray-500 font-medium cursor-pointer select-none whitespace-nowrap">中文名称 {getPickerSortIcon('name')}</th>
-                    <th onClick={() => handlePickerSort('version')} className="px-3 py-2 text-left text-gray-500 font-medium w-16 cursor-pointer select-none whitespace-nowrap">版本 {getPickerSortIcon('version')}</th>
-                    <th onClick={() => handlePickerSort('status')} className="px-3 py-2 text-left text-gray-500 font-medium w-16 cursor-pointer select-none whitespace-nowrap">状态 {getPickerSortIcon('status')}</th>
-                    <th className="px-3 py-2 text-center text-gray-500 font-medium w-20">操作</th>
+                    <th onClick={() => handlePickerSort('code')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium cursor-pointer select-none whitespace-nowrap">件号 {getPickerSortIcon('code')}</th>
+                    <th onClick={() => handlePickerSort('name')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium cursor-pointer select-none whitespace-nowrap">中文名称 {getPickerSortIcon('name')}</th>
+                    <th onClick={() => handlePickerSort('version')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16 cursor-pointer select-none whitespace-nowrap">版本 {getPickerSortIcon('version')}</th>
+                    <th onClick={() => handlePickerSort('status')} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16 cursor-pointer select-none whitespace-nowrap">状态 {getPickerSortIcon('status')}</th>
+                    <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-20">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filtered.map((item) => {
                     const isAdded = selected.has(item.id);
                     return (
-                      <tr key={item.id} className="hover:bg-gray-50">
+                      <tr key={item.id} className="hover:bg-[var(--ui-bg-hover)]">
                         <td className="px-3 py-2 font-medium">
                           {item.code}
                         </td>
                         <td className="px-3 py-2">{item.name}</td>
-                        <td className="px-3 py-2 text-gray-500">{item.version}</td>
+                        <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{item.version}</td>
                         <td className="px-3 py-2">
                           <Badge status={item.status} />
                         </td>
@@ -428,7 +428,7 @@ export default function AssemblyPartPicker({
 
         {/* ---- 底部操作 ---- */}
         <div className="flex justify-between items-center pt-2 border-t">
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-[var(--ui-text-secondary)]">
             已选 <span className="font-medium text-gray-700">{selectedList.length}</span> 项
           </span>
           <div className="flex gap-2">

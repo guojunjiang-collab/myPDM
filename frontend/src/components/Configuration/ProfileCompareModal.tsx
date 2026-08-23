@@ -75,16 +75,16 @@ function ProfilePicker({ label, options, valueId, onPick }: {
           onBlur={() => setTimeout(() => setOpen(false), 150)}
         />
         {open && filtered.length > 0 && (
-          <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-auto">
+          <div className="absolute z-20 w-full mt-1 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-lg max-h-56 overflow-auto">
             {filtered.map((o) => (
               <button
                 key={o.id}
                 type="button"
                 onMouseDown={() => { onPick(o.id); setOpen(false); }}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-b-0 flex items-center gap-2"
+                className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--ui-bg-hover)] border-b border-gray-100 last:border-b-0 flex items-center gap-2"
               >
                 <span className="font-medium">{o.code}</span>
-                <span className="text-gray-500">{o.name}</span>
+                <span className="text-[var(--ui-text-secondary)]">{o.name}</span>
                 <span className="ml-auto"><ProfileStatusBadge status={o.status} /></span>
               </button>
             ))}
@@ -165,21 +165,21 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
     rows.push(
       <tr key={n.key} className={`${rowBg[n.change_type]} border-b border-gray-100 cursor-pointer hover:brightness-95`}
         onClick={() => openDetail('config_item', n)}>
-        <td className="px-2 py-2 text-xs text-gray-500 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+        <td className="px-2 py-2 text-xs text-[var(--ui-text-secondary)] whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
           {'-'.repeat(level)} {level}
           {hasChildren && level > 0 && (
             <span className="ml-1 inline-flex"><TreeToggle expanded={isExpanded} onClick={() => toggle(n.key)} size="sm" /></span>
           )}
         </td>
         <td className="px-2 py-2 text-xs font-medium">{l?.code || '-'}</td>
-        <td className="px-2 py-2 text-xs text-gray-600">{l?.name || '-'}</td>
-        <td className="px-2 py-2 text-xs text-center text-gray-500">{l?.version || '-'}</td>
-        <td className="px-2 py-2 text-xs text-center text-gray-500">{l?.quantity ?? '-'}</td>
+        <td className="px-2 py-2 text-xs text-[var(--ui-text-secondary)]">{l?.name || '-'}</td>
+        <td className="px-2 py-2 text-xs text-center text-[var(--ui-text-secondary)]">{l?.version || '-'}</td>
+        <td className="px-2 py-2 text-xs text-center text-[var(--ui-text-secondary)]">{l?.quantity ?? '-'}</td>
         <td className="w-px bg-gray-200 p-0" />
         <td className="px-2 py-2 text-xs font-medium">{r?.code || '-'}</td>
-        <td className="px-2 py-2 text-xs text-gray-600">{r?.name || '-'}</td>
-        <td className="px-2 py-2 text-xs text-center text-gray-500">{r?.version || '-'}</td>
-        <td className={`px-2 py-2 text-xs text-center ${n.changed_fields?.includes('quantity') ? 'font-semibold' : 'text-gray-500'}`}>{r?.quantity ?? '-'}</td>
+        <td className="px-2 py-2 text-xs text-[var(--ui-text-secondary)]">{r?.name || '-'}</td>
+        <td className="px-2 py-2 text-xs text-center text-[var(--ui-text-secondary)]">{r?.version || '-'}</td>
+        <td className={`px-2 py-2 text-xs text-center ${n.changed_fields?.includes('quantity') ? 'font-semibold' : 'text-[var(--ui-text-secondary)]'}`}>{r?.quantity ?? '-'}</td>
         <td className="w-px bg-gray-200 p-0" />
         <td className="px-2 py-2 text-xs text-gray-700">{nodeChangeText(n)}</td>
       </tr>
@@ -192,20 +192,20 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
         rows.push(
           <tr key={p.key} className={`${rowBg[p.change_type]} border-b border-gray-100 cursor-pointer hover:brightness-95`}
             onClick={() => openDetail('part', p)}>
-            <td className="px-2 py-2 text-xs text-gray-400 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>{'-'.repeat(level + 1)}</td>
-            <td className="px-2 py-2 text-xs font-mono text-gray-600">{pl?.item_code || '-'}</td>
-            <td className="px-2 py-2 text-xs text-gray-600">{pl?.item_name || '-'}</td>
-            <td className="px-2 py-2 text-xs text-center text-gray-500">{pl?.item_version || '-'}</td>
-            <td className="px-2 py-2 text-xs text-center text-gray-500">{pl?.quantity ?? '-'}</td>
+            <td className="px-2 py-2 text-xs text-[var(--ui-text-tertiary)] whitespace-nowrap" onClick={(e) => e.stopPropagation()}>{'-'.repeat(level + 1)}</td>
+            <td className="px-2 py-2 text-xs font-mono text-[var(--ui-text-secondary)]">{pl?.item_code || '-'}</td>
+            <td className="px-2 py-2 text-xs text-[var(--ui-text-secondary)]">{pl?.item_name || '-'}</td>
+            <td className="px-2 py-2 text-xs text-center text-[var(--ui-text-secondary)]">{pl?.item_version || '-'}</td>
+            <td className="px-2 py-2 text-xs text-center text-[var(--ui-text-secondary)]">{pl?.quantity ?? '-'}</td>
             <td className="w-px bg-gray-200 p-0" />
-            <td className={`px-2 py-2 text-xs font-mono ${chg.has('version') ? 'font-semibold' : 'text-gray-600'}`}>
+            <td className={`px-2 py-2 text-xs font-mono ${chg.has('version') ? 'font-semibold' : 'text-[var(--ui-text-secondary)]'}`}>
               {pr?.item_code || '-'}
             </td>
-            <td className="px-2 py-2 text-xs text-gray-600">{pr?.item_name || '-'}</td>
-            <td className={`px-2 py-2 text-xs text-center ${chg.has('version') ? 'font-semibold' : 'text-gray-500'}`}>
+            <td className="px-2 py-2 text-xs text-[var(--ui-text-secondary)]">{pr?.item_name || '-'}</td>
+            <td className={`px-2 py-2 text-xs text-center ${chg.has('version') ? 'font-semibold' : 'text-[var(--ui-text-secondary)]'}`}>
               {pr?.item_version || '-'}
             </td>
-            <td className={`px-2 py-2 text-xs text-center ${chg.has('quantity') ? 'font-semibold' : 'text-gray-500'}`}>{pr?.quantity ?? '-'}</td>
+            <td className={`px-2 py-2 text-xs text-center ${chg.has('quantity') ? 'font-semibold' : 'text-[var(--ui-text-secondary)]'}`}>{pr?.quantity ?? '-'}</td>
             <td className="w-px bg-gray-200 p-0" />
             <td className="px-2 py-2 text-xs text-gray-700">{partChangeText(p)}</td>
           </tr>
@@ -220,7 +220,7 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
     if (!result) return null;
     const { config_item: ci, part: pt } = result.summary;
     return (
-      <div className="flex flex-wrap gap-4 mb-3 p-3 bg-gray-50 rounded-lg border text-sm">
+      <div className="flex flex-wrap gap-4 mb-3 p-3 bg-[var(--ui-bg-subtle)] rounded-lg border text-sm">
         <span>构型项：<span className="text-green-600">新增 {ci.add}</span>　<span className="text-red-600">删除 {ci.delete}</span>　<span className="text-yellow-600">修改 {ci.modify}</span></span>
         <span>零部件：<span className="text-green-600">新增 {pt.add}</span>　<span className="text-red-600">删除 {pt.delete}</span>　<span className="text-yellow-600">修改 {pt.modify}</span></span>
       </div>
@@ -240,7 +240,7 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
             <ProfilePicker label="右配置" options={options} valueId={rightId} onPick={setRightId} />
           </div>
           {(leftProfile || rightProfile) && (
-            <div className="grid grid-cols-2 gap-4 text-xs text-gray-500">
+            <div className="grid grid-cols-2 gap-4 text-xs text-[var(--ui-text-secondary)]">
               <div>{leftProfile ? <>状态 <ProfileStatusBadge status={leftProfile.status} /> · 架次 {leftProfile.effectivity_start || '-'} ~ {leftProfile.effectivity_end || '-'}</> : ''}</div>
               <div>{rightProfile ? <>状态 <ProfileStatusBadge status={rightProfile.status} /> · 架次 {rightProfile.effectivity_start || '-'} ~ {rightProfile.effectivity_end || '-'}</> : ''}</div>
             </div>
@@ -250,7 +250,7 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
               {loading ? '对比中...' : '开始对比'}
             </Button>
             {result && (
-              <label className="flex items-center gap-1 text-sm text-gray-600 cursor-pointer">
+              <label className="flex items-center gap-1 text-sm text-[var(--ui-text-secondary)] cursor-pointer">
                 <input type="checkbox" checked={onlyDiff} onChange={(e) => setOnlyDiff(e.target.checked)} />
                 仅显示差异
               </label>
@@ -260,7 +260,7 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
           {error && <div className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{error}</div>}
 
           {result && !result.root && (
-            <div className="text-sm text-gray-500 text-center py-6">两侧均无正式配置清单</div>
+            <div className="text-sm text-[var(--ui-text-secondary)] text-center py-6">两侧均无正式配置清单</div>
           )}
           {identical && (
             <div className="text-sm text-green-600 bg-green-50 px-3 py-2 rounded">两配置正式清单一致</div>
@@ -284,16 +284,16 @@ export default function ProfileCompareModal({ open, onClose }: Props) {
                     <col className="w-px" />
                     <col className="w-40" />
                   </colgroup>
-                  <thead className="sticky top-0 bg-gray-50 z-10">
-                    <tr className="text-xs font-medium text-gray-600 border-b">
+                  <thead className="sticky top-0 bg-[var(--ui-bg-subtle)] z-10">
+                    <tr className="text-xs font-medium text-[var(--ui-text-secondary)] border-b">
                       <th className="px-2 py-2 text-left">层级</th>
-                      <th colSpan={4} className="px-2 py-2 text-left border-r border-gray-200">左配置</th>
+                      <th colSpan={4} className="px-2 py-2 text-left border-r border-[var(--ui-border)]">左配置</th>
                       <th className="w-px bg-gray-200 p-0" />
                       <th colSpan={4} className="px-2 py-2 text-left">右配置</th>
                       <th className="w-px bg-gray-200 p-0" />
                       <th className="px-2 py-2 text-left">变更</th>
                     </tr>
-                    <tr className="text-xs font-medium text-gray-500 border-b">
+                    <tr className="text-xs font-medium text-[var(--ui-text-secondary)] border-b">
                       <th className="px-2 py-1" />
                       <th className="px-2 py-1 text-left">构型号/件号</th>
                       <th className="px-2 py-1 text-left">名称</th>

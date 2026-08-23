@@ -45,23 +45,23 @@ export default function VersionHistory({ entityType, entityId, onViewVersion }: 
   };
 
   if (loading) {
-    return <div className="text-sm text-gray-500 py-4 text-center">加载中...</div>;
+    return <div className="text-sm text-[var(--ui-text-secondary)] py-4 text-center">加载中...</div>;
   }
 
   if (versions.length === 0) {
-    return <div className="text-sm text-gray-400 py-4 text-center">暂无版本历史</div>;
+    return <div className="text-sm text-[var(--ui-text-tertiary)] py-4 text-center">暂无版本历史</div>;
   }
 
   return (
     <div className="border rounded-lg overflow-hidden">
       <table className="w-full text-sm">
-        <thead className="bg-gray-50 border-b">
+        <thead className="bg-[var(--ui-bg-subtle)] border-b">
           <tr>
-            <th className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap min-w-[5rem]">版本</th>
-            <th className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap min-w-[4rem]">状态</th>
-            <th className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap min-w-[9rem]">创建时间</th>
-            <th className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap min-w-[5rem]">创建人</th>
-            <th className="px-3 py-2 text-left text-gray-500 font-medium">备注</th>
+            <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium whitespace-nowrap min-w-[5rem]">版本</th>
+            <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium whitespace-nowrap min-w-[4rem]">状态</th>
+            <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium whitespace-nowrap min-w-[9rem]">创建时间</th>
+            <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium whitespace-nowrap min-w-[5rem]">创建人</th>
+            <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">备注</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
@@ -74,7 +74,7 @@ export default function VersionHistory({ entityType, entityId, onViewVersion }: 
                 onClick={() => {
                   if (!isCurrent && onViewVersion) onViewVersion(v.id);
                 }}
-                className={`${isCurrent ? 'bg-blue-50' : 'hover:bg-gray-50 cursor-pointer'}`}
+                className={`${isCurrent ? 'bg-blue-50' : 'hover:bg-[var(--ui-bg-hover)] cursor-pointer'}`}
               >
                 <td className="px-3 py-2">
                   <span className={`font-medium ${isCurrent ? 'text-blue-700' : 'text-gray-800'}`}>
@@ -85,13 +85,13 @@ export default function VersionHistory({ entityType, entityId, onViewVersion }: 
                 <td className="px-3 py-2">
                   <Badge status={v.status} />
                 </td>
-                <td className="px-3 py-2 text-gray-500">
+                <td className="px-3 py-2 text-[var(--ui-text-secondary)]">
                   {formatDateTime(v.created_at)}
                 </td>
-                <td className="px-3 py-2 text-gray-500">
+                <td className="px-3 py-2 text-[var(--ui-text-secondary)]">
                   {creator || '-'}
                 </td>
-                <td className="px-3 py-2 text-gray-500 max-w-60 truncate">
+                <td className="px-3 py-2 text-[var(--ui-text-secondary)] max-w-60 truncate">
                   {v.remark || '-'}
                 </td>
               </tr>

@@ -53,11 +53,11 @@ export function ECOExecutionPanel({ ecoId, status, onRefresh }: Props) {
       </div>
 
       {items.length === 0 ? (
-        <p className="text-xs text-gray-400">暂无执行项</p>
+        <p className="text-xs text-[var(--ui-text-tertiary)]">暂无执行项</p>
       ) : (
         <div className="border rounded overflow-hidden">
           <table className="min-w-full text-xs">
-            <thead><tr className="bg-gray-50 border-b">
+            <thead><tr className="bg-[var(--ui-bg-subtle)] border-b">
               <th className="p-1.5 text-left">#</th>
               <th className="p-1.5 text-left">实体名称</th>
               <th className="p-1.5 text-left">操作</th>
@@ -68,16 +68,16 @@ export function ECOExecutionPanel({ ecoId, status, onRefresh }: Props) {
             </tr></thead>
             <tbody>
               {items.map((item, idx) => (
-                <tr key={item.id} className="border-b hover:bg-gray-50">
+                <tr key={item.id} className="border-b hover:bg-[var(--ui-bg-hover)]">
                   <td className="p-1.5">{item.sort_order ?? idx + 1}</td>
                   <td className="p-1.5">{item.entity_name}</td>
                   <td className="p-1.5"><ECOActionBadge action={item.action} /></td>
                   <td className="p-1.5"><ECOExecStatusBadge status={item.status} /></td>
-                  <td className="p-1.5 text-gray-500">
+                  <td className="p-1.5 text-[var(--ui-text-secondary)]">
                     {item.new_version && <span>v{item.new_version}</span>}
                     {item.error_message && <span className="text-red-500">{item.error_message}</span>}
                   </td>
-                  <td className="p-1.5 text-gray-400">{item.executed_at?.slice(0, 16) || '-'}</td>
+                  <td className="p-1.5 text-[var(--ui-text-tertiary)]">{item.executed_at?.slice(0, 16) || '-'}</td>
                   <td className="p-1.5">
                     {canExecute && (item.status === 'pending' || item.status === 'failed') && (
                       <Button variant="link" size="xs"

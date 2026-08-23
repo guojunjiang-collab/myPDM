@@ -388,20 +388,20 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
     <Modal open={open} title={editingEco ? '编辑 ECO' : '新建 ECO'} onClose={onClose} width="3xl">
       <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
         {ecrTitle && (
-          <div className="text-sm text-gray-500 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+          <div className="text-sm text-[var(--ui-text-secondary)] bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
             来源 ECR: {ecrTitle}
           </div>
         )}
 
         {/* 基本字段 - 卡片式 */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-            <label className="block text-xs text-gray-500 mb-0.5">ECO 编号</label>
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">ECO 编号</label>
             <Input size="xs" type="text" value={localEco?.eco_number || ''} disabled
               placeholder="新建时自动生成" />
           </div>
-          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-            <label className="block text-xs text-gray-500 mb-0.5">标题 <span className="text-red-500">*</span></label>
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">标题 <span className="text-red-500">*</span></label>
             <Input size="xs" type="text" value={title}
               onChange={(e) => setTitle(e.target.value)}
               className={errors.title ? '!border-red-500' : ''}
@@ -411,34 +411,34 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-            <label className="block text-xs text-gray-500 mb-0.5">变更原因 <span className="text-red-500">*</span></label>
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">变更原因 <span className="text-red-500">*</span></label>
             <Select size="xs" value={reason} onChange={(e) => setReason(e.target.value)}
               className={errors.reason ? '!border-red-400' : ''}>
               {REASON_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </Select>
             {errors.reason && <p className="text-red-500 text-xs mt-1">{errors.reason}</p>}
           </div>
-          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-            <label className="block text-xs text-gray-500 mb-0.5">变更类别</label>
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">变更类别</label>
             <Select size="xs" value={category} onChange={(e) => setCategory(e.target.value)}>
               {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </Select>
           </div>
-          <div className="col-span-2 md:col-span-1 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-            <label className="block text-xs text-gray-500 mb-0.5">优先级</label>
+          <div className="col-span-2 md:col-span-1 bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">优先级</label>
             <div className="flex gap-2 pt-0.5 flex-wrap">
               {PRIORITY_OPTIONS.map((o) => (
                 <label key={o.value} className="inline-flex items-center gap-0.5 cursor-pointer select-none text-xs">
                   <input type="radio" name="priority" value={o.value} checked={priority === o.value}
                     onChange={(e) => setPriority(e.target.value)} className="w-3 h-3 text-primary-600" />
-                  <span className="text-gray-600">{o.label}</span>
+                  <span className="text-[var(--ui-text-secondary)]">{o.label}</span>
                 </label>
               ))}
             </div>
           </div>
-          <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-            <label className="block text-xs text-gray-500 mb-0.5">审批模式</label>
+          <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+            <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">审批模式</label>
             <Select size="xs" value={reviewMode} onChange={(e) => setReviewMode(e.target.value)}>
               <option value="all">会签（全部通过）</option>
               <option value="any">或签（任一通过）</option>
@@ -446,8 +446,8 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
           </div>
         </div>
 
-        <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-          <label className="block text-xs text-gray-500 mb-0.5">变更描述</label>
+        <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+          <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">变更描述</label>
           <Textarea size="xs" ref={descRef} value={description} onChange={(e) => setDescription(e.target.value)}
             onInput={(e) => { e.currentTarget.style.height = 'auto'; e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px'; }}
             rows={1} style={{ minHeight: '38px', resize: 'none' }}
@@ -464,15 +464,15 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
           </div>
 
           {reviewers.length === 0 && (
-            <div className="text-center text-gray-400 py-3 text-sm border border-dashed border-gray-300 rounded-lg">
+            <div className="text-center text-[var(--ui-text-tertiary)] py-3 text-sm border border-dashed border-gray-300 rounded-lg">
               暂无审批人，请点击上方按钮添加
             </div>
           )}
 
           <div className="space-y-2">
             {reviewers.map((reviewer, index) => (
-              <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                <span className="text-xs text-gray-400 w-6">{reviewer.seq}</span>
+              <div key={index} className="flex items-center gap-3 p-3 bg-[var(--ui-bg-subtle)] rounded-lg border border-[var(--ui-border)]">
+                <span className="text-xs text-[var(--ui-text-tertiary)] w-6">{reviewer.seq}</span>
                 <Select value={reviewer.user_id}
                   onChange={(e) => updateReviewer(index, 'user_id', e.target.value)}
                   className="flex-1"
@@ -495,11 +495,11 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
         {ecrItems && ecrItems.length > 0 && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">执行项（从 ECR 带入）</label>
-            <div className="border border-gray-200 rounded-lg divide-y max-h-40 overflow-auto">
+            <div className="border border-[var(--ui-border)] rounded-lg divide-y max-h-40 overflow-auto">
               {ecrItems.map((it, i) => (
                 <div key={i} className="px-3 py-2 text-sm flex justify-between items-center">
                   <span>{it.entity_name}</span>
-                  <span className="text-gray-400 text-xs">{it.action}</span>
+                  <span className="text-[var(--ui-text-tertiary)] text-xs">{it.action}</span>
                 </div>
               ))}
             </div>
@@ -515,20 +515,20 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
           </div>
           <div className="border rounded-lg overflow-hidden">
             {documentLinks.length === 0 ? (
-              <div className="px-4 py-6 text-center text-sm text-gray-400">暂无关联图文档</div>
+              <div className="px-4 py-6 text-center text-sm text-[var(--ui-text-tertiary)]">暂无关联图文档</div>
             ) : (
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-[var(--ui-bg-subtle)] border-b">
                   <tr>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档编号</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">图文档名称</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">版本</th>
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">图文档编号</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">图文档名称</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">版本</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">状态</th>
                     {docFieldDefs.map((def) => (
-                      <th key={def.id} className="px-3 py-2 text-left text-gray-500 font-medium whitespace-nowrap">{def.name}</th>
+                      <th key={def.id} className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium whitespace-nowrap">{def.name}</th>
                     ))}
-                    <th className="px-3 py-2 text-left text-gray-500 font-medium">附件</th>
-                    <th className="px-3 py-2 text-center text-gray-500 font-medium whitespace-nowrap w-28">操作</th>
+                    <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">附件</th>
+                    <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium whitespace-nowrap w-28">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -536,21 +536,21 @@ export function ECOCreateModal({ open, onClose, onCreated, ecrId, ecrTitle, ecrI
                     const doc = docData[link.document_id];
                     const atts = docAttachments[link.document_id] || [];
                     return (
-                      <tr key={link.document_id} className="hover:bg-gray-50">
+                      <tr key={link.document_id} className="hover:bg-[var(--ui-bg-hover)]">
                         <td className="px-3 py-2 text-sm font-medium">{doc?.code || link.document_code}</td>
                         <td className="px-3 py-2 text-sm">{doc?.name || link.document_name}</td>
-                        <td className="px-3 py-2 text-sm text-gray-500">{doc?.version || link.document_version || '-'}</td>
+                        <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{doc?.version || link.document_version || '-'}</td>
                         <td className="px-3 py-2">{doc ? <Badge status={doc.status} /> : '-'}</td>
                         {docFieldDefs.map((def) => {
                           const vals = docCustomValues[link.document_id] || {};
                           const val = vals[def.id];
                           return (
-                            <td key={def.id} className="px-3 py-2 text-sm text-gray-500">
+                            <td key={def.id} className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">
                               {val !== undefined && val !== null && val !== '' ? String(val) : '-'}
                             </td>
                           );
                         })}
-                        <td className="px-3 py-2 text-sm text-gray-500">{doc?.file_name || atts.map((a: any) => a.file_name).join(', ') || '-'}</td>
+                        <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{doc?.file_name || atts.map((a: any) => a.file_name).join(', ') || '-'}</td>
                         <td className="px-3 py-2 text-center">
                           <div className="flex items-center justify-center gap-1">
                             <Button variant="link" size="xs" type="button" onClick={() => setVersionSelectState({ docId: link.document_id, oldDocId: link.document_id })}>选择</Button>
@@ -617,7 +617,7 @@ onExecuteFreeze={(itemId, newEntityId) => handleExecuteAction('freeze', itemId, 
             <Button size="sm" type="button" onClick={() => setShowReleasePicker(true)}>+ 关联零部件</Button>
           </div>
           {releaseItems.length === 0 ? (
-            <div className="border rounded-lg px-4 py-6 text-center text-sm text-gray-400">暂无工程变更结果</div>
+            <div className="border rounded-lg px-4 py-6 text-center text-sm text-[var(--ui-text-tertiary)]">暂无工程变更结果</div>
           ) : (
             <ReleaseItemsTable items={releaseItems} onViewItem={viewItem} onRemove={(idx) => { const newItems = releaseItems.filter((_, i) => i !== idx); saveReleaseItems(newItems); }} onVersionSelect={(idx) => { const item = releaseItems[idx]; setReleaseVersionState({ itemIdx: idx, entityType: item.entity_type, entityId: item.entity_id, entityName: item.entity_name }); }} />
           )}
@@ -626,7 +626,7 @@ onExecuteFreeze={(itemId, newEntityId) => handleExecuteAction('freeze', itemId, 
       </div>
 
       {/* 按钮 */}
-      <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+      <div className="flex justify-end gap-3 pt-4 border-t border-[var(--ui-border)]">
         <Button variant="secondary" onClick={onClose}>
           取消
         </Button>
@@ -653,7 +653,7 @@ onExecuteFreeze={(itemId, newEntityId) => handleExecuteAction('freeze', itemId, 
       {/* ECR 选择弹窗 */}
       {showEcrPicker && (
       <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center" onClick={() => setShowEcrPicker(false)}>
-        <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[70vh] overflow-auto p-4" onClick={e => e.stopPropagation()}>
+        <div className="bg-[var(--ui-bg-surface)] rounded-lg shadow-xl w-full max-w-lg max-h-[70vh] overflow-auto p-4" onClick={e => e.stopPropagation()}>
           <h4 className="text-sm font-semibold mb-3">选择 ECR</h4>
           <EcrPicker onSelect={async (id, number) => {
             try {
@@ -770,12 +770,12 @@ function EcrPicker({ onSelect }: { onSelect: (id: string, number: string) => voi
           placeholder="搜索 ECR 编号或标题..." className="flex-1" />
         <Button size="sm" onClick={handleSearch} disabled={searching}>搜索</Button>
       </div>
-      {searching ? <p className="text-xs text-gray-400 text-center py-4">加载中...</p> : (
+      {searching ? <p className="text-xs text-[var(--ui-text-tertiary)] text-center py-4">加载中...</p> : (
         <table className="w-full text-sm border-collapse">
-          <thead><tr className="bg-gray-50 border-b">
-            <th className="px-3 py-2 text-left text-gray-500 font-medium text-xs">ECR 编号</th>
-            <th className="px-3 py-2 text-left text-gray-500 font-medium text-xs">标题</th>
-            <th className="px-3 py-2 text-left text-gray-500 font-medium text-xs w-20">状态</th>
+          <thead><tr className="bg-[var(--ui-bg-subtle)] border-b">
+            <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium text-xs">ECR 编号</th>
+            <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium text-xs">标题</th>
+            <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium text-xs w-20">状态</th>
           </tr></thead>
           <tbody className="divide-y">
             {results.map(e => (
@@ -785,7 +785,7 @@ function EcrPicker({ onSelect }: { onSelect: (id: string, number: string) => voi
                 <td className="px-3 py-2 text-xs">{stl(e.status)}</td>
               </tr>
             ))}
-            {results.length === 0 && <tr><td colSpan={3} className="text-xs text-gray-400 text-center py-4">无数据</td></tr>}
+            {results.length === 0 && <tr><td colSpan={3} className="text-xs text-[var(--ui-text-tertiary)] text-center py-4">无数据</td></tr>}
           </tbody>
         </table>
       )}
@@ -818,15 +818,15 @@ function ReleaseItemsTable({ items, onViewItem, onRemove, onVersionSelect }: { i
     const rowNum = parseInt(idx.split('-')[0], 10);
     return (
       <>
-        <tr key={idx} className="hover:bg-gray-50 cursor-pointer" onClick={() => onViewItem(isAssembly ? 'assembly' : 'part', ri.entity_id, 'view')}>
-          <td className="px-3 py-1.5 text-xs text-gray-400 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+        <tr key={idx} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => onViewItem(isAssembly ? 'assembly' : 'part', ri.entity_id, 'view')}>
+          <td className="px-3 py-1.5 text-xs text-[var(--ui-text-tertiary)] whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
             <span>{'-'.repeat(level)}{level}</span>
             {isAssembly && <span className="ml-1 inline-flex"><TreeToggle expanded={!!childRows} onClick={() => toggleExpand(idx, ri.entity_id, ri.entity_type)} size="sm" /></span>}
           </td>
           <td className="px-3 py-1.5 text-xs"><Badge tone={isAssembly ? 'blue' : 'gray'} label={isAssembly ? '部件' : '零件'} /></td>
           <td className="px-3 py-1.5 text-xs font-mono">{ri.entity_code}</td>
           <td className="px-3 py-1.5 text-xs">{ri.entity_name}</td>
-          <td className="px-3 py-1.5 text-xs text-gray-500">{ri.spec || '-'}</td>
+          <td className="px-3 py-1.5 text-xs text-[var(--ui-text-secondary)]">{ri.spec || '-'}</td>
           <td className="px-3 py-1.5 text-xs">{ri.entity_version || 'A'}</td>
           <td className="px-3 py-1.5 text-xs whitespace-nowrap">{ri.status ? <Badge status={ri.status} /> : '-'}</td>
           <td className="px-3 py-1.5 text-xs text-center">{ri.quantity || 1}</td>
@@ -839,24 +839,24 @@ function ReleaseItemsTable({ items, onViewItem, onRemove, onVersionSelect }: { i
           {(onRemove || onVersionSelect) && level > 0 && <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}></td>}
         </tr>
         {childRows && childRows.map((child: any, j: number) => renderRow(child, level + 1, `${idx}-${j}`))}
-        {loadingIdx === idx && <tr><td colSpan={(onRemove || onVersionSelect) ? 9 : 8} className="px-3 py-1.5 text-xs text-gray-400 text-center">加载中...</td></tr>}
+        {loadingIdx === idx && <tr><td colSpan={(onRemove || onVersionSelect) ? 9 : 8} className="px-3 py-1.5 text-xs text-[var(--ui-text-tertiary)] text-center">加载中...</td></tr>}
       </>
     );
   };
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
+    <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden">
       <table className="w-full text-sm">
-        <thead className="bg-gray-50 border-b"><tr>
-          <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-20">层级</th>
-          <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-16">类型</th>
-          <th className="px-3 py-1.5 text-left text-xs text-gray-500">件号</th>
-          <th className="px-3 py-1.5 text-left text-xs text-gray-500">中文名称</th>
-          <th className="px-3 py-1.5 text-left text-xs text-gray-500">规格型号</th>
-          <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-14">版本</th>
-          <th className="px-3 py-1.5 text-left text-xs text-gray-500 w-20">状态</th>
-          <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-12">用量</th>
-          {(onRemove || onVersionSelect) && <th className="px-3 py-1.5 text-center text-xs text-gray-500 w-28">操作</th>}
+        <thead className="bg-[var(--ui-bg-subtle)] border-b"><tr>
+          <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)] w-20">层级</th>
+          <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)] w-16">类型</th>
+          <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)]">件号</th>
+          <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)]">中文名称</th>
+          <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)]">规格型号</th>
+          <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)] w-14">版本</th>
+          <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)] w-20">状态</th>
+          <th className="px-3 py-1.5 text-center text-xs text-[var(--ui-text-secondary)] w-12">用量</th>
+          {(onRemove || onVersionSelect) && <th className="px-3 py-1.5 text-center text-xs text-[var(--ui-text-secondary)] w-28">操作</th>}
         </tr></thead>
         <tbody className="divide-y">{items.map((ri, i) => renderRow(ri, 0, String(i)))}</tbody>
       </table>

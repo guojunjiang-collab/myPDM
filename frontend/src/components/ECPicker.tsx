@@ -72,10 +72,10 @@ export default function ECPicker({ open, onClose, onConfirm }: ECPickerProps) {
             <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggle(r.id)} />
             <span className="text-xs px-2 py-0.5 rounded bg-primary-50 text-primary-700">{r.kind}</span>
             <span className="font-medium">{r.number}</span>
-            <span className="text-gray-500 truncate">{r.title}</span>
+            <span className="text-[var(--ui-text-secondary)] truncate">{r.title}</span>
           </label>
         ))}
-        {filtered.length === 0 && <div className="py-8 text-center text-gray-400">无数据</div>}
+        {filtered.length === 0 && <div className="py-8 text-center text-[var(--ui-text-tertiary)]">无数据</div>}
       </div>
       <div className="flex justify-end gap-2 mt-4">
         <Button variant="secondary" onClick={onClose}>取消</Button>

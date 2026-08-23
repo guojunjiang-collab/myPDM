@@ -39,10 +39,10 @@ function InfoCard({ label, value, readonly, onChange }: {
   label: string; value: string; readonly: boolean; onChange?: (v: string) => void;
 }) {
   return (
-    <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
+    <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+      <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{label}</div>
       {readonly ? (
-        <div className="text-sm text-gray-900 font-medium">{value || '—'}</div>
+        <div className="text-sm text-[var(--ui-text-primary)] font-medium">{value || '—'}</div>
       ) : (
         <Input value={value} onChange={(e) => onChange?.(e.target.value)}
           size="xs"
@@ -246,7 +246,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
     const nested = subChildren[revId] || [];
     const rows: React.ReactNode[] = [];
     rows.push(
-      <tr key={c.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => { if (revId) setNestedConfigRevId(revId); }}>
+      <tr key={c.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => { if (revId) setNestedConfigRevId(revId); }}>
         <td
           className="relative px-3 py-2 font-medium whitespace-nowrap"
           style={{ paddingLeft: `calc(8px + (${level} - 1) * var(--ui-tree-indent))` }}
@@ -269,7 +269,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
                   loadSubChildren(revId);
                 }
               }}
-                className="w-4 h-4 inline-flex items-center justify-center shrink-0 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-200/60"
+                className="w-4 h-4 inline-flex items-center justify-center shrink-0 rounded text-[var(--ui-text-tertiary)] hover:text-[var(--ui-text-secondary)] hover:bg-gray-200/60"
                 title={isExpanded ? '折叠' : '展开'}>
                 <BomChevron expanded={isExpanded} />
               </button>
@@ -280,9 +280,9 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
           </span>
         </td>
         <td className="px-3 py-2">{c.child_detail?.name || '—'}</td>
-        <td className="px-3 py-2 text-center text-gray-500 text-xs">{c.child_detail?.version || '—'}</td>
+        <td className="px-3 py-2 text-center text-[var(--ui-text-secondary)] text-xs">{c.child_detail?.version || '—'}</td>
         <td className="px-3 py-2 text-center"><Badge status={c.child_detail?.status || 'draft'} /></td>
-        <td className="px-3 py-2 text-center">{c.child_detail?.check_out_user_name ? (<span className="text-xs text-orange-600">{c.child_detail.check_out_user_name}</span>) : (<span className="text-xs text-gray-400">—</span>)}</td>
+        <td className="px-3 py-2 text-center">{c.child_detail?.check_out_user_name ? (<span className="text-xs text-orange-600">{c.child_detail.check_out_user_name}</span>) : (<span className="text-xs text-[var(--ui-text-tertiary)]">—</span>)}</td>
         <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
           {canEdit ? (
             <button onClick={async () => { try { await configurationApi.updateChild(parentRevisionId, c.id, { is_required: !c.is_required }); if (parentRevisionId === internalRevId) { setChildren(prev => prev.map(x => x.id === c.id ? { ...x, is_required: !x.is_required } : x)); } else { setSubChildren(prev => { const s = { ...prev }; s[parentRevisionId] = (s[parentRevisionId] || []).map((x: any) => x.id === c.id ? { ...x, is_required: !x.is_required } : x); return s; }); } } catch {} }} className={`text-xs px-2 py-0.5 rounded ${c.is_required ? 'bg-[var(--ui-blue-bg)] text-[var(--ui-blue-text)] hover:opacity-80' : 'bg-[var(--ui-gray-bg)] text-[var(--ui-gray-text)] hover:opacity-80'}`}>{c.is_required ? '必选' : '可选'}</button>
@@ -334,20 +334,20 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
       ) : undefined}
     >
       <div className="h-[50vh] flex flex-col">
-        {detailLoading && !master ? (<Loading />) : !master ? (<div className="text-gray-400 text-sm py-8 text-center">加载失败</div>) : (<>
+        {detailLoading && !master ? (<Loading />) : !master ? (<div className="text-[var(--ui-text-tertiary)] text-sm py-8 text-center">加载失败</div>) : (<>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 shrink-0 mb-3">
             {canEdit ? (<>
               <InfoCard label="构型号" value={editCode} readonly={false} onChange={(v) => { setEditCode(v); autoSaveMaster({ code: v }); }} />
               <InfoCard label="中文名称" value={editName} readonly={false} onChange={(v) => { setEditName(v); autoSaveMaster({ name: v }); }} />
-              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100"><div className="text-xs text-gray-500 mb-0.5">类型</div><div className="text-sm text-gray-900 font-medium">构型项</div></div>
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100"><div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">类型</div><div className="text-sm text-[var(--ui-text-primary)] font-medium">构型项</div></div>
             </>) : (<>
-              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100"><div className="text-xs text-gray-500 mb-0.5">构型号</div><div className="text-sm text-gray-900 font-medium font-mono">{master?.code}</div></div>
-              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100"><div className="text-xs text-gray-500 mb-0.5">中文名称</div><div className="text-sm text-gray-900 font-medium">{master?.name}</div></div>
-              <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100"><div className="text-xs text-gray-500 mb-0.5">类型</div><div className="text-sm text-gray-900 font-medium">构型项</div></div>
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100"><div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">构型号</div><div className="text-sm text-[var(--ui-text-primary)] font-medium font-mono">{master?.code}</div></div>
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100"><div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">中文名称</div><div className="text-sm text-[var(--ui-text-primary)] font-medium">{master?.name}</div></div>
+              <div className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100"><div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">类型</div><div className="text-sm text-[var(--ui-text-primary)] font-medium">构型项</div></div>
             </>)}
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 p-3 shrink-0 mb-3">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] p-3 shrink-0 mb-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-3">
                 <span className="font-semibold text-sm">版本：{revision?.version}</span>
@@ -369,16 +369,16 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
-            <div className="flex border-b border-gray-200 shrink-0">
+          <div className="bg-[var(--ui-bg-surface)] rounded-lg border border-[var(--ui-border)] overflow-hidden flex-1 min-h-0 flex flex-col">
+            <div className="flex border-b border-[var(--ui-border)] shrink-0">
               {tabs.map((t) => (
-                <button key={t.key} onClick={() => setActiveTab(t.key)} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === t.key ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>{t.label}</button>
+                <button key={t.key} onClick={() => setActiveTab(t.key)} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === t.key ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--ui-text-secondary)] hover:text-gray-700'}`}>{t.label}</button>
               ))}
             </div>
             <div className="p-4 overflow-y-auto flex-1 min-h-0">
               {activeTab === 'info' && (
                 <div className="space-y-4">
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-[var(--ui-text-secondary)]">
                     Iteration #{viewingIterationData ? viewingIterationData.iteration : revision?.latest_iteration}
                     {viewingIterationData ? (
                       <span className="ml-2">签入说明：{viewingIterationData.check_in_note || '—'}</span>
@@ -387,8 +387,8 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
                     )}
                   </div>
                   {cfDefs.length > 0 ? (
-                    <div><h4 className="text-sm font-semibold mb-2">自定义字段</h4><div className="grid grid-cols-3 gap-3">{cfDefs.map((def: any) => (<div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100"><div className="text-xs text-gray-500 mb-0.5">{def.name}</div><div><CustomFieldInput def={def} value={cfValues[def.id]} onChange={(val) => { setCfValues(prev => ({ ...prev, [def.id]: val })); autoSaveCf(def.id, val); }} readOnly={!canEdit} /></div></div>))}</div></div>
-                  ) : (<div className="text-gray-400 text-sm">无</div>)}
+                    <div><h4 className="text-sm font-semibold mb-2">自定义字段</h4><div className="grid grid-cols-3 gap-3">{cfDefs.map((def: any) => (<div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100"><div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{def.name}</div><div><CustomFieldInput def={def} value={cfValues[def.id]} onChange={(val) => { setCfValues(prev => ({ ...prev, [def.id]: val })); autoSaveCf(def.id, val); }} readOnly={!canEdit} /></div></div>))}</div></div>
+                  ) : (<div className="text-[var(--ui-text-tertiary)] text-sm">无</div>)}
                 </div>
               )}
               {activeTab === 'parts' && (
@@ -399,18 +399,18 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
                       <Button size="sm" onClick={() => setPartPickerOpen(true)}>关联零部件</Button>
                     )}
                   </div>
-                  {parts.length === 0 ? (<div className="text-gray-400 text-sm py-4 text-center">暂无关联零部件</div>) : (
+                  {parts.length === 0 ? (<div className="text-[var(--ui-text-tertiary)] text-sm py-4 text-center">暂无关联零部件</div>) : (
                     <div className="border rounded-lg overflow-hidden"><table className="w-full text-sm">
-                      <thead><tr className="bg-gray-50 border-b">
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium">件号</th>
-                        <th className="px-3 py-2 text-left text-gray-500 font-medium">中文名称</th>
-                        <th className="px-3 py-2 text-center text-gray-500 font-medium w-14">版本</th>
-                        <th className="px-3 py-2 text-center text-gray-500 font-medium w-16">状态</th>
-                        <th className="px-3 py-2 text-center text-gray-500 font-medium w-20">签出状态</th>
-                        <th className="px-3 py-2 text-center text-gray-500 font-medium w-20 whitespace-nowrap">可选/必选</th>
-                        <th className="px-3 py-2 text-center text-gray-500 font-medium w-14">数量</th>
-                        <th className="px-3 py-2 text-center text-gray-500 font-medium w-14">预览</th>
-                        <th className="px-3 py-2 text-center text-gray-500 font-medium w-24">操作</th>
+                      <thead><tr className="bg-[var(--ui-bg-subtle)] border-b">
+                        <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">件号</th>
+                        <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">中文名称</th>
+                        <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-14">版本</th>
+                        <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-16">状态</th>
+                        <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-20">签出状态</th>
+                        <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-20 whitespace-nowrap">可选/必选</th>
+                        <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-14">数量</th>
+                        <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-14">预览</th>
+                        <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-24">操作</th>
                       </tr></thead>
                       <tbody className="divide-y divide-gray-200">
                         {parts.map((p: any, i: number) => {
@@ -418,15 +418,15 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
                           const isAssembly = p.part_type === 'assembly';
                           const canPreview = isAssembly || pd.has_3d;
                           return (
-                            <tr key={p.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => { if (p.part_id) setSelectedPartMasterId(p.part_id); }}>
+                            <tr key={p.id} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => { if (p.part_id) setSelectedPartMasterId(p.part_id); }}>
                               <td className="px-3 py-2 font-mono text-xs">{pd.code || '—'}</td>
                               <td className="px-3 py-2">{pd.name || '—'}</td>
-                              <td className="px-3 py-2 text-center text-gray-500">{pd.version || '—'}</td>
+                              <td className="px-3 py-2 text-center text-[var(--ui-text-secondary)]">{pd.version || '—'}</td>
                               <td className="px-3 py-2 text-center">
                                 <Badge status={pd.status || 'draft'} />
                               </td>
                               <td className="px-3 py-2 text-center">
-                                {pd.check_out_user_name ? (<span className="text-xs text-orange-600">{pd.check_out_user_name}</span>) : (<span className="text-xs text-gray-400">—</span>)}
+                                {pd.check_out_user_name ? (<span className="text-xs text-orange-600">{pd.check_out_user_name}</span>) : (<span className="text-xs text-[var(--ui-text-tertiary)]">—</span>)}
                               </td>
                               <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
                                 {canEdit ? (
@@ -456,7 +456,7 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
                                       <Button variant="danger" size="xs" onClick={async () => { if (!confirm('确定移除此关联零部件？')) return; try { await configurationApi.removePart(internalRevId, p.id); setParts(prev => prev.filter(x => x.id !== p.id)); } catch {} }}>移除</Button>
                                     </>
                                   )}
-                                  {!canEdit && <span className="text-xs text-gray-400">—</span>}
+                                  {!canEdit && <span className="text-xs text-[var(--ui-text-tertiary)]">—</span>}
                                 </div>
                               </td>
                             </tr>
@@ -469,23 +469,23 @@ export default function ConfigItemDetailModal({ revisionId, open, onClose }: Pro
               {activeTab === 'children' && (
                 <div className="flex flex-col h-full min-h-0">
                   <div className="flex items-center justify-between mb-3 shrink-0"><h4 className="text-sm font-bold text-gray-700">子构型项</h4>{canEdit && (<Button size="sm" onClick={() => { setPickerParentId(internalRevId); setCfgPickerOpen(true); }}>+ 添加子项</Button>)}</div>
-                  {children.length === 0 ? (<div className="text-gray-400 text-sm py-4 text-center">暂无子构型项</div>) : (
-                     <div className="border rounded-lg overflow-hidden flex-1 min-h-0"><div className="overflow-y-auto h-full" ref={childrenScrollRef}><table className="w-full text-sm"><thead><tr className="bg-gray-50 border-b sticky top-0 z-10"><th className="px-3 py-2 text-left text-gray-500 font-medium" style={{ paddingLeft: 28 }}>构型号</th><th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-16">版本</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-20">状态</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-20">签出状态</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-20 whitespace-nowrap">必选/可选</th><th className="px-3 py-2 text-center text-gray-500 font-medium w-16 whitespace-nowrap">数量</th>{canEdit && <th className="px-3 py-2 text-center text-gray-500 font-medium w-28 whitespace-nowrap">操作</th>}</tr></thead><tbody className="divide-y divide-gray-200">{rows}</tbody></table></div></div>
+                  {children.length === 0 ? (<div className="text-[var(--ui-text-tertiary)] text-sm py-4 text-center">暂无子构型项</div>) : (
+                     <div className="border rounded-lg overflow-hidden flex-1 min-h-0"><div className="overflow-y-auto h-full" ref={childrenScrollRef}><table className="w-full text-sm"><thead><tr className="bg-[var(--ui-bg-subtle)] border-b sticky top-0 z-10"><th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium" style={{ paddingLeft: 28 }}>构型号</th><th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">名称</th><th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-16">版本</th><th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-20">状态</th><th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-20">签出状态</th><th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-20 whitespace-nowrap">必选/可选</th><th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-16 whitespace-nowrap">数量</th>{canEdit && <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-28 whitespace-nowrap">操作</th>}</tr></thead><tbody className="divide-y divide-gray-200">{rows}</tbody></table></div></div>
                   )}
                 </div>
               )}
               {activeTab === 'docs' && internalRevId && (<EntityDocumentSection entityType="configuration" entityId={internalRevId} editable={isCheckedOutByMe && isDraft} entityCode={master?.code} entityName={master?.name} />)}
               {activeTab === 'versions' && (
-                <table className="w-full text-sm"><thead><tr className="bg-gray-50 border-b border-gray-200"><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">版本</th><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">状态</th><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">创建时间</th><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">操作</th></tr></thead><tbody className="divide-y divide-gray-200">
+                <table className="w-full text-sm"><thead><tr className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]"><th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">版本</th><th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">状态</th><th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">创建时间</th><th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">操作</th></tr></thead><tbody className="divide-y divide-gray-200">
                   {versions.map((v: any) => (
-                    <tr key={v.id} className={`hover:bg-gray-50 ${v.id === revision?.id ? 'bg-blue-50' : ''}`}><td className="px-4 py-3">{v.version}</td><td className="px-4 py-3"><Badge status={v.status} /></td><td className="px-4 py-3 text-gray-500">{v.created_at ? new Date(v.created_at).toLocaleDateString('zh-CN') : ''}</td><td className="px-4 py-3">{v.id === revision?.id ? (<span className="text-primary-600 text-xs">当前</span>) : (<Button variant="link" size="xs" onClick={() => setInternalRevId(v.id)}>切换</Button>)}</td></tr>
+                    <tr key={v.id} className={`hover:bg-[var(--ui-bg-hover)] ${v.id === revision?.id ? 'bg-blue-50' : ''}`}><td className="px-4 py-3">{v.version}</td><td className="px-4 py-3"><Badge status={v.status} /></td><td className="px-4 py-3 text-[var(--ui-text-secondary)]">{v.created_at ? new Date(v.created_at).toLocaleDateString('zh-CN') : ''}</td><td className="px-4 py-3">{v.id === revision?.id ? (<span className="text-primary-600 text-xs">当前</span>) : (<Button variant="link" size="xs" onClick={() => setInternalRevId(v.id)}>切换</Button>)}</td></tr>
                   ))}
                 </tbody></table>
               )}
               {activeTab === 'iterations' && (
-                <table className="w-full text-sm"><thead><tr className="bg-gray-50 border-b border-gray-200"><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">迭代</th><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">签入时间</th><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">签入说明</th><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">创建人</th><th className="text-left px-4 py-3 text-sm font-medium text-gray-500">操作</th></tr></thead><tbody className="divide-y divide-gray-200">
+                <table className="w-full text-sm"><thead><tr className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)]"><th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">迭代</th><th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">签入时间</th><th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">签入说明</th><th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">创建人</th><th className="text-left px-4 py-3 text-sm font-medium text-[var(--ui-text-secondary)]">操作</th></tr></thead><tbody className="divide-y divide-gray-200">
                   {iterations.map((it: any) => (
-                    <tr key={it.id} className={`hover:bg-gray-50 ${it.iteration === revision?.latest_iteration ? 'bg-blue-50' : ''}`}><td className="px-4 py-3">#{it.iteration}</td><td className="px-4 py-3 text-gray-500">{it.created_at ? new Date(it.created_at).toLocaleString('zh-CN') : '未签入'}</td><td className="px-4 py-3">{it.check_in_note || '—'}</td><td className="px-4 py-3 text-gray-500">{it.creator_name || '—'}</td><td className="px-4 py-3"><div className="flex items-center gap-2">{it.iteration === revision?.latest_iteration ? (<span className="text-primary-600 text-xs">当前</span>) : (<Button variant="link" size="xs" onClick={() => handleViewIteration(it)}>查看数据</Button>)}{it.iteration > 1 && isAdminUser && (<Button variant="danger" size="xs" onClick={() => handleDeleteIteration(it)}>删除</Button>)}</div></td></tr>
+                    <tr key={it.id} className={`hover:bg-[var(--ui-bg-hover)] ${it.iteration === revision?.latest_iteration ? 'bg-blue-50' : ''}`}><td className="px-4 py-3">#{it.iteration}</td><td className="px-4 py-3 text-[var(--ui-text-secondary)]">{it.created_at ? new Date(it.created_at).toLocaleString('zh-CN') : '未签入'}</td><td className="px-4 py-3">{it.check_in_note || '—'}</td><td className="px-4 py-3 text-[var(--ui-text-secondary)]">{it.creator_name || '—'}</td><td className="px-4 py-3"><div className="flex items-center gap-2">{it.iteration === revision?.latest_iteration ? (<span className="text-primary-600 text-xs">当前</span>) : (<Button variant="link" size="xs" onClick={() => handleViewIteration(it)}>查看数据</Button>)}{it.iteration > 1 && isAdminUser && (<Button variant="danger" size="xs" onClick={() => handleDeleteIteration(it)}>删除</Button>)}</div></td></tr>
                   ))}
                 </tbody></table>
               )}

@@ -57,14 +57,14 @@ export function CADWorkspaceModal({ open, onClose }: Props) {
     <Modal open={open} onClose={handleClose} title="CAD工作台" width="max" height="85vh">
       <div className="flex flex-col h-full">
         {/* 步骤标签 */}
-        <div className="flex border-b border-gray-200 mb-4 shrink-0">
+        <div className="flex border-b border-[var(--ui-border)] mb-4 shrink-0">
           {(['connect', 'match', 'complete'] as Step[]).map((s, i) => (
             <div
               key={s}
               className={`px-5 py-2.5 text-sm font-semibold ${
                 step === s
                   ? 'text-primary-600 border-b-2 border-primary-600'
-                  : 'text-gray-400'
+                  : 'text-[var(--ui-text-tertiary)]'
               }`}
             >
               {i === 0 ? '①' : i === 1 ? '②' : '③'} {stepLabels[s]}

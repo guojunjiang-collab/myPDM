@@ -185,8 +185,8 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
     const rowCls = onClickRow ? 'cursor-pointer' : '';
     return (
       <>
-        <tr key={idx} className={`hover:bg-gray-50 ${rowCls}`}>
-          <td className="px-3 py-2 text-sm text-gray-400 whitespace-nowrap">
+        <tr key={idx} className={`hover:bg-[var(--ui-bg-hover)] ${rowCls}`}>
+          <td className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)] whitespace-nowrap">
             <span>{'-'.repeat(level)}{level}</span>
             {isAssembly && entityId && (
               <span className="ml-1 inline-flex"><TreeToggle expanded={!!childRows} onClick={() => togglePart(idx, entityId, p.part_detail?.revision_id || '')} size="md" /></span>
@@ -207,7 +207,7 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
           </td>
         </tr>
         {childRows && childRows.map((c: any, j: number) => renderPartRow(c, level + 1, `${idx}-${j}`))}
-        {loadingPart === idx && <tr><td colSpan={8} className="px-3 py-2 text-sm text-gray-400 text-center">加载中...</td></tr>}
+        {loadingPart === idx && <tr><td colSpan={8} className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)] text-center">加载中...</td></tr>}
       </>
     );
   };
@@ -229,19 +229,19 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
     const rowCls = onClickRow ? 'cursor-pointer' : '';
     return (
       <>
-        <tr key={idx} className={`hover:bg-gray-50 ${rowCls}`}>
-          <td className="px-3 py-2 text-sm text-gray-400 whitespace-nowrap">
+        <tr key={idx} className={`hover:bg-[var(--ui-bg-hover)] ${rowCls}`}>
+          <td className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)] whitespace-nowrap">
             <span>{'-'.repeat(level)}</span>
             {isAssembly && entityId && (
               <span className="ml-1 inline-flex"><TreeToggle expanded={!!childRows} onClick={() => togglePart(idx, entityId, p.part_detail?.revision_id || '')} size="md" /></span>
             )}
           </td>
-          <td className={`px-3 py-2 text-sm font-mono text-gray-600 ${rowCls}`} onClick={onClickRow}>{code}</td>
+          <td className={`px-3 py-2 text-sm font-mono text-[var(--ui-text-secondary)] ${rowCls}`} onClick={onClickRow}>{code}</td>
           <td className={`px-3 py-2 text-sm ${rowCls}`} onClick={onClickRow}>{name}</td>
           <td className={`px-3 py-2 text-sm whitespace-nowrap ${rowCls}`} onClick={onClickRow}>
             <Badge tone={isAssembly ? 'blue' : 'gray'} label={isAssembly ? '部件' : '零件'} />
           </td>
-          <td className={`px-3 py-2 text-sm text-gray-500 ${rowCls}`} onClick={onClickRow}>{version}</td>
+          <td className={`px-3 py-2 text-sm text-[var(--ui-text-secondary)] ${rowCls}`} onClick={onClickRow}>{version}</td>
           <td className={`px-3 py-2 text-sm whitespace-nowrap ${rowCls}`} onClick={onClickRow}>
             <Badge status={status} />
           </td>
@@ -251,7 +251,7 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
           </td>
         </tr>
         {childRows && childRows.map((c: any, j: number) => renderUnifiedPartRow(c, level + 1, `${idx}-${j}`))}
-        {loadingPart === idx && <tr><td colSpan={8} className="px-3 py-2 text-sm text-gray-400 text-center">加载中...</td></tr>}
+        {loadingPart === idx && <tr><td colSpan={8} className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)] text-center">加载中...</td></tr>}
       </>
     );
   };
@@ -268,20 +268,20 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
     const rowCls = onClickRow ? 'cursor-pointer' : '';
     return (
       <>
-        <tr key={idx} className={`bg-gray-50/70 hover:bg-purple-50 ${rowCls}`}>
-          <td className="px-3 py-2 text-sm text-gray-400 whitespace-nowrap">
+        <tr key={idx} className={`bg-[var(--ui-bg-subtle)] hover:bg-purple-50 ${rowCls}`}>
+          <td className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)] whitespace-nowrap">
             <span>{'-'.repeat(level)}{level}</span>
             {expandable && (
               <span className="ml-1 inline-flex"><TreeToggle expanded={!!expanded} onClick={() => toggleChild(idx, childId)} size="md" /></span>
             )}
           </td>
           <td className={`px-3 py-2 text-sm font-medium text-gray-700 ${rowCls}`} onClick={onClickRow}>{c.child_detail?.code || c.child_code || c.child_id}</td>
-          <td className={`px-3 py-2 text-sm text-gray-600 ${rowCls}`} onClick={onClickRow}>{c.child_detail?.name || c.child_name || '-'}</td>
+          <td className={`px-3 py-2 text-sm text-[var(--ui-text-secondary)] ${rowCls}`} onClick={onClickRow}>{c.child_detail?.name || c.child_name || '-'}</td>
           <td className={`px-3 py-2 text-xs whitespace-nowrap ${rowCls}`} onClick={onClickRow}>
             <Badge tone="purple" label="构型项" />
           </td>
-          <td className="px-3 py-2 text-xs text-gray-400">-</td>
-          <td className="px-3 py-2 text-xs text-gray-400">-</td>
+          <td className="px-3 py-2 text-xs text-[var(--ui-text-tertiary)]">-</td>
+          <td className="px-3 py-2 text-xs text-[var(--ui-text-tertiary)]">-</td>
           <td className={`px-3 py-2 text-center text-sm ${rowCls}`} onClick={onClickRow}>{c.quantity ?? 1}</td>
           <td className={`px-3 py-2 text-center text-sm ${rowCls}`} onClick={onClickRow}>
             <Badge tone={c.is_required ? 'blue' : 'gray'} label={c.is_required ? '必选' : '可选'} />
@@ -289,7 +289,7 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
         </tr>
         {expanded && expanded.parts.map((p: any, j: number) => renderUnifiedPartRow(p, level + 1, `${idx}-p${j}`))}
         {expanded && expanded.children.map((cc: any, j: number) => renderUnifiedChildRow(cc, level + 1, `${idx}-c${j}`))}
-        {loadingChild === idx && <tr><td colSpan={8} className="px-3 py-2 text-sm text-gray-400 text-center">加载中...</td></tr>}
+        {loadingChild === idx && <tr><td colSpan={8} className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)] text-center">加载中...</td></tr>}
       </>
     );
   };
@@ -300,9 +300,9 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
     <>
     <Modal open={!!itemId} onClose={onClose} title="构型项详情" width="full">
       {loading ? (
-        <div className="py-8 text-center text-sm text-gray-400">加载中...</div>
+        <div className="py-8 text-center text-sm text-[var(--ui-text-tertiary)]">加载中...</div>
       ) : !data ? (
-        <div className="py-8 text-center text-sm text-gray-400">加载失败</div>
+        <div className="py-8 text-center text-sm text-[var(--ui-text-tertiary)]">加载失败</div>
       ) : (
         <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-1">
           {/* 基本信息 - 卡片式 */}
@@ -317,8 +317,8 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
           {cfDefs.length > 0 && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {cfDefs.map(def => (
-                <div key={def.id} className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-                  <label className="block text-xs text-gray-500 mb-0.5">{def.name}</label>
+                <div key={def.id} className="bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100">
+                  <label className="block text-xs text-[var(--ui-text-secondary)] mb-0.5">{def.name}</label>
                   <CustomFieldInput def={def} value={cfValues[def.id]} onChange={() => {}} readOnly />
                 </div>
               ))}
@@ -329,44 +329,44 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
           <div>
             <h4 className="text-sm font-bold text-gray-700 mb-2">关联零部件 ({data.parts?.length || 0})</h4>
             {data.parts?.length > 0 ? (
-              <table className="w-full text-sm border border-gray-200 rounded">
-                <thead className="bg-gray-50 border-b"><tr>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">层级</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">类型</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium">件号</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium">中文名称</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-14">版本</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
-                  <th className="px-3 py-2 text-center text-gray-500 font-medium w-16">用量</th>
-                  <th className="px-3 py-2 text-center text-gray-500 font-medium w-24">必选/可选</th>
+              <table className="w-full text-sm border border-[var(--ui-border)] rounded">
+                <thead className="bg-[var(--ui-bg-subtle)] border-b"><tr>
+                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20">层级</th>
+                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">类型</th>
+                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">件号</th>
+                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">中文名称</th>
+                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-14">版本</th>
+                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">状态</th>
+                  <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-16">用量</th>
+                  <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-24">必选/可选</th>
                 </tr></thead>
                 <tbody className="divide-y divide-gray-100">
                   {(data.parts as ConfigPartItem[]).map((p, i) => renderPartRow(p, 0, String(i)))}
                 </tbody>
               </table>
-            ) : <div className="text-sm text-gray-400 py-2">暂无关联零部件</div>}
+            ) : <div className="text-sm text-[var(--ui-text-tertiary)] py-2">暂无关联零部件</div>}
           </div>
 
           {/* 子构型项 */}
           <div>
             <h4 className="text-sm font-bold text-gray-700 mb-2">子构型项 ({data.children?.length || 0})</h4>
             {data.children?.length > 0 ? (
-              <table className="w-full text-sm border border-gray-200 rounded">
-                <thead className="bg-gray-50 border-b"><tr>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-20">层级</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium">构型号/零部件件号</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium">名称</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">类型</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-14">版本</th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-16">状态</th>
-                  <th className="px-3 py-2 text-center text-gray-500 font-medium w-16">用量</th>
-                  <th className="px-3 py-2 text-center text-gray-500 font-medium w-24">必选/可选</th>
+              <table className="w-full text-sm border border-[var(--ui-border)] rounded">
+                <thead className="bg-[var(--ui-bg-subtle)] border-b"><tr>
+                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-20">层级</th>
+                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">构型号/零部件件号</th>
+                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium">名称</th>
+                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">类型</th>
+                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-14">版本</th>
+                  <th className="px-3 py-2 text-left text-[var(--ui-text-secondary)] font-medium w-16">状态</th>
+                  <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-16">用量</th>
+                  <th className="px-3 py-2 text-center text-[var(--ui-text-secondary)] font-medium w-24">必选/可选</th>
                 </tr></thead>
                 <tbody className="divide-y divide-gray-100">
                   {(data.children as ConfigChildItem[]).map((c, i) => renderUnifiedChildRow(c, 1, `c${i}`))}
                 </tbody>
               </table>
-            ) : <div className="text-sm text-gray-400 py-2">暂无子构型项</div>}
+            ) : <div className="text-sm text-[var(--ui-text-tertiary)] py-2">暂无子构型项</div>}
           </div>
 
           {/* 关联图文档 */}
@@ -384,9 +384,9 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
     >
       <div className="max-h-[70vh] overflow-y-auto pr-1">
       {nestedLoading ? (
-        <div className="py-8 text-center text-sm text-gray-400">加载中...</div>
+        <div className="py-8 text-center text-sm text-[var(--ui-text-tertiary)]">加载中...</div>
       ) : !nestedData ? (
-        <div className="py-8 text-center text-sm text-gray-400">加载失败</div>
+        <div className="py-8 text-center text-sm text-[var(--ui-text-tertiary)]">加载失败</div>
       ) : nestedEntity?.type === 'part' ? (
         <PartDetailContent part={nestedData} customFieldDefs={nestedCustomDefs} customFieldValues={nestedCustomValues} />
       ) : (
@@ -420,9 +420,9 @@ export default function ConfigurationDetailModal({ itemId, onClose }: Props) {
 
 function InfoItem({ label, value, icon, className }: { label: string; value: string; icon?: string; className?: string }) {
   return (
-    <div className={`bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 ${className || ''}`}>
-      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-      <div className="text-sm text-gray-900 font-medium whitespace-pre-wrap">
+    <div className={`bg-[var(--ui-bg-subtle)] rounded-lg px-3 py-2 border border-gray-100 ${className || ''}`}>
+      <div className="text-xs text-[var(--ui-text-secondary)] mb-0.5">{label}</div>
+      <div className="text-sm text-[var(--ui-text-primary)] font-medium whitespace-pre-wrap">
         {icon && <span className="mr-1">{icon}</span>}
         {value}
       </div>
