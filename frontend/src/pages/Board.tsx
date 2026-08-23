@@ -395,11 +395,31 @@ export default function Board() {
         <div className="flex-1 min-h-0 flex flex-col gap-2.5">
         {selectedFolder ? (
           <>
-            {/* 子卡① 头部：路径 + 操作按钮 */}
-            <div className="shrink-0 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-sm px-5 py-4">
-              <h2 className="text-sm font-medium text-[var(--ui-text-secondary)] mb-2">{getFolderPath(allFolders, selectedFolder.id)}</h2>
+            {/* 子卡① 头部：路径 */}
+            <div className="shrink-0 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-sm px-5 py-3.5">
+              <h2 className="text-sm font-medium text-[var(--ui-text-secondary)]">{getFolderPath(allFolders, selectedFolder.id)}</h2>
+            </div>
+
+            {/* 子卡② 工具栏：Tab 行 + 操作按钮 */}
+            <div className="shrink-0 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-sm px-4 flex items-center gap-2">
+              <div className="flex gap-0">
+                {(['all', 'component', 'document', 'configuration'] as FilterTab[]).map((tab) => (
+                  <button
+                    type="button"
+                    key={tab}
+                    onClick={() => setFilterTab(tab)}
+                    className={`px-3 py-2.5 text-sm border-b-2 transition-colors ${
+                      filterTab === tab
+                        ? 'border-primary-500 text-primary-700 font-medium'
+                        : 'border-transparent text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)]'
+                    }`}
+                  >
+                    {tab === 'all' ? `全部 (${tabCounts.all})` : `${ENTITY_LABEL[tab]} (${tabCounts[tab]})`}
+                  </button>
+                ))}
+              </div>
               {canEditFolder && (
-                <div className="flex gap-2">
+                <div className="ml-auto flex gap-2">
                   <Button type="button" variant="secondary" size="md" onClick={() => { setCreateModal(selectedFolder.id); setCreateName(''); }}>
                     + 子文件夹
                   </Button>
@@ -408,24 +428,6 @@ export default function Board() {
                   </Button>
                 </div>
               )}
-            </div>
-
-            {/* 子卡② Tab 行 */}
-            <div className="shrink-0 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded-lg shadow-sm px-4 flex gap-0">
-              {(['all', 'component', 'document', 'configuration'] as FilterTab[]).map((tab) => (
-                <button
-                  type="button"
-                  key={tab}
-                  onClick={() => setFilterTab(tab)}
-                  className={`px-3 py-2.5 text-sm border-b-2 transition-colors ${
-                    filterTab === tab
-                      ? 'border-primary-500 text-primary-700 font-medium'
-                      : 'border-transparent text-[var(--ui-text-secondary)] hover:text-[var(--ui-text-primary)]'
-                  }`}
-                >
-                  {tab === 'all' ? `全部 (${tabCounts.all})` : `${ENTITY_LABEL[tab]} (${tabCounts[tab]})`}
-                </button>
-              ))}
             </div>
 
             {/* 子卡③ 内容表格 */}
