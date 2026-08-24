@@ -84,7 +84,7 @@ export function CADConnectStep({ bridge, cadType, onCadTypeChange, onAssemblyLoa
       </div>
 
       <div className="flex gap-3">
-        <Select size="xs"
+        <Select
           value={cadType}
           onChange={(e) => onCadTypeChange(e.target.value as CADType)}
         >
