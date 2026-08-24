@@ -1744,6 +1744,8 @@ def sync_cad_bom_children(
         created_items += 1
 
     db.commit()
+    # CAD 同步后同步零部件类型：父件有子项→assembly（与 add_bom_item 路径一致）
+    _sync_component_type(db, revision_id)
     return {
         "created_parts": created_parts,
         "created_items": created_items,
