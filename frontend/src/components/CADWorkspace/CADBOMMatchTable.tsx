@@ -849,7 +849,7 @@ export function CADBOMMatchTable({ bridge, rows: initialRows, onComplete, naming
 
       {/* 表格：左侧固定列 + 右侧自定义字段独立水平滚动 */}
       <div className="flex-1 min-h-0 flex">
-        <div ref={leftScrollRef} className="shrink-0 overflow-y-auto overflow-x-hidden" onScroll={handleLeftScroll}>
+        <div ref={leftScrollRef} className="shrink-0 overflow-y-auto overflow-x-hidden scrollbar-hidden" onScroll={handleLeftScroll}>
           {/* ====== 左表：固定列 ====== */}
           <table className="border-collapse text-xs whitespace-nowrap">
               <thead className="sticky top-0 z-10">
