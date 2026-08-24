@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>弹窗三区排版示意图：项目成员管理 + 知会用户</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #f3f4f6; color: #111827; padding: 40px 16px;
+  }
+  .page-note { max-width: 640px; margin: 0 auto 20px; font-size: 13px; color: #6b7280; line-height: 1.8; }
+  .page-note b { color: #111827; }
+  .section-title { max-width: 640px; margin: 48px auto 12px; font-size: 15px; font-weight: 600; color: #374151; }
+
+  /* 模拟遮罩 + 弹窗 */
+  .stage { position: relative; max-width: 640px; margin: 0 auto; }
+  .stage::before {
+    content: ""; position: absolute; inset: 0; background: rgba(17,24,39,.32); border-radius: 12px;
+  }
+  .modal {
+    position: relative; z-index: 1; width: 576px; max-width: 100%; margin: 28px auto;
+    background: #ffffff; border-radius: 8px; box-shadow: 0 20px 40px rgba(0,0,0,.18); overflow: hidden;
+  }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px 0; }
+  .modal-head h3 { font-size: 18px; font-weight: 600; }
+  .modal-close { color: #9ca3af; font-size: 20px; line-height: 1; cursor: pointer; }
+  .modal-body { padding: 14px 20px 0; }
+
+  /* 三区：已选 / 搜索 / 候选 */
+  .area { border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+  .area-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 12px; background: #f9fafb; font-size: 12px; color: #6b7280; border-bottom: 1px solid #e5e7eb;
+    position: sticky; top: 0; z-index: 2;
+  }
+  .area-head b { color: #111827; font-weight: 600; }
+
+  /* 滚动容器（固定高度） */
+  .scroll { overflow-y: auto; }
+  .scroll::-webkit-scrollbar { width: 8px; }
+  .scroll::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+  .scroll::-webkit-scrollbar-track { background: transparent; }
+  .h-selected { height: 168px; }   /* 已选区固定高度 */
+  .h-candidates { height: 248px; } /* 候选区固定高度 */
+
+  /* 行 */
+  .row { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-bottom: 1px solid #f3f4f6; }
+  .row:last-child { border-bottom: none; }
+  .row-name { font-weight: 500; font-size: 14px; }
+  .row-account { font-size: 12px; color: #9ca3af; }
+  .spacer { flex: 1; }
+  .row.dim { opacity: .55; }  /* 超出可视区的行压暗示意滚动 */
+
+  /* 控件 */
+  .select-xs {
+    height: 24px; border: 1px solid #d1d5db; border-radius: 6px; padding: 0 6px; font-size: 12px;
+    color: #374151; background: #fff; cursor: pointer; min-width: 72px; width: auto;
+  }
+  .btn-xs { height: 24px; padding: 0 10px; font-size: 12px; border-radius: 6px; border: none; cursor: pointer; font-weight: 500; }
+  .btn-primary-xs { background: #0284c7; color: #fff; }
+  .btn-danger-xs { background: #dc2626; color: #fff; }
+  .btn { height: 32px; padding: 0 16px; font-size: 14px; border-radius: 8px; border: none; cursor: pointer; font-weight: 500; }
+  .btn-primary { background: #0284c7; color: #fff; }
+  .btn-secondary { background: #fff; border: 1px solid #d1d5db; color: #374151; }
+
+  /* 徽标 */
+  .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 500; }
+  .badge-blue { background: #dbeafe; color: #1e40af; }
+  .badge-tag { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+
+  /* checkbox */
+  input[type="checkbox"] { width: 15px; height: 15px; accent-color: #0284c7; cursor: pointer; }
+  .row.checked { background: #eff6ff; }
+  .row.checked .row-name { color: #1e40af; }
+
+  /* 成员表格（已选区） */
+  table.members { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .members th {
+    text-align: left; font-weight: 500; font-size: 12px; color: #6b7280; background: #f9fafb;
+    padding: 6px 12px; position: sticky; top: 0; z-index: 1;
+  }
+  .members td { padding: 6px 12px; border-top: 1px solid #e5e7eb; vertical-align: middle; }
+  .members th:last-child, .members td:last-child { text-align: right; }
+  .col-role { width: 96px; }
+  .col-action { width: 60px; }
+  .member-name { font-weight: 500; }
+  .member-account { font-size: 12px; color: #9ca3af; margin-left: 6px; }
+
+  /* 搜索框 */
+  .search-input {
+    width: 100%; height: 32px; border: 1px solid #d1d5db; border-radius: 8px; padding: 0 12px;
+    font-size: 14px; color: #111827; background: #fff;
+  }
+  .search-input::placeholder { color: #9ca3af; }
+
+  /* 底部 */
+  .modal-foot { display: flex; align-items: center; justify-content: flex-end; gap: 8px; border-top: 1px solid #e5e7eb; margin-top: 14px; padding: 12px 20px; }
+  .foot-note { font-size: 12px; color: #9ca3af; margin-right: auto; }
+
+  .hint { margin-top: 16px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #1e40af; line-height: 1.7; }
+  .hint b { color: #1e40af; }
+  .hint-amber { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+  .hint-amber b { color: #92400e; }
+</style>
+</head>
+<body>
+
+  <div class="page-note">
+    <b>弹窗三区排版示意图</b>：项目成员管理 + 知会用户（CcPicker）<br>
+    两个弹窗统一为「上：已选 / 中：搜索框 / 下：候选列表」三区结构，弹窗宽度 <code>xl</code>（576px）。
+  </div>
+
+  <!-- ============ ① 项目成员管理 ============ -->
+  <div class="section-title">① 项目成员管理（MemberManageModal）</div>
+  <div class="stage">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>项目成员管理</h3>
+        <span class="modal-close">✕</span>
+      </div>
+
+      <div class="modal-body">
+
+        <!-- 上：已选（固定高度滚动容器） -->
+        <div class="area">
+          <div class="area-head"><span>已选成员（3）</span><span style="font-size:11px; color:#9ca3af;">固定高度 · 可滚动</span></div>
+          <div class="scroll h-selected">
+            <table class="members">
+              <thead>
+                <tr>
+                  <th>成员</th>
+                  <th class="col-role">角色</th>
+                  <th class="col-action">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="member-name">张伟</span><span class="member-account">zhangwei</span><span class="badge badge-blue" style="margin-left:8px;">负责人</span></td>
+                  <td><span class="text-secondary" style="color:#6b7280; font-size:13px;">—</span></td>
+                  <td></td>
+                </tr>
+                <tr>
+                  <td><span class="member-name">李娜</span><span class="member-account">lina</span></td>
+                  <td><select class="select-xs"><option>经理</option><option>成员</option></select></td>
+                  <td><button class="btn-xs btn-danger-xs">移除</button></td>
+                </tr>
+                <tr>
+                  <td><span class="member-name">刘强</span><span class="member-account">liuqiang</span></td>
+                  <td><select class="select-xs"><option selected>成员</option><option>经理</option></select></td>
+                  <td><button class="btn-xs btn-danger-xs">移除</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 中：搜索框 -->
+        <div style="margin: 12px 0;">
+          <input class="search-input" type="text" placeholder="搜索姓名或账号…">
+        </div>
+
+        <!-- 下：候选列表（固定高度滚动容器；空搜索=全部可选用户，输入后过滤） -->
+        <div class="area">
+          <div class="area-head"><span>可选用户（5）· 已排除已加入成员</span><span style="font-size:11px; color:#9ca3af;">固定高度 · 可滚动</span></div>
+          <div class="scroll h-candidates">
+            <div class="row">
+              <span class="row-name">王小明</span>
+              <span class="row-account">wangxiaoming</span>
+              <span class="spacer"></span>
+              <select class="select-xs"><option>成员</option><option>经理</option></select>
+              <button class="btn-xs btn-primary-xs">添加</button>
+            </div>
+            <div class="row">
+              <span class="row-name">王芳</span>
+              <span class="row-account">wangfang</span>
+              <span class="spacer"></span>
+              <select class="select-xs"><option>经理</option><option>成员</option></select>
+              <button class="btn-xs btn-primary-xs">添加</button>
+            </div>
+            <div class="row">
+              <span class="row-name">王建国</span>
+              <span class="row-account">wangjianguo</span>
+              <span class="spacer"></span>
+              <select class="select-xs"><option>成员</option><option>经理</option></select>
+              <button class="btn-xs btn-primary-xs">添加</button>
+            </div>
+            <div class="row">
+              <span class="row-name">王磊</span>
+              <span class="row-account">wanglei</span>
+              <span class="spacer"></span>
+              <select class="select-xs"><option>成员</option><option>经理</option></select>
+              <button class="btn-xs btn-primary-xs">添加</button>
+            </div>
+            <div class="row dim">
+              <span class="row-name">王超</span>
+              <span class="row-account">wangchao</span>
+              <span class="spacer"></span>
+              <select class="select-xs"><option>成员</option><option>经理</option></select>
+              <button class="btn-xs btn-primary-xs">添加</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <span class="foot-note">有未保存的改动时「保存」可用</span>
+        <button class="btn btn-secondary">取消</button>
+        <button class="btn btn-primary">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-note">
+    <div class="hint">
+      <b>① 成员弹窗：</b>上区「已选成员」= 当前成员表格（表头常驻，行内改角色/移除）；下区恒常显示可选用户——空搜索时列出全部未加入成员，输入关键字即过滤（姓名/账号）；候选行内选角色 + 添加。已选区与候选区高度固定（168px / 248px），内容多时各自滚动，弹窗总高恒定不跳动。
+    </div>
+  </div>
+
+  <!-- ============ ② 知会用户 ============ -->
+  <div class="section-title">② 知会用户（CcPicker · ECR/ECO 共用）</div>
+  <div class="stage">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>知会用户</h3>
+        <span class="modal-close">✕</span>
+      </div>
+
+      <div class="modal-body">
+
+        <!-- 上：已选 = 已知会 + 本次勾选（固定高度滚动容器） -->
+        <div class="area">
+          <div class="area-head"><span>已选（3）· 已知会 2 · 待知会 1</span><span style="font-size:11px; color:#9ca3af;">固定高度 · 可滚动</span></div>
+          <div class="scroll h-selected">
+            <div class="row">
+              <span class="row-name">张伟</span>
+              <span class="row-account">zhangwei</span>
+              <span class="spacer"></span>
+              <button class="btn-xs btn-danger-xs">取消知会</button>
+            </div>
+            <div class="row">
+              <span class="row-name">陈静</span>
+              <span class="row-account">chenjing</span>
+              <span class="spacer"></span>
+              <button class="btn-xs btn-danger-xs">取消知会</button>
+            </div>
+            <div class="row">
+              <span class="row-name">王芳</span>
+              <span class="row-account">wangfang</span>
+              <span class="badge badge-tag" style="margin-left:8px;">本次</span>
+              <span class="spacer"></span>
+              <button class="btn-xs btn-danger-xs">移除</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 中：搜索框 -->
+        <div style="margin: 12px 0;">
+          <input class="search-input" type="text" placeholder="搜索姓名或账号…">
+        </div>
+
+        <!-- 下：候选列表（固定高度滚动容器；空搜索=全部可选用户，输入后过滤） -->
+        <div class="area">
+          <div class="area-head"><span>可选用户（4）· 已排除已选用户</span><span style="font-size:11px; color:#9ca3af;">固定高度 · 可滚动</span></div>
+          <div class="scroll h-candidates">
+            <div class="row">
+              <input type="checkbox">
+              <span class="row-name">李四</span>
+              <span class="row-account">lisi</span>
+            </div>
+            <div class="row">
+              <input type="checkbox">
+              <span class="row-name">李雷</span>
+              <span class="row-account">lilei</span>
+            </div>
+            <div class="row">
+              <input type="checkbox">
+              <span class="row-name">李梅</span>
+              <span class="row-account">limei</span>
+            </div>
+            <div class="row dim">
+              <input type="checkbox">
+              <span class="row-name">李华</span>
+              <span class="row-account">lihua</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <span class="foot-note">勾选候选后点「知会」生效</span>
+        <button class="btn btn-secondary">取消</button>
+        <button class="btn btn-primary">知会 (2)</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-note">
+    <div class="hint">
+      <b>② 知会弹窗：</b>上区「已选」合并展示已知会（行内「取消知会」，即时生效）与本次勾选（行内「移除」+ 「本次」标记），顶部计数合计；下区恒常显示可选用户——空搜索时列出全部未知会用户，输入关键字即过滤，勾选即加入已选、行高亮；「知会 (N)」提交新勾选（N=0 禁用）。
+    </div>
+    <div class="hint hint-amber" style="margin-top:12px;">
+      <b>高度约定：</b>已选区 168px、候选区 248px（两弹窗一致），均带 sticky 头部 + 独立滚动条；弹窗总高度恒定，内容增减不跳动。具体数值可按你的观感再调。
+    </div>
+  </div>
+
+</body>
+</html>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { usersApi, userGroupsApi } from '../services/api';
 import type { User } from '../types';
 import { isAdmin, can } from '../stores/auth';
@@ -12,6 +12,7 @@ import FormField from '../components/ui/FormField';
 import Alert from '../components/ui/Alert';
 import { useTableSort } from '../hooks/useTableSort';
 import { formatDateTime } from '../utils/date';
+import { filterUsers } from '../lib/filterUsers';
 
 interface UserFormData {
   username: string;
@@ -59,6 +60,20 @@ export default function Users() {
   const [viewingGroupId, setViewingGroupId] = useState<string | null>(null);
   const [viewingGroupMembers, setViewingGroupMembers] = useState<string[]>([]);
 
+  // 用户组弹窗成员区（参考项目成员管理三区交互）：已选成员 / 候选用户
+  const groupSelectedMembers = useMemo(
+    () => memberSelectedIds.map((id) => users.find((u) => u.id === id)).filter(Boolean) as User[],
+    [memberSelectedIds, users]
+  );
+  const groupCandidates = useMemo(
+    () => filterUsers(users, memberSelectedIds, memberSearch),
+    [users, memberSelectedIds, memberSearch]
+  );
+  const addGroupMember = (uid: string) => {
+    if (!memberSelectedIds.includes(uid)) setMemberSelectedIds((prev) => [...prev, uid]);
+  };
+  const removeGroupMember = (uid: string) => setMemberSelectedIds((prev) => prev.filter((x) => x !== uid));
+
   const { sortedData, handleSort, getSortIcon } = useTableSort<User>(users);
 
   useEffect(() => {
@@ -68,7 +83,7 @@ export default function Users() {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const res = await usersApi.list();
+      const res = await usersApi.list({ limit: 500 });
       const data = res.data;
       setUsers(Array.isArray(data) ? data : (data as any)?.items || []);
     } catch {
@@ -618,8 +633,23 @@ export default function Users() {
       )}
 
       {/* 组编辑弹窗 */}
-      <Modal open={groupModalOpen} title={editingGroup ? '编辑用户组' : '新建用户组'} onClose={() => { setGroupModalOpen(false); setGroupError(null); }} width="lg">
-        <div className="space-y-4">
+      <Modal
+        open={groupModalOpen}
+        title={editingGroup ? '编辑用户组' : '新建用户组'}
+        onClose={() => { setGroupModalOpen(false); setGroupError(null); }}
+        width="xl"
+        height="75vh"
+        footer={
+          <div className="flex items-center justify-between gap-2 w-full">
+            <span className="text-xs text-[var(--ui-text-tertiary)]">成员 {memberSelectedIds.length} 人</span>
+            <div className="flex items-center gap-2">
+              <Button type="button" onClick={() => { setGroupModalOpen(false); setGroupError(null); }} variant="secondary" disabled={groupSaving}>取消</Button>
+              <Button type="button" onClick={saveGroup} disabled={groupSaving}>{groupSaving ? '保存中...' : '保存'}</Button>
+            </div>
+          </div>
+        }
+      >
+        <div className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField label="名称" required card>
               <Input
@@ -642,44 +672,61 @@ export default function Users() {
             </FormField>
           </div>
           {groupError && <Alert tone="danger">{groupError}</Alert>}
-          <div className="border-t pt-3">
-            <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">成员</h4>
-            <Input
-              type="text"
-              placeholder="搜索用户..."
-              value={memberSearch}
-              onChange={(e) => setMemberSearch(e.target.value)}
-              className="mb-2"
-            />
-            <div className="max-h-52 overflow-auto border border-[var(--ui-border)] rounded-lg">
-              {users.filter((u) => {
-                if (!memberSearch.trim()) return true;
-                const kw = memberSearch.trim().toLowerCase();
-                return u.real_name.toLowerCase().includes(kw) || u.username.toLowerCase().includes(kw);
-              }).length === 0 ? (
-                <div className="text-sm text-[var(--ui-text-tertiary)] py-4 text-center">无匹配用户</div>
-              ) : (
-                users.filter((u) => {
-                  if (!memberSearch.trim()) return true;
-                  const kw = memberSearch.trim().toLowerCase();
-                  return u.real_name.toLowerCase().includes(kw) || u.username.toLowerCase().includes(kw);
-                }).map((u) => (
-                  <label key={u.id} className="flex items-center gap-2 px-3 py-1.5 hover:bg-[var(--ui-bg-hover)] cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={memberSelectedIds.includes(String(u.id))}
-                      onChange={(e) => setMemberSelectedIds((prev) =>
-                        e.target.checked ? [...prev, String(u.id)] : prev.filter((x) => x !== String(u.id)))}
-                    />
-                    <span className="text-sm">{u.real_name}（{u.username}）<span className="text-[var(--ui-text-tertiary)] ml-1">{u.role}</span></span>
-                  </label>
-                ))
+
+          {/* 上：已选成员（固定高度滚动容器） */}
+          <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden">
+            <div className="bg-[var(--ui-bg-subtle)] px-3 py-1.5 text-xs text-[var(--ui-text-secondary)]">
+              已选成员（{memberSelectedIds.length}）
+            </div>
+            <div className="h-[168px] overflow-y-auto divide-y divide-[var(--ui-border)]">
+              {groupSelectedMembers.map((u) => (
+                <div key={u.id} className="flex items-center gap-2 px-3 py-2">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <span className="text-sm font-medium whitespace-nowrap">{u.real_name}</span>
+                    <span className="text-xs text-[var(--ui-text-tertiary)] whitespace-nowrap truncate min-w-0">({u.username})</span>
+                  </div>
+                  <RoleTag role={u.role} />
+                  <Button variant="danger" size="xs" onClick={() => removeGroupMember(u.id)}>移除</Button>
+                </div>
+              ))}
+              {groupSelectedMembers.length === 0 && (
+                <div className="px-3 py-6 text-center text-xs text-[var(--ui-text-tertiary)]">暂无成员</div>
               )}
             </div>
           </div>
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button type="button" onClick={() => { setGroupModalOpen(false); setGroupError(null); }} variant="secondary" disabled={groupSaving}>取消</Button>
-            <Button type="button" onClick={saveGroup} disabled={groupSaving}>{groupSaving ? '保存中...' : '保存'}</Button>
+
+          {/* 中：搜索框 */}
+          <Input
+            type="text"
+            placeholder="搜索姓名或账号…"
+            value={memberSearch}
+            onChange={(e) => setMemberSearch(e.target.value)}
+          />
+
+          {/* 下：候选用户（固定高度滚动容器；空搜索=全部可选用户，输入后过滤） */}
+          <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden">
+            <div className="bg-[var(--ui-bg-subtle)] px-3 py-1.5 text-xs text-[var(--ui-text-secondary)] flex items-center justify-between">
+              <span>{memberSearch.trim() ? `匹配结果（${groupCandidates.length}）` : `可选用户（${groupCandidates.length}）`}</span>
+              <span className="text-[var(--ui-text-tertiary)]">已排除已选成员</span>
+            </div>
+            {groupCandidates.length === 0 ? (
+              <div className="px-3 py-6 text-center text-xs text-[var(--ui-text-tertiary)]">
+                {memberSearch.trim() ? '无匹配用户' : '暂无可添加用户'}
+              </div>
+            ) : (
+              <div className="h-[248px] overflow-y-auto divide-y divide-[var(--ui-border)]">
+                {groupCandidates.map((u) => (
+                  <div key={u.id} className="flex items-center gap-2 px-3 py-2">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                      <span className="text-sm font-medium whitespace-nowrap">{u.real_name}</span>
+                      <span className="text-xs text-[var(--ui-text-tertiary)] whitespace-nowrap truncate min-w-0">({u.username})</span>
+                    </div>
+                    <RoleTag role={u.role} />
+                    <Button size="xs" onClick={() => addGroupMember(u.id)}>添加</Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </Modal>
