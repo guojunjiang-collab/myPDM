@@ -753,7 +753,7 @@ export default function Projects() {
                   <div className="h-full flex bg-[var(--ui-bg-surface)]"
                        onMouseLeave={() => setHoveredId(null)}
                        onDragLeave={() => { setDragOver(null); if (expandTimerRef.current) { clearTimeout(expandTimerRef.current); expandTimerRef.current = null; } }}>
-                    <div className="flex h-full min-w-0">
+                    <div className="flex h-full min-w-0 flex-1">
                       <div ref={leftScrollRef} className="shrink-0 overflow-y-auto overflow-x-hidden scrollbar-hidden" onScroll={handleLeftScroll}>
                         <SharedLeftPanel
                         tasks={visibleLeftTasks}
