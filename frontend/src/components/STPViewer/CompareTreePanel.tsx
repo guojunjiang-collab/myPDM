@@ -248,7 +248,11 @@ function ChildRow({ row, level }: { row: CompareChildRow; level: number }) {
   const canExpand = hasInstances || hasChildren;
 
   const labelOf = (s: CompareSide | null) => [s?.code, s?.version, s?.name].filter(Boolean).join('_');
-  const bg = isSelected ? 'bg-primary-50 ring-1 ring-inset ring-primary-400' : 'hover:bg-[var(--ui-bg-hover)]';
+  // 子项行（实例层级中的汇总行）按该 BOM 行的变更类型上底色：
+  // modify/internal → 黄、add → 绿、delete → 红、位置变 → 紫、none → 白
+  const bg = isSelected
+    ? 'bg-primary-50 ring-1 ring-inset ring-primary-400'
+    : `${node.changeType === 'none' && node.placementChanged ? 'bg-purple-50' : ROW_BG[node.changeType]} hover:brightness-95`;
 
   return (
     <li>
