@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { greeting, statusDistribution, type Distribution } from './lib/aggregate';
 import type { RecentDisplay, Activity } from './hooks';
 import type { FavItem } from './lib/aggregate';
-import type { DocumentBrief, ConfigItemBrief } from '../../types';
+import type { DocumentBrief } from '../../types';
 
 // myPDM 统一 components：part/assembly/component 均落到 /components
 const ENTITY_ICON: Record<string, string> = { part: '🔧', assembly: '📦', component: '🔧', document: '📄', configuration: '⚙️' };
@@ -37,14 +37,14 @@ export function GreetingHeader({ name, todoCount, overdueCount }: { name: string
   );
 }
 
-export function KpiStrip({ partsMasters, documents, configItems, changeOpen }: {
-  partsMasters: number; documents: number; configItems: number; changeOpen: number;
+export function KpiStrip({ partsMasters, documents, configItems, stockItems }: {
+  partsMasters: number; documents: number; configItems: number; stockItems: number;
 }) {
   const items = [
     { label: '零部件', value: partsMasters, cls: 'text-[var(--ui-text-primary)]', to: '/components' },
     { label: '构型项', value: configItems, cls: 'text-[var(--ui-text-primary)]', to: '/configuration' },
     { label: '图文档', value: documents, cls: 'text-[var(--ui-text-primary)]', to: '/documents' },
-    { label: '变更进行中', value: changeOpen, cls: 'text-red-500', to: '/ec' },
+    { label: '有库存物料', value: stockItems, cls: 'text-[var(--ui-text-primary)]', to: '/inventory' },
   ];
   return (
     <div className="grid grid-cols-4 gap-3">
@@ -78,13 +78,14 @@ function DistRow({ label, dist }: { label: string; dist: Distribution }) {
 export function StatusDistributionTile({ partsMasters, documents, configItems }: {
   partsMasters: any[];
   documents: DocumentBrief[];
-  configItems: ConfigItemBrief[];
+  configItems: { status: string }[];
 }) {
   const rows = [
     { label: '零部件', dist: statusDistribution(partsMasters) },
     { label: '图文档', dist: statusDistribution(documents as { status: string }[]) },
+    { label: '构型项', dist: statusDistribution(configItems) },
   ];
-  const empty = rows.every((r) => r.dist.total === 0) && configItems.length === 0;
+  const empty = rows.every((r) => r.dist.total === 0);
   return (
     <Tile title="状态分布" icon={<span>📊</span>} className="min-h-[180px]">
       {empty ? <EmptyState text="暂无数据，去各页面检出后自动统计" /> : (

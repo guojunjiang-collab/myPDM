@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useDataStore } from '../../stores/data';
 import { useAuthStore } from '../../stores/auth';
-import { ecrApi, ecoApi } from '../../services/api';
+import { configurationApi } from '../../services/api';
+import { inventoryApi } from '../../services/inventoryApi';
 import { useRecentEdited, useFavorites, useActivityFeed } from './hooks';
 import {
   GreetingHeader, KpiStrip, StatusDistributionTile, RecentItemsTile, FavoritesTile, ActivityFeedTile,
@@ -22,17 +23,22 @@ export default function Dashboard() {
 
   const [todoCount, setTodoCount] = useState(0);
   const [overdueCount, setOverdueCount] = useState(0);
-  const [changeOpen, setChangeOpen] = useState(0);
+  // 有库存物料数（库存数量 > 0 的物料，按 material_id 去重；与移动端仪表盘一致）
+  const [stockItems, setStockItems] = useState(0);
+  // 构型项状态分布数据（store 缓存的 configItems 无 status，此处单独取数）
+  const [configItemStatuses, setConfigItemStatuses] = useState<{ status: string }[]>([]);
   useEffect(() => {
     let cancelled = false;
-    Promise.allSettled([
-      ecrApi.list({ status: 'reviewing', page_size: 1 }),
-      ecoApi.list({ status: 'reviewing', page_size: 1 }),
-    ]).then((rs) => {
+    inventoryApi.listStock().then((v: any) => {
       if (cancelled) return;
-      const n = rs.reduce((sum, r) => sum + (r.status === 'fulfilled' ? (r.value.data?.total ?? 0) : 0), 0);
-      setChangeOpen(n);
-    });
+      const items: any[] = v?.data?.items ?? [];
+      setStockItems(new Set(items.filter((i) => (i.quantity ?? 0) > 0).map((i) => i.material_id)).size);
+    }).catch(() => {});
+    configurationApi.listItems({ page_size: 10000 }).then((v: any) => {
+      if (cancelled) return;
+      const items: any[] = v?.data?.items ?? [];
+      setConfigItemStatuses(items.map((i) => ({ status: i.status || 'draft' })));
+    }).catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
@@ -66,9 +72,9 @@ export default function Dashboard() {
       <div className="border-t border-[var(--ui-border)]" />
 
       {/* 全局概览 */}
-      <KpiStrip partsMasters={components.length} documents={documents.length} configItems={configItems.length} changeOpen={changeOpen} />
+      <KpiStrip partsMasters={components.length} documents={documents.length} configItems={configItems.length} stockItems={stockItems} />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <StatusDistributionTile partsMasters={components} documents={documents} configItems={configItems} />
+        <StatusDistributionTile partsMasters={components} documents={documents} configItems={configItemStatuses} />
         <ActivityFeedTile items={activity} />
       </div>
     </div>
