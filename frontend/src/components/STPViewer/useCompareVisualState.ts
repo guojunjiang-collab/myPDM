@@ -35,6 +35,8 @@ export function useCompareVisualState(
     // BOM 行 key 在 nodeMap 里，直接取两侧 meshUuids；
     // 实例行 key（形如 "<nodeKey>:inst:3"）不在 nodeMap 里，
     // 改按 mesh 上回填的 userData.compareInstanceKey 反查。
+    // 多实例装配的中间实例/子项行 key 是叶子实例 key 的前缀 →
+    // 前缀匹配，选中整棵子树。
     const selected = new Set<string>();
     if (selectedKey) {
       const node = nodeMap.get(selectedKey);
@@ -43,8 +45,10 @@ export function useCompareVisualState(
         node.right?.meshUuids.forEach((u) => selected.add(u));
       } else {
         group.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh && child.userData.compareInstanceKey === selectedKey) {
-            selected.add(child.uuid);
+          const mesh = child as THREE.Mesh;
+          const k = mesh.userData.compareInstanceKey;
+          if (mesh.isMesh && typeof k === 'string' && (k === selectedKey || k.startsWith(selectedKey + ':'))) {
+            selected.add(mesh.uuid);
           }
         });
       }

@@ -7,9 +7,10 @@ import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.j
 import { useViewerStore } from '../../stores/viewerStore';
 import { useCompareVisualState } from './useCompareVisualState';
 import { renderDecision } from './compareRenderRules';
-import type { CompareNode, CompareInstanceNode, Side, ChangeType } from './compareTypes';
+import type { CompareNode, CompareInstanceNode, CompareChildRow, Side, ChangeType } from './compareTypes';
 import type { AssemblyInstance } from '../../services/api';
-import { matchInstancePairs, type InstanceRef } from './matchInstances';
+import { matchInstancePairs, type InstanceRef, type InstanceMatch } from './matchInstances';
+import { buildCompareInstances, type CompareLeafInput } from './buildCompareInstances';
 
 const draco = new DRACOLoader();
 draco.setDecoderPath('/draco/');
@@ -169,9 +170,8 @@ export function CompareModelLoader({ leftInstances, rightInstances }: Props) {
     ];
 
     (async () => {
-      // ── 第一遍：按配对行 key 分组，做实例匹配 ──
-      // 关键：分组键必须是 CompareNode.key（件号链，左右共有），不能是 bom_item id
-      // ——后者按 parent_revision_id 存行，左右版本下必然不同，会导致永远匹配不上。
+      // ── 第一遍：叶子实例匹配 + 实例层级树构建 ──
+      // 叶子配对：按叶子 BOM 行 key（件号链，左右共有）分组做矩阵匹配。
       const groupLeft = new Map<string, InstanceRef[]>();
       const groupRight = new Map<string, InstanceRef[]>();
       for (const { inst, side, index } of queue) {
@@ -179,59 +179,68 @@ export function CompareModelLoader({ leftInstances, rightInstances }: Props) {
         if (!nodeKey) nodeKey = 'ROOT'; // 无 BOM 子项的零件/部件自身模型挂在根节点
         const group = side === 'left' ? groupLeft : groupRight;
         const list = group.get(nodeKey) || [];
-        list.push({ index, matrix: inst.matrix, revisionId: inst.revision_id });
+        list.push({ index, matrix: inst.matrix, revisionId: inst.revision_id, code: inst.part_code });
         group.set(nodeKey, list);
       }
 
       const allKeys = new Set([...groupLeft.keys(), ...groupRight.keys()]);
+      const leafMatches = new Map<string, InstanceMatch[]>();
       for (const nodeKey of allKeys) {
-        const node = compare.nodeMap.get(nodeKey);
-        if (!node) continue;
-        const matches = matchInstancePairs(groupLeft.get(nodeKey) || [], groupRight.get(nodeKey) || []);
-        // 左右共享一套序号：删除项与新增项都占号，匹配上的实例在两侧序号相同
-        node.instances = matches.map((m, i) => {
-          const seq = i + 1;
-          return {
-            key: `${nodeKey}:inst:${seq}`,
-            changeType: m.changeType,
-            side: m.side,
-            leftIndex: m.leftIndex,
-            rightIndex: m.rightIndex,
-            leftMeshUuids: [],
-            rightMeshUuids: [],
-            seq,
-          };
-        });
+        leafMatches.set(nodeKey, matchInstancePairs(groupLeft.get(nodeKey) || [], groupRight.get(nodeKey) || []));
       }
 
-      // 仅位置变动标记：件号/版本/数量都没变（changeType === 'none'）但实例矩阵对不上，
-      // 与后端 changeType 正交，单独打标；再沿 parentKey 向上传播到所有祖先（含 ROOT），
-      // 让折叠的父行也能看到"子孙里有仅位置变动"。
+      // 配对反查表：叶子实例（'left:idx' / 'right:idx'）→ 匹配结果
+      const matchByRef = new Map<string, InstanceMatch>();
+      for (const matches of leafMatches.values()) {
+        for (const m of matches) {
+          if (m.leftIndex !== undefined) matchByRef.set(`left:${m.leftIndex}`, m);
+          if (m.rightIndex !== undefined) matchByRef.set(`right:${m.rightIndex}`, m);
+        }
+      }
+
+      // 每个实例的层级路径：bom_path 逐段 → 该侧 CompareNode.key + ":idx" 解析
+      const parseSeg = (seg: string): { bomId: string; idx: number | null } => {
+        const i = seg.indexOf(':');
+        return i >= 0 ? { bomId: seg.slice(0, i), idx: parseInt(seg.slice(i + 1), 10) } : { bomId: seg, idx: null };
+      };
+      const leaves: CompareLeafInput[] = queue.map(({ inst, side, index }) => {
+        const segs = inst.bom_path.map(parseSeg);
+        const idxMap = side === 'left' ? leftIndex : rightIndex;
+        const keyPath = segs.map((s) => idxMap.get(s.bomId) || 'ROOT');
+        const seqs = segs.map((s) => s.idx);
+        return { side, index, keyPath, seqs };
+      });
+
+      // 实例层级树：多实例装配 → 实例行 → 子项行 → 叶子实例（递归）。
+      // instByRef：'side:index' → 叶子实例节点（mesh 回填用）。
+      const instByRef = buildCompareInstances(leaves, compare.nodeMap, matchByRef);
+
+      // 仅位置变动标记：件号/版本/数量都没变（changeType === 'none'）但叶子实例
+      // 对不上（delete/add = 矩阵位置不同）→ placementChanged，再沿 parentKey 向上传播。
+      const leafChanged = (inst: CompareInstanceNode): boolean => {
+        const isLeaf = !inst.children || inst.children.length === 0;
+        if (isLeaf) return inst.changeType === 'delete' || inst.changeType === 'add';
+        return (inst.children ?? []).some((row) => rowChanged(row));
+      };
+      const rowChanged = (row: CompareChildRow): boolean =>
+        (row.instances ?? []).some(leafChanged) || (row.children ?? []).some(rowChanged);
+
       for (const node of compare.nodeMap.values()) {
-        if (node.changeType === 'none' && node.instances && node.instances.some((i) => i.changeType !== 'none')) {
-          node.placementChanged = true;
-          let p = node.parentKey ? compare.nodeMap.get(node.parentKey) : null;
-          const visited = new Set<string>();
-          while (p && !visited.has(p.key) && !p.placementChanged) {
-            visited.add(p.key);
-            p.placementChanged = true;
-            p = p.parentKey ? compare.nodeMap.get(p.parentKey) : null;
-          }
+        if (node.changeType !== 'none') continue;
+        if (!(node.instances ?? []).some(leafChanged)) continue;
+        node.placementChanged = true;
+        let p = node.parentKey ? compare.nodeMap.get(node.parentKey) : null;
+        const visited = new Set<string>();
+        while (p && !visited.has(p.key) && !p.placementChanged) {
+          visited.add(p.key);
+          p.placementChanged = true;
+          p = p.parentKey ? compare.nodeMap.get(p.parentKey) : null;
         }
       }
 
       // 实例数据是直接改在节点对象上的，浅拷贝 compare 触发面板重渲染
       const c0 = useViewerStore.getState().compare;
       if (c0) useViewerStore.setState({ compare: { ...c0, tree: { ...c0.tree } } });
-
-      // 按 "{side}:{index}" 建反查表，第二遍加载时按实例下标直接定位（不再按矩阵串比）
-      const instByRef = new Map<string, CompareInstanceNode>();
-      for (const node of compare.nodeMap.values()) {
-        for (const inst of node.instances || []) {
-          if (inst.leftIndex !== undefined) instByRef.set(`left:${inst.leftIndex}`, inst);
-          if (inst.rightIndex !== undefined) instByRef.set(`right:${inst.rightIndex}`, inst);
-        }
-      }
 
       // ── 第二遍：加载模型，按实例匹配结果着色 ──
       let loaded = 0;

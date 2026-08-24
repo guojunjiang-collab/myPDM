@@ -1,12 +1,17 @@
 /**
  * 实例级匹配：判定左右两版装配中的零件实例是否为"同一个实例"。
  *
- * 判定标准：件号 + 版本 + 空间位置三者全同。件号+版本在数据上等价于一个
- * PartRevision，因此直接用 revision_id 作身份；空间位置按容差比对矩阵。
+ * 判定分两轮：
+ * 1. 件号 + 版本（revision_id）+ 空间位置三者全同 → none（未变）。
+ *    revision_id 在数据上等价于"件号+版本"这对组合，是同一个 PartRevision。
+ * 2. 件号相同、版本不同、位置相同 → modify（版本变更）。零件升版必然产生
+ *    新 revision_id，但件号（master）不变、摆位不变，仍是同一个实例，只是换了版本，
+ *    不能算删除+新增。
+ * 其余（件号不同，或位置不同）→ delete / add。
  *
- * 不用 toFixed 串比：一是舍入边界会抖（0.00005 与 0.000049999 落到不同串），
- * 二是同一装配重新导出后矩阵尾数几乎必然变化，4 位小数在 mm 单位下约等于
- * 要求二进制完全一致。
+ * 空间位置按容差比对矩阵。不用 toFixed 串比：一是舍入边界会抖
+ * （0.00005 与 0.000049999 落到不同串），二是同一装配重新导出后矩阵尾数几乎必然
+ * 变化，4 位小数在 mm 单位下约等于要求二进制完全一致。
  */
 
 /** 平移欧氏距离阈值（mm）。远小于任何有意义的位置变动，又足以吸收重导出噪声。 */
@@ -27,13 +32,15 @@ export interface InstanceRef {
   index: number;
   /** 行主序 4×4，共 16 个数 */
   matrix: number[];
+  /** 件号（master 等价身份）：版本变更但件号不变仍是同一个零件 */
+  code: string;
   /** 件号+版本的等价身份 */
   revisionId: string;
 }
 
 /** 一条匹配结果 */
 export interface InstanceMatch {
-  changeType: 'none' | 'add' | 'delete';
+  changeType: 'none' | 'add' | 'delete' | 'modify';
   side: 'left' | 'right' | 'both';
   leftIndex?: number;
   rightIndex?: number;
@@ -60,11 +67,15 @@ export function isSamePlacement(a: number[], b: number[]): boolean {
 }
 
 /**
- * 左右实例配对。左侧按序贪心：找第一个未被占用、revision 相同、位置相同的
- * 右实例配成 none；配不上标 delete；右侧剩余标 add。
+ * 左右实例配对。左侧按序贪心：
+ * 1. 第一轮：找第一个未被占用、revision 相同、位置相同的右实例配成 none；
+ * 2. 第二轮：把第一轮落空的 delete 项，升级为"件号相同、位置相同但版本不同"的
+ *    modify（版本变更），从右侧未被占用的实例中配对；
+ * 3. 左侧剩余标 delete，右侧剩余标 add。
  *
  * 贪心不保证全局最优，但在 0.01mm 容差下两个候选同时命中意味着两个零件几乎
- * 重叠——现实装配里不出现，因此解唯一。
+ * 重叠——现实装配里不出现，因此解唯一。两轮分离保证同版本实例优先配对，
+ * 版本不同的实例只与真正没有同版本对手的实例配对。
  *
  * 返回顺序即树中显示顺序：左侧原序在前，右侧未匹配追加在后。
  */
@@ -81,6 +92,29 @@ export function matchInstancePairs(left: InstanceRef[], right: InstanceRef[]): I
       out.push({ changeType: 'none', side: 'both', leftIndex: l.index, rightIndex: right[hit].index });
     } else {
       out.push({ changeType: 'delete', side: 'left', leftIndex: l.index });
+    }
+  }
+
+  // 第二轮：同件号、不同版本、位置相同 → 版本变更（modify）
+  // 注意：out 前 left.length 项与 left 数组一一对应（左侧原序 push），必须按
+  // 数组下标 i 取左实例 —— m.leftIndex 是原始 instances 数组的下标，而 left 是
+  // 分组后的子集数组，用它索引 left 会越界成 undefined。
+  for (let i = 0; i < left.length; i++) {
+    const m = out[i];
+    if (m.changeType !== 'delete') continue;
+    const l = left[i];
+    const hit = right.findIndex(
+      (r, j) =>
+        !usedRight.has(j) &&
+        r.code === l.code &&
+        r.revisionId !== l.revisionId &&
+        isSamePlacement(l.matrix, r.matrix),
+    );
+    if (hit >= 0) {
+      usedRight.add(hit);
+      m.changeType = 'modify';
+      m.side = 'both';
+      m.rightIndex = right[hit].index;
     }
   }
 

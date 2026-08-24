@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useViewerStore } from '../../stores/viewerStore';
 import { filterCompareTree } from './compareTreeFilter';
-import type { CompareNode, CompareSide, ChangeType, Side, CompareInstanceNode } from './compareTypes';
+import type { CompareNode, CompareSide, ChangeType, Side, CompareInstanceNode, CompareChildRow } from './compareTypes';
 
 const ROW_BG: Record<ChangeType, string> = {
   add: 'bg-green-50',
@@ -102,11 +102,12 @@ function SideCell({ side, node, which, indent, leading }: {
 }
 
 /** 实例行的单侧格子 */
-function InstanceCell({ present, label, meshUuids, indent }: {
+function InstanceCell({ present, label, meshUuids, indent, leading }: {
   present: boolean;
   label: string;
   meshUuids: string[];
   indent: number;
+  leading?: ReactNode;
 }) {
   const hiddenParts = useViewerStore((s) => s.hiddenParts);
   const toggleMeshes = useViewerStore((s) => s.toggleMeshes);
@@ -115,8 +116,8 @@ function InstanceCell({ present, label, meshUuids, indent }: {
 
   return (
     <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-0.5" style={{ paddingLeft: `calc(8px + ${indent} * var(--ui-tree-indent))` }}>
-      {/* 与 BOM 行的展开按钮等宽占位，保证实例行文字与上级行对齐 */}
-      <span className="w-4 shrink-0" />
+      {/* 与 BOM 行的展开按钮等宽占位；中间实例行用 leading 放展开按钮 */}
+      {leading ?? <span className="w-4 shrink-0" />}
       {present && meshUuids.length > 0 ? (
         <button
           onClick={(e) => { e.stopPropagation(); toggleMeshes(meshUuids); }}
@@ -133,6 +134,165 @@ function InstanceCell({ present, label, meshUuids, indent }: {
         {present ? label : <span className="text-gray-300 italic">—</span>}
       </span>
     </div>
+  );
+}
+
+/** 实例行的单侧格子（中间实例：无几何，不显示眼睛按钮，label 取父 BOM 行数据 + 实例序号） */
+function MiddleInstanceCell({ present, label, indent, leading }: {
+  present: boolean;
+  label: string;
+  indent: number;
+  leading?: ReactNode;
+}) {
+  return (
+    <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-0.5" style={{ paddingLeft: `calc(8px + ${indent} * var(--ui-tree-indent))` }}>
+      {leading ?? <span className="w-4 shrink-0" />}
+      <span className="w-3.5 shrink-0" />
+      <span className={`truncate flex-1 text-[11px] ${present ? 'text-[var(--ui-text-secondary)]' : 'text-gray-300 italic'}`}>
+        {present ? label : '—'}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * 实例行：叶子实例（无 children）显示左右格 + 眼睛按钮；
+ * 多实例装配的中间实例（有 children）可展开到该实例下的 BOM 子项行。
+ *
+ * level 是行的层级（GuideLines / 缩进用），instance 行比其所属 BOM 行深一级。
+ */
+function InstanceRow({ inst, level, node }: { inst: CompareInstanceNode; level: number; node: CompareNode }) {
+  const selectedKey = useViewerStore((s) => s.compare?.selectedKey ?? null);
+  const selectCompareKey = useViewerStore((s) => s.selectCompareKey);
+  const expandedIds = useViewerStore((s) => s.expandedIds);
+  const toggleExpanded = useViewerStore((s) => s.toggleExpanded);
+
+  const isSelected = selectedKey === inst.key;
+  const inLeft = inst.side === 'left' || inst.side === 'both';
+  const inRight = inst.side === 'right' || inst.side === 'both';
+  const isMiddle = !!inst.children && inst.children.length > 0;
+  const expanded = expandedIds.has(inst.key);
+
+  // 左右两侧件号/版本可能不同，各取自己那侧的 CompareSide
+  const labelOf = (s: CompareSide | null) =>
+    [s?.code, s?.version, s?.name, `实例${inst.seq}`].filter(Boolean).join('_');
+
+  const bg = isSelected
+    ? 'bg-primary-50 ring-1 ring-inset ring-primary-400'
+    : inst.changeType === 'add'
+      ? 'bg-green-50 hover:bg-green-100'
+      : inst.changeType === 'delete'
+        ? 'bg-red-50 hover:bg-red-100'
+        : inst.changeType === 'modify' || inst.changeType === 'internal'
+          ? 'bg-yellow-50 hover:bg-yellow-100'
+          : 'hover:bg-[var(--ui-bg-hover)]';
+
+  return (
+    <li>
+      <div
+        onClick={(e) => { e.stopPropagation(); selectCompareKey(inst.key); }}
+        className={`relative flex items-stretch cursor-pointer select-none border-b border-gray-50 transition-colors ${bg}`}
+      >
+        <GuideLines level={level} />
+        {isMiddle ? (
+          <>
+            <MiddleInstanceCell
+              present={inLeft}
+              label={labelOf(node.left)}
+              indent={level}
+              leading={
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleExpanded(inst.key); }}
+                  className="w-4 h-4 flex items-center justify-center shrink-0 rounded hover:bg-gray-200/60"
+                  title={expanded ? '折叠' : '展开'}
+                >
+                  <Chevron expanded={expanded} />
+                </button>
+              }
+            />
+            <div className="w-px bg-gray-200 shrink-0" />
+            <MiddleInstanceCell present={inRight} label={labelOf(node.right)} indent={level} />
+          </>
+        ) : (
+          <>
+            <InstanceCell present={inLeft} label={labelOf(node.left)} meshUuids={inst.leftMeshUuids} indent={level} />
+            <div className="w-px bg-gray-200 shrink-0" />
+            <InstanceCell present={inRight} label={labelOf(node.right)} meshUuids={inst.rightMeshUuids} indent={level} />
+          </>
+        )}
+      </div>
+
+      {isMiddle && expanded && (
+        <ul>
+          {inst.children!.map((row) => (
+            <ChildRow key={row.key} row={row} level={level + 1} />
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
+
+/** 实例上下文中的 BOM 子项行视图：左右格显示对应 BOM 行数据，可展开到下一层实例 */
+function ChildRow({ row, level }: { row: CompareChildRow; level: number }) {
+  const selectedKey = useViewerStore((s) => s.compare?.selectedKey ?? null);
+  const selectCompareKey = useViewerStore((s) => s.selectCompareKey);
+  const expandedIds = useViewerStore((s) => s.expandedIds);
+  const toggleExpanded = useViewerStore((s) => s.toggleExpanded);
+
+  const isSelected = selectedKey === row.key;
+  const expanded = expandedIds.has(row.key);
+  const node = row.node;
+  const hasInstances = !!row.instances && row.instances.length > 0;
+  const hasChildren = !!row.children && row.children.length > 0;
+  const canExpand = hasInstances || hasChildren;
+
+  const labelOf = (s: CompareSide | null) => [s?.code, s?.version, s?.name].filter(Boolean).join('_');
+  const bg = isSelected ? 'bg-primary-50 ring-1 ring-inset ring-primary-400' : 'hover:bg-[var(--ui-bg-hover)]';
+
+  return (
+    <li>
+      <div
+        onClick={(e) => { e.stopPropagation(); selectCompareKey(row.key); }}
+        className={`relative flex items-stretch cursor-pointer select-none border-b border-gray-50 transition-colors ${bg}`}
+      >
+        <GuideLines level={level} />
+        <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-0.5" style={{ paddingLeft: `calc(8px + ${level} * var(--ui-tree-indent))` }}>
+          {canExpand ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleExpanded(row.key); }}
+              className="w-4 h-4 flex items-center justify-center shrink-0 rounded hover:bg-gray-200/60"
+              title={expanded ? '折叠' : '展开'}
+            >
+              <Chevron expanded={expanded} />
+            </button>
+          ) : (
+            <span className="w-4 shrink-0" />
+          )}
+          <span className={`truncate flex-1 text-xs ${isSelected ? 'text-primary-700' : 'text-gray-700'}`} title={labelOf(node.left)}>
+            {labelOf(node.left)}
+          </span>
+        </div>
+        <div className="w-px bg-gray-200 shrink-0" />
+        <div className="flex-1 min-w-0 flex items-center gap-1 px-2 py-0.5" style={{ paddingLeft: `calc(8px + ${level} * var(--ui-tree-indent))` }}>
+          <span className="w-4 shrink-0" />
+          <span className={`truncate flex-1 text-xs ${isSelected ? 'text-primary-700' : 'text-gray-700'}`} title={labelOf(node.right)}>
+            {labelOf(node.right)}
+          </span>
+        </div>
+      </div>
+
+      {(hasInstances || hasChildren) && expanded && (
+        <ul>
+          {row.instances?.map((inst) => (
+            <InstanceRow key={inst.key} inst={inst} level={level + 1} node={node} />
+          ))}
+          {row.children?.map((sub) => (
+            <ChildRow key={sub.key} row={sub} level={level + 1} />
+          ))}
+        </ul>
+      )}
+    </li>
   );
 }
 
@@ -170,42 +330,7 @@ function GuideLines({ level }: { level: number }) {
   );
 }
 
-/** 实例行：与 BOM 行同一套骨架（展开槽 + 两格等宽 + 分隔线），缩进走格内 padding */
-function InstanceRow({ inst, depth, node }: { inst: CompareInstanceNode; depth: number; node: CompareNode }) {
-  const selectedKey = useViewerStore((s) => s.compare?.selectedKey ?? null);
-  const selectCompareKey = useViewerStore((s) => s.selectCompareKey);
-  const isSelected = selectedKey === inst.key;
-  const inLeft = inst.side === 'left' || inst.side === 'both';
-  const inRight = inst.side === 'right' || inst.side === 'both';
-  const indent = depth + 1;
-
-  // 左右两侧件号/版本可能不同，各取自己那侧的 CompareSide
-  const labelOf = (s: CompareSide | null) =>
-    [s?.code, s?.version, s?.name, inst.seq].filter(Boolean).join('_');
-
-  const bg = isSelected
-    ? 'bg-primary-50 ring-1 ring-inset ring-primary-400'
-    : inst.changeType === 'add'
-      ? 'bg-green-50 hover:bg-green-100'
-      : inst.changeType === 'delete'
-        ? 'bg-red-50 hover:bg-red-100'
-        : 'hover:bg-[var(--ui-bg-hover)]';
-
-  return (
-    <li>
-      <div
-        onClick={(e) => { e.stopPropagation(); selectCompareKey(inst.key); }}
-        className={`relative flex items-stretch cursor-pointer select-none border-b border-gray-50 transition-colors ${bg}`}
-      >
-        <GuideLines level={depth + 1} />
-        <InstanceCell present={inLeft} label={labelOf(node.left)} meshUuids={inst.leftMeshUuids} indent={indent} />
-        <div className="w-px bg-gray-200 shrink-0" />
-        <InstanceCell present={inRight} label={labelOf(node.right)} meshUuids={inst.rightMeshUuids} indent={indent} />
-      </div>
-    </li>
-  );
-}
-
+/** BOM 配对行：与实例行/子项行同一套骨架（展开槽 + 两格等宽 + 分隔线） */
 function Row({ node, depth }: { node: CompareNode; depth: number }) {
   const expandedIds = useViewerStore((s) => s.expandedIds);
   const toggleExpanded = useViewerStore((s) => s.toggleExpanded);
@@ -262,17 +387,20 @@ function Row({ node, depth }: { node: CompareNode; depth: number }) {
         />
       </div>
 
-      {hasChildren && expanded && (
+      {/* 有实例层（多实例装配/多实例叶子）时只显示实例行 —— 子项挂在各实例下，
+          不再重复渲染 BOM 子项行；无实例层才渲染 BOM 子项。 */}
+      {hasChildren && !hasInstances && expanded && (
         <ul>
           {node.children.map((c) => <Row key={c.key} node={c} depth={depth + 1} />)}
         </ul>
       )}
 
-      {/* 实例子行：按矩阵匹配结果，逐实例展示，仿 ModelTreePanel 样式 */}
+      {/* 实例子行：按矩阵匹配结果，逐实例展示，仿 ModelTreePanel 样式。
+          多实例装配的中间实例可继续展开到该实例下的子项行（递归）。 */}
       {hasInstances && expanded && (
         <ul>
           {node.instances?.map((inst) => (
-            <InstanceRow key={inst.key} inst={inst} depth={depth} node={node} />
+            <InstanceRow key={inst.key} inst={inst} level={depth + 1} node={node} />
           ))}
         </ul>
       )}
