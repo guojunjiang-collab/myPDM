@@ -8,7 +8,8 @@ export const BAR_H = 12;      // 任务条高度
 export const CODE_W = 200;    // 左侧:任务编号列宽(含层级缩进)
 export const ASSIGNEE_W = 72; // 左侧:负责人列宽
 export const STATUS_W = 64;   // 左侧:状态列宽
-export const LEFT_W = 574;    // 左侧固定区总宽(编号 + 名称 + 状态 + 负责人)
+export const OP_W = 151;      // 左侧:关联/操作列宽(数字位 24 + 按钮组 + 内边距)
+export const LEFT_W = 725;    // 左侧固定区总宽(编号 + 名称 + 状态 + 负责人 + 关联/操作)
 export const INDENT = 20;     // 每层级缩进像素(同详情页)
 
 export function parseDate(s: string | null): Date | null {

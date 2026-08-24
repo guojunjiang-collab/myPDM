@@ -107,6 +107,7 @@ export interface GanttTask {
   duration_days: number | null;
   is_critical: boolean;
   is_overdue: boolean;
+  link_count?: number;
   sort_order: number;
   depth: number;
 }
