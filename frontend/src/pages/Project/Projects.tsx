@@ -20,6 +20,7 @@ import DeliverableModal from './DeliverableModal';
 import TaskEditModal from './TaskEditModal';
 import GanttView from './gantt/GanttView';
 import SharedLeftPanel from './SharedLeftPanel';
+import { LEFT_W } from './gantt/ganttUtils';
 import type { Project, ProjectStatus, ProjectTask, TaskStatus, TaskLink, TaskComment, GanttTask } from '../../types/project';
 
 const STATUSES: ProjectStatus[] = ['待启动', '进行中', '已完成', '已暂停', '已归档'];
@@ -724,11 +725,14 @@ export default function Projects() {
                 </div>
 
                 <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden flex-1 min-h-0">
-                  <div className="overflow-y-auto h-full bg-[var(--ui-bg-surface)]" style={{ overflowX: 'hidden' }}
+                  {/* 双向滚动容器：左侧面板 sticky left-0 冻结（参考 CAD 工作台 BOM 匹配表的固定列+横向滚动设计），
+                      空间不足时右侧计划表可横向滚动，操作列始终可查看 */}
+                  <div className="overflow-auto h-full bg-[var(--ui-bg-surface)]"
                        onMouseLeave={() => setHoveredId(null)}
                        onDragLeave={() => { setDragOver(null); if (expandTimerRef.current) { clearTimeout(expandTimerRef.current); expandTimerRef.current = null; } }}>
                     <div className="flex">
-                      <SharedLeftPanel
+                      <div className="sticky left-0 z-20 bg-[var(--ui-bg-surface)]" style={{ width: LEFT_W, flexShrink: 0 }}>
+                        <SharedLeftPanel
                         tasks={visibleLeftTasks}
                         expanded={expanded}
                         childMap={childMap}
@@ -745,8 +749,9 @@ export default function Projects() {
                         onDragLeave={handleDragLeave}
                         onDrop={handleDrop}
                       />
+                      </div>
                       {viewMode === 'table' ? (
-                        <div className="flex-1 bg-[var(--ui-bg-surface)]">
+                        <div className="flex-1 min-w-0 bg-[var(--ui-bg-surface)]">
                            <div className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] flex items-center text-sm font-medium text-[var(--ui-text-secondary)] sticky top-0 z-10" style={{ height: 36 }}>
                             <span className="px-2 shrink-0 truncate text-left" style={{ width: 64 }}>优先级</span>
                             <span className="px-2 shrink-0 truncate text-left" style={{ width: 100 }}>计划开始</span>
