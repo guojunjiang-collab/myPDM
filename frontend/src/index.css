@@ -325,4 +325,12 @@ body {
   .text-sm   { font-size: var(--ui-font-size-base); }
   .text-base { font-size: var(--ui-font-size-lg); }
   .text-lg   { font-size: var(--ui-font-size-xl); }
+  /* 隐藏滚动条但保留滚动能力（项目详情左侧固定区：垂直滚动与右侧同步，滚动条不显示） */
+  .scrollbar-hidden {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+  }
 }

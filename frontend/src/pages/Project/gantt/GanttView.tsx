@@ -25,9 +25,11 @@ interface Props {
   onHoverChange?: (taskId: string | null) => void;
   hoveredId?: string | null;
   filteredTaskIds?: Set<string> | null;
+  /** hideLeftPanel 模式下外部提供的滚动容器 ref（项目详情右面板），用于宽度测量与拖拽平移 */
+  scrollRef?: React.RefObject<HTMLDivElement>;
 }
 
-export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClick, refreshKey, project, expanded: extExpanded, onExpandedChange, scale: extScale, onScaleChange, autoScheduleKey, hideLeftPanel, onHoverChange, hoveredId: extHoveredId, filteredTaskIds }: Props) {
+export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClick, refreshKey, project, expanded: extExpanded, onExpandedChange, scale: extScale, onScaleChange, autoScheduleKey, hideLeftPanel, onHoverChange, hoveredId: extHoveredId, filteredTaskIds, scrollRef }: Props) {
   const [data, setData] = useState<GanttData | null>(null);
   const [intScale, setIntScale] = useState<Scale>('day');
   const scale = extScale ?? intScale;
@@ -38,7 +40,6 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
   const [createDrag, setCreateDrag] = useState<{ id: string; anchorDay: number; isMilestone: boolean; startX: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const calendarScrollRef = useRef<HTMLDivElement>(null);
-  const dateHeaderTranslateRef = useRef<HTMLDivElement>(null);
   const movedRef = useRef(false);
   const [viewportW, setViewportW] = useState(0);
   const [pan, setPan] = useState<{ startX: number; startScroll: number; taskId?: string } | null>(null);
@@ -269,44 +270,30 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
     /* eslint-disable-next-line */
   }, [createDrag, preview, px, projectId, range]);
 
-  // 测量外层滚动容器宽度,用于把日历铺满界面
+  // 测量滚动容器宽度,用于把日历铺满界面（hideLeftPanel 模式下滚动容器为外部传入的右面板）
   useEffect(() => {
-    const el = calendarScrollRef.current;
+    const el = (hideLeftPanel ? (scrollRef ?? calendarScrollRef) : calendarScrollRef).current;
     if (!el) return;
     const measure = () => setViewportW(el.clientWidth);
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [data, hideLeftPanel]);
-
-  // hideLeftPanel 模式:日期抬头不在 overflow-x:auto 容器内(否则 CSS 强制 overflow-y:hidden 拦截 sticky),
-  // 改用 transform 同步水平滚动位置,sticky top-0 相对外层垂直滚动容器生效
-  useEffect(() => {
-    if (!hideLeftPanel) return;
-    const content = dateHeaderTranslateRef.current;
-    const scroller = calendarScrollRef.current;
-    if (!content || !scroller) return;
-    const onScroll = () => {
-      content.style.transform = `translateX(${-scroller.scrollLeft}px)`;
-    };
-    onScroll();
-    scroller.addEventListener('scroll', onScroll, { passive: true });
-    return () => scroller.removeEventListener('scroll', onScroll);
-    // chartW 由 viewportW/data/scale 推导,这些变化时重新同步 transform
-  }, [hideLeftPanel, viewportW, data, scale]);
+  }, [data, hideLeftPanel, scrollRef]);
 
   // 拖动时间轴空白处左右平移(调整关注区域)
   const onPanDown = (e: React.MouseEvent, taskId?: string) => {
-    if (!calendarScrollRef.current) return;
+    const scroller = (hideLeftPanel ? (scrollRef ?? calendarScrollRef) : calendarScrollRef).current;
+    if (!scroller) return;
     movedRef.current = false;
-    setPan({ startX: e.clientX, startScroll: calendarScrollRef.current.scrollLeft, taskId });
+    setPan({ startX: e.clientX, startScroll: scroller.scrollLeft, taskId });
   };
   useEffect(() => {
     if (!pan) return;
+    const scroller = (hideLeftPanel ? (scrollRef ?? calendarScrollRef) : calendarScrollRef).current;
     const onMove = (e: MouseEvent) => {
       if (Math.abs(e.clientX - pan.startX) > 4) movedRef.current = true;
-      if (calendarScrollRef.current) calendarScrollRef.current.scrollLeft = pan.startScroll - (e.clientX - pan.startX);
+      if (scroller) scroller.scrollLeft = pan.startScroll - (e.clientX - pan.startX);
     };
     const onUp = () => {
       if (!movedRef.current && pan.taskId) onRowClick?.(pan.taskId);
@@ -454,16 +441,13 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
   if (hideLeftPanel) {
     return (
       <div className="min-w-0 flex-1">
-        {/* 日期抬头:不在 overflow 容器内,sticky top-0 穿透到外层垂直滚动容器;transform 同步水平位置 */}
-        <div className="sticky top-0 bg-[var(--ui-bg-subtle)]" style={{ height: ROW_H, zIndex: 1 }}>
-          <div ref={dateHeaderTranslateRef} style={{ width: chartW, willChange: 'transform' }}>
-            {dateHeader}
-          </div>
+        {/* 日期抬头:直接放在外部右面板滚动容器内,sticky top-0 垂直吸顶;宽度与图表一致随水平滚动,
+            水平滚动条常驻右面板底部(参考 CAD 工作台 BOM 匹配表) */}
+        <div className="sticky top-0 z-30 bg-[var(--ui-bg-subtle)]" style={{ height: ROW_H }}>
+          {dateHeader}
         </div>
-        {/* 图表区域:水平滚动 */}
-        <div ref={calendarScrollRef} className="overflow-x-auto" style={{ overflowY: 'hidden' }}>
-          {svgPart}
-        </div>
+        {/* 图表区域:与日期抬头同宽,由右面板统一双向滚动 */}
+        {svgPart}
       </div>
     );
   }

@@ -20,7 +20,6 @@ import DeliverableModal from './DeliverableModal';
 import TaskEditModal from './TaskEditModal';
 import GanttView from './gantt/GanttView';
 import SharedLeftPanel from './SharedLeftPanel';
-import { LEFT_W } from './gantt/ganttUtils';
 import type { Project, ProjectStatus, ProjectTask, TaskStatus, TaskLink, TaskComment, GanttTask } from '../../types/project';
 
 const STATUSES: ProjectStatus[] = ['待启动', '进行中', '已完成', '已暂停', '已归档'];
@@ -84,6 +83,10 @@ export default function Projects() {
   const expandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectedProjectIdRef = useRef<string | null>(null);
   useEffect(() => { selectedProjectIdRef.current = selectedProjectId; }, [selectedProjectId]);
+  // 左右双滚动容器（参考 CAD 工作台 BOM 匹配表）：垂直滚动互相同步的 refs
+  const leftScrollRef = useRef<HTMLDivElement>(null);
+  const rightScrollRef = useRef<HTMLDivElement>(null);
+  const isSyncingScroll = useRef(false);
 
   useEffect(() => {
     return () => { if (expandTimerRef.current) clearTimeout(expandTimerRef.current); };
@@ -286,6 +289,26 @@ export default function Projects() {
     // 同时刷新任务表和甘特图(甘特按 refreshKey 重新拉取 /gantt 数据)
     if (selectedProjectId) { loadTasks(selectedProjectId); setGanttKey((k) => k + 1); }
   }, [selectedProjectId, loadTasks]);
+
+  // 左右两侧垂直滚动同步（参考 CAD 工作台 BOM 匹配表），
+  // 使左侧固定区与右侧内容区行对齐，且水平滚动条不被垂直滚动条推到底部不可见
+  const handleLeftScroll = useCallback(() => {
+    if (isSyncingScroll.current) return;
+    isSyncingScroll.current = true;
+    if (leftScrollRef.current && rightScrollRef.current) {
+      rightScrollRef.current.scrollTop = leftScrollRef.current.scrollTop;
+    }
+    requestAnimationFrame(() => { isSyncingScroll.current = false; });
+  }, []);
+
+  const handleRightScroll = useCallback(() => {
+    if (isSyncingScroll.current) return;
+    isSyncingScroll.current = true;
+    if (rightScrollRef.current && leftScrollRef.current) {
+      leftScrollRef.current.scrollTop = rightScrollRef.current.scrollTop;
+    }
+    requestAnimationFrame(() => { isSyncingScroll.current = false; });
+  }, []);
 
   // 系统角色 + 项目角色双层判定：两者都满足才显示管理类按钮，避免"看得见却 403"。
   // is_manager 由 GET /projects/{id} 返回（admin / owner / 经理成员）。
@@ -725,13 +748,13 @@ export default function Projects() {
                 </div>
 
                 <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden flex-1 min-h-0">
-                  {/* 双向滚动容器：左侧面板 sticky left-0 冻结（参考 CAD 工作台 BOM 匹配表的固定列+横向滚动设计），
-                      空间不足时右侧计划表可横向滚动，操作列始终可查看 */}
-                  <div className="overflow-auto h-full bg-[var(--ui-bg-surface)]"
+                  {/* 左右双滚动容器（参考 CAD 工作台 BOM 匹配表）：左侧固定区自带垂直滚动条，
+                      右侧内容区双向滚动且滚动条溢出时常显，左右垂直滚动互相同步 */}
+                  <div className="h-full flex bg-[var(--ui-bg-surface)]"
                        onMouseLeave={() => setHoveredId(null)}
                        onDragLeave={() => { setDragOver(null); if (expandTimerRef.current) { clearTimeout(expandTimerRef.current); expandTimerRef.current = null; } }}>
-                    <div className="flex">
-                      <div className="sticky left-0 z-20 bg-[var(--ui-bg-surface)]" style={{ width: LEFT_W, flexShrink: 0 }}>
+                    <div className="flex h-full min-w-0">
+                      <div ref={leftScrollRef} className="shrink-0 overflow-y-auto overflow-x-hidden scrollbar-hidden" onScroll={handleLeftScroll}>
                         <SharedLeftPanel
                         tasks={visibleLeftTasks}
                         expanded={expanded}
@@ -751,12 +774,12 @@ export default function Projects() {
                       />
                       </div>
                       {viewMode === 'table' ? (
-                        <div className="flex-1 min-w-0 bg-[var(--ui-bg-surface)]">
+                        <div ref={rightScrollRef} className="flex-1 min-w-0 bg-[var(--ui-bg-surface)] overflow-auto" onScroll={handleRightScroll}>
                            <div className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] flex items-center text-sm font-medium text-[var(--ui-text-secondary)] sticky top-0 z-10" style={{ height: 36 }}>
                             <span className="px-2 shrink-0 truncate text-left" style={{ width: 64 }}>优先级</span>
                             <span className="px-2 shrink-0 truncate text-left" style={{ width: 100 }}>计划开始</span>
                             <span className="px-2 shrink-0 truncate text-left" style={{ width: 100 }}>计划完成</span>
-                            <span className="px-2 flex-1 min-w-0 truncate text-left">描述</span>
+                            <span className="px-2 flex-1 min-w-[240px] truncate text-left">描述</span>
                             <span className="shrink-0 px-4 text-right">关联/操作</span>
                           </div>
                           {currentProject && (
@@ -765,15 +788,7 @@ export default function Projects() {
                                 <span className="px-2 shrink-0 truncate text-[var(--ui-text-tertiary)]" style={{ width: 64 }}>—</span>
                                 <span className="px-2 shrink-0 truncate text-[var(--ui-text-secondary)]" style={{ width: 100 }}>{currentProject.planned_start || '—'}</span>
                                 <span className="px-2 shrink-0 truncate text-[var(--ui-text-secondary)]" style={{ width: 100 }}>{currentProject.planned_end || '—'}</span>
-                                <span className="px-2 flex-1 min-w-0 truncate text-[var(--ui-text-secondary)]" title={currentProject.description || undefined}>{currentProject.description || '—'}</span>
-                                <div className="shrink-0 flex items-center justify-end px-4 text-[var(--ui-text-tertiary)]">
-                                  {isManager && (
-                                    <Button variant="link" size="xs" className="mr-2" onClick={() => setMemberOpen(true)}>成员</Button>
-                                  )}
-                                  {can('project:update') && (
-                                    <Button variant="link" size="xs" onClick={(e) => handleOpenEdit(currentProject, e)}>编辑</Button>
-                                  )}
-                                </div>
+                                <span className="px-2 flex-1 min-w-[240px] truncate text-[var(--ui-text-secondary)]" title={currentProject.description || undefined}>{currentProject.description || '—'}</span>
                               </div>
                               {(() => {
                                 const rightRows: JSX.Element[] = [];
@@ -798,7 +813,7 @@ export default function Projects() {
                                       <span className="px-2 shrink-0 truncate" style={{ width: 64 }}>{t.priority}</span>
                                       <span className="px-2 shrink-0 truncate text-[var(--ui-text-secondary)]" style={{ width: 100 }}>{t.planned_start || '—'}</span>
                                       <span className="px-2 shrink-0 truncate text-[var(--ui-text-secondary)]" style={{ width: 100 }}>{t.planned_end || '—'}</span>
-                                      <span className="px-2 flex-1 min-w-0 truncate text-[var(--ui-text-secondary)]" title={t.description || undefined}>{t.description || '—'}</span>
+                                      <span className="px-2 flex-1 min-w-[240px] truncate text-[var(--ui-text-secondary)]" title={t.description || undefined}>{t.description || '—'}</span>
                                       <div className="shrink-0 flex items-center justify-end px-4 text-[var(--ui-text-tertiary)]" onClick={(e) => e.stopPropagation()}>
                                         {(t.link_count ?? 0) > 0 && <span className="mr-2">🔗 {t.link_count}</span>}
                                         {isManager && <Button variant="link" size="xs" className="mr-2" onClick={() => openCreate(t.id)}>+子</Button>}
@@ -814,8 +829,10 @@ export default function Projects() {
                           )}
                         </div>
                       ) : (
+                        <div ref={rightScrollRef} className="flex-1 min-w-0 bg-[var(--ui-bg-surface)] overflow-auto" onScroll={handleRightScroll}>
                         <GanttView
                           hideLeftPanel
+                          scrollRef={rightScrollRef}
                           hoveredId={hoveredId}
                           onHoverChange={setHoveredId}
                           filteredTaskIds={filteredTaskIds.size > 0 ? filteredTaskIds : null}
@@ -831,6 +848,7 @@ export default function Projects() {
                           onRowClick={(id) => { const t = findTaskById(tasks, id); if (t) openEdit(t); }}
                           onTaskUpdated={() => { loadTasks(selectedProjectId!); setGanttKey((k) => k + 1); }}
                         />
+                        </div>
                       )}
                     </div>
                   </div>
