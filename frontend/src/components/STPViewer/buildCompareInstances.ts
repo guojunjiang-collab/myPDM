@@ -64,11 +64,11 @@ function instancesArrOf(ctx: Host, key: string, nodeMap: Map<string, CompareNode
   return { arr: row.instances ??= [], parentKey: row.key };
 }
 
-function createInstance(parentKey: string, seq: number): CompareInstanceNode {
+function createInstance(parentKey: string, seq: number, side: Side | 'both' = 'both'): CompareInstanceNode {
   return {
     key: `${parentKey}:inst:${seq}`,
     changeType: 'none',
-    side: 'both',
+    side,
     seq,
     leftMeshUuids: [],
     rightMeshUuids: [],
@@ -116,6 +116,8 @@ function mount(
   nodeMap: Map<string, CompareNode>,
   instByRef: Map<string, CompareInstanceNode>,
   matchByRef: Map<string, InstanceMatch>,
+  pairNodes: Map<string, CompareInstanceNode>,
+  idxMap: Map<string, CompareInstanceNode>,
 ): void {
   const key = leaf.keyPath[seg];
   const idx = leaf.seqs[seg];
@@ -126,13 +128,45 @@ function mount(
     const { arr, parentKey } = instancesArrOf(ctx, key, nodeMap);
     const m = matchByRef.get(`${leaf.side}:${leaf.index}`);
     const paired = !!m && m.side === 'both';
-    const seq = paired ? (idx !== null ? idx : 0) + 1 : nextSeq(arr);
-    const existing = paired ? arr.find((n) => n.seq === seq) : undefined;
-    const instNode = existing ?? createInstance(parentKey, seq);
-    if (!existing) arr.push(instNode);
+
+    let instNode: CompareInstanceNode;
+    if (isLast) {
+      // 叶子实例段：配对按"配对对"聚合 —— 数量不等时左右组内位置会错位
+      // （左 idx1 可配右 idx0），seq/idx 不唯一；未配对 → 独立节点
+      // （delete=left / add=right），nextSeq 追加不与配对区冲突。
+      if (paired) {
+        const pairKey = `${parentKey}|${m!.leftIndex}:${m!.rightIndex}`;
+        const existing = pairNodes.get(pairKey);
+        if (existing) {
+          instNode = existing;
+        } else {
+          instNode = createInstance(parentKey, nextSeq(arr), 'both');
+          pairNodes.set(pairKey, instNode);
+          arr.push(instNode);
+        }
+      } else {
+        instNode = createInstance(parentKey, nextSeq(arr), leaf.side);
+        arr.push(instNode);
+      }
+    } else {
+      // 中间实例段：按 (parentKey, idx) 聚合 —— 同一装配实例（idx）下的多个
+      // 子项（如 003 与 001）共享一个中间实例；左右同 idx 即同一装配实例。
+      // 配对状态须一致：配对 ↔ both，delete ↔ left，add ↔ right；同 idx 但
+      // 配对状态不同（位置不同）视为不同实例，独立建节点。
+      const instKey = `${parentKey}|idx:${idx}`;
+      const existing = idxMap.get(instKey);
+      if (existing && (paired ? existing.side === 'both' : existing.side === leaf.side)) {
+        instNode = existing;
+      } else {
+        instNode = createInstance(parentKey, nextSeq(arr), paired ? 'both' : leaf.side);
+        idxMap.set(instKey, instNode);
+        arr.push(instNode);
+      }
+    }
+
     // 只有叶子段才注册（mesh 回填目标）；中间实例节点仅作层级分组，无几何
     if (isLast) register(leaf, instNode, instByRef, matchByRef);
-    if (!isLast) mount(leaf, { kind: 'inst', inst: instNode }, seg + 1, nodeMap, instByRef, matchByRef);
+    if (!isLast) mount(leaf, { kind: 'inst', inst: instNode }, seg + 1, nodeMap, instByRef, matchByRef, pairNodes, idxMap);
     return;
   }
 
@@ -140,13 +174,13 @@ function mount(
   if (ctx.kind === 'node') {
     // 顶层单实例：跳到下一段对应的 BOM 行
     const next = nodeMap.get(leaf.keyPath[seg + 1]);
-    mount(leaf, { kind: 'node', node: next ?? ctx.node }, seg + 1, nodeMap, instByRef, matchByRef);
+    mount(leaf, { kind: 'node', node: next ?? ctx.node }, seg + 1, nodeMap, instByRef, matchByRef, pairNodes, idxMap);
   } else if (ctx.kind === 'inst') {
     const row = ensureRow(ctx.inst.children ??= [], ctx.inst.key, key, nodeMap.get(key)!);
-    mount(leaf, { kind: 'row', row }, seg + 1, nodeMap, instByRef, matchByRef);
+    mount(leaf, { kind: 'row', row }, seg + 1, nodeMap, instByRef, matchByRef, pairNodes, idxMap);
   } else {
     const row = ensureRow(ctx.row.children ??= [], ctx.row.key, key, nodeMap.get(key)!);
-    mount(leaf, { kind: 'row', row }, seg + 1, nodeMap, instByRef, matchByRef);
+    mount(leaf, { kind: 'row', row }, seg + 1, nodeMap, instByRef, matchByRef, pairNodes, idxMap);
   }
 }
 
@@ -182,9 +216,13 @@ export function buildCompareInstances(
   matchByRef: Map<string, InstanceMatch>,
 ): Map<string, CompareInstanceNode> {
   const instByRef = new Map<string, CompareInstanceNode>();
+  // 叶子配对聚合表：`${parentKey}|${leftIndex}:${rightIndex}` → 叶子实例节点
+  const pairNodes = new Map<string, CompareInstanceNode>();
+  // 中间实例聚合表：`${parentKey}|idx:${idx}` → 中间实例节点
+  const idxMap = new Map<string, CompareInstanceNode>();
 
   for (const leaf of leaves) {
-    mount(leaf, { kind: 'node', node: nodeMap.get(leaf.keyPath[0]) ?? nodeMap.get('ROOT')! }, 0, nodeMap, instByRef, matchByRef);
+    mount(leaf, { kind: 'node', node: nodeMap.get(leaf.keyPath[0]) ?? nodeMap.get('ROOT')! }, 0, nodeMap, instByRef, matchByRef, pairNodes, idxMap);
   }
 
   // 中间实例 changeType 聚合（后序遍历，从每个叶子实例节点向上）

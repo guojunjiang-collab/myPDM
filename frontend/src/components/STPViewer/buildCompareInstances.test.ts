@@ -181,4 +181,119 @@ describe('buildCompareInstances 实例层级树', () => {
     expect(instByRef.get('left:0')).toBe(P.instances![0]);
     expect(instByRef.get('right:0')).toBe(P.instances![0]);
   });
+
+  it('数量差异：多实例装配左右实例数不同（左 2 右 4），中间实例按侧标记，两侧数量统计正确', () => {
+    const map = new Map<string, CompareNode>();
+    const A = node('/A');
+    const B = node('/A/B', 1);
+    map.set('/A', A);
+    map.set('/A/B', B);
+
+    const leaves: CompareLeafInput[] = [];
+    const matchByRef = new Map<string, InstanceMatch>();
+    // 左 2 个实例（idx 0-1）
+    for (let i = 0; i < 2; i++) leaves.push(leaf('left', i, ['/A', '/A/B'], [i, null]));
+    // 右 4 个实例（idx 0-3），前 2 个配对
+    for (let i = 0; i < 4; i++) {
+      leaves.push(leaf('right', i, ['/A', '/A/B'], [i, null]));
+      if (i < 2) addPair(matchByRef, i, i);
+    }
+
+    buildCompareInstances(leaves, map, matchByRef);
+
+    // 中间实例：2 配对（both）+ 2 右侧独有（add → right）
+    expect(A.instances).toHaveLength(4);
+    const sides = A.instances!.map((i) => i.side).sort();
+    expect(sides).toEqual(['both', 'both', 'right', 'right']);
+    // 两侧数量统计（SideCell 同款 filter）：左 2 右 4，不再两侧都取多的
+    const leftCount = A.instances!.filter((i) => i.side === 'both' || i.side === 'left').length;
+    const rightCount = A.instances!.filter((i) => i.side === 'both' || i.side === 'right').length;
+    expect(leftCount).toBe(2);
+    expect(rightCount).toBe(4);
+  });
+
+  it('数量差异：多实例装配左右实例数不同（左 4 右 2），左侧独有实例标记为 left', () => {
+    const map = new Map<string, CompareNode>();
+    const A = node('/A');
+    const B = node('/A/B', 1);
+    map.set('/A', A);
+    map.set('/A/B', B);
+
+    const leaves: CompareLeafInput[] = [];
+    const matchByRef = new Map<string, InstanceMatch>();
+    for (let i = 0; i < 4; i++) {
+      leaves.push(leaf('left', i, ['/A', '/A/B'], [i, null]));
+      if (i < 2) addPair(matchByRef, i, i);
+    }
+    for (let i = 0; i < 2; i++) leaves.push(leaf('right', i, ['/A', '/A/B'], [i, null]));
+
+    buildCompareInstances(leaves, map, matchByRef);
+
+    expect(A.instances).toHaveLength(4);
+    const sides = A.instances!.map((i) => i.side).sort();
+    expect(sides).toEqual(['both', 'both', 'left', 'left']);
+    const leftCount = A.instances!.filter((i) => i.side === 'both' || i.side === 'left').length;
+    const rightCount = A.instances!.filter((i) => i.side === 'both' || i.side === 'right').length;
+    expect(leftCount).toBe(4);
+    expect(rightCount).toBe(2);
+  });
+
+  it('数量差异：多实例叶子左右实例数不同（左 2 右 4），叶子实例按侧标记', () => {
+    const map = new Map<string, CompareNode>();
+    const P = node('/P');
+    map.set('/P', P);
+
+    const leaves: CompareLeafInput[] = [];
+    const matchByRef = new Map<string, InstanceMatch>();
+    for (let i = 0; i < 2; i++) leaves.push(leaf('left', i, ['/P'], [i]));
+    for (let i = 0; i < 4; i++) {
+      leaves.push(leaf('right', i, ['/P'], [i]));
+      if (i < 2) addPair(matchByRef, i, i);
+    }
+
+    buildCompareInstances(leaves, map, matchByRef);
+
+    expect(P.instances).toHaveLength(4);
+    const sides = P.instances!.map((i) => i.side).sort();
+    expect(sides).toEqual(['both', 'both', 'right', 'right']);
+    const leftCount = P.instances!.filter((i) => i.side === 'both' || i.side === 'left').length;
+    const rightCount = P.instances!.filter((i) => i.side === 'both' || i.side === 'right').length;
+    expect(leftCount).toBe(2);
+    expect(rightCount).toBe(4);
+  });
+
+  it('数量差异且左右组内位置错位：左 idx0 delete、左 idx1 配对右 idx0（真实数据 HP10-32000-001 左2右1）', () => {
+    const map = new Map<string, CompareNode>();
+    const P = node('/P');
+    map.set('/P', P);
+
+    const leaves: CompareLeafInput[] = [
+      leaf('left', 0, ['/P'], [0]),
+      leaf('left', 1, ['/P'], [1]),
+      leaf('right', 0, ['/P'], [0]),
+    ];
+    const matchByRef = new Map<string, InstanceMatch>();
+    // 左 idx1 与右 idx0 配对（位置相同）；左 idx0 位置不同 → delete
+    const m: InstanceMatch = { changeType: 'none', side: 'both', leftIndex: 1, rightIndex: 0 };
+    matchByRef.set('left:1', m);
+    matchByRef.set('right:0', m);
+
+    buildCompareInstances(leaves, map, matchByRef);
+
+    // 左 0 delete 独立节点 + 左1/右0 配对聚合 → 2 个节点，不重叠
+    expect(P.instances).toHaveLength(2);
+    const sides = P.instances!.map((i) => i.side).sort();
+    expect(sides).toEqual(['both', 'left']);
+    const leftCount = P.instances!.filter((i) => i.side === 'both' || i.side === 'left').length;
+    const rightCount = P.instances!.filter((i) => i.side === 'both' || i.side === 'right').length;
+    expect(leftCount).toBe(2);
+    expect(rightCount).toBe(1);
+    // 配对实例的左右引用都指向同一节点，delete 实例只指向左
+    const bothInst = P.instances!.find((i) => i.side === 'both')!;
+    const leftInst = P.instances!.find((i) => i.side === 'left')!;
+    expect(bothInst.leftIndex).toBe(1);
+    expect(bothInst.rightIndex).toBe(0);
+    expect(leftInst.leftIndex).toBe(0);
+    expect(leftInst.rightIndex).toBeUndefined();
+  });
 });
