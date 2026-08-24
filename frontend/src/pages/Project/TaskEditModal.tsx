@@ -55,6 +55,37 @@ const logActionTone = (action: string): BadgeTone => {
   return 'gray';
 };
 
+/** 描述框：随内容自动增高（输入时实时调整，值变化/初始渲染时对齐内容高度） */
+function AutoSizeTextarea({ value, onChange, placeholder }: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = `${el.scrollHeight}px`;
+    }
+  }, [value]);
+  return (
+    <Textarea
+      ref={ref}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onInput={(e) => {
+        const el = e.currentTarget;
+        el.style.height = 'auto';
+        el.style.height = `${el.scrollHeight}px`;
+      }}
+      className="resize-none"
+      rows={3}
+      placeholder={placeholder}
+    />
+  );
+}
+
 export default function TaskEditModal({ open, projectId, task, parentId, onClose, onSaved, onRefresh }: Props) {
   const empty = { name: '', task_type: '任务' as TaskType, assignee_id: '', status: '未开始' as TaskStatus,
     priority: '中' as TaskPriority, planned_start: '', planned_end: '', actual_start: '', actual_end: '', description: '' };
@@ -451,29 +482,31 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                   {/* 描述 */}
                   <div>
                     <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">描述</h4>
-                    <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
-                              className="resize-none"
-                              rows={3} placeholder="可选" />
+                    <AutoSizeTextarea value={form.description} onChange={(v) => setForm({ ...form, description: v })} placeholder="可选" />
                   </div>
 
                   {/* 任务依赖 */}
                   {task?.id && (
                     <div>
-                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      <div className="flex items-center justify-between mb-2">
                         <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm">任务依赖</h4>
-                        {canEditDeps && (
-                          <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
-                            <Select size="xs" value={depForm.role}
+                        {deps.length > 0 && <span className="text-xs text-[var(--ui-text-tertiary)]">共 {deps.length} 条</span>}
+                      </div>
+
+                      {/* 添加依赖：独立卡片行，控件宽度统一、换行不散乱 */}
+                      {canEditDeps && (
+                        <div className="bg-[var(--ui-bg-subtle)] border border-[var(--ui-border)] rounded-lg p-3 mb-3">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Select size="xs" className="!w-36 shrink-0" value={depForm.role}
                               onChange={(e) => setDepForm({ ...depForm, role: e.target.value as 'pred' | 'succ' })}>
                               <option value="pred">本任务为前置 →</option>
                               <option value="succ">本任务为后置 ←</option>
                             </Select>
-                            <div className="relative" ref={taskDropRef}>
+                            <div className="relative flex-1 min-w-[180px]" ref={taskDropRef}>
                               <Input
                                 size="xs"
                                 type="text"
-                                className="!w-48"
-                                placeholder="搜索任务…"
+                                placeholder="搜索目标任务…"
                                 value={depForm.other
                                   ? (allTasks.find(t => t.id === depForm.other)
                                       ? `${allTasks.find(t => t.id === depForm.other)!.code} ${allTasks.find(t => t.id === depForm.other)!.name}`
@@ -487,7 +520,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                                 onFocus={() => setTaskDropOpen(true)}
                               />
                               {taskDropOpen && (
-                                <div className="absolute z-50 mt-1 w-72 bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded shadow-lg max-h-48 overflow-y-auto">
+                                <div className="absolute z-50 mt-1 w-full bg-[var(--ui-bg-surface)] border border-[var(--ui-border)] rounded shadow-lg max-h-48 overflow-y-auto">
                                   {allTasks
                                     .filter(t => {
                                       const q = depTaskSearch.toLowerCase();
@@ -515,13 +548,14 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                                 </div>
                               )}
                             </div>
-                            <Select size="xs" value={depForm.type}
+                            <Select size="xs" className="!w-24 shrink-0" value={depForm.type}
+                              title="FS=完成→开始 · SS=开始→开始 · FF=完成→完成 · SF=开始→完成"
                               onChange={(e) => setDepForm({ ...depForm, type: e.target.value as DepType })}>
                               {(['FS', 'SS', 'FF', 'SF'] as DepType[]).map((t) => <option key={t} value={t}>{t}</option>)}
                             </Select>
-                            <Input size="xs" type="number" className="!w-20" placeholder="lag" value={depForm.lag}
+                            <Input size="xs" type="number" className="!w-20 shrink-0" placeholder="lag 天" value={depForm.lag}
                               onChange={(e) => setDepForm({ ...depForm, lag: Number(e.target.value) })} />
-                            <Button size="sm"
+                            <Button size="sm" className="shrink-0"
                               disabled={!depForm.other}
                               onClick={async () => {
                                 const pred = depForm.role === 'pred' ? task.id : depForm.other;
@@ -536,26 +570,36 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
                                 }
                               }}>添加依赖</Button>
                           </div>
-                        )}
-                      </div>
-                      <ul className="space-y-1 mb-2">
+                          <div className="mt-2 text-xs text-[var(--ui-text-tertiary)]">
+                            依赖类型：FS=完成→开始 · SS=开始→开始 · FF=完成→完成 · SF=开始→完成；箭头方向均为「前置 → 后置」
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 依赖列表：边框容器 + 行分隔，任务名自适应省略 */}
+                      <ul className="border border-[var(--ui-border)] rounded-lg divide-y divide-[var(--ui-border)]">
                         {deps.map((d) => {
                           const isPred = d.predecessor_id === task.id;
                           const otherId = isPred ? d.successor_id : d.predecessor_id;
                           const other = allTasks.find((t) => t.id === otherId);
                           return (
-                            <li key={d.id} className="flex items-center gap-2 text-sm">
-                              <Badge size="xs" tone={d.is_violation ? 'red' : 'gray'} label={d.dep_type} />
-                              <span className="text-[var(--ui-text-secondary)]">{isPred ? '后置→' : '←前置'}</span>
-                              <span className="truncate">{other ? `${other.code} ${other.name}` : otherId}</span>
-                              {d.lag_days ? <span className="text-[var(--ui-text-tertiary)]">lag {d.lag_days}d</span> : null}
+                            <li key={d.id} className="flex items-center gap-2 px-3 py-2 text-sm">
+                              <Badge size="xs" tone={d.is_violation ? 'red' : 'gray'} label={d.dep_type} className="shrink-0" />
+                              <span className={`shrink-0 text-xs ${d.is_violation ? 'text-red-500' : 'text-[var(--ui-text-secondary)]'}`}>
+                                {isPred ? '→ 后置' : '← 前置'}
+                              </span>
+                              <span className="flex-1 min-w-0 truncate">
+                                <span className="font-mono text-xs text-[var(--ui-text-secondary)] mr-1">{other?.code}</span>
+                                <span className="text-[var(--ui-text-primary)]">{other?.name || otherId}</span>
+                              </span>
+                              {d.lag_days ? <span className="shrink-0 text-xs text-[var(--ui-text-tertiary)]">lag {d.lag_days}d</span> : null}
                               {canEditDeps && (
-                                <Button variant="danger" size="xs" className="ml-auto" onClick={async () => { await projectApi.removeDep(projectId, d.id); loadDeps(); }}>删除</Button>
+                                <Button variant="danger" size="xs" className="shrink-0" onClick={async () => { await projectApi.removeDep(projectId, d.id); loadDeps(); }}>删除</Button>
                               )}
                             </li>
                           );
                         })}
-                        {deps.length === 0 && <li className="text-xs text-[var(--ui-text-tertiary)]">暂无依赖</li>}
+                        {deps.length === 0 && <li className="px-3 py-3 text-xs text-[var(--ui-text-tertiary)]">暂无依赖</li>}
                       </ul>
                     </div>
                   )}
@@ -760,9 +804,7 @@ export default function TaskEditModal({ open, projectId, task, parentId, onClose
             {/* 描述 */}
             <div>
               <h4 className="text-[var(--ui-text-secondary)] font-semibold text-sm mb-2">描述</h4>
-              <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
-                        className="resize-none"
-                        rows={3} placeholder="可选" />
+              <AutoSizeTextarea value={form.description} onChange={(v) => setForm({ ...form, description: v })} placeholder="可选" />
             </div>
           </div>
         )}
