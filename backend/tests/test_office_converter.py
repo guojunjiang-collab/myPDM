@@ -21,10 +21,11 @@ def test_is_office_file_false():
         assert is_office_file(name) is False
 
 
-def test_get_pdf_cache_path_uses_folder_and_stem():
+def test_get_pdf_cache_path_uses_uuid_key():
+    """PDF 缓存以附件 UUID 为唯一键，不再按上传目录名+stem 命名（历史曾产生 pdf_cache/1/xxx.pdf）"""
     p = get_pdf_cache_path("att-1", "documents/test-DOC_A/spec.docx")
-    assert p.name == "spec.pdf"
-    assert p.parent.name == "test-DOC_A"
+    assert p.name == "att-1.pdf"
+    assert p.parent.name == "pdf_cache"
 
 
 def test_get_pdf_path_for_attachment_missing_returns_none():

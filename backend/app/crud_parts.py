@@ -340,6 +340,13 @@ def _purge_attachment_files(db: Session, iteration_ids: List[UUID]) -> None:
                     os.remove(att.file_path)
             except Exception:
                 pass
+        # 同步清理该附件的 glb 缓存（含三档 LOD 与失败标记）
+        try:
+            from .stp_converter import delete_glb_cache, is_stp_file
+            if is_stp_file(att.file_name):
+                delete_glb_cache(str(att.id), att.file_path, is_part=True)
+        except Exception:
+            pass
         db.delete(att)
 
 
@@ -1303,7 +1310,8 @@ def _write_production_step(db, revision, iteration, data: bytes) -> None:
             pass
         try:
             from .stp_converter import delete_glb_cache
-            delete_glb_cache(str(old.id), old.file_path)
+            # 零部件生产附件：is_part=True 才能命中 parts/{id}.glb 缓存
+            delete_glb_cache(str(old.id), old.file_path, is_part=True)
         except Exception:
             pass
         db.delete(old)

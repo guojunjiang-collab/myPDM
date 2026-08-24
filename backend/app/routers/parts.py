@@ -460,6 +460,13 @@ def delete_iteration(
                         break
             except Exception:
                 pass
+        # 同步清理该附件的 glb 缓存（含三档 LOD 与失败标记）
+        try:
+            from ..stp_converter import delete_glb_cache, is_stp_file
+            if is_stp_file(att.file_name):
+                delete_glb_cache(str(att.id), att.file_path, is_part=True)
+        except Exception:
+            pass
         db.delete(att)
 
     # 清理该迭代关联的 BOMItem 和自定义字段值

@@ -334,6 +334,16 @@ def undocheckout_document(
                     file_storage.delete_file(att.file_path)
                 except Exception:
                     pass
+            # 同步清理预览缓存（glb/pdf）
+            try:
+                from .office_converter import delete_pdf_cache, is_office_file
+                from .stp_converter import delete_glb_cache, is_stp_file
+                if is_stp_file(att.file_name):
+                    delete_glb_cache(str(att.id), att.file_path)
+                if is_office_file(att.file_name):
+                    delete_pdf_cache(str(att.id), att.file_path)
+            except Exception:
+                pass
             db.delete(att)
         db.query(models.CustomFieldValue).filter(
             models.CustomFieldValue.iteration_id == latest_iter.id
@@ -815,6 +825,16 @@ def delete_iteration(
                 file_storage.delete_file(att.file_path)
             except Exception:
                 pass
+        # 同步清理预览缓存（glb/pdf）
+        try:
+            from .office_converter import delete_pdf_cache, is_office_file
+            from .stp_converter import delete_glb_cache, is_stp_file
+            if is_stp_file(att.file_name):
+                delete_glb_cache(str(att.id), att.file_path)
+            if is_office_file(att.file_name):
+                delete_pdf_cache(str(att.id), att.file_path)
+        except Exception:
+            pass
         db.delete(att)
 
     db.query(models.CustomFieldValue).filter(
