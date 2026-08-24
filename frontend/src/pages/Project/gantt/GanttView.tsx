@@ -361,15 +361,22 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
             </marker>
           </defs>
           {hasProject && (
+            <>
             <rect x={0} y={0} width={chartW} height={ROW_H}
-              fill="#f9fafb" style={{ cursor: pan ? 'grabbing' : 'pointer' }} onMouseDown={(e) => onPanDown(e)} />
+              fill="var(--ui-bg-subtle)" style={{ cursor: pan ? 'grabbing' : 'pointer' }} onMouseDown={(e) => onPanDown(e)} />
+            <rect x={0} y={ROW_H - 1} width={chartW} height={1} fill="var(--ui-border)" pointerEvents="none" />
+            </>
           )}
           {visibleTasks.map((t, i) => (
-            <rect key={`bg-${t.id}`} x={0} y={(i + taskRowOffset) * ROW_H} width={chartW} height={ROW_H}
-              fill={hoveredId === t.id ? '#f0f9ff' : (i % 2 ? '#fafafa' : '#fff')}
+            <g key={`bg-${t.id}`}>
+            <rect x={0} y={(i + taskRowOffset) * ROW_H} width={chartW} height={ROW_H}
+              fill={hoveredId === t.id ? 'var(--ui-highlight-bg)' : 'var(--ui-bg-surface)'}
               onMouseEnter={() => setHovered(t.id)}
               onMouseLeave={() => setHovered(null)}
               style={{ cursor: pan ? 'grabbing' : 'pointer' }} onMouseDown={(e) => onPanDown(e, t.id)} />
+            {/* 行分割线：与左侧行 border-b 对齐 */}
+            <rect x={0} y={(i + taskRowOffset + 1) * ROW_H - 1} width={chartW} height={1} fill="var(--ui-border)" pointerEvents="none" />
+            </g>
           ))}
           {todayX >= 0 && todayX <= chartW && (
             <line x1={todayX} y1={0} x2={todayX} y2={chartH} stroke="#f97316" strokeWidth={1} strokeDasharray="3,3" />
@@ -383,7 +390,7 @@ export default function GanttView({ projectId, canEdit, onTaskUpdated, onRowClic
               const w = Math.max(px, (daysBetween(ps, pe) + 1) * px);
               const y = (ROW_H - BAR_H) / 2;
               return (
-                <rect x={x} y={y} width={w} height={12} rx={3} fill="#93c5fd" opacity={0.7} />
+                <rect x={x} y={y} width={w} height={12} rx={3} fill="var(--ui-highlight-bg)" opacity={0.7} />
               );
             })()
           )}

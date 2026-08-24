@@ -191,6 +191,7 @@ html[data-theme='dark'] .bg-red-100 { background-color: #7f1d1d; }
 html[data-theme='dark'] .bg-yellow-50 { background-color: #422006; }
 html[data-theme='dark'] .bg-yellow-100 { background-color: #713f12; }
 html[data-theme='dark'] .bg-blue-50 { background-color: #172554; }
+html[data-theme='dark'] .bg-primary-50 { background-color: #0c4a6e; }
 html[data-theme='dark'] .bg-blue-100 { background-color: #1e3a8a; }
 html[data-theme='dark'] .bg-orange-50 { background-color: #431407; }
 html[data-theme='dark'] .bg-orange-100 { background-color: #7c2d12; }
@@ -259,6 +260,10 @@ html[data-theme='dark'] .bg-orange-50:hover { background-color: #7c2d12; }
 html[data-theme='dark'] .bg-amber-50:hover { background-color: #78350f; }
 html[data-theme='dark'] .bg-purple-50:hover { background-color: #581c87; }
 html[data-theme='dark'] .bg-indigo-50:hover { background-color: #312e81; }
+
+/* 项目详情任务行 hover 覆盖：悬浮瞬间 CSS :hover 先于 React hoveredId 更新生效，
+   覆盖深色状态色 hover 提亮（.bg-red-50:hover 等），直接显示高亮底色，避免红闪 */
+.project-detail-row.bg-red-50:hover { background-color: var(--ui-highlight-bg); }
 
 * {
   box-sizing: border-box;
