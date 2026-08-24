@@ -14,6 +14,11 @@ describe('badges 映射表', () => {
     expect(BADGE_DOMAINS.role.unverified).toEqual({ label: '未验证', tone: 'amber' });
   });
 
+  it('partType domain 零件/部件徽标', () => {
+    expect(BADGE_DOMAINS.partType['零件']).toEqual({ label: '零件', tone: 'gray' });
+    expect(BADGE_DOMAINS.partType['部件']).toEqual({ label: '部件', tone: 'blue' });
+  });
+
   it('resolveBadge 未知状态灰底兜底并保留原值', () => {
     expect(resolveBadge('weird', 'part')).toEqual({ label: 'weird', tone: 'gray' });
   });

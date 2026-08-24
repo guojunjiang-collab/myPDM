@@ -17,7 +17,7 @@ export interface DeliverableTabDef {
 }
 
 export const DELIVERABLE_TABS: DeliverableTabDef[] = [
-  { key: 'config_items', label: '构型项', nameLabel: '名称', extraLabel: '版本名称', showVersion: true, showExtra: true },
+  { key: 'config_items', label: '构型项', nameLabel: '名称', extraLabel: '版本名称', showVersion: true, showExtra: false },
   { key: 'parts', label: '零部件', nameLabel: '名称', extraLabel: '类型', showVersion: true, showExtra: true },
   { key: 'documents', label: '图文档', nameLabel: '名称', extraLabel: '备注', showVersion: true, showExtra: false },
   { key: 'changes', label: '变更', nameLabel: '标题', extraLabel: '类型', showVersion: false, showExtra: true },
@@ -63,4 +63,21 @@ export function statusOptions(items: DeliverableItem[]): { value: string; label:
 /** 来源任务列的悬浮提示：每行一个任务 */
 export function taskTooltip(tasks: DeliverableTaskRef[]): string {
   return tasks.map((t) => `${t.code} ${t.name}`).join('\n');
+}
+
+/**
+ * 版本号序列比较（A→B→…→Z→AA→…→ZZ，24 进制不含 I/O）。
+ * 用于版本列表头点击排序：localeCompare 会把 Z 排在 AA 前，需专用比较器。
+ */
+export function compareVersion(a: string, b: string): number {
+  const toVal = (s: string): number => {
+    let n = 0;
+    for (const ch of s.toUpperCase()) {
+      const c = ch.charCodeAt(0) - 64;                 // A=1 … Z=26
+      const v = c - (c > 9 ? 1 : 0) - (c > 15 ? 1 : 0); // 跳过 I(9) 与 O(15)
+      n = n * 24 + v;
+    }
+    return n;
+  };
+  return toVal(a) - toVal(b);
 }

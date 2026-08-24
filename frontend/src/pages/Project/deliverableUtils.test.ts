@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  DELIVERABLE_TABS, statusLabel, filterItems, statusOptions, taskTooltip,
+  DELIVERABLE_TABS, statusLabel, filterItems, statusOptions, taskTooltip, compareVersion,
 } from './deliverableUtils';
 import type { DeliverableItem } from '../../types/project';
 
@@ -24,6 +24,13 @@ describe('DELIVERABLE_TABS', () => {
   it('变更 TAB 的名称列表头为「标题」', () => {
     expect(DELIVERABLE_TABS.find((t) => t.key === 'changes')!.nameLabel).toBe('标题');
     expect(DELIVERABLE_TABS.find((t) => t.key === 'parts')!.nameLabel).toBe('名称');
+  });
+
+  it('额外列仅零部件与变更显示（构型项不显示版本名称列）', () => {
+    expect(DELIVERABLE_TABS.find((t) => t.key === 'config_items')!.showExtra).toBe(false);
+    expect(DELIVERABLE_TABS.find((t) => t.key === 'parts')!.showExtra).toBe(true);
+    expect(DELIVERABLE_TABS.find((t) => t.key === 'documents')!.showExtra).toBe(false);
+    expect(DELIVERABLE_TABS.find((t) => t.key === 'changes')!.showExtra).toBe(true);
   });
 });
 
@@ -105,5 +112,24 @@ describe('taskTooltip', () => {
 
   it('空任务返回空串', () => {
     expect(taskTooltip([])).toBe('');
+  });
+});
+
+describe('compareVersion', () => {
+  it('按 A→B→…→Z→AA→…→ZZ 序列排序', () => {
+    const sorted = ['ZZ', 'AA', 'B', 'AZ', 'A', 'Z', 'AB', 'H', 'J'].sort(compareVersion);
+    expect(sorted).toEqual(['A', 'B', 'H', 'J', 'Z', 'AA', 'AB', 'AZ', 'ZZ']);
+  });
+
+  it('相邻版本大小关系', () => {
+    expect(compareVersion('A', 'B')).toBeLessThan(0);
+    expect(compareVersion('Z', 'AA')).toBeLessThan(0);
+    expect(compareVersion('AZ', 'B')).toBeGreaterThan(0);
+    expect(compareVersion('ZZ', 'AAA')).toBeLessThan(0);
+  });
+
+  it('大小写等价', () => {
+    expect(compareVersion('a', 'A')).toBe(0);
+    expect(compareVersion('z', 'Z')).toBe(0);
   });
 });

@@ -6,7 +6,8 @@ export type BadgeTone = (typeof BADGE_TONES)[number];
 
 export type BadgeDomain =
   | 'part' | 'ecr' | 'eco' | 'profile' | 'inventoryDoc' | 'priority' | 'action' | 'exec'
-  | 'checkout' | 'required' | 'entity' | 'match' | 'role' | 'user' | 'project' | 'task' | 'decision';
+  | 'checkout' | 'required' | 'entity' | 'match' | 'role' | 'user' | 'project' | 'task' | 'decision'
+  | 'partType';
 
 export interface BadgeDef { label: string; tone: BadgeTone }
 
@@ -88,6 +89,10 @@ export const BADGE_DOMAINS: Record<BadgeDomain, Record<string, BadgeDef>> = {
     assembly: { label: '装配', tone: 'blue' },
     configuration: { label: '构型项', tone: 'purple' },
     document: { label: '图文档', tone: 'indigo' },
+  },
+  partType: { // 零部件交付物类型（后端 PART_TYPE_LABEL 中文值）
+    '零件': { label: '零件', tone: 'gray' },
+    '部件': { label: '部件', tone: 'blue' },
   },
   match: {
     matched: { label: '已匹配', tone: 'green' },

@@ -9,7 +9,7 @@ import { exportDeliverables } from '../../services/deliverableExport';
 import { toast } from '../../components/Toast';
 import type { DeliverableItem, DeliverableSummary, DeliverableTaskRef } from '../../types/project';
 import {
-  DELIVERABLE_TABS, filterItems, statusOptions, statusLabel, taskTooltip,
+  DELIVERABLE_TABS, filterItems, statusOptions, taskTooltip, compareVersion,
   type DeliverableTabKey, type DeliverableTabDef,
 } from './deliverableUtils';
 import PartDetailModal from '../../components/PartDetailModal';
@@ -17,9 +17,13 @@ import DocumentDetailModal from '../../components/DocumentDetailModal';
 import ConfigItemDetailModal from '../../components/Configuration/ConfigItemDetailModal';
 import { ECRDetailModal } from '../../components/ECR/ECRDetailModal';
 import { ECODetailModal } from '../../components/ECO/ECODetailModal';
+import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
+import SortableTh from '../../components/ui/SortableTh';
+import { useTableSort } from '../../hooks/useTableSort';
+import type { BadgeDomain } from '../../constants/badges';
 
 interface Props {
   open: boolean;
@@ -112,6 +116,25 @@ export default function DeliverableModal({
   const items = useMemo(() => filterItems(rawItems, search, status), [rawItems, search, status]);
   const options = useMemo(() => statusOptions(rawItems), [rawItems]);
 
+  // 点击表头排序：版本列用 A→B→ZZ 序列比较器；来源任务列按首个任务编号排
+  const { sortedData: sortedItems, sortField, sortDirection, handleSort } = useTableSort<DeliverableItem>(
+    items,
+    {
+      fieldComparators: { version: (a: unknown, b: unknown) => compareVersion(String(a), String(b)) },
+      getValue: (i, f) => (f === 'tasks' ? (i.tasks[0]?.code ?? '') : i[f]),
+    }
+  );
+  const sortProps = (key: keyof DeliverableItem) => ({
+    sortKey: String(key),
+    active: sortField === key,
+    direction: sortDirection,
+    onSort: (k: string) => handleSort(k as keyof DeliverableItem),
+  });
+
+  /** 状态徽标语义域：变更按 ECR/ECO 区分，其余走数据生命周期 */
+  const statusDomain = (t: DeliverableTabKey, i: DeliverableItem): BadgeDomain =>
+    t === 'changes' ? (i.extra === 'ECO' ? 'eco' : 'ecr') : 'part';
+
   const colSpan = 5 + (tabDef.showVersion ? 1 : 0) + (tabDef.showExtra ? 1 : 0);
 
   const handleExport = () => {
@@ -175,26 +198,26 @@ export default function DeliverableModal({
         <table className="w-full">
           <thead className="bg-[var(--ui-bg-subtle)] sticky top-0 z-10">
             <tr>
-              <th className="px-3 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap w-28">编号</th>
-              <th className="px-3 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">{tabDef.nameLabel}</th>
+              <SortableTh {...sortProps('code')} className="w-28">编号</SortableTh>
+              <SortableTh {...sortProps('name')}>{tabDef.nameLabel}</SortableTh>
               {tabDef.showVersion && (
-                <th className="px-3 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap w-16">版本</th>
+                <SortableTh {...sortProps('version')} className="w-16">版本</SortableTh>
               )}
               {tabDef.showExtra && (
-                <th className="px-3 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap w-20">{tabDef.extraLabel}</th>
+                <SortableTh {...sortProps('extra')} className="w-20">{tabDef.extraLabel}</SortableTh>
               )}
-              <th className="px-3 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap w-18">状态</th>
-              <th className="px-3 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap w-18">创建人</th>
-              <th className="px-3 py-2 text-left text-sm font-medium text-[var(--ui-text-secondary)] whitespace-nowrap">来源任务</th>
+              <SortableTh {...sortProps('status')} className="w-18">状态</SortableTh>
+              <SortableTh {...sortProps('creator_name')} className="w-18">创建人</SortableTh>
+              <SortableTh {...sortProps('tasks')}>来源任务</SortableTh>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {loading ? (
               <tr><td colSpan={colSpan} className="px-3 py-8 text-center text-[var(--ui-text-secondary)]">加载中...</td></tr>
-            ) : items.length === 0 ? (
+            ) : sortedItems.length === 0 ? (
               <tr><td colSpan={colSpan} className="px-3 py-8 text-center text-[var(--ui-text-secondary)]">{EMPTY_HINT[tab]}</td></tr>
             ) : (
-              items.map((i) => (
+              sortedItems.map((i) => (
                 <tr key={i.entity_id} onClick={() => setDetail(i)}
                     className="hover:bg-[var(--ui-bg-hover)] cursor-pointer">
                   <td className="px-3 py-2 text-sm font-medium whitespace-nowrap">{i.code}</td>
@@ -203,12 +226,16 @@ export default function DeliverableModal({
                     <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)] whitespace-nowrap">{i.version || '—'}</td>
                   )}
                   {tabDef.showExtra && (
-                    <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">{i.extra || '—'}</td>
+                    <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">
+                      {tab === 'parts' && i.extra ? (
+                        <Badge size="xs" status={i.extra} domain="partType" />
+                      ) : (
+                        i.extra || '—'
+                      )}
+                    </td>
                   )}
                   <td className="px-3 py-2 text-sm whitespace-nowrap">
-                    <span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
-                      {statusLabel(i.status)}
-                    </span>
+                    <Badge size="xs" status={i.status} domain={statusDomain(tab, i)} />
                   </td>
                   <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)] whitespace-nowrap">{i.creator_name || '—'}</td>
                   <td className="px-3 py-2 text-sm text-[var(--ui-text-secondary)]">
