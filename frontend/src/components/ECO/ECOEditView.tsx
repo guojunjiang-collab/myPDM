@@ -311,9 +311,8 @@ function ReadOnlyUpward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade, o
                         <Button size="xs" onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || '', { entity_type: n.entity_type || 'component', entity_id: n.entity_id, entity_code: n.entity_code || '', entity_name: n.entity_name || '', action: n.action || 'upgrade' }); }}>升版</Button>
                       ) : null
                     ) : ecoStatus === 'executing' ? (
-                      // 执行阶段
-                      exec?.new_entity_status === 'frozen' ? (
-                        // 已冻结：发布
+                      // 执行阶段：已升版（draft）或已冻结（frozen）均可直接发布
+                      (exec?.new_entity_status === 'frozen' || exec?.new_entity_status === 'draft') ? (
                         <Button variant="success" size="xs" onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || '', exec?.new_entity_id); }}>发布</Button>
                       ) : null
                     ) : null}
@@ -405,7 +404,8 @@ function ReadOnlyDownward({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade,
                         <Button size="xs" onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || '', { entity_type: n.entity_type || 'component', entity_id: n.entity_id, entity_code: n.entity_code || '', entity_name: n.entity_name || '', action: n.action || 'upgrade' }); }}>升版</Button>
                       ) : null
                     ) : ecoStatus === 'executing' ? (
-                      effStatus === 'frozen' ? (
+                      // 执行阶段：已升版（draft）或已冻结（frozen）均可直接发布
+                      (effStatus === 'frozen' || effStatus === 'draft') ? (
                         <Button variant="success" size="xs" onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || '', exec?.new_entity_id); }}>发布</Button>
                       ) : null
                     ) : null}
@@ -469,7 +469,8 @@ function AffectedTable({ rows, execMap, canExec, ecoStatus, ecoId, onUpgrade, on
                         <Button size="xs" onClick={(e) => { e.stopPropagation(); onUpgrade?.(exec?.id || '', { entity_type: n.entity_type || 'component', entity_id: n.entity_id, entity_code: n.entity_code || '', entity_name: n.entity_name || '', action: 'upgrade' }); }}>升版</Button>
                       ) : null
                     ) : ecoStatus === 'executing' ? (
-                      effStatus === 'frozen' ? (
+                      // 执行阶段：已升版（draft）或已冻结（frozen）均可直接发布
+                      (effStatus === 'frozen' || effStatus === 'draft') ? (
                         <Button variant="success" size="xs" onClick={(e) => { e.stopPropagation(); onPublish?.(exec?.id || '', exec?.new_entity_id); }}>发布</Button>
                       ) : null
                     ) : null}

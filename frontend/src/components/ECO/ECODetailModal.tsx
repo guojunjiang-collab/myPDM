@@ -118,7 +118,7 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
 
   const act = async (fn: () => Promise<any>, msg: string) => {
     setActionLoading(true);
-    try { await fn(); toast.success(msg); load(); } catch (err: any) {
+    try { await fn(); toast.success(msg); load(); onRefresh(); } catch (err: any) {
       const detail = err?.response?.data?.detail;
       toast.error(typeof detail === 'string' ? detail : '操作失败');
     }
@@ -211,7 +211,18 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
         >📄 导出PDF</Button>
       ) : undefined}
       footer={executionMode && eco?.status === 'executing' ? (
-        <Button variant="success" size="sm" onClick={() => act(() => ecoApi.completeExecution(ecoId), '执行已完成')} disabled={actionLoading}>
+        <Button variant="success" size="sm" onClick={async () => {
+          setActionLoading(true);
+          try {
+            await ecoApi.completeExecution(ecoId);
+            toast.success('执行已完成');
+            onRefresh();      // 主界面列表立即刷新（executing → completed）
+            onClose();        // 完成执行后自动返回主界面
+          } catch (err: any) {
+            const detail = err?.response?.data?.detail;
+            toast.error(typeof detail === 'string' ? detail : '操作失败');
+          } finally { setActionLoading(false); }
+        }} disabled={actionLoading}>
           {actionLoading ? '处理中...' : '完成执行'}
         </Button>
       ) : undefined}
@@ -381,6 +392,10 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
                   try {
                     await ecoApi.freezeItem(ecoId, itemId, newEntityId);
                     updateExecutionItem(itemId, { new_entity_status: 'frozen' });
+                    // 同步工程变更结果表：该实体对应行状态 → 冻结
+                    setReleaseItems(prev => prev.map((ri: any) =>
+                      ri.entity_id === newEntityId ? { ...ri, status: 'frozen' } : ri
+                    ));
                     toast.success('冻结完成');
                   } catch (err: any) { toast.error(err?.response?.data?.detail || '操作失败'); }
                 }}
@@ -388,6 +403,10 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
                   try {
                     await ecoApi.releaseItem(ecoId, itemId, newEntityId);
                     updateExecutionItem(itemId, { new_entity_status: 'released' });
+                    // 同步工程变更结果表：该实体对应行状态 → 发布
+                    setReleaseItems(prev => prev.map((ri: any) =>
+                      ri.entity_id === newEntityId ? { ...ri, status: 'released' } : ri
+                    ));
                     toast.success('发布完成');
                   } catch (err: any) { toast.error(err?.response?.data?.detail || '操作失败'); }
                 }}
@@ -528,6 +547,15 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
           // 仅就地更新工程变更结果列表的状态，避免整屏 load() 造成的闪屏与滚动复位。
           // 一键发布确定性地把树中所有非作废件置为 released，故可乐观更新顶层 + 已展开子项。
           setReleaseItems(prev => prev.map((ri: any) => ri.status === 'obsolete' ? ri : { ...ri, status: 'released' }));
+          // 同步执行项状态（draft/frozen → released）：ECR 变更分析操作列的"发布"按钮随之消失，
+          // 与工程变更结果表的"已全部发布"保持一致
+          setEco(prev => prev ? {
+            ...prev,
+            execution_items: (prev.execution_items || []).map((ei: any) =>
+              (ei.new_entity_status === 'draft' || ei.new_entity_status === 'frozen')
+                ? { ...ei, new_entity_status: 'released' } : ei
+            ),
+          } : prev);
           setPublishedNonce(n => n + 1);
           // releaseItems 引用变化会触发发布状态校验，从而自动把"一键发布"按钮置灰
         } catch (err: any) {

@@ -216,8 +216,8 @@ export function ECOList() {
         </div>
       )}
       <ECOCreateModal open={createOpen || !!editingEco} onClose={() => { setCreateOpen(false); setEditingEco(null); }} onCreated={() => { setCreateOpen(false); setEditingEco(null); load(); }} editingEco={editingEco} />
-      {detailId && <ECODetailModal ecoId={detailId} onClose={() => setDetailId(null)} onRefresh={load} />}
-      {execId && <ECODetailModal ecoId={execId} onClose={() => setExecId(null)} onRefresh={load} executionMode />}
+      {detailId && <ECODetailModal ecoId={detailId} onClose={() => { setDetailId(null); load(); }} onRefresh={load} />}
+      {execId && <ECODetailModal ecoId={execId} onClose={() => { setExecId(null); load(); }} onRefresh={load} executionMode />}
       {ccEcoId && (
         <CcPicker
           open={true}
