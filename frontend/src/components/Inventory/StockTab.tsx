@@ -52,7 +52,7 @@ export default function StockTab() {
       <div className="flex items-center gap-2 mb-4 shrink-0">
         <Input type="text" placeholder="搜索物料编码/名称..." value={material}
           onChange={(e) => setMaterial(e.target.value)}
-          className="flex-1 min-w-0" />
+          className="!w-64" />
         <Select className="!w-auto" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
           <option value="">全部仓库</option>
           {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
