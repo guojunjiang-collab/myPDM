@@ -5,6 +5,7 @@ import StockDetail from './StockDetail';
 import DocumentDetail from './DocumentDetail';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
+import Button from '../ui/Button';
 import SortableTh from '../ui/SortableTh';
 import type { StockRow } from '../../types';
 import { useTableSort } from '../../hooks/useTableSort';
@@ -56,11 +57,9 @@ export default function StockTab() {
           <option value="">全部仓库</option>
           {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
         </Select>
-        <label className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-[var(--ui-bg-hover)] text-sm whitespace-nowrap">
-          <input type="checkbox" checked={lowOnly} onChange={(e) => setLowOnly(e.target.checked)}
-            className="w-3.5 h-3.5" />
+        <Button active={lowOnly} onClick={() => setLowOnly((v) => !v)} title="只显示库存低于阈值的物料">
           仅看低库存
-        </label>
+        </Button>
       </div>
 
       {/* 表格 */}
