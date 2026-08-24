@@ -775,7 +775,7 @@ export default function Projects() {
                       </div>
                       {viewMode === 'table' ? (
                         <div ref={rightScrollRef} className="flex-1 min-w-0 bg-[var(--ui-bg-surface)] overflow-auto" onScroll={handleRightScroll}>
-                           <div className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] flex items-center text-sm font-medium text-[var(--ui-text-secondary)] sticky top-0 z-10" style={{ height: 36 }}>
+                           <div className="bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] flex items-center text-sm font-medium text-[var(--ui-text-secondary)] sticky top-0 z-10 min-w-[680px]" style={{ height: 36 }}>
                             <span className="px-2 shrink-0 truncate text-left" style={{ width: 64 }}>优先级</span>
                             <span className="px-2 shrink-0 truncate text-left" style={{ width: 100 }}>计划开始</span>
                             <span className="px-2 shrink-0 truncate text-left" style={{ width: 100 }}>计划完成</span>
@@ -784,7 +784,7 @@ export default function Projects() {
                           </div>
                           {currentProject && (
                             <>
-                              <div className="flex items-center bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] text-sm" style={{ height: 36 }}>
+                              <div className="flex items-center bg-[var(--ui-bg-subtle)] border-b border-[var(--ui-border)] text-sm min-w-[680px]" style={{ height: 36 }}>
                                 <span className="px-2 shrink-0 truncate text-[var(--ui-text-tertiary)]" style={{ width: 64 }}>—</span>
                                 <span className="px-2 shrink-0 truncate text-[var(--ui-text-secondary)]" style={{ width: 100 }}>{currentProject.planned_start || '—'}</span>
                                 <span className="px-2 shrink-0 truncate text-[var(--ui-text-secondary)]" style={{ width: 100 }}>{currentProject.planned_end || '—'}</span>
@@ -808,14 +808,15 @@ export default function Projects() {
                                       onDrop={(e) => handleDrop(t, e)}
                                       onClick={() => openEdit(t)}
                                       onMouseEnter={() => setHoveredId(t.id)}
-                                      className={`flex items-center border-b border-[var(--ui-border)] text-sm ${hoveredId === t.id ? 'bg-primary-50' : ''} ${overdue ? 'bg-red-50' : ''} cursor-pointer ${isDragInto ? 'bg-blue-50 ring-2 ring-primary-300 ring-inset' : ''} ${isDragging ? 'opacity-40' : ''}`}
+                                      className={`flex items-center border-b border-[var(--ui-border)] text-sm min-w-[680px] ${hoveredId === t.id ? 'bg-primary-50' : ''} ${overdue ? 'bg-red-50' : ''} cursor-pointer ${isDragInto ? 'bg-blue-50 ring-2 ring-primary-300 ring-inset' : ''} ${isDragging ? 'opacity-40' : ''}`}
                                       style={{ height: 36 }}>
                                       <span className="px-2 shrink-0 truncate" style={{ width: 64 }}>{t.priority}</span>
                                       <span className="px-2 shrink-0 truncate text-[var(--ui-text-secondary)]" style={{ width: 100 }}>{t.planned_start || '—'}</span>
                                       <span className="px-2 shrink-0 truncate text-[var(--ui-text-secondary)]" style={{ width: 100 }}>{t.planned_end || '—'}</span>
                                       <span className="px-2 flex-1 min-w-[240px] truncate text-[var(--ui-text-secondary)]" title={t.description || undefined}>{t.description || '—'}</span>
                                       <div className="shrink-0 flex items-center justify-end px-4 text-[var(--ui-text-tertiary)]" onClick={(e) => e.stopPropagation()}>
-                                        {(t.link_count ?? 0) > 0 && <span className="mr-2">🔗 {t.link_count}</span>}
+                                        {/* 关联数固定占位右对齐：有/无关联的行操作列等宽，按钮组与关联数字均右对齐 */}
+                                        <span className={`mr-2 w-[48px] shrink-0 text-right ${(t.link_count ?? 0) > 0 ? '' : 'invisible'}`}>🔗 {t.link_count ?? 0}</span>
                                         {isManager && <Button variant="link" size="xs" className="mr-2" onClick={() => openCreate(t.id)}>+子</Button>}
                                         {can('project.task:delete') && <Button variant="danger" size="xs" onClick={() => setDelTask(t)}>删除</Button>}
                                       </div>
