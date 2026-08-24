@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { ecoApi, documentsApi, partsApi, customFieldsApi, mediaApi } from '../../services/api';
 import type { ECORequest, Document, ECRDocumentLink } from '../../types';
 import { ECOStatusBadge, ECOPriorityBadge } from './ECOStatusBadge';
@@ -74,14 +74,14 @@ export function ECODetailModal({ ecoId, onClose, onRefresh, executionMode }: Pro
       setEco(r.data);
       setDocumentLinks(r.data.document_links || []);
       setReleaseItems(r.data.release_items || []);
-      // 刷新 release_items 状态（避免显示过期状态）
+      // 刷新 release_items 状态（避免显示过期状态），并用 master.type 权威修正类型（历史数据可能错标）
       const items = r.data.release_items || [];
       if (items.length > 0) {
         const refreshed = await Promise.all(items.map(async (ri: any) => {
           try {
             const rev = await partsApi.getRevision(ri.entity_id);
             const master = await partsApi.get(rev.master_id);
-            return { ...ri, status: rev.status, entity_version: rev.version, entity_code: master.code, entity_name: master.name };
+            return { ...ri, status: rev.status, entity_version: rev.version, entity_code: master.code, entity_name: master.name, entity_type: master.type === 'assembly' ? 'assembly' : 'part' };
           } catch { return ri; }
         }));
         setReleaseItems(refreshed);
@@ -553,9 +553,34 @@ function InfoItem({ label, value, icon, className }: { label: string; value: str
   );
 }
 
+// 部件类型判定：'component' 为历史遗留值，语义等同 'assembly'（部件）
+const isAssemblyType = (t: string) => t === 'assembly' || t === 'component';
+
 function ReleaseItemsTable({ items, onViewItem, publishedNonce }: { items: any[]; onViewItem: (type: string, id: string, mode?: 'view' | 'edit') => void; publishedNonce?: number }) {
   const [expanded, setExpanded] = useState<Record<string, any[]>>({});
   const [loadingIdx, setLoadingIdx] = useState<string | null>(null);
+  // 表头点击排序（件号/名称/版本/状态/用量）：顶层与各层子项统一排序（渲染时派生，切换排序即时生效于整棵树）
+  const { sortField, sortDirection, handleSort } = useTableSort<any>(items, { fieldComparators: { version: (a, b) => compareVersions(String(a), String(b)) } });
+  // 排序 key → release item 实际字段映射
+  const fieldOf = (ri: any, f: string) => f === 'code' ? ri.entity_code : f === 'name' ? ri.entity_name : f === 'version' ? ri.entity_version : f === 'status' ? ri.status : ri.quantity;
+  const sortRows = useCallback((list: any[]) => {
+    if (!sortField || !sortDirection) return list;
+    return [...list].sort((a: any, b: any) => {
+      const aVal = fieldOf(a, String(sortField));
+      const bVal = fieldOf(b, String(sortField));
+      if (aVal == null && bVal == null) return 0;
+      if (aVal == null) return 1;
+      if (bVal == null) return -1;
+      let cmp: number;
+      if (sortField === 'version') cmp = compareVersions(String(aVal), String(bVal));
+      else if (typeof aVal === 'number' && typeof bVal === 'number') cmp = aVal - bVal;
+      else cmp = String(aVal).localeCompare(String(bVal), 'zh-CN');
+      return sortDirection === 'desc' ? -cmp : cmp;
+    });
+  }, [sortField, sortDirection]);
+  const sortedItems = sortRows(items);
+  // 展开状态用稳定标识（entity_id/code），排序后展开不错位
+  const keyOf = (ri: any, fallback: string) => ri.entity_id || ri.entity_code || fallback;
 
   // 一键发布后：就地把已展开子项的非作废状态更新为 released（与后端一致），无需重新拉取、不收起、不闪屏
   useEffect(() => {
@@ -569,42 +594,47 @@ function ReleaseItemsTable({ items, onViewItem, publishedNonce }: { items: any[]
     });
   }, [publishedNonce]);
 
-  const toggleExpand = async (idx: string, entityId: string, entityType: string) => {
-    if (expanded[idx]) { setExpanded(prev => { const n = {...prev}; delete n[idx]; return n; }); return; }
-    if (entityType !== 'assembly') return;
-    setLoadingIdx(idx);
+  const toggleExpand = async (key: string, entityId: string, entityType: string) => {
+    if (expanded[key]) { setExpanded(prev => { const n = {...prev}; delete n[key]; return n; }); return; }
+    if (!isAssemblyType(entityType)) return;
+    setLoadingIdx(key);
     try {
       const master = await partsApi.get(entityId);
       const revId = master.latest_revision?.id;
       if (!revId) { toast.error('无法获取最新版本'); return; }
       const rows = await partsApi.getBOM(revId);
-      const children = rows.map((c: any) => ({ entity_type: c.child_type === 'assembly' ? 'assembly' : 'part', entity_id: c.child_master_id, entity_code: c.child_code || '', entity_name: c.child_name || '', entity_version: c.child_version || '', spec: c.child_spec || '', status: c.child_status || '', quantity: c.quantity || 1 }));
-      setExpanded(prev => ({ ...prev, [idx]: children }));
+      const children = rows.map((c: any) => ({ entity_type: isAssemblyType(c.child_type) ? 'assembly' : 'part', entity_id: c.child_master_id, entity_code: c.child_code || '', entity_name: c.child_name || '', entity_version: c.child_version || '', spec: c.child_spec || '', status: c.child_status || '', quantity: c.quantity || 1 }));
+      setExpanded(prev => ({ ...prev, [key]: children }));
     } catch { toast.error('加载子项失败'); }
     finally { setLoadingIdx(null); }
   };
 
-  const renderRow = (ri: any, level: number, idx: string): React.ReactNode => {
-    const isAssembly = ri.entity_type === 'assembly';
-    const childRows = expanded[idx];
-    const rowNum = parseInt(idx.split('-')[0], 10);
+  const renderRow = (ri: any, level: number, key: string): React.ReactNode => {
+    const isAssembly = isAssemblyType(ri.entity_type);
+    const childRows = expanded[key];
     return (
       <>
-        <tr key={idx} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => onViewItem(isAssembly ? 'assembly' : 'part', ri.entity_id, 'view')}>
-          <td className="px-3 py-1.5 text-xs text-[var(--ui-text-tertiary)] whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-            <span>{'-'.repeat(level)}{level}</span>
-            {isAssembly && <span className="ml-1 inline-flex"><TreeToggle expanded={!!childRows} onClick={() => toggleExpand(idx, ri.entity_id, ri.entity_type)} size="sm" /></span>}
+        <tr key={key} className="hover:bg-[var(--ui-bg-hover)] cursor-pointer" onClick={() => onViewItem(isAssembly ? 'assembly' : 'part', ri.entity_id, 'view')}>
+          <td className="relative px-3 py-2 font-medium whitespace-nowrap" style={{ paddingLeft: `calc(8px + ${level} * var(--ui-tree-indent))` }} onClick={(e) => e.stopPropagation()}>
+            {level > 0 && Array.from({ length: level }, (_, k) => (
+              <span key={k} className="absolute -top-px bottom-0 w-px bg-[var(--ui-border)] pointer-events-none" style={{ left: `calc(16px + ${k} * var(--ui-tree-indent))` }} />
+            ))}
+            <span className="inline-flex items-center gap-1">
+              {isAssembly ? (
+                <TreeToggle expanded={!!childRows} onClick={() => toggleExpand(key, ri.entity_id, ri.entity_type)} size="sm" title={childRows ? '折叠' : '展开'} />
+              ) : (
+                <TreeToggle leaf size="sm" />
+              )}
+              <span className="text-sm">{ri.entity_code}</span>
+            </span>
           </td>
-          <td className="px-3 py-1.5 text-xs"><Badge tone={isAssembly ? 'blue' : 'gray'} label={isAssembly ? '部件' : '零件'} /></td>
-          <td className="px-3 py-1.5 text-xs font-mono">{ri.entity_code}</td>
-          <td className="px-3 py-1.5 text-xs">{ri.entity_name}</td>
-          <td className="px-3 py-1.5 text-xs text-[var(--ui-text-secondary)]">{ri.spec || '-'}</td>
-          <td className="px-3 py-1.5 text-xs">{ri.entity_version || 'A'}</td>
-          <td className="px-3 py-1.5 text-xs whitespace-nowrap">{ri.status ? <Badge status={ri.status} /> : '-'}</td>
-          <td className="px-3 py-1.5 text-xs text-center">{ri.quantity || 1}</td>
+          <td className="px-3 py-2">{ri.entity_name}</td>
+          <td className="px-3 py-2 text-[var(--ui-text-secondary)]">{ri.entity_version || 'A'}</td>
+          <td className="px-3 py-2 whitespace-nowrap">{ri.status ? <Badge status={ri.status} /> : '-'}</td>
+          <td className="px-3 py-2 text-center">{ri.quantity || 1}</td>
         </tr>
-        {childRows && childRows.map((child: any, j: number) => renderRow(child, level + 1, `${idx}-${j}`))}
-        {loadingIdx === idx && <tr><td colSpan={8} className="px-3 py-1.5 text-xs text-[var(--ui-text-tertiary)] text-center">加载中...</td></tr>}
+        {childRows && sortRows(childRows).map((child: any, j: number) => renderRow(child, level + 1, keyOf(child, `${key}-${j}`)))}
+        {loadingIdx === key && <tr><td colSpan={5} className="px-3 py-2 text-sm text-[var(--ui-text-tertiary)] text-center">加载中...</td></tr>}
       </>
     );
   };
@@ -612,17 +642,14 @@ function ReleaseItemsTable({ items, onViewItem, publishedNonce }: { items: any[]
   return (
     <div className="border border-[var(--ui-border)] rounded-lg overflow-hidden">
       <table className="w-full text-sm">
-        <thead className="bg-[var(--ui-bg-subtle)] border-b"><tr>
-          <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)] w-20">层级</th>
-          <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)] w-16">类型</th>
-          <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)]">件号</th>
-          <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)]">中文名称</th>
-          <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)]">规格型号</th>
-          <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)] w-14">版本</th>
-          <th className="px-3 py-1.5 text-left text-xs text-[var(--ui-text-secondary)] w-20">状态</th>
-          <th className="px-3 py-1.5 text-center text-xs text-[var(--ui-text-secondary)] w-12">用量</th>
+        <thead className="bg-[var(--ui-bg-subtle)] border-b"><tr className="sticky top-0 z-10">
+          <SortableTh sortKey="code" active={sortField === 'code'} direction={sortDirection} onSort={(k) => handleSort(k)} className="!px-3 !py-2">件号</SortableTh>
+          <SortableTh sortKey="name" active={sortField === 'name'} direction={sortDirection} onSort={(k) => handleSort(k)} className="!px-3 !py-2">中文名称</SortableTh>
+          <SortableTh sortKey="version" active={sortField === 'version'} direction={sortDirection} onSort={(k) => handleSort(k)} className="!px-3 !py-2 w-14">版本</SortableTh>
+          <SortableTh sortKey="status" active={sortField === 'status'} direction={sortDirection} onSort={(k) => handleSort(k)} className="!px-3 !py-2 w-20">状态</SortableTh>
+          <SortableTh sortKey="quantity" active={sortField === 'quantity'} direction={sortDirection} onSort={(k) => handleSort(k)} align="center" className="!px-3 !py-2 w-12">用量</SortableTh>
         </tr></thead>
-        <tbody className="divide-y">{items.map((ri, i) => renderRow(ri, 0, String(i)))}</tbody>
+        <tbody className="divide-y">{sortedItems.map((ri, i) => renderRow(ri, 0, keyOf(ri, String(i))))}</tbody>
       </table>
     </div>
   );
